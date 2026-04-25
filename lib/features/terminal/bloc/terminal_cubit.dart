@@ -41,6 +41,19 @@ class TerminalCubit extends Cubit<TerminalState> {
   /// Per-session idle timers: fire when PTY goes quiet → clear PTY-detected ThinkingPhase.
   final Map<String, Timer> _ptyIdleTimers = {};
 
+  /// Fallback timers: clear AwaitingApprovalPhase if PTY stays quiet after
+  /// the approval dialog was dismissed (i.e. no new approval pattern detected).
+  final Map<String, Timer> _approvalClearTimers = {};
+
+  /// Periodic cleanup: clears orphaned AwaitingApprovalPhase (e.g. after hot
+  /// reload when in-memory timers are lost but bloc state persists).
+  Timer? _approvalSweepTimer;
+
+  /// Rolling tail buffer per session for PTY pattern detection across chunk
+  /// boundaries. Holds the last 512 chars of raw PTY output.
+  final Map<String, StringBuffer> _ptyTailBuffers = {};
+  static const int _ptyTailMaxLen = 512;
+
   List<AgentSession> get _workspaceSessions =>
       _allSessions.where((s) => s.workspaceId == _activeWorkspaceId).toList();
 
@@ -62,7 +75,28 @@ class TerminalCubit extends Cubit<TerminalState> {
     ]);
     _emitLoaded([], 0);
 
-    // Start polling ~/.yoloit/hooks/ for agent status updates.
+    // Periodic sweep: clear any AwaitingApprovalPhase that has no running
+    // timer (e.g. orphaned after hot reload). 30 s interval is generous enough
+    // to not interfere with real dialogs that stream continuously.
+    _approvalSweepTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      var changed = false;
+      for (var i = 0; i < _allSessions.length; i++) {
+        final s = _allSessions[i];
+        if (s.hookPhase is AwaitingApprovalPhase &&
+            !_approvalClearTimers.containsKey(s.id)) {
+          _allSessions[i] = s.copyWith(clearHookPhase: true);
+          changed = true;
+        }
+      }
+      if (changed) {
+        final cur = _loaded;
+        if (cur != null && !isClosed) {
+          emit(cur.copyWith(
+              sessions: _workspaceSessions,
+              allSessions: List.unmodifiable(_allSessions)));
+        }
+      }
+    });
     AgentHookService.instance.start();
     _hookSub = AgentHookService.instance.events.listen(_onHookEvent);
   }
@@ -348,6 +382,25 @@ class TerminalCubit extends Cubit<TerminalState> {
     _ptyService.resize(active.id, columns, rows);
   }
 
+  /// Called when the user presses plain Enter in the terminal (not Shift+Enter).
+  /// If the session is awaiting approval/confirmation, immediately transitions
+  /// to ThinkingPhase so the UI responds without waiting for PTY spinner output.
+  void onTerminalEnterPressed(String sessionId) {
+    final i = _allSessions.indexWhere((s) => s.id == sessionId);
+    if (i < 0) return;
+    if (_allSessions[i].hookPhase is! AwaitingApprovalPhase) return;
+    _approvalClearTimers[sessionId]?.cancel();
+    _approvalClearTimers.remove(sessionId);
+    _ptyTailBuffers[sessionId]?.clear();
+    _allSessions[i] = _allSessions[i].copyWith(hookPhase: const ThinkingPhase());
+    final cur = _loaded;
+    if (cur != null && !isClosed) {
+      emit(cur.copyWith(
+          sessions: _workspaceSessions,
+          allSessions: List.unmodifiable(_allSessions)));
+    }
+  }
+
   void _onHookEvent(HookEvent event) {
     debugPrint('[HookEvent] event=${event.event} phase=${event.phase} cwd=${event.workspacePath}');
 
@@ -443,7 +496,8 @@ class TerminalCubit extends Cubit<TerminalState> {
     if (current == null || isClosed) return;
     final i = _allSessions.indexWhere((s) => s.id == sessionId);
     if (i < 0) return;
-    if (_allSessions[i].hookPhase is! ThinkingPhase) return;
+    final phase = _allSessions[i].hookPhase;
+    if (phase is! ThinkingPhase && phase is! AwaitingApprovalPhase) return;
 
     // Flash DonePhase briefly then clear.
     _allSessions[i] = _allSessions[i].copyWith(hookPhase: const DonePhase());
@@ -479,8 +533,20 @@ class TerminalCubit extends Cubit<TerminalState> {
     if (i < 0) return;
     final current = _allSessions[i];
 
+    // Maintain a rolling tail buffer so patterns split across chunks are caught.
+    final buf = _ptyTailBuffers.putIfAbsent(sessionId, StringBuffer.new)
+      ..write(data);
+    final tail = buf.toString();
+    if (tail.length > _ptyTailMaxLen) {
+      final trimmed = tail.substring(tail.length - _ptyTailMaxLen);
+      buf.clear();
+      buf.write(trimmed);
+    }
+    // Use the tail for approval detection; raw data still used for spinner/done.
+    final checkData = buf.toString();
+
     // Approval dialog detected → AwaitingApprovalPhase + urgent sound.
-    if (config.containsApproval(data) &&
+    if (config.containsApproval(checkData) &&
         current.hookPhase is! AwaitingApprovalPhase) {
       _ptyIdleTimers[sessionId]?.cancel();
       _allSessions[i] = current.copyWith(
@@ -495,11 +561,34 @@ class TerminalCubit extends Cubit<TerminalState> {
       SessionPrefs.isApprovalSoundEnabled().then((enabled) {
         if (enabled) Process.run('afplay', ['/System/Library/Sounds/Sosumi.aiff']);
       });
-      return;
+    }
+
+    // If already awaiting approval, restart the fallback clear timer on every
+    // PTY chunk — approval pattern keeps resetting it while dialog is visible;
+    // once the dialog is dismissed PTY data stops matching and the timer fires.
+    if (current.hookPhase is AwaitingApprovalPhase ||
+        config.containsApproval(checkData)) {
+      _approvalClearTimers[sessionId]?.cancel();
+      _approvalClearTimers[sessionId] = Timer(const Duration(seconds: 15), () {
+        _approvalClearTimers.remove(sessionId);
+        _ptyTailBuffers[sessionId]?.clear(); // reset buffer after dialog gone
+        final j = _allSessions.indexWhere((s) => s.id == sessionId);
+        if (j >= 0 && _allSessions[j].hookPhase is AwaitingApprovalPhase) {
+          _allSessions[j] = _allSessions[j].copyWith(clearHookPhase: true);
+          final cur = _loaded;
+          if (cur != null && !isClosed) {
+            emit(cur.copyWith(
+                sessions: _workspaceSessions,
+                allSessions: List.unmodifiable(_allSessions)));
+          }
+        }
+      });
+      if (config.containsApproval(checkData)) return;
     }
 
     // Done-prompt detected while thinking → transition to done.
-    if (current.hookPhase is ThinkingPhase && config.containsDonePrompt(data)) {
+    if (current.hookPhase is ThinkingPhase &&
+        config.containsDonePrompt(data)) {
       _onCopilotPromptDetected(sessionId);
       return;
     }
@@ -562,10 +651,15 @@ class TerminalCubit extends Cubit<TerminalState> {
   @override
   Future<void> close() {
     _hookSub?.cancel();
+    _approvalSweepTimer?.cancel();
     for (final t in _ptyIdleTimers.values) {
       t.cancel();
     }
     _ptyIdleTimers.clear();
+    for (final t in _approvalClearTimers.values) {
+      t.cancel();
+    }
+    _approvalClearTimers.clear();
     AgentHookService.instance.stop();
     _ptyService.killAll();
     return super.close();

@@ -14,6 +14,7 @@ import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
+import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
@@ -622,6 +623,15 @@ class TerminalWidgetState extends State<TerminalWidget> {
         !HardwareKeyboard.instance.isAltPressed) {
       _writePty('\x1b\r');
       return KeyEventResult.handled;
+    }
+    // Plain Enter while awaiting approval → immediately signal ThinkingPhase.
+    if (event.logicalKey == LogicalKeyboardKey.enter &&
+        !HardwareKeyboard.instance.isShiftPressed &&
+        !HardwareKeyboard.instance.isMetaPressed &&
+        !HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
+        widget.session.hookPhase is AwaitingApprovalPhase) {
+      context.read<TerminalCubit>().onTerminalEnterPressed(widget.session.id);
     }
     // Cmd+V — already handled by _handleHardwareKey; block xterm's native
     // paste so text isn't inserted twice.

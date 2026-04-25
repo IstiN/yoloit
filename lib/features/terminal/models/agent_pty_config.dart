@@ -56,16 +56,17 @@ extension AgentTypePtyConfig on AgentType {
             '\u25CE', // ◎ bullseye
             '\u25C9', // ◉ fisheye
           },
-          // '› ' — Copilot interactive prompt (may not reliably appear in stream).
-          // Primary clearing mechanism is the 5s idle timeout after spinner stops.
-          donePrompts: {'\u203A '},
+          // Copilot shows '› ' as the interactive prompt, but it also renders
+          // it in the terminal stream while the agent is still processing,
+          // causing false DonePhase flashes. Rely on the idle timeout instead.
+          donePrompts: {},
           // Copilot shows these strings when asking user to approve a tool action.
           approvalPatterns: {
             'Do you want to allow',
             'Allow directory access',
             'Allow file access',
             'Allow network access',
-            'to navigate',   // bottom hint line of approval dialogs
+            'to confirm',  // bottom hint of ask_user dialogs ("Enter to confirm")
           },
           // 5s after spinner stops → agent is done responding.
           idleTimeout: Duration(seconds: 5),
