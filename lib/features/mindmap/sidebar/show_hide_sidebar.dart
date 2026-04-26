@@ -205,6 +205,11 @@ class MindMapShowHideSidebar extends StatefulWidget {
     this.onFocusNode,
     this.onShowAll,
     this.onCreateWorkspace,
+    this.onRemoveFolder,
+    this.hiddenTypes = const {},
+    this.onToggleType,
+    this.onHideDescendants,
+    this.onShowDescendants,
   });
 
   final ShowHideSidebarData data;
@@ -212,6 +217,17 @@ class MindMapShowHideSidebar extends StatefulWidget {
   final void Function(String nodeId)? onFocusNode;
   final VoidCallback? onShowAll;
   final VoidCallback? onCreateWorkspace;
+  /// Called when the user removes a workspace folder via context menu.
+  /// Parameters: workspaceId, folderPath.
+  final void Function(String workspaceId, String folderPath)? onRemoveFolder;
+  /// Currently hidden types (used to style toggle chips).
+  final Set<String> hiddenTypes;
+  /// Called with the type tag when the user clicks a type-filter chip.
+  final void Function(String typeTag)? onToggleType;
+  /// Hides all nodes in [ids] (descendants of a row).
+  final void Function(Set<String> ids)? onHideDescendants;
+  /// Shows all nodes in [ids] (descendants of a row).
+  final void Function(Set<String> ids)? onShowDescendants;
 
   @override
   State<MindMapShowHideSidebar> createState() => _MindMapShowHideSidebarState();
@@ -307,6 +323,12 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                 ),
               ),
               const Divider(height: 1, color: Color(0xFF1E2330)),
+              // ── Type-filter chips ────────────────────────────────────────
+              _TypeFilterRow(
+                hiddenTypes: widget.hiddenTypes,
+                onToggle: widget.onToggleType,
+              ),
+              const Divider(height: 1, color: Color(0xFF1E2330)),
               if (widget.onCreateWorkspace != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
@@ -366,6 +388,7 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
       final isWorkspace = depth == 0 && node.type == 'workspace';
       final hasChildren = node.children.isNotEmpty;
       final expanded = _expandedIds.contains(node.id);
+      final descendantIds = hasChildren ? _collectDescendantIds(node) : const <String>{};
       widgets.add(
         _SidebarTreeRow(
           node: node,
@@ -382,6 +405,13 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
               : null,
           onFocus: widget.onFocusNode != null
               ? () => widget.onFocusNode!(node.id)
+              : null,
+          onRemoveFolder: widget.onRemoveFolder,
+          onHideDescendants: hasChildren && widget.onHideDescendants != null
+              ? () => widget.onHideDescendants!(descendantIds)
+              : null,
+          onShowDescendants: hasChildren && widget.onShowDescendants != null
+              ? () => widget.onShowDescendants!(descendantIds)
               : null,
         ),
       );
@@ -481,6 +511,16 @@ void _collectReachableIds(
       _collectReachableIds(child, childMap, out);
     }
   }
+}
+
+/// Collects all descendant node IDs from a [ShowHideSidebarNode] recursively.
+Set<String> _collectDescendantIds(ShowHideSidebarNode node) {
+  final ids = <String>{};
+  for (final child in node.children) {
+    ids.add(child.id);
+    ids.addAll(_collectDescendantIds(child));
+  }
+  return ids;
 }
 
 ({String type, String label}) _desktopMeta(MindMapNodeData node) {
@@ -636,6 +676,9 @@ class _SidebarTreeRow extends StatelessWidget {
     required this.onToggleHide,
     this.onToggleExpand,
     this.onFocus,
+    this.onRemoveFolder,
+    this.onHideDescendants,
+    this.onShowDescendants,
   });
 
   final ShowHideSidebarNode node;
@@ -645,6 +688,11 @@ class _SidebarTreeRow extends StatelessWidget {
   final VoidCallback onToggleHide;
   final VoidCallback? onToggleExpand;
   final VoidCallback? onFocus;
+  final void Function(String workspaceId, String folderPath)? onRemoveFolder;
+  /// Hides all descendants of this node.
+  final VoidCallback? onHideDescendants;
+  /// Shows all descendants of this node.
+  final VoidCallback? onShowDescendants;
 
   static const _typeIcons = <String, IconData>{
     'workspace': Icons.folder_copy_outlined,
@@ -680,8 +728,114 @@ class _SidebarTreeRow extends StatelessWidget {
     final color = _typeColors[node.type] ?? const Color(0xFF64748B);
     final hasChildren = node.children.isNotEmpty;
 
+    // Parse workspace ID and folder path from repo node IDs like 'repo:{wsId}:{path}'.
+    // Nodes with ID 'repo:orphan:...' are not workspace context folders.
+    ({String wsId, String folderPath})? repoFolderInfo;
+    if (node.type == 'repo' &&
+        onRemoveFolder != null &&
+        node.id.startsWith('repo:') &&
+        !node.id.startsWith('repo:orphan:')) {
+      final rest = node.id.substring('repo:'.length);
+      final colonIdx = rest.indexOf(':');
+      if (colonIdx > 0) {
+        repoFolderInfo = (
+          wsId: rest.substring(0, colonIdx),
+          folderPath: rest.substring(colonIdx + 1),
+        );
+      }
+    }
+
+    void showContextMenu(TapUpDetails details) {
+      final hasDescendantActions = onHideDescendants != null || onShowDescendants != null;
+      if (!hasDescendantActions && repoFolderInfo == null) return;
+
+      final items = <PopupMenuEntry<String>>[];
+
+      if (hasDescendantActions) {
+        if (onHideDescendants != null) {
+          items.add(PopupMenuItem<String>(
+            value: 'hide_children',
+            height: 32,
+            child: Row(
+              children: const [
+                Icon(Icons.visibility_off_outlined, size: 13, color: Color(0xFF9AA3BF)),
+                SizedBox(width: 8),
+                Text(
+                  'Hide all below',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF9AA3BF)),
+                ),
+              ],
+            ),
+          ));
+        }
+        if (onShowDescendants != null) {
+          items.add(PopupMenuItem<String>(
+            value: 'show_children',
+            height: 32,
+            child: Row(
+              children: const [
+                Icon(Icons.visibility_outlined, size: 13, color: Color(0xFF9AA3BF)),
+                SizedBox(width: 8),
+                Text(
+                  'Show all below',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF9AA3BF)),
+                ),
+              ],
+            ),
+          ));
+        }
+      }
+
+      if (repoFolderInfo != null) {
+        if (items.isNotEmpty) {
+          items.add(const PopupMenuDivider(height: 8));
+        }
+        items.add(PopupMenuItem<String>(
+          value: 'remove',
+          height: 32,
+          child: Row(
+            children: const [
+              Icon(Icons.folder_off_outlined, size: 13, color: Color(0xFFEF4444)),
+              SizedBox(width: 8),
+              Text(
+                'Remove Folder',
+                style: TextStyle(fontSize: 12, color: Color(0xFFEF4444)),
+              ),
+            ],
+          ),
+        ));
+      }
+
+      if (items.isEmpty) return;
+
+      final info = repoFolderInfo;
+      showMenu<String>(
+        context: context,
+        position: RelativeRect.fromLTRB(
+          details.globalPosition.dx,
+          details.globalPosition.dy,
+          details.globalPosition.dx,
+          details.globalPosition.dy,
+        ),
+        color: const Color(0xFF1A1E2A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: const BorderSide(color: Color(0xFF2A3040)),
+        ),
+        items: items,
+      ).then((value) {
+        if (value == 'hide_children') {
+          onHideDescendants?.call();
+        } else if (value == 'show_children') {
+          onShowDescendants?.call();
+        } else if (value == 'remove' && info != null) {
+          onRemoveFolder!(info.wsId, info.folderPath);
+        }
+      });
+    }
+
     if (isWorkspace) {
-      return InkWell(
+      final workspaceRow = InkWell(
         onTap: onToggleExpand,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -729,10 +883,18 @@ class _SidebarTreeRow extends StatelessWidget {
           ),
         ),
       );
+      final hasContext = onHideDescendants != null || onShowDescendants != null;
+      if (hasContext) {
+        return GestureDetector(
+          onSecondaryTapUp: showContextMenu,
+          child: workspaceRow,
+        );
+      }
+      return workspaceRow;
     }
 
     final indent = 10.0 + depth * 14.0;
-    return InkWell(
+    final row = InkWell(
       onTap: hasChildren ? onToggleExpand : onFocus,
       child: Padding(
         padding: EdgeInsets.fromLTRB(indent, 3, 8, 3),
@@ -789,6 +951,17 @@ class _SidebarTreeRow extends StatelessWidget {
         ),
       ),
     );
+
+    final needsContextMenu = repoFolderInfo != null ||
+        onHideDescendants != null ||
+        onShowDescendants != null;
+    if (needsContextMenu) {
+      return GestureDetector(
+        onSecondaryTapUp: showContextMenu,
+        child: row,
+      );
+    }
+    return row;
   }
 }
 
@@ -857,6 +1030,114 @@ class _SidebarToggle extends StatelessWidget {
             Icons.chevron_right,
             size: 16,
             color: Color(0xFF7C6BFF),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeFilterRow extends StatelessWidget {
+  const _TypeFilterRow({required this.hiddenTypes, this.onToggle});
+
+  final Set<String> hiddenTypes;
+  final void Function(String typeTag)? onToggle;
+
+  static const _chips = [
+    (tag: 'agent',   label: 'Sessions', icon: Icons.terminal),
+    (tag: 'branch',  label: 'Branches', icon: Icons.alt_route),
+    (tag: 'run',     label: 'Runs',     icon: Icons.play_circle_outline),
+    (tag: 'files',   label: 'Files',    icon: Icons.insert_drive_file_outlined),
+    (tag: 'tree',    label: 'Tree',     icon: Icons.account_tree_outlined),
+    (tag: 'diff',    label: 'Diff',     icon: Icons.compare_arrows_rounded),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: [
+          for (final chip in _chips)
+            _TypeChip(
+              label: chip.label,
+              icon: chip.icon,
+              hidden: hiddenTypes.contains(chip.tag),
+              onTap: onToggle != null ? () => onToggle!(chip.tag) : null,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TypeChip extends StatefulWidget {
+  const _TypeChip({
+    required this.label,
+    required this.icon,
+    required this.hidden,
+    this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool hidden;
+  final VoidCallback? onTap;
+
+  @override
+  State<_TypeChip> createState() => _TypeChipState();
+}
+
+class _TypeChipState extends State<_TypeChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = !widget.hidden;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          decoration: BoxDecoration(
+            color: active
+                ? (_hovered ? const Color(0xFF2A2060) : const Color(0xFF1E1A40))
+                : (_hovered ? const Color(0xFF1A1E2A) : const Color(0xFF12141C)),
+            border: Border.all(
+              color: active
+                  ? const Color(0xFF7C6BFF)
+                  : const Color(0xFF2A3040),
+            ),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                widget.icon,
+                size: 10,
+                color: active
+                    ? const Color(0xFFC084FC)
+                    : const Color(0xFF4A5680),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: active
+                      ? const Color(0xFFE8E8FF)
+                      : const Color(0xFF4A5680),
+                ),
+              ),
+            ],
           ),
         ),
       ),

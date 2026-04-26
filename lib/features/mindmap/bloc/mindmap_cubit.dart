@@ -234,6 +234,22 @@ class MindMapCubit extends Cubit<MindMapState> {
     _saveHidden(newHidden);
   }
 
+  /// Hides multiple nodes at once (e.g. all children of a parent).
+  void hideNodes(Set<String> ids) {
+    if (ids.isEmpty) return;
+    final newHidden = {...state.hidden, ...ids};
+    emit(state.copyWith(hidden: newHidden));
+    _saveHidden(newHidden);
+  }
+
+  /// Shows (un-hides) multiple nodes at once.
+  void showNodes(Set<String> ids) {
+    if (ids.isEmpty) return;
+    final newHidden = {...state.hidden}..removeAll(ids);
+    emit(state.copyWith(hidden: newHidden));
+    _saveHidden(newHidden);
+  }
+
   void showAllNodes() {
     emit(state.copyWith(hidden: {}, hiddenTypes: {}));
     _saveHidden({});

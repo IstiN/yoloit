@@ -28,6 +28,9 @@ class WorkspaceNode extends StatelessWidget {
         if (dir == null || !context.mounted) return;
         await context.read<WorkspaceCubit>().addPathToWorkspace(ws.id, dir);
       },
+      onRemoveFolder: (path) async {
+        await context.read<WorkspaceCubit>().removePathFromWorkspace(ws.id, path);
+      },
       onCreateSession: () => _createSession(context, ws.paths.isNotEmpty ? ws.paths.first : null, ws.id),
     );
   }
