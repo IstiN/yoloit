@@ -66,7 +66,7 @@ extension AgentTypePtyConfig on AgentType {
             'Allow directory access',
             'Allow file access',
             'Allow network access',
-            'to confirm',  // bottom hint of ask_user dialogs ("Enter to confirm")
+            'Enter to confirm',  // bottom hint of ask_user dialogs — more specific than "to confirm"
           },
           // 5s after spinner stops → agent is done responding.
           idleTimeout: Duration(seconds: 5),
