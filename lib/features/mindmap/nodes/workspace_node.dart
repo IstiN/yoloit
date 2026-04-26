@@ -32,6 +32,9 @@ class WorkspaceNode extends StatelessWidget {
       },
       onCreateSession: () => _openSessionDialog(context),
       onColorDotTap: () => _pickColor(context),
+      onRemoveFolder: (path) async {
+        await context.read<WorkspaceCubit>().removePathFromWorkspace(ws.id, path);
+      },
     );
   }
 

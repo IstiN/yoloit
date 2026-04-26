@@ -1255,6 +1255,10 @@ class _GroupSidebarState extends State<_GroupSidebar> {
           onHideAll: cubit.hideAll,
           onToggleType: cubit.toggleType,
           onCreateWorkspace: () => _createWorkspace(context),
+          onRemoveFolder: (workspaceId, folderPath) =>
+              context.read<WorkspaceCubit>().removePathFromWorkspace(workspaceId, folderPath),
+          onHideDescendants: cubit.hideNodes,
+          onShowDescendants: cubit.showNodes,
         );
       },
     );

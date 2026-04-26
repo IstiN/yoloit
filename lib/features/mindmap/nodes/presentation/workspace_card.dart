@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
@@ -10,11 +11,14 @@ class WorkspaceCard extends StatelessWidget {
     this.onAddFolder,
     this.onCreateSession,
     this.onColorDotTap,
+    this.onRemoveFolder,
   });
   final WorkspaceCardProps props;
   final VoidCallback? onAddFolder;
   final VoidCallback? onCreateSession;
   final VoidCallback? onColorDotTap;
+  /// Called with the full folder path when the user removes a folder from context.
+  final void Function(String path)? onRemoveFolder;
 
   static const _borderColor = Color(0x8060A5FA);
   static const _bgGrad = [Color(0xFF181E2E), Color(0xFF141826)];
@@ -79,10 +83,10 @@ class WorkspaceCard extends StatelessWidget {
           ),
           if (props.paths.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(
-              '${props.paths.length} ${props.paths.length == 1 ? "repo" : "repos"}',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF6B7898)),
-            ),
+            ...props.paths.map((path) => _FolderRow(
+                  path: path,
+                  onRemove: onRemoveFolder != null ? () => onRemoveFolder!(path) : null,
+                )),
           ],
           const SizedBox(height: 8),
           Row(
@@ -101,6 +105,52 @@ class WorkspaceCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FolderRow extends StatefulWidget {
+  const _FolderRow({required this.path, this.onRemove});
+  final String path;
+  final VoidCallback? onRemove;
+
+  @override
+  State<_FolderRow> createState() => _FolderRowState();
+}
+
+class _FolderRowState extends State<_FolderRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Row(
+          children: [
+            const Icon(Icons.folder_outlined, size: 10, color: Color(0xFF6B7898)),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                p.basename(widget.path),
+                style: const TextStyle(fontSize: 10, color: Color(0xFF6B7898)),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (_hovered && widget.onRemove != null)
+              GestureDetector(
+                onTap: widget.onRemove,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Icon(Icons.close, size: 10, color: Color(0xFFEF4444)),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
