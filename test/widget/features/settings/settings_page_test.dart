@@ -87,6 +87,9 @@ void main() {
       await tester.tap(find.text('About'));
       await tester.pump();
       expect(find.textContaining('YoLoIT'), findsWidgets);
+      // Drain any pending async work from _AboutSectionState.initState
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
     });
 
     testWidgets('shows Setup Guide category in sidebar', (tester) async {
