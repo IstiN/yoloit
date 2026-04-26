@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:yoloit/features/collaboration/model/sync_message.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_state.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 import 'package:yoloit/features/mindmap/sidebar/show_hide_sidebar.dart';
+import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/runs/models/run_session.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
@@ -187,24 +189,27 @@ Future<void> _pumpSidebar(WidgetTester tester, ShowHideSidebarData data) async {
   addTearDown(() => tester.view.resetDevicePixelRatio());
 
   await tester.pumpWidget(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: _surfaceBg),
-      home: Scaffold(
-        body: Align(
-          alignment: Alignment.topLeft,
-          child: SizedBox(
-            width: 320,
-            height: 520,
-            child: MindMapShowHideSidebar(
-              data: data,
-              onToggleHide: (_) {},
-              onToggleGroup: (_) {},
-              onFocusNode: (_) {},
-              onShowAll: () {},
-              onHideAll: () {},
-              onToggleType: (_) {},
-              onCreateWorkspace: () {},
+    BlocProvider<ReviewCubit>(
+      create: (_) => ReviewCubit(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: _surfaceBg),
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 320,
+              height: 520,
+              child: MindMapShowHideSidebar(
+                data: data,
+                onToggleHide: (_) {},
+                onToggleGroup: (_) {},
+                onFocusNode: (_) {},
+                onShowAll: () {},
+                onHideAll: () {},
+                onToggleType: (_) {},
+                onCreateWorkspace: () {},
+              ),
             ),
           ),
         ),

@@ -186,26 +186,27 @@ class _RepoTree extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
-          child: Row(
-            children: [
-              Icon(Icons.folder_open, size: 14, color: AppColors.neonBlue.withAlpha(180)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  repoName,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+        if (sessions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
+            child: Row(
+              children: [
+                Icon(Icons.folder_open, size: 14, color: AppColors.neonBlue.withAlpha(180)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    repoName,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         ...children,
       ],
     );

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:yoloit/features/mindmap/sidebar/show_hide_sidebar.dart';
+import 'package:yoloit/features/review/bloc/review_cubit.dart';
 
 const _darkBg = Color(0xFF0D1117);
 
@@ -17,11 +19,14 @@ Future<void> _pump(
   addTearDown(tester.view.resetDevicePixelRatio);
 
   await tester.pumpWidget(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: _darkBg),
-      home: Scaffold(
-        body: SizedBox(width: width, height: height, child: child),
+    BlocProvider<ReviewCubit>(
+      create: (_) => ReviewCubit(),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: _darkBg),
+        home: Scaffold(
+          body: SizedBox(width: width, height: height, child: child),
+        ),
       ),
     ),
   );
@@ -94,6 +99,7 @@ void main() {
         MindMapShowHideSidebar(
           data: _buildSampleData(),
           onToggleHide: (_) {},
+          onToggleGroup: (_) {},
           onFocusNode: (_) {},
           onShowAll: () {},
           onCreateWorkspace: () {},
@@ -112,6 +118,7 @@ void main() {
             hiddenCount: 0,
           ),
           onToggleHide: (_) {},
+          onToggleGroup: (_) {},
           onCreateWorkspace: () {},
         ),
         height: 200,
@@ -142,6 +149,7 @@ void main() {
             hiddenCount: 1,
           ),
           onToggleHide: (_) {},
+          onToggleGroup: (_) {},
         ),
         height: 240,
       );
@@ -173,6 +181,7 @@ void main() {
             hiddenCount: 3,
           ),
           onToggleHide: (_) {},
+          onToggleGroup: (_) {},
           onShowAll: () {},
         ),
       );

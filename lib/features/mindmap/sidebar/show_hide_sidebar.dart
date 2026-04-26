@@ -222,6 +222,9 @@ class MindMapShowHideSidebar extends StatefulWidget {
     this.onHideAll,
     this.onToggleType,
     this.onCreateWorkspace,
+    this.onRemoveFolder,
+    this.onHideDescendants,
+    this.onShowDescendants,
   });
 
   final ShowHideSidebarData data;
@@ -233,6 +236,12 @@ class MindMapShowHideSidebar extends StatefulWidget {
   final VoidCallback? onHideAll;
   final void Function(String typeTag)? onToggleType;
   final VoidCallback? onCreateWorkspace;
+  /// Called when the user removes a workspace folder via right-click.
+  final void Function(String workspaceId, String folderPath)? onRemoveFolder;
+  /// Hides all nodes in [ids] (all children of a row).
+  final void Function(Set<String> ids)? onHideDescendants;
+  /// Shows all nodes in [ids] (all children of a row).
+  final void Function(Set<String> ids)? onShowDescendants;
 
   @override
   State<MindMapShowHideSidebar> createState() => _MindMapShowHideSidebarState();
@@ -445,6 +454,22 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
           ? () => widget.onToggleGroup(_allDescendantIds(node))
           : () => widget.onToggleHide(node.id);
 
+      // Collect descendant IDs as a Set for hide/show-all-children callbacks.
+      Set<String> descendantIds() {
+        final ids = <String>{};
+        for (final c in node.children) {
+          ids.add(c.id);
+          void collect(ShowHideSidebarNode n) {
+            for (final ch in n.children) {
+              ids.add(ch.id);
+              collect(ch);
+            }
+          }
+          collect(c);
+        }
+        return ids;
+      }
+
       widgets.add(
         _SidebarTreeRow(
           node: node,
@@ -461,6 +486,13 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
               : null,
           onFocus: widget.onFocusNode != null
               ? () => widget.onFocusNode!(node.id)
+              : null,
+          onRemoveFolder: widget.onRemoveFolder,
+          onHideDescendants: hasChildren && widget.onHideDescendants != null
+              ? () => widget.onHideDescendants!(descendantIds())
+              : null,
+          onShowDescendants: hasChildren && widget.onShowDescendants != null
+              ? () => widget.onShowDescendants!(descendantIds())
               : null,
         ),
       );
@@ -558,6 +590,7 @@ ShowHideSidebarNode? _buildSnapshotNode(
     label: _snapshotLabel(id, content, type),
     hidden: hidden.contains(id) || hiddenTypes.contains(type),
     children: children,
+    path: type == 'workspace' ? content['path'] as String? : null,
   );
 }
 
@@ -743,6 +776,9 @@ class _SidebarTreeRow extends StatelessWidget {
     required this.onToggleHide,
     this.onToggleExpand,
     this.onFocus,
+    this.onRemoveFolder,
+    this.onHideDescendants,
+    this.onShowDescendants,
   });
 
   final ShowHideSidebarNode node;
@@ -752,6 +788,11 @@ class _SidebarTreeRow extends StatelessWidget {
   final VoidCallback onToggleHide;
   final VoidCallback? onToggleExpand;
   final VoidCallback? onFocus;
+  final void Function(String workspaceId, String folderPath)? onRemoveFolder;
+  /// Hides all descendants of this node.
+  final VoidCallback? onHideDescendants;
+  /// Shows all descendants of this node.
+  final VoidCallback? onShowDescendants;
 
   static const _typeIcons = <String, IconData>{
     'workspace': Icons.folder_copy_outlined,
@@ -942,7 +983,92 @@ class _SidebarTreeRow extends StatelessWidget {
         child: row,
       );
     }
+    // For other nodes: right-click shows hide/show children + remove folder.
+    final hasDescendantActions = onHideDescendants != null || onShowDescendants != null;
+    final isRepoFolder = node.type == 'repo' &&
+        onRemoveFolder != null &&
+        node.id.startsWith('repo:') &&
+        !node.id.startsWith('repo:orphan:');
+    if (hasDescendantActions || isRepoFolder) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onSecondaryTapUp: (details) =>
+            _showNodeMenu(context, details.globalPosition, isRepoFolder),
+        child: row,
+      );
+    }
     return row;
+  }
+
+  void _showNodeMenu(BuildContext context, Offset position, bool isRepoFolder) {
+    final items = <PopupMenuEntry<String>>[];
+
+    if (onHideDescendants != null) {
+      items.add(PopupMenuItem<String>(
+        value: 'hide_children',
+        height: 32,
+        child: Row(
+          children: const [
+            Icon(Icons.visibility_off_outlined, size: 13, color: Color(0xFF9AA3BF)),
+            SizedBox(width: 8),
+            Text('Hide all below', style: TextStyle(fontSize: 12, color: Color(0xFF9AA3BF))),
+          ],
+        ),
+      ));
+    }
+    if (onShowDescendants != null) {
+      items.add(PopupMenuItem<String>(
+        value: 'show_children',
+        height: 32,
+        child: Row(
+          children: const [
+            Icon(Icons.visibility_outlined, size: 13, color: Color(0xFF9AA3BF)),
+            SizedBox(width: 8),
+            Text('Show all below', style: TextStyle(fontSize: 12, color: Color(0xFF9AA3BF))),
+          ],
+        ),
+      ));
+    }
+
+    if (isRepoFolder) {
+      if (items.isNotEmpty) items.add(const PopupMenuDivider(height: 8));
+      items.add(PopupMenuItem<String>(
+        value: 'remove_folder',
+        height: 32,
+        child: Row(
+          children: const [
+            Icon(Icons.folder_off_outlined, size: 13, color: Color(0xFFEF4444)),
+            SizedBox(width: 8),
+            Text('Remove Folder', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444))),
+          ],
+        ),
+      ));
+    }
+
+    if (items.isEmpty) return;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 1, position.dy + 1),
+      color: const Color(0xFF1A1E2A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: const BorderSide(color: Color(0xFF2A3040)),
+      ),
+      items: items,
+    ).then((value) {
+      if (value == 'hide_children') {
+        onHideDescendants?.call();
+      } else if (value == 'show_children') {
+        onShowDescendants?.call();
+      } else if (value == 'remove_folder') {
+        final rest = node.id.substring('repo:'.length);
+        final colonIdx = rest.indexOf(':');
+        if (colonIdx > 0) {
+          onRemoveFolder!(rest.substring(0, colonIdx), rest.substring(colonIdx + 1));
+        }
+      }
+    });
   }
 
   Future<void> _showWorkspaceMenu(BuildContext context, Offset position) async {
