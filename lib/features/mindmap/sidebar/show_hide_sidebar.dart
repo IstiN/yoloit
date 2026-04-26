@@ -590,6 +590,7 @@ ShowHideSidebarNode? _buildSnapshotNode(
     label: _snapshotLabel(id, content, type),
     hidden: hidden.contains(id) || hiddenTypes.contains(type),
     children: children,
+    path: type == 'workspace' ? content['path'] as String? : null,
   );
 }
 
