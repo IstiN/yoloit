@@ -1,8 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation file-tree card — renders a flat expandable tree from snapshot data.
@@ -199,7 +198,7 @@ class _TreeRowState extends State<_TreeRow> {
       case 'copy_name':
         await Clipboard.setData(ClipboardData(text: e.name));
       case 'show_finder':
-        await Process.run('open', ['-R', e.path]);
+        await PlatformLauncher.instance.revealInFinder(e.path);
       case 'open_panel':
         widget.onOpenInPanel?.call(e.path);
     }

@@ -83,8 +83,12 @@ class AgentHookService {
 
   Timer? _timer;
 
-  Directory get _hooksDir =>
-      Directory('${Platform.environment['HOME']}/.yoloit/hooks');
+  static String get _homeDir =>
+      Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'] ??
+      '';
+
+  Directory get _hooksDir => Directory('${_homeDir}/.yoloit/hooks');
 
   void start() {
     _timer?.cancel();
@@ -163,16 +167,18 @@ class AgentHookService {
   /// Updating the binary automatically updates ALL workspaces at once — no
   /// need to revisit each workspace on every YoLoIT release.
   static Future<void> installHooks(String workspacePath) async {
-    final home = Platform.environment['HOME'] ?? '';
+    final home = _homeDir;
     final binDir = Directory('$home/.yoloit/bin');
     await binDir.create(recursive: true);
 
     // Write canonical files (idempotent — only writes when content differs).
     final canonicalScript = File('${binDir.path}/yoloit-hook.sh');
     await _writeIfChanged(canonicalScript, _hookScriptContent);
-    try {
-      await Process.run('chmod', ['+x', canonicalScript.path]);
-    } catch (_) {}
+    if (!Platform.isWindows) {
+      try {
+        await Process.run('chmod', ['+x', canonicalScript.path]);
+      } catch (_) {}
+    }
 
     final canonicalJson = File('${binDir.path}/hooks.json');
     await _writeIfChanged(canonicalJson, _hooksJsonContent);
@@ -199,6 +205,21 @@ class AgentHookService {
     bool makeExecutable = false,
   }) async {
     try {
+      if (Platform.isWindows) {
+        // Symlinks require Developer Mode on Windows; copy the file instead.
+        // Note: copied files are NOT auto-updated when the canonical file changes.
+        // To enable true symlinks, turn on Developer Mode in Windows Settings →
+        // System → For developers.
+        final plain = File(link);
+        if (await plain.exists()) {
+          final existing = await plain.readAsString();
+          final canonical = await File(target).readAsString();
+          if (existing == canonical) return; // already up to date
+          await plain.delete();
+        }
+        await File(target).copy(link);
+        return;
+      }
       final linkFile = Link(link);
       if (await linkFile.exists()) {
         final current = await linkFile.target();

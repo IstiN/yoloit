@@ -134,6 +134,15 @@ class WindowsPlatformLauncher extends PlatformLauncher {
 
   @override
   Future<void> openTerminal(String workdir) async {
+    // Prefer Windows Terminal (wt.exe) — ships with Windows 11 by default.
+    // Fall back to cmd.exe on Windows 10 or machines without wt.exe.
+    try {
+      final result = await _run('where', ['wt.exe'], runInShell: true);
+      if (result.exitCode == 0) {
+        await _run('wt.exe', ['-d', workdir]);
+        return;
+      }
+    } catch (_) {}
     await _run('cmd', ['/c', 'start', 'cmd.exe', '/K', 'cd /d "$workdir"']);
   }
 }

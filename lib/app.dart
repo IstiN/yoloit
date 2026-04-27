@@ -392,7 +392,7 @@ class App extends StatelessWidget {
     if (path != null && path.isNotEmpty) {
       // Web client provided the path directly — expand ~ if needed.
       dir = path.startsWith('~')
-          ? (Platform.environment['HOME'] ?? '') + path.substring(1)
+          ? (Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '') + path.substring(1)
           : path;
     } else {
       dir = await FilePicker.platform.getDirectoryPath(
@@ -437,7 +437,7 @@ class App extends StatelessWidget {
       name = presetName;
       // Expand leading ~ to the home directory.
       folder = presetPath.startsWith('~')
-          ? (Platform.environment['HOME'] ?? '') + presetPath.substring(1)
+          ? (Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '') + presetPath.substring(1)
           : presetPath;
     } else {
       // Native host path: show macOS dialogs.

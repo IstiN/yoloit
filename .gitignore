@@ -9,6 +9,8 @@
 settings_page_test_new.dart
 flutter_*.log
 run.sh
+*.local.json
+
 
 # Golden test failure artifacts (generated on test failure, not source)
 test/golden/failures/

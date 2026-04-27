@@ -562,13 +562,15 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
     _renameCtrl.text = widget.node.name;
     setState(() => _renaming = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _renameFocus.requestFocus();
-      _renameCtrl.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _renameCtrl.text.lastIndexOf('.') > 0
-            ? _renameCtrl.text.lastIndexOf('.')
-            : _renameCtrl.text.length,
-      );
+      if (mounted) {
+        _renameFocus.requestFocus();
+        _renameCtrl.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _renameCtrl.text.lastIndexOf('.') > 0
+              ? _renameCtrl.text.lastIndexOf('.')
+              : _renameCtrl.text.length,
+        );
+      }
     });
   }
 

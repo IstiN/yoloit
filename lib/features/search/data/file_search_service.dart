@@ -42,6 +42,23 @@ class FileSearchService {
   static Future<String?> _findRg() async {
     if (_rgChecked) return _rgBin;
     _rgChecked = true;
+
+    if (Platform.isWindows) {
+      // On Windows use where.exe to find rg in PATH.
+      // Install via: winget install BurntSushi.ripgrep.MSVC
+      try {
+        final result = await Process.run('where', ['rg'], runInShell: true);
+        if (result.exitCode == 0) {
+          final p = (result.stdout as String).trim().split('\n').first.trim();
+          if (p.isNotEmpty) {
+            _rgBin = p;
+            return _rgBin;
+          }
+        }
+      } catch (_) {}
+      return null;
+    }
+
     for (final candidate in ['/opt/homebrew/bin/rg', '/usr/local/bin/rg', '/usr/bin/rg']) {
       if (await File(candidate).exists()) {
         _rgBin = candidate;
@@ -223,6 +240,11 @@ class FileSearchService {
     String wsName,
     String query,
   ) async {
+    if (Platform.isWindows) {
+      // grep is not available natively on Windows.
+      // Install ripgrep via: winget install BurntSushi.ripgrep.MSVC
+      return [];
+    }
     try {
       final excludeArgs = _ignoreDirs
           .expand((d) => ['--exclude-dir=$d'])

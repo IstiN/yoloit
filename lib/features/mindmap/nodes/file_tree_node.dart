@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/features/collaboration/desktop/repo_directory_listing.dart';
+import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/file_tree_card.dart';
@@ -30,7 +29,7 @@ class FileTreeNode extends StatelessWidget {
         onToggle: (path) => context.read<ReviewCubit>().toggleNode(path),
         onSelect: (path) => _openInPanel(context, path),
         onNewFolder: (parentPath) => _createNewFolder(context, parentPath),
-        onShowInFinder: (path) => Process.run('open', ['-R', path]),
+        onShowInFinder: (path) => PlatformLauncher.instance.revealInFinder(path),
         onOpenInPanel: (path) => _openInPanel(context, path),
         onRename: (path, currentName) => _renameEntry(context, path, currentName),
         onCreateFile: (dirPath) => _createFile(context, dirPath),

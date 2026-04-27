@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /// Abstract backend for persistent terminal sessions.
 ///
 /// Implementations:
@@ -35,10 +37,59 @@ abstract class TerminalSessionBackend {
   Future<String> logPath(String sessionId);
 }
 
-// ── Stub for Windows (ConPTY) ─────────────────────────────────────────────────
+// ── Windows ConPTY backend (stub — see implementation guide below) ────────────
 
-/// Windows ConPTY backend — not yet implemented.
-/// All methods throw [UnsupportedError].
+/// Windows ConPTY backend — graceful no-op stub pending full implementation.
+///
+/// ## Implementation guide (Option B — full Windows terminal sessions)
+///
+/// Replace this stub with a real implementation using `flutter_pty` + ConPTY:
+///
+/// ### Dependencies (already in pubspec)
+/// - `flutter_pty: ^0.4.2` — ConPTY support on Windows 10 1903+
+/// - `PlatformShell.instance.defaultShell` — returns `cmd.exe` on Windows
+/// - `PlatformDirs.instance.logsDir` — correct Windows log directory
+///
+/// ### start({sessionId, command, workingDir, env})
+/// ```dart
+/// final pty = Pty.start(
+///   PlatformShell.instance.defaultShell,        // cmd.exe
+///   arguments: ['/K', command],                  // /K keeps the window open
+///   workingDirectory: workingDir,
+///   environment: {...Platform.environment, ...env},
+/// );
+/// _ptySessions[sessionId] = pty;
+/// // Mirror output to a log file for reconnect support:
+/// final log = File(await logPath(sessionId));
+/// pty.output.transform(utf8.decoder).listen((chunk) => log.writeAsStringSync(chunk, mode: FileMode.append));
+/// ```
+///
+/// ### reconnect(sessionId)
+/// Read the log file written by start(); emit all past output to the caller,
+/// then resume tailing. Return `true` if the log exists and the process is
+/// still alive (`_ptySessions[sessionId]?.exitCode == null`).
+///
+/// ### stop(sessionId)
+/// ```dart
+/// _ptySessions.remove(sessionId)?.kill();
+/// // Optionally delete the log file.
+/// ```
+///
+/// ### sendKeys(sessionId, keys)
+/// ```dart
+/// _ptySessions[sessionId]?.write(Uint8List.fromList(utf8.encode(keys)));
+/// ```
+///
+/// ### logPath(sessionId)
+/// ```dart
+/// return path.join(PlatformDirs.instance.logsDir, 'session_$sessionId.log');
+/// ```
+///
+/// ### Output stream (add to interface if needed)
+/// ```dart
+/// Stream<String> outputStream(String sessionId) =>
+///     _ptySessions[sessionId]!.output.transform(utf8.decoder);
+/// ```
 class ConPtySessionBackend extends TerminalSessionBackend {
   const ConPtySessionBackend();
 
@@ -48,22 +99,21 @@ class ConPtySessionBackend extends TerminalSessionBackend {
     required String command,
     required String workingDir,
     Map<String, String> env = const {},
-  }) =>
-      throw UnsupportedError('ConPTY backend is not yet implemented.');
+  }) async {
+    // Not yet implemented — TmuxService.init() returns early on Windows so
+    // this method is never called in practice. See implementation guide above.
+  }
 
   @override
-  Future<bool> reconnect(String sessionId) =>
-      throw UnsupportedError('ConPTY backend is not yet implemented.');
+  Future<bool> reconnect(String sessionId) async => false;
 
   @override
-  Future<void> stop(String sessionId) =>
-      throw UnsupportedError('ConPTY backend is not yet implemented.');
+  Future<void> stop(String sessionId) async {}
 
   @override
-  Future<void> sendKeys(String sessionId, String keys) =>
-      throw UnsupportedError('ConPTY backend is not yet implemented.');
+  Future<void> sendKeys(String sessionId, String keys) async {}
 
   @override
-  Future<String> logPath(String sessionId) =>
-      throw UnsupportedError('ConPTY backend is not yet implemented.');
+  Future<String> logPath(String sessionId) async =>
+      '${Directory.systemTemp.path}\\yoloit_session_$sessionId.log';
 }

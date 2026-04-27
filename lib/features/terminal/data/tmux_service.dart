@@ -37,6 +37,11 @@ class TmuxService {
 
   /// Must be called once at startup before using any other methods.
   Future<void> init() async {
+    if (Platform.isWindows) {
+      _available = false;
+      _enabled = false;
+      return;
+    }
     _tmuxBin = await _findTmux();
     _available = _tmuxBin != null;
     final prefs = await SharedPreferences.getInstance();

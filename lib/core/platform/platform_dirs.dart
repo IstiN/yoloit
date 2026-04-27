@@ -149,4 +149,7 @@ class WindowsPlatformDirs extends PlatformDirs {
 
   @override
   String get skillsDir => '$_appData\\yoloit\\skills';
+
+  @override
+  String get yoloitTempDir => '${Directory.systemTemp.path}\\yoloit_tmp';
 }

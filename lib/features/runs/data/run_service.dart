@@ -61,6 +61,11 @@ class RunService {
     required OutputCallback onOutput,
     required ExitCallback onExit,
   }) async {
+    if (Platform.isWindows) {
+      onOutput('Run sessions are not available on Windows yet.', true);
+      onExit(1);
+      return;
+    }
     final name = tmuxName(configId);
     final log = await logPath(configId);
     _sessionTmux[sessionId] = name;
@@ -109,6 +114,7 @@ class RunService {
     required OutputCallback onOutput,
     required ExitCallback onExit,
   }) async {
+    if (Platform.isWindows) return false;
     final name = tmuxName(configId);
     final check = await Process.run(await _tmux(), ["has-session", "-t", name]);
     if (check.exitCode != 0) return false;

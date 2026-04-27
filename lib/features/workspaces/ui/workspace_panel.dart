@@ -395,7 +395,15 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     );
     controller.dispose();
     if (result != null && result != ws.name && context.mounted) {
-      await context.read<WorkspaceCubit>().renameWorkspace(ws.id, result);
+      // Defer the emit until after the dialog-dismiss frame is fully built.
+      // Calling renameWorkspace synchronously here can fire a BlocBuilder
+      // rebuild while the dialog's InheritedWidget subtree is still
+      // deactivating, triggering '_dependents.isEmpty' in framework.dart.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          context.read<WorkspaceCubit>().renameWorkspace(ws.id, result);
+        }
+      });
     }
   }
 
@@ -928,7 +936,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
         ),
       ],
     ).then((value) {
-      if (value == null) return;
+      if (value == null || !mounted) return;
       if (value == 'rename') {
         widget.onRename();
       } else if (value == 'add_folder') {

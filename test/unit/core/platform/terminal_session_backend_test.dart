@@ -38,47 +38,40 @@ void main() {
   });
 
   group('ConPtySessionBackend', () {
+    // ConPtySessionBackend is a graceful no-op stub pending full ConPTY
+    // implementation. Methods complete without throwing so the app does not
+    // crash on Windows while the backend is unimplemented.
     late ConPtySessionBackend backend;
 
     setUp(() => backend = const ConPtySessionBackend());
 
-    test('start throws UnsupportedError', () {
-      expect(
-        () => backend.start(
+    test('start completes without throwing', () async {
+      await expectLater(
+        backend.start(
           sessionId: 'test',
           command: 'echo hello',
-          workingDir: '/tmp',
+          workingDir: r'C:\tmp',
         ),
-        throwsA(isA<UnsupportedError>()),
+        completes,
       );
     });
 
-    test('reconnect throws UnsupportedError', () {
-      expect(
-        () => backend.reconnect('test'),
-        throwsA(isA<UnsupportedError>()),
-      );
+    test('reconnect returns false', () async {
+      expect(await backend.reconnect('test'), isFalse);
     });
 
-    test('stop throws UnsupportedError', () {
-      expect(
-        () => backend.stop('test'),
-        throwsA(isA<UnsupportedError>()),
-      );
+    test('stop completes without throwing', () async {
+      await expectLater(backend.stop('test'), completes);
     });
 
-    test('sendKeys throws UnsupportedError', () {
-      expect(
-        () => backend.sendKeys('test', 'r'),
-        throwsA(isA<UnsupportedError>()),
-      );
+    test('sendKeys completes without throwing', () async {
+      await expectLater(backend.sendKeys('test', 'r'), completes);
     });
 
-    test('logPath throws UnsupportedError', () {
-      expect(
-        () => backend.logPath('test'),
-        throwsA(isA<UnsupportedError>()),
-      );
+    test('logPath returns a non-empty string containing the sessionId', () async {
+      final path = await backend.logPath('test');
+      expect(path, isNotEmpty);
+      expect(path, contains('test'));
     });
   });
 }

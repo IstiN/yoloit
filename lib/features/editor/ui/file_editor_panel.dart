@@ -1186,16 +1186,16 @@ class _EditorBodyState extends State<_EditorBody> {
   void _openFind() => setState(() {
     _showFind = true;
     _showReplace = false;
-    SchedulerBinding.instance.addPostFrameCallback(
-      (_) => _findFocus.requestFocus(),
-    );
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _findFocus.requestFocus();
+    });
   });
   void _openReplace() => setState(() {
     _showFind = true;
     _showReplace = true;
-    SchedulerBinding.instance.addPostFrameCallback(
-      (_) => _findFocus.requestFocus(),
-    );
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _findFocus.requestFocus();
+    });
   });
   void _closeFind() => setState(() {
     _showFind = false;

@@ -274,11 +274,13 @@ class _AgentTabState extends State<_AgentTab> {
       _nameController.text = widget.session.displayName;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _nameFocus.requestFocus();
-      _nameController.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _nameController.text.length,
-      );
+      if (mounted) {
+        _nameFocus.requestFocus();
+        _nameController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _nameController.text.length,
+        );
+      }
     });
   }
 
@@ -928,7 +930,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _currentHitIndex = -1;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
+      if (mounted) _searchFocusNode.requestFocus();
     });
   }
 

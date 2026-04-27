@@ -71,7 +71,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   void initState() {
     super.initState();
     _controller.addListener(_onQueryChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   @override

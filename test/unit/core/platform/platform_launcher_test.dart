@@ -104,7 +104,16 @@ void main() {
       expect(call.arguments, contains('/select,'));
     });
 
-    test('openTerminal calls cmd /c start cmd.exe', () async {
+    test('openTerminal uses wt.exe when available', () async {
+      // FakeProcessRunner returns exitCode 0 by default, so where wt.exe succeeds.
+      await launcher.openTerminal(r'C:\my\project');
+      final call = fakeRunner.lastCall!;
+      expect(call.executable, 'wt.exe');
+      expect(call.arguments, contains('-d'));
+    });
+
+    test('openTerminal falls back to cmd when wt.exe is not found', () async {
+      fakeRunner.mockResult('where', exitCode: 1, stdout: '');
       await launcher.openTerminal(r'C:\my\project');
       final call = fakeRunner.lastCall!;
       expect(call.executable, 'cmd');

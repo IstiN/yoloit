@@ -123,8 +123,9 @@ class ResourceSnapshot {
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
-/// Polls macOS `ps` periodically to get CPU/RAM for this app, registered PTY
-/// sessions, and well-known agent processes.
+/// Polls OS process information periodically to get CPU/RAM for this app,
+/// registered PTY sessions, and well-known agent processes.
+/// Uses `ps` on macOS/Linux and `wmic` on Windows.
 class ResourceMonitorService {
   ResourceMonitorService._();
   static final instance = ResourceMonitorService._();
@@ -242,30 +243,13 @@ class ResourceMonitorService {
   // ── Data collection ─────────────────────────────────────────────────────
 
   Future<ResourceSnapshot> _collect() async {
-    // Single atomic ps call for all processes.
-    final psResult = await Process.run('ps', ['-eo', 'pid=,ppid=,pcpu=,rss=']);
-
     _byPid = {};
     _childrenOf = {};
 
-    if (psResult.exitCode == 0) {
-      for (final line in (psResult.stdout as String).split('\n')) {
-        final parts = line.trim().split(RegExp(r'\s+'));
-        if (parts.length < 4) continue;
-        final p = int.tryParse(parts[0]);
-        final pp = int.tryParse(parts[1]);
-        if (p == null || pp == null) continue;
-        final cpu = math.max(0.0, double.tryParse(parts[2]) ?? 0.0);
-        final rssKb = math.max(0, int.tryParse(parts[3]) ?? 0);
-        final info = ProcessInfo(
-          pid: p,
-          ppid: pp,
-          cpu: cpu,
-          memoryBytes: rssKb * 1024,
-        );
-        _byPid[p] = info;
-        _childrenOf.putIfAbsent(pp, () => []).add(p);
-      }
+    if (Platform.isWindows) {
+      await _collectProcessesWindows();
+    } else {
+      await _collectProcessesPosix();
     }
 
     // App's own subtree.
@@ -290,39 +274,29 @@ class ResourceMonitorService {
       registeredPids.addAll(_getSubtreePids(sessionPid));
     }
 
-    // Scan for unregistered well-known agent names via a second ps call with comm.
-    final commResult = await Process.run('ps', ['-eo', 'pid=,comm=']);
+    // Scan for unregistered well-known agent names.
     final agentSessions = <SessionStat>[];
     final seenPids = <int>{appPid, ...registeredPids};
-
-    if (commResult.exitCode == 0) {
-      for (final line in (commResult.stdout as String).split('\n')) {
-        final parts = line.trim().split(RegExp(r'\s+'));
-        if (parts.length < 2) continue;
-        final p = int.tryParse(parts[0]);
-        if (p == null || seenPids.contains(p)) continue;
-        final comm = parts.sublist(1).join(' ');
-        final name = comm.split('/').last;
-        if (_agentNames.any((a) => name.toLowerCase().contains(a))) {
-          seenPids.add(p);
-          final res = _getSubtreeResources(p);
-          agentSessions.add(SessionStat(
-            pid: p,
-            label: name,
-            cpuPercent: res.cpu,
-            memoryBytes: res.mem,
-          ));
-        }
+    for (final entry in _byPid.entries) {
+      final p = entry.key;
+      if (seenPids.contains(p)) continue;
+      // Name stored in a side map populated during collection.
+      final name = _processNames[p] ?? '';
+      if (_agentNames.any((a) => name.toLowerCase().contains(a))) {
+        seenPids.add(p);
+        final res = _getSubtreeResources(p);
+        agentSessions.add(SessionStat(
+          pid: p,
+          label: name.split('/').last,
+          cpuPercent: res.cpu,
+          memoryBytes: res.mem,
+        ));
       }
     }
 
     final allSessions = [...registeredSessions, ...agentSessions];
-
-    // Totals.
     final totalMem = allSessions.fold(appMem, (s, e) => s + e.memoryBytes);
     final totalCpu = allSessions.fold(appCpu, (s, e) => s + e.cpuPercent);
-
-    // Host metrics.
     final host = await _collectHost();
 
     return ResourceSnapshot(
@@ -335,7 +309,87 @@ class ResourceMonitorService {
     );
   }
 
+  /// pid → process name, populated alongside _byPid each poll cycle.
+  final Map<int, String> _processNames = {};
+
+  Future<void> _collectProcessesPosix() async {
+    // Single ps call: pid ppid cpu rss.
+    final psResult = await Process.run('ps', ['-eo', 'pid=,ppid=,pcpu=,rss=']);
+    if (psResult.exitCode == 0) {
+      for (final line in (psResult.stdout as String).split('\n')) {
+        final parts = line.trim().split(RegExp(r'\s+'));
+        if (parts.length < 4) continue;
+        final p = int.tryParse(parts[0]);
+        final pp = int.tryParse(parts[1]);
+        if (p == null || pp == null) continue;
+        final cpu = math.max(0.0, double.tryParse(parts[2]) ?? 0.0);
+        final rssKb = math.max(0, int.tryParse(parts[3]) ?? 0);
+        _byPid[p] = ProcessInfo(pid: p, ppid: pp, cpu: cpu, memoryBytes: rssKb * 1024);
+        _childrenOf.putIfAbsent(pp, () => []).add(p);
+      }
+    }
+    // Second ps call to get process names for agent detection.
+    final commResult = await Process.run('ps', ['-eo', 'pid=,comm=']);
+    if (commResult.exitCode == 0) {
+      for (final line in (commResult.stdout as String).split('\n')) {
+        final parts = line.trim().split(RegExp(r'\s+'));
+        if (parts.length < 2) continue;
+        final p = int.tryParse(parts[0]);
+        if (p == null) continue;
+        _processNames[p] = parts.sublist(1).join(' ');
+      }
+    }
+  }
+
+  /// Populates [_byPid], [_childrenOf], and [_processNames] using wmic on Windows.
+  /// CPU% is not available from wmic without sampling; reported as 0.0.
+  Future<void> _collectProcessesWindows() async {
+    _processNames.clear();
+    try {
+      // wmic process get ProcessId,ParentProcessId,Name,WorkingSetSize /format:csv
+      // Output: Node,Name,ParentProcessId,ProcessId,WorkingSetSize
+      final result = await Process.run(
+        'wmic',
+        ['process', 'get', 'ProcessId,ParentProcessId,Name,WorkingSetSize', '/format:csv'],
+        runInShell: true,
+      );
+      if (result.exitCode != 0) return;
+      final lines = (result.stdout as String).split('\n');
+      // First non-empty line is the header: Node,Name,ParentProcessId,ProcessId,WorkingSetSize
+      int? pidIdx, ppidIdx, nameIdx, memIdx;
+      for (final raw in lines) {
+        final line = raw.trim();
+        if (line.isEmpty) continue;
+        final cols = line.split(',');
+        if (pidIdx == null) {
+          // Parse header
+          pidIdx = cols.indexOf('ProcessId');
+          ppidIdx = cols.indexOf('ParentProcessId');
+          nameIdx = cols.indexOf('Name');
+          memIdx = cols.indexOf('WorkingSetSize');
+          continue;
+        }
+        if (cols.length <= math.max(pidIdx, math.max(ppidIdx ?? 0, math.max(nameIdx ?? 0, memIdx ?? 0)))) continue;
+        final p = int.tryParse(cols[pidIdx].trim());
+        final pp = int.tryParse(cols[ppidIdx ?? 0].trim());
+        final name = nameIdx != null ? cols[nameIdx].trim() : '';
+        final memBytes = math.max(0, int.tryParse(cols[memIdx ?? 0].trim()) ?? 0);
+        if (p == null || pp == null) continue;
+        _byPid[p] = ProcessInfo(pid: p, ppid: pp, cpu: 0.0, memoryBytes: memBytes);
+        _childrenOf.putIfAbsent(pp, () => []).add(p);
+        _processNames[p] = name;
+      }
+    } catch (_) {}
+  }
+
   Future<HostMetrics> _collectHost() async {
+    if (Platform.isWindows) {
+      return _collectHostWindows();
+    }
+    return _collectHostPosix();
+  }
+
+  Future<HostMetrics> _collectHostPosix() async {
     try {
       final results = await Future.wait([
         Process.run('vm_stat', []),
@@ -377,6 +431,76 @@ class ResourceMonitorService {
         usedPercent: usedPercent,
         cpuCoreCount: coreCount,
         loadAverage1m: load1m,
+      );
+    } catch (_) {
+      return HostMetrics.empty;
+    }
+  }
+
+  Future<HostMetrics> _collectHostWindows() async {
+    try {
+      // Memory: wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /value  (KB)
+      final memResult = await Process.run(
+        'wmic',
+        ['OS', 'get', 'FreePhysicalMemory,TotalVisibleMemorySize', '/value'],
+        runInShell: true,
+      );
+      int freeKb = 0, totalKb = 0;
+      if (memResult.exitCode == 0) {
+        for (final line in (memResult.stdout as String).split('\n')) {
+          final kv = line.trim().split('=');
+          if (kv.length != 2) continue;
+          final key = kv[0].trim();
+          final val = int.tryParse(kv[1].trim()) ?? 0;
+          if (key == 'FreePhysicalMemory') freeKb = val;
+          if (key == 'TotalVisibleMemorySize') totalKb = val;
+        }
+      }
+      final freeBytes = math.max(0, freeKb * 1024);
+      final totalBytes = math.max(0, totalKb * 1024);
+      final usedBytes = math.max(0, totalBytes - freeBytes);
+      final usedPercent =
+          totalBytes > 0 ? (usedBytes / totalBytes * 100).clamp(0.0, 100.0) : 0.0;
+
+      // CPU load: wmic cpu get LoadPercentage /value
+      final cpuResult = await Process.run(
+        'wmic',
+        ['cpu', 'get', 'LoadPercentage', '/value'],
+        runInShell: true,
+      );
+      double cpuLoad = 0.0;
+      if (cpuResult.exitCode == 0) {
+        for (final line in (cpuResult.stdout as String).split('\n')) {
+          final kv = line.trim().split('=');
+          if (kv.length == 2 && kv[0].trim() == 'LoadPercentage') {
+            cpuLoad = math.max(0.0, double.tryParse(kv[1].trim()) ?? 0.0);
+          }
+        }
+      }
+
+      // Core count: wmic cpu get NumberOfLogicalProcessors /value
+      final coreResult = await Process.run(
+        'wmic',
+        ['cpu', 'get', 'NumberOfLogicalProcessors', '/value'],
+        runInShell: true,
+      );
+      int coreCount = 0;
+      if (coreResult.exitCode == 0) {
+        for (final line in (coreResult.stdout as String).split('\n')) {
+          final kv = line.trim().split('=');
+          if (kv.length == 2 && kv[0].trim() == 'NumberOfLogicalProcessors') {
+            coreCount = math.max(0, int.tryParse(kv[1].trim()) ?? 0);
+          }
+        }
+      }
+
+      return HostMetrics(
+        totalBytes: totalBytes,
+        freeBytes: freeBytes,
+        usedBytes: usedBytes,
+        usedPercent: usedPercent,
+        cpuCoreCount: coreCount,
+        loadAverage1m: cpuLoad, // load average not a concept on Windows; repurpose for overall CPU %
       );
     } catch (_) {
       return HostMetrics.empty;

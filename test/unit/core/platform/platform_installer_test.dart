@@ -58,13 +58,32 @@ void main() {
   });
 
   group('WindowsPlatformInstaller', () {
-    const installer = WindowsPlatformInstaller();
+    late FakeProcessRunner fakeRunner;
+    late WindowsPlatformInstaller installer;
+
+    setUp(() {
+      fakeRunner = FakeProcessRunner();
+      installer = WindowsPlatformInstaller(processRunner: fakeRunner.run);
+    });
 
     test('supportsInAppInstall is true', () {
       expect(installer.supportsInAppInstall, isTrue);
     });
 
-    test('getAppVersion returns fallback', () async {
+    test('getAppVersion returns fallback when powershell fails', () async {
+      fakeRunner.mockResult('powershell', exitCode: 1, stdout: '');
+      final version = await installer.getAppVersion(fallback: '2.0.0');
+      expect(version, '2.0.0');
+    });
+
+    test('getAppVersion returns version string from powershell', () async {
+      fakeRunner.mockResult('powershell', exitCode: 0, stdout: '1.2.3\r\n');
+      final version = await installer.getAppVersion(fallback: '0.0.0');
+      expect(version, '1.2.3');
+    });
+
+    test('getAppVersion returns fallback when stdout is 0.0.0.0', () async {
+      fakeRunner.mockResult('powershell', exitCode: 0, stdout: '0.0.0.0');
       final version = await installer.getAppVersion(fallback: '2.0.0');
       expect(version, '2.0.0');
     });

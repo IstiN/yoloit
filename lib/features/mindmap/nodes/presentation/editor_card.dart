@@ -294,9 +294,9 @@ class _EditorCardState extends State<EditorCard> {
                               _isEditing = true;
                               _isPreview = false;
                             });
-                            WidgetsBinding.instance.addPostFrameCallback(
-                              (_) => _focusNode.requestFocus(),
-                            );
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) _focusNode.requestFocus();
+                            });
                           }
                         },
                       ),
