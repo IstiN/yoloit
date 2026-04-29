@@ -6,34 +6,126 @@ import 'package:yoloit/features/collaboration/desktop/repo_directory_listing.dar
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
+import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/file_tree_card.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/review_card_props_builder.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_state.dart';
 
 /// Mindmap file-tree card — uses the same presentation widget as the browser.
-class FileTreeNode extends StatelessWidget {
+///
+/// Tree state management: prefers [ReviewCubit] when it already owns this
+/// repo path (so the review panel and miro board stay in sync). Falls back to
+/// a fully-local tree when ReviewCubit is not loaded for this path, so the
+/// folders can still be expanded without affecting the review panel state.
+class FileTreeNode extends StatefulWidget {
   const FileTreeNode({super.key, required this.data});
   final FileTreeNodeData data;
 
   @override
+  State<FileTreeNode> createState() => _FileTreeNodeState();
+}
+
+class _FileTreeNodeState extends State<FileTreeNode> {
+  // ── helpers ───────────────────────────────────────────────────────────────
+
+  String get _repoPath => widget.data.repoPath ?? '';
+
+  /// Returns true when the ReviewCubit has already loaded a tree that contains
+  /// this repo path as a root, so we can delegate to it instead of managing
+  /// local state.
+  bool _reviewCubitOwnsPath(ReviewState state) {
+    if (state is! ReviewLoaded) return false;
+    return state.fileTree.any((n) => n.path == _repoPath);
+  }
+
+  /// User-toggled expanded state. Paths not present here use the
+  /// default from [listRepoDir] (root = true, others = false).
+  final Map<String, bool> _localExpanded = {};
+
+  void _toggleLocal(String path) {
+    setState(() {
+      // Default expanded state: root is expanded, all else collapsed.
+      final currentlyExpanded = _localExpanded[path] ?? (path == _repoPath);
+      _localExpanded[path] = !currentlyExpanded;
+    });
+  }
+
+  /// Builds a flat list of [TreeEntry] from the filesystem, respecting
+  /// the [_localExpanded] user-toggle map.
+  List<TreeEntry> _buildLocalTree(String dirPath, int depth) {
+    final raw = listRepoDir(dirPath);
+    if (raw.isEmpty) return const [];
+
+    final result = <TreeEntry>[];
+    for (final e in raw) {
+      final path = e['path'] as String? ?? '';
+      final isDir = e['isDir'] as bool? ?? false;
+      final rawDepth = e['depth'] as int? ?? 0;
+      final entryDepth = depth + rawDepth;
+
+      // Determine expanded state: explicit toggle overrides, root defaults to true.
+      final isExpanded = isDir && (_localExpanded[path] ?? (rawDepth == 0));
+
+      result.add(TreeEntry(
+        name: e['name'] as String? ?? '',
+        path: path,
+        isDir: isDir,
+        depth: entryDepth,
+        isExpanded: isExpanded,
+      ));
+
+      // Recursively expand directories that are open (only their direct
+      // children — listRepoDir gives us depth 0 + depth 1, so one level
+      // at a time keeps the UI snappy).
+      if (isDir && isExpanded && rawDepth > 0) {
+        result.addAll(_buildLocalTree(path, entryDepth));
+      }
+    }
+    return result;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return BlocBuilder<ReviewCubit, ReviewState>(
-      builder: (context, state) => FileTreeCard(
-        props: buildFileTreeCardProps(
-          repoPath: data.repoPath ?? '',
-          repoName: data.repoName,
-          reviewState: state,
-          listDirectory: listRepoDir,
-        ),
-        onToggle: (path) => context.read<ReviewCubit>().toggleNode(path),
-        onSelect: (path) => _openInPanel(context, path),
-        onNewFolder: (parentPath) => _createNewFolder(context, parentPath),
-        onShowInFinder: (path) => PlatformLauncher.instance.revealInFinder(path),
-        onOpenInPanel: (path) => _openInPanel(context, path),
-        onRename: (path, currentName) => _renameEntry(context, path, currentName),
-        onCreateFile: (dirPath) => _createFile(context, dirPath),
-      ),
+      builder: (context, state) {
+        final useReview = _reviewCubitOwnsPath(state);
+
+        if (useReview) {
+          // ── ReviewCubit owns this path — delegate everything to it ─────
+          return FileTreeCard(
+            props: buildFileTreeCardProps(
+              repoPath: _repoPath,
+              repoName: widget.data.repoName,
+              reviewState: state,
+            ),
+            onToggle: (path) => context.read<ReviewCubit>().toggleNode(path),
+            onSelect: (path) => _openInPanel(context, path),
+            onNewFolder: (parentPath) => _createNewFolder(context, parentPath),
+            onShowInFinder: (path) => PlatformLauncher.instance.revealInFinder(path),
+            onOpenInPanel: (path) => _openInPanel(context, path),
+            onRename: (path, currentName) => _renameEntry(context, path, currentName),
+            onCreateFile: (dirPath) => _createFile(context, dirPath),
+          );
+        }
+
+        // ── Local tree mode — manage expansion state in this widget ───────
+        final localEntries = _buildLocalTree(_repoPath, 0);
+        return FileTreeCard(
+          props: FileTreeCardProps(
+            repoName: widget.data.repoName,
+            repoPath: _repoPath,
+            entries: localEntries,
+          ),
+          onToggle: (path) => _toggleLocal(path),
+          onSelect: (path) => _openInPanel(context, path),
+          onNewFolder: (parentPath) => _createNewFolder(context, parentPath),
+          onShowInFinder: (path) => PlatformLauncher.instance.revealInFinder(path),
+          onOpenInPanel: (path) => _openInPanel(context, path),
+          onRename: (path, currentName) => _renameEntry(context, path, currentName),
+          onCreateFile: (dirPath) => _createFile(context, dirPath),
+        );
+      },
     );
   }
 
@@ -159,7 +251,6 @@ class FileTreeNode extends StatelessWidget {
   Future<void> _createFile(BuildContext context, String dirPath) async {
     final navigator = Navigator.of(context, rootNavigator: true);
     final reviewCubit = context.read<ReviewCubit>();
-    final mindMapCubit = context.read<MindMapCubit>();
     final ctrl = TextEditingController();
 
     final fileName = await showDialog<String>(
@@ -212,7 +303,7 @@ class FileTreeNode extends StatelessWidget {
     }
     // Open the new file in a mindmap panel
     final newPath = p.join(dirPath, fileName);
-    _openInPanel(context, newPath);
+    if (context.mounted) _openInPanel(context, newPath);
   }
 
   void _openInPanel(BuildContext context, String path) {
