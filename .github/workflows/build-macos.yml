@@ -22,6 +22,11 @@ jobs:
     runs-on: [self-hosted, macOS, ARM64]
     permissions:
       contents: write   # needed to create GitHub Releases
+    env:
+      # Workaround: force .NET (used by the runner) to use SocketsHttpHandler
+      # instead of Apple's SSL APIs, avoiding "bad certificate format" errors
+      # caused by corporate Zscaler/MDM certificates in the system keychain.
+      DOTNET_SYSTEM_NET_HTTP_USESOCKETSHTTPHANDLER: "0"
 
     steps:
       # ── Checkout ────────────────────────────────────────────────────────────
