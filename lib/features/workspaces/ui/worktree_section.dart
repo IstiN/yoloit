@@ -466,7 +466,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
   }
 
   Future<void> _browse() async {
-    final dir = await FilePicker.platform.getDirectoryPath(
+    final dir = await FilePicker.getDirectoryPath(
       dialogTitle: 'Select Worktree Directory',
     );
     if (dir != null && mounted) {

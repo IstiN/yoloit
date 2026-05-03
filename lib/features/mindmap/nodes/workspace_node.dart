@@ -24,7 +24,7 @@ class WorkspaceNode extends StatelessWidget {
         paths: ws.paths,
       ),
       onAddFolder: () async {
-        final dir = await FilePicker.platform.getDirectoryPath(
+        final dir = await FilePicker.getDirectoryPath(
           dialogTitle: 'Add folder to "${ws.name}"',
         );
         if (dir == null || !context.mounted) return;

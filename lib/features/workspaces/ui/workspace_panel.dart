@@ -190,7 +190,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     if (name == null || !context.mounted) return;
 
     // Step 2: pick at least one folder
-    final folder = await FilePicker.platform.getDirectoryPath(
+    final folder = await FilePicker.getDirectoryPath(
       dialogTitle: 'Add Folder to "$name"',
     );
     if (folder == null || !context.mounted) return;
@@ -211,7 +211,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
         isDestructive: false,
       );
       if (!addMore || !context.mounted) break;
-      final extra = await FilePicker.platform.getDirectoryPath(
+      final extra = await FilePicker.getDirectoryPath(
         dialogTitle: 'Add Folder to "$name"',
       );
       if (extra == null || !context.mounted) break;
@@ -291,7 +291,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
   }
 
   Future<void> _addPathToWorkspace(BuildContext context, String workspaceId) async {
-    final result = await FilePicker.platform.getDirectoryPath(
+    final result = await FilePicker.getDirectoryPath(
       dialogTitle: 'Add Folder to Workspace',
     );
     if (result == null || !context.mounted) return;

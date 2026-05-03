@@ -231,7 +231,7 @@ class _WorkingDirField extends StatelessWidget {
   final TextEditingController controller;
 
   Future<void> _browse(BuildContext context) async {
-    final dir = await FilePicker.platform.getDirectoryPath(
+    final dir = await FilePicker.getDirectoryPath(
       dialogTitle: 'Select Working Directory',
     );
     if (dir != null) controller.text = dir;

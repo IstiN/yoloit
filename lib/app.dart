@@ -395,7 +395,7 @@ class App extends StatelessWidget {
           ? (Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '') + path.substring(1)
           : path;
     } else {
-      dir = await FilePicker.platform.getDirectoryPath(
+      dir = await FilePicker.getDirectoryPath(
         dialogTitle: 'Add folder to "${node.workspace.name}"',
       );
     }
@@ -487,7 +487,7 @@ class App extends StatelessWidget {
       controller.dispose();
       if (pickedName == null || pickedName.isEmpty) return;
 
-      final pickedFolder = await FilePicker.platform.getDirectoryPath(
+      final pickedFolder = await FilePicker.getDirectoryPath(
         dialogTitle: 'Pick a folder for "$pickedName"',
       );
       if (pickedFolder == null) return;

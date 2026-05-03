@@ -1619,7 +1619,7 @@ Future<void> _createWorkspace(BuildContext context) async {
     controller.dispose();
   }
   if (name == null || name.isEmpty || !context.mounted) return;
-  final folder = await FilePicker.platform.getDirectoryPath(
+  final folder = await FilePicker.getDirectoryPath(
     dialogTitle: 'Pick a folder for "$name"',
   );
   if (folder == null || !context.mounted) return;
