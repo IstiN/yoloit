@@ -942,7 +942,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _searchController.clear();
     });
     _controller.clearSelection();
-    _focusNode.requestFocus();
+    if (mounted) _focusNode.requestFocus();
   }
 
   void _performSearch(String query) {

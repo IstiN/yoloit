@@ -225,16 +225,23 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
   }
 }
 
-class _WorkingDirField extends StatelessWidget {
+class _WorkingDirField extends StatefulWidget {
   const _WorkingDirField({required this.controller});
 
   final TextEditingController controller;
 
-  Future<void> _browse(BuildContext context) async {
+  @override
+  State<_WorkingDirField> createState() => _WorkingDirFieldState();
+}
+
+class _WorkingDirFieldState extends State<_WorkingDirField> {
+  TextEditingController get controller => widget.controller;
+
+  Future<void> _browse() async {
     final dir = await FilePicker.getDirectoryPath(
       dialogTitle: 'Select Working Directory',
     );
-    if (dir != null) controller.text = dir;
+    if (dir != null && mounted) controller.text = dir;
   }
 
   List<String> _workspacePaths(BuildContext context) {
@@ -298,7 +305,7 @@ class _WorkingDirField extends StatelessWidget {
             Tooltip(
               message: 'Browse for directory',
               child: InkWell(
-                onTap: () => _browse(context),
+                onTap: _browse,
                 borderRadius: BorderRadius.circular(4),
                 child: Container(
                   padding: const EdgeInsets.all(7),
