@@ -1815,7 +1815,7 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
   }
 
   Future<void> _pickDirectory(BuildContext context) async {
-    final result = await FilePicker.platform.getDirectoryPath(
+    final result = await FilePicker.getDirectoryPath(
       dialogTitle: 'Choose workspace storage folder',
     );
     if (result == null) return;

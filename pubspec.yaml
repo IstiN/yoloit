@@ -38,8 +38,8 @@ dependencies:
   flutter_pty: ^0.4.2
   xterm:
     path: packages/xterm
-  window_manager: ^0.4.3
-  file_picker: ^9.2.1
+  window_manager: ^0.5.1
+  file_picker: ^11.0.2
   path: ^1.9.1
   process_run: ^1.2.2
   diff_match_patch: ^0.4.1
@@ -51,14 +51,14 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   flutter_colorpicker: ^1.1.0
   flutter_code_editor: ^0.3.5
-  flutter_markdown: ^0.7.7+1
+  flutter_markdown_plus: ^1.0.7
   # ── Collaboration / remote sync ──────────────────────────────────────────
   shelf: ^1.4.2
-  shelf_web_socket: ^2.0.0
+  shelf_web_socket: ^3.0.0
   web_socket_channel: ^3.0.1
   shelf_static: ^1.1.3
   crypto: ^3.0.0
-  vector_math: ^2.2.0
+  vector_math: 2.2.0
   cryptography: ^2.9.0
 
 dev_dependencies:
@@ -67,7 +67,7 @@ dev_dependencies:
   integration_test:
     sdk: flutter
 
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
   bloc_test: ^10.0.0
   mocktail: ^1.0.4
   golden_toolkit: ^0.15.0
