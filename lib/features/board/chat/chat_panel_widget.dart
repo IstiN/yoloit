@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 
 /// The chat UI rendered inside a board panel.
 ///
@@ -25,10 +29,12 @@ class ChatPanelWidget extends StatefulWidget {
   State<ChatPanelWidget> createState() => _ChatPanelWidgetState();
 }
 
-class _ChatPanelWidgetState extends State<ChatPanelWidget> {
+class _ChatPanelWidgetState extends State<ChatPanelWidget>
+    with SingleTickerProviderStateMixin {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _inputFocusNode = FocusNode();
+  late AnimationController _glowCtrl;
 
   late ChatProvider _provider;
   late ChatSessionConfig _config;
@@ -38,7 +44,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
   bool _isProcessing = false;
   bool _isFirstMessage = true;
   ChatTokenUsage? _lastUsage;
+  int _totalOutputTokens = 0;
   StreamSubscription<ChatEvent>? _eventSub;
+
+  /// Notifier for panel border animation.
+  final ValueNotifier<bool> processingNotifier = ValueNotifier(false);
 
   // Streaming assistant message accumulator
   String _streamingContent = '';
@@ -49,6 +59,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
     super.initState();
     _initConfig();
     _provider = CopilotCliProvider();
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
   }
 
   void _initConfig() {
@@ -70,6 +84,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
+    _glowCtrl.dispose();
+    processingNotifier.dispose();
     super.dispose();
   }
 
@@ -85,9 +101,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
     });
   }
 
+  void _setProcessing(bool value) {
+    _isProcessing = value;
+    processingNotifier.value = value;
+    if (value) {
+      _glowCtrl.repeat(reverse: true);
+    } else {
+      _glowCtrl.stop();
+      _glowCtrl.value = 0;
+    }
+  }
+
   void _sendMessage() {
     final text = _inputController.text.trim();
-    if (text.isEmpty || _isProcessing) return;
+    if (text.isEmpty) return;
 
     _inputController.clear();
 
@@ -99,7 +126,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
         content: text,
         timestamp: DateTime.now(),
       ));
-      _isProcessing = true;
+      _setProcessing(true);
       _streamingContent = '';
       _streamingMessageId = null;
       _activeToolCalls.clear();
@@ -121,7 +148,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
       _handleEvent,
       onError: (Object error) {
         setState(() {
-          _isProcessing = false;
+          _setProcessing(false);
           _messages.add(ChatMessage(
             id: 'error-${DateTime.now().millisecondsSinceEpoch}',
             role: ChatRole.system,
@@ -133,15 +160,23 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
       },
       onDone: () {
         setState(() {
-          _isProcessing = false;
+          _setProcessing(false);
           // Finalize any streaming message
           if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
             _finalizeStreamingMessage();
           }
         });
         _scrollToBottom();
+        // Play macOS system sound on completion
+        _playCompletionSound();
       },
     );
+  }
+
+  void _playCompletionSound() {
+    try {
+      Process.run('afplay', ['/System/Library/Sounds/Glass.aiff']);
+    } catch (_) {}
   }
 
   void _handleEvent(ChatEvent event) {
@@ -187,6 +222,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
           ChatTokenUsage? usage;
           if (outputTokens != null) {
             usage = ChatTokenUsage(outputTokens: outputTokens);
+            _totalOutputTokens += outputTokens;
           }
 
           _messages.add(ChatMessage(
@@ -272,6 +308,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
       case ChatEventType.assistantTurnStart:
       case ChatEventType.assistantTurnEnd:
       case ChatEventType.askUser:
+        final question = event.data['question'] as String? ?? '';
+        final choicesRaw = event.data['choices'];
+        final choices = choicesRaw is List
+            ? choicesRaw.cast<String>()
+            : <String>[];
+        final allowFreeform = event.data['allowFreeform'] as bool? ?? true;
+        setState(() {
+          _messages.add(ChatMessage(
+            id: 'ask-${DateTime.now().millisecondsSinceEpoch}',
+            role: ChatRole.system,
+            content: question,
+            timestamp: DateTime.now(),
+            metadata: {
+              'type': 'ask_user',
+              'choices': choices,
+              'allowFreeform': allowFreeform,
+            },
+          ));
+        });
+        _scrollToBottom();
+        break;
       case ChatEventType.unknown:
         break;
     }
@@ -320,20 +377,47 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
   // ── Chat view ─────────────────────────────────────────────────────────────
 
   Widget _buildChatView() {
-    return Column(
-      children: [
-        // Model + session info bar
-        _buildInfoBar(),
-        const Divider(height: 1),
-        // Messages
-        Expanded(
-          child: _messages.isEmpty && !_isProcessing
-              ? _buildEmptyState()
-              : _buildMessageList(),
-        ),
-        // Input
-        _buildInputBar(),
-      ],
+    return AnimatedBuilder(
+      animation: _glowCtrl,
+      builder: (context, child) {
+        return Container(
+          decoration: _isProcessing
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFF34D399).withAlpha(
+                      (40 + _glowCtrl.value * 80).round(),
+                    ),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF34D399).withAlpha(
+                        (_glowCtrl.value * 40).round(),
+                      ),
+                      blurRadius: 12,
+                    ),
+                  ],
+                )
+              : null,
+          child: child,
+        );
+      },
+      child: Column(
+        children: [
+          // Model + session info bar
+          _buildInfoBar(),
+          const Divider(height: 1),
+          // Messages
+          Expanded(
+            child: _messages.isEmpty && !_isProcessing
+                ? _buildEmptyState()
+                : _buildMessageList(),
+          ),
+          // Input
+          _buildInputBar(),
+        ],
+      ),
     );
   }
 
@@ -343,7 +427,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
       color: const Color(0x0AFFFFFF),
       child: Row(
         children: [
-          const Icon(Icons.smart_toy_outlined, size: 14, color: Color(0xFF34D399)),
+          const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF34D399)),
           const SizedBox(width: 4),
           Text(
             _config.model,
@@ -370,6 +454,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
                 '${_lastUsage!.premiumRequests} premium',
                 style: const TextStyle(fontSize: 10, color: Color(0xFFFBBF24)),
               ),
+          ],
+          if (_totalOutputTokens > 0) ...[
+            const SizedBox(width: 4),
+            Text(
+              '∑ ${_totalOutputTokens}tok',
+              style: const TextStyle(fontSize: 10, color: Color(0xFF818CF8)),
+            ),
           ],
           if (_isProcessing)
             const Padding(
@@ -408,33 +499,35 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
   }
 
   Widget _buildMessageList() {
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      itemCount: _messages.length
-          + (_streamingContent.isNotEmpty ? 1 : 0)
-          + (_activeToolCalls.values.any((t) => t.isRunning) ? 1 : 0),
-      itemBuilder: (context, index) {
-        // Active tool calls indicator
-        final runningTools = _activeToolCalls.values.where((t) => t.isRunning).toList();
-        final hasRunningTools = runningTools.isNotEmpty;
+    return SelectionArea(
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        itemCount: _messages.length
+            + (_streamingContent.isNotEmpty ? 1 : 0)
+            + (_activeToolCalls.values.any((t) => t.isRunning) ? 1 : 0),
+        itemBuilder: (context, index) {
+          // Active tool calls indicator
+          final runningTools = _activeToolCalls.values.where((t) => t.isRunning).toList();
+          final hasRunningTools = runningTools.isNotEmpty;
 
-        if (index < _messages.length) {
-          return _buildMessageBubble(_messages[index]);
-        }
+          if (index < _messages.length) {
+            return _buildMessageBubble(_messages[index]);
+          }
 
-        // Running tools indicator
-        if (hasRunningTools && index == _messages.length) {
-          return _buildRunningToolsCard(runningTools);
-        }
+          // Running tools indicator
+          if (hasRunningTools && index == _messages.length) {
+            return _buildRunningToolsCard(runningTools);
+          }
 
-        // Streaming content
-        if (_streamingContent.isNotEmpty) {
-          return _buildStreamingBubble();
-        }
+          // Streaming content
+          if (_streamingContent.isNotEmpty) {
+            return _buildStreamingBubble();
+          }
 
-        return const SizedBox.shrink();
-      },
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 
@@ -456,6 +549,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
           success: _activeToolCalls[message.toolCallId]?.success,
         );
       case ChatRole.system:
+        final meta = message.metadata;
+        if (meta != null && meta['type'] == 'ask_user') {
+          return _AskUserCard(
+            question: message.content,
+            choices: (meta['choices'] as List?)?.cast<String>() ?? [],
+            onChoice: (choice) {
+              _inputController.text = choice;
+              _sendMessage();
+            },
+          );
+        }
         return _SystemBubble(content: message.content);
     }
   }
@@ -503,6 +607,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
   }
 
   Widget _buildStreamingBubble() {
+    final processedContent = _streamingContent
+        .replaceAll(RegExp(r'<br\s*/?>'), '\n');
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 4, right: 40),
       child: Container(
@@ -515,9 +621,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             MarkdownBody(
-              data: _streamingContent,
+              data: processedContent,
+              onTapLink: (text, href, title) {
+                if (href != null && href.isNotEmpty) {
+                  PlatformLauncher.instance.openUrl(href);
+                }
+              },
               styleSheet: MarkdownStyleSheet(
                 p: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+                a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
                 code: const TextStyle(fontSize: 12, color: Color(0xFF34D399), backgroundColor: Color(0xFF0F172A)),
               ),
             ),
@@ -537,6 +649,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
       ),
       child: Row(
         children: [
+          // Paste button for images/long text
+          IconButton(
+            onPressed: _handleClipboardPaste,
+            icon: const Icon(Icons.attach_file, size: 18, color: Color(0xFF64748B)),
+            splashRadius: 16,
+            tooltip: 'Paste from clipboard',
+          ),
           Expanded(
             child: KeyboardListener(
               focusNode: FocusNode(),
@@ -550,10 +669,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
               child: TextField(
                 controller: _inputController,
                 focusNode: _inputFocusNode,
-                enabled: !_isProcessing,
                 style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
                 decoration: InputDecoration(
-                  hintText: _isProcessing ? 'Waiting for response…' : 'Type a message… (Shift+Enter for newline)',
+                  hintText: _isProcessing ? 'Agent working… (you can still send)' : 'Type a message… (Shift+Enter for newline)',
                   hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -575,12 +693,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           IconButton(
-            onPressed: _isProcessing ? null : _sendMessage,
+            onPressed: _sendMessage,
             icon: Icon(
-              _isProcessing ? Icons.hourglass_top : Icons.send,
-              color: _isProcessing ? const Color(0xFF475569) : const Color(0xFF34D399),
+              _isProcessing ? Icons.send : Icons.send,
+              color: const Color(0xFF34D399),
               size: 20,
             ),
             splashRadius: 18,
@@ -588,6 +706,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleClipboardPaste() async {
+    try {
+      final result = await ClipboardFileService.instance.saveClipboardToFile();
+      if (result != null) {
+        _inputController.text += result;
+        _inputController.selection = TextSelection.collapsed(
+          offset: _inputController.text.length,
+        );
+      }
+    } catch (e) {
+      debugPrint('[ChatPanel] Clipboard paste error: $e');
+    }
   }
 
   String _shortPath(String path) {
@@ -673,19 +805,40 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 4),
-          TextField(
-            controller: _dirCtrl,
-            style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
-            decoration: InputDecoration(
-              hintText: '/path/to/project',
-              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF334155)),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _dirCtrl,
+                  readOnly: true,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                  decoration: InputDecoration(
+                    hintText: 'Select a project folder…',
+                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFF334155)),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    isDense: true,
+                  ),
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              isDense: true,
-            ),
+              const SizedBox(width: 6),
+              IconButton(
+                icon: const Icon(Icons.folder_open, size: 20, color: Color(0xFF34D399)),
+                splashRadius: 18,
+                tooltip: 'Browse…',
+                onPressed: () async {
+                  final dir = await FilePicker.getDirectoryPath(
+                    dialogTitle: 'Select working directory',
+                  );
+                  if (dir != null) {
+                    setState(() => _dirCtrl.text = dir);
+                  }
+                },
+              ),
+            ],
           ),
           const SizedBox(height: 12),
 
@@ -782,6 +935,10 @@ class _UserBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check if content is a file reference (from clipboard paste)
+    final isImageFile = content.startsWith('/') &&
+        RegExp(r'\.(png|jpg|jpeg|gif|webp|bmp)$', caseSensitive: false).hasMatch(content);
+
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 4, left: 40),
       child: Align(
@@ -792,10 +949,28 @@ class _UserBubble extends StatelessWidget {
             color: const Color(0xFF3B82F6),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            content,
-            style: const TextStyle(fontSize: 13, color: Colors.white),
-          ),
+          child: isImageFile
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                        child: Image.file(File(content), fit: BoxFit.contain),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      content.split('/').last,
+                      style: const TextStyle(fontSize: 10, color: Color(0xFFBFDBFE)),
+                    ),
+                  ],
+                )
+              : Text(
+                  content,
+                  style: const TextStyle(fontSize: 13, color: Colors.white),
+                ),
         ),
       ),
     );
@@ -814,6 +989,10 @@ class _AssistantBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Preprocess: replace <br> tags with newlines for markdown rendering
+    final processedContent = content
+        .replaceAll(RegExp(r'<br\s*/?>'), '\n');
+
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 4, right: 40),
       child: Column(
@@ -854,9 +1033,15 @@ class _AssistantBubble extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: MarkdownBody(
-              data: content.isEmpty ? '_thinking…_' : content,
+              data: processedContent.isEmpty ? '_thinking…_' : processedContent,
+              onTapLink: (text, href, title) {
+                if (href != null && href.isNotEmpty) {
+                  PlatformLauncher.instance.openUrl(href);
+                }
+              },
               styleSheet: MarkdownStyleSheet(
                 p: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+                a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
                 code: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF34D399),
@@ -1002,6 +1187,71 @@ class _SystemBubble extends StatelessWidget {
             style: const TextStyle(fontSize: 12, color: Color(0xFFF87171)),
             textAlign: TextAlign.center,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AskUserCard extends StatelessWidget {
+  const _AskUserCard({
+    required this.question,
+    required this.choices,
+    required this.onChoice,
+  });
+  final String question;
+  final List<String> choices;
+  final ValueChanged<String> onChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0x15818CF8),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0x40818CF8)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.help_outline, size: 16, color: Color(0xFF818CF8)),
+                const SizedBox(width: 6),
+                const Text(
+                  'Agent asks:',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF818CF8)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              question,
+              style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+            ),
+            if (choices.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: choices.map((choice) => OutlinedButton(
+                  onPressed: () => onChoice(choice),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF818CF8),
+                    side: const BorderSide(color: Color(0xFF818CF8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  child: Text(choice),
+                )).toList(),
+              ),
+            ],
+          ],
         ),
       ),
     );

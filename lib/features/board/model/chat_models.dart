@@ -22,6 +22,7 @@ class ChatMessage extends Equatable {
     this.toolCallId,
     this.isStreaming = false,
     this.tokenUsage,
+    this.metadata,
   });
 
   final String id;
@@ -44,6 +45,9 @@ class ChatMessage extends Equatable {
   /// Token usage info (populated from the `result` event).
   final ChatTokenUsage? tokenUsage;
 
+  /// Extra metadata (e.g. ask_user choices).
+  final Map<String, dynamic>? metadata;
+
   ChatMessage copyWith({
     String? id,
     ChatRole? role,
@@ -54,6 +58,7 @@ class ChatMessage extends Equatable {
     String? toolCallId,
     bool? isStreaming,
     ChatTokenUsage? tokenUsage,
+    Map<String, dynamic>? metadata,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -65,13 +70,14 @@ class ChatMessage extends Equatable {
       toolCallId: toolCallId ?? this.toolCallId,
       isStreaming: isStreaming ?? this.isStreaming,
       tokenUsage: tokenUsage ?? this.tokenUsage,
+      metadata: metadata ?? this.metadata,
     );
   }
 
   @override
   List<Object?> get props => [
     id, role, content, timestamp, toolCalls, toolName,
-    toolCallId, isStreaming, tokenUsage,
+    toolCallId, isStreaming, tokenUsage, metadata,
   ];
 }
 

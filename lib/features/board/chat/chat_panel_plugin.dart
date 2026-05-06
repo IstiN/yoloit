@@ -17,7 +17,7 @@ class ChatPanelPlugin extends BoardPanelPlugin {
   String get displayName => 'AI Chat';
 
   @override
-  IconData get icon => Icons.smart_toy_outlined;
+  IconData get icon => Icons.auto_awesome;
 
   @override
   Color get accentColor => const Color(0xFF34D399);
