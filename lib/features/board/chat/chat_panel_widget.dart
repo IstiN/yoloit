@@ -75,6 +75,45 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         workingDir: '',
       );
     }
+    // Restore saved messages
+    final savedMessages = widget.panel.state['messages'];
+    if (savedMessages is List) {
+      for (final m in savedMessages) {
+        if (m is Map) {
+          try {
+            final msg = ChatMessage.fromJson(Map<String, dynamic>.from(m));
+            _messages.add(msg);
+            // Restore token count
+            if (msg.tokenUsage != null) {
+              _totalOutputTokens += msg.tokenUsage!.outputTokens;
+            }
+          } catch (_) {}
+        }
+      }
+      if (_messages.isNotEmpty) {
+        _isFirstMessage = false;
+        _scrollToBottom();
+      }
+    }
+    // Restore last usage
+    final savedUsage = widget.panel.state['lastUsage'];
+    if (savedUsage is Map) {
+      _lastUsage = ChatTokenUsage.fromJson(Map<String, dynamic>.from(savedUsage));
+    }
+  }
+
+  static const _maxSavedMessages = 100;
+
+  void _persistMessages() {
+    final trimmed = _messages.length > _maxSavedMessages
+        ? _messages.sublist(_messages.length - _maxSavedMessages)
+        : _messages;
+    widget.onUpdateState({
+      ...widget.panel.state,
+      'config': _config.toJson(),
+      'messages': trimmed.map((m) => m.toJson()).toList(),
+      'lastUsage': _lastUsage?.toJson(),
+    });
   }
 
   @override
@@ -156,6 +195,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             timestamp: DateTime.now(),
           ));
         });
+        _persistMessages();
         _scrollToBottom();
       },
       onDone: () {
@@ -166,6 +206,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             _finalizeStreamingMessage();
           }
         });
+        _persistMessages();
         _scrollToBottom();
         // Play macOS system sound on completion
         _playCompletionSound();

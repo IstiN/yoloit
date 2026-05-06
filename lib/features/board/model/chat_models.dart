@@ -48,6 +48,45 @@ class ChatMessage extends Equatable {
   /// Extra metadata (e.g. ask_user choices).
   final Map<String, dynamic>? metadata;
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'role': role.name,
+    'content': content,
+    if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
+    if (toolCalls.isNotEmpty) 'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
+    if (toolName != null) 'toolName': toolName,
+    if (toolCallId != null) 'toolCallId': toolCallId,
+    if (tokenUsage != null) 'tokenUsage': tokenUsage!.toJson(),
+    if (metadata != null) 'metadata': metadata,
+  };
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final roleStr = json['role'] as String? ?? 'system';
+    final role = ChatRole.values.firstWhere(
+      (r) => r.name == roleStr,
+      orElse: () => ChatRole.system,
+    );
+    return ChatMessage(
+      id: json['id'] as String? ?? '',
+      role: role,
+      content: json['content'] as String? ?? '',
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'] as String)
+          : null,
+      toolCalls: (json['toolCalls'] as List?)
+          ?.map((e) => ChatToolCall.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList() ?? const [],
+      toolName: json['toolName'] as String?,
+      toolCallId: json['toolCallId'] as String?,
+      tokenUsage: json['tokenUsage'] is Map
+          ? ChatTokenUsage.fromJson(Map<String, dynamic>.from(json['tokenUsage'] as Map))
+          : null,
+      metadata: json['metadata'] is Map
+          ? Map<String, dynamic>.from(json['metadata'] as Map)
+          : null,
+    );
+  }
+
   ChatMessage copyWith({
     String? id,
     ChatRole? role,
@@ -107,6 +146,24 @@ class ChatToolCall extends Equatable {
 
   /// Whether execution succeeded (null = not yet complete).
   final bool? success;
+
+  Map<String, dynamic> toJson() => {
+    'toolCallId': toolCallId,
+    'toolName': toolName,
+    'arguments': arguments,
+    if (result != null) 'result': result,
+    if (success != null) 'success': success,
+  };
+
+  factory ChatToolCall.fromJson(Map<String, dynamic> json) => ChatToolCall(
+    toolCallId: json['toolCallId'] as String? ?? '',
+    toolName: json['toolName'] as String? ?? '',
+    arguments: json['arguments'] is Map
+        ? Map<String, dynamic>.from(json['arguments'] as Map)
+        : <String, dynamic>{},
+    result: json['result'] as String?,
+    success: json['success'] as bool?,
+  );
 
   ChatToolCall copyWith({
     String? toolCallId,
@@ -182,6 +239,24 @@ class ChatTokenUsage extends Equatable {
   final int sessionDurationMs;
   final int linesAdded;
   final int linesRemoved;
+
+  Map<String, dynamic> toJson() => {
+    'outputTokens': outputTokens,
+    'premiumRequests': premiumRequests,
+    'totalApiDurationMs': totalApiDurationMs,
+    'sessionDurationMs': sessionDurationMs,
+    'linesAdded': linesAdded,
+    'linesRemoved': linesRemoved,
+  };
+
+  factory ChatTokenUsage.fromJson(Map<String, dynamic> json) => ChatTokenUsage(
+    outputTokens: (json['outputTokens'] as num?)?.toInt() ?? 0,
+    premiumRequests: (json['premiumRequests'] as num?)?.toInt() ?? 0,
+    totalApiDurationMs: (json['totalApiDurationMs'] as num?)?.toInt() ?? 0,
+    sessionDurationMs: (json['sessionDurationMs'] as num?)?.toInt() ?? 0,
+    linesAdded: (json['linesAdded'] as num?)?.toInt() ?? 0,
+    linesRemoved: (json['linesRemoved'] as num?)?.toInt() ?? 0,
+  );
 
   @override
   List<Object?> get props => [
