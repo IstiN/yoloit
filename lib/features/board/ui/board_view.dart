@@ -3074,17 +3074,21 @@ class _BoardDrawingWidget extends StatefulWidget {
 
 class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
   bool _hovered = false;
+  bool _selected = false;
+
+  bool get _showBadge => widget.isSelectMode && (_hovered || _selected);
 
   @override
   Widget build(BuildContext context) {
-    // Use _StrokeHitTestBox which only claims hit when pointer is
-    // near an actual drawn stroke. Transparent bbox areas pass through.
     return _StrokeHitTestBox(
       drawing: widget.drawing,
       onHoverChanged: (h) {
         if (_hovered != h) setState(() => _hovered = h);
       },
       child: GestureDetector(
+        onTap: widget.isSelectMode
+            ? () => setState(() => _selected = !_selected)
+            : null,
         onPanUpdate:
             widget.isSelectMode
                 ? (d) => widget.onMove(widget.drawing.position + d.delta)
@@ -3096,7 +3100,7 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
               size: widget.drawing.size,
               painter: _DrawingElementPainter(drawing: widget.drawing),
             ),
-            if (widget.isSelectMode && _hovered)
+            if (_showBadge)
               Positioned(
                 right: -6,
                 top: -6,
