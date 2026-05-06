@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -25,6 +26,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   static const double _canvasExpansionChunk = 20000;
   static const double _edgePanZone = 120;
   static const double _edgePanMaxStep = 18;
+
+  final FocusNode _boardFocus = FocusNode();
 
   final TransformationController _transformController =
       TransformationController();
@@ -81,13 +84,28 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _transformController.removeListener(_scheduleCanvasExpansionIfNeeded);
     _panController.dispose();
     _transformController.dispose();
+    _boardFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return BlocBuilder<BoardCubit, BoardState>(
+    return KeyboardListener(
+      focusNode: _boardFocus,
+      autofocus: true,
+      onKeyEvent: (event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          if (_connectSourceId != null) {
+            setState(() {
+              _connectSourceId = null;
+              _connectPreviewPointer = null;
+            });
+          }
+        }
+      },
+      child: BlocBuilder<BoardCubit, BoardState>(
       builder: (context, state) {
         if (!state.isLoaded) {
           return const Center(child: CircularProgressIndicator());
@@ -535,6 +553,62 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               ),
                             ),
                           ),
+                          // ── Cancel connection button ───────────────────────
+                          if (_activeTool == BoardToolId.connect &&
+                              _connectSourceId != null)
+                            Positioned(
+                              bottom: 24,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () => setState(() {
+                                      _connectSourceId = null;
+                                      _connectPreviewPointer = null;
+                                    }),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1E1E2E)
+                                            .withAlpha(220),
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: Colors.redAccent
+                                              .withAlpha(160),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.close,
+                                            size: 14,
+                                            color: Colors.redAccent
+                                                .withAlpha(200),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Cancel connection  (Esc)',
+                                            style: TextStyle(
+                                              color: Colors.redAccent
+                                                  .withAlpha(200),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       );
                     },
@@ -545,7 +619,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           ),
         );
       },
-    );
+    ), // BlocBuilder
+    ); // KeyboardListener
   }
 
   void _syncViewport(BoardDocument board) {
