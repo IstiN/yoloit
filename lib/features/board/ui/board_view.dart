@@ -1023,8 +1023,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       final to = panelMap[link.toPanelId];
       if (from == null || to == null || from.hidden || to.hidden) continue;
 
-      final start = from.bounds.rect.center + _canvasOrigin;
-      final end = to.bounds.rect.center + _canvasOrigin;
+      // Use edge-to-edge points (same as painter) for accurate midpoint
+      final fromRect = from.bounds.rect.translate(_canvasOrigin.dx, _canvasOrigin.dy);
+      final toRect = to.bounds.rect.translate(_canvasOrigin.dx, _canvasOrigin.dy);
+      final start = _BoardLinksPainter.edgePointToward(fromRect, toRect.center);
+      final end = _BoardLinksPainter.edgePointToward(toRect, fromRect.center);
       final mid = _linkMidpoint(start, end, link.geometry);
 
       const badgeR = 11.0;
@@ -2186,8 +2189,10 @@ class _BoardLinksPainter extends CustomPainter {
       final to = panelMap[link.toPanelId];
       if (from == null || to == null || from.hidden || to.hidden) continue;
 
-      final start = from.bounds.rect.center + origin;
-      final end = to.bounds.rect.center + origin;
+      final fromRect = from.bounds.rect.translate(origin.dx, origin.dy);
+      final toRect = to.bounds.rect.translate(origin.dx, origin.dy);
+      final start = _edgePointToward(fromRect, toRect.center);
+      final end = _edgePointToward(toRect, fromRect.center);
       final path = _buildLinkPath(start, end, link.geometry);
 
       final paint =
@@ -2241,6 +2246,25 @@ class _BoardLinksPainter extends CustomPainter {
             end.dy,
           );
     }
+  }
+
+  /// Returns the point on [rect]'s border in the direction of [target]
+  /// from the rect's center. Used to start/end links at panel edges.
+  static Offset edgePointToward(Rect rect, Offset target) =>
+      _edgePointToward(rect, target);
+
+  static Offset _edgePointToward(Rect rect, Offset target) {
+    final cx = rect.center.dx;
+    final cy = rect.center.dy;
+    final dx = target.dx - cx;
+    final dy = target.dy - cy;
+    if (dx.abs() < 0.001 && dy.abs() < 0.001) return rect.center;
+    double t = double.infinity;
+    if (dx > 0) t = math.min(t, (rect.right - cx) / dx);
+    if (dx < 0) t = math.min(t, (rect.left - cx) / dx);
+    if (dy > 0) t = math.min(t, (rect.bottom - cy) / dy);
+    if (dy < 0) t = math.min(t, (rect.top - cy) / dy);
+    return Offset(cx + dx * t, cy + dy * t);
   }
 
   void _drawDashedPath(Canvas canvas, Path path, Paint paint) {
@@ -2744,8 +2768,9 @@ class _ConnectSettingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activeColor = settings.color;
     return Container(
-      width: 160,
+      width: 168,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xE50B0D12),
@@ -2757,7 +2782,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'Connect settings',
+            'Connect',
             style: TextStyle(
               color: AppColors.textMuted,
               fontSize: 11,
@@ -2765,72 +2790,140 @@ class _ConnectSettingsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Line style
-          _SettingRow(
-            label: 'Style',
-            child: DropdownButton<BoardLinkGeometry>(
-              value: settings.geometry,
-              isDense: true,
-              dropdownColor: const Color(0xFF0B0D12),
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 12,
+          // ── Live mini preview ──────────────────────────────────────────
+          Container(
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B0D12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF2A3040)),
+            ),
+            child: CustomPaint(
+              painter: _LinkPreviewPainter(
+                geometry: settings.geometry,
+                showArrow: settings.showArrow,
+                color: activeColor,
               ),
-              underline: const SizedBox.shrink(),
-              items: const [
-                DropdownMenuItem(
-                  value: BoardLinkGeometry.bezier,
-                  child: Text('Bezier'),
-                ),
-                DropdownMenuItem(
-                  value: BoardLinkGeometry.straight,
-                  child: Text('Straight'),
-                ),
-                DropdownMenuItem(
-                  value: BoardLinkGeometry.elbow,
-                  child: Text('Elbow'),
-                ),
-              ],
-              onChanged:
-                  (v) =>
-                      v != null
-                          ? onChanged(settings.copyWith(geometry: v))
-                          : null,
             ),
           ),
+          const SizedBox(height: 8),
+          // ── Geometry buttons ───────────────────────────────────────────
+          Row(
+            children: [
+              for (final geo in BoardLinkGeometry.values) ...[
+                if (BoardLinkGeometry.values.indexOf(geo) > 0)
+                  const SizedBox(width: 4),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => onChanged(settings.copyWith(geometry: geo)),
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color:
+                            settings.geometry == geo
+                                ? activeColor.withAlpha(25)
+                                : Colors.transparent,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color:
+                              settings.geometry == geo
+                                  ? activeColor.withAlpha(160)
+                                  : const Color(0xFF2A3040),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CustomPaint(
+                            size: const Size(32, 14),
+                            painter: _LinkMiniPreviewPainter(
+                              geometry: geo,
+                              color:
+                                  settings.geometry == geo
+                                      ? activeColor
+                                      : AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            switch (geo) {
+                              BoardLinkGeometry.bezier => 'Bézier',
+                              BoardLinkGeometry.straight => 'Line',
+                              BoardLinkGeometry.elbow => 'Elbow',
+                            },
+                            style: TextStyle(
+                              fontSize: 8,
+                              color:
+                                  settings.geometry == geo
+                                      ? activeColor
+                                      : AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          // ── Arrow + color row ──────────────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Arrow',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              ),
+              Transform.scale(
+                scale: 0.75,
+                alignment: Alignment.centerRight,
+                child: Switch.adaptive(
+                  value: settings.showArrow,
+                  onChanged:
+                      (v) => onChanged(settings.copyWith(showArrow: v)),
+                  activeColor: activeColor,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
-          _SettingRow(
-            label: 'Arrow',
-            child: Switch.adaptive(
-              value: settings.showArrow,
-              onChanged:
-                  (v) => onChanged(settings.copyWith(showArrow: v)),
-              activeColor: const Color(0xFF34D399),
-            ),
+          // ── Color swatches ─────────────────────────────────────────────
+          Wrap(
+            spacing: 5,
+            runSpacing: 5,
+            children: [
+              for (final c in const [
+                Color(0xFF60A5FA),
+                Color(0xFF34D399),
+                Color(0xFFF87171),
+                Color(0xFFFBBF24),
+                Color(0xFFE879F9),
+                Color(0xFFFFFFFF),
+              ])
+                GestureDetector(
+                  onTap: () => onChanged(settings.copyWith(color: c)),
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: c,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color:
+                            settings.color == c
+                                ? Colors.white
+                                : Colors.white.withAlpha(30),
+                        width: settings.color == c ? 2 : 1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SettingRow extends StatelessWidget {
-  const _SettingRow({required this.label, required this.child});
-
-  final String label;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-        ),
-        child,
-      ],
     );
   }
 }
@@ -2998,14 +3091,10 @@ class _ConnectPreviewPainter extends CustomPainter {
     final source = panels.where((p) => p.id == sourceId).firstOrNull;
     if (source == null) return;
 
-    final srcCenter = Offset(
-      source.bounds.x + source.bounds.width / 2 + origin.dx,
-      source.bounds.y + source.bounds.height / 2 + origin.dy,
-    );
-    final target = Offset(
-      targetPoint.dx + origin.dx,
-      targetPoint.dy + origin.dy,
-    );
+    final srcRect = source.bounds.rect.translate(origin.dx, origin.dy);
+    final target = Offset(targetPoint.dx + origin.dx, targetPoint.dy + origin.dy);
+    // Start from panel edge toward the cursor
+    final srcEdge = _BoardLinksPainter.edgePointToward(srcRect, target);
 
     final paint =
         Paint()
@@ -3015,11 +3104,11 @@ class _ConnectPreviewPainter extends CustomPainter {
 
     final path =
         Path()
-          ..moveTo(srcCenter.dx, srcCenter.dy)
+          ..moveTo(srcEdge.dx, srcEdge.dy)
           ..cubicTo(
-            srcCenter.dx + (target.dx - srcCenter.dx) * 0.4,
-            srcCenter.dy,
-            srcCenter.dx + (target.dx - srcCenter.dx) * 0.6,
+            srcEdge.dx + (target.dx - srcEdge.dx) * 0.4,
+            srcEdge.dy,
+            srcEdge.dx + (target.dx - srcEdge.dx) * 0.6,
             target.dy,
             target.dx,
             target.dy,
@@ -3266,8 +3355,9 @@ class _LinkPreviewPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final start = Offset(size.width * 0.15, size.height * 0.5);
-    final end = Offset(size.width * 0.85, size.height * 0.5);
+    // Stagger panels vertically so curves are clearly visible
+    final start = Offset(size.width * 0.15, size.height * 0.35);
+    final end = Offset(size.width * 0.85, size.height * 0.65);
 
     // Draw mock panels
     final panelPaint =
@@ -3281,13 +3371,13 @@ class _LinkPreviewPainter extends CustomPainter {
           ..strokeWidth = 1;
     final leftPanel = Rect.fromCenter(
       center: start,
-      width: 60,
-      height: 36,
+      width: 56,
+      height: 32,
     );
     final rightPanel = Rect.fromCenter(
       center: end,
-      width: 60,
-      height: 36,
+      width: 56,
+      height: 32,
     );
     final rr = RRect.fromRectAndRadius(leftPanel, const Radius.circular(6));
     final rr2 = RRect.fromRectAndRadius(rightPanel, const Radius.circular(6));
@@ -3366,8 +3456,9 @@ class _LinkMiniPreviewPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final start = Offset(4, size.height / 2);
-    final end = Offset(size.width - 4, size.height / 2);
+    // Stagger Y so bezier/elbow/straight are visually distinct
+    final start = Offset(4, size.height * 0.75);
+    final end = Offset(size.width - 4, size.height * 0.25);
     final path = _BoardLinksPainter.buildLinkPath(start, end, geometry);
     canvas.drawPath(
       path,
