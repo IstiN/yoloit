@@ -290,33 +290,42 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         .toList();
                                   })(),
                                   // ── Drawing layer (completed drawings) ──
-                                  // In connect mode drawings must NOT intercept
-                                  // taps so the panel underneath can be targeted.
+                                  // Positioned must be direct Stack child, so
+                                  // IgnorePointer wraps only the widget content.
                                   ...activeBoard.drawings
                                       .where((d) => !d.hidden)
                                       .map(
-                                        (drawing) => IgnorePointer(
-                                          ignoring:
-                                              _activeTool ==
-                                              BoardToolId.connect,
-                                          child: _BoardDrawingWidget(
-                                            key: ValueKey(drawing.id),
-                                            drawing: drawing,
-                                            canvasOrigin: _canvasOrigin,
-                                            isSelectMode:
+                                        (drawing) => Positioned(
+                                          key: ValueKey(drawing.id),
+                                          left: drawing.position.dx +
+                                              _canvasOrigin.dx,
+                                          top: drawing.position.dy +
+                                              _canvasOrigin.dy,
+                                          width: drawing.size.width,
+                                          height: drawing.size.height,
+                                          child: IgnorePointer(
+                                            ignoring:
                                                 _activeTool ==
-                                                BoardToolId.select,
-                                            onMove:
-                                                (newPos) => context
-                                                    .read<BoardCubit>()
-                                                    .moveDrawing(
-                                                      drawing.id,
-                                                      newPos,
-                                                    ),
-                                            onDelete:
-                                                () => context
-                                                    .read<BoardCubit>()
-                                                    .removeDrawing(drawing.id),
+                                                BoardToolId.connect,
+                                            child: _BoardDrawingWidget(
+                                              drawing: drawing,
+                                              isSelectMode:
+                                                  _activeTool ==
+                                                  BoardToolId.select,
+                                              onMove:
+                                                  (newPos) => context
+                                                      .read<BoardCubit>()
+                                                      .moveDrawing(
+                                                        drawing.id,
+                                                        newPos,
+                                                      ),
+                                              onDelete:
+                                                  () => context
+                                                      .read<BoardCubit>()
+                                                      .removeDrawing(
+                                                        drawing.id,
+                                                      ),
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -2852,7 +2861,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final activeColor = settings.color;
     return Container(
-      width: 168,
+      width: 200,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xE50B0D12),
@@ -2873,18 +2882,26 @@ class _ConnectSettingsPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           // ── Live mini preview ──────────────────────────────────────────
-          Container(
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B0D12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF2A3040)),
-            ),
-            child: CustomPaint(
-              painter: _LinkPreviewPainter(
-                geometry: settings.geometry,
-                showArrow: settings.showArrow,
-                color: activeColor,
+          SizedBox(
+            height: 56,
+            width: double.infinity,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B0D12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF2A3040)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CustomPaint(
+                  size: const Size(double.infinity, 56),
+                  painter: _LinkPreviewPainter(
+                    geometry: settings.geometry,
+                    showArrow: settings.showArrow,
+                    color: activeColor,
+                  ),
+                  child: const SizedBox.expand(),
+                ),
               ),
             ),
           ),
@@ -3012,20 +3029,19 @@ class _ConnectSettingsPanel extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drawing widget — renders a completed BoardDrawingElement as a draggable item
+// Caller is responsible for positioning (Positioned must be direct Stack child)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _BoardDrawingWidget extends StatefulWidget {
   const _BoardDrawingWidget({
     super.key,
     required this.drawing,
-    required this.canvasOrigin,
     required this.isSelectMode,
     required this.onMove,
     required this.onDelete,
   });
 
   final BoardDrawingElement drawing;
-  final Offset canvasOrigin;
   final bool isSelectMode;
   final ValueChanged<Offset> onMove;
   final VoidCallback onDelete;
@@ -3039,49 +3055,43 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      left: widget.drawing.position.dx + widget.canvasOrigin.dx,
-      top: widget.drawing.position.dy + widget.canvasOrigin.dy,
-      width: widget.drawing.size.width,
-      height: widget.drawing.size.height,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.deferToChild,
-          onPanUpdate:
-              widget.isSelectMode
-                  ? (d) => widget.onMove(widget.drawing.position + d.delta)
-                  : null,
-          child: Stack(
-            children: [
-              CustomPaint(
-                size: widget.drawing.size,
-                painter: _DrawingElementPainter(drawing: widget.drawing),
-              ),
-              if (widget.isSelectMode && _hovered)
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: GestureDetector(
-                    onTap: widget.onDelete,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: Color(0xCCF87171),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        size: 12,
-                        color: Colors.white,
-                      ),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.deferToChild,
+        onPanUpdate:
+            widget.isSelectMode
+                ? (d) => widget.onMove(widget.drawing.position + d.delta)
+                : null,
+        child: Stack(
+          children: [
+            CustomPaint(
+              size: widget.drawing.size,
+              painter: _DrawingElementPainter(drawing: widget.drawing),
+            ),
+            if (widget.isSelectMode && _hovered)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: GestureDetector(
+                  onTap: widget.onDelete,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: Color(0xCCF87171),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      size: 12,
+                      color: Colors.white,
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -3280,11 +3290,15 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF2A3040)),
               ),
-              child: CustomPaint(
-                painter: _LinkPreviewPainter(
-                  geometry: _geometry,
-                  showArrow: _showArrow,
-                  color: _color,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CustomPaint(
+                  painter: _LinkPreviewPainter(
+                    geometry: _geometry,
+                    showArrow: _showArrow,
+                    color: _color,
+                  ),
+                  child: const SizedBox.expand(),
                 ),
               ),
             ),
