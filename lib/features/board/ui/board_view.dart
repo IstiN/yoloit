@@ -272,27 +272,34 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         .toList();
                                   })(),
                                   // ── Drawing layer (completed drawings) ──
+                                  // In connect mode drawings must NOT intercept
+                                  // taps so the panel underneath can be targeted.
                                   ...activeBoard.drawings
                                       .where((d) => !d.hidden)
                                       .map(
-                                        (drawing) => _BoardDrawingWidget(
-                                          key: ValueKey(drawing.id),
-                                          drawing: drawing,
-                                          canvasOrigin: _canvasOrigin,
-                                          isSelectMode:
+                                        (drawing) => IgnorePointer(
+                                          ignoring:
                                               _activeTool ==
-                                              BoardToolId.select,
-                                          onMove:
-                                              (newPos) => context
-                                                  .read<BoardCubit>()
-                                                  .moveDrawing(
-                                                    drawing.id,
-                                                    newPos,
-                                                  ),
-                                          onDelete:
-                                              () => context
-                                                  .read<BoardCubit>()
-                                                  .removeDrawing(drawing.id),
+                                              BoardToolId.connect,
+                                          child: _BoardDrawingWidget(
+                                            key: ValueKey(drawing.id),
+                                            drawing: drawing,
+                                            canvasOrigin: _canvasOrigin,
+                                            isSelectMode:
+                                                _activeTool ==
+                                                BoardToolId.select,
+                                            onMove:
+                                                (newPos) => context
+                                                    .read<BoardCubit>()
+                                                    .moveDrawing(
+                                                      drawing.id,
+                                                      newPos,
+                                                    ),
+                                            onDelete:
+                                                () => context
+                                                    .read<BoardCubit>()
+                                                    .removeDrawing(drawing.id),
+                                          ),
                                         ),
                                       ),
                                   // ── Active stroke preview ─────────────────
