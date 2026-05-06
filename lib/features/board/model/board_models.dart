@@ -7,6 +7,9 @@ enum BoardLinkStyle { line, arrow }
 
 enum BoardLinkBehavior { fixed, dynamic }
 
+/// Line geometry for board links.
+enum BoardLinkGeometry { bezier, straight, elbow }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Drawing element
 // ─────────────────────────────────────────────────────────────────────────────
@@ -374,6 +377,7 @@ class BoardPanelLink extends Equatable {
     this.style = BoardLinkStyle.arrow,
     this.behavior = BoardLinkBehavior.fixed,
     this.color = const Color(0xFF60A5FA),
+    this.geometry = BoardLinkGeometry.bezier,
   });
 
   final String id;
@@ -382,6 +386,7 @@ class BoardPanelLink extends Equatable {
   final BoardLinkStyle style;
   final BoardLinkBehavior behavior;
   final Color color;
+  final BoardLinkGeometry geometry;
 
   BoardPanelLink copyWith({
     String? id,
@@ -390,6 +395,7 @@ class BoardPanelLink extends Equatable {
     BoardLinkStyle? style,
     BoardLinkBehavior? behavior,
     Color? color,
+    BoardLinkGeometry? geometry,
   }) {
     return BoardPanelLink(
       id: id ?? this.id,
@@ -398,6 +404,7 @@ class BoardPanelLink extends Equatable {
       style: style ?? this.style,
       behavior: behavior ?? this.behavior,
       color: color ?? this.color,
+      geometry: geometry ?? this.geometry,
     );
   }
 
@@ -408,6 +415,7 @@ class BoardPanelLink extends Equatable {
     'style': style.name,
     'behavior': behavior.name,
     'color': color.toARGB32(),
+    'geometry': geometry.name,
   };
 
   factory BoardPanelLink.fromJson(Map<String, dynamic> json) {
@@ -422,17 +430,15 @@ class BoardPanelLink extends Equatable {
         json['behavior'] as String? ?? BoardLinkBehavior.fixed.name,
       ),
       color: Color((json['color'] as num?)?.toInt() ?? 0xFF60A5FA),
+      geometry: BoardLinkGeometry.values.byName(
+        json['geometry'] as String? ?? BoardLinkGeometry.bezier.name,
+      ),
     );
   }
 
   @override
   List<Object?> get props => [
-    id,
-    fromPanelId,
-    toPanelId,
-    style,
-    behavior,
-    color,
+    id, fromPanelId, toPanelId, style, behavior, color, geometry,
   ];
 }
 

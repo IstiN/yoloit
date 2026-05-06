@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/features/board/model/board_models.dart'
+    show BoardLinkGeometry;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool identifiers
@@ -119,8 +121,8 @@ class DrawSettings {
 // Connect tool settings
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Line geometry for links.
-enum BoardLinkGeometry { bezier, straight, elbow }
+// BoardLinkGeometry is defined in board_models.dart and re-exported here
+// via the import above.
 
 class ConnectSettings {
   const ConnectSettings({
