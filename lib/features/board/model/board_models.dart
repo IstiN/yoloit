@@ -1,9 +1,165 @@
+import 'dart:math' as math;
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
 enum BoardLinkStyle { line, arrow }
 
 enum BoardLinkBehavior { fixed, dynamic }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drawing element
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A free-hand drawing element stored as a list of strokes.
+///
+/// Each stroke is a list of [Offset] points **relative to [position]**
+/// (the top-left of the element's bounding box in board space).
+/// This makes dragging cheap — only [position] needs to change.
+class BoardDrawingElement extends Equatable {
+  const BoardDrawingElement({
+    required this.id,
+    required this.strokes,
+    required this.position,
+    required this.size,
+    required this.strokeColor,
+    required this.strokeWidth,
+    this.zIndex = 0,
+    this.hidden = false,
+  });
+
+  final String id;
+
+  /// Strokes as lists of points relative to [position].
+  final List<List<Offset>> strokes;
+
+  /// Top-left of the bounding box in board space.
+  final Offset position;
+
+  /// Bounding box size (width × height) in board space.
+  final Size size;
+
+  final Color strokeColor;
+  final double strokeWidth;
+  final int zIndex;
+  final bool hidden;
+
+  Rect get bounds => position & size;
+
+  BoardDrawingElement copyWith({
+    String? id,
+    List<List<Offset>>? strokes,
+    Offset? position,
+    Size? size,
+    Color? strokeColor,
+    double? strokeWidth,
+    int? zIndex,
+    bool? hidden,
+  }) {
+    return BoardDrawingElement(
+      id: id ?? this.id,
+      strokes: strokes ?? this.strokes,
+      position: position ?? this.position,
+      size: size ?? this.size,
+      strokeColor: strokeColor ?? this.strokeColor,
+      strokeWidth: strokeWidth ?? this.strokeWidth,
+      zIndex: zIndex ?? this.zIndex,
+      hidden: hidden ?? this.hidden,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'strokes': strokes
+        .map(
+          (stroke) =>
+              stroke.map((p) => [p.dx, p.dy]).toList(),
+        )
+        .toList(),
+    'position': [position.dx, position.dy],
+    'size': [size.width, size.height],
+    'strokeColor': strokeColor.toARGB32(),
+    'strokeWidth': strokeWidth,
+    'zIndex': zIndex,
+    'hidden': hidden,
+  };
+
+  factory BoardDrawingElement.fromJson(Map<String, dynamic> json) {
+    final rawStrokes = json['strokes'] as List? ?? const [];
+    final rawPos = json['position'] as List? ?? const [0, 0];
+    final rawSize = json['size'] as List? ?? const [100, 100];
+    return BoardDrawingElement(
+      id: json['id'] as String,
+      strokes: rawStrokes
+          .map(
+            (stroke) => (stroke as List)
+                .map(
+                  (p) => Offset(
+                    (p as List)[0] is num ? (p[0] as num).toDouble() : 0,
+                    p[1] is num ? (p[1] as num).toDouble() : 0,
+                  ),
+                )
+                .toList(),
+          )
+          .toList(),
+      position: Offset(
+        (rawPos[0] as num).toDouble(),
+        (rawPos[1] as num).toDouble(),
+      ),
+      size: Size(
+        (rawSize[0] as num).toDouble(),
+        (rawSize[1] as num).toDouble(),
+      ),
+      strokeColor: Color((json['strokeColor'] as num).toInt()),
+      strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 3.0,
+      zIndex: (json['zIndex'] as num?)?.toInt() ?? 0,
+      hidden: json['hidden'] as bool? ?? false,
+    );
+  }
+
+  /// Build a [BoardDrawingElement] from raw board-space points captured during
+  /// a single draw gesture. Points must not be empty.
+  factory BoardDrawingElement.fromRawStroke({
+    required String id,
+    required List<Offset> rawPoints,
+    required Color strokeColor,
+    required double strokeWidth,
+    int zIndex = 0,
+  }) {
+    assert(rawPoints.isNotEmpty);
+    double minX = rawPoints.first.dx;
+    double minY = rawPoints.first.dy;
+    double maxX = minX;
+    double maxY = minY;
+    for (final p in rawPoints) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+    const padding = 8.0;
+    final origin = Offset(minX - padding, minY - padding);
+    final relativePoints =
+        rawPoints.map((p) => p - origin).toList(growable: false);
+    return BoardDrawingElement(
+      id: id,
+      strokes: [relativePoints],
+      position: origin,
+      size: Size(
+        math.max(maxX - minX + padding * 2, strokeWidth * 2),
+        math.max(maxY - minY + padding * 2, strokeWidth * 2),
+      ),
+      strokeColor: strokeColor,
+      strokeWidth: strokeWidth,
+      zIndex: zIndex,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    id, strokes, position, size, strokeColor, strokeWidth, zIndex, hidden,
+  ];
+}
 
 class BoardViewport extends Equatable {
   const BoardViewport({
@@ -287,6 +443,7 @@ class BoardDocument extends Equatable {
     this.viewport = const BoardViewport(),
     this.panels = const [],
     this.links = const [],
+    this.drawings = const [],
     this.metadata = const {},
   });
 
@@ -295,6 +452,7 @@ class BoardDocument extends Equatable {
   final BoardViewport viewport;
   final List<BoardPanelInstance> panels;
   final List<BoardPanelLink> links;
+  final List<BoardDrawingElement> drawings;
   final Map<String, dynamic> metadata;
 
   BoardDocument copyWith({
@@ -303,6 +461,7 @@ class BoardDocument extends Equatable {
     BoardViewport? viewport,
     List<BoardPanelInstance>? panels,
     List<BoardPanelLink>? links,
+    List<BoardDrawingElement>? drawings,
     Map<String, dynamic>? metadata,
   }) {
     return BoardDocument(
@@ -311,6 +470,7 @@ class BoardDocument extends Equatable {
       viewport: viewport ?? this.viewport,
       panels: panels ?? this.panels,
       links: links ?? this.links,
+      drawings: drawings ?? this.drawings,
       metadata: metadata ?? this.metadata,
     );
   }
@@ -321,12 +481,14 @@ class BoardDocument extends Equatable {
     'viewport': viewport.toJson(),
     'panels': panels.map((panel) => panel.toJson()).toList(),
     'links': links.map((link) => link.toJson()).toList(),
+    'drawings': drawings.map((d) => d.toJson()).toList(),
     'metadata': metadata,
   };
 
   factory BoardDocument.fromJson(Map<String, dynamic> json) {
     final rawPanels = json['panels'] as List? ?? const [];
     final rawLinks = json['links'] as List? ?? const [];
+    final rawDrawings = json['drawings'] as List? ?? const [];
     return BoardDocument(
       id: json['id'] as String,
       name: json['name'] as String? ?? 'Board',
@@ -349,10 +511,20 @@ class BoardDocument extends Equatable {
                 ),
               )
               .toList(),
+      drawings:
+          rawDrawings
+              .map(
+                (entry) => BoardDrawingElement.fromJson(
+                  Map<String, dynamic>.from(entry as Map),
+                ),
+              )
+              .toList(),
       metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? const {}),
     );
   }
 
   @override
-  List<Object?> get props => [id, name, viewport, panels, links, metadata];
+  List<Object?> get props => [
+    id, name, viewport, panels, links, drawings, metadata,
+  ];
 }

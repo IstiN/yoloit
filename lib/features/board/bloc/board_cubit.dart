@@ -278,6 +278,44 @@ class BoardCubit extends Cubit<BoardState> {
     });
   }
 
+  // ── Drawing elements ──────────────────────────────────────────────────────
+
+  Future<void> addDrawing(
+    BoardDrawingElement drawing, {
+    String? boardId,
+  }) async {
+    final targetId = boardId ?? state.activeBoard?.id;
+    if (targetId == null) return;
+    await _updateBoard(targetId, (board) {
+      return board.copyWith(drawings: [...board.drawings, drawing]);
+    });
+  }
+
+  Future<void> moveDrawing(
+    String drawingId,
+    Offset position, {
+    String? boardId,
+  }) async {
+    final targetId = boardId ?? state.activeBoard?.id;
+    if (targetId == null) return;
+    await _updateBoard(targetId, (board) {
+      final updated = board.drawings.map((d) {
+        return d.id == drawingId ? d.copyWith(position: position) : d;
+      }).toList();
+      return board.copyWith(drawings: updated);
+    });
+  }
+
+  Future<void> removeDrawing(String drawingId, {String? boardId}) async {
+    final targetId = boardId ?? state.activeBoard?.id;
+    if (targetId == null) return;
+    await _updateBoard(targetId, (board) {
+      final updated =
+          board.drawings.where((d) => d.id != drawingId).toList();
+      return board.copyWith(drawings: updated);
+    });
+  }
+
   Future<void> _updateBoard(
     String boardId,
     BoardDocument Function(BoardDocument board) update,

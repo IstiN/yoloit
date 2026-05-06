@@ -10,6 +10,7 @@ import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/tools/board_tool.dart';
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key});
@@ -39,10 +40,23 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String? _autoFitKey;
   String? _focusedPanelVisibilityKey;
   bool _showMinimap = true;
+  bool _showToolsPanel = true;
   late final AnimationController _panController;
   Animation<Matrix4>? _panAnimation;
   VoidCallback? _panAnimationListener;
   AnimationStatusListener? _panStatusListener;
+
+  // ── Tool state ────────────────────────────────────────────────────────────
+  BoardToolId _activeTool = BoardToolId.select;
+  DrawSettings _drawSettings = const DrawSettings();
+  ConnectSettings _connectSettings = const ConnectSettings();
+
+  /// Points accumulated for the active stroke (board-space).
+  final List<Offset> _activeStroke = [];
+
+  /// Pending connection source panel id.
+  String? _connectSourceId;
+  Offset? _connectPreviewPointer; // board-space pointer for preview line
 
   @override
   void initState() {
@@ -140,6 +154,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             boundaryMargin: const EdgeInsets.all(
                               _canvasExpansionChunk,
                             ),
+                            panEnabled: _activeTool == BoardToolId.select,
                             transformationController: _transformController,
                             onInteractionStart: (_) {
                               _isViewportInteracting = true;
@@ -226,14 +241,130 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                           panel: panel,
                                                         )
                                                     : null,
+                                            connectMode:
+                                                _activeTool ==
+                                                BoardToolId.connect,
+                                            connectSourceId: _connectSourceId,
+                                            onConnectTap:
+                                                _activeTool ==
+                                                        BoardToolId.connect
+                                                    ? () =>
+                                                        _handleConnectTap(
+                                                          context,
+                                                          activeBoard,
+                                                          panel.id,
+                                                        )
+                                                    : null,
                                           ),
                                         )
                                         .toList();
                                   })(),
+                                  // ── Drawing layer (completed drawings) ──
+                                  ...activeBoard.drawings
+                                      .where((d) => !d.hidden)
+                                      .map(
+                                        (drawing) => _BoardDrawingWidget(
+                                          key: ValueKey(drawing.id),
+                                          drawing: drawing,
+                                          canvasOrigin: _canvasOrigin,
+                                          isSelectMode:
+                                              _activeTool ==
+                                              BoardToolId.select,
+                                          onMove:
+                                              (newPos) => context
+                                                  .read<BoardCubit>()
+                                                  .moveDrawing(
+                                                    drawing.id,
+                                                    newPos,
+                                                  ),
+                                          onDelete:
+                                              () => context
+                                                  .read<BoardCubit>()
+                                                  .removeDrawing(drawing.id),
+                                        ),
+                                      ),
+                                  // ── Active stroke preview ─────────────────
+                                  if (_activeStroke.isNotEmpty)
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: CustomPaint(
+                                          painter: _ActiveStrokePainter(
+                                            points: _activeStroke,
+                                            origin: _canvasOrigin,
+                                            color: _drawSettings.strokeColor,
+                                            strokeWidth:
+                                                _drawSettings.strokeWidth,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  // ── Connect preview line ──────────────────
+                                  if (_activeTool == BoardToolId.connect &&
+                                      _connectSourceId != null &&
+                                      _connectPreviewPointer != null)
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: CustomPaint(
+                                          painter: _ConnectPreviewPainter(
+                                            panels: activeBoard.panels,
+                                            sourceId: _connectSourceId!,
+                                            targetPoint:
+                                                _connectPreviewPointer!,
+                                            origin: _canvasOrigin,
+                                            color: _connectSettings.color,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
                           ),
+                          // ── Draw gesture capture overlay ──────────────────
+                          if (_activeTool == BoardToolId.draw)
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onPanStart: (d) {
+                                  final pt = _boardPointFromGlobal(
+                                    d.globalPosition,
+                                  );
+                                  if (pt == null) return;
+                                  setState(() {
+                                    _activeStroke
+                                      ..clear()
+                                      ..add(pt);
+                                  });
+                                },
+                                onPanUpdate: (d) {
+                                  final pt = _boardPointFromGlobal(
+                                    d.globalPosition,
+                                  );
+                                  if (pt == null) return;
+                                  setState(() => _activeStroke.add(pt));
+                                },
+                                onPanEnd:
+                                    (_) => _finishDrawStroke(context),
+                              ),
+                            ),
+                          // ── Connect tool pointer tracking ─────────────────
+                          if (_activeTool == BoardToolId.connect &&
+                              _connectSourceId != null)
+                            Positioned.fill(
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.precise,
+                                onHover: (e) {
+                                  final pt = _boardPointFromGlobal(
+                                    e.position,
+                                  );
+                                  if (pt == null) return;
+                                  setState(
+                                    () => _connectPreviewPointer = pt,
+                                  );
+                                },
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
                           if (activeBoard.panels.isEmpty)
                             Positioned.fill(
                               child: IgnorePointer(
@@ -351,6 +482,30 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   ),
                                 ],
                               ],
+                            ),
+                          ),
+                          // ── Quick Tools Panel (left side) ──────────────────
+                          Positioned(
+                            left: 12,
+                            top: 12,
+                            child: _BoardToolsPanel(
+                              visible: _showToolsPanel,
+                              activeTool: _activeTool,
+                              drawSettings: _drawSettings,
+                              connectSettings: _connectSettings,
+                              onToolChanged: (tool) => setState(() {
+                                _activeTool = tool;
+                                _activeStroke.clear();
+                                _connectSourceId = null;
+                                _connectPreviewPointer = null;
+                              }),
+                              onDrawSettingsChanged: (s) =>
+                                  setState(() => _drawSettings = s),
+                              onConnectSettingsChanged: (s) =>
+                                  setState(() => _connectSettings = s),
+                              onToggle: () => setState(
+                                () => _showToolsPanel = !_showToolsPanel,
+                              ),
                             ),
                           ),
                         ],
@@ -831,6 +986,75 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String _fmtMatrix(Matrix4 matrix) {
     final storage = matrix.storage;
     return 'scale=${_fmt(matrix.getMaxScaleOnAxis())} t=${_fmtOffset(Offset(storage[12], storage[13]))}';
+  }
+
+  // ── Tool actions ──────────────────────────────────────────────────────────
+
+  void _finishDrawStroke(BuildContext context) {
+    if (_activeStroke.length < 2) {
+      setState(() => _activeStroke.clear());
+      return;
+    }
+    final drawing = BoardDrawingElement.fromRawStroke(
+      id: 'draw_${DateTime.now().millisecondsSinceEpoch}',
+      rawPoints: List.of(_activeStroke),
+      strokeColor: _drawSettings.strokeColor,
+      strokeWidth: _drawSettings.strokeWidth,
+    );
+    context.read<BoardCubit>().addDrawing(drawing);
+    setState(() => _activeStroke.clear());
+  }
+
+  Future<void> _handleConnectTap(
+    BuildContext context,
+    BoardDocument board,
+    String panelId,
+  ) async {
+    if (_connectSourceId == null) {
+      setState(() {
+        _connectSourceId = panelId;
+        _connectPreviewPointer = null;
+      });
+      return;
+    }
+    if (_connectSourceId == panelId) {
+      setState(() {
+        _connectSourceId = null;
+        _connectPreviewPointer = null;
+      });
+      return;
+    }
+    // Show style picker then create link
+    final style = await _showConnectStyleDialog(context);
+    if (style == null) {
+      setState(() {
+        _connectSourceId = null;
+        _connectPreviewPointer = null;
+      });
+      return;
+    }
+    final link = BoardPanelLink(
+      id: 'link_${DateTime.now().millisecondsSinceEpoch}',
+      fromPanelId: _connectSourceId!,
+      toPanelId: panelId,
+      style: style.showArrow ? BoardLinkStyle.arrow : BoardLinkStyle.line,
+      behavior: BoardLinkBehavior.fixed,
+    );
+    if (!context.mounted) return;
+    context.read<BoardCubit>().upsertLink(link);
+    setState(() {
+      _connectSourceId = null;
+      _connectPreviewPointer = null;
+    });
+  }
+
+  Future<_LinkStyleChoice?> _showConnectStyleDialog(
+    BuildContext context,
+  ) async {
+    return showDialog<_LinkStyleChoice>(
+      context: context,
+      builder: (ctx) => const _LinkStyleDialog(),
+    );
   }
 
   Future<void> _createBoard(BuildContext context) async {
@@ -1457,6 +1681,9 @@ class _BoardPanelCard extends StatelessWidget {
     required this.onDelete,
     required this.onEditColor,
     this.onEditNote,
+    this.connectMode = false,
+    this.connectSourceId,
+    this.onConnectTap,
   });
 
   final BoardPanelInstance panel;
@@ -1469,6 +1696,9 @@ class _BoardPanelCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onEditColor;
   final VoidCallback? onEditNote;
+  final bool connectMode;
+  final String? connectSourceId;
+  final VoidCallback? onConnectTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1656,6 +1886,73 @@ class _BoardPanelCard extends StatelessWidget {
                   ),
                 ),
               ),
+              // ── Connect mode overlay ──────────────────────────────────────
+              if (connectMode)
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: onConnectTap,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color:
+                              connectSourceId == panel.id
+                                  ? const Color(0xFF34D399)
+                                  : const Color(0xFF34D399).withAlpha(100),
+                          width: connectSourceId == panel.id ? 2.5 : 1.5,
+                        ),
+                        color:
+                            connectSourceId == panel.id
+                                ? const Color(0x1534D399)
+                                : Colors.transparent,
+                      ),
+                      child:
+                          connectSourceId == null
+                              ? Center(
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0x6634D399),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.add_link,
+                                    size: 18,
+                                    color: Color(0xFF34D399),
+                                  ),
+                                ),
+                              )
+                              : connectSourceId == panel.id
+                              ? const Center(
+                                child: Text(
+                                  'Source\n(tap to cancel)',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFF34D399),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              )
+                              : Center(
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0x6634D399),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.call_made,
+                                    size: 18,
+                                    color: Color(0xFF34D399),
+                                  ),
+                                ),
+                              ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -2039,5 +2336,664 @@ class _BoardMiniMapPainter extends CustomPainter {
     return oldDelegate.panels != panels ||
         oldDelegate.bounds != bounds ||
         oldDelegate.viewportRect != viewportRect;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Quick Tools Panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BoardToolsPanel extends StatelessWidget {
+  const _BoardToolsPanel({
+    required this.visible,
+    required this.activeTool,
+    required this.drawSettings,
+    required this.connectSettings,
+    required this.onToolChanged,
+    required this.onDrawSettingsChanged,
+    required this.onConnectSettingsChanged,
+    required this.onToggle,
+  });
+
+  final bool visible;
+  final BoardToolId activeTool;
+  final DrawSettings drawSettings;
+  final ConnectSettings connectSettings;
+  final ValueChanged<BoardToolId> onToolChanged;
+  final ValueChanged<DrawSettings> onDrawSettingsChanged;
+  final ValueChanged<ConnectSettings> onConnectSettingsChanged;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── Toggle button ─────────────────────────────────────────────────
+        _OverlayIconButton(
+          icon: visible ? Icons.tune : Icons.tune_outlined,
+          tooltip: visible ? 'Hide tools' : 'Show tools',
+          active: visible,
+          onTap: onToggle,
+        ),
+        if (visible) ...[
+          const SizedBox(height: 6),
+          // ── Tool buttons ────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xE50B0D12),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF2A3040)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final tool in kBoardTools) ...[
+                  if (kBoardTools.indexOf(tool) > 0)
+                    const SizedBox(height: 4),
+                  Tooltip(
+                    message:
+                        tool.shortcutHint != null
+                            ? '${tool.label} (${tool.shortcutHint})'
+                            : tool.label,
+                    child: GestureDetector(
+                      onTap: () => onToolChanged(tool.id),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color:
+                              activeTool == tool.id
+                                  ? tool.accentColor.withAlpha(50)
+                                  : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              activeTool == tool.id
+                                  ? Border.all(
+                                    color: tool.accentColor.withAlpha(180),
+                                  )
+                                  : null,
+                        ),
+                        child: Icon(
+                          tool.icon,
+                          size: 18,
+                          color:
+                              activeTool == tool.id
+                                  ? tool.accentColor
+                                  : AppColors.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // ── Draw settings ────────────────────────────────────────────────
+          if (activeTool == BoardToolId.draw) ...[
+            const SizedBox(height: 6),
+            _DrawSettingsPanel(
+              settings: drawSettings,
+              onChanged: onDrawSettingsChanged,
+            ),
+          ],
+          // ── Connect settings ─────────────────────────────────────────────
+          if (activeTool == BoardToolId.connect) ...[
+            const SizedBox(height: 6),
+            _ConnectSettingsPanel(
+              settings: connectSettings,
+              onChanged: onConnectSettingsChanged,
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Draw settings panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DrawSettingsPanel extends StatelessWidget {
+  const _DrawSettingsPanel({
+    required this.settings,
+    required this.onChanged,
+  });
+
+  final DrawSettings settings;
+  final ValueChanged<DrawSettings> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 160,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xE50B0D12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A3040)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Draw settings',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Color swatches
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final c in const [
+                Color(0xFFE879F9),
+                Color(0xFF60A5FA),
+                Color(0xFF34D399),
+                Color(0xFFFBBF24),
+                Color(0xFFF87171),
+                Color(0xFFFFFFFF),
+              ])
+                GestureDetector(
+                  onTap: () => onChanged(settings.copyWith(strokeColor: c)),
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: c,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color:
+                            settings.strokeColor == c
+                                ? Colors.white
+                                : Colors.white.withAlpha(40),
+                        width: settings.strokeColor == c ? 2 : 1,
+                      ),
+                    ),
+                  ),
+                ),
+              // Custom color picker
+              GestureDetector(
+                onTap: () async {
+                  Color picked = settings.strokeColor;
+                  await showDialog<void>(
+                    context: context,
+                    builder:
+                        (ctx) => AlertDialog(
+                          title: const Text('Stroke color'),
+                          content: ColorPicker(
+                            pickerColor: picked,
+                            onColorChanged: (c) => picked = c,
+                            enableAlpha: false,
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () {
+                                onChanged(
+                                  settings.copyWith(strokeColor: picked),
+                                );
+                                Navigator.of(ctx).pop();
+                              },
+                              child: const Text('Apply'),
+                            ),
+                          ],
+                        ),
+                  );
+                },
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    gradient: const SweepGradient(
+                      colors: [
+                        Color(0xFFFF0000),
+                        Color(0xFFFFFF00),
+                        Color(0xFF00FF00),
+                        Color(0xFF00FFFF),
+                        Color(0xFF0000FF),
+                        Color(0xFFFF00FF),
+                        Color(0xFFFF0000),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withAlpha(60)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Stroke width slider
+          const Text(
+            'Size',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+          ),
+          SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 2,
+              thumbShape:
+                  const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape:
+                  const RoundSliderOverlayShape(overlayRadius: 12),
+              activeTrackColor: settings.strokeColor,
+              thumbColor: settings.strokeColor,
+              overlayColor: settings.strokeColor.withAlpha(40),
+              inactiveTrackColor: const Color(0xFF2A3040),
+            ),
+            child: Slider(
+              value: settings.strokeWidth,
+              min: 1,
+              max: 20,
+              onChanged:
+                  (v) => onChanged(settings.copyWith(strokeWidth: v)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Connect settings panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ConnectSettingsPanel extends StatelessWidget {
+  const _ConnectSettingsPanel({
+    required this.settings,
+    required this.onChanged,
+  });
+
+  final ConnectSettings settings;
+  final ValueChanged<ConnectSettings> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 160,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xE50B0D12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A3040)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Connect settings',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Line style
+          _SettingRow(
+            label: 'Style',
+            child: DropdownButton<BoardLinkGeometry>(
+              value: settings.geometry,
+              isDense: true,
+              dropdownColor: const Color(0xFF0B0D12),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+              ),
+              underline: const SizedBox.shrink(),
+              items: const [
+                DropdownMenuItem(
+                  value: BoardLinkGeometry.bezier,
+                  child: Text('Bezier'),
+                ),
+                DropdownMenuItem(
+                  value: BoardLinkGeometry.straight,
+                  child: Text('Straight'),
+                ),
+                DropdownMenuItem(
+                  value: BoardLinkGeometry.elbow,
+                  child: Text('Elbow'),
+                ),
+              ],
+              onChanged:
+                  (v) =>
+                      v != null
+                          ? onChanged(settings.copyWith(geometry: v))
+                          : null,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _SettingRow(
+            label: 'Arrow',
+            child: Switch.adaptive(
+              value: settings.showArrow,
+              onChanged:
+                  (v) => onChanged(settings.copyWith(showArrow: v)),
+              activeColor: const Color(0xFF34D399),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drawing widget — renders a completed BoardDrawingElement as a draggable item
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BoardDrawingWidget extends StatelessWidget {
+  const _BoardDrawingWidget({
+    super.key,
+    required this.drawing,
+    required this.canvasOrigin,
+    required this.isSelectMode,
+    required this.onMove,
+    required this.onDelete,
+  });
+
+  final BoardDrawingElement drawing;
+  final Offset canvasOrigin;
+  final bool isSelectMode;
+  final ValueChanged<Offset> onMove;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: drawing.position.dx + canvasOrigin.dx,
+      top: drawing.position.dy + canvasOrigin.dy,
+      width: drawing.size.width,
+      height: drawing.size.height,
+      child: GestureDetector(
+        behavior: HitTestBehavior.deferToChild,
+        onPanUpdate:
+            isSelectMode
+                ? (d) => onMove(drawing.position + d.delta)
+                : null,
+        child: Stack(
+          children: [
+            CustomPaint(
+              size: drawing.size,
+              painter: _DrawingElementPainter(drawing: drawing),
+            ),
+            if (isSelectMode)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: GestureDetector(
+                  onTap: onDelete,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: Color(0xCCF87171),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Paints a [BoardDrawingElement]'s strokes on the given canvas.
+class _DrawingElementPainter extends CustomPainter {
+  const _DrawingElementPainter({required this.drawing});
+
+  final BoardDrawingElement drawing;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = drawing.strokeColor
+          ..strokeWidth = drawing.strokeWidth
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
+
+    for (final stroke in drawing.strokes) {
+      if (stroke.isEmpty) continue;
+      final path = Path()..moveTo(stroke.first.dx, stroke.first.dy);
+      for (int i = 1; i < stroke.length; i++) {
+        path.lineTo(stroke[i].dx, stroke[i].dy);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawingElementPainter oldDelegate) {
+    return oldDelegate.drawing != drawing;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Active stroke painter (board-space points)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ActiveStrokePainter extends CustomPainter {
+  const _ActiveStrokePainter({
+    required this.points,
+    required this.origin,
+    required this.color,
+    required this.strokeWidth,
+  });
+
+  final List<Offset> points;
+  final Offset origin;
+  final Color color;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final paint =
+        Paint()
+          ..color = color
+          ..strokeWidth = strokeWidth
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(points.first.dx + origin.dx, points.first.dy + origin.dy);
+    for (int i = 1; i < points.length; i++) {
+      path.lineTo(points[i].dx + origin.dx, points[i].dy + origin.dy);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ActiveStrokePainter oldDelegate) => true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Connect preview painter
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ConnectPreviewPainter extends CustomPainter {
+  const _ConnectPreviewPainter({
+    required this.panels,
+    required this.sourceId,
+    required this.targetPoint,
+    required this.origin,
+    required this.color,
+  });
+
+  final List<BoardPanelInstance> panels;
+  final String sourceId;
+  final Offset targetPoint;
+  final Offset origin;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final source = panels.where((p) => p.id == sourceId).firstOrNull;
+    if (source == null) return;
+
+    final srcCenter = Offset(
+      source.bounds.x + source.bounds.width / 2 + origin.dx,
+      source.bounds.y + source.bounds.height / 2 + origin.dy,
+    );
+    final target = Offset(
+      targetPoint.dx + origin.dx,
+      targetPoint.dy + origin.dy,
+    );
+
+    final paint =
+        Paint()
+          ..color = color.withAlpha(180)
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke;
+
+    final path =
+        Path()
+          ..moveTo(srcCenter.dx, srcCenter.dy)
+          ..cubicTo(
+            srcCenter.dx + (target.dx - srcCenter.dx) * 0.4,
+            srcCenter.dy,
+            srcCenter.dx + (target.dx - srcCenter.dx) * 0.6,
+            target.dy,
+            target.dx,
+            target.dy,
+          );
+    // Draw dashed
+    for (final metric in path.computeMetrics()) {
+      double dist = 0;
+      bool draw = true;
+      while (dist < metric.length) {
+        final next = math.min(dist + (draw ? 8.0 : 6.0), metric.length);
+        if (draw) canvas.drawPath(metric.extractPath(dist, next), paint);
+        dist = next;
+        draw = !draw;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConnectPreviewPainter oldDelegate) => true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Link style dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LinkStyleChoice {
+  const _LinkStyleChoice({required this.showArrow, required this.geometry});
+
+  final bool showArrow;
+  final BoardLinkGeometry geometry;
+}
+
+class _LinkStyleDialog extends StatefulWidget {
+  const _LinkStyleDialog();
+
+  @override
+  State<_LinkStyleDialog> createState() => _LinkStyleDialogState();
+}
+
+class _LinkStyleDialogState extends State<_LinkStyleDialog> {
+  bool _showArrow = true;
+  BoardLinkGeometry _geometry = BoardLinkGeometry.bezier;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Link style'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show arrow'),
+            trailing: Switch.adaptive(
+              value: _showArrow,
+              onChanged: (v) => setState(() => _showArrow = v),
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Line geometry'),
+            trailing: DropdownButton<BoardLinkGeometry>(
+              value: _geometry,
+              isDense: true,
+              items: const [
+                DropdownMenuItem(
+                  value: BoardLinkGeometry.bezier,
+                  child: Text('Bezier'),
+                ),
+                DropdownMenuItem(
+                  value: BoardLinkGeometry.straight,
+                  child: Text('Straight'),
+                ),
+                DropdownMenuItem(
+                  value: BoardLinkGeometry.elbow,
+                  child: Text('Elbow'),
+                ),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => _geometry = v);
+              },
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(
+            _LinkStyleChoice(showArrow: _showArrow, geometry: _geometry),
+          ),
+          child: const Text('Connect'),
+        ),
+      ],
+    );
   }
 }
