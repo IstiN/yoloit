@@ -344,10 +344,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         }
         break;
 
-      case ChatEventType.sessionStatus:
-      case ChatEventType.userMessage:
-      case ChatEventType.assistantTurnStart:
-      case ChatEventType.assistantTurnEnd:
       case ChatEventType.askUser:
         final question = event.data['question'] as String? ?? '';
         final choicesRaw = event.data['choices'];
@@ -355,21 +351,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ? choicesRaw.cast<String>()
             : <String>[];
         final allowFreeform = event.data['allowFreeform'] as bool? ?? true;
-        setState(() {
-          _messages.add(ChatMessage(
-            id: 'ask-${DateTime.now().millisecondsSinceEpoch}',
-            role: ChatRole.system,
-            content: question,
-            timestamp: DateTime.now(),
-            metadata: {
-              'type': 'ask_user',
-              'choices': choices,
-              'allowFreeform': allowFreeform,
-            },
-          ));
-        });
-        _scrollToBottom();
+        if (question.isNotEmpty) {
+          setState(() {
+            _messages.add(ChatMessage(
+              id: 'ask-${DateTime.now().millisecondsSinceEpoch}',
+              role: ChatRole.system,
+              content: question,
+              timestamp: DateTime.now(),
+              metadata: {
+                'type': 'ask_user',
+                'choices': choices,
+                'allowFreeform': allowFreeform,
+              },
+            ));
+          });
+          _scrollToBottom();
+        }
         break;
+      case ChatEventType.sessionStatus:
+      case ChatEventType.userMessage:
+      case ChatEventType.assistantTurnStart:
+      case ChatEventType.assistantTurnEnd:
       case ChatEventType.unknown:
         break;
     }

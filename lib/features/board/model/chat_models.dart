@@ -307,10 +307,18 @@ class ChatEvent extends Equatable {
 
   factory ChatEvent.fromJson(Map<String, dynamic> json) {
     final rawType = json['type'] as String? ?? '';
-    final data = Map<String, dynamic>.from(json['data'] as Map? ?? const {});
+    var data = Map<String, dynamic>.from(json['data'] as Map? ?? const {});
     final ephemeral = json['ephemeral'] as bool? ?? false;
 
     final type = _parseEventType(rawType);
+
+    // For 'result' events, usage/sessionId/exitCode are at the top level
+    if (type == ChatEventType.result) {
+      data = Map<String, dynamic>.from(json);
+      data.remove('type');
+      data.remove('timestamp');
+    }
+
     DateTime? ts;
     final tsStr = json['timestamp'] as String?;
     if (tsStr != null) {
