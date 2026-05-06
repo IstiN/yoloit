@@ -3084,8 +3084,10 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.deferToChild,
+        // Only register pan recognizer when actually hovering over the drawing
+        // so panels underneath can still be dragged without interference.
         onPanUpdate:
-            widget.isSelectMode
+            (widget.isSelectMode && _hovered)
                 ? (d) => widget.onMove(widget.drawing.position + d.delta)
                 : null,
         child: Stack(
