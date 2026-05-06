@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
@@ -692,21 +693,22 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       ),
       child: Row(
         children: [
-          // Paste button for images/long text
-          IconButton(
-            onPressed: _handleClipboardPaste,
-            icon: const Icon(Icons.attach_file, size: 18, color: Color(0xFF64748B)),
-            splashRadius: 16,
-            tooltip: 'Paste from clipboard',
-          ),
           Expanded(
             child: KeyboardListener(
               focusNode: FocusNode(),
               onKeyEvent: (event) {
-                if (event is KeyDownEvent &&
-                    event.logicalKey == LogicalKeyboardKey.enter &&
+                if (event is! KeyDownEvent) return;
+                // Enter (without Shift) → send
+                if (event.logicalKey == LogicalKeyboardKey.enter &&
                     !HardwareKeyboard.instance.isShiftPressed) {
                   _sendMessage();
+                  return;
+                }
+                // Cmd+V (macOS) or Ctrl+V → smart paste
+                final isCmd = HardwareKeyboard.instance.isMetaPressed;
+                final isCtrl = HardwareKeyboard.instance.isControlPressed;
+                if (event.logicalKey == LogicalKeyboardKey.keyV && (isCmd || isCtrl)) {
+                  _handleSmartPaste();
                 }
               },
               child: TextField(
@@ -739,11 +741,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           const SizedBox(width: 6),
           IconButton(
             onPressed: _sendMessage,
-            icon: Icon(
-              _isProcessing ? Icons.send : Icons.send,
-              color: const Color(0xFF34D399),
-              size: 20,
-            ),
+            icon: const Icon(Icons.send, color: Color(0xFF34D399), size: 20),
             splashRadius: 18,
           ),
         ],
@@ -751,17 +749,42 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
   }
 
-  Future<void> _handleClipboardPaste() async {
+  /// Smart paste: short text pastes inline, long text or images → file ref.
+  Future<void> _handleSmartPaste() async {
     try {
-      final result = await ClipboardFileService.instance.saveClipboardToFile();
-      if (result != null) {
-        _inputController.text += result;
-        _inputController.selection = TextSelection.collapsed(
-          offset: _inputController.text.length,
-        );
+      final clipboard = SystemClipboard.instance;
+      if (clipboard != null) {
+        final reader = await clipboard.read();
+
+        // Check for plain text first
+        if (reader.canProvide(Formats.plainText)) {
+          final text = await reader.readValue(Formats.plainText);
+          if (text != null && text.isNotEmpty) {
+            final wordCount = text.trim().split(RegExp(r'\s+')).length;
+            if (wordCount <= 1000) {
+              // Short text — let default paste handle it
+              return;
+            }
+          }
+        }
+      }
+
+      // Long text or image — save to file and insert path
+      final path = await ClipboardFileService.instance.saveClipboardToFile();
+      if (path != null && mounted) {
+        // Clear any text that the default paste might have inserted
+        // (we schedule this after the current frame)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final currentText = _inputController.text;
+          // Replace the pasted long text with the file path
+          _inputController.text = currentText.isEmpty ? path : '$currentText $path';
+          _inputController.selection = TextSelection.collapsed(
+            offset: _inputController.text.length,
+          );
+        });
       }
     } catch (e) {
-      debugPrint('[ChatPanel] Clipboard paste error: $e');
+      debugPrint('[ChatPanel] Smart paste error: $e');
     }
   }
 
