@@ -1126,9 +1126,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       final mid = _linkMidpoint(start, end, link.geometry);
 
       // Large transparent hit area so mouse-over the line is easy to trigger
-      const hitR = 20.0;
+      const hitR = 24.0;
       const badgeR = 11.0;
       final isHovered = _hoveredLinkId == link.id;
+      final linkColor = link.color ?? const Color(0xFF60A5FA);
       badges.add(
         Positioned(
           left: mid.dx - hitR,
@@ -1141,24 +1142,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
               if (_hoveredLinkId == link.id) _hoveredLinkId = null;
             }),
             child: Center(
-              child: AnimatedOpacity(
-                opacity: isHovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 150),
-                child: GestureDetector(
-                  onTap: () => context.read<BoardCubit>().removeLink(link.id),
-                  child: Container(
-                    width: badgeR * 2,
-                    height: badgeR * 2,
-                    decoration: BoxDecoration(
-                      color: const Color(0xCCF87171),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withAlpha(80),
-                        width: 1,
-                      ),
+              child: GestureDetector(
+                onTap: () => context.read<BoardCubit>().removeLink(link.id),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: isHovered ? badgeR * 2 : 8,
+                  height: isHovered ? badgeR * 2 : 8,
+                  decoration: BoxDecoration(
+                    color: isHovered
+                        ? const Color(0xCCF87171)
+                        : linkColor.withAlpha(100),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isHovered
+                          ? Colors.white.withAlpha(80)
+                          : linkColor.withAlpha(50),
+                      width: 1,
                     ),
-                    child: const Icon(Icons.close, size: 12, color: Colors.white),
                   ),
+                  child: isHovered
+                      ? const Icon(Icons.close, size: 12, color: Colors.white)
+                      : null,
                 ),
               ),
             ),
@@ -2400,12 +2404,20 @@ class _BoardLinksPainter extends CustomPainter {
     final metrics = path.computeMetrics().toList();
     if (metrics.isEmpty) return;
     final metric = metrics.last;
-    final tangent = metric.getTangentForOffset(metric.length);
+    // Sample tangent slightly before the end for reliable direction
+    final sampleAt = (metric.length - 2.0).clamp(0.0, metric.length);
+    final tangent = metric.getTangentForOffset(sampleAt);
     if (tangent == null) return;
 
+    // Compute angle from sample point toward the tip
+    final tip = metric.getTangentForOffset(metric.length)?.position ??
+        tangent.position;
+    final dir = tip - tangent.position;
+    final angle = dir.distance > 0.5
+        ? math.atan2(dir.dy, dir.dx)
+        : tangent.angle;
+
     const arrowSize = 13.0;
-    final angle = tangent.angle;
-    final tip = tangent.position;
     final p1 = Offset(
       tip.dx - arrowSize * math.cos(angle - math.pi / 5),
       tip.dy - arrowSize * math.sin(angle - math.pi / 5),
@@ -2415,7 +2427,6 @@ class _BoardLinksPainter extends CustomPainter {
       tip.dy - arrowSize * math.sin(angle + math.pi / 5),
     );
 
-    // Open arrowhead (two lines, no fill) — cleaner look
     final arrowPaint =
         Paint()
           ..color = paint.color
