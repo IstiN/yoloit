@@ -7,26 +7,28 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/hotkeys/hotkeys.dart';
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_colors.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/ui/board_view.dart';
+import 'package:yoloit/features/mindmap/mindmap_view.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
-import 'package:yoloit/features/mindmap/mindmap_view.dart';
-import 'package:yoloit/features/review/bloc/review_cubit.dart';
-import 'package:yoloit/features/review/ui/review_panel.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
+import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
+import 'package:yoloit/features/review/bloc/review_cubit.dart';
+import 'package:yoloit/features/review/ui/review_panel.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/ui/workspace_panel.dart';
-import 'package:yoloit/core/services/resource_monitor_service.dart';
-import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 import 'package:yoloit/features/updates/ui/update_banner.dart';
 import 'package:yoloit/ui/widgets/activity_rail.dart';
@@ -40,20 +42,22 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
+enum _CanvasMode { panes, mindMap, board }
+
 class _MainShellState extends State<MainShell> with WindowListener {
   final _workspacePanelKey = GlobalKey<WorkspacePanelState>();
   final _terminalFocusNode = FocusNode();
   PanelVisibility _workspaceVis = PanelVisibility.open;
-  PanelVisibility _agentsVis    = PanelVisibility.open;
-  PanelVisibility _fileTreeVis  = PanelVisibility.open;
+  PanelVisibility _agentsVis = PanelVisibility.open;
+  PanelVisibility _fileTreeVis = PanelVisibility.open;
   SessionSnapshot? _sessionSnapshot;
-  bool _isMindMapView = false;
+  _CanvasMode _canvasMode = _CanvasMode.panes;
 
   // ── Silent auto-update state ───────────────────────────────────────────────
   UpdateInfo? _updateInfo;
-  AutoUpdatePhase? _updatePhase;   // null = no banner
+  AutoUpdatePhase? _updatePhase; // null = no banner
   double? _updateProgress;
-  String  _updateStatus = '';
+  String _updateStatus = '';
   String? _updateLaunchToken;
 
   @override
@@ -74,14 +78,15 @@ class _MainShellState extends State<MainShell> with WindowListener {
     final snap = await SessionPrefs.load();
     if (!mounted) return;
     setState(() {
-      _workspaceVis    = snap.workspaceVis;
-      _agentsVis       = snap.agentsVis;
-      _fileTreeVis     = snap.fileTreeVis;
+      _workspaceVis = snap.workspaceVis;
+      _agentsVis = snap.agentsVis;
+      _fileTreeVis = snap.fileTreeVis;
       _sessionSnapshot = snap;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Initialize terminal services (no sessions yet — workspace listener will load them)
       context.read<TerminalCubit>().initialize();
+      context.read<BoardCubit?>()?.load();
       // Load workspaces — BlocListener in _BottomPanel will pick up active workspace
       context.read<WorkspaceCubit>().load();
       // NOTE: do NOT requestFocus on _terminalFocusNode here — TerminalWidget
@@ -116,7 +121,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
 
     // ── Found an update — start silent download immediately ──────────────────
     setState(() {
-      _updateInfo  = info;
+      _updateInfo = info;
       _updatePhase = AutoUpdatePhase.downloading;
       _updateProgress = null;
       _updateStatus = '';
@@ -129,10 +134,11 @@ class _MainShellState extends State<MainShell> with WindowListener {
           if (!mounted) return;
           setState(() {
             _updateProgress = progress;
-            _updateStatus   = status;
-            _updatePhase = progress == null
-                ? AutoUpdatePhase.installing
-                : AutoUpdatePhase.downloading;
+            _updateStatus = status;
+            _updatePhase =
+                progress == null
+                    ? AutoUpdatePhase.installing
+                    : AutoUpdatePhase.downloading;
           });
         },
       );
@@ -146,7 +152,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
       if (mounted) {
         setState(() {
           _updateStatus = e.toString().replaceFirst('Exception: ', '');
-          _updatePhase  = AutoUpdatePhase.error;
+          _updatePhase = AutoUpdatePhase.error;
         });
       }
     }
@@ -181,7 +187,9 @@ class _MainShellState extends State<MainShell> with WindowListener {
     final cubit = context.read<TerminalCubit>();
     final state = cubit.state;
     if (state is TerminalLoaded && state.sessions.isNotEmpty) {
-      final prev = (state.activeIndex - 1 + state.sessions.length) % state.sessions.length;
+      final prev =
+          (state.activeIndex - 1 + state.sessions.length) %
+          state.sessions.length;
       cubit.switchTab(prev);
     }
   }
@@ -204,138 +212,162 @@ class _MainShellState extends State<MainShell> with WindowListener {
     }
   }
 
+  void _toggleCanvasMode(_CanvasMode targetMode) {
+    setState(() {
+      _canvasMode = _canvasMode == targetMode ? _CanvasMode.panes : targetMode;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return ListenableBuilder(
       listenable: HotkeyRegistry.instance,
-      builder: (context, _) => Shortcuts(
-      shortcuts: HotkeyRegistry.instance.shortcuts,
-      child: Actions(
-        actions: {
-          PreviousAgentTabIntent: CallbackAction<PreviousAgentTabIntent>(
-            onInvoke: (_) => _previousTab(),
-          ),
-          NextAgentTabIntent: CallbackAction<NextAgentTabIntent>(
-            onInvoke: (_) => _nextTab(),
-          ),
-          CloseTerminalTabIntent: CallbackAction<CloseTerminalTabIntent>(
-            onInvoke: (_) => _closeTab(),
-          ),
-          ToggleWorkspacePanelIntent: CallbackAction<ToggleWorkspacePanelIntent>(
-            onInvoke: (_) {
-              final next = _workspaceVis == PanelVisibility.open
-                  ? PanelVisibility.closed
-                  : PanelVisibility.open;
-              _setPanelVis('workspace', next);
-              return null;
-            },
-          ),
-          ToggleTerminalPanelIntent: CallbackAction<ToggleTerminalPanelIntent>(
-            onInvoke: (_) {
-              final next = _agentsVis == PanelVisibility.open
-                  ? PanelVisibility.closed
-                  : PanelVisibility.open;
-              _setPanelVis('agents', next);
-              return null;
-            },
-          ),
-          ToggleReviewPanelIntent: CallbackAction<ToggleReviewPanelIntent>(
-            onInvoke: (_) {
-              final next = _fileTreeVis == PanelVisibility.open
-                  ? PanelVisibility.closed
-                  : PanelVisibility.open;
-              _setPanelVis('filetree', next);
-              return null;
-            },
-          ),
-          FocusTerminalIntent: CallbackAction<FocusTerminalIntent>(
-            onInvoke: (_) {
-              // Focus the panel scope then immediately descend to the xterm widget
-              // so Cmd+` brings keyboard focus to the actual terminal, not just its container.
-              _terminalFocusNode.requestFocus();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted) return;
-                final scope = FocusScope.of(context);
-                if (scope.focusedChild == _terminalFocusNode ||
-                    _terminalFocusNode.hasFocus) {
-                  FocusTraversalGroup.maybeOf(context)?.next(_terminalFocusNode);
-                }
-              });
-              return null;
-            },
-          ),
-          OpenSettingsIntent: CallbackAction<OpenSettingsIntent>(
-            onInvoke: (_) => SettingsPage.show(context),
-          ),
-          OpenFileSearchIntent: CallbackAction<OpenFileSearchIntent>(
-            onInvoke: (_) => _openFileSearch(),
-          ),
-        },
-        child: Focus(
-          autofocus: true,
-          child: Scaffold(
-            backgroundColor: colors.background,
-            body: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _TitleBar(
-                  onSettings: () => SettingsPage.show(context),
-                  workspaceVis: _workspaceVis,
-                  agentsVis: _agentsVis,
-                  fileTreeVis: _fileTreeVis,
-                  isMindMapView: _isMindMapView,
-                  onToggleWorkspace: () {
-                    final next = _workspaceVis == PanelVisibility.open
-                        ? PanelVisibility.closed
-                        : PanelVisibility.open;
-                    _setPanelVis('workspace', next);
-                  },
-                  onToggleAgents: () {
-                    final next = _agentsVis == PanelVisibility.open
-                        ? PanelVisibility.closed
-                        : PanelVisibility.open;
-                    _setPanelVis('agents', next);
-                  },
-                  onToggleFileTree: () {
-                    final next = _fileTreeVis == PanelVisibility.open
-                        ? PanelVisibility.closed
-                        : PanelVisibility.open;
-                    _setPanelVis('filetree', next);
-                  },
-                  onToggleMapView: () => setState(() => _isMindMapView = !_isMindMapView),
-                  onSearch: _openFileSearch,
+      builder:
+          (context, _) => Shortcuts(
+            shortcuts: HotkeyRegistry.instance.shortcuts,
+            child: Actions(
+              actions: {
+                PreviousAgentTabIntent: CallbackAction<PreviousAgentTabIntent>(
+                  onInvoke: (_) => _previousTab(),
                 ),
-                if (_updatePhase != null && _updateInfo != null)
-                  AutoUpdateBanner(
-                    info: _updateInfo!,
-                    phase: _updatePhase!,
-                    progress: _updateProgress,
-                    status: _updateStatus,
-                    launchToken: _updateLaunchToken,
-                    onDismiss: () {
-                      if (mounted) setState(() => _updatePhase = null);
-                    },
-                  ),
-                Expanded(
-                  child: _isMindMapView
-                      ? const MindMapView()
-                      : _FourPaneLayout(
-                          workspacePanelKey: _workspacePanelKey,
-                          terminalFocusNode: _terminalFocusNode,
-                          workspaceVis: _workspaceVis,
-                          agentsVis: _agentsVis,
-                          fileTreeVis: _fileTreeVis,
-                          initialSnapshot: _sessionSnapshot,
-                          onSetPanelVis: _setPanelVis,
+                NextAgentTabIntent: CallbackAction<NextAgentTabIntent>(
+                  onInvoke: (_) => _nextTab(),
+                ),
+                CloseTerminalTabIntent: CallbackAction<CloseTerminalTabIntent>(
+                  onInvoke: (_) => _closeTab(),
+                ),
+                ToggleWorkspacePanelIntent:
+                    CallbackAction<ToggleWorkspacePanelIntent>(
+                      onInvoke: (_) {
+                        final next =
+                            _workspaceVis == PanelVisibility.open
+                                ? PanelVisibility.closed
+                                : PanelVisibility.open;
+                        _setPanelVis('workspace', next);
+                        return null;
+                      },
+                    ),
+                ToggleTerminalPanelIntent:
+                    CallbackAction<ToggleTerminalPanelIntent>(
+                      onInvoke: (_) {
+                        final next =
+                            _agentsVis == PanelVisibility.open
+                                ? PanelVisibility.closed
+                                : PanelVisibility.open;
+                        _setPanelVis('agents', next);
+                        return null;
+                      },
+                    ),
+                ToggleReviewPanelIntent:
+                    CallbackAction<ToggleReviewPanelIntent>(
+                      onInvoke: (_) {
+                        final next =
+                            _fileTreeVis == PanelVisibility.open
+                                ? PanelVisibility.closed
+                                : PanelVisibility.open;
+                        _setPanelVis('filetree', next);
+                        return null;
+                      },
+                    ),
+                FocusTerminalIntent: CallbackAction<FocusTerminalIntent>(
+                  onInvoke: (_) {
+                    // Focus the panel scope then immediately descend to the xterm widget
+                    // so Cmd+` brings keyboard focus to the actual terminal, not just its container.
+                    _terminalFocusNode.requestFocus();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      final scope = FocusScope.of(context);
+                      if (scope.focusedChild == _terminalFocusNode ||
+                          _terminalFocusNode.hasFocus) {
+                        FocusTraversalGroup.maybeOf(
+                          context,
+                        )?.next(_terminalFocusNode);
+                      }
+                    });
+                    return null;
+                  },
+                ),
+                OpenSettingsIntent: CallbackAction<OpenSettingsIntent>(
+                  onInvoke: (_) => SettingsPage.show(context),
+                ),
+                OpenFileSearchIntent: CallbackAction<OpenFileSearchIntent>(
+                  onInvoke: (_) => _openFileSearch(),
+                ),
+              },
+              child: Focus(
+                autofocus: true,
+                child: Scaffold(
+                  backgroundColor: colors.background,
+                  body: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _TitleBar(
+                        onSettings: () => SettingsPage.show(context),
+                        workspaceVis: _workspaceVis,
+                        agentsVis: _agentsVis,
+                        fileTreeVis: _fileTreeVis,
+                        canvasMode: _canvasMode,
+                        onToggleWorkspace: () {
+                          final next =
+                              _workspaceVis == PanelVisibility.open
+                                  ? PanelVisibility.closed
+                                  : PanelVisibility.open;
+                          _setPanelVis('workspace', next);
+                        },
+                        onToggleAgents: () {
+                          final next =
+                              _agentsVis == PanelVisibility.open
+                                  ? PanelVisibility.closed
+                                  : PanelVisibility.open;
+                          _setPanelVis('agents', next);
+                        },
+                        onToggleFileTree: () {
+                          final next =
+                              _fileTreeVis == PanelVisibility.open
+                                  ? PanelVisibility.closed
+                                  : PanelVisibility.open;
+                          _setPanelVis('filetree', next);
+                        },
+                        onToggleMapView:
+                            () => _toggleCanvasMode(_CanvasMode.mindMap),
+                        onToggleBoardView:
+                            () => _toggleCanvasMode(_CanvasMode.board),
+                        onSearch: _openFileSearch,
+                      ),
+                      if (_updatePhase != null && _updateInfo != null)
+                        AutoUpdateBanner(
+                          info: _updateInfo!,
+                          phase: _updatePhase!,
+                          progress: _updateProgress,
+                          status: _updateStatus,
+                          launchToken: _updateLaunchToken,
+                          onDismiss: () {
+                            if (mounted) setState(() => _updatePhase = null);
+                          },
                         ),
+                      Expanded(
+                        child:
+                            _canvasMode == _CanvasMode.mindMap
+                                ? const MindMapView()
+                                : _canvasMode == _CanvasMode.board
+                                ? const BoardView()
+                                : _FourPaneLayout(
+                                  workspacePanelKey: _workspacePanelKey,
+                                  terminalFocusNode: _terminalFocusNode,
+                                  workspaceVis: _workspaceVis,
+                                  agentsVis: _agentsVis,
+                                  fileTreeVis: _fileTreeVis,
+                                  initialSnapshot: _sessionSnapshot,
+                                  onSetPanelVis: _setPanelVis,
+                                ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
-    ), // Shortcuts
+          ), // Shortcuts
     ); // ListenableBuilder
   }
 }
@@ -383,11 +415,11 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
     super.initState();
     final s = widget.initialSnapshot;
     _workspaceWidth = s?.workspaceWidth ?? 260;
-    _editorWidth    = s?.editorWidth    ?? 480;
-    _reviewWidth    = s?.reviewWidth    ?? 360;
-    _agentsHeight   = s?.agentsHeight;
-    _editorHeight   = s?.editorHeight;
-    _reviewHeight   = s?.reviewHeight;
+    _editorWidth = s?.editorWidth ?? 480;
+    _reviewWidth = s?.reviewWidth ?? 360;
+    _agentsHeight = s?.agentsHeight;
+    _editorHeight = s?.editorHeight;
+    _reviewHeight = s?.reviewHeight;
   }
 
   @override
@@ -402,19 +434,21 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
   Widget build(BuildContext context) {
     return BlocBuilder<FileEditorCubit, FileEditorState>(
       builder: (context, editorState) {
-        final showWorkspace      = widget.workspaceVis == PanelVisibility.open;
-        final workspaceCollapsed = widget.workspaceVis == PanelVisibility.collapsed;
-        final showAgents         = widget.agentsVis == PanelVisibility.open;
-        final agentsCollapsed    = widget.agentsVis == PanelVisibility.collapsed;
-        final showEditor         = editorState.isVisible;
-        final showFileTree       = widget.fileTreeVis == PanelVisibility.open;
-        final fileTreeCollapsed  = widget.fileTreeVis == PanelVisibility.collapsed;
-        final leftRailVisible    = workspaceCollapsed || agentsCollapsed;
-        final rightRailVisible   = fileTreeCollapsed;
+        final showWorkspace = widget.workspaceVis == PanelVisibility.open;
+        final workspaceCollapsed =
+            widget.workspaceVis == PanelVisibility.collapsed;
+        final showAgents = widget.agentsVis == PanelVisibility.open;
+        final agentsCollapsed = widget.agentsVis == PanelVisibility.collapsed;
+        final showEditor = editorState.isVisible;
+        final showFileTree = widget.fileTreeVis == PanelVisibility.open;
+        final fileTreeCollapsed =
+            widget.fileTreeVis == PanelVisibility.collapsed;
+        final leftRailVisible = workspaceCollapsed || agentsCollapsed;
+        final rightRailVisible = fileTreeCollapsed;
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final totalWidth  = constraints.maxWidth;
+            final totalWidth = constraints.maxWidth;
             final totalHeight = constraints.maxHeight;
 
             return Row(
@@ -426,31 +460,40 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: leftRailVisible ? 32 : 0,
-                    child: leftRailVisible
-                        ? ActivityRail(
-                            side: ActivityRailSide.left,
-                            items: [
-                              if (workspaceCollapsed)
-                                ActivityRailItem(
-                                  iconWidget: SvgPicture.asset(
-                                    'assets/images/yoloit_mark.svg',
-                                    colorFilter: const ColorFilter.mode(
-                                        AppColors.textMuted, BlendMode.srcIn),
+                    child:
+                        leftRailVisible
+                            ? ActivityRail(
+                              side: ActivityRailSide.left,
+                              items: [
+                                if (workspaceCollapsed)
+                                  ActivityRailItem(
+                                    iconWidget: SvgPicture.asset(
+                                      'assets/images/yoloit_mark.svg',
+                                      colorFilter: const ColorFilter.mode(
+                                        AppColors.textMuted,
+                                        BlendMode.srcIn,
+                                      ),
+                                    ),
+                                    tooltip: 'Expand Workspaces',
+                                    onTap:
+                                        () => widget.onSetPanelVis(
+                                          'workspace',
+                                          PanelVisibility.open,
+                                        ),
                                   ),
-                                  tooltip: 'Expand Workspaces',
-                                  onTap: () => widget.onSetPanelVis(
-                                      'workspace', PanelVisibility.open),
-                                ),
-                              if (agentsCollapsed)
-                                ActivityRailItem(
-                                  icon: Icons.terminal,
-                                  tooltip: 'Expand Agents',
-                                  onTap: () => widget.onSetPanelVis(
-                                      'agents', PanelVisibility.open),
-                                ),
-                            ],
-                          )
-                        : const SizedBox.shrink(),
+                                if (agentsCollapsed)
+                                  ActivityRailItem(
+                                    icon: Icons.terminal,
+                                    tooltip: 'Expand Agents',
+                                    onTap:
+                                        () => widget.onSetPanelVis(
+                                          'agents',
+                                          PanelVisibility.open,
+                                        ),
+                                  ),
+                              ],
+                            )
+                            : const SizedBox.shrink(),
                   ),
                 ),
 
@@ -461,34 +504,48 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: showWorkspace ? _workspaceWidth : 0,
-                    child: showWorkspace
-                        ? SizedBox(
-                            width: _workspaceWidth,
-                            child: PanelShell(
-                              title: 'WORKSPACES',
-                              iconWidget: SvgPicture.asset(
-                                'assets/images/yoloit_mark.svg',
-                                colorFilter: const ColorFilter.mode(
-                                    AppColors.textMuted, BlendMode.srcIn),
-                              ),
-                              actions: [
-                                PanelActionBtn(
-                                  icon: Icons.add,
-                                  tooltip: 'Add workspace',
-                                  onTap: () => widget.workspacePanelKey
-                                      .currentState
-                                      ?.addWorkspace(),
+                    child:
+                        showWorkspace
+                            ? SizedBox(
+                              width: _workspaceWidth,
+                              child: PanelShell(
+                                title: 'WORKSPACES',
+                                iconWidget: SvgPicture.asset(
+                                  'assets/images/yoloit_mark.svg',
+                                  colorFilter: const ColorFilter.mode(
+                                    AppColors.textMuted,
+                                    BlendMode.srcIn,
+                                  ),
                                 ),
-                              ],
-                              onCollapse: () => widget.onSetPanelVis(
-                                  'workspace', PanelVisibility.collapsed),
-                              collapseIcon: Icons.keyboard_arrow_left,
-                              onClose: () => widget.onSetPanelVis(
-                                  'workspace', PanelVisibility.closed),
-                              child: WorkspacePanel(key: widget.workspacePanelKey),
-                            ),
-                          )
-                        : const SizedBox.shrink(),
+                                actions: [
+                                  PanelActionBtn(
+                                    icon: Icons.add,
+                                    tooltip: 'Add workspace',
+                                    onTap:
+                                        () =>
+                                            widget
+                                                .workspacePanelKey
+                                                .currentState
+                                                ?.addWorkspace(),
+                                  ),
+                                ],
+                                onCollapse:
+                                    () => widget.onSetPanelVis(
+                                      'workspace',
+                                      PanelVisibility.collapsed,
+                                    ),
+                                collapseIcon: Icons.keyboard_arrow_left,
+                                onClose:
+                                    () => widget.onSetPanelVis(
+                                      'workspace',
+                                      PanelVisibility.closed,
+                                    ),
+                                child: WorkspacePanel(
+                                  key: widget.workspacePanelKey,
+                                ),
+                              ),
+                            )
+                            : const SizedBox.shrink(),
                   ),
                 ),
 
@@ -499,16 +556,21 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: showWorkspace ? 4 : 0,
-                    child: showWorkspace
-                        ? _Divider(
-                            onDrag: (dx) {
-                              setState(() => _workspaceWidth =
-                                  (_workspaceWidth + dx)
-                                      .clamp(_minWidth, totalWidth / 3));
-                              SessionPrefs.saveWorkspaceWidth(_workspaceWidth);
-                            },
-                          )
-                        : const SizedBox.shrink(),
+                    child:
+                        showWorkspace
+                            ? _Divider(
+                              onDrag: (dx) {
+                                setState(
+                                  () =>
+                                      _workspaceWidth = (_workspaceWidth + dx)
+                                          .clamp(_minWidth, totalWidth / 3),
+                                );
+                                SessionPrefs.saveWorkspaceWidth(
+                                  _workspaceWidth,
+                                );
+                              },
+                            )
+                            : const SizedBox.shrink(),
                   ),
                 ),
 
@@ -528,20 +590,32 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                               child: PanelShell(
                                 title: 'AGENTS',
                                 icon: Icons.terminal,
-                                onCollapse: () => widget.onSetPanelVis(
-                                    'agents', PanelVisibility.collapsed),
+                                onCollapse:
+                                    () => widget.onSetPanelVis(
+                                      'agents',
+                                      PanelVisibility.collapsed,
+                                    ),
                                 collapseIcon: Icons.keyboard_arrow_left,
-                                onClose: () => widget.onSetPanelVis(
-                                    'agents', PanelVisibility.closed),
+                                onClose:
+                                    () => widget.onSetPanelVis(
+                                      'agents',
+                                      PanelVisibility.closed,
+                                    ),
                                 child: const _AgentsContent(),
                               ),
                             ),
-                            _HorizontalDivider(onDrag: (dy) {
-                              setState(() => _agentsHeight =
-                                  ((_agentsHeight ?? totalHeight) + dy)
-                                      .clamp(_minHeight, totalHeight - 40));
-                              SessionPrefs.saveAgentsHeight(_agentsHeight);
-                            }),
+                            _HorizontalDivider(
+                              onDrag: (dy) {
+                                setState(
+                                  () =>
+                                      _agentsHeight = ((_agentsHeight ??
+                                                  totalHeight) +
+                                              dy)
+                                          .clamp(_minHeight, totalHeight - 40),
+                                );
+                                SessionPrefs.saveAgentsHeight(_agentsHeight);
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -553,8 +627,13 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   if (showAgents)
                     _Divider(
                       onDrag: (dx) {
-                        setState(() => _editorWidth = (_editorWidth - dx)
-                            .clamp(_minWidth, totalWidth / 2));
+                        setState(
+                          () =>
+                              _editorWidth = (_editorWidth - dx).clamp(
+                                _minWidth,
+                                totalWidth / 2,
+                              ),
+                        );
                         SessionPrefs.saveEditorWidth(_editorWidth);
                       },
                     ),
@@ -568,17 +647,26 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                             child: PanelShell(
                               title: 'EDITOR',
                               icon: Icons.code,
-                              onClose: () =>
-                                  context.read<FileEditorCubit>().hidePanel(),
+                              onClose:
+                                  () =>
+                                      context
+                                          .read<FileEditorCubit>()
+                                          .hidePanel(),
                               child: const FileEditorPanel(),
                             ),
                           ),
-                          _HorizontalDivider(onDrag: (dy) {
-                            setState(() => _editorHeight =
-                                ((_editorHeight ?? totalHeight) + dy)
-                                    .clamp(_minHeight, totalHeight - 40));
-                            SessionPrefs.saveEditorHeight(_editorHeight);
-                          }),
+                          _HorizontalDivider(
+                            onDrag: (dy) {
+                              setState(
+                                () =>
+                                    _editorHeight = ((_editorHeight ??
+                                                totalHeight) +
+                                            dy)
+                                        .clamp(_minHeight, totalHeight - 40),
+                              );
+                              SessionPrefs.saveEditorHeight(_editorHeight);
+                            },
+                          ),
                         ],
                       ),
                     )
@@ -591,17 +679,26 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                             child: PanelShell(
                               title: 'EDITOR',
                               icon: Icons.code,
-                              onClose: () =>
-                                  context.read<FileEditorCubit>().hidePanel(),
+                              onClose:
+                                  () =>
+                                      context
+                                          .read<FileEditorCubit>()
+                                          .hidePanel(),
                               child: const FileEditorPanel(),
                             ),
                           ),
-                          _HorizontalDivider(onDrag: (dy) {
-                            setState(() => _editorHeight =
-                                ((_editorHeight ?? totalHeight) + dy)
-                                    .clamp(_minHeight, totalHeight - 40));
-                            SessionPrefs.saveEditorHeight(_editorHeight);
-                          }),
+                          _HorizontalDivider(
+                            onDrag: (dy) {
+                              setState(
+                                () =>
+                                    _editorHeight = ((_editorHeight ??
+                                                totalHeight) +
+                                            dy)
+                                        .clamp(_minHeight, totalHeight - 40),
+                              );
+                              SessionPrefs.saveEditorHeight(_editorHeight);
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -614,16 +711,21 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: showFileTree ? 4 : 0,
-                    child: showFileTree
-                        ? _Divider(
-                            onDrag: (dx) {
-                              setState(() => _reviewWidth =
-                                  (_reviewWidth - dx)
-                                      .clamp(_minWidth, totalWidth / 2));
-                              SessionPrefs.saveReviewWidth(_reviewWidth);
-                            },
-                          )
-                        : const SizedBox.shrink(),
+                    child:
+                        showFileTree
+                            ? _Divider(
+                              onDrag: (dx) {
+                                setState(
+                                  () =>
+                                      _reviewWidth = (_reviewWidth - dx).clamp(
+                                        _minWidth,
+                                        totalWidth / 2,
+                                      ),
+                                );
+                                SessionPrefs.saveReviewWidth(_reviewWidth);
+                              },
+                            )
+                            : const SizedBox.shrink(),
                   ),
                 ),
 
@@ -634,34 +736,52 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: showFileTree ? _reviewWidth : 0,
-                    child: showFileTree
-                        ? SizedBox(
-                            width: _reviewWidth,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(
-                                  child: PanelShell(
-                                    title: 'FILE TREE',
-                                    icon: Icons.account_tree,
-                                    onCollapse: () => widget.onSetPanelVis(
-                                        'filetree', PanelVisibility.collapsed),
-                                    collapseIcon: Icons.keyboard_arrow_right,
-                                    onClose: () => widget.onSetPanelVis(
-                                        'filetree', PanelVisibility.closed),
-                                    child: const ReviewPanel(),
+                    child:
+                        showFileTree
+                            ? SizedBox(
+                              width: _reviewWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: PanelShell(
+                                      title: 'FILE TREE',
+                                      icon: Icons.account_tree,
+                                      onCollapse:
+                                          () => widget.onSetPanelVis(
+                                            'filetree',
+                                            PanelVisibility.collapsed,
+                                          ),
+                                      collapseIcon: Icons.keyboard_arrow_right,
+                                      onClose:
+                                          () => widget.onSetPanelVis(
+                                            'filetree',
+                                            PanelVisibility.closed,
+                                          ),
+                                      child: const ReviewPanel(),
+                                    ),
                                   ),
-                                ),
-                                _HorizontalDivider(onDrag: (dy) {
-                                  setState(() => _reviewHeight =
-                                      ((_reviewHeight ?? totalHeight) + dy)
-                                          .clamp(_minHeight, totalHeight - 40));
-                                  SessionPrefs.saveReviewHeight(_reviewHeight);
-                                }),
-                              ],
-                            ),
-                          )
-                        : const SizedBox.shrink(),
+                                  _HorizontalDivider(
+                                    onDrag: (dy) {
+                                      setState(
+                                        () =>
+                                            _reviewHeight = ((_reviewHeight ??
+                                                        totalHeight) +
+                                                    dy)
+                                                .clamp(
+                                                  _minHeight,
+                                                  totalHeight - 40,
+                                                ),
+                                      );
+                                      SessionPrefs.saveReviewHeight(
+                                        _reviewHeight,
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            )
+                            : const SizedBox.shrink(),
                   ),
                 ),
 
@@ -672,23 +792,30 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: rightRailVisible ? 32 : 0,
-                    child: rightRailVisible
-                        ? ActivityRail(
-                            side: ActivityRailSide.right,
-                            items: [
-                              ActivityRailItem(
-                                icon: Icons.account_tree,
-                                tooltip: 'Expand File Tree',
-                                onTap: () => widget.onSetPanelVis(
-                                    'filetree', PanelVisibility.open),
-                              ),
-                            ],
-                          )
-                        : const SizedBox.shrink(),
+                    child:
+                        rightRailVisible
+                            ? ActivityRail(
+                              side: ActivityRailSide.right,
+                              items: [
+                                ActivityRailItem(
+                                  icon: Icons.account_tree,
+                                  tooltip: 'Expand File Tree',
+                                  onTap:
+                                      () => widget.onSetPanelVis(
+                                        'filetree',
+                                        PanelVisibility.open,
+                                      ),
+                                ),
+                              ],
+                            )
+                            : const SizedBox.shrink(),
                   ),
                 ),
 
-                if (!showAgents && !agentsCollapsed && !showEditor && !showFileTree)
+                if (!showAgents &&
+                    !agentsCollapsed &&
+                    !showEditor &&
+                    !showFileTree)
                   const Expanded(child: SizedBox.shrink()),
               ],
             );
@@ -729,7 +856,10 @@ class _AgentsContent extends StatelessWidget {
               workspacePaths: ws.paths,
             );
             context.read<RunCubit>().loadForWorkspace(ws.path);
-            context.read<ReviewCubit>().loadWorkspace(ws.paths, workspaceId: wsId);
+            context.read<ReviewCubit>().loadWorkspace(
+              ws.paths,
+              workspaceId: wsId,
+            );
             context.read<FileEditorCubit>().setWorkspace(wsId);
           },
         ),
@@ -845,22 +975,24 @@ class _TitleBar extends StatelessWidget {
     required this.workspaceVis,
     required this.agentsVis,
     required this.fileTreeVis,
-    required this.isMindMapView,
+    required this.canvasMode,
     required this.onToggleWorkspace,
     required this.onToggleAgents,
     required this.onToggleFileTree,
     required this.onToggleMapView,
+    required this.onToggleBoardView,
     required this.onSearch,
   });
   final VoidCallback onSettings;
   final PanelVisibility workspaceVis;
   final PanelVisibility agentsVis;
   final PanelVisibility fileTreeVis;
-  final bool isMindMapView;
+  final _CanvasMode canvasMode;
   final VoidCallback onToggleWorkspace;
   final VoidCallback onToggleAgents;
   final VoidCallback onToggleFileTree;
   final VoidCallback onToggleMapView;
+  final VoidCallback onToggleBoardView;
   final VoidCallback onSearch;
 
   @override
@@ -912,19 +1044,29 @@ class _TitleBar extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.search, size: 15, color: AppColors.textMuted),
+                          const Icon(
+                            Icons.search,
+                            size: 15,
+                            color: AppColors.textMuted,
+                          ),
                           const SizedBox(width: 8),
                           const Flexible(
                             child: Text(
                               'Quick open…',
-                              style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                              style: TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 14,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             isWindows ? 'Ctrl+O' : '⌘O',
-                            style: TextStyle(color: AppColors.textMuted.withAlpha(120), fontSize: 12),
+                            style: TextStyle(
+                              color: AppColors.textMuted.withAlpha(120),
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -939,20 +1081,29 @@ class _TitleBar extends StatelessWidget {
               icon: Icons.hub_outlined,
               tooltip: 'Map View',
               semanticsLabel: 'Toggle Miro-like map view',
-              active: isMindMapView,
+              active: canvasMode == _CanvasMode.mindMap,
               onTap: onToggleMapView,
+            ),
+            const SizedBox(width: 4),
+            _PanelToggleButton(
+              icon: Icons.dashboard_customize_outlined,
+              tooltip: 'Board View',
+              semanticsLabel: 'Toggle board view',
+              active: canvasMode == _CanvasMode.board,
+              onTap: onToggleBoardView,
             ),
             const SizedBox(width: 4),
             const _ResourceChip(),
             const SizedBox(width: 8),
             BlocBuilder<FileEditorCubit, FileEditorState>(
-              builder: (context, editorState) => _PanelToggleButton(
-                icon: Icons.edit_document,
-                tooltip: 'Toggle File Editor',
-                semanticsLabel: 'Toggle file editor panel',
-                active: editorState.isVisible,
-                onTap: () => context.read<FileEditorCubit>().togglePanel(),
-              ),
+              builder:
+                  (context, editorState) => _PanelToggleButton(
+                    icon: Icons.edit_document,
+                    tooltip: 'Toggle File Editor',
+                    semanticsLabel: 'Toggle file editor panel',
+                    active: editorState.isVisible,
+                    onTap: () => context.read<FileEditorCubit>().togglePanel(),
+                  ),
             ),
             const SizedBox(width: 4),
             _PanelToggleButton(
@@ -1014,9 +1165,7 @@ class _PanelToggleButton extends StatelessWidget {
             width: 32,
             height: 28,
             decoration: BoxDecoration(
-              color: active
-                  ? colors.primary.withAlpha(40)
-                  : Colors.transparent,
+              color: active ? colors.primary.withAlpha(40) : Colors.transparent,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Icon(
@@ -1121,7 +1270,9 @@ class _WinBtnState extends State<_WinBtn> {
   @override
   Widget build(BuildContext context) {
     final hoverColor =
-        widget.isClose ? const Color(0xFFE81123) : AppColors.textMuted.withAlpha(40);
+        widget.isClose
+            ? const Color(0xFFE81123)
+            : AppColors.textMuted.withAlpha(40);
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
@@ -1136,9 +1287,10 @@ class _WinBtnState extends State<_WinBtn> {
             child: Icon(
               widget.icon,
               size: 14,
-              color: _hovered && widget.isClose
-                  ? Colors.white
-                  : AppColors.textSecondary,
+              color:
+                  _hovered && widget.isClose
+                      ? Colors.white
+                      : AppColors.textSecondary,
             ),
           ),
         ),
@@ -1165,8 +1317,9 @@ class _ResourceChipState extends State<_ResourceChip> {
   @override
   void initState() {
     super.initState();
-    _sub = ResourceMonitorService.instance.stream
-        .listen((s) { if (mounted) setState(() => _snap = s); });
+    _sub = ResourceMonitorService.instance.stream.listen((s) {
+      if (mounted) setState(() => _snap = s);
+    });
   }
 
   @override
@@ -1185,11 +1338,20 @@ class _ResourceChipState extends State<_ResourceChip> {
     }
     final box = context.findRenderObject()! as RenderBox;
     final offset = box.localToGlobal(Offset.zero);
-    _overlay = OverlayEntry(builder: (_) => _ResourcePanel(
-      snapshot: _snap,
-      position: Offset(offset.dx - 260 + box.size.width, offset.dy + box.size.height + 4),
-      onClose: () { _overlay?.remove(); _overlay = null; },
-    ));
+    _overlay = OverlayEntry(
+      builder:
+          (_) => _ResourcePanel(
+            snapshot: _snap,
+            position: Offset(
+              offset.dx - 260 + box.size.width,
+              offset.dy + box.size.height + 4,
+            ),
+            onClose: () {
+              _overlay?.remove();
+              _overlay = null;
+            },
+          ),
+    );
     Overlay.of(context).insert(_overlay!);
   }
 
@@ -1248,8 +1410,9 @@ class _ResourcePanelState extends State<_ResourcePanel> {
   @override
   void initState() {
     super.initState();
-    _sub = ResourceMonitorService.instance.stream
-        .listen((s) { if (mounted) setState(() => _snap = s); });
+    _sub = ResourceMonitorService.instance.stream.listen((s) {
+      if (mounted) setState(() => _snap = s);
+    });
   }
 
   @override
@@ -1261,9 +1424,10 @@ class _ResourcePanelState extends State<_ResourcePanel> {
   @override
   Widget build(BuildContext context) {
     final host = _snap.host;
-    final ramSharePercent = host.totalBytes > 0
-        ? (_snap.totalMemoryBytes / host.totalBytes * 100).clamp(0.0, 100.0)
-        : 0.0;
+    final ramSharePercent =
+        host.totalBytes > 0
+            ? (_snap.totalMemoryBytes / host.totalBytes * 100).clamp(0.0, 100.0)
+            : 0.0;
 
     final Color memBarColor;
     if (host.usedPercent >= 90) {
@@ -1302,7 +1466,9 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                 color: const Color(0xFF16163A),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFF32327A)),
-                boxShadow: [BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 16)],
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 16),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1313,7 +1479,11 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                     padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.monitor_heart_outlined, size: 13, color: Color(0xFF7C7CFF)),
+                        const Icon(
+                          Icons.monitor_heart_outlined,
+                          size: 13,
+                          color: Color(0xFF7C7CFF),
+                        ),
                         const SizedBox(width: 6),
                         const Expanded(
                           child: Text(
@@ -1327,15 +1497,24 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => ResourceMonitorService.instance.pollNow(),
+                          onTap:
+                              () => ResourceMonitorService.instance.pollNow(),
                           child: const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 4),
-                            child: Icon(Icons.refresh, size: 13, color: Color(0xFF6060A0)),
+                            child: Icon(
+                              Icons.refresh,
+                              size: 13,
+                              color: Color(0xFF6060A0),
+                            ),
                           ),
                         ),
                         GestureDetector(
                           onTap: widget.onClose,
-                          child: const Icon(Icons.close, size: 12, color: Color(0xFF6060A0)),
+                          child: const Icon(
+                            Icons.close,
+                            size: 12,
+                            color: Color(0xFF6060A0),
+                          ),
                         ),
                       ],
                     ),
@@ -1344,7 +1523,10 @@ class _ResourcePanelState extends State<_ResourcePanel> {
 
                   // 3-column metric grid: CPU total%, Memory total, RAM share%
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     child: Row(
                       children: [
                         _StatCell(
@@ -1371,10 +1553,15 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Tooltip(
-                          message: 'Total RAM of your Mac (all processes combined)',
+                          message:
+                              'Total RAM of your Mac (all processes combined)',
                           child: const Text(
                             'SYSTEM RAM',
-                            style: TextStyle(color: Color(0xFF6060A0), fontSize: 9, letterSpacing: 0.8),
+                            style: TextStyle(
+                              color: Color(0xFF6060A0),
+                              fontSize: 9,
+                              letterSpacing: 0.8,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 5),
@@ -1382,7 +1569,10 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                           children: [
                             Text(
                               '${formatBytes(host.usedBytes)} used / ${formatBytes(host.totalBytes)} total',
-                              style: const TextStyle(color: Color(0xFFB0B0D0), fontSize: 10),
+                              style: const TextStyle(
+                                color: Color(0xFFB0B0D0),
+                                fontSize: 10,
+                              ),
                             ),
                           ],
                         ),
@@ -1395,7 +1585,9 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                             child: LinearProgressIndicator(
                               value: (host.usedPercent / 100).clamp(0.0, 1.0),
                               backgroundColor: const Color(0xFF2A2A5A),
-                              valueColor: AlwaysStoppedAnimation<Color>(memBarColor),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                memBarColor,
+                              ),
                             ),
                           ),
                         ),
@@ -1405,7 +1597,11 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                           children: [
                             const Text(
                               'LOAD AVG',
-                              style: TextStyle(color: Color(0xFF6060A0), fontSize: 9, letterSpacing: 0.8),
+                              style: TextStyle(
+                                color: Color(0xFF6060A0),
+                                fontSize: 9,
+                                letterSpacing: 0.8,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -1430,7 +1626,11 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                       padding: EdgeInsets.fromLTRB(14, 8, 14, 4),
                       child: Text(
                         'SESSIONS',
-                        style: TextStyle(color: Color(0xFF6060A0), fontSize: 9, letterSpacing: 0.8),
+                        style: TextStyle(
+                          color: Color(0xFF6060A0),
+                          fontSize: 9,
+                          letterSpacing: 0.8,
+                        ),
                       ),
                     ),
                     ...registeredSessions.map((s) => _SessionRow(session: s)),
@@ -1443,7 +1643,11 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                       padding: EdgeInsets.fromLTRB(14, 8, 14, 4),
                       child: Text(
                         'AGENTS & TOOLS',
-                        style: TextStyle(color: Color(0xFF6060A0), fontSize: 9, letterSpacing: 0.8),
+                        style: TextStyle(
+                          color: Color(0xFF6060A0),
+                          fontSize: 9,
+                          letterSpacing: 0.8,
+                        ),
                       ),
                     ),
                     ...agentSessions.map((s) => _SessionRow(session: s)),
@@ -1471,9 +1675,23 @@ class _StatCell extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF6060A0), fontSize: 9, letterSpacing: 0.6)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF6060A0),
+              fontSize: 9,
+              letterSpacing: 0.6,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(value, style: const TextStyle(color: Color(0xFFE0E0F0), fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFFE0E0F0),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -1502,14 +1720,22 @@ class _SessionRow extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '${session.cpuPercent.toStringAsFixed(1)}%',
-            style: const TextStyle(color: Color(0xFF8080B0), fontSize: 10, fontFamily: 'monospace'),
+            style: const TextStyle(
+              color: Color(0xFF8080B0),
+              fontSize: 10,
+              fontFamily: 'monospace',
+            ),
           ),
           const SizedBox(width: 8),
           SizedBox(
             width: 56,
             child: Text(
               formatBytes(session.memoryBytes),
-              style: const TextStyle(color: Color(0xFF8080B0), fontSize: 10, fontFamily: 'monospace'),
+              style: const TextStyle(
+                color: Color(0xFF8080B0),
+                fontSize: 10,
+                fontFamily: 'monospace',
+              ),
               textAlign: TextAlign.right,
             ),
           ),
@@ -1518,5 +1744,3 @@ class _SessionRow extends StatelessWidget {
     );
   }
 }
-
-

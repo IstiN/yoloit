@@ -4,8 +4,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
+import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
 import 'package:yoloit/features/collaboration/desktop/repo_directory_listing.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
@@ -41,6 +42,7 @@ class App extends StatelessWidget {
         BlocProvider(create: (_) => FileEditorCubit()),
         BlocProvider(create: (_) => RunCubit()),
         BlocProvider(create: (_) => MindMapCubit()),
+        BlocProvider(create: (_) => BoardCubit()),
         // CollaborationCubit must come after MindMapCubit so it can read it.
         BlocProvider(
           create: (ctx) {
@@ -51,89 +53,97 @@ class App extends StatelessWidget {
               reviewCubit: ctx.read<ReviewCubit>(),
               fileEditorCubit: ctx.read<FileEditorCubit>(),
               listDirectory: listRepoDir,
-              ensureNodesPopulated: () => _populateMindMap(
-                ctx.read<MindMapCubit>(),
-                ctx.read<WorkspaceCubit>().state,
-                ctx.read<TerminalCubit>().state,
-                ctx.read<ReviewCubit>().state,
-                ctx.read<FileEditorCubit>().state,
-                ctx.read<RunCubit>().state,
-              ),
-              onCreateWorkspace: (payload) => _handleWorkspaceCreate(
-                ctx.read<MindMapCubit>(),
-                ctx.read<WorkspaceCubit>(),
-                ctx.read<TerminalCubit>(),
-                ctx.read<ReviewCubit>(),
-                ctx.read<FileEditorCubit>(),
-                ctx.read<RunCubit>(),
-                collaborationCubit,
-                payload: payload,
-              ),
-              onAddFolder: (nodeId, {String? path}) => _handleAddFolder(
-                ctx.read<MindMapCubit>(),
-                ctx.read<WorkspaceCubit>(),
-                ctx.read<TerminalCubit>(),
-                ctx.read<ReviewCubit>(),
-                ctx.read<FileEditorCubit>(),
-                ctx.read<RunCubit>(),
-                collaborationCubit,
-                nodeId,
-                path: path,
-              ),
-              onCreateSession: (nodeId) => _handleWorkspaceSessionCreate(
-                ctx.read<MindMapCubit>(),
-                ctx.read<WorkspaceCubit>(),
-                ctx.read<TerminalCubit>(),
-                ctx.read<ReviewCubit>(),
-                ctx.read<FileEditorCubit>(),
-                ctx.read<RunCubit>(),
-                collaborationCubit,
-                nodeId,
-              ),
-              onRunStart: (nodeId) => _handleRunAction(
-                ctx.read<MindMapCubit>(),
-                ctx.read<RunCubit>(),
-                ctx.read<WorkspaceCubit>().state,
-                ctx.read<TerminalCubit>().state,
-                ctx.read<ReviewCubit>().state,
-                ctx.read<FileEditorCubit>().state,
-                nodeId,
-                collaborationCubit,
-                'start',
-              ),
-              onRunStop: (nodeId) => _handleRunAction(
-                ctx.read<MindMapCubit>(),
-                ctx.read<RunCubit>(),
-                ctx.read<WorkspaceCubit>().state,
-                ctx.read<TerminalCubit>().state,
-                ctx.read<ReviewCubit>().state,
-                ctx.read<FileEditorCubit>().state,
-                nodeId,
-                collaborationCubit,
-                'stop',
-              ),
-              onRunRestart: (nodeId) => _handleRunAction(
-                ctx.read<MindMapCubit>(),
-                ctx.read<RunCubit>(),
-                ctx.read<WorkspaceCubit>().state,
-                ctx.read<TerminalCubit>().state,
-                ctx.read<ReviewCubit>().state,
-                ctx.read<FileEditorCubit>().state,
-                nodeId,
-                collaborationCubit,
-                'restart',
-              ),
-              onFileSelect: (nodeId, path) => _handleFileSelect(
-                ctx.read<MindMapCubit>(),
-                ctx.read<FileEditorCubit>(),
-                ctx.read<WorkspaceCubit>().state,
-                ctx.read<TerminalCubit>().state,
-                ctx.read<ReviewCubit>().state,
-                ctx.read<RunCubit>().state,
-                nodeId,
-                path,
-                collaborationCubit,
-              ),
+              ensureNodesPopulated:
+                  () => _populateMindMap(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<WorkspaceCubit>().state,
+                    ctx.read<TerminalCubit>().state,
+                    ctx.read<ReviewCubit>().state,
+                    ctx.read<FileEditorCubit>().state,
+                    ctx.read<RunCubit>().state,
+                  ),
+              onCreateWorkspace:
+                  (payload) => _handleWorkspaceCreate(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<WorkspaceCubit>(),
+                    ctx.read<TerminalCubit>(),
+                    ctx.read<ReviewCubit>(),
+                    ctx.read<FileEditorCubit>(),
+                    ctx.read<RunCubit>(),
+                    collaborationCubit,
+                    payload: payload,
+                  ),
+              onAddFolder:
+                  (nodeId, {String? path}) => _handleAddFolder(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<WorkspaceCubit>(),
+                    ctx.read<TerminalCubit>(),
+                    ctx.read<ReviewCubit>(),
+                    ctx.read<FileEditorCubit>(),
+                    ctx.read<RunCubit>(),
+                    collaborationCubit,
+                    nodeId,
+                    path: path,
+                  ),
+              onCreateSession:
+                  (nodeId) => _handleWorkspaceSessionCreate(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<WorkspaceCubit>(),
+                    ctx.read<TerminalCubit>(),
+                    ctx.read<ReviewCubit>(),
+                    ctx.read<FileEditorCubit>(),
+                    ctx.read<RunCubit>(),
+                    collaborationCubit,
+                    nodeId,
+                  ),
+              onRunStart:
+                  (nodeId) => _handleRunAction(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<RunCubit>(),
+                    ctx.read<WorkspaceCubit>().state,
+                    ctx.read<TerminalCubit>().state,
+                    ctx.read<ReviewCubit>().state,
+                    ctx.read<FileEditorCubit>().state,
+                    nodeId,
+                    collaborationCubit,
+                    'start',
+                  ),
+              onRunStop:
+                  (nodeId) => _handleRunAction(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<RunCubit>(),
+                    ctx.read<WorkspaceCubit>().state,
+                    ctx.read<TerminalCubit>().state,
+                    ctx.read<ReviewCubit>().state,
+                    ctx.read<FileEditorCubit>().state,
+                    nodeId,
+                    collaborationCubit,
+                    'stop',
+                  ),
+              onRunRestart:
+                  (nodeId) => _handleRunAction(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<RunCubit>(),
+                    ctx.read<WorkspaceCubit>().state,
+                    ctx.read<TerminalCubit>().state,
+                    ctx.read<ReviewCubit>().state,
+                    ctx.read<FileEditorCubit>().state,
+                    nodeId,
+                    collaborationCubit,
+                    'restart',
+                  ),
+              onFileSelect:
+                  (nodeId, path) => _handleFileSelect(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<FileEditorCubit>(),
+                    ctx.read<WorkspaceCubit>().state,
+                    ctx.read<TerminalCubit>().state,
+                    ctx.read<ReviewCubit>().state,
+                    ctx.read<RunCubit>().state,
+                    nodeId,
+                    path,
+                    collaborationCubit,
+                  ),
               onTreeToggle: (_, path) {
                 ctx.read<ReviewCubit>().toggleNode(path);
                 return _syncMindMap(
@@ -147,16 +157,17 @@ class App extends StatelessWidget {
                   force: true,
                 );
               },
-              onTreeSelect: (_, path) => _handleTreeSelect(
-                ctx.read<ReviewCubit>(),
-                ctx.read<FileEditorCubit>(),
-                ctx.read<MindMapCubit>(),
-                ctx.read<WorkspaceCubit>().state,
-                ctx.read<TerminalCubit>().state,
-                ctx.read<RunCubit>().state,
-                path,
-                collaborationCubit,
-              ),
+              onTreeSelect:
+                  (_, path) => _handleTreeSelect(
+                    ctx.read<ReviewCubit>(),
+                    ctx.read<FileEditorCubit>(),
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<WorkspaceCubit>().state,
+                    ctx.read<TerminalCubit>().state,
+                    ctx.read<RunCubit>().state,
+                    path,
+                    collaborationCubit,
+                  ),
               onEditorSwitchTab: (_, tabIndex) {
                 ctx.read<FileEditorCubit>().switchTab(tabIndex);
                 return _syncMindMap(
@@ -197,16 +208,17 @@ class App extends StatelessWidget {
                   force: true,
                 );
               },
-              onSessionStart: (nodeId) => _handleSessionStart(
-                ctx.read<MindMapCubit>(),
-                ctx.read<TerminalCubit>(),
-                ctx.read<WorkspaceCubit>().state,
-                ctx.read<ReviewCubit>().state,
-                ctx.read<FileEditorCubit>().state,
-                ctx.read<RunCubit>().state,
-                collaborationCubit,
-                nodeId,
-              ),
+              onSessionStart:
+                  (nodeId) => _handleSessionStart(
+                    ctx.read<MindMapCubit>(),
+                    ctx.read<TerminalCubit>(),
+                    ctx.read<WorkspaceCubit>().state,
+                    ctx.read<ReviewCubit>().state,
+                    ctx.read<FileEditorCubit>().state,
+                    ctx.read<RunCubit>().state,
+                    collaborationCubit,
+                    nodeId,
+                  ),
             );
             return collaborationCubit;
           },
@@ -391,9 +403,13 @@ class App extends StatelessWidget {
     final String? dir;
     if (path != null && path.isNotEmpty) {
       // Web client provided the path directly — expand ~ if needed.
-      dir = path.startsWith('~')
-          ? (Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '') + path.substring(1)
-          : path;
+      dir =
+          path.startsWith('~')
+              ? (Platform.environment['HOME'] ??
+                      Platform.environment['USERPROFILE'] ??
+                      '') +
+                  path.substring(1)
+              : path;
     } else {
       dir = await FilePicker.getDirectoryPath(
         dialogTitle: 'Add folder to "${node.workspace.name}"',
@@ -432,13 +448,19 @@ class App extends StatelessWidget {
     final String name;
     final String folder;
 
-    if (presetName != null && presetName.isNotEmpty &&
-        presetPath != null && presetPath.isNotEmpty) {
+    if (presetName != null &&
+        presetName.isNotEmpty &&
+        presetPath != null &&
+        presetPath.isNotEmpty) {
       name = presetName;
       // Expand leading ~ to the home directory.
-      folder = presetPath.startsWith('~')
-          ? (Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'] ?? '') + presetPath.substring(1)
-          : presetPath;
+      folder =
+          presetPath.startsWith('~')
+              ? (Platform.environment['HOME'] ??
+                      Platform.environment['USERPROFILE'] ??
+                      '') +
+                  presetPath.substring(1)
+              : presetPath;
     } else {
       // Native host path: show macOS dialogs.
       final dialogContext = navigatorKey.currentContext;
@@ -447,42 +469,43 @@ class App extends StatelessWidget {
       final controller = TextEditingController();
       final pickedName = await showDialog<String>(
         context: dialogContext,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF12151C),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: Color(0xFF2A3040)),
-          ),
-          title: const Text(
-            'New Workspace',
-            style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
-          ),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            style: const TextStyle(color: Color(0xFFE8E8FF)),
-            decoration: const InputDecoration(
-              hintText: 'Workspace name',
-              hintStyle: TextStyle(color: Color(0xFF6B7898)),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Color(0xFF6B7898)),
+        builder:
+            (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF12151C),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Color(0xFF2A3040)),
               ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text(
-                'Pick folder →',
-                style: TextStyle(color: Color(0xFF7C6BFF)),
+              title: const Text(
+                'New Workspace',
+                style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
               ),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                style: const TextStyle(color: Color(0xFFE8E8FF)),
+                decoration: const InputDecoration(
+                  hintText: 'Workspace name',
+                  hintStyle: TextStyle(color: Color(0xFF6B7898)),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Color(0xFF6B7898)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                  child: const Text(
+                    'Pick folder →',
+                    style: TextStyle(color: Color(0xFF7C6BFF)),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
       );
       controller.dispose();
       if (pickedName == null || pickedName.isEmpty) return;
@@ -533,23 +556,24 @@ class App extends StatelessWidget {
 
     final type = await showDialog<AgentType>(
       context: dialogContext,
-      builder: (ctx) => SimpleDialog(
-        backgroundColor: const Color(0xFF12151C),
-        title: const Text(
-          'New Session',
-          style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
-        ),
-        children: [
-          for (final agentType in AgentType.values)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, agentType),
-              child: Text(
-                agentType.displayName,
-                style: const TextStyle(color: Color(0xFFCECEEE)),
-              ),
+      builder:
+          (ctx) => SimpleDialog(
+            backgroundColor: const Color(0xFF12151C),
+            title: const Text(
+              'New Session',
+              style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
             ),
-        ],
-      ),
+            children: [
+              for (final agentType in AgentType.values)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, agentType),
+                  child: Text(
+                    agentType.displayName,
+                    style: const TextStyle(color: Color(0xFFCECEEE)),
+                  ),
+                ),
+            ],
+          ),
     );
     if (type == null) return;
 
