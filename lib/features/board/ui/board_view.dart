@@ -3080,50 +3080,51 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return _StrokeHitTestBox(
-      drawing: widget.drawing,
-      onHoverChanged: (h) {
-        if (_hovered != h) setState(() => _hovered = h);
-      },
-      child: GestureDetector(
-        onTap: widget.isSelectMode
-            ? () => setState(() => _selected = !_selected)
-            : null,
-        onPanUpdate:
-            widget.isSelectMode
-                ? (d) => widget.onMove(widget.drawing.position + d.delta)
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _StrokeHitTestBox(
+          drawing: widget.drawing,
+          onHoverChanged: (h) {
+            if (_hovered != h) setState(() => _hovered = h);
+          },
+          child: GestureDetector(
+            onTap: widget.isSelectMode
+                ? () => setState(() => _selected = !_selected)
                 : null,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            CustomPaint(
+            onPanUpdate:
+                widget.isSelectMode
+                    ? (d) => widget.onMove(widget.drawing.position + d.delta)
+                    : null,
+            child: CustomPaint(
               size: widget.drawing.size,
               painter: _DrawingElementPainter(drawing: widget.drawing),
             ),
-            if (_showBadge)
-              Positioned(
-                right: -6,
-                top: -6,
-                child: GestureDetector(
-                  onTap: widget.onDelete,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      color: Color(0xCCF87171),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 12,
-                      color: Colors.white,
-                    ),
-                  ),
+          ),
+        ),
+        // Delete badge OUTSIDE _StrokeHitTestBox so it has its own hit area
+        if (_showBadge)
+          Positioned(
+            right: -6,
+            top: -6,
+            child: GestureDetector(
+              onTap: widget.onDelete,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: const BoxDecoration(
+                  color: Color(0xCCF87171),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  size: 12,
+                  color: Colors.white,
                 ),
               ),
-          ],
-        ),
-      ),
+            ),
+          ),
+      ],
     );
   }
 }
