@@ -54,6 +54,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// Points accumulated for the active stroke (board-space).
   final List<Offset> _activeStroke = [];
 
+  /// Active pointer id for drawing (null when not drawing).
+  int? _drawPointer;
+
   /// Pending connection source panel id.
   String? _connectSourceId;
   Offset? _connectPreviewPointer; // board-space pointer for preview line
@@ -154,7 +157,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             boundaryMargin: const EdgeInsets.all(
                               _canvasExpansionChunk,
                             ),
-                            panEnabled: _activeTool == BoardToolId.select,
+                            // Disable pan only while actively drawing (drawPointer held)
+                            panEnabled:
+                                _activeTool != BoardToolId.draw ||
+                                _drawPointer == null,
                             transformationController: _transformController,
                             onInteractionStart: (_) {
                               _isViewportInteracting = true;
@@ -320,43 +326,51 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               ),
                             ),
                           ),
-                          // ── Draw gesture capture overlay ──────────────────
+                          // ── Draw gesture capture overlay ─────────────────
+                          // Uses Listener with translucent so InteractiveViewer
+                          // still receives trackpad scroll / pinch-to-zoom events.
                           if (_activeTool == BoardToolId.draw)
                             Positioned.fill(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onPanStart: (d) {
-                                  final pt = _boardPointFromGlobal(
-                                    d.globalPosition,
-                                  );
+                              child: Listener(
+                                behavior: HitTestBehavior.translucent,
+                                onPointerDown: (e) {
+                                  if (_drawPointer != null) return;
+                                  final pt = _boardPointFromGlobal(e.position);
                                   if (pt == null) return;
                                   setState(() {
+                                    _drawPointer = e.pointer;
                                     _activeStroke
                                       ..clear()
                                       ..add(pt);
                                   });
                                 },
-                                onPanUpdate: (d) {
-                                  final pt = _boardPointFromGlobal(
-                                    d.globalPosition,
-                                  );
+                                onPointerMove: (e) {
+                                  if (e.pointer != _drawPointer) return;
+                                  final pt = _boardPointFromGlobal(e.position);
                                   if (pt == null) return;
                                   setState(() => _activeStroke.add(pt));
                                 },
-                                onPanEnd:
-                                    (_) => _finishDrawStroke(context),
+                                onPointerUp: (e) {
+                                  if (e.pointer != _drawPointer) return;
+                                  _drawPointer = null;
+                                  _finishDrawStroke(context);
+                                },
+                                onPointerCancel: (e) {
+                                  if (e.pointer != _drawPointer) return;
+                                  _drawPointer = null;
+                                  setState(() => _activeStroke.clear());
+                                },
                               ),
                             ),
                           // ── Connect tool pointer tracking ─────────────────
+                          // translucent so panel-tap GestureDetectors still fire.
                           if (_activeTool == BoardToolId.connect &&
                               _connectSourceId != null)
                             Positioned.fill(
-                              child: MouseRegion(
-                                cursor: SystemMouseCursors.precise,
-                                onHover: (e) {
-                                  final pt = _boardPointFromGlobal(
-                                    e.position,
-                                  );
+                              child: Listener(
+                                behavior: HitTestBehavior.translucent,
+                                onPointerHover: (e) {
+                                  final pt = _boardPointFromGlobal(e.position);
                                   if (pt == null) return;
                                   setState(
                                     () => _connectPreviewPointer = pt,
