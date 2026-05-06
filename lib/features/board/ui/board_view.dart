@@ -11,7 +11,10 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
+import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
 
 class BoardView extends StatefulWidget {
@@ -142,6 +145,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                 onRenameBoard: () => _renameBoard(context, activeBoard),
                 onDeleteBoard: () => _deleteBoard(context, activeBoard),
                 onAddMarkdownNote: () => _showMarkdownNoteDialog(context),
+                onAddChat: () => _addChatPanel(context),
               ),
               Expanded(
                 child: DecoratedBox(
@@ -275,6 +279,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                           panel: panel,
                                                         )
                                                     : null,
+                                            onUpdateState: (newState) {
+                                              context.read<BoardCubit>().updatePanel(
+                                                panel.id,
+                                                (p) => p.copyWith(state: newState),
+                                              );
+                                            },
                                             connectMode:
                                                 _activeTool ==
                                                 BoardToolId.connect,
@@ -1323,6 +1333,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     await context.read<BoardCubit>().deleteBoard(board.id);
   }
 
+  void _addChatPanel(BuildContext context) {
+    context.read<BoardCubit>().createChatPanel();
+  }
+
   Future<void> _showMarkdownNoteDialog(
     BuildContext context, {
     BoardPanelInstance? panel,
@@ -1709,6 +1723,7 @@ class _BoardToolbar extends StatelessWidget {
     required this.onRenameBoard,
     required this.onDeleteBoard,
     required this.onAddMarkdownNote,
+    required this.onAddChat,
   });
 
   final BoardDocument board;
@@ -1718,6 +1733,7 @@ class _BoardToolbar extends StatelessWidget {
   final VoidCallback onRenameBoard;
   final VoidCallback onDeleteBoard;
   final VoidCallback onAddMarkdownNote;
+  final VoidCallback onAddChat;
 
   @override
   Widget build(BuildContext context) {
@@ -1786,6 +1802,16 @@ class _BoardToolbar extends StatelessWidget {
             onPressed: onAddMarkdownNote,
             icon: const Icon(Icons.note_add_outlined),
             label: const Text('Add note'),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: onAddChat,
+            icon: const Icon(Icons.smart_toy_outlined),
+            label: const Text('Add chat'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF34D399),
+              foregroundColor: const Color(0xFF0F172A),
+            ),
           ),
         ],
       ),
@@ -1900,6 +1926,7 @@ class _BoardPanelCard extends StatelessWidget {
     required this.onDelete,
     required this.onEditColor,
     this.onEditNote,
+    this.onUpdateState,
     this.connectMode = false,
     this.connectSourceId,
     this.onConnectTap,
@@ -1915,6 +1942,7 @@ class _BoardPanelCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onEditColor;
   final VoidCallback? onEditNote;
+  final ValueChanged<Map<String, dynamic>>? onUpdateState;
   final bool connectMode;
   final String? connectSourceId;
   final VoidCallback? onConnectTap;
@@ -2012,9 +2040,8 @@ class _BoardPanelCard extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(
-                            panel.type == 'board.note.markdown'
-                                ? Icons.sticky_note_2_outlined
-                                : Icons.dashboard_customize_outlined,
+                            BoardPluginRegistry.instance.pluginFor(panel.type)?.icon
+                                ?? Icons.dashboard_customize_outlined,
                             size: 16,
                             color: AppColors.textMuted,
                           ),
@@ -2063,25 +2090,10 @@ class _BoardPanelCard extends StatelessWidget {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child:
-                          panel.type == 'board.note.markdown'
-                              ? ClipRect(
-                                child: SingleChildScrollView(
-                                  child: MarkdownBody(
-                                    data:
-                                        markdown.isEmpty
-                                            ? '*Empty note*'
-                                            : markdown,
-                                  ),
-                                ),
-                              )
-                              : Text(
-                                panel.type,
-                                style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                ),
-                              ),
+                      padding: panel.type == ChatPanelPlugin.kTypeId
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.all(12),
+                      child: _buildPanelContent(context, panel),
                     ),
                   ),
                 ],
@@ -2175,6 +2187,33 @@ class _BoardPanelCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPanelContent(BuildContext context, BoardPanelInstance panel) {
+    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+    if (plugin != null) {
+      return plugin.buildContent(
+        context,
+        panel,
+        BoardPanelRenderContext(
+          isSelected: panel.id ==
+              context.select<BoardCubit, String?>(
+                (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
+              ),
+          onFocus: onTap,
+          onDelete: onDelete,
+          onUpdateState: onUpdateState ?? (_) {},
+          onShowEditor: onEditNote ?? () {},
+        ),
+      );
+    }
+    // Fallback for unknown types
+    return Center(
+      child: Text(
+        'Unknown: ${panel.type}',
+        style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
       ),
     );
   }

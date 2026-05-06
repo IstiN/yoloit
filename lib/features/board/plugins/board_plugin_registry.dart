@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 
@@ -48,6 +49,7 @@ class BoardPluginRegistry {
 
   void _registerBuiltins() {
     register(const MarkdownNotePlugin());
+    register(const ChatPanelPlugin());
   }
 }
 

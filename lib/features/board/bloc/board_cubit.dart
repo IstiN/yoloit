@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
+import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/model/chat_models.dart';
 
 class BoardCubit extends Cubit<BoardState> {
   BoardCubit() : super(const BoardState());
@@ -128,6 +130,41 @@ class BoardCubit extends Cubit<BoardState> {
       title: title.trim().isEmpty ? 'Note' : title.trim(),
       bounds: bounds,
       state: {'markdown': markdown},
+      zIndex:
+          board.panels.fold<int>(
+            0,
+            (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+          ) +
+          1,
+    );
+    await addPanel(panel);
+    await focusPanel(panel.id);
+  }
+
+  Future<void> createChatPanel({
+    String? title,
+    String? sessionName,
+    String workingDir = '',
+    String model = 'gpt-5-mini',
+  }) async {
+    final board = state.activeBoard;
+    if (board == null) return;
+    final bounds = _nextAvailableBounds(
+      board,
+      preferredWidth: 420,
+      preferredHeight: 500,
+    );
+    final config = ChatSessionConfig(
+      sessionName: sessionName ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
+      workingDir: workingDir,
+      model: model,
+    );
+    final panel = BoardPanelInstance(
+      id: _nextId('panel'),
+      type: ChatPanelPlugin.kTypeId,
+      title: title?.trim().isNotEmpty == true ? title!.trim() : 'AI Chat',
+      bounds: bounds,
+      state: {'config': config.toJson()},
       zIndex:
           board.panels.fold<int>(
             0,
