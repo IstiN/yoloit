@@ -216,45 +216,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       context,
                                       activeBoard,
                                     ),
-                                  // ── Drawing layer (below panels so panels
-                                  //    always win pointer events) ─────────────
-                                  ...activeBoard.drawings
-                                      .where((d) => !d.hidden)
-                                      .map(
-                                        (drawing) => Positioned(
-                                          key: ValueKey(drawing.id),
-                                          left: drawing.position.dx +
-                                              _canvasOrigin.dx,
-                                          top: drawing.position.dy +
-                                              _canvasOrigin.dy,
-                                          width: drawing.size.width,
-                                          height: drawing.size.height,
-                                          child: IgnorePointer(
-                                            ignoring:
-                                                _activeTool ==
-                                                BoardToolId.connect,
-                                            child: _BoardDrawingWidget(
-                                              drawing: drawing,
-                                              isSelectMode:
-                                                  _activeTool ==
-                                                  BoardToolId.select,
-                                              onMove:
-                                                  (newPos) => context
-                                                      .read<BoardCubit>()
-                                                      .moveDrawing(
-                                                        drawing.id,
-                                                        newPos,
-                                                      ),
-                                              onDelete:
-                                                  () => context
-                                                      .read<BoardCubit>()
-                                                      .removeDrawing(
-                                                        drawing.id,
-                                                      ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
                                   ...(() {
                                     final visiblePanels =
                                         activeBoard.panels
@@ -331,6 +292,46 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         )
                                         .toList();
                                   })(),
+                                  // ── Drawing layer (above panels visually;
+                                  //    only intercepts gestures on actual stroke
+                                  //    pixels via path-based hitTest) ──────────
+                                  ...activeBoard.drawings
+                                      .where((d) => !d.hidden)
+                                      .map(
+                                        (drawing) => Positioned(
+                                          key: ValueKey(drawing.id),
+                                          left: drawing.position.dx +
+                                              _canvasOrigin.dx,
+                                          top: drawing.position.dy +
+                                              _canvasOrigin.dy,
+                                          width: drawing.size.width,
+                                          height: drawing.size.height,
+                                          child: IgnorePointer(
+                                            ignoring:
+                                                _activeTool ==
+                                                BoardToolId.connect,
+                                            child: _BoardDrawingWidget(
+                                              drawing: drawing,
+                                              isSelectMode:
+                                                  _activeTool ==
+                                                  BoardToolId.select,
+                                              onMove:
+                                                  (newPos) => context
+                                                      .read<BoardCubit>()
+                                                      .moveDrawing(
+                                                        drawing.id,
+                                                        newPos,
+                                                      ),
+                                              onDelete:
+                                                  () => context
+                                                      .read<BoardCubit>()
+                                                      .removeDrawing(
+                                                        drawing.id,
+                                                      ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                   // ── Active stroke preview ─────────────────
                                   if (_activeStroke.isNotEmpty)
                                     Positioned.fill(
@@ -3150,6 +3151,39 @@ class _DrawingElementPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DrawingElementPainter oldDelegate) {
     return oldDelegate.drawing != drawing;
+  }
+
+  /// Only return true when [position] is within hit distance of an actual
+  /// stroke segment. Transparent bbox areas return null (miss) so panels
+  /// underneath can still handle pointer events.
+  @override
+  bool? hitTest(Offset position) {
+    final hitRadius = (drawing.strokeWidth / 2) + 8.0;
+    for (final stroke in drawing.strokes) {
+      if (stroke.isEmpty) continue;
+      if (stroke.length == 1) {
+        if ((stroke.first - position).distance <= hitRadius) return true;
+        continue;
+      }
+      for (int i = 0; i < stroke.length - 1; i++) {
+        if (_distToSegment(position, stroke[i], stroke[i + 1]) <= hitRadius) {
+          return true;
+        }
+      }
+    }
+    return null; // transparent — let events fall through
+  }
+
+  static double _distToSegment(Offset p, Offset a, Offset b) {
+    final dx = b.dx - a.dx;
+    final dy = b.dy - a.dy;
+    final lenSq = dx * dx + dy * dy;
+    final t = lenSq == 0
+        ? 0.0
+        : ((p.dx - a.dx) * dx + (p.dy - a.dy) * dy) / lenSq;
+    final closest = Offset(a.dx + t.clamp(0.0, 1.0) * dx,
+                           a.dy + t.clamp(0.0, 1.0) * dy);
+    return (p - closest).distance;
   }
 }
 
