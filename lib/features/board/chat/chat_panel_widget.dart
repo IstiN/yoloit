@@ -26,6 +26,10 @@ class ChatPanelWidget extends StatefulWidget {
   final BoardPanelInstance panel;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
 
+  /// Global registry of processing notifiers keyed by panel ID.
+  /// Used by [_BoardPanelCard] to animate the border glow.
+  static final Map<String, ValueNotifier<bool>> processingNotifiers = {};
+
   @override
   State<ChatPanelWidget> createState() => _ChatPanelWidgetState();
 }
@@ -64,6 +68,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
+    // Register processing notifier for board-level glow
+    ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
   }
 
   void _initConfig() {
@@ -125,6 +131,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _scrollController.dispose();
     _inputFocusNode.dispose();
     _glowCtrl.dispose();
+    ChatPanelWidget.processingNotifiers.remove(widget.panel.id);
     processingNotifier.dispose();
     super.dispose();
   }
@@ -421,47 +428,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   // ── Chat view ─────────────────────────────────────────────────────────────
 
   Widget _buildChatView() {
-    return AnimatedBuilder(
-      animation: _glowCtrl,
-      builder: (context, child) {
-        return Container(
-          decoration: _isProcessing
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFF34D399).withAlpha(
-                      (40 + _glowCtrl.value * 80).round(),
-                    ),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF34D399).withAlpha(
-                        (_glowCtrl.value * 40).round(),
-                      ),
-                      blurRadius: 12,
-                    ),
-                  ],
-                )
-              : null,
-          child: child,
-        );
-      },
-      child: Column(
-        children: [
-          // Model + session info bar
-          _buildInfoBar(),
-          const Divider(height: 1),
-          // Messages
-          Expanded(
-            child: _messages.isEmpty && !_isProcessing
-                ? _buildEmptyState()
-                : _buildMessageList(),
-          ),
-          // Input
-          _buildInputBar(),
-        ],
-      ),
+    return Column(
+      children: [
+        // Model + session info bar
+        _buildInfoBar(),
+        const Divider(height: 1),
+        // Messages
+        Expanded(
+          child: _messages.isEmpty && !_isProcessing
+              ? _buildEmptyState()
+              : _buildMessageList(),
+        ),
+        // Input
+        _buildInputBar(),
+      ],
     );
   }
 

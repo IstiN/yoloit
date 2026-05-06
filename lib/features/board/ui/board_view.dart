@@ -12,6 +12,7 @@ import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
+import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
@@ -1970,7 +1971,10 @@ class _BoardPanelCard extends StatelessWidget {
       top: panel.bounds.y + positionOffset.dy,
       width: panel.bounds.width,
       height: panel.bounds.height,
-      child: GestureDetector(
+      child: _ChatGlowWrapper(
+        panelId: panel.id,
+        borderRadius: BorderRadius.circular(16),
+        child: GestureDetector(
         onTap: onTap,
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -2187,6 +2191,7 @@ class _BoardPanelCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -3802,4 +3807,100 @@ class _LinkMiniPreviewPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _LinkMiniPreviewPainter old) =>
       old.geometry != geometry || old.color != color;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Animated glow wrapper for chat panels while processing
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ChatGlowWrapper extends StatefulWidget {
+  const _ChatGlowWrapper({
+    required this.panelId,
+    required this.borderRadius,
+    required this.child,
+  });
+
+  final String panelId;
+  final BorderRadius borderRadius;
+  final Widget child;
+
+  @override
+  State<_ChatGlowWrapper> createState() => _ChatGlowWrapperState();
+}
+
+class _ChatGlowWrapperState extends State<_ChatGlowWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _glowCtrl;
+  ValueNotifier<bool>? _notifier;
+  bool _isGlowing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _attachNotifier();
+  }
+
+  @override
+  void didUpdateWidget(_ChatGlowWrapper old) {
+    super.didUpdateWidget(old);
+    if (old.panelId != widget.panelId) _attachNotifier();
+  }
+
+  void _attachNotifier() {
+    _notifier?.removeListener(_onNotifierChange);
+    _notifier = ChatPanelWidget.processingNotifiers[widget.panelId];
+    _notifier?.addListener(_onNotifierChange);
+    _onNotifierChange();
+  }
+
+  void _onNotifierChange() {
+    final processing = _notifier?.value ?? false;
+    if (processing != _isGlowing) {
+      setState(() => _isGlowing = processing);
+      if (processing) {
+        _glowCtrl.repeat(reverse: true);
+      } else {
+        _glowCtrl.stop();
+        _glowCtrl.value = 0;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _notifier?.removeListener(_onNotifierChange);
+    _glowCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isGlowing) return widget.child;
+
+    return AnimatedBuilder(
+      animation: _glowCtrl,
+      builder: (context, child) {
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: widget.borderRadius,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF34D399).withAlpha(
+                  (20 + _glowCtrl.value * 60).round(),
+                ),
+                blurRadius: 16 + _glowCtrl.value * 8,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+  }
 }
