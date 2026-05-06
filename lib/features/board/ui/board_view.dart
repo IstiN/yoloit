@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -3076,19 +3077,20 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      // opaque: false allows pointer events to pass through transparent areas
-      // to panels/widgets underneath the drawing's bounding box
-      opaque: false,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+    // Use _StrokeHitTestBox which only claims hit when pointer is
+    // near an actual drawn stroke. Transparent bbox areas pass through.
+    return _StrokeHitTestBox(
+      drawing: widget.drawing,
+      onHoverChanged: (h) {
+        if (_hovered != h) setState(() => _hovered = h);
+      },
       child: GestureDetector(
-        behavior: HitTestBehavior.deferToChild,
         onPanUpdate:
             widget.isSelectMode
                 ? (d) => widget.onMove(widget.drawing.position + d.delta)
                 : null,
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             CustomPaint(
               size: widget.drawing.size,
@@ -3096,8 +3098,8 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
             ),
             if (widget.isSelectMode && _hovered)
               Positioned(
-                right: 0,
-                top: 0,
+                right: -6,
+                top: -6,
                 child: GestureDetector(
                   onTap: widget.onDelete,
                   child: Container(
@@ -3184,6 +3186,111 @@ class _DrawingElementPainter extends CustomPainter {
     final closest = Offset(a.dx + t.clamp(0.0, 1.0) * dx,
                            a.dy + t.clamp(0.0, 1.0) * dy);
     return (p - closest).distance;
+  }
+
+  /// Public stroke hit test used by [_StrokeHitTestRenderBox].
+  static bool strokeHitTest(BoardDrawingElement drawing, Offset position) {
+    final hitRadius = (drawing.strokeWidth / 2) + 8.0;
+    for (final stroke in drawing.strokes) {
+      if (stroke.isEmpty) continue;
+      if (stroke.length == 1) {
+        if ((stroke.first - position).distance <= hitRadius) return true;
+        continue;
+      }
+      for (int i = 0; i < stroke.length - 1; i++) {
+        if (_distToSegment(position, stroke[i], stroke[i + 1]) <= hitRadius) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _StrokeHitTestBox — SingleChildRenderObjectWidget whose RenderBox only
+// returns true from hitTest when the pointer is near an actual drawn stroke.
+// Transparent bbox areas pass through to panels below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _StrokeHitTestBox extends SingleChildRenderObjectWidget {
+  const _StrokeHitTestBox({
+    required this.drawing,
+    required this.onHoverChanged,
+    required super.child,
+  });
+
+  final BoardDrawingElement drawing;
+  final ValueChanged<bool> onHoverChanged;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _StrokeHitTestRenderBox(
+      drawing: drawing,
+      onHoverChanged: onHoverChanged,
+    );
+  }
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant _StrokeHitTestRenderBox renderObject,
+  ) {
+    renderObject
+      ..drawing = drawing
+      ..onHoverChanged = onHoverChanged;
+  }
+}
+
+class _StrokeHitTestRenderBox extends RenderProxyBox {
+  _StrokeHitTestRenderBox({
+    required BoardDrawingElement drawing,
+    required this.onHoverChanged,
+  }) : _drawing = drawing;
+
+  BoardDrawingElement _drawing;
+  set drawing(BoardDrawingElement value) {
+    if (_drawing == value) return;
+    _drawing = value;
+    markNeedsPaint();
+  }
+
+  ValueChanged<bool> onHoverChanged;
+
+  bool _lastHover = false;
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    // Only hit if pointer is near a stroke
+    if (!_DrawingElementPainter.strokeHitTest(_drawing, position)) {
+      if (_lastHover) {
+        _lastHover = false;
+        // Schedule callback to avoid calling during hit test
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          onHoverChanged(false);
+        });
+      }
+      return false;
+    }
+    if (!_lastHover) {
+      _lastHover = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onHoverChanged(true);
+      });
+    }
+    // Let child handle the event
+    return super.hitTest(result, position: position);
+  }
+
+  @override
+  void handleEvent(PointerEvent event, BoxHitTestEntry entry) {
+    super.handleEvent(event, entry);
+    if (event is PointerExitEvent || event is PointerCancelEvent) {
+      if (_lastHover) {
+        _lastHover = false;
+        onHoverChanged(false);
+      }
+    }
   }
 }
 
