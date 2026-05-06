@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
@@ -537,32 +538,41 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget> {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _inputController,
-              focusNode: _inputFocusNode,
-              enabled: !_isProcessing,
-              style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
-              decoration: InputDecoration(
-                hintText: _isProcessing ? 'Waiting for response…' : 'Type a message…',
-                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF334155)),
+            child: KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: (event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.enter &&
+                    !HardwareKeyboard.instance.isShiftPressed) {
+                  _sendMessage();
+                }
+              },
+              child: TextField(
+                controller: _inputController,
+                focusNode: _inputFocusNode,
+                enabled: !_isProcessing,
+                style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+                decoration: InputDecoration(
+                  hintText: _isProcessing ? 'Waiting for response…' : 'Type a message… (Shift+Enter for newline)',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: Color(0xFF34D399)),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  isDense: true,
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF334155)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF34D399)),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                isDense: true,
+                maxLines: 5,
+                minLines: 1,
               ),
-              onSubmitted: (_) => _sendMessage(),
-              maxLines: null,
-              minLines: 1,
             ),
           ),
           const SizedBox(width: 8),
