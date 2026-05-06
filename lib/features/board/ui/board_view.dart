@@ -54,6 +54,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   DrawSettings _drawSettings = const DrawSettings();
   ConnectSettings _connectSettings = const ConnectSettings();
 
+  /// Link id currently hovered (for showing delete badge).
+  String? _hoveredLinkId;
+
   /// Points accumulated for the active stroke (board-space).
   final List<Offset> _activeStroke = [];
 
@@ -1121,26 +1124,42 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       final end = _BoardLinksPainter.edgePointToward(toRect, fromRect.center);
       final mid = _linkMidpoint(start, end, link.geometry);
 
+      // Large transparent hit area so mouse-over the line is easy to trigger
+      const hitR = 20.0;
       const badgeR = 11.0;
+      final isHovered = _hoveredLinkId == link.id;
       badges.add(
         Positioned(
-          left: mid.dx - badgeR,
-          top: mid.dy - badgeR,
-          width: badgeR * 2,
-          height: badgeR * 2,
-          child: GestureDetector(
-            onTap:
-                () => context.read<BoardCubit>().removeLink(link.id),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xCCF87171),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withAlpha(80),
-                  width: 1,
+          left: mid.dx - hitR,
+          top: mid.dy - hitR,
+          width: hitR * 2,
+          height: hitR * 2,
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _hoveredLinkId = link.id),
+            onExit: (_) => setState(() {
+              if (_hoveredLinkId == link.id) _hoveredLinkId = null;
+            }),
+            child: Center(
+              child: AnimatedOpacity(
+                opacity: isHovered ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: GestureDetector(
+                  onTap: () => context.read<BoardCubit>().removeLink(link.id),
+                  child: Container(
+                    width: badgeR * 2,
+                    height: badgeR * 2,
+                    decoration: BoxDecoration(
+                      color: const Color(0xCCF87171),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withAlpha(80),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(Icons.close, size: 12, color: Colors.white),
+                  ),
                 ),
               ),
-              child: const Icon(Icons.close, size: 12, color: Colors.white),
             ),
           ),
         ),
