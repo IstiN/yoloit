@@ -538,6 +538,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   const SizedBox(height: 6),
                                   _BoardMiniMap(
                                     panels: activeBoard.panels,
+                                    processingPanelIds: ChatPanelWidget.processingNotifiers.entries
+                                        .where((e) => e.value.value)
+                                        .map((e) => e.key)
+                                        .toSet(),
                                     transformCtrl: _transformController,
                                     viewportSize:
                                         _viewportSize ?? const Size(1, 1),
@@ -2497,6 +2501,7 @@ class _BoardLinksPainter extends CustomPainter {
 class _BoardMiniMap extends StatelessWidget {
   const _BoardMiniMap({
     required this.panels,
+    required this.processingPanelIds,
     required this.transformCtrl,
     required this.viewportSize,
     required this.origin,
@@ -2504,6 +2509,7 @@ class _BoardMiniMap extends StatelessWidget {
   });
 
   final List<BoardPanelInstance> panels;
+  final Set<String> processingPanelIds;
   final TransformationController transformCtrl;
   final Size viewportSize;
   final Offset origin;
@@ -2577,6 +2583,7 @@ class _BoardMiniMap extends StatelessWidget {
               child: CustomPaint(
                 painter: _BoardMiniMapPainter(
                   panels: panels.where((panel) => !panel.hidden).toList(),
+                  processingPanelIds: processingPanelIds,
                   bounds: bounds,
                   viewportRect: viewportRect,
                 ),
@@ -2592,11 +2599,13 @@ class _BoardMiniMap extends StatelessWidget {
 class _BoardMiniMapPainter extends CustomPainter {
   const _BoardMiniMapPainter({
     required this.panels,
+    required this.processingPanelIds,
     required this.bounds,
     required this.viewportRect,
   });
 
   final List<BoardPanelInstance> panels;
+  final Set<String> processingPanelIds;
   final Rect bounds;
   final Rect viewportRect;
 
@@ -2612,12 +2621,28 @@ class _BoardMiniMapPainter extends CustomPainter {
       final y = (rect.top - bounds.top) * scaleY;
       final w = math.max(4.0, rect.width * scaleX);
       final h = math.max(3.0, rect.height * scaleY);
+      final rrect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, y, w, h),
+        const Radius.circular(1.5),
+      );
+
+      final isProcessing = processingPanelIds.contains(panel.id);
+
+      if (isProcessing) {
+        // Draw glow behind processing panels
+        canvas.drawRRect(
+          rrect.inflate(2),
+          Paint()
+            ..color = const Color(0xFF34D399)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+        );
+      }
+
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, y, w, h),
-          const Radius.circular(1.5),
-        ),
-        Paint()..color = panel.color ?? _colorForPanelType(panel.type),
+        rrect,
+        Paint()..color = isProcessing
+            ? const Color(0xFF34D399)
+            : (panel.color ?? _colorForPanelType(panel.type)),
       );
     }
 
@@ -2650,7 +2675,8 @@ class _BoardMiniMapPainter extends CustomPainter {
   bool shouldRepaint(covariant _BoardMiniMapPainter oldDelegate) {
     return oldDelegate.panels != panels ||
         oldDelegate.bounds != bounds ||
-        oldDelegate.viewportRect != viewportRect;
+        oldDelegate.viewportRect != viewportRect ||
+        oldDelegate.processingPanelIds != processingPanelIds;
   }
 }
 

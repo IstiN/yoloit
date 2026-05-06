@@ -447,61 +447,57 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildInfoBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      color: const Color(0x0AFFFFFF),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1117),
+        border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 0.5)),
+      ),
       child: Row(
         children: [
-          const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF34D399)),
-          const SizedBox(width: 4),
           GestureDetector(
             onTap: () => _showModelPicker(context),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _config.model,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                ),
-                const Icon(Icons.arrow_drop_down, size: 14, color: Color(0xFF94A3B8)),
-              ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A2030),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.auto_awesome, size: 11, color: Color(0xFF34D399)),
+                  const SizedBox(width: 4),
+                  Text(
+                    _config.model,
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                  ),
+                  const Icon(Icons.expand_more, size: 12, color: Color(0xFF64748B)),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          const Icon(Icons.folder_outlined, size: 14, color: Color(0xFF94A3B8)),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
+          const Icon(Icons.folder_outlined, size: 11, color: Color(0xFF475569)),
+          const SizedBox(width: 3),
           Expanded(
             child: Text(
               _shortPath(_config.workingDir),
-              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              style: const TextStyle(fontSize: 10, color: Color(0xFF475569)),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (_lastUsage != null) ...[
+          if (_totalOutputTokens > 0)
             Text(
-              '${_lastUsage!.totalApiDurationMs}ms',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+              '∑${_totalOutputTokens}',
+              style: const TextStyle(fontSize: 9, color: Color(0xFF6366F1)),
             ),
-            const SizedBox(width: 4),
-            if (_lastUsage!.premiumRequests > 0)
-              Text(
-                '${_lastUsage!.premiumRequests} premium',
-                style: const TextStyle(fontSize: 10, color: Color(0xFFFBBF24)),
-              ),
-          ],
-          if (_totalOutputTokens > 0) ...[
-            const SizedBox(width: 4),
-            Text(
-              '∑ ${_totalOutputTokens}tok',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF818CF8)),
-            ),
-          ],
           if (_isProcessing)
             const Padding(
-              padding: EdgeInsets.only(left: 8),
+              padding: EdgeInsets.only(left: 6),
               child: SizedBox(
-                width: 12, height: 12,
+                width: 10, height: 10,
                 child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
+                  strokeWidth: 1.2,
                   color: Color(0xFF34D399),
                 ),
               ),
@@ -643,12 +639,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final processedContent = _streamingContent
         .replaceAll(RegExp(r'<br\s*/?>'), '\n');
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 4, right: 40),
+      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
       child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(12),
+        padding: const EdgeInsets.all(12),
+        decoration: const BoxDecoration(
+          color: Color(0xFF161D2A),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(16),
+            bottomLeft: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -661,12 +662,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 }
               },
               styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+                p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
                 a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
-                code: const TextStyle(fontSize: 12, color: Color(0xFF34D399), backgroundColor: Color(0xFF0F172A)),
+                code: const TextStyle(fontSize: 11.5, color: Color(0xFF34D399), backgroundColor: Color(0xFF0D1117)),
+                codeblockDecoration: BoxDecoration(
+                  color: const Color(0xFF0D1117),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF1E293B)),
+                ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             const _TypingIndicator(),
           ],
         ),
@@ -676,62 +682,75 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildInputBar() {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFF334155))),
+        color: Color(0xFF0F1219),
+        border: Border(top: BorderSide(color: Color(0xFF1E293B), width: 0.5)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: KeyboardListener(
-              focusNode: FocusNode(),
-              onKeyEvent: (event) {
-                if (event is! KeyDownEvent) return;
+            child: Focus(
+              onKeyEvent: (node, event) {
+                if (event is! KeyDownEvent) return KeyEventResult.ignored;
                 // Enter (without Shift) → send
                 if (event.logicalKey == LogicalKeyboardKey.enter &&
                     !HardwareKeyboard.instance.isShiftPressed) {
                   _sendMessage();
-                  return;
+                  return KeyEventResult.handled;
                 }
                 // Cmd+V (macOS) or Ctrl+V → smart paste
                 final isCmd = HardwareKeyboard.instance.isMetaPressed;
                 final isCtrl = HardwareKeyboard.instance.isControlPressed;
                 if (event.logicalKey == LogicalKeyboardKey.keyV && (isCmd || isCtrl)) {
                   _handleSmartPaste();
+                  // Don't return handled here — _handleSmartPaste decides
+                  // whether to block or allow default paste asynchronously
                 }
+                return KeyEventResult.ignored;
               },
               child: TextField(
                 controller: _inputController,
                 focusNode: _inputFocusNode,
-                style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+                style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), height: 1.4),
                 decoration: InputDecoration(
-                  hintText: _isProcessing ? 'Agent working… (you can still send)' : 'Type a message… (Shift+Enter for newline)',
+                  hintText: _isProcessing ? 'Agent working…' : 'Message…',
                   hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                  filled: true,
+                  fillColor: const Color(0xFF1A2030),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF34D399)),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Color(0xFF34D399), width: 0.8),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   isDense: true,
                 ),
-                maxLines: 5,
+                maxLines: 4,
                 minLines: 1,
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          IconButton(
-            onPressed: _sendMessage,
-            icon: const Icon(Icons.send, color: Color(0xFF34D399), size: 20),
-            splashRadius: 18,
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _sendMessage,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF34D399),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.arrow_upward, color: Color(0xFF0F172A), size: 18),
+            ),
           ),
         ],
       ),
@@ -742,35 +761,39 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Future<void> _handleSmartPaste() async {
     try {
       final clipboard = SystemClipboard.instance;
-      if (clipboard != null) {
-        final reader = await clipboard.read();
+      if (clipboard == null) return;
 
-        // Check for plain text first
-        if (reader.canProvide(Formats.plainText)) {
-          final text = await reader.readValue(Formats.plainText);
-          if (text != null && text.isNotEmpty) {
-            final wordCount = text.trim().split(RegExp(r'\s+')).length;
-            if (wordCount <= 1000) {
-              // Short text — let default paste handle it
-              return;
-            }
-          }
+      final reader = await clipboard.read();
+
+      // Check for image first — always save as file
+      if (reader.canProvide(Formats.png) || reader.canProvide(Formats.jpeg)) {
+        final path = await ClipboardFileService.instance.saveClipboardToFile();
+        if (path != null && mounted) {
+          _inputController.text = path;
+          _inputController.selection = TextSelection.collapsed(offset: path.length);
         }
+        return;
       }
 
-      // Long text or image — save to file and insert path
-      final path = await ClipboardFileService.instance.saveClipboardToFile();
-      if (path != null && mounted) {
-        // Clear any text that the default paste might have inserted
-        // (we schedule this after the current frame)
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final currentText = _inputController.text;
-          // Replace the pasted long text with the file path
-          _inputController.text = currentText.isEmpty ? path : '$currentText $path';
-          _inputController.selection = TextSelection.collapsed(
-            offset: _inputController.text.length,
-          );
-        });
+      // Check for plain text
+      if (reader.canProvide(Formats.plainText)) {
+        final text = await reader.readValue(Formats.plainText);
+        if (text != null && text.isNotEmpty) {
+          final wordCount = text.trim().split(RegExp(r'\s+')).length;
+          if (wordCount <= 1000) {
+            // Short text — let default paste handle it (already happened)
+            return;
+          }
+          // Long text — save to file, replace whatever got pasted
+          final path = await ClipboardFileService.instance.saveClipboardToFile();
+          if (path != null && mounted) {
+            // Schedule after frame to override default paste
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _inputController.text = path;
+              _inputController.selection = TextSelection.collapsed(offset: path.length);
+            });
+          }
+        }
       }
     } catch (e) {
       debugPrint('[ChatPanel] Smart paste error: $e');
@@ -1053,14 +1076,23 @@ class _UserBubble extends StatelessWidget {
         RegExp(r'\.(png|jpg|jpeg|gif|webp|bmp)$', caseSensitive: false).hasMatch(content);
 
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 4, left: 40),
+      padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
       child: Align(
         alignment: Alignment.centerRight,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFF3B82F6),
-            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(4),
+            ),
           ),
           child: isImageFile
               ? Column(
@@ -1082,7 +1114,7 @@ class _UserBubble extends StatelessWidget {
                 )
               : Text(
                   content,
-                  style: const TextStyle(fontSize: 13, color: Colors.white),
+                  style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.4),
                 ),
         ),
       ),
@@ -1107,7 +1139,7 @@ class _AssistantBubble extends StatelessWidget {
         .replaceAll(RegExp(r'<br\s*/?>'), '\n');
 
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 4, right: 40),
+      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1117,17 +1149,18 @@ class _AssistantBubble extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 4),
               child: Wrap(
                 spacing: 4,
+                runSpacing: 4,
                 children: toolCalls.map((tc) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0x20FBBF24),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: const Color(0x40FBBF24)),
+                    color: const Color(0x15FBBF24),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0x30FBBF24)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.build_outlined, size: 10, color: Color(0xFFFBBF24)),
+                      const Icon(Icons.terminal_rounded, size: 10, color: Color(0xFFFBBF24)),
                       const SizedBox(width: 4),
                       Text(
                         tc.toolName,
@@ -1140,10 +1173,15 @@ class _AssistantBubble extends StatelessWidget {
             ),
 
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(12),
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Color(0xFF161D2A),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
             ),
             child: MarkdownBody(
               data: processedContent.isEmpty ? '_thinking…_' : processedContent,
@@ -1153,17 +1191,24 @@ class _AssistantBubble extends StatelessWidget {
                 }
               },
               styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+                p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
                 a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
                 code: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 11.5,
+                  fontFamily: 'JetBrains Mono',
                   color: Color(0xFF34D399),
-                  backgroundColor: Color(0xFF0F172A),
+                  backgroundColor: Color(0xFF0D1117),
                 ),
                 codeblockDecoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+                  color: const Color(0xFF0D1117),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF1E293B)),
                 ),
+                codeblockPadding: const EdgeInsets.all(10),
+                listBullet: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                h1: const TextStyle(fontSize: 16, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
+                h2: const TextStyle(fontSize: 14, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
+                h3: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w500),
               ),
             ),
           ),
@@ -1171,10 +1216,10 @@ class _AssistantBubble extends StatelessWidget {
           // Token usage
           if (tokenUsage != null)
             Padding(
-              padding: const EdgeInsets.only(top: 2, left: 4),
+              padding: const EdgeInsets.only(top: 3, left: 6),
               child: Text(
-                '${tokenUsage!.outputTokens} tokens',
-                style: const TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                '${tokenUsage!.outputTokens} tok',
+                style: const TextStyle(fontSize: 9, color: Color(0xFF3B4A5F)),
               ),
             ),
         ],
