@@ -453,9 +453,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         children: [
           const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF34D399)),
           const SizedBox(width: 4),
-          Text(
-            _config.model,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+          GestureDetector(
+            onTap: () => _showModelPicker(context),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _config.model,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                ),
+                const Icon(Icons.arrow_drop_down, size: 14, color: Color(0xFF94A3B8)),
+              ],
+            ),
           ),
           const SizedBox(width: 8),
           const Icon(Icons.folder_outlined, size: 14, color: Color(0xFF94A3B8)),
@@ -772,6 +781,64 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final parts = path.split('/');
     if (parts.length <= 3) return path;
     return '…/${parts.sublist(parts.length - 2).join('/')}';
+  }
+
+  void _showModelPicker(BuildContext context) {
+    final models = _provider.availableModels;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(offset.dx, offset.dy + 28, offset.dx + 200, 0),
+      color: const Color(0xFF1E293B),
+      items: models.map((m) => PopupMenuItem<String>(
+        value: m.id,
+        height: 32,
+        child: Row(
+          children: [
+            if (m.id == _config.model)
+              const Icon(Icons.check, size: 14, color: Color(0xFF34D399))
+            else
+              const SizedBox(width: 14),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                m.displayName,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: m.id == _config.model
+                      ? const Color(0xFF34D399)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
+            ),
+            Text(
+              '${m.costMultiplier}x',
+              style: TextStyle(
+                fontSize: 10,
+                color: m.costMultiplier == 0
+                    ? const Color(0xFF34D399)
+                    : m.costMultiplier > 3
+                        ? const Color(0xFFF87171)
+                        : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      )).toList(),
+    ).then((selected) {
+      if (selected != null && selected != _config.model) {
+        setState(() {
+          _config = ChatSessionConfig(
+            sessionName: _config.sessionName,
+            workingDir: _config.workingDir,
+            model: selected,
+          );
+        });
+        _persistMessages();
+      }
+    });
   }
 }
 
