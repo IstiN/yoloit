@@ -2402,30 +2402,32 @@ class _BoardLinksPainter extends CustomPainter {
     final tangent = metric.getTangentForOffset(metric.length);
     if (tangent == null) return;
 
-    const arrowSize = 10.0;
+    const arrowSize = 13.0;
     final angle = tangent.angle;
     final tip = tangent.position;
     final p1 = Offset(
-      tip.dx - arrowSize * math.cos(angle - math.pi / 6),
-      tip.dy - arrowSize * math.sin(angle - math.pi / 6),
+      tip.dx - arrowSize * math.cos(angle - math.pi / 5),
+      tip.dy - arrowSize * math.sin(angle - math.pi / 5),
     );
     final p2 = Offset(
-      tip.dx - arrowSize * math.cos(angle + math.pi / 6),
-      tip.dy - arrowSize * math.sin(angle + math.pi / 6),
+      tip.dx - arrowSize * math.cos(angle + math.pi / 5),
+      tip.dy - arrowSize * math.sin(angle + math.pi / 5),
     );
 
-    final fillPaint =
+    // Open arrowhead (two lines, no fill) — cleaner look
+    final arrowPaint =
         Paint()
           ..color = paint.color
-          ..style = PaintingStyle.fill;
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = paint.strokeWidth.clamp(1.5, 2.5)
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
     final arrow =
         Path()
-          ..moveTo(tip.dx, tip.dy)
-          ..lineTo(p1.dx, p1.dy)
-          ..lineTo(p2.dx, p2.dy)
-          ..close();
-    canvas.drawPath(arrow, fillPaint);
-    canvas.drawCircle(fallbackEnd, 1.2, fillPaint);
+          ..moveTo(p1.dx, p1.dy)
+          ..lineTo(tip.dx, tip.dy)
+          ..lineTo(p2.dx, p2.dy);
+    canvas.drawPath(arrow, arrowPaint);
   }
 
   @override
@@ -3075,6 +3077,9 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
+      // opaque: false allows pointer events to pass through transparent areas
+      // to panels/widgets underneath the drawing's bounding box
+      opaque: false,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
@@ -3540,26 +3545,28 @@ class _LinkPreviewPainter extends CustomPainter {
     final metric = metrics.last;
     final tangent = metric.getTangentForOffset(metric.length);
     if (tangent == null) return;
-    const sz = 9.0;
+    const sz = 11.0;
     final angle = tangent.angle;
     final tip = tangent.position;
     final p1 = Offset(
-      tip.dx - sz * math.cos(angle - math.pi / 6),
-      tip.dy - sz * math.sin(angle - math.pi / 6),
+      tip.dx - sz * math.cos(angle - math.pi / 5),
+      tip.dy - sz * math.sin(angle - math.pi / 5),
     );
     final p2 = Offset(
-      tip.dx - sz * math.cos(angle + math.pi / 6),
-      tip.dy - sz * math.sin(angle + math.pi / 6),
+      tip.dx - sz * math.cos(angle + math.pi / 5),
+      tip.dy - sz * math.sin(angle + math.pi / 5),
     );
     canvas.drawPath(
       Path()
-        ..moveTo(tip.dx, tip.dy)
-        ..lineTo(p1.dx, p1.dy)
-        ..lineTo(p2.dx, p2.dy)
-        ..close(),
+        ..moveTo(p1.dx, p1.dy)
+        ..lineTo(tip.dx, tip.dy)
+        ..lineTo(p2.dx, p2.dy),
       Paint()
         ..color = paint.color
-        ..style = PaintingStyle.fill,
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = paint.strokeWidth.clamp(1.5, 2.5)
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
     );
   }
 
