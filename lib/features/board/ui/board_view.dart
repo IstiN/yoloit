@@ -3014,7 +3014,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
 // Drawing widget — renders a completed BoardDrawingElement as a draggable item
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _BoardDrawingWidget extends StatelessWidget {
+class _BoardDrawingWidget extends StatefulWidget {
   const _BoardDrawingWidget({
     super.key,
     required this.drawing,
@@ -3031,46 +3031,57 @@ class _BoardDrawingWidget extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
+  State<_BoardDrawingWidget> createState() => _BoardDrawingWidgetState();
+}
+
+class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: drawing.position.dx + canvasOrigin.dx,
-      top: drawing.position.dy + canvasOrigin.dy,
-      width: drawing.size.width,
-      height: drawing.size.height,
-      child: GestureDetector(
-        behavior: HitTestBehavior.deferToChild,
-        onPanUpdate:
-            isSelectMode
-                ? (d) => onMove(drawing.position + d.delta)
-                : null,
-        child: Stack(
-          children: [
-            CustomPaint(
-              size: drawing.size,
-              painter: _DrawingElementPainter(drawing: drawing),
-            ),
-            if (isSelectMode)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: GestureDetector(
-                  onTap: onDelete,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      color: Color(0xCCF87171),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close,
-                      size: 12,
-                      color: Colors.white,
+      left: widget.drawing.position.dx + widget.canvasOrigin.dx,
+      top: widget.drawing.position.dy + widget.canvasOrigin.dy,
+      width: widget.drawing.size.width,
+      height: widget.drawing.size.height,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.deferToChild,
+          onPanUpdate:
+              widget.isSelectMode
+                  ? (d) => widget.onMove(widget.drawing.position + d.delta)
+                  : null,
+          child: Stack(
+            children: [
+              CustomPaint(
+                size: widget.drawing.size,
+                painter: _DrawingElementPainter(drawing: widget.drawing),
+              ),
+              if (widget.isSelectMode && _hovered)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: GestureDetector(
+                    onTap: widget.onDelete,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: const BoxDecoration(
+                        color: Color(0xCCF87171),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 12,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
