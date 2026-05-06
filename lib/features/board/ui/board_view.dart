@@ -216,6 +216,45 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       context,
                                       activeBoard,
                                     ),
+                                  // ── Drawing layer (below panels so panels
+                                  //    always win pointer events) ─────────────
+                                  ...activeBoard.drawings
+                                      .where((d) => !d.hidden)
+                                      .map(
+                                        (drawing) => Positioned(
+                                          key: ValueKey(drawing.id),
+                                          left: drawing.position.dx +
+                                              _canvasOrigin.dx,
+                                          top: drawing.position.dy +
+                                              _canvasOrigin.dy,
+                                          width: drawing.size.width,
+                                          height: drawing.size.height,
+                                          child: IgnorePointer(
+                                            ignoring:
+                                                _activeTool ==
+                                                BoardToolId.connect,
+                                            child: _BoardDrawingWidget(
+                                              drawing: drawing,
+                                              isSelectMode:
+                                                  _activeTool ==
+                                                  BoardToolId.select,
+                                              onMove:
+                                                  (newPos) => context
+                                                      .read<BoardCubit>()
+                                                      .moveDrawing(
+                                                        drawing.id,
+                                                        newPos,
+                                                      ),
+                                              onDelete:
+                                                  () => context
+                                                      .read<BoardCubit>()
+                                                      .removeDrawing(
+                                                        drawing.id,
+                                                      ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                   ...(() {
                                     final visiblePanels =
                                         activeBoard.panels
@@ -292,46 +331,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         )
                                         .toList();
                                   })(),
-                                  // ── Drawing layer (completed drawings) ──
-                                  // Positioned must be direct Stack child, so
-                                  // IgnorePointer wraps only the widget content.
-                                  ...activeBoard.drawings
-                                      .where((d) => !d.hidden)
-                                      .map(
-                                        (drawing) => Positioned(
-                                          key: ValueKey(drawing.id),
-                                          left: drawing.position.dx +
-                                              _canvasOrigin.dx,
-                                          top: drawing.position.dy +
-                                              _canvasOrigin.dy,
-                                          width: drawing.size.width,
-                                          height: drawing.size.height,
-                                          child: IgnorePointer(
-                                            ignoring:
-                                                _activeTool ==
-                                                BoardToolId.connect,
-                                            child: _BoardDrawingWidget(
-                                              drawing: drawing,
-                                              isSelectMode:
-                                                  _activeTool ==
-                                                  BoardToolId.select,
-                                              onMove:
-                                                  (newPos) => context
-                                                      .read<BoardCubit>()
-                                                      .moveDrawing(
-                                                        drawing.id,
-                                                        newPos,
-                                                      ),
-                                              onDelete:
-                                                  () => context
-                                                      .read<BoardCubit>()
-                                                      .removeDrawing(
-                                                        drawing.id,
-                                                      ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
                                   // ── Active stroke preview ─────────────────
                                   if (_activeStroke.isNotEmpty)
                                     Positioned.fill(
@@ -3084,10 +3083,8 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.deferToChild,
-        // Only register pan recognizer when actually hovering over the drawing
-        // so panels underneath can still be dragged without interference.
         onPanUpdate:
-            (widget.isSelectMode && _hovered)
+            widget.isSelectMode
                 ? (d) => widget.onMove(widget.drawing.position + d.delta)
                 : null,
         child: Stack(
