@@ -2098,8 +2098,8 @@ class _BoardPanelCard extends StatelessWidget {
                 ],
               ),
               Positioned(
-                right: 8,
-                bottom: 8,
+                right: 4,
+                bottom: 2,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onPanStart: (details) {
@@ -2111,7 +2111,7 @@ class _BoardPanelCard extends StatelessWidget {
                   onPanCancel: onDragEnd,
                   child: const Icon(
                     Icons.drag_handle,
-                    size: 16,
+                    size: 14,
                     color: AppColors.textMuted,
                   ),
                 ),
