@@ -5,14 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
-import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
+import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
@@ -29,7 +28,6 @@ class TerminalPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return BlocBuilder<TerminalCubit, TerminalState>(
       builder: (context, state) {
         if (state is TerminalLoaded && state.sessions.isNotEmpty) {
@@ -62,7 +60,11 @@ class _EmptyTerminal extends StatelessWidget {
                       color: colors.primary.withAlpha(20),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.terminal_outlined, size: 32, color: colors.primary),
+                    child: Icon(
+                      Icons.terminal_outlined,
+                      size: 32,
+                      color: colors.primary,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -81,30 +83,38 @@ class _EmptyTerminal extends StatelessWidget {
                   const SizedBox(height: 24),
                   BlocBuilder<WorkspaceCubit, WorkspaceState>(
                     builder: (context, wsState) {
-                      final hasActive = wsState is WorkspaceLoaded &&
+                      final hasActive =
+                          wsState is WorkspaceLoaded &&
                           wsState.activeWorkspace != null;
                       if (!hasActive) {
                         return const Text(
                           'Select a workspace from the left panel first',
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
                         );
                       }
                       return SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: AgentType.values.map((type) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: _AgentLaunchButton(
-                              type: type,
-                              workspacePath: wsState.activeWorkspace!.workspaceDir,
-                              workspaceId: wsState.activeWorkspace!.id,
-                            ),
-                          );
-                        }).toList(),
+                          mainAxisSize: MainAxisSize.min,
+                          children:
+                              AgentType.values.map((type) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  child: _AgentLaunchButton(
+                                    type: type,
+                                    workspacePath:
+                                        wsState.activeWorkspace!.workspaceDir,
+                                    workspaceId: wsState.activeWorkspace!.id,
+                                  ),
+                                );
+                              }).toList(),
                         ),
-                        );
+                      );
                     },
                   ),
                 ],
@@ -130,7 +140,10 @@ class _TerminalViewState extends State<_TerminalView> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final sessions = widget.state.sessions;
-    final activeIndex = widget.state.activeIndex.clamp(0, sessions.isEmpty ? 0 : sessions.length - 1);
+    final activeIndex = widget.state.activeIndex.clamp(
+      0,
+      sessions.isEmpty ? 0 : sessions.length - 1,
+    );
     final activeSession = widget.state.activeSession;
 
     return Container(
@@ -141,20 +154,22 @@ class _TerminalViewState extends State<_TerminalView> {
           _TerminalHeader(sessions: sessions, activeIndex: activeIndex),
           if (activeSession != null) _SessionInfoBar(session: activeSession),
           Expanded(
-            child: sessions.isEmpty
-                ? const SizedBox()
-                : IndexedStack(
-                    index: activeIndex,
-                    children: sessions.asMap().entries.map((e) {
-                      return RepaintBoundary(
-                        child: TerminalWidget(
-                          key: ValueKey(e.value.id),
-                          session: e.value,
-                          isActive: e.key == activeIndex,
-                        ),
-                      );
-                    }).toList(),
-                  ),
+            child:
+                sessions.isEmpty
+                    ? const SizedBox()
+                    : IndexedStack(
+                      index: activeIndex,
+                      children:
+                          sessions.asMap().entries.map((e) {
+                            return RepaintBoundary(
+                              child: TerminalWidget(
+                                key: ValueKey(e.value.id),
+                                session: e.value,
+                                isActive: e.key == activeIndex,
+                              ),
+                            );
+                          }).toList(),
+                    ),
           ),
           _WorkspaceStatusBar(session: activeSession),
         ],
@@ -176,7 +191,9 @@ class _TerminalHeader extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: colors.surface,
-        border: Border(bottom: BorderSide(color: const Color(0xFF32327A), width: 1)),
+        border: Border(
+          bottom: BorderSide(color: const Color(0xFF32327A), width: 1),
+        ),
       ),
       child: Row(
         children: [
@@ -193,8 +210,15 @@ class _TerminalHeader extends StatelessWidget {
                   session: session,
                   isActive: isActive,
                   onTap: () => context.read<TerminalCubit>().switchTab(i),
-                  onClose: () => context.read<TerminalCubit>().closeSession(session.id),
-                  onRename: (name) => context.read<TerminalCubit>().renameSession(session.id, name),
+                  onClose:
+                      () => context.read<TerminalCubit>().closeSession(
+                        session.id,
+                      ),
+                  onRename:
+                      (name) => context.read<TerminalCubit>().renameSession(
+                        session.id,
+                        name,
+                      ),
                 );
               },
             ),
@@ -202,7 +226,8 @@ class _TerminalHeader extends StatelessWidget {
           // "+" button to launch a new agent session
           BlocBuilder<WorkspaceCubit, WorkspaceState>(
             builder: (context, wsState) {
-              final workspace = wsState is WorkspaceLoaded ? wsState.activeWorkspace : null;
+              final workspace =
+                  wsState is WorkspaceLoaded ? wsState.activeWorkspace : null;
               if (workspace == null) return const SizedBox.shrink();
               return Container(
                 decoration: BoxDecoration(
@@ -256,7 +281,8 @@ class _AgentTabState extends State<_AgentTab> {
   @override
   void didUpdateWidget(_AgentTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_editing && oldWidget.session.displayName != widget.session.displayName) {
+    if (!_editing &&
+        oldWidget.session.displayName != widget.session.displayName) {
       _nameController.text = widget.session.displayName;
     }
   }
@@ -285,7 +311,8 @@ class _AgentTabState extends State<_AgentTab> {
   }
 
   void _commitRename() {
-    if (!_editing) return;           // guard against double-call (onSubmitted + focus lost)
+    if (!_editing)
+      return; // guard against double-call (onSubmitted + focus lost)
     final name = _nameController.text.trim();
     setState(() => _editing = false);
     widget.onRename(name);
@@ -294,14 +321,23 @@ class _AgentTabState extends State<_AgentTab> {
   void _showContextMenu(BuildContext context, Offset position) async {
     final result = await showMenu<String>(
       context: context,
-      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 1, position.dy + 1),
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
+      ),
       items: [
         PopupMenuItem(
           value: 'rename',
           height: 32,
           child: Row(
             children: [
-              Icon(Icons.drive_file_rename_outline, size: 14, color: AppColors.textMuted),
+              Icon(
+                Icons.drive_file_rename_outline,
+                size: 14,
+                color: AppColors.textMuted,
+              ),
               const SizedBox(width: 8),
               const Text('Rename', style: TextStyle(fontSize: 13)),
             ],
@@ -329,8 +365,7 @@ class _AgentTabState extends State<_AgentTab> {
     final colors = context.appColors;
     final session = widget.session;
     final isLive = session.status == AgentStatus.live;
-    final statusColor =
-        isLive ? AppColors.statusActive : AppColors.statusIdle;
+    final statusColor = isLive ? AppColors.statusActive : AppColors.statusIdle;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -339,7 +374,10 @@ class _AgentTabState extends State<_AgentTab> {
       child: GestureDetector(
         onTap: _editing ? null : widget.onTap,
         onDoubleTap: _editing ? null : _startEditing,
-        onSecondaryTapDown: _editing ? null : (d) => _showContextMenu(context, d.globalPosition),
+        onSecondaryTapDown:
+            _editing
+                ? null
+                : (d) => _showContextMenu(context, d.globalPosition),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
@@ -358,7 +396,10 @@ class _AgentTabState extends State<_AgentTab> {
                 session.type.iconLabel,
                 style: TextStyle(
                   fontSize: 12,
-                  color: widget.isActive ? colors.primaryLight : AppColors.textMuted,
+                  color:
+                      widget.isActive
+                          ? colors.primaryLight
+                          : AppColors.textMuted,
                 ),
               ),
               const SizedBox(width: 5),
@@ -376,14 +417,20 @@ class _AgentTabState extends State<_AgentTab> {
                     ),
                     decoration: InputDecoration(
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(3),
                         borderSide: BorderSide(color: colors.primary, width: 1),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(3),
-                        borderSide: BorderSide(color: colors.primary, width: 1.5),
+                        borderSide: BorderSide(
+                          color: colors.primary,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                     onSubmitted: (_) => _commitRename(),
@@ -394,9 +441,13 @@ class _AgentTabState extends State<_AgentTab> {
                 Text(
                   session.displayName,
                   style: TextStyle(
-                    color: widget.isActive ? colors.primaryLight : AppColors.textSecondary,
+                    color:
+                        widget.isActive
+                            ? colors.primaryLight
+                            : AppColors.textSecondary,
                     fontSize: 12,
-                    fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight:
+                        widget.isActive ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               const SizedBox(width: 5),
@@ -421,7 +472,10 @@ class _AgentTabState extends State<_AgentTab> {
                       child: Icon(
                         Icons.close,
                         size: 12,
-                        color: _hovering ? AppColors.textPrimary : AppColors.textMuted,
+                        color:
+                            _hovering
+                                ? AppColors.textPrimary
+                                : AppColors.textMuted,
                       ),
                     ),
                   ),
@@ -487,6 +541,7 @@ class TerminalWidget extends StatefulWidget {
   });
   final AgentSession session;
   final bool isActive;
+
   /// When false, the terminal won't auto-request focus on creation or when
   /// becoming active. This prevents focus-fighting when multiple terminals
   /// exist (e.g. mindmap cards). Focus will still be requested on click.
@@ -535,8 +590,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(() {
-    });
+    _focusNode.addListener(() {});
     _bindTerminal();
     if (widget.autoRequestFocus) _requestFocusAfterFrame();
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
@@ -593,8 +647,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     // its binding.
     if (identical(session.terminal.onOutput, _boundOnOutput)) {
       session.terminal.onOutput = null;
-    } else {
-    }
+    } else {}
     if (identical(session.terminal.onResize, _boundOnResize)) {
       session.terminal.onResize = null;
     }
@@ -747,8 +800,14 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void _selectAll() {
     final terminal = widget.session.terminal;
     _controller.setSelection(
-      terminal.buffer.createAnchor(0, terminal.buffer.height - terminal.viewHeight),
-      terminal.buffer.createAnchor(terminal.viewWidth, terminal.buffer.height - 1),
+      terminal.buffer.createAnchor(
+        0,
+        terminal.buffer.height - terminal.viewHeight,
+      ),
+      terminal.buffer.createAnchor(
+        terminal.viewWidth,
+        terminal.buffer.height - 1,
+      ),
       mode: SelectionMode.line,
     );
   }
@@ -775,12 +834,14 @@ class TerminalWidgetState extends State<TerminalWidget> {
     final cellWidth = innerWidth / terminal.viewWidth;
     final cellHeight = innerHeight / terminal.viewHeight;
 
-    final clickCol = ((localPosition.dx - padding) / cellWidth)
-        .floor()
-        .clamp(0, terminal.viewWidth - 1);
-    final clickRow = ((localPosition.dy - padding) / cellHeight)
-        .floor()
-        .clamp(0, terminal.viewHeight - 1);
+    final clickCol = ((localPosition.dx - padding) / cellWidth).floor().clamp(
+      0,
+      terminal.viewWidth - 1,
+    );
+    final clickRow = ((localPosition.dy - padding) / cellHeight).floor().clamp(
+      0,
+      terminal.viewHeight - 1,
+    );
 
     // Only move when click is on the same row as the cursor
     if (clickRow != terminal.buffer.cursorY) return;
@@ -794,32 +855,20 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   Future<void> _pasteAsFileRef() async {
-    // Read clipboard text first to decide how to paste.
-    final clipboard = SystemClipboard.instance;
-    if (clipboard != null) {
-      final reader = await clipboard.read();
-      if (reader.canProvide(Formats.plainText)) {
-        final text = await reader.readValue(Formats.plainText);
-        if (text != null && text.isNotEmpty && text.trim().split(RegExp(r'\s+')).length <= 1000) {
-          // Short text — paste directly as plain text.
-          if (!mounted) return;
-          PtyService.instance.write(widget.session.id, text);
-          return;
-        }
-      }
-    }
-
-    // Long text or image — save to file and paste the path.
-    final path = await ClipboardFileService.instance.saveClipboardToFile();
-    if (path == null || !mounted) return;
-    PtyService.instance.write(widget.session.id, path);
+    final pasted =
+        await SmartClipboardPasteService.instance
+            .readInlineTextOrSavedFilePath();
+    if (pasted == null || !mounted) return;
+    PtyService.instance.write(widget.session.id, pasted);
   }
 
   // ── Selection helpers ───────────────────────────────────────────────
 
-
   /// Shows a right-click context menu with Copy (if selection) and Paste.
-  Future<void> _showTerminalContextMenu(BuildContext context, Offset globalPos) async {
+  Future<void> _showTerminalContextMenu(
+    BuildContext context,
+    Offset globalPos,
+  ) async {
     final selection = _controller.selection;
     final hasSelection = selection != null;
 
@@ -827,59 +876,87 @@ class TerminalWidgetState extends State<TerminalWidget> {
       const PopupMenuItem(
         value: _TermCtxAction.selectAll,
         height: 36,
-        child: Row(children: [
-          Icon(Icons.select_all, size: 14, color: AppColors.textSecondary),
-          SizedBox(width: 8),
-          Text('Select All', style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-        ]),
+        child: Row(
+          children: [
+            Icon(Icons.select_all, size: 14, color: AppColors.textSecondary),
+            SizedBox(width: 8),
+            Text(
+              'Select All',
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            ),
+          ],
+        ),
       ),
       if (hasSelection)
         const PopupMenuItem(
           value: _TermCtxAction.copy,
           height: 36,
-          child: Row(children: [
-            Icon(Icons.copy, size: 14, color: AppColors.textSecondary),
-            SizedBox(width: 8),
-            Text('Copy', style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.copy, size: 14, color: AppColors.textSecondary),
+              SizedBox(width: 8),
+              Text(
+                'Copy',
+                style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
         ),
       const PopupMenuItem(
         value: _TermCtxAction.paste,
         height: 36,
-        child: Row(children: [
-          Icon(Icons.content_paste, size: 14, color: AppColors.textSecondary),
-          SizedBox(width: 8),
-          Text('Paste', style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-        ]),
+        child: Row(
+          children: [
+            Icon(Icons.content_paste, size: 14, color: AppColors.textSecondary),
+            SizedBox(width: 8),
+            Text(
+              'Paste',
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            ),
+          ],
+        ),
       ),
       if (hasSelection) ...[
         const PopupMenuDivider(height: 1),
         const PopupMenuItem(
           value: _TermCtxAction.clearSelection,
           height: 36,
-          child: Row(children: [
-            Icon(Icons.clear, size: 14, color: AppColors.textSecondary),
-            SizedBox(width: 8),
-            Text('Clear selection', style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.clear, size: 14, color: AppColors.textSecondary),
+              SizedBox(width: 8),
+              Text(
+                'Clear selection',
+                style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
         ),
       ],
       const PopupMenuDivider(height: 1),
       const PopupMenuItem(
         value: _TermCtxAction.search,
         height: 36,
-        child: Row(children: [
-          Icon(Icons.search, size: 14, color: AppColors.textSecondary),
-          SizedBox(width: 8),
-          Text('Find', style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-        ]),
+        child: Row(
+          children: [
+            Icon(Icons.search, size: 14, color: AppColors.textSecondary),
+            SizedBox(width: 8),
+            Text(
+              'Find',
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            ),
+          ],
+        ),
       ),
     ];
 
     final action = await showMenu<_TermCtxAction>(
       context: context,
       position: RelativeRect.fromLTRB(
-        globalPos.dx, globalPos.dy, globalPos.dx + 1, globalPos.dy + 1,
+        globalPos.dx,
+        globalPos.dy,
+        globalPos.dx + 1,
+        globalPos.dy + 1,
       ),
       items: items,
       color: const Color(0xFF1A1A2E),
@@ -1004,8 +1081,14 @@ class TerminalWidgetState extends State<TerminalWidget> {
 
     final cellW = (_terminalSize.width - 16) / terminal.viewWidth;
     final cellH = (_terminalSize.height - 16) / terminal.viewHeight;
-    final startOffset = Offset(hit.x * cellW + 8, visRow * cellH + cellH / 2 + 8);
-    final endOffset = Offset((hit.x + queryLen) * cellW + 8, visRow * cellH + cellH / 2 + 8);
+    final startOffset = Offset(
+      hit.x * cellW + 8,
+      visRow * cellH + cellH / 2 + 8,
+    );
+    final endOffset = Offset(
+      (hit.x + queryLen) * cellW + 8,
+      visRow * cellH + cellH / 2 + 8,
+    );
     rt.selectCharacters(startOffset, endOffset);
   }
 
@@ -1035,126 +1118,124 @@ class TerminalWidgetState extends State<TerminalWidget> {
         return Stack(
           children: [
             Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (event) {
-            if (!_focusNode.hasFocus) _focusNode.requestFocus();
-            // Right-click → context menu
-            if (event.buttons == kSecondaryMouseButton) {
-              _showTerminalContextMenu(context, event.position);
-              return;
-            }
-            if (event.buttons != kPrimaryButton) return;
-            _clickDownPosition = event.localPosition;
-            _dragStartGlobal = event.position;
-            _isDragSelecting = false;
-            _activePointers[event.pointer] = event.localPosition;
-            if (_activePointers.length == 2) {
-              final positions = _activePointers.values.toList();
-              _pinchStartDistance = (positions[0] - positions[1]).distance;
-              _pinchStartFontSize = _fontSize;
-            }
-          },
-          onPointerMove: (event) {
-            _activePointers[event.pointer] = event.localPosition;
-            if (_activePointers.length == 2 && _pinchStartDistance > 0) {
-              final positions = _activePointers.values.toList();
-              final dist = (positions[0] - positions[1]).distance;
-              final newSize = (_pinchStartFontSize * dist / _pinchStartDistance)
-                  .clamp(8.0, 48.0);
-              setState(() => _fontSize = newSize);
-              SessionPrefs.saveTerminalFontSize(newSize);
-              return;
-            }
-            // Drag-to-select: bypass xterm's gesture arena entirely.
-            final startGlobal = _dragStartGlobal;
-            if (startGlobal == null || _activePointers.length != 1) return;
-            final dist = (event.position - startGlobal).distance;
-            if (dist < 4.0) return;
-            final state = _terminalViewKey.currentState;
-            if (state == null) return;
-            final rt = state.renderTerminal;
-            if (!_isDragSelecting) {
-              _isDragSelecting = true;
-              _controller.clearSelection();
-            }
-            final localStart = rt.globalToLocal(startGlobal);
-            final localCurrent = rt.globalToLocal(event.position);
-            rt.selectCharacters(localStart, localCurrent);
-          },
-          onPointerUp: (event) {
-            _activePointers.remove(event.pointer);
-            final wasDragging = _isDragSelecting;
-            _isDragSelecting = false;
-            _dragStartGlobal = null;
-            final down = _clickDownPosition;
-            _clickDownPosition = null;
-            if (wasDragging) {
-              return; // keep selection
-            }
-            if (down == null) return;
-            if ((event.localPosition - down).distance > 6.0) return;
-            // Single tap clears any existing selection
-            if (_controller.selection != null) {
-              _controller.clearSelection();
-              return;
-            }
-            _handleTerminalClick(event.localPosition);
-          },
-          onPointerCancel: (event) {
-            _activePointers.remove(event.pointer);
-            _isDragSelecting = false;
-            _dragStartGlobal = null;
-          },
-          child: MouseRegion(
-            cursor: SystemMouseCursors.text,
-            child: TerminalView(
-              widget.session.terminal,
-              key: _terminalViewKey,
-              controller: _controller,
-              focusNode: _focusNode,
-              autofocus: widget.isActive,
-              onKeyEvent: _onTerminalKeyEvent,
-              textStyle: TerminalStyle(
-                fontSize: _fontSize,
-                fontFamily: 'JetBrainsMono',
-                height: 1.2,
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (event) {
+                if (!_focusNode.hasFocus) _focusNode.requestFocus();
+                // Right-click → context menu
+                if (event.buttons == kSecondaryMouseButton) {
+                  _showTerminalContextMenu(context, event.position);
+                  return;
+                }
+                if (event.buttons != kPrimaryButton) return;
+                _clickDownPosition = event.localPosition;
+                _dragStartGlobal = event.position;
+                _isDragSelecting = false;
+                _activePointers[event.pointer] = event.localPosition;
+                if (_activePointers.length == 2) {
+                  final positions = _activePointers.values.toList();
+                  _pinchStartDistance = (positions[0] - positions[1]).distance;
+                  _pinchStartFontSize = _fontSize;
+                }
+              },
+              onPointerMove: (event) {
+                _activePointers[event.pointer] = event.localPosition;
+                if (_activePointers.length == 2 && _pinchStartDistance > 0) {
+                  final positions = _activePointers.values.toList();
+                  final dist = (positions[0] - positions[1]).distance;
+                  final newSize = (_pinchStartFontSize *
+                          dist /
+                          _pinchStartDistance)
+                      .clamp(8.0, 48.0);
+                  setState(() => _fontSize = newSize);
+                  SessionPrefs.saveTerminalFontSize(newSize);
+                  return;
+                }
+                // Drag-to-select: bypass xterm's gesture arena entirely.
+                final startGlobal = _dragStartGlobal;
+                if (startGlobal == null || _activePointers.length != 1) return;
+                final dist = (event.position - startGlobal).distance;
+                if (dist < 4.0) return;
+                final state = _terminalViewKey.currentState;
+                if (state == null) return;
+                final rt = state.renderTerminal;
+                if (!_isDragSelecting) {
+                  _isDragSelecting = true;
+                  _controller.clearSelection();
+                }
+                final localStart = rt.globalToLocal(startGlobal);
+                final localCurrent = rt.globalToLocal(event.position);
+                rt.selectCharacters(localStart, localCurrent);
+              },
+              onPointerUp: (event) {
+                _activePointers.remove(event.pointer);
+                final wasDragging = _isDragSelecting;
+                _isDragSelecting = false;
+                _dragStartGlobal = null;
+                final down = _clickDownPosition;
+                _clickDownPosition = null;
+                if (wasDragging) {
+                  return; // keep selection
+                }
+                if (down == null) return;
+                if ((event.localPosition - down).distance > 6.0) return;
+                // Single tap clears any existing selection
+                if (_controller.selection != null) {
+                  _controller.clearSelection();
+                  return;
+                }
+                _handleTerminalClick(event.localPosition);
+              },
+              onPointerCancel: (event) {
+                _activePointers.remove(event.pointer);
+                _isDragSelecting = false;
+                _dragStartGlobal = null;
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.text,
+                child: TerminalView(
+                  widget.session.terminal,
+                  key: _terminalViewKey,
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  autofocus: widget.isActive,
+                  onKeyEvent: _onTerminalKeyEvent,
+                  textStyle: TerminalStyle(
+                    fontSize: _fontSize,
+                    fontFamily: 'JetBrainsMono',
+                    height: 1.2,
+                  ),
+                  theme: TerminalTheme(
+                    cursor: colors.primary,
+                    selection: colors.primary.withAlpha(120),
+                    foreground: const Color(0xFFCECEEE),
+                    background: const Color(0xFF070714),
+                    black: const Color(0xFF1A1A2E),
+                    red: const Color(0xFFFF4F6A),
+                    green: const Color(0xFF00FF9F),
+                    yellow: const Color(0xFFFFD700),
+                    blue: const Color(0xFF00B4FF),
+                    magenta: const Color(0xFFB87FFF),
+                    cyan: const Color(0xFF00E5FF),
+                    white: const Color(0xFFCECEEE),
+                    brightBlack: const Color(0xFF44446A),
+                    brightRed: const Color(0xFFFF6B85),
+                    brightGreen: const Color(0xFF4DFFBE),
+                    brightYellow: const Color(0xFFFFE866),
+                    brightBlue: const Color(0xFF33C5FF),
+                    brightMagenta: const Color(0xFFCDA0FF),
+                    brightCyan: const Color(0xFF33EEFF),
+                    brightWhite: const Color(0xFFFFFFFF),
+                    searchHitBackground: const Color(0xFFFF9500),
+                    searchHitBackgroundCurrent: const Color(0xFFFFB700),
+                    searchHitForeground: const Color(0xFF000000),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                ),
               ),
-              theme: TerminalTheme(
-                cursor: colors.primary,
-                selection: colors.primary.withAlpha(120),
-                foreground: const Color(0xFFCECEEE),
-                background: const Color(0xFF070714),
-                black: const Color(0xFF1A1A2E),
-                red: const Color(0xFFFF4F6A),
-                green: const Color(0xFF00FF9F),
-                yellow: const Color(0xFFFFD700),
-                blue: const Color(0xFF00B4FF),
-                magenta: const Color(0xFFB87FFF),
-                cyan: const Color(0xFF00E5FF),
-                white: const Color(0xFFCECEEE),
-                brightBlack: const Color(0xFF44446A),
-                brightRed: const Color(0xFFFF6B85),
-                brightGreen: const Color(0xFF4DFFBE),
-                brightYellow: const Color(0xFFFFE866),
-                brightBlue: const Color(0xFF33C5FF),
-                brightMagenta: const Color(0xFFCDA0FF),
-                brightCyan: const Color(0xFF33EEFF),
-                brightWhite: const Color(0xFFFFFFFF),
-                searchHitBackground: const Color(0xFFFF9500),
-                searchHitBackgroundCurrent: const Color(0xFFFFB700),
-                searchHitForeground: const Color(0xFF000000),
-              ),
-              padding: const EdgeInsets.all(8),
             ),
-          ),
-        ),
             // Search overlay
             if (_isSearching)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _buildSearchBar(colors),
-              ),
+              Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
           ],
         );
       },
@@ -1163,9 +1244,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
 
   Widget _buildSearchBar(dynamic colors) {
     final hitCount = _searchHits.length;
-    final hitLabel = hitCount == 0
-        ? 'No results'
-        : '${_currentHitIndex + 1} of $hitCount';
+    final hitLabel =
+        hitCount == 0 ? 'No results' : '${_currentHitIndex + 1} of $hitCount';
 
     return Material(
       color: Colors.transparent,
@@ -1196,35 +1276,34 @@ class TerminalWidgetState extends State<TerminalWidget> {
                   }
                 },
                 child: TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Find in terminal…',
-                  hintStyle: TextStyle(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  style: const TextStyle(
                     fontSize: 13,
-                    color: AppColors.textMuted,
+                    color: AppColors.textPrimary,
                   ),
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  border: InputBorder.none,
+                  decoration: InputDecoration(
+                    hintText: 'Find in terminal…',
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    border: InputBorder.none,
+                  ),
+                  onChanged: _performSearch,
+                  onSubmitted: (_) => _nextHit(),
                 ),
-                onChanged: _performSearch,
-                onSubmitted: (_) => _nextHit(),
-              ),
               ),
             ),
             if (_searchController.text.isNotEmpty) ...[
               Text(
                 hitLabel,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textMuted,
-                ),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
               ),
               const SizedBox(width: 4),
               _searchIconBtn(Icons.keyboard_arrow_up, _prevHit),
@@ -1263,8 +1342,9 @@ class _AddSessionButtonState extends State<_AddSessionButton> {
   Future<void> _showDialog(BuildContext context) async {
     final worktrees = <String, List<WorktreeEntry>>{};
     for (final repoPath in widget.workspace.paths) {
-      worktrees[repoPath] =
-          await WorktreeService.instance.listWorktrees(repoPath);
+      worktrees[repoPath] = await WorktreeService.instance.listWorktrees(
+        repoPath,
+      );
     }
     if (!context.mounted) return;
     showNewAgentSessionDialog(
@@ -1322,7 +1402,8 @@ class _AgentLaunchButton extends StatelessWidget {
     return Tooltip(
       message: 'Start ${type.displayName} session',
       child: GestureDetector(
-        onTap: () => context.read<TerminalCubit>().spawnSession(
+        onTap:
+            () => context.read<TerminalCubit>().spawnSession(
               type: type,
               workspacePath: workspacePath,
               workspaceId: workspaceId,
@@ -1362,12 +1443,19 @@ class _WorkspaceStatusBar extends StatelessWidget {
   void _showColorPicker(BuildContext context, Workspace ws, Color current) {
     showDialog<void>(
       context: context,
-      builder: (_) => _WorkspaceColorPickerDialog(
-        workspace: ws,
-        initial: ws.color ?? current,
-        onSave: (c) => context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, c),
-        onReset: () => context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, null),
-      ),
+      builder:
+          (_) => _WorkspaceColorPickerDialog(
+            workspace: ws,
+            initial: ws.color ?? current,
+            onSave:
+                (c) =>
+                    context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, c),
+            onReset:
+                () => context.read<WorkspaceCubit>().setWorkspaceColor(
+                  ws.id,
+                  null,
+                ),
+          ),
     );
   }
 
@@ -1384,7 +1472,10 @@ class _WorkspaceStatusBar extends StatelessWidget {
         return Tooltip(
           message: 'Click to change workspace colour',
           child: GestureDetector(
-            onTap: ws != null ? () => _showColorPicker(context, ws, accentColor) : null,
+            onTap:
+                ws != null
+                    ? () => _showColorPicker(context, ws, accentColor)
+                    : null,
             child: Container(
               height: 28,
               decoration: BoxDecoration(
@@ -1422,13 +1513,20 @@ class _WorkspaceStatusBar extends StatelessWidget {
                         ),
                         if (ws?.gitBranch != null) ...[
                           const SizedBox(width: 6),
-                          const Icon(Icons.alt_route, size: 10, color: AppColors.textMuted),
+                          const Icon(
+                            Icons.alt_route,
+                            size: 10,
+                            color: AppColors.textMuted,
+                          ),
                           const SizedBox(width: 3),
                           Flexible(
                             child: Text(
                               ws!.gitBranch!,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 10,
+                              ),
                             ),
                           ),
                         ],
@@ -1436,7 +1534,11 @@ class _WorkspaceStatusBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
-                  Icon(Icons.palette_outlined, size: 10, color: accentColor.withAlpha(120)),
+                  Icon(
+                    Icons.palette_outlined,
+                    size: 10,
+                    color: accentColor.withAlpha(120),
+                  ),
                 ],
               ),
             ),
@@ -1472,13 +1574,26 @@ class _WorkspaceColorPickerDialogState
   late final TextEditingController _hexCtrl;
 
   static const _presets = [
-    Color(0xFF7C3AED), Color(0xFF2563EB), Color(0xFF059669),
-    Color(0xFFD97706), Color(0xFFDC2626), Color(0xFF0891B2),
-    Color(0xFFDB2777), Color(0xFF65A30D), Color(0xFF9333EA),
-    Color(0xFFEA580C), Color(0xFF0D9488), Color(0xFF4F46E5),
-    Color(0xFFF59E0B), Color(0xFF10B981), Color(0xFFEF4444),
-    Color(0xFF6366F1), Color(0xFFF97316), Color(0xFF14B8A6),
-    Color(0xFFEC4899), Color(0xFF84CC16),
+    Color(0xFF7C3AED),
+    Color(0xFF2563EB),
+    Color(0xFF059669),
+    Color(0xFFD97706),
+    Color(0xFFDC2626),
+    Color(0xFF0891B2),
+    Color(0xFFDB2777),
+    Color(0xFF65A30D),
+    Color(0xFF9333EA),
+    Color(0xFFEA580C),
+    Color(0xFF0D9488),
+    Color(0xFF4F46E5),
+    Color(0xFFF59E0B),
+    Color(0xFF10B981),
+    Color(0xFFEF4444),
+    Color(0xFF6366F1),
+    Color(0xFFF97316),
+    Color(0xFF14B8A6),
+    Color(0xFFEC4899),
+    Color(0xFF84CC16),
   ];
 
   @override
@@ -1496,8 +1611,9 @@ class _WorkspaceColorPickerDialogState
 
   String _toHex(Color c) =>
       '#${c.r.toInt().toRadixString(16).padLeft(2, '0')}'
-      '${c.g.toInt().toRadixString(16).padLeft(2, '0')}'
-      '${c.b.toInt().toRadixString(16).padLeft(2, '0')}'.toUpperCase();
+              '${c.g.toInt().toRadixString(16).padLeft(2, '0')}'
+              '${c.b.toInt().toRadixString(16).padLeft(2, '0')}'
+          .toUpperCase();
 
   void _setColor(Color c) {
     setState(() {
@@ -1549,7 +1665,11 @@ class _WorkspaceColorPickerDialogState
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 16, color: AppColors.textMuted),
+                    icon: const Icon(
+                      Icons.close,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -1602,7 +1722,10 @@ class _WorkspaceColorPickerDialogState
                           borderRadius: BorderRadius.circular(6),
                           borderSide: BorderSide(color: _current.withAlpha(80)),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                       ),
                       onSubmitted: _onHexSubmit,
                     ),
@@ -1636,27 +1759,37 @@ class _WorkspaceColorPickerDialogState
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: _presets.map((c) {
-                  final isSelected = _current.toARGB32() == c.toARGB32();
-                  return GestureDetector(
-                    onTap: () => _setColor(c),
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: c,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected ? Colors.white : Colors.transparent,
-                          width: 2,
+                children:
+                    _presets.map((c) {
+                      final isSelected = _current.toARGB32() == c.toARGB32();
+                      return GestureDetector(
+                        onTap: () => _setColor(c),
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: c,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? Colors.white
+                                      : Colors.transparent,
+                              width: 2,
+                            ),
+                            boxShadow:
+                                isSelected
+                                    ? [
+                                      BoxShadow(
+                                        color: c.withAlpha(180),
+                                        blurRadius: 6,
+                                      ),
+                                    ]
+                                    : null,
+                          ),
                         ),
-                        boxShadow: isSelected
-                            ? [BoxShadow(color: c.withAlpha(180), blurRadius: 6)]
-                            : null,
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
 
               const SizedBox(height: 20),
@@ -1694,8 +1827,14 @@ class _WorkspaceColorPickerDialogState
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _current,
                       foregroundColor: Colors.white,
-                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                     ),
                     child: const Text('Apply'),
                   ),

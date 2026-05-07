@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -15,7 +14,7 @@ import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/terminal/data/clipboard_file_service.dart';
+import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 
 /// The chat UI rendered inside a board panel.
 ///
@@ -1018,37 +1017,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   /// Smart paste: short text pastes inline, long text or images → file ref.
   Future<void> _handleSmartPaste() async {
     try {
-      final clipboard = SystemClipboard.instance;
-      if (clipboard == null) return;
-
-      final reader = await clipboard.read();
-
-      // Check for image first — always save as file
-      if (reader.canProvide(Formats.png) || reader.canProvide(Formats.jpeg)) {
-        final path = await ClipboardFileService.instance.saveClipboardToFile();
-        if (path != null && mounted) {
-          _insertTextAtCursor(path);
-        }
-        return;
-      }
-
-      // Check for plain text
-      if (reader.canProvide(Formats.plainText)) {
-        final text = await reader.readValue(Formats.plainText);
-        if (text != null && text.isNotEmpty) {
-          final wordCount = text.trim().split(RegExp(r'\s+')).length;
-          if (wordCount <= 1000) {
-            // Short text — paste inline manually (we blocked default paste)
-            if (mounted) _insertTextAtCursor(text);
-            return;
-          }
-          // Long text — save to file
-          final path =
-              await ClipboardFileService.instance.saveClipboardToFile();
-          if (path != null && mounted) {
-            _insertTextAtCursor(path);
-          }
-        }
+      final pasted =
+          await SmartClipboardPasteService.instance
+              .readInlineTextOrSavedFilePath();
+      if (pasted != null && mounted) {
+        _insertTextAtCursor(pasted);
       }
     } catch (e) {
       debugPrint('[ChatPanel] Smart paste error: $e');
