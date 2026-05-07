@@ -10,6 +10,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -554,6 +555,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          ChatProviderIcon(
+            provider: _config.provider,
+            size: 14,
+            color: const Color(0xFF64748B),
+          ),
+          const SizedBox(width: 8),
           // Autopilot toggle
           GestureDetector(
             onTap: () {
@@ -1462,7 +1469,13 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                 items: const [
                   DropdownMenuItem(
                     value: 'copilot',
-                    child: Text('GitHub Copilot'),
+                    child: Row(
+                      children: [
+                        ChatProviderIcon(provider: 'copilot', size: 16),
+                        SizedBox(width: 8),
+                        Text('GitHub Copilot'),
+                      ],
+                    ),
                   ),
                 ],
                 onChanged: (_) {},
@@ -1777,72 +1790,73 @@ class _AssistantBubble extends StatelessWidget {
               ),
             ),
 
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: Color(0xFF161D2A),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(4),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
+          if (processedContent.trim().isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF161D2A),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
               ),
-            ),
-            child: SelectionArea(
-              child: MarkdownBody(
-                data: processedContent.isEmpty ? ' ' : processedContent,
-                selectable: false,
-                onTapLink: (text, href, title) {
-                  if (href != null && href.isNotEmpty) {
-                    PlatformLauncher.instance.openUrl(href);
-                  }
-                },
-                styleSheet: MarkdownStyleSheet(
-                  p: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFFCBD5E1),
-                    height: 1.5,
-                  ),
-                  a: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF60A5FA),
-                    decoration: TextDecoration.underline,
-                  ),
-                  code: const TextStyle(
-                    fontSize: 11.5,
-                    fontFamily: 'JetBrains Mono',
-                    color: Color(0xFF34D399),
-                    backgroundColor: Color(0xFF0D1117),
-                  ),
-                  codeblockDecoration: BoxDecoration(
-                    color: const Color(0xFF0D1117),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF1E293B)),
-                  ),
-                  codeblockPadding: const EdgeInsets.all(10),
-                  listBullet: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
-                  ),
-                  h1: const TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFFE2E8F0),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  h2: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFFE2E8F0),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  h3: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFFE2E8F0),
-                    fontWeight: FontWeight.w500,
+              child: SelectionArea(
+                child: MarkdownBody(
+                  data: processedContent,
+                  selectable: false,
+                  onTapLink: (text, href, title) {
+                    if (href != null && href.isNotEmpty) {
+                      PlatformLauncher.instance.openUrl(href);
+                    }
+                  },
+                  styleSheet: MarkdownStyleSheet(
+                    p: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFCBD5E1),
+                      height: 1.5,
+                    ),
+                    a: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF60A5FA),
+                      decoration: TextDecoration.underline,
+                    ),
+                    code: const TextStyle(
+                      fontSize: 11.5,
+                      fontFamily: 'JetBrains Mono',
+                      color: Color(0xFF34D399),
+                      backgroundColor: Color(0xFF0D1117),
+                    ),
+                    codeblockDecoration: BoxDecoration(
+                      color: const Color(0xFF0D1117),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
+                    codeblockPadding: const EdgeInsets.all(10),
+                    listBullet: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                    h1: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFFE2E8F0),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    h2: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFE2E8F0),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    h3: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFE2E8F0),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
           // Token usage
           if (tokenUsage != null)

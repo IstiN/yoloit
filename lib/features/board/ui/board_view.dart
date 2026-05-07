@@ -14,6 +14,7 @@ import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
+import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -2072,17 +2073,23 @@ class _BoardPanelCard extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              BoardPluginRegistry.instance
-                                      .pluginFor(panel.type)
-                                      ?.icon ??
-                                  Icons.dashboard_customize_outlined,
-                              size: 16,
-                              color:
-                                  panel.type == ChatPanelPlugin.kTypeId
-                                      ? const Color(0xFF34D399)
-                                      : AppColors.textMuted,
-                            ),
+                            if (panel.type == ChatPanelPlugin.kTypeId)
+                              ChatProviderIcon(
+                                provider:
+                                    (panel.state['config'] as Map?)?['provider']
+                                        as String? ??
+                                    'copilot',
+                                size: 18,
+                              )
+                            else
+                              Icon(
+                                BoardPluginRegistry.instance
+                                        .pluginFor(panel.type)
+                                        ?.icon ??
+                                    Icons.dashboard_customize_outlined,
+                                size: 16,
+                                color: AppColors.textMuted,
+                              ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
