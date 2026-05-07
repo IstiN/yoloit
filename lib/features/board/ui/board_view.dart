@@ -13,6 +13,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
+import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
@@ -4032,6 +4033,17 @@ class _ChatHeaderMenu extends StatelessWidget {
           ),
         ),
         const PopupMenuItem(
+          value: 'history',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.history, size: 14, color: Color(0xFF94A3B8)),
+              SizedBox(width: 8),
+              Text('Session history', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
           value: 'color',
           height: 36,
           child: Row(
@@ -4047,6 +4059,8 @@ class _ChatHeaderMenu extends StatelessWidget {
         switch (value) {
           case 'rename':
             _showRenameDialog(context);
+          case 'history':
+            _showSessionHistory(context);
           case 'color':
             onEditColor();
         }
@@ -4059,6 +4073,8 @@ class _ChatHeaderMenu extends StatelessWidget {
     final config = panel.state['config'] as Map<String, dynamic>?;
     final currentName = config?['sessionName'] as String? ?? panel.title;
     final ctrl = TextEditingController(text: currentName);
+    // Capture the cubit from the parent context (not the dialog's context)
+    final cubit = context.read<BoardCubit>();
 
     showDialog(
       context: context,
@@ -4075,7 +4091,7 @@ class _ChatHeaderMenu extends StatelessWidget {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
           onSubmitted: (_) {
-            _applyRename(ctx, ctrl.text);
+            _applyRename(ctx, ctrl.text, cubit);
           },
         ),
         actions: [
@@ -4084,7 +4100,7 @@ class _ChatHeaderMenu extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => _applyRename(ctx, ctrl.text),
+            onPressed: () => _applyRename(ctx, ctrl.text, cubit),
             child: const Text('Rename'),
           ),
         ],
@@ -4092,7 +4108,7 @@ class _ChatHeaderMenu extends StatelessWidget {
     );
   }
 
-  void _applyRename(BuildContext ctx, String newName) {
+  void _applyRename(BuildContext ctx, String newName, BoardCubit cubit) {
     final name = newName.trim();
     if (name.isEmpty) return;
     Navigator.pop(ctx);
@@ -4102,11 +4118,102 @@ class _ChatHeaderMenu extends StatelessWidget {
     );
     config['sessionName'] = name;
 
-    final cubit = ctx.read<BoardCubit>();
     cubit.updatePanelTitle(panel.id, name);
     onUpdateState?.call({
       ...panel.state,
       'config': config,
     });
+  }
+
+  void _showSessionHistory(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _ChatSessionHistoryDialog(panelId: panel.id),
+    );
+  }
+}
+
+class _ChatSessionHistoryDialog extends StatelessWidget {
+  const _ChatSessionHistoryDialog({required this.panelId});
+  final String panelId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1E293B),
+      title: const Text('Session history', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16)),
+      content: SizedBox(
+        width: 360,
+        height: 400,
+        child: FutureBuilder<List<ChatSessionEntry>>(
+          future: ChatSessionHistory.instance.loadAll(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final entries = snapshot.data!;
+            if (entries.isEmpty) {
+              return const Center(
+                child: Text('No sessions yet', style: TextStyle(color: Color(0xFF64748B))),
+              );
+            }
+            return ListView.builder(
+              itemCount: entries.length,
+              itemBuilder: (context, index) {
+                final e = entries[index];
+                final isCurrent = e.id == panelId;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  decoration: BoxDecoration(
+                    color: isCurrent ? const Color(0xFF1A3A2A) : const Color(0xFF0F1219),
+                    borderRadius: BorderRadius.circular(8),
+                    border: isCurrent ? Border.all(color: const Color(0xFF34D399), width: 0.5) : null,
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(
+                      Icons.chat_bubble_outline,
+                      size: 16,
+                      color: isCurrent ? const Color(0xFF34D399) : const Color(0xFF64748B),
+                    ),
+                    title: Text(
+                      e.sessionName.isNotEmpty ? e.sessionName : 'Unnamed session',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCurrent ? const Color(0xFF34D399) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${e.provider} • ${e.model} • ${e.messageCount} msgs',
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    ),
+                    trailing: Text(
+                      _formatDate(e.lastMessageAt ?? e.createdAt),
+                      style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 }

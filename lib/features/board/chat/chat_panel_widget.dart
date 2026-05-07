@@ -8,6 +8,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -121,6 +122,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       'messages': trimmed.map((m) => m.toJson()).toList(),
       'lastUsage': _lastUsage?.toJson(),
     });
+    // Update session history registry
+    ChatSessionHistory.instance.upsert(ChatSessionEntry(
+      id: widget.panel.id,
+      sessionName: _config.sessionName,
+      provider: _provider.providerId,
+      model: _config.model,
+      workingDir: _config.workingDir,
+      createdAt: DateTime.now(),
+      lastMessageAt: _messages.isNotEmpty ? DateTime.now() : null,
+      messageCount: _messages.length,
+    ));
   }
 
   @override
@@ -817,12 +829,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   void _showModelPicker(BuildContext context) {
     final models = _provider.availableModels;
+    // Position the popup above the model button (bottom-left of input bar)
     final renderBox = context.findRenderObject() as RenderBox?;
-    final offset = renderBox?.localToGlobal(Offset.zero) ?? Offset.zero;
-
+    if (renderBox == null) return;
+    final size = renderBox.size;
+    final offset = renderBox.localToGlobal(Offset(0, size.height));
+    // Show menu anchored to bottom-left, growing upward
     showMenu<String>(
       context: context,
-      position: RelativeRect.fromLTRB(offset.dx, offset.dy + 28, offset.dx + 200, 0),
+      position: RelativeRect.fromLTRB(
+        offset.dx + 10,
+        offset.dy - size.height - (models.length * 32.0).clamp(0, 500),
+        offset.dx + 220,
+        offset.dy,
+      ),
       color: const Color(0xFF1E293B),
       items: models.map((m) => PopupMenuItem<String>(
         value: m.id,
