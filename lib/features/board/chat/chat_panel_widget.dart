@@ -118,23 +118,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final trimmed = _messages.length > _maxSavedMessages
         ? _messages.sublist(_messages.length - _maxSavedMessages)
         : _messages;
+    final messagesJson = trimmed.map((m) => m.toJson()).toList();
     widget.onUpdateState({
       ...widget.panel.state,
       'config': _config.toJson(),
-      'messages': trimmed.map((m) => m.toJson()).toList(),
+      'messages': messagesJson,
       'lastUsage': _lastUsage?.toJson(),
     });
-    // Update session history registry
-    ChatSessionHistory.instance.upsert(ChatSessionEntry(
-      id: widget.panel.id,
-      sessionName: _config.sessionName,
-      provider: _provider.providerId,
-      model: _config.model,
-      workingDir: _config.workingDir,
-      createdAt: DateTime.now(),
-      lastMessageAt: _messages.isNotEmpty ? DateTime.now() : null,
-      messageCount: _messages.length,
-    ));
+    // Update session history registry (metadata + messages on disk)
+    ChatSessionHistory.instance.upsert(
+      ChatSessionEntry(
+        id: widget.panel.id,
+        sessionName: _config.sessionName,
+        provider: _provider.providerId,
+        model: _config.model,
+        workingDir: _config.workingDir,
+        createdAt: DateTime.now(),
+        lastMessageAt: _messages.isNotEmpty ? DateTime.now() : null,
+        messageCount: _messages.length,
+      ),
+      messages: messagesJson,
+    );
   }
 
   @override
@@ -910,7 +914,31 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   void _showSessionHistoryDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => _SessionHistoryDialog(currentPanelId: widget.panel.id),
+      builder: (ctx) => _SessionHistoryDialog(
+        currentPanelId: widget.panel.id,
+        onRestore: (entry, messages) {
+          setState(() {
+            _config = ChatSessionConfig(
+              sessionName: entry.sessionName,
+              workingDir: entry.workingDir,
+              model: entry.model,
+            );
+            _messages.clear();
+            for (final m in messages) {
+              try {
+                _messages.add(ChatMessage.fromJson(m));
+              } catch (_) {}
+            }
+            _isFirstMessage = false;
+          });
+          // Update panel title
+          context.read<BoardCubit>().updatePanelTitle(
+            widget.panel.id, entry.sessionName,
+          );
+          _persistMessages();
+          _scrollToBottom();
+        },
+      ),
     );
   }
 }
@@ -919,9 +947,32 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 // Session history dialog (accessible from info bar)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SessionHistoryDialog extends StatelessWidget {
-  const _SessionHistoryDialog({required this.currentPanelId});
+class _SessionHistoryDialog extends StatefulWidget {
+  const _SessionHistoryDialog({
+    required this.currentPanelId,
+    this.onRestore,
+  });
   final String currentPanelId;
+  final void Function(ChatSessionEntry entry, List<Map<String, dynamic>> messages)? onRestore;
+
+  @override
+  State<_SessionHistoryDialog> createState() => _SessionHistoryDialogState();
+}
+
+class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
+  late Future<List<ChatSessionEntry>> _entriesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _entriesFuture = ChatSessionHistory.instance.loadAll();
+  }
+
+  void _refresh() {
+    setState(() {
+      _entriesFuture = ChatSessionHistory.instance.loadAll();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -938,7 +989,7 @@ class _SessionHistoryDialog extends StatelessWidget {
         width: 380,
         height: 420,
         child: FutureBuilder<List<ChatSessionEntry>>(
-          future: ChatSessionHistory.instance.loadAll(),
+          future: _entriesFuture,
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -958,7 +1009,7 @@ class _SessionHistoryDialog extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 4),
               itemBuilder: (context, index) {
                 final e = entries[index];
-                final isCurrent = e.id == currentPanelId;
+                final isCurrent = e.id == widget.currentPanelId;
                 return Container(
                   decoration: BoxDecoration(
                     color: isCurrent ? const Color(0xFF1A3A2A) : const Color(0xFF0F1219),
@@ -1002,6 +1053,30 @@ class _SessionHistoryDialog extends StatelessWidget {
                         _formatDate(e.lastMessageAt ?? e.createdAt),
                         style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
                       ),
+                      const SizedBox(width: 6),
+                      // Restore button (not for current session)
+                      if (!isCurrent && widget.onRestore != null)
+                        _actionButton(
+                          icon: Icons.restore,
+                          color: const Color(0xFF60A5FA),
+                          tooltip: 'Restore',
+                          onTap: () async {
+                            final msgs = await ChatSessionHistory.instance.loadMessages(e.id);
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            widget.onRestore?.call(e, msgs);
+                          },
+                        ),
+                      // Delete button
+                      _actionButton(
+                        icon: Icons.delete_outline,
+                        color: const Color(0xFFF87171),
+                        tooltip: 'Delete',
+                        onTap: () async {
+                          await ChatSessionHistory.instance.delete(e.id);
+                          _refresh();
+                        },
+                      ),
                     ],
                   ),
                 );
@@ -1016,6 +1091,25 @@ class _SessionHistoryDialog extends StatelessWidget {
           child: const Text('Close'),
         ),
       ],
+    );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 14, color: color),
+        ),
+      ),
     );
   }
 
