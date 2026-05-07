@@ -509,6 +509,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 ),
               ),
             ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () => _showSessionHistoryDialog(context),
+            child: const Icon(Icons.history, size: 13, color: Color(0xFF475569)),
+          ),
         ],
       ),
     );
@@ -893,11 +898,129 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       }
     });
   }
+
+  void _showSessionHistoryDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _SessionHistoryDialog(currentPanelId: widget.panel.id),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Setup view (folder + session + model picker)
+// Session history dialog (accessible from info bar)
 // ─────────────────────────────────────────────────────────────────────────────
+
+class _SessionHistoryDialog extends StatelessWidget {
+  const _SessionHistoryDialog({required this.currentPanelId});
+  final String currentPanelId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1E293B),
+      title: const Row(
+        children: [
+          Icon(Icons.history, size: 18, color: Color(0xFF94A3B8)),
+          SizedBox(width: 8),
+          Text('Session history', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16)),
+        ],
+      ),
+      content: SizedBox(
+        width: 380,
+        height: 420,
+        child: FutureBuilder<List<ChatSessionEntry>>(
+          future: ChatSessionHistory.instance.loadAll(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final entries = snapshot.data!;
+            if (entries.isEmpty) {
+              return const Center(
+                child: Text(
+                  'No sessions yet.\nStart chatting to see history here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                ),
+              );
+            }
+            return ListView.separated(
+              itemCount: entries.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 4),
+              itemBuilder: (context, index) {
+                final e = entries[index];
+                final isCurrent = e.id == currentPanelId;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: isCurrent ? const Color(0xFF1A3A2A) : const Color(0xFF0F1219),
+                    borderRadius: BorderRadius.circular(10),
+                    border: isCurrent
+                        ? Border.all(color: const Color(0xFF34D399), width: 0.5)
+                        : null,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        size: 14,
+                        color: isCurrent ? const Color(0xFF34D399) : const Color(0xFF64748B),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              e.sessionName.isNotEmpty ? e.sessionName : 'Unnamed session',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isCurrent
+                                    ? const Color(0xFF34D399)
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${e.provider} • ${e.model} • ${e.messageCount} msgs',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        _formatDate(e.lastMessageAt ?? e.createdAt),
+                        style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
 
 class _ChatSetupView extends StatefulWidget {
   const _ChatSetupView({
