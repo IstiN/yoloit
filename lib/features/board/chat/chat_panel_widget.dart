@@ -670,7 +670,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildInputBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      padding: const EdgeInsets.fromLTRB(10, 8, 24, 14),
       decoration: const BoxDecoration(
         color: Color(0xFF0F1219),
       ),
