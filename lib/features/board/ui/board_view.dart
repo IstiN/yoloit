@@ -4016,7 +4016,7 @@ class _ChatHeaderMenu extends StatelessWidget {
       icon: const Icon(Icons.more_horiz, size: 16, color: AppColors.textMuted),
       splashRadius: 14,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(maxWidth: 28, maxHeight: 28),
+      iconSize: 16,
       color: const Color(0xFF1E293B),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       itemBuilder: (context) => [
