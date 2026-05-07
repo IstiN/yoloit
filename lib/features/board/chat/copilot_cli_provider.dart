@@ -64,9 +64,11 @@ class CopilotCliProvider extends ChatProvider {
     await stop(config.sessionName);
 
     final args = <String>[
-      '--output-format', 'json',
+      '--output-format',
+      'json',
       '--yolo',
-      '--model', config.model,
+      '--model',
+      config.model,
     ];
 
     // Reasoning effort
@@ -76,7 +78,11 @@ class CopilotCliProvider extends ChatProvider {
 
     // Autopilot mode
     if (config.autopilot) {
-      args.addAll(['--max-autopilot-continues', '${config.maxAutopilotContinues}']);
+      args.addAll([
+        '--autopilot',
+        '--max-autopilot-continues',
+        '${config.maxAutopilotContinues}',
+      ]);
     }
 
     // Agent mode
@@ -146,13 +152,9 @@ class CopilotCliProvider extends ChatProvider {
             },
           );
 
-      process.stderr
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              debugPrint('[CopilotCli] stderr: $chunk');
-            },
-          );
+      process.stderr.transform(utf8.decoder).listen((chunk) {
+        debugPrint('[CopilotCli] stderr: $chunk');
+      });
 
       final exitCode = await process.exitCode;
       debugPrint('[CopilotCli] Process exited with code: $exitCode');

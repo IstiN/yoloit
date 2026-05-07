@@ -111,16 +111,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // Restore last usage
     final savedUsage = widget.panel.state['lastUsage'];
     if (savedUsage is Map) {
-      _lastUsage = ChatTokenUsage.fromJson(Map<String, dynamic>.from(savedUsage));
+      _lastUsage = ChatTokenUsage.fromJson(
+        Map<String, dynamic>.from(savedUsage),
+      );
     }
   }
 
   static const _maxSavedMessages = 100;
 
   void _persistMessages() {
-    final trimmed = _messages.length > _maxSavedMessages
-        ? _messages.sublist(_messages.length - _maxSavedMessages)
-        : _messages;
+    final trimmed =
+        _messages.length > _maxSavedMessages
+            ? _messages.sublist(_messages.length - _maxSavedMessages)
+            : _messages;
     final messagesJson = trimmed.map((m) => m.toJson()).toList();
     widget.onUpdateState({
       ...widget.panel.state,
@@ -214,12 +217,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     // Add user message
     setState(() {
-      _messages.add(ChatMessage(
-        id: 'user-${DateTime.now().millisecondsSinceEpoch}',
-        role: ChatRole.user,
-        content: text,
-        timestamp: DateTime.now(),
-      ));
+      _messages.add(
+        ChatMessage(
+          id: 'user-${DateTime.now().millisecondsSinceEpoch}',
+          role: ChatRole.user,
+          content: text,
+          timestamp: DateTime.now(),
+        ),
+      );
       _setProcessing(true);
       _streamingContent = '';
       _streamingMessageId = null;
@@ -244,12 +249,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _isSending = false;
         setState(() {
           _setProcessing(false);
-          _messages.add(ChatMessage(
-            id: 'error-${DateTime.now().millisecondsSinceEpoch}',
-            role: ChatRole.system,
-            content: '❌ Error: $error',
-            timestamp: DateTime.now(),
-          ));
+          _messages.add(
+            ChatMessage(
+              id: 'error-${DateTime.now().millisecondsSinceEpoch}',
+              role: ChatRole.system,
+              content: '❌ Error: $error',
+              timestamp: DateTime.now(),
+            ),
+          );
         });
         _persistMessages();
         _scrollToBottom();
@@ -301,19 +308,22 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final toolReqs = event.toolRequests;
         setState(() {
           // Remove any existing streaming placeholder
-          _messages.removeWhere((m) =>
-            m.id == _streamingMessageId && m.isStreaming);
+          _messages.removeWhere(
+            (m) => m.id == _streamingMessageId && m.isStreaming,
+          );
 
-          final toolCalls = toolReqs.map((tr) {
-            final args = tr['arguments'];
-            return ChatToolCall(
-              toolCallId: tr['toolCallId'] as String? ?? '',
-              toolName: tr['name'] as String? ?? '',
-              arguments: args is Map
-                  ? Map<String, dynamic>.from(args)
-                  : <String, dynamic>{},
-            );
-          }).toList();
+          final toolCalls =
+              toolReqs.map((tr) {
+                final args = tr['arguments'];
+                return ChatToolCall(
+                  toolCallId: tr['toolCallId'] as String? ?? '',
+                  toolName: tr['name'] as String? ?? '',
+                  arguments:
+                      args is Map
+                          ? Map<String, dynamic>.from(args)
+                          : <String, dynamic>{},
+                );
+              }).toList();
 
           // Extract token usage from this message if available
           final outputTokens = (event.data['outputTokens'] as num?)?.toInt();
@@ -323,15 +333,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             _totalOutputTokens += outputTokens;
           }
 
-          _messages.add(ChatMessage(
-            id: event.messageId ?? 'assistant-${DateTime.now().millisecondsSinceEpoch}',
-            role: ChatRole.assistant,
-            content: content,
-            timestamp: event.timestamp ?? DateTime.now(),
-            toolCalls: toolCalls,
-            isStreaming: false,
-            tokenUsage: usage,
-          ));
+          _messages.add(
+            ChatMessage(
+              id:
+                  event.messageId ??
+                  'assistant-${DateTime.now().millisecondsSinceEpoch}',
+              role: ChatRole.assistant,
+              content: content,
+              timestamp: event.timestamp ?? DateTime.now(),
+              toolCalls: toolCalls,
+              isStreaming: false,
+              tokenUsage: usage,
+            ),
+          );
           _streamingMessageId = null;
           _streamingContent = '';
         });
@@ -358,29 +372,34 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final resultContent = event.toolResultContent ?? '';
         setState(() {
           _activeToolCalls[toolCallId] = (_activeToolCalls[toolCallId] ??
-            ChatToolCall(
-              toolCallId: toolCallId,
-              toolName: 'unknown',
-              arguments: {},
-            )).copyWith(
-            isRunning: false,
-            success: success,
-            result: resultContent.length > 500
-                ? '${resultContent.substring(0, 500)}…'
-                : resultContent,
-          );
+                  ChatToolCall(
+                    toolCallId: toolCallId,
+                    toolName: 'unknown',
+                    arguments: {},
+                  ))
+              .copyWith(
+                isRunning: false,
+                success: success,
+                result:
+                    resultContent.length > 500
+                        ? '${resultContent.substring(0, 500)}…'
+                        : resultContent,
+              );
 
           // Add tool result as a message for the chat log
-          _messages.add(ChatMessage(
-            id: 'tool-$toolCallId',
-            role: ChatRole.tool,
-            content: resultContent.length > 500
-                ? '${resultContent.substring(0, 500)}…'
-                : resultContent,
-            toolName: _activeToolCalls[toolCallId]?.toolName ?? 'unknown',
-            toolCallId: toolCallId,
-            timestamp: event.timestamp ?? DateTime.now(),
-          ));
+          _messages.add(
+            ChatMessage(
+              id: 'tool-$toolCallId',
+              role: ChatRole.tool,
+              content:
+                  resultContent.length > 500
+                      ? '${resultContent.substring(0, 500)}…'
+                      : resultContent,
+              toolName: _activeToolCalls[toolCallId]?.toolName ?? 'unknown',
+              toolCallId: toolCallId,
+              timestamp: event.timestamp ?? DateTime.now(),
+            ),
+          );
         });
         _scrollToBottom();
         break;
@@ -392,10 +411,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           setState(() {
             _lastUsage = ChatTokenUsage(
               premiumRequests: (usage['premiumRequests'] as num?)?.toInt() ?? 0,
-              totalApiDurationMs: (usage['totalApiDurationMs'] as num?)?.toInt() ?? 0,
-              sessionDurationMs: (usage['sessionDurationMs'] as num?)?.toInt() ?? 0,
+              totalApiDurationMs:
+                  (usage['totalApiDurationMs'] as num?)?.toInt() ?? 0,
+              sessionDurationMs:
+                  (usage['sessionDurationMs'] as num?)?.toInt() ?? 0,
               linesAdded: (codeChanges?['linesAdded'] as num?)?.toInt() ?? 0,
-              linesRemoved: (codeChanges?['linesRemoved'] as num?)?.toInt() ?? 0,
+              linesRemoved:
+                  (codeChanges?['linesRemoved'] as num?)?.toInt() ?? 0,
             );
           });
         }
@@ -404,23 +426,24 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       case ChatEventType.askUser:
         final question = event.data['question'] as String? ?? '';
         final choicesRaw = event.data['choices'];
-        final choices = choicesRaw is List
-            ? choicesRaw.cast<String>()
-            : <String>[];
+        final choices =
+            choicesRaw is List ? choicesRaw.cast<String>() : <String>[];
         final allowFreeform = event.data['allowFreeform'] as bool? ?? true;
         if (question.isNotEmpty) {
           setState(() {
-            _messages.add(ChatMessage(
-              id: 'ask-${DateTime.now().millisecondsSinceEpoch}',
-              role: ChatRole.system,
-              content: question,
-              timestamp: DateTime.now(),
-              metadata: {
-                'type': 'ask_user',
-                'choices': choices,
-                'allowFreeform': allowFreeform,
-              },
-            ));
+            _messages.add(
+              ChatMessage(
+                id: 'ask-${DateTime.now().millisecondsSinceEpoch}',
+                role: ChatRole.system,
+                content: question,
+                timestamp: DateTime.now(),
+                metadata: {
+                  'type': 'ask_user',
+                  'choices': choices,
+                  'allowFreeform': allowFreeform,
+                },
+              ),
+            );
           });
           _scrollToBottom();
         }
@@ -436,12 +459,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   void _finalizeStreamingMessage() {
     if (_streamingContent.isEmpty) return;
-    _messages.add(ChatMessage(
-      id: _streamingMessageId ?? 'assistant-${DateTime.now().millisecondsSinceEpoch}',
-      role: ChatRole.assistant,
-      content: _streamingContent,
-      timestamp: DateTime.now(),
-    ));
+    _messages.add(
+      ChatMessage(
+        id:
+            _streamingMessageId ??
+            'assistant-${DateTime.now().millisecondsSinceEpoch}',
+        role: ChatRole.assistant,
+        content: _streamingContent,
+        timestamp: DateTime.now(),
+      ),
+    );
     _streamingMessageId = null;
     _streamingContent = '';
   }
@@ -468,7 +495,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         // Update panel title to session name
         if (config.sessionName.isNotEmpty) {
           context.read<BoardCubit>().updatePanelTitle(
-            widget.panel.id, config.sessionName,
+            widget.panel.id,
+            config.sessionName,
           );
         }
         // Persist config to panel state
@@ -494,9 +522,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _buildInfoBar(),
           // Messages
           Expanded(
-            child: _messages.isEmpty && !_isProcessing
-                ? _buildEmptyState()
-                : _buildMessageList(),
+            child:
+                _messages.isEmpty && !_isProcessing
+                    ? _buildEmptyState()
+                    : _buildMessageList(),
           ),
           // Input
           _buildInputBar(),
@@ -510,7 +539,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: const BoxDecoration(
         color: Color(0xFF0D1117),
-        border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 0.5)),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF1E293B), width: 0.5),
+        ),
       ),
       child: Row(
         children: [
@@ -536,9 +567,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               child: Icon(
                 Icons.rocket_launch,
                 size: 12,
-                color: _config.autopilot
-                    ? const Color(0xFF34D399)
-                    : const Color(0xFF334155),
+                color:
+                    _config.autopilot
+                        ? const Color(0xFF34D399)
+                        : const Color(0xFF334155),
               ),
             ),
           ),
@@ -548,14 +580,32 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             onTap: _cycleReasoningEffort,
             child: Tooltip(
               message: 'Effort: ${_config.reasoningEffort ?? 'default'}',
-              child: Text(
-                _reasoningLabel(),
-                style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w600,
-                  color: _config.reasoningEffort != null
-                      ? const Color(0xFFF59E0B)
-                      : const Color(0xFF334155),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color:
+                      _config.reasoningEffort != null
+                          ? const Color(0x20F59E0B)
+                          : const Color(0x151E293B),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color:
+                        _config.reasoningEffort != null
+                            ? const Color(0x80F59E0B)
+                            : const Color(0xFF334155),
+                    width: 0.6,
+                  ),
+                ),
+                child: Text(
+                  _reasoningLabel(),
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color:
+                        _config.reasoningEffort != null
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFF64748B),
+                  ),
                 ),
               ),
             ),
@@ -576,7 +626,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             const Padding(
               padding: EdgeInsets.only(left: 6),
               child: SizedBox(
-                width: 10, height: 10,
+                width: 10,
+                height: 10,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.2,
                   color: Color(0xFF34D399),
@@ -586,7 +637,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           const SizedBox(width: 4),
           GestureDetector(
             onTap: () => _showSessionHistoryDialog(context),
-            child: const Icon(Icons.history, size: 13, color: Color(0xFF475569)),
+            child: const Icon(
+              Icons.history,
+              size: 13,
+              color: Color(0xFF475569),
+            ),
           ),
         ],
       ),
@@ -595,11 +650,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   String _reasoningLabel() {
     return switch (_config.reasoningEffort) {
-      'low' => 'Lo',
-      'medium' => 'Med',
-      'high' => 'Hi',
-      'xhigh' => 'X',
-      _ => 'Ef',
+      'low' => 'Effort: low',
+      'medium' => 'Effort: med',
+      'high' => 'Effort: high',
+      'xhigh' => 'Effort: xhigh',
+      _ => 'Effort',
     };
   }
 
@@ -642,12 +697,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      itemCount: _messages.length
-          + (showStreaming ? 1 : 0)
-          + (hasRunningTools ? 1 : 0)
-          + (showThinking ? 1 : 0),
+      itemCount:
+          _messages.length +
+          (showStreaming ? 1 : 0) +
+          (hasRunningTools ? 1 : 0) +
+          (showThinking ? 1 : 0),
       itemBuilder: (context, index) {
-        final runningTools = _activeToolCalls.values.where((t) => t.isRunning).toList();
+        final runningTools =
+            _activeToolCalls.values.where((t) => t.isRunning).toList();
 
         if (index < _messages.length) {
           return _buildMessageBubble(_messages[index]);
@@ -728,46 +785,58 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: tools.map((tool) => Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0x15FBBF24),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0x30FBBF24)),
-          ),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: 14, height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: Color(0xFFFBBF24),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.build_outlined, size: 14, color: Color(0xFFFBBF24)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  tool.toolName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFFBBF24),
-                    fontWeight: FontWeight.w500,
+        children:
+            tools
+                .map(
+                  (tool) => Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0x15FBBF24),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0x30FBBF24)),
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: Color(0xFFFBBF24),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.build_outlined,
+                          size: 14,
+                          color: Color(0xFFFBBF24),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            tool.toolName,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFFBBF24),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            ],
-          ),
-        )).toList(),
+                )
+                .toList(),
       ),
     );
   }
 
   Widget _buildStreamingBubble() {
-    final processedContent = _streamingContent
-        .replaceAll(RegExp(r'<br\s*/?>'), '\n');
+    final processedContent = _streamingContent.replaceAll(
+      RegExp(r'<br\s*/?>'),
+      '\n',
+    );
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
       child: Container(
@@ -781,26 +850,39 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             bottomRight: Radius.circular(16),
           ),
         ),
-        child: processedContent.isEmpty
-            ? const _TypingIndicator()
-            : MarkdownBody(
-                data: processedContent,
-                onTapLink: (text, href, title) {
-                  if (href != null && href.isNotEmpty) {
-                    PlatformLauncher.instance.openUrl(href);
-                  }
-                },
-                styleSheet: MarkdownStyleSheet(
-                  p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
-                  a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
-                  code: const TextStyle(fontSize: 11.5, color: Color(0xFF34D399), backgroundColor: Color(0xFF0D1117)),
-                  codeblockDecoration: BoxDecoration(
-                    color: const Color(0xFF0D1117),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF1E293B)),
+        child:
+            processedContent.isEmpty
+                ? const _TypingIndicator()
+                : MarkdownBody(
+                  data: processedContent,
+                  onTapLink: (text, href, title) {
+                    if (href != null && href.isNotEmpty) {
+                      PlatformLauncher.instance.openUrl(href);
+                    }
+                  },
+                  styleSheet: MarkdownStyleSheet(
+                    p: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFCBD5E1),
+                      height: 1.5,
+                    ),
+                    a: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF60A5FA),
+                      decoration: TextDecoration.underline,
+                    ),
+                    code: const TextStyle(
+                      fontSize: 11.5,
+                      color: Color(0xFF34D399),
+                      backgroundColor: Color(0xFF0D1117),
+                    ),
+                    codeblockDecoration: BoxDecoration(
+                      color: const Color(0xFF0D1117),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF1E293B)),
+                    ),
                   ),
                 ),
-              ),
       ),
     );
   }
@@ -821,19 +903,24 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         children: [
           // Model selector (bottom-left)
           Builder(
-            builder: (btnContext) => GestureDetector(
-              onTap: () => _showModelPicker(btnContext),
-              child: Container(
-                width: 28,
-                height: 28,
-                margin: const EdgeInsets.only(bottom: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A2030),
-                  borderRadius: BorderRadius.circular(14),
+            builder:
+                (btnContext) => GestureDetector(
+                  onTap: () => _showModelPicker(btnContext),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    margin: const EdgeInsets.only(bottom: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2030),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      size: 14,
+                      color: Color(0xFF34D399),
+                    ),
+                  ),
                 ),
-                child: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF34D399)),
-              ),
-            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -849,7 +936,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 // Cmd+V (macOS) or Ctrl+V → smart paste — intercept fully
                 final isCmd = HardwareKeyboard.instance.isMetaPressed;
                 final isCtrl = HardwareKeyboard.instance.isControlPressed;
-                if (event.logicalKey == LogicalKeyboardKey.keyV && (isCmd || isCtrl)) {
+                if (event.logicalKey == LogicalKeyboardKey.keyV &&
+                    (isCmd || isCtrl)) {
                   _handleSmartPaste();
                   return KeyEventResult.handled;
                 }
@@ -858,10 +946,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               child: TextField(
                 controller: _inputController,
                 focusNode: _inputFocusNode,
-                style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), height: 1.4),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFFE2E8F0),
+                  height: 1.4,
+                ),
                 decoration: InputDecoration(
                   hintText: _isProcessing ? 'Agent working…' : 'Message…',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                  hintStyle: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF475569),
+                  ),
                   filled: true,
                   fillColor: const Color(0xFF1A2030),
                   border: OutlineInputBorder(
@@ -874,9 +969,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF34D399), width: 0.8),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF34D399),
+                      width: 0.8,
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   isDense: true,
                 ),
                 maxLines: 4,
@@ -895,7 +996,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 color: const Color(0xFF34D399),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.arrow_upward, color: Color(0xFF0F172A), size: 16),
+              child: const Icon(
+                Icons.arrow_upward,
+                color: Color(0xFF0F172A),
+                size: 16,
+              ),
             ),
           ),
         ],
@@ -931,7 +1036,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             return;
           }
           // Long text — save to file
-          final path = await ClipboardFileService.instance.saveClipboardToFile();
+          final path =
+              await ClipboardFileService.instance.saveClipboardToFile();
           if (path != null && mounted) {
             _insertTextAtCursor(path);
           }
@@ -975,41 +1081,52 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         buttonPos.dy,
       ),
       color: const Color(0xFF1E293B),
-      items: models.map((m) => PopupMenuItem<String>(
-        value: m.id,
-        height: 32,
-        child: Row(
-          children: [
-            if (m.id == _config.model)
-              const Icon(Icons.check, size: 14, color: Color(0xFF34D399))
-            else
-              const SizedBox(width: 14),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                m.displayName,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: m.id == _config.model
-                      ? const Color(0xFF34D399)
-                      : const Color(0xFFE2E8F0),
+      items:
+          models
+              .map(
+                (m) => PopupMenuItem<String>(
+                  value: m.id,
+                  height: 32,
+                  child: Row(
+                    children: [
+                      if (m.id == _config.model)
+                        const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Color(0xFF34D399),
+                        )
+                      else
+                        const SizedBox(width: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          m.displayName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color:
+                                m.id == _config.model
+                                    ? const Color(0xFF34D399)
+                                    : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${m.costMultiplier}x',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color:
+                              m.costMultiplier == 0
+                                  ? const Color(0xFF34D399)
+                                  : m.costMultiplier > 3
+                                  ? const Color(0xFFF87171)
+                                  : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            Text(
-              '${m.costMultiplier}x',
-              style: TextStyle(
-                fontSize: 10,
-                color: m.costMultiplier == 0
-                    ? const Color(0xFF34D399)
-                    : m.costMultiplier > 3
-                        ? const Color(0xFFF87171)
-                        : const Color(0xFF64748B),
-              ),
-            ),
-          ],
-        ),
-      )).toList(),
+              )
+              .toList(),
     ).then((selected) {
       if (selected != null && selected != _config.model) {
         setState(() {
@@ -1027,31 +1144,33 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   void _showSessionHistoryDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => _SessionHistoryDialog(
-        currentPanelId: widget.panel.id,
-        onRestore: (entry, messages) {
-          setState(() {
-            _config = ChatSessionConfig(
-              sessionName: entry.sessionName,
-              workingDir: entry.workingDir,
-              model: entry.model,
-            );
-            _messages.clear();
-            for (final m in messages) {
-              try {
-                _messages.add(ChatMessage.fromJson(m));
-              } catch (_) {}
-            }
-            _isFirstMessage = false;
-          });
-          // Update panel title
-          context.read<BoardCubit>().updatePanelTitle(
-            widget.panel.id, entry.sessionName,
-          );
-          _persistMessages();
-          _scrollToBottom();
-        },
-      ),
+      builder:
+          (ctx) => _SessionHistoryDialog(
+            currentPanelId: widget.panel.id,
+            onRestore: (entry, messages) {
+              setState(() {
+                _config = ChatSessionConfig(
+                  sessionName: entry.sessionName,
+                  workingDir: entry.workingDir,
+                  model: entry.model,
+                );
+                _messages.clear();
+                for (final m in messages) {
+                  try {
+                    _messages.add(ChatMessage.fromJson(m));
+                  } catch (_) {}
+                }
+                _isFirstMessage = false;
+              });
+              // Update panel title
+              context.read<BoardCubit>().updatePanelTitle(
+                widget.panel.id,
+                entry.sessionName,
+              );
+              _persistMessages();
+              _scrollToBottom();
+            },
+          ),
     );
   }
 }
@@ -1061,12 +1180,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SessionHistoryDialog extends StatefulWidget {
-  const _SessionHistoryDialog({
-    required this.currentPanelId,
-    this.onRestore,
-  });
+  const _SessionHistoryDialog({required this.currentPanelId, this.onRestore});
   final String currentPanelId;
-  final void Function(ChatSessionEntry entry, List<Map<String, dynamic>> messages)? onRestore;
+  final void Function(
+    ChatSessionEntry entry,
+    List<Map<String, dynamic>> messages,
+  )?
+  onRestore;
 
   @override
   State<_SessionHistoryDialog> createState() => _SessionHistoryDialogState();
@@ -1095,7 +1215,10 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
         children: [
           Icon(Icons.history, size: 18, color: Color(0xFF94A3B8)),
           SizedBox(width: 8),
-          Text('Session history', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16)),
+          Text(
+            'Session history',
+            style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16),
+          ),
         ],
       ),
       content: SizedBox(
@@ -1125,19 +1248,32 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                 final isCurrent = e.id == widget.currentPanelId;
                 return Container(
                   decoration: BoxDecoration(
-                    color: isCurrent ? const Color(0xFF1A3A2A) : const Color(0xFF0F1219),
+                    color:
+                        isCurrent
+                            ? const Color(0xFF1A3A2A)
+                            : const Color(0xFF0F1219),
                     borderRadius: BorderRadius.circular(10),
-                    border: isCurrent
-                        ? Border.all(color: const Color(0xFF34D399), width: 0.5)
-                        : null,
+                    border:
+                        isCurrent
+                            ? Border.all(
+                              color: const Color(0xFF34D399),
+                              width: 0.5,
+                            )
+                            : null,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.chat_bubble_outline,
                         size: 14,
-                        color: isCurrent ? const Color(0xFF34D399) : const Color(0xFF64748B),
+                        color:
+                            isCurrent
+                                ? const Color(0xFF34D399)
+                                : const Color(0xFF64748B),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1145,26 +1281,35 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              e.sessionName.isNotEmpty ? e.sessionName : 'Unnamed session',
+                              e.sessionName.isNotEmpty
+                                  ? e.sessionName
+                                  : 'Unnamed session',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,
-                                color: isCurrent
-                                    ? const Color(0xFF34D399)
-                                    : const Color(0xFFE2E8F0),
+                                color:
+                                    isCurrent
+                                        ? const Color(0xFF34D399)
+                                        : const Color(0xFFE2E8F0),
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${e.provider} • ${e.model} • ${e.messageCount} msgs',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF64748B),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       Text(
                         _formatDate(e.lastMessageAt ?? e.createdAt),
-                        style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: Color(0xFF475569),
+                        ),
                       ),
                       const SizedBox(width: 6),
                       // Restore button (not for current session)
@@ -1174,7 +1319,8 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                           color: const Color(0xFF60A5FA),
                           tooltip: 'Restore',
                           onTap: () async {
-                            final msgs = await ChatSessionHistory.instance.loadMessages(e.id);
+                            final msgs = await ChatSessionHistory.instance
+                                .loadMessages(e.id);
                             if (!context.mounted) return;
                             Navigator.pop(context);
                             widget.onRestore?.call(e, msgs);
@@ -1279,11 +1425,13 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     if (sessionName.isEmpty) {
       sessionName = 'chat-${DateTime.now().millisecondsSinceEpoch}';
     }
-    widget.onStart(ChatSessionConfig(
-      sessionName: sessionName,
-      workingDir: dir,
-      model: _selectedModel,
-    ));
+    widget.onStart(
+      ChatSessionConfig(
+        sessionName: sessionName,
+        workingDir: dir,
+        model: _selectedModel,
+      ),
+    );
   }
 
   @override
@@ -1312,7 +1460,10 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                 dropdownColor: const Color(0xFF1E293B),
                 style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
                 items: const [
-                  DropdownMenuItem(value: 'copilot', child: Text('GitHub Copilot')),
+                  DropdownMenuItem(
+                    value: 'copilot',
+                    child: Text('GitHub Copilot'),
+                  ),
                 ],
                 onChanged: (_) {},
               ),
@@ -1339,21 +1490,33 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                     }
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
                       color: const Color(0xFF1A2030),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.folder_outlined, size: 16, color: Color(0xFF34D399)),
+                        const Icon(
+                          Icons.folder_outlined,
+                          size: 16,
+                          color: Color(0xFF34D399),
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _dirCtrl.text.isEmpty ? 'Select folder…' : _dirCtrl.text.split('/').last,
+                            _dirCtrl.text.isEmpty
+                                ? 'Select folder…'
+                                : _dirCtrl.text.split('/').last,
                             style: TextStyle(
                               fontSize: 12,
-                              color: _dirCtrl.text.isEmpty ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                              color:
+                                  _dirCtrl.text.isEmpty
+                                      ? const Color(0xFF475569)
+                                      : const Color(0xFFE2E8F0),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1378,14 +1541,20 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
             decoration: InputDecoration(
               hintText: 'auto-generated if empty',
-              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+              hintStyle: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF475569),
+              ),
               filled: true,
               fillColor: const Color(0xFF1A2030),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
               isDense: true,
             ),
           ),
@@ -1409,25 +1578,31 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                 isExpanded: true,
                 dropdownColor: const Color(0xFF1E293B),
                 style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
-                items: widget.models.map((m) => DropdownMenuItem(
-                  value: m.id,
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(m.displayName)),
-                      Text(
-                        '${m.costMultiplier}x',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: m.costMultiplier == 0
-                              ? const Color(0xFF34D399)
-                              : m.costMultiplier > 3
-                                  ? const Color(0xFFF87171)
-                                  : const Color(0xFF94A3B8),
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                items:
+                    widget.models
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m.id,
+                            child: Row(
+                              children: [
+                                Expanded(child: Text(m.displayName)),
+                                Text(
+                                  '${m.costMultiplier}x',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color:
+                                        m.costMultiplier == 0
+                                            ? const Color(0xFF34D399)
+                                            : m.costMultiplier > 3
+                                            ? const Color(0xFFF87171)
+                                            : const Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
                 onChanged: (v) {
                   if (v != null) setState(() => _selectedModel = v);
                 },
@@ -1443,9 +1618,14 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
               backgroundColor: const Color(0xFF34D399),
               foregroundColor: const Color(0xFF0F172A),
               padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Start Chat', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text(
+              'Start Chat',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -1464,8 +1644,12 @@ class _UserBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Check if content is a file reference (from clipboard paste)
-    final isImageFile = content.startsWith('/') &&
-        RegExp(r'\.(png|jpg|jpeg|gif|webp|bmp)$', caseSensitive: false).hasMatch(content);
+    final isImageFile =
+        content.startsWith('/') &&
+        RegExp(
+          r'\.(png|jpg|jpeg|gif|webp|bmp)$',
+          caseSensitive: false,
+        ).hasMatch(content);
 
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
@@ -1486,30 +1670,41 @@ class _UserBubble extends StatelessWidget {
               bottomRight: Radius.circular(4),
             ),
           ),
-          child: isImageFile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
-                        child: Image.file(File(content), fit: BoxFit.contain),
+          child:
+              isImageFile
+                  ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxHeight: 200,
+                            maxWidth: 300,
+                          ),
+                          child: Image.file(File(content), fit: BoxFit.contain),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        content.split('/').last,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFFBFDBFE),
+                        ),
+                      ),
+                    ],
+                  )
+                  : SelectionArea(
+                    child: Text(
+                      content,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.white,
+                        height: 1.4,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      content.split('/').last,
-                      style: const TextStyle(fontSize: 10, color: Color(0xFFBFDBFE)),
-                    ),
-                  ],
-                )
-              : SelectionArea(
-                  child: Text(
-                    content,
-                    style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.4),
                   ),
-                ),
         ),
       ),
     );
@@ -1529,8 +1724,7 @@ class _AssistantBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Preprocess: replace <br> tags with newlines for markdown rendering
-    final processedContent = content
-        .replaceAll(RegExp(r'<br\s*/?>'), '\n');
+    final processedContent = content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
 
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
@@ -1544,25 +1738,42 @@ class _AssistantBubble extends StatelessWidget {
               child: Wrap(
                 spacing: 4,
                 runSpacing: 4,
-                children: toolCalls.map((tc) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0x15FBBF24),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0x30FBBF24)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.terminal_rounded, size: 10, color: Color(0xFFFBBF24)),
-                      const SizedBox(width: 4),
-                      Text(
-                        tc.toolName,
-                        style: const TextStyle(fontSize: 10, color: Color(0xFFFBBF24)),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                children:
+                    toolCalls
+                        .map(
+                          (tc) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0x15FBBF24),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0x30FBBF24),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.terminal_rounded,
+                                  size: 10,
+                                  color: Color(0xFFFBBF24),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  tc.toolName,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFFFBBF24),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
               ),
             ),
 
@@ -1587,8 +1798,16 @@ class _AssistantBubble extends StatelessWidget {
                   }
                 },
                 styleSheet: MarkdownStyleSheet(
-                  p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
-                  a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
+                  p: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFCBD5E1),
+                    height: 1.5,
+                  ),
+                  a: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF60A5FA),
+                    decoration: TextDecoration.underline,
+                  ),
                   code: const TextStyle(
                     fontSize: 11.5,
                     fontFamily: 'JetBrains Mono',
@@ -1601,10 +1820,25 @@ class _AssistantBubble extends StatelessWidget {
                     border: Border.all(color: const Color(0xFF1E293B)),
                   ),
                   codeblockPadding: const EdgeInsets.all(10),
-                  listBullet: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                  h1: const TextStyle(fontSize: 16, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
-                  h2: const TextStyle(fontSize: 14, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
-                  h3: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w500),
+                  listBullet: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                  ),
+                  h1: const TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFFE2E8F0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  h2: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFFE2E8F0),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  h3: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFE2E8F0),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -1646,14 +1880,16 @@ class _ToolResultCardState extends State<_ToolResultCard> {
 
   @override
   Widget build(BuildContext context) {
-    final statusIcon = widget.success == null
-        ? Icons.hourglass_top
-        : widget.success!
+    final statusIcon =
+        widget.success == null
+            ? Icons.hourglass_top
+            : widget.success!
             ? Icons.check_circle_outline
             : Icons.error_outline;
-    final statusColor = widget.success == null
-        ? const Color(0xFF94A3B8)
-        : widget.success!
+    final statusColor =
+        widget.success == null
+            ? const Color(0xFF94A3B8)
+            : widget.success!
             ? const Color(0xFF34D399)
             : const Color(0xFFF87171);
 
@@ -1675,7 +1911,11 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                 children: [
                   Icon(statusIcon, size: 14, color: statusColor),
                   const SizedBox(width: 6),
-                  Icon(Icons.build_outlined, size: 12, color: const Color(0xFF94A3B8)),
+                  Icon(
+                    Icons.build_outlined,
+                    size: 12,
+                    color: const Color(0xFF94A3B8),
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -1774,11 +2014,19 @@ class _AskUserCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.help_outline, size: 16, color: Color(0xFF818CF8)),
+                const Icon(
+                  Icons.help_outline,
+                  size: 16,
+                  color: Color(0xFF818CF8),
+                ),
                 const SizedBox(width: 6),
                 const Text(
                   'Agent asks:',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF818CF8)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF818CF8),
+                  ),
                 ),
               ],
             ),
@@ -1792,18 +2040,26 @@ class _AskUserCard extends StatelessWidget {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: choices.map((choice) => OutlinedButton(
-                  onPressed: () => onChoice(choice),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF818CF8),
-                    side: const BorderSide(color: Color(0xFF818CF8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    textStyle: const TextStyle(fontSize: 12),
-                  ),
-                  child: Text(choice),
-                )).toList(),
+                children:
+                    choices
+                        .map(
+                          (choice) => OutlinedButton(
+                            onPressed: () => onChoice(choice),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF818CF8),
+                              side: const BorderSide(color: Color(0xFF818CF8)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle: const TextStyle(fontSize: 12),
+                            ),
+                            child: Text(choice),
+                          ),
+                        )
+                        .toList(),
               ),
             ],
           ],
@@ -1849,7 +2105,10 @@ class _TypingIndicatorState extends State<_TypingIndicator>
           children: List.generate(3, (i) {
             final delay = i * 0.2;
             final t = ((_ctrl.value - delay) % 1.0).clamp(0.0, 1.0);
-            final opacity = (0.3 + 0.7 * (1.0 - (t * 2 - 1).abs())).clamp(0.3, 1.0);
+            final opacity = (0.3 + 0.7 * (1.0 - (t * 2 - 1).abs())).clamp(
+              0.3,
+              1.0,
+            );
             return Padding(
               padding: const EdgeInsets.only(right: 3),
               child: Opacity(

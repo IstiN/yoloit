@@ -116,524 +116,392 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         }
       },
       child: BlocBuilder<BoardCubit, BoardState>(
-      builder: (context, state) {
-        if (!state.isLoaded) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        builder: (context, state) {
+          if (!state.isLoaded) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final activeBoard = state.activeBoard;
-        if (activeBoard == null) {
-          return Center(
-            child: FilledButton.icon(
-              onPressed: () => context.read<BoardCubit>().createBoard(),
-              icon: const Icon(Icons.add),
-              label: const Text('Create board'),
-            ),
-          );
-        }
-
-        _syncViewport(activeBoard);
-
-        return Container(
-          color: colors.background,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _BoardToolbar(
-                board: activeBoard,
-                boards: state.boards,
-                onSelectedBoard:
-                    (id) => context.read<BoardCubit>().setActiveBoard(id),
-                onCreateBoard: () => _createBoard(context),
-                onRenameBoard: () => _renameBoard(context, activeBoard),
-                onDeleteBoard: () => _deleteBoard(context, activeBoard),
+          final activeBoard = state.activeBoard;
+          if (activeBoard == null) {
+            return Center(
+              child: FilledButton.icon(
+                onPressed: () => context.read<BoardCubit>().createBoard(),
+                icon: const Icon(Icons.add),
+                label: const Text('Create board'),
               ),
-              Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: colors.divider)),
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      _viewportSize = Size(
-                        constraints.maxWidth,
-                        constraints.maxHeight,
-                      );
-                      _scheduleAutoFitIfNeeded(activeBoard);
-                      _scheduleFocusedPanelVisibilityIfNeeded(activeBoard);
+            );
+          }
 
-                      return Stack(
-                        key: _viewportKey,
-                        children: [
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: CustomPaint(
-                                painter: _InfiniteBoardGridPainter(
-                                  transformCtrl: _transformController,
-                                  origin: _canvasOrigin,
-                                  minorColor: colors.divider.withAlpha(60),
-                                  majorColor: colors.divider.withAlpha(110),
+          _syncViewport(activeBoard);
+
+          return Container(
+            color: colors.background,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _BoardToolbar(
+                  board: activeBoard,
+                  boards: state.boards,
+                  onSelectedBoard:
+                      (id) => context.read<BoardCubit>().setActiveBoard(id),
+                  onCreateBoard: () => _createBoard(context),
+                  onRenameBoard: () => _renameBoard(context, activeBoard),
+                  onDeleteBoard: () => _deleteBoard(context, activeBoard),
+                ),
+                Expanded(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: colors.divider)),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        _viewportSize = Size(
+                          constraints.maxWidth,
+                          constraints.maxHeight,
+                        );
+                        _scheduleAutoFitIfNeeded(activeBoard);
+                        _scheduleFocusedPanelVisibilityIfNeeded(activeBoard);
+
+                        return Stack(
+                          key: _viewportKey,
+                          children: [
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: CustomPaint(
+                                  painter: _InfiniteBoardGridPainter(
+                                    transformCtrl: _transformController,
+                                    origin: _canvasOrigin,
+                                    minorColor: colors.divider.withAlpha(60),
+                                    majorColor: colors.divider.withAlpha(110),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          InteractiveViewer(
-                            constrained: false,
-                            minScale: 0.2,
-                            maxScale: 2.5,
-                            boundaryMargin: const EdgeInsets.all(
-                              _canvasExpansionChunk,
-                            ),
-                            // Disable pan only while actively drawing (drawPointer held)
-                            panEnabled:
-                                _activeTool != BoardToolId.draw ||
-                                _drawPointer == null,
-                            transformationController: _transformController,
-                            onInteractionStart: (_) {
-                              _isViewportInteracting = true;
-                              _boardDebugLog('interaction.start');
-                              _stopPanAnimation();
-                            },
-                            onInteractionEnd: (_) {
-                              _isViewportInteracting = false;
-                              _boardDebugLog('interaction.end');
-                              _persistViewport(context, activeBoard);
-                            },
-                            child: SizedBox(
-                              width: _canvasSize.width,
-                              height: _canvasSize.height,
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: CustomPaint(
-                                        painter: _BoardLinksPainter(
-                                          panels: activeBoard.panels,
-                                          links: activeBoard.links,
-                                          origin: _canvasOrigin,
+                            InteractiveViewer(
+                              constrained: false,
+                              minScale: 0.2,
+                              maxScale: 2.5,
+                              boundaryMargin: const EdgeInsets.all(
+                                _canvasExpansionChunk,
+                              ),
+                              // Disable pan only while actively drawing (drawPointer held)
+                              panEnabled:
+                                  _activeTool != BoardToolId.draw ||
+                                  _drawPointer == null,
+                              transformationController: _transformController,
+                              onInteractionStart: (_) {
+                                _isViewportInteracting = true;
+                                _boardDebugLog('interaction.start');
+                                _stopPanAnimation();
+                              },
+                              onInteractionEnd: (_) {
+                                _isViewportInteracting = false;
+                                _boardDebugLog('interaction.end');
+                                _persistViewport(context, activeBoard);
+                              },
+                              child: SizedBox(
+                                width: _canvasSize.width,
+                                height: _canvasSize.height,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: CustomPaint(
+                                          painter: _BoardLinksPainter(
+                                            panels: activeBoard.panels,
+                                            links: activeBoard.links,
+                                            origin: _canvasOrigin,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  // ── Link delete badges ─────────────────────
-                                  if (_activeTool == BoardToolId.select)
-                                    ..._buildLinkDeleteBadges(
-                                      context,
-                                      activeBoard,
-                                    ),
-                                  ...(() {
-                                    final visiblePanels =
-                                        activeBoard.panels
-                                            .where((panel) => !panel.hidden)
-                                            .toList()
-                                          ..sort(
-                                            (a, b) =>
-                                                a.zIndex.compareTo(b.zIndex),
-                                          );
-                                    return visiblePanels
-                                        .map(
-                                          (panel) => _BoardPanelCard(
-                                            key: ValueKey(panel.id),
-                                            panel: panel,
-                                            positionOffset: _canvasOrigin,
-                                            onTap:
-                                                () => context
-                                                    .read<BoardCubit>()
-                                                    .focusPanel(panel.id),
-                                            onMove:
-                                                (details) =>
-                                                    _movePanelWithEdgePan(
-                                                      context,
-                                                      panel.id,
-                                                      details,
-                                                    ),
-                                            onResize:
-                                                (details) =>
-                                                    _resizePanelWithEdgePan(
-                                                      context,
-                                                      panel,
-                                                      details,
-                                                    ),
-                                            onDragStart:
-                                                (details) =>
-                                                    _handlePanelDragStart(
-                                                      panel.id,
-                                                      details,
-                                                    ),
-                                            onDragEnd: _handlePanelDragEnd,
-                                            onDelete:
-                                                () => context
-                                                    .read<BoardCubit>()
-                                                    .removePanel(panel.id),
-                                            onEditColor:
-                                                () => _showPanelColorDialog(
-                                                  context,
-                                                  panel,
-                                                ),
-                                            onEditNote:
-                                                panel.type ==
-                                                        'board.note.markdown'
-                                                    ? () =>
-                                                        _showMarkdownNoteDialog(
-                                                          context,
-                                                          panel: panel,
-                                                        )
-                                                    : null,
-                                            onUpdateState: (newState) {
-                                              context.read<BoardCubit>().updatePanel(
-                                                panel.id,
-                                                (p) => p.copyWith(state: newState),
-                                              );
-                                            },
-                                            connectMode:
-                                                _activeTool ==
-                                                BoardToolId.connect,
-                                            connectSourceId: _connectSourceId,
-                                            onConnectTap:
-                                                _activeTool ==
-                                                        BoardToolId.connect
-                                                    ? () =>
-                                                        _handleConnectTap(
-                                                          context,
-                                                          activeBoard,
-                                                          panel.id,
-                                                        )
-                                                    : null,
-                                          ),
-                                        )
-                                        .toList();
-                                  })(),
-                                  // ── Drawing layer (above panels visually;
-                                  //    only intercepts gestures on actual stroke
-                                  //    pixels via path-based hitTest) ──────────
-                                  ...activeBoard.drawings
-                                      .where((d) => !d.hidden)
-                                      .map(
-                                        (drawing) => Positioned(
-                                          key: ValueKey(drawing.id),
-                                          left: drawing.position.dx +
-                                              _canvasOrigin.dx,
-                                          top: drawing.position.dy +
-                                              _canvasOrigin.dy,
-                                          width: drawing.size.width,
-                                          height: drawing.size.height,
-                                          child: IgnorePointer(
-                                            ignoring:
-                                                _activeTool ==
-                                                BoardToolId.connect,
-                                            child: _BoardDrawingWidget(
-                                              drawing: drawing,
-                                              isSelectMode:
-                                                  _activeTool ==
-                                                  BoardToolId.select,
-                                              onMove:
-                                                  (newPos) => context
+                                    // ── Link delete badges ─────────────────────
+                                    if (_activeTool == BoardToolId.select)
+                                      ..._buildLinkDeleteBadges(
+                                        context,
+                                        activeBoard,
+                                      ),
+                                    ...(() {
+                                      final visiblePanels =
+                                          activeBoard.panels
+                                              .where((panel) => !panel.hidden)
+                                              .toList()
+                                            ..sort(
+                                              (a, b) =>
+                                                  a.zIndex.compareTo(b.zIndex),
+                                            );
+                                      return visiblePanels
+                                          .map(
+                                            (panel) => _BoardPanelCard(
+                                              key: ValueKey(panel.id),
+                                              panel: panel,
+                                              positionOffset: _canvasOrigin,
+                                              onTap:
+                                                  () => context
                                                       .read<BoardCubit>()
-                                                      .moveDrawing(
-                                                        drawing.id,
-                                                        newPos,
+                                                      .focusPanel(panel.id),
+                                              onMove:
+                                                  (details) =>
+                                                      _movePanelWithEdgePan(
+                                                        context,
+                                                        panel.id,
+                                                        details,
                                                       ),
+                                              onResize:
+                                                  (details) =>
+                                                      _resizePanelWithEdgePan(
+                                                        context,
+                                                        panel,
+                                                        details,
+                                                      ),
+                                              onDragStart:
+                                                  (details) =>
+                                                      _handlePanelDragStart(
+                                                        panel.id,
+                                                        details,
+                                                      ),
+                                              onDragEnd: _handlePanelDragEnd,
                                               onDelete:
                                                   () => context
                                                       .read<BoardCubit>()
-                                                      .removeDrawing(
-                                                        drawing.id,
+                                                      .removePanel(panel.id),
+                                              onEditColor:
+                                                  () => _showPanelColorDialog(
+                                                    context,
+                                                    panel,
+                                                  ),
+                                              onEditNote:
+                                                  panel.type ==
+                                                          'board.note.markdown'
+                                                      ? () =>
+                                                          _showMarkdownNoteDialog(
+                                                            context,
+                                                            panel: panel,
+                                                          )
+                                                      : null,
+                                              onUpdateState: (newState) {
+                                                context
+                                                    .read<BoardCubit>()
+                                                    .updatePanel(
+                                                      panel.id,
+                                                      (p) => p.copyWith(
+                                                        state: newState,
                                                       ),
+                                                    );
+                                              },
+                                              connectMode:
+                                                  _activeTool ==
+                                                  BoardToolId.connect,
+                                              connectSourceId: _connectSourceId,
+                                              onConnectTap:
+                                                  _activeTool ==
+                                                          BoardToolId.connect
+                                                      ? () => _handleConnectTap(
+                                                        context,
+                                                        activeBoard,
+                                                        panel.id,
+                                                      )
+                                                      : null,
+                                            ),
+                                          )
+                                          .toList();
+                                    })(),
+                                    // ── Drawing layer (above panels visually;
+                                    //    only intercepts gestures on actual stroke
+                                    //    pixels via path-based hitTest) ──────────
+                                    ...activeBoard.drawings
+                                        .where((d) => !d.hidden)
+                                        .map(
+                                          (drawing) => Positioned(
+                                            key: ValueKey(drawing.id),
+                                            left:
+                                                drawing.position.dx +
+                                                _canvasOrigin.dx,
+                                            top:
+                                                drawing.position.dy +
+                                                _canvasOrigin.dy,
+                                            width: drawing.size.width,
+                                            height: drawing.size.height,
+                                            child: IgnorePointer(
+                                              ignoring:
+                                                  _activeTool ==
+                                                  BoardToolId.connect,
+                                              child: _BoardDrawingWidget(
+                                                drawing: drawing,
+                                                isSelectMode:
+                                                    _activeTool ==
+                                                    BoardToolId.select,
+                                                onMove:
+                                                    (newPos) => context
+                                                        .read<BoardCubit>()
+                                                        .moveDrawing(
+                                                          drawing.id,
+                                                          newPos,
+                                                        ),
+                                                onDelete:
+                                                    () => context
+                                                        .read<BoardCubit>()
+                                                        .removeDrawing(
+                                                          drawing.id,
+                                                        ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    // ── Active stroke preview ─────────────────
+                                    if (_activeStroke.isNotEmpty)
+                                      Positioned.fill(
+                                        child: IgnorePointer(
+                                          child: CustomPaint(
+                                            painter: _ActiveStrokePainter(
+                                              points: _activeStroke,
+                                              origin: _canvasOrigin,
+                                              color: _drawSettings.strokeColor,
+                                              strokeWidth:
+                                                  _drawSettings.strokeWidth,
                                             ),
                                           ),
                                         ),
                                       ),
-                                  // ── Active stroke preview ─────────────────
-                                  if (_activeStroke.isNotEmpty)
-                                    Positioned.fill(
-                                      child: IgnorePointer(
-                                        child: CustomPaint(
-                                          painter: _ActiveStrokePainter(
-                                            points: _activeStroke,
-                                            origin: _canvasOrigin,
-                                            color: _drawSettings.strokeColor,
-                                            strokeWidth:
-                                                _drawSettings.strokeWidth,
+                                    // ── Connect preview line ──────────────────
+                                    if (_activeTool == BoardToolId.connect &&
+                                        _connectSourceId != null &&
+                                        _connectPreviewPointer != null)
+                                      Positioned.fill(
+                                        child: IgnorePointer(
+                                          child: CustomPaint(
+                                            painter: _ConnectPreviewPainter(
+                                              panels: activeBoard.panels,
+                                              sourceId: _connectSourceId!,
+                                              targetPoint:
+                                                  _connectPreviewPointer!,
+                                              origin: _canvasOrigin,
+                                              color: _connectSettings.color,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  // ── Connect preview line ──────────────────
-                                  if (_activeTool == BoardToolId.connect &&
-                                      _connectSourceId != null &&
-                                      _connectPreviewPointer != null)
-                                    Positioned.fill(
-                                      child: IgnorePointer(
-                                        child: CustomPaint(
-                                          painter: _ConnectPreviewPainter(
-                                            panels: activeBoard.panels,
-                                            sourceId: _connectSourceId!,
-                                            targetPoint:
-                                                _connectPreviewPointer!,
-                                            origin: _canvasOrigin,
-                                            color: _connectSettings.color,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // ── Draw gesture capture overlay ─────────────────
-                          // Uses Listener with translucent so InteractiveViewer
-                          // still receives trackpad scroll / pinch-to-zoom events.
-                          if (_activeTool == BoardToolId.draw)
-                            Positioned.fill(
-                              child: Listener(
-                                behavior: HitTestBehavior.translucent,
-                                onPointerDown: (e) {
-                                  if (_drawPointer != null) return;
-                                  final pt = _boardPointFromGlobal(e.position);
-                                  if (pt == null) return;
-                                  setState(() {
-                                    _drawPointer = e.pointer;
-                                    _activeStroke
-                                      ..clear()
-                                      ..add(pt);
-                                  });
-                                },
-                                onPointerMove: (e) {
-                                  if (e.pointer != _drawPointer) return;
-                                  final pt = _boardPointFromGlobal(e.position);
-                                  if (pt == null) return;
-                                  setState(() => _activeStroke.add(pt));
-                                },
-                                onPointerUp: (e) {
-                                  if (e.pointer != _drawPointer) return;
-                                  _drawPointer = null;
-                                  _finishDrawStroke(context);
-                                },
-                                onPointerCancel: (e) {
-                                  if (e.pointer != _drawPointer) return;
-                                  _drawPointer = null;
-                                  setState(() => _activeStroke.clear());
-                                },
-                              ),
-                            ),
-                          // ── Connect tool pointer tracking ─────────────────
-                          // translucent so panel-tap GestureDetectors still fire.
-                          if (_activeTool == BoardToolId.connect &&
-                              _connectSourceId != null)
-                            Positioned.fill(
-                              child: Listener(
-                                behavior: HitTestBehavior.translucent,
-                                onPointerHover: (e) {
-                                  final pt = _boardPointFromGlobal(e.position);
-                                  if (pt == null) return;
-                                  setState(
-                                    () => _connectPreviewPointer = pt,
-                                  );
-                                },
-                                child: const SizedBox.expand(),
-                              ),
-                            ),
-                          if (activeBoard.panels.isEmpty)
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                ignoring: false,
-                                child: Center(
-                                  child: Container(
-                                    width: 420,
-                                    padding: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(
-                                      color: colors.surface,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: colors.divider),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withAlpha(45),
-                                          blurRadius: 18,
-                                          offset: const Offset(0, 10),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.dashboard_customize_outlined,
-                                          size: 32,
-                                          color: AppColors.textMuted,
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          'Board foundation is ready',
-                                          style: const TextStyle(
-                                            color: AppColors.textPrimary,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        const Text(
-                                          'Create named boards and start with markdown notes. '
-                                          'The first panel will open in a free slot, and links will support static and dynamic lines/arrows.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: AppColors.textMuted,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        FilledButton.icon(
-                                          onPressed:
-                                              () => _showMarkdownNoteDialog(
-                                                context,
-                                              ),
-                                          icon: const Icon(
-                                            Icons.note_add_outlined,
-                                          ),
-                                          label: const Text('Add note'),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Positioned(
-                            top: 12,
-                            right: 12,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _OverlayIconButton(
-                                      icon: Icons.fit_screen_outlined,
-                                      tooltip: 'Fit board to content',
-                                      onTap:
-                                          () => _fitBoardPanels(
-                                            activeBoard,
-                                            persist: true,
-                                          ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    _OverlayIconButton(
-                                      icon:
-                                          _showMinimap
-                                              ? Icons.map
-                                              : Icons.map_outlined,
-                                      tooltip:
-                                          _showMinimap
-                                              ? 'Hide minimap'
-                                              : 'Show minimap',
-                                      active: _showMinimap,
-                                      onTap:
-                                          () => setState(
-                                            () => _showMinimap = !_showMinimap,
-                                          ),
-                                    ),
                                   ],
                                 ),
-                                if (_showMinimap) ...[
-                                  const SizedBox(height: 6),
-                                  ValueListenableBuilder<int>(
-                                    valueListenable: ChatPanelWidget.processingChangeNotifier,
-                                    builder: (context, _, __) => _BoardMiniMap(
-                                      panels: activeBoard.panels,
-                                      processingPanelIds: ChatPanelWidget.processingNotifiers.entries
-                                          .where((e) => e.value.value)
-                                          .map((e) => e.key)
-                                          .toSet(),
-                                      transformCtrl: _transformController,
-                                      viewportSize:
-                                          _viewportSize ?? const Size(1, 1),
-                                      origin: _canvasOrigin,
-                                      onPanTo:
-                                          (center) => _centerViewportOn(
-                                            activeBoard,
-                                            center,
-                                            persist: true,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          // ── Quick Tools Panel (left side) ──────────────────
-                          Positioned(
-                            left: 12,
-                            top: 12,
-                            child: _BoardToolsPanel(
-                              visible: _showToolsPanel,
-                              activeTool: _activeTool,
-                              drawSettings: _drawSettings,
-                              connectSettings: _connectSettings,
-                              onToolChanged: (tool) => setState(() {
-                                _activeTool = tool;
-                                _activeStroke.clear();
-                                _connectSourceId = null;
-                                _connectPreviewPointer = null;
-                              }),
-                              onDrawSettingsChanged: (s) =>
-                                  setState(() => _drawSettings = s),
-                              onConnectSettingsChanged: (s) =>
-                                  setState(() => _connectSettings = s),
-                              onToggle: () => setState(
-                                () => _showToolsPanel = !_showToolsPanel,
                               ),
-                              onAddNote: () => _showMarkdownNoteDialog(context),
-                              onAddChat: () => _addChatPanel(context),
                             ),
-                          ),
-                          // ── Cancel connection button ───────────────────────
-                          if (_activeTool == BoardToolId.connect &&
-                              _connectSourceId != null)
-                            Positioned(
-                              bottom: 24,
-                              left: 0,
-                              right: 0,
-                              child: Center(
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(20),
-                                    onTap: () => setState(() {
-                                      _connectSourceId = null;
-                                      _connectPreviewPointer = null;
-                                    }),
+                            // ── Draw gesture capture overlay ─────────────────
+                            // Uses Listener with translucent so InteractiveViewer
+                            // still receives trackpad scroll / pinch-to-zoom events.
+                            if (_activeTool == BoardToolId.draw)
+                              Positioned.fill(
+                                child: Listener(
+                                  behavior: HitTestBehavior.translucent,
+                                  onPointerDown: (e) {
+                                    if (_drawPointer != null) return;
+                                    final pt = _boardPointFromGlobal(
+                                      e.position,
+                                    );
+                                    if (pt == null) return;
+                                    setState(() {
+                                      _drawPointer = e.pointer;
+                                      _activeStroke
+                                        ..clear()
+                                        ..add(pt);
+                                    });
+                                  },
+                                  onPointerMove: (e) {
+                                    if (e.pointer != _drawPointer) return;
+                                    final pt = _boardPointFromGlobal(
+                                      e.position,
+                                    );
+                                    if (pt == null) return;
+                                    setState(() => _activeStroke.add(pt));
+                                  },
+                                  onPointerUp: (e) {
+                                    if (e.pointer != _drawPointer) return;
+                                    _drawPointer = null;
+                                    _finishDrawStroke(context);
+                                  },
+                                  onPointerCancel: (e) {
+                                    if (e.pointer != _drawPointer) return;
+                                    _drawPointer = null;
+                                    setState(() => _activeStroke.clear());
+                                  },
+                                ),
+                              ),
+                            // ── Connect tool pointer tracking ─────────────────
+                            // translucent so panel-tap GestureDetectors still fire.
+                            if (_activeTool == BoardToolId.connect &&
+                                _connectSourceId != null)
+                              Positioned.fill(
+                                child: Listener(
+                                  behavior: HitTestBehavior.translucent,
+                                  onPointerHover: (e) {
+                                    final pt = _boardPointFromGlobal(
+                                      e.position,
+                                    );
+                                    if (pt == null) return;
+                                    setState(() => _connectPreviewPointer = pt);
+                                  },
+                                  child: const SizedBox.expand(),
+                                ),
+                              ),
+                            if (activeBoard.panels.isEmpty)
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  ignoring: false,
+                                  child: Center(
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
+                                      width: 420,
+                                      padding: const EdgeInsets.all(20),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF1E1E2E)
-                                            .withAlpha(220),
-                                        borderRadius:
-                                            BorderRadius.circular(20),
+                                        color: colors.surface,
+                                        borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
-                                          color: Colors.redAccent
-                                              .withAlpha(160),
+                                          color: colors.divider,
                                         ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withAlpha(45),
+                                            blurRadius: 18,
+                                            offset: const Offset(0, 10),
+                                          ),
+                                        ],
                                       ),
-                                      child: Row(
+                                      child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(
-                                            Icons.close,
-                                            size: 14,
-                                            color: Colors.redAccent
-                                                .withAlpha(200),
+                                          const Icon(
+                                            Icons.dashboard_customize_outlined,
+                                            size: 32,
+                                            color: AppColors.textMuted,
                                           ),
-                                          const SizedBox(width: 6),
+                                          const SizedBox(height: 12),
                                           Text(
-                                            'Cancel connection  (Esc)',
-                                            style: TextStyle(
-                                              color: Colors.redAccent
-                                                  .withAlpha(200),
-                                              fontSize: 12,
+                                            'Board foundation is ready',
+                                            style: const TextStyle(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 16,
                                             ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          const Text(
+                                            'Create named boards and start with markdown notes. '
+                                            'The first panel will open in a free slot, and links will support static and dynamic lines/arrows.',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: AppColors.textMuted,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          FilledButton.icon(
+                                            onPressed:
+                                                () => _showMarkdownNoteDialog(
+                                                  context,
+                                                ),
+                                            icon: const Icon(
+                                              Icons.note_add_outlined,
+                                            ),
+                                            label: const Text('Add note'),
                                           ),
                                         ],
                                       ),
@@ -641,18 +509,177 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
+                            Positioned(
+                              top: 12,
+                              right: 12,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _OverlayIconButton(
+                                        icon: Icons.fit_screen_outlined,
+                                        tooltip: 'Fit board to content',
+                                        onTap:
+                                            () => _fitBoardPanels(
+                                              activeBoard,
+                                              persist: true,
+                                            ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      _OverlayIconButton(
+                                        icon:
+                                            _showMinimap
+                                                ? Icons.map
+                                                : Icons.map_outlined,
+                                        tooltip:
+                                            _showMinimap
+                                                ? 'Hide minimap'
+                                                : 'Show minimap',
+                                        active: _showMinimap,
+                                        onTap:
+                                            () => setState(
+                                              () =>
+                                                  _showMinimap = !_showMinimap,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_showMinimap) ...[
+                                    const SizedBox(height: 6),
+                                    ValueListenableBuilder<int>(
+                                      valueListenable:
+                                          ChatPanelWidget
+                                              .processingChangeNotifier,
+                                      builder:
+                                          (context, _, __) => _BoardMiniMap(
+                                            panels: activeBoard.panels,
+                                            processingPanelIds:
+                                                ChatPanelWidget
+                                                    .processingNotifiers
+                                                    .entries
+                                                    .where((e) => e.value.value)
+                                                    .map((e) => e.key)
+                                                    .toSet(),
+                                            transformCtrl: _transformController,
+                                            viewportSize:
+                                                _viewportSize ??
+                                                const Size(1, 1),
+                                            origin: _canvasOrigin,
+                                            onPanTo:
+                                                (center) => _centerViewportOn(
+                                                  activeBoard,
+                                                  center,
+                                                  persist: true,
+                                                ),
+                                          ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                        ],
-                      );
-                    },
+                            // ── Quick Tools Panel (left side) ──────────────────
+                            Positioned(
+                              left: 12,
+                              top: 12,
+                              child: _BoardToolsPanel(
+                                visible: _showToolsPanel,
+                                activeTool: _activeTool,
+                                drawSettings: _drawSettings,
+                                connectSettings: _connectSettings,
+                                onToolChanged:
+                                    (tool) => setState(() {
+                                      _activeTool = tool;
+                                      _activeStroke.clear();
+                                      _connectSourceId = null;
+                                      _connectPreviewPointer = null;
+                                    }),
+                                onDrawSettingsChanged:
+                                    (s) => setState(() => _drawSettings = s),
+                                onConnectSettingsChanged:
+                                    (s) => setState(() => _connectSettings = s),
+                                onToggle:
+                                    () => setState(
+                                      () => _showToolsPanel = !_showToolsPanel,
+                                    ),
+                                onAddNote:
+                                    () => _showMarkdownNoteDialog(context),
+                                onAddChat: () => _addChatPanel(context),
+                              ),
+                            ),
+                            // ── Cancel connection button ───────────────────────
+                            if (_activeTool == BoardToolId.connect &&
+                                _connectSourceId != null)
+                              Positioned(
+                                bottom: 24,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(20),
+                                      onTap:
+                                          () => setState(() {
+                                            _connectSourceId = null;
+                                            _connectPreviewPointer = null;
+                                          }),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0xFF1E1E2E,
+                                          ).withAlpha(220),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.redAccent.withAlpha(
+                                              160,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.close,
+                                              size: 14,
+                                              color: Colors.redAccent.withAlpha(
+                                                200,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Cancel connection  (Esc)',
+                                              style: TextStyle(
+                                                color: Colors.redAccent
+                                                    .withAlpha(200),
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    ), // BlocBuilder
+              ],
+            ),
+          );
+        },
+      ), // BlocBuilder
     ); // KeyboardListener
   }
 
@@ -1139,8 +1166,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       if (from == null || to == null || from.hidden || to.hidden) continue;
 
       // Use edge-to-edge points (same as painter) for accurate midpoint
-      final fromRect = from.bounds.rect.translate(_canvasOrigin.dx, _canvasOrigin.dy);
-      final toRect = to.bounds.rect.translate(_canvasOrigin.dx, _canvasOrigin.dy);
+      final fromRect = from.bounds.rect.translate(
+        _canvasOrigin.dx,
+        _canvasOrigin.dy,
+      );
+      final toRect = to.bounds.rect.translate(
+        _canvasOrigin.dx,
+        _canvasOrigin.dy,
+      );
       final start = _BoardLinksPainter.edgePointToward(fromRect, toRect.center);
       final end = _BoardLinksPainter.edgePointToward(toRect, fromRect.center);
       final mid = _linkMidpoint(start, end, link.geometry);
@@ -1158,9 +1191,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           height: hitR * 2,
           child: MouseRegion(
             onEnter: (_) => setState(() => _hoveredLinkId = link.id),
-            onExit: (_) => setState(() {
-              if (_hoveredLinkId == link.id) _hoveredLinkId = null;
-            }),
+            onExit:
+                (_) => setState(() {
+                  if (_hoveredLinkId == link.id) _hoveredLinkId = null;
+                }),
             child: Center(
               child: GestureDetector(
                 onTap: () => context.read<BoardCubit>().removeLink(link.id),
@@ -1169,20 +1203,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                   width: isHovered ? badgeR * 2 : 8,
                   height: isHovered ? badgeR * 2 : 8,
                   decoration: BoxDecoration(
-                    color: isHovered
-                        ? const Color(0xCCF87171)
-                        : linkColor.withAlpha(100),
+                    color:
+                        isHovered
+                            ? const Color(0xCCF87171)
+                            : linkColor.withAlpha(100),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isHovered
-                          ? Colors.white.withAlpha(80)
-                          : linkColor.withAlpha(50),
+                      color:
+                          isHovered
+                              ? Colors.white.withAlpha(80)
+                              : linkColor.withAlpha(50),
                       width: 1,
                     ),
                   ),
-                  child: isHovered
-                      ? const Icon(Icons.close, size: 12, color: Colors.white)
-                      : null,
+                  child:
+                      isHovered
+                          ? const Icon(
+                            Icons.close,
+                            size: 12,
+                            color: Colors.white,
+                          )
+                          : null,
                 ),
               ),
             ),
@@ -1291,8 +1332,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ) async {
     return showDialog<_LinkStyleChoice>(
       context: context,
-      builder:
-          (ctx) => _LinkStyleDialog(initialSettings: _connectSettings),
+      builder: (ctx) => _LinkStyleDialog(initialSettings: _connectSettings),
     );
   }
 
@@ -1964,245 +2004,252 @@ class _BoardPanelCard extends StatelessWidget {
         panelId: panel.id,
         borderRadius: BorderRadius.circular(16),
         child: GestureDetector(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: panelFill,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color:
-                  panel.id ==
-                          context.select<BoardCubit, String?>(
-                            (cubit) =>
-                                cubit
-                                    .state
-                                    .activeBoard
-                                    ?.viewport
-                                    .focusedPanelId,
-                          )
-                      ? colors.primary
-                      : borderColor,
-              width:
-                  panel.id ==
-                          context.select<BoardCubit, String?>(
-                            (cubit) =>
-                                cubit
-                                    .state
-                                    .activeBoard
-                                    ?.viewport
-                                    .focusedPanelId,
-                          )
-                      ? 1.5
-                      : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(35),
-                blurRadius: 22,
-                offset: const Offset(0, 8),
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: panelFill,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color:
+                    panel.id ==
+                            context.select<BoardCubit, String?>(
+                              (cubit) =>
+                                  cubit
+                                      .state
+                                      .activeBoard
+                                      ?.viewport
+                                      .focusedPanelId,
+                            )
+                        ? colors.primary
+                        : borderColor,
+                width:
+                    panel.id ==
+                            context.select<BoardCubit, String?>(
+                              (cubit) =>
+                                  cubit
+                                      .state
+                                      .activeBoard
+                                      ?.viewport
+                                      .focusedPanelId,
+                            )
+                        ? 1.5
+                        : 1,
               ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  GestureDetector(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(35),
+                  blurRadius: 22,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: (details) {
+                        onTap();
+                        onDragStart(details);
+                      },
+                      onPanUpdate:
+                          panel.locked ? null : (details) => onMove(details),
+                      onPanEnd: (_) => onDragEnd(),
+                      onPanCancel: onDragEnd,
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: panelHeaderFill,
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(16),
+                          ),
+                          border: Border(
+                            bottom: BorderSide(color: colors.divider),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              BoardPluginRegistry.instance
+                                      .pluginFor(panel.type)
+                                      ?.icon ??
+                                  Icons.dashboard_customize_outlined,
+                              size: 16,
+                              color:
+                                  panel.type == ChatPanelPlugin.kTypeId
+                                      ? const Color(0xFF34D399)
+                                      : AppColors.textMuted,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                panel.title,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            if (panel.type != ChatPanelPlugin.kTypeId) ...[
+                              GestureDetector(
+                                onTap: onEditColor,
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: accent ?? const Color(0xFF64748B),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withAlpha(100),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              if (onEditNote != null)
+                                SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: IconButton(
+                                    tooltip: 'Edit note',
+                                    onPressed: onEditNote,
+                                    icon: const Icon(
+                                      Icons.edit_outlined,
+                                      size: 16,
+                                    ),
+                                    splashRadius: 14,
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ),
+                            ],
+                            if (panel.type == ChatPanelPlugin.kTypeId)
+                              _ChatHeaderMenu(
+                                panel: panel,
+                                onEditColor: onEditColor,
+                                onUpdateState: onUpdateState,
+                              ),
+                            SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: IconButton(
+                                tooltip: 'Remove panel',
+                                onPressed: onDelete,
+                                icon: const Icon(Icons.close, size: 16),
+                                splashRadius: 14,
+                                padding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding:
+                            panel.type == ChatPanelPlugin.kTypeId
+                                ? EdgeInsets.zero
+                                : const EdgeInsets.all(12),
+                        child: _buildPanelContent(context, panel),
+                      ),
+                    ),
+                  ],
+                ),
+                Positioned(
+                  right: 4,
+                  bottom: 2,
+                  child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onPanStart: (details) {
                       onTap();
                       onDragStart(details);
                     },
-                    onPanUpdate:
-                        panel.locked ? null : (details) => onMove(details),
+                    onPanUpdate: onResize,
                     onPanEnd: (_) => onDragEnd(),
                     onPanCancel: onDragEnd,
-                    child: Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: panelHeaderFill,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                        border: Border(
-                          bottom: BorderSide(color: colors.divider),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            BoardPluginRegistry.instance.pluginFor(panel.type)?.icon
-                                ?? Icons.dashboard_customize_outlined,
-                            size: 16,
-                            color: panel.type == ChatPanelPlugin.kTypeId
-                                ? const Color(0xFF34D399)
-                                : AppColors.textMuted,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              panel.title,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                          if (panel.type != ChatPanelPlugin.kTypeId) ...[
-                            GestureDetector(
-                              onTap: onEditColor,
-                              child: Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: accent ?? const Color(0xFF64748B),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withAlpha(100),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            if (onEditNote != null)
-                              SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: IconButton(
-                                  tooltip: 'Edit note',
-                                  onPressed: onEditNote,
-                                  icon: const Icon(Icons.edit_outlined, size: 16),
-                                  splashRadius: 14,
-                                  padding: EdgeInsets.zero,
-                                ),
-                              ),
-                          ],
-                          if (panel.type == ChatPanelPlugin.kTypeId)
-                            _ChatHeaderMenu(
-                              panel: panel,
-                              onEditColor: onEditColor,
-                              onUpdateState: onUpdateState,
-                            ),
-                          SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: IconButton(
-                              tooltip: 'Remove panel',
-                              onPressed: onDelete,
-                              icon: const Icon(Icons.close, size: 16),
-                              splashRadius: 14,
-                              padding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: const Icon(
+                      Icons.drag_handle,
+                      size: 14,
+                      color: AppColors.textMuted,
                     ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: panel.type == ChatPanelPlugin.kTypeId
-                          ? EdgeInsets.zero
-                          : const EdgeInsets.all(12),
-                      child: _buildPanelContent(context, panel),
-                    ),
-                  ),
-                ],
-              ),
-              Positioned(
-                right: 4,
-                bottom: 2,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanStart: (details) {
-                    onTap();
-                    onDragStart(details);
-                  },
-                  onPanUpdate: onResize,
-                  onPanEnd: (_) => onDragEnd(),
-                  onPanCancel: onDragEnd,
-                  child: const Icon(
-                    Icons.drag_handle,
-                    size: 14,
-                    color: AppColors.textMuted,
                   ),
                 ),
-              ),
-              // ── Connect mode overlay ──────────────────────────────────────
-              if (connectMode)
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: onConnectTap,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
+                // ── Connect mode overlay ──────────────────────────────────────
+                if (connectMode)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: onConnectTap,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color:
+                                connectSourceId == panel.id
+                                    ? const Color(0xFF34D399)
+                                    : const Color(0xFF34D399).withAlpha(100),
+                            width: connectSourceId == panel.id ? 2.5 : 1.5,
+                          ),
                           color:
                               connectSourceId == panel.id
-                                  ? const Color(0xFF34D399)
-                                  : const Color(0xFF34D399).withAlpha(100),
-                          width: connectSourceId == panel.id ? 2.5 : 1.5,
+                                  ? const Color(0x1534D399)
+                                  : Colors.transparent,
                         ),
-                        color:
-                            connectSourceId == panel.id
-                                ? const Color(0x1534D399)
-                                : Colors.transparent,
+                        child:
+                            connectSourceId == null
+                                ? Center(
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0x6634D399),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.add_link,
+                                      size: 18,
+                                      color: Color(0xFF34D399),
+                                    ),
+                                  ),
+                                )
+                                : connectSourceId == panel.id
+                                ? const Center(
+                                  child: Text(
+                                    'Source\n(tap to cancel)',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Color(0xFF34D399),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                )
+                                : Center(
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0x6634D399),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.call_made,
+                                      size: 18,
+                                      color: Color(0xFF34D399),
+                                    ),
+                                  ),
+                                ),
                       ),
-                      child:
-                          connectSourceId == null
-                              ? Center(
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0x6634D399),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.add_link,
-                                    size: 18,
-                                    color: Color(0xFF34D399),
-                                  ),
-                                ),
-                              )
-                              : connectSourceId == panel.id
-                              ? const Center(
-                                child: Text(
-                                  'Source\n(tap to cancel)',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Color(0xFF34D399),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              )
-                              : Center(
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0x6634D399),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.call_made,
-                                    size: 18,
-                                    color: Color(0xFF34D399),
-                                  ),
-                                ),
-                              ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -2214,7 +2261,8 @@ class _BoardPanelCard extends StatelessWidget {
         context,
         panel,
         BoardPanelRenderContext(
-          isSelected: panel.id ==
+          isSelected:
+              panel.id ==
               context.select<BoardCubit, String?>(
                 (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
               ),
@@ -2388,10 +2436,17 @@ class _BoardLinksPainter extends CustomPainter {
     }
   }
 
-  static Path buildLinkPath(Offset start, Offset end, BoardLinkGeometry geometry) =>
-      _buildLinkPath(start, end, geometry);
+  static Path buildLinkPath(
+    Offset start,
+    Offset end,
+    BoardLinkGeometry geometry,
+  ) => _buildLinkPath(start, end, geometry);
 
-  static Path _buildLinkPath(Offset start, Offset end, BoardLinkGeometry geometry) {
+  static Path _buildLinkPath(
+    Offset start,
+    Offset end,
+    BoardLinkGeometry geometry,
+  ) {
     switch (geometry) {
       case BoardLinkGeometry.straight:
         return Path()
@@ -2465,12 +2520,11 @@ class _BoardLinksPainter extends CustomPainter {
     if (tangent == null) return;
 
     // Compute angle from sample point toward the tip
-    final tip = metric.getTangentForOffset(metric.length)?.position ??
-        tangent.position;
+    final tip =
+        metric.getTangentForOffset(metric.length)?.position ?? tangent.position;
     final dir = tip - tangent.position;
-    final angle = dir.distance > 0.5
-        ? math.atan2(dir.dy, dir.dx)
-        : tangent.angle;
+    final angle =
+        dir.distance > 0.5 ? math.atan2(dir.dy, dir.dx) : tangent.angle;
 
     const arrowSize = 13.0;
     final p1 = Offset(
@@ -2647,9 +2701,11 @@ class _BoardMiniMapPainter extends CustomPainter {
 
       canvas.drawRRect(
         rrect,
-        Paint()..color = isProcessing
-            ? const Color(0xFF34D399)
-            : (panel.color ?? _colorForPanelType(panel.type)),
+        Paint()
+          ..color =
+              isProcessing
+                  ? const Color(0xFF34D399)
+                  : (panel.color ?? _colorForPanelType(panel.type)),
       );
     }
 
@@ -2743,8 +2799,7 @@ class _BoardToolsPanel extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (final tool in kBoardTools) ...[
-                  if (kBoardTools.indexOf(tool) > 0)
-                    const SizedBox(height: 4),
+                  if (kBoardTools.indexOf(tool) > 0) const SizedBox(height: 4),
                   Tooltip(
                     message:
                         tool.shortcutHint != null
@@ -2834,69 +2889,100 @@ class _BoardToolsPanel extends StatelessWidget {
               if (onAddChat != null) ...[
                 const SizedBox(height: 4),
                 Builder(
-                  builder: (btnCtx) => Tooltip(
-                    message: 'AI Chat',
-                    child: GestureDetector(
-                      onTap: () {
-                        final box = btnCtx.findRenderObject() as RenderBox?;
-                        if (box == null) return;
-                        final pos = box.localToGlobal(Offset(box.size.width, 0));
-                        showMenu<String>(
-                          context: btnCtx,
-                          position: RelativeRect.fromLTRB(
-                            pos.dx + 4, pos.dy, pos.dx + 200, pos.dy + 100,
-                          ),
-                          color: const Color(0xFF1E293B),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          items: const [
-                            PopupMenuItem(
-                              value: 'new',
-                              height: 36,
-                              child: Row(
-                                children: [
-                                  Icon(Icons.add, size: 14, color: Color(0xFF34D399)),
-                                  SizedBox(width: 8),
-                                  Text('New chat', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'history',
-                              height: 36,
-                              child: Row(
-                                children: [
-                                  Icon(Icons.history, size: 14, color: Color(0xFF94A3B8)),
-                                  SizedBox(width: 8),
-                                  Text('Session history', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ).then((value) {
-                          if (value == 'new') {
-                            onAddChat!();
-                          } else if (value == 'history') {
-                            showDialog(
-                              context: btnCtx,
-                              builder: (_) => const _ChatSessionHistoryDialog(panelId: ''),
+                  builder:
+                      (btnCtx) => Tooltip(
+                        message: 'AI Chat',
+                        child: GestureDetector(
+                          onTap: () {
+                            final box = btnCtx.findRenderObject() as RenderBox?;
+                            if (box == null) return;
+                            final pos = box.localToGlobal(
+                              Offset(box.size.width, 0),
                             );
-                          }
-                        });
-                      },
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.auto_awesome,
-                          size: 18,
-                          color: Color(0xFF34D399),
+                            showMenu<String>(
+                              context: btnCtx,
+                              position: RelativeRect.fromLTRB(
+                                pos.dx + 4,
+                                pos.dy,
+                                pos.dx + 200,
+                                pos.dy + 100,
+                              ),
+                              color: const Color(0xFF1E293B),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              items: const [
+                                PopupMenuItem(
+                                  value: 'new',
+                                  height: 36,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.add,
+                                        size: 14,
+                                        color: Color(0xFF34D399),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'New chat',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFE2E8F0),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'history',
+                                  height: 36,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.history,
+                                        size: 14,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Session history',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFE2E8F0),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ).then((value) {
+                              if (value == 'new') {
+                                onAddChat!();
+                              } else if (value == 'history') {
+                                showDialog(
+                                  context: btnCtx,
+                                  builder:
+                                      (_) => const _ChatSessionHistoryDialog(
+                                        panelId: '',
+                                      ),
+                                );
+                              }
+                            });
+                          },
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.auto_awesome,
+                              size: 18,
+                              color: Color(0xFF34D399),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
                 ),
               ],
             ],
@@ -2912,10 +2998,7 @@ class _BoardToolsPanel extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _DrawSettingsPanel extends StatelessWidget {
-  const _DrawSettingsPanel({
-    required this.settings,
-    required this.onChanged,
-  });
+  const _DrawSettingsPanel({required this.settings, required this.onChanged});
 
   final DrawSettings settings;
   final ValueChanged<DrawSettings> onChanged;
@@ -3037,10 +3120,8 @@ class _DrawSettingsPanel extends StatelessWidget {
           SliderTheme(
             data: SliderThemeData(
               trackHeight: 2,
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape:
-                  const RoundSliderOverlayShape(overlayRadius: 12),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               activeTrackColor: settings.strokeColor,
               thumbColor: settings.strokeColor,
               overlayColor: settings.strokeColor.withAlpha(40),
@@ -3050,8 +3131,7 @@ class _DrawSettingsPanel extends StatelessWidget {
               value: settings.strokeWidth,
               min: 1,
               max: 20,
-              onChanged:
-                  (v) => onChanged(settings.copyWith(strokeWidth: v)),
+              onChanged: (v) => onChanged(settings.copyWith(strokeWidth: v)),
             ),
           ),
         ],
@@ -3196,8 +3276,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: Switch.adaptive(
                   value: settings.showArrow,
-                  onChanged:
-                      (v) => onChanged(settings.copyWith(showArrow: v)),
+                  onChanged: (v) => onChanged(settings.copyWith(showArrow: v)),
                   activeColor: activeColor,
                 ),
               ),
@@ -3283,9 +3362,10 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
             if (_hovered != h) setState(() => _hovered = h);
           },
           child: GestureDetector(
-            onTap: widget.isSelectMode
-                ? () => setState(() => _selected = !_selected)
-                : null,
+            onTap:
+                widget.isSelectMode
+                    ? () => setState(() => _selected = !_selected)
+                    : null,
             onPanUpdate:
                 widget.isSelectMode
                     ? (d) => widget.onMove(widget.drawing.position + d.delta)
@@ -3310,11 +3390,7 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
                   color: Color(0xCCF87171),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.close,
-                  size: 12,
-                  color: Colors.white,
-                ),
+                child: const Icon(Icons.close, size: 12, color: Colors.white),
               ),
             ),
           ),
@@ -3379,11 +3455,12 @@ class _DrawingElementPainter extends CustomPainter {
     final dx = b.dx - a.dx;
     final dy = b.dy - a.dy;
     final lenSq = dx * dx + dy * dy;
-    final t = lenSq == 0
-        ? 0.0
-        : ((p.dx - a.dx) * dx + (p.dy - a.dy) * dy) / lenSq;
-    final closest = Offset(a.dx + t.clamp(0.0, 1.0) * dx,
-                           a.dy + t.clamp(0.0, 1.0) * dy);
+    final t =
+        lenSq == 0 ? 0.0 : ((p.dx - a.dx) * dx + (p.dy - a.dy) * dy) / lenSq;
+    final closest = Offset(
+      a.dx + t.clamp(0.0, 1.0) * dx,
+      a.dy + t.clamp(0.0, 1.0) * dy,
+    );
     return (p - closest).distance;
   }
 
@@ -3521,8 +3598,9 @@ class _ActiveStrokePainter extends CustomPainter {
           ..strokeJoin = StrokeJoin.round
           ..style = PaintingStyle.stroke;
 
-    final path = Path()
-      ..moveTo(points.first.dx + origin.dx, points.first.dy + origin.dy);
+    final path =
+        Path()
+          ..moveTo(points.first.dx + origin.dx, points.first.dy + origin.dy);
     for (int i = 1; i < points.length; i++) {
       path.lineTo(points[i].dx + origin.dx, points[i].dy + origin.dy);
     }
@@ -3558,7 +3636,10 @@ class _ConnectPreviewPainter extends CustomPainter {
     if (source == null) return;
 
     final srcRect = source.bounds.rect.translate(origin.dx, origin.dy);
-    final target = Offset(targetPoint.dx + origin.dx, targetPoint.dy + origin.dy);
+    final target = Offset(
+      targetPoint.dx + origin.dx,
+      targetPoint.dy + origin.dy,
+    );
     // Start from panel edge toward the cursor
     final srcEdge = _BoardLinksPainter.edgePointToward(srcRect, target);
 
@@ -3737,10 +3818,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Show arrow',
-                  style: TextStyle(fontSize: 13),
-                ),
+                const Text('Show arrow', style: TextStyle(fontSize: 13)),
                 Switch.adaptive(
                   value: _showArrow,
                   onChanged: (v) => setState(() => _showArrow = v),
@@ -3839,16 +3917,8 @@ class _LinkPreviewPainter extends CustomPainter {
           ..color = const Color(0xFF2A3040)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1;
-    final leftPanel = Rect.fromCenter(
-      center: start,
-      width: 56,
-      height: 32,
-    );
-    final rightPanel = Rect.fromCenter(
-      center: end,
-      width: 56,
-      height: 32,
-    );
+    final leftPanel = Rect.fromCenter(center: start, width: 56, height: 32);
+    final rightPanel = Rect.fromCenter(center: end, width: 56, height: 32);
     final rr = RRect.fromRectAndRadius(leftPanel, const Radius.circular(6));
     final rr2 = RRect.fromRectAndRadius(rightPanel, const Radius.circular(6));
     canvas.drawRRect(rr, panelPaint);
@@ -3918,10 +3988,7 @@ class _LinkPreviewPainter extends CustomPainter {
 
 /// Tiny icon-sized link preview used inside the geometry selector buttons.
 class _LinkMiniPreviewPainter extends CustomPainter {
-  const _LinkMiniPreviewPainter({
-    required this.geometry,
-    required this.color,
-  });
+  const _LinkMiniPreviewPainter({required this.geometry, required this.color});
 
   final BoardLinkGeometry geometry;
   final Color color;
@@ -4024,23 +4091,24 @@ class _ChatGlowWrapperState extends State<_ChatGlowWrapper>
 
   @override
   Widget build(BuildContext context) {
-    if (!_isGlowing) return widget.child;
-
     return AnimatedBuilder(
       animation: _glowCtrl,
       builder: (context, child) {
         return DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: widget.borderRadius,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF34D399).withAlpha(
-                  (20 + _glowCtrl.value * 60).round(),
-                ),
-                blurRadius: 16 + _glowCtrl.value * 8,
-                spreadRadius: 2,
-              ),
-            ],
+            boxShadow:
+                _isGlowing
+                    ? [
+                      BoxShadow(
+                        color: const Color(
+                          0xFF34D399,
+                        ).withAlpha((20 + _glowCtrl.value * 60).round()),
+                        blurRadius: 16 + _glowCtrl.value * 8,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                    : const [],
           ),
           child: child,
         );
@@ -4049,10 +4117,6 @@ class _ChatGlowWrapperState extends State<_ChatGlowWrapper>
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Chat header menu (⋯ button with rename/color options)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _ChatHeaderMenu extends StatelessWidget {
   const _ChatHeaderMenu({
@@ -4071,70 +4135,95 @@ class _ChatHeaderMenu extends StatelessWidget {
       width: 28,
       height: 28,
       child: PopupMenuButton<String>(
-      icon: const Icon(Icons.more_horiz, size: 16, color: AppColors.textMuted),
-      splashRadius: 14,
-      padding: EdgeInsets.zero,
-      iconSize: 16,
-      color: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'rename',
-          height: 36,
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined, size: 14, color: Color(0xFF94A3B8)),
-              SizedBox(width: 8),
-              Text('Rename session', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
-            ],
-          ),
+        icon: const Icon(
+          Icons.more_horiz,
+          size: 16,
+          color: AppColors.textMuted,
         ),
-        const PopupMenuItem(
-          value: 'settings',
-          height: 36,
-          child: Row(
-            children: [
-              Icon(Icons.tune, size: 14, color: Color(0xFF94A3B8)),
-              SizedBox(width: 8),
-              Text('CLI settings', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
+        splashRadius: 14,
+        padding: EdgeInsets.zero,
+        iconSize: 16,
+        color: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        itemBuilder:
+            (context) => [
+              const PopupMenuItem(
+                value: 'rename',
+                height: 36,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.edit_outlined,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Rename session',
+                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'settings',
+                height: 36,
+                child: Row(
+                  children: [
+                    Icon(Icons.tune, size: 14, color: Color(0xFF94A3B8)),
+                    SizedBox(width: 8),
+                    Text(
+                      'CLI settings',
+                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'history',
+                height: 36,
+                child: Row(
+                  children: [
+                    Icon(Icons.history, size: 14, color: Color(0xFF94A3B8)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Session history',
+                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'color',
+                height: 36,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.palette_outlined,
+                      size: 14,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Change color',
+                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                    ),
+                  ],
+                ),
+              ),
             ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'history',
-          height: 36,
-          child: Row(
-            children: [
-              Icon(Icons.history, size: 14, color: Color(0xFF94A3B8)),
-              SizedBox(width: 8),
-              Text('Session history', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'color',
-          height: 36,
-          child: Row(
-            children: [
-              Icon(Icons.palette_outlined, size: 14, color: Color(0xFF94A3B8)),
-              SizedBox(width: 8),
-              Text('Change color', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
-            ],
-          ),
-        ),
-      ],
-      onSelected: (value) {
-        switch (value) {
-          case 'rename':
-            _showRenameDialog(context);
-          case 'settings':
-            _showSettingsDialog(context);
-          case 'history':
-            _showSessionHistory(context);
-          case 'color':
-            onEditColor();
-        }
-      },
+        onSelected: (value) {
+          switch (value) {
+            case 'rename':
+              _showRenameDialog(context);
+            case 'settings':
+              _showSettingsDialog(context);
+            case 'history':
+              _showSessionHistory(context);
+            case 'color':
+              onEditColor();
+          }
+        },
       ),
     );
   }
@@ -4148,33 +4237,39 @@ class _ChatHeaderMenu extends StatelessWidget {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Rename session', style: TextStyle(color: Color(0xFFE2E8F0))),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: Color(0xFFE2E8F0)),
-          decoration: InputDecoration(
-            hintText: 'Session name',
-            hintStyle: const TextStyle(color: Color(0xFF475569)),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: const Text(
+              'Rename session',
+              style: TextStyle(color: Color(0xFFE2E8F0)),
+            ),
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: const TextStyle(color: Color(0xFFE2E8F0)),
+              decoration: InputDecoration(
+                hintText: 'Session name',
+                hintStyle: const TextStyle(color: Color(0xFF475569)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onSubmitted: (_) {
+                _applyRename(ctx, ctrl.text, cubit);
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => _applyRename(ctx, ctrl.text, cubit),
+                child: const Text('Rename'),
+              ),
+            ],
           ),
-          onSubmitted: (_) {
-            _applyRename(ctx, ctrl.text, cubit);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => _applyRename(ctx, ctrl.text, cubit),
-            child: const Text('Rename'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -4189,10 +4284,7 @@ class _ChatHeaderMenu extends StatelessWidget {
     config['sessionName'] = name;
 
     cubit.updatePanelTitle(panel.id, name);
-    onUpdateState?.call({
-      ...panel.state,
-      'config': config,
-    });
+    onUpdateState?.call({...panel.state, 'config': config});
   }
 
   void _showSessionHistory(BuildContext context) {
@@ -4206,95 +4298,180 @@ class _ChatHeaderMenu extends StatelessWidget {
     final config = ChatSessionConfig.fromJson(
       Map<String, dynamic>.from(panel.state['config'] as Map? ?? {}),
     );
-    final customArgsCtrl = TextEditingController(text: config.customArgs.join(' '));
-    final maxContinuesCtrl = TextEditingController(text: '${config.maxAutopilotContinues}');
+    final customArgsCtrl = TextEditingController(
+      text: config.customArgs.join(' '),
+    );
+    final maxContinuesCtrl = TextEditingController(
+      text: '${config.maxAutopilotContinues}',
+    );
 
     showDialog(
       context: context,
       builder: (ctx) {
         var mode = config.mode;
+        var reasoningEffort = config.reasoningEffort;
         return StatefulBuilder(
-          builder: (ctx, setDialogState) => AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
-            title: const Text('CLI Settings', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 14)),
-            content: SizedBox(
-              width: 320,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Agent Mode', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                  const SizedBox(height: 4),
-                  DropdownButton<String?>(
-                    value: mode,
-                    isExpanded: true,
-                    dropdownColor: const Color(0xFF1E293B),
-                    style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
-                    items: const [
-                      DropdownMenuItem(value: null, child: Text('Default (interactive)')),
-                      DropdownMenuItem(value: 'interactive', child: Text('Interactive')),
-                      DropdownMenuItem(value: 'plan', child: Text('Plan')),
-                      DropdownMenuItem(value: 'autopilot', child: Text('Autopilot')),
+          builder:
+              (ctx, setDialogState) => AlertDialog(
+                backgroundColor: const Color(0xFF1E293B),
+                title: const Text(
+                  'CLI Settings',
+                  style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 14),
+                ),
+                content: SizedBox(
+                  width: 320,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Agent Mode',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      DropdownButton<String?>(
+                        value: mode,
+                        isExpanded: true,
+                        dropdownColor: const Color(0xFF1E293B),
+                        style: const TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontSize: 12,
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: null,
+                            child: Text('Default (interactive)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'interactive',
+                            child: Text('Interactive'),
+                          ),
+                          DropdownMenuItem(value: 'plan', child: Text('Plan')),
+                          DropdownMenuItem(
+                            value: 'autopilot',
+                            child: Text('Autopilot'),
+                          ),
+                        ],
+                        onChanged: (v) => setDialogState(() => mode = v),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Reasoning effort',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      DropdownButton<String?>(
+                        value: reasoningEffort,
+                        isExpanded: true,
+                        dropdownColor: const Color(0xFF1E293B),
+                        style: const TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontSize: 12,
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('Default')),
+                          DropdownMenuItem(value: 'low', child: Text('Low')),
+                          DropdownMenuItem(
+                            value: 'medium',
+                            child: Text('Medium'),
+                          ),
+                          DropdownMenuItem(value: 'high', child: Text('High')),
+                          DropdownMenuItem(
+                            value: 'xhigh',
+                            child: Text('XHigh'),
+                          ),
+                        ],
+                        onChanged:
+                            (v) => setDialogState(() => reasoningEffort = v),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Max autopilot continues',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: maxContinuesCtrl,
+                        style: const TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontSize: 12,
+                        ),
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: '99',
+                          hintStyle: const TextStyle(color: Color(0xFF475569)),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Custom args',
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: customArgsCtrl,
+                        style: const TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontSize: 12,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '--flag value ...',
+                          hintStyle: const TextStyle(color: Color(0xFF475569)),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
                     ],
-                    onChanged: (v) => setDialogState(() => mode = v),
                   ),
-                  const SizedBox(height: 12),
-                  const Text('Max autopilot continues', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: maxContinuesCtrl,
-                    style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: '99',
-                      hintStyle: const TextStyle(color: Color(0xFF475569)),
-                      isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                    ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
                   ),
-                  const SizedBox(height: 12),
-                  const Text('Custom args', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: customArgsCtrl,
-                    style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
-                    decoration: InputDecoration(
-                      hintText: '--flag value ...',
-                      hintStyle: const TextStyle(color: Color(0xFF475569)),
-                      isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                    ),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      final argsText = customArgsCtrl.text.trim();
+                      final customArgs =
+                          argsText.isEmpty
+                              ? <String>[]
+                              : argsText.split(RegExp(r'\s+'));
+                      final maxCont =
+                          int.tryParse(maxContinuesCtrl.text.trim()) ?? 99;
+                      final updatedConfig = config.copyWith(
+                        mode: () => mode,
+                        reasoningEffort: () => reasoningEffort,
+                        maxAutopilotContinues: maxCont,
+                        customArgs: customArgs,
+                      );
+                      onUpdateState?.call({
+                        ...panel.state,
+                        'config': updatedConfig.toJson(),
+                      });
+                    },
+                    child: const Text('Save'),
                   ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  final argsText = customArgsCtrl.text.trim();
-                  final customArgs = argsText.isEmpty
-                      ? <String>[]
-                      : argsText.split(RegExp(r'\s+'));
-                  final maxCont = int.tryParse(maxContinuesCtrl.text.trim()) ?? 99;
-                  final updatedConfig = config.copyWith(
-                    mode: () => mode,
-                    maxAutopilotContinues: maxCont,
-                    customArgs: customArgs,
-                  );
-                  onUpdateState?.call({
-                    ...panel.state,
-                    'config': updatedConfig.toJson(),
-                  });
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          ),
         );
       },
     );
@@ -4306,7 +4483,8 @@ class _ChatSessionHistoryDialog extends StatefulWidget {
   final String panelId;
 
   @override
-  State<_ChatSessionHistoryDialog> createState() => _ChatSessionHistoryDialogState();
+  State<_ChatSessionHistoryDialog> createState() =>
+      _ChatSessionHistoryDialogState();
 }
 
 class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
@@ -4332,7 +4510,10 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
         children: [
           Icon(Icons.history, size: 18, color: Color(0xFF94A3B8)),
           SizedBox(width: 8),
-          Text('Session history', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16)),
+          Text(
+            'Session history',
+            style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16),
+          ),
         ],
       ),
       content: SizedBox(
@@ -4361,96 +4542,129 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                 final e = entries[index];
                 final isCurrent = e.id == widget.panelId;
                 return GestureDetector(
-                  onTap: isCurrent ? null : () async {
-                    final msgs = await ChatSessionHistory.instance.loadMessages(e.id);
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    final cubit = context.read<BoardCubit>();
-                    await cubit.createChatPanel(
-                      title: e.sessionName.isNotEmpty ? e.sessionName : 'Restored chat',
-                      sessionName: e.sessionName,
-                      workingDir: e.workingDir,
-                      model: e.model,
-                      messages: msgs,
-                    );
-                  },
-                  child: Container(
-                  decoration: BoxDecoration(
-                    color: isCurrent ? const Color(0xFF1A3A2A) : const Color(0xFF0F1219),
-                    borderRadius: BorderRadius.circular(10),
-                    border: isCurrent
-                        ? Border.all(color: const Color(0xFF34D399), width: 0.5)
-                        : null,
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline,
-                        size: 14,
-                        color: isCurrent ? const Color(0xFF34D399) : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              e.sessionName.isNotEmpty ? e.sessionName : 'Unnamed session',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: isCurrent
-                                    ? const Color(0xFF34D399)
-                                    : const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${e.provider} • ${e.model} • ${e.messageCount} msgs',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        _formatDate(e.lastMessageAt ?? e.createdAt),
-                        style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
-                      ),
-                      const SizedBox(width: 6),
-                      // Restore: create a new chat panel with this session's messages
-                      if (!isCurrent)
-                        _actionButton(
-                          icon: Icons.restore,
-                          color: const Color(0xFF60A5FA),
-                          tooltip: 'Restore as new chat',
-                          onTap: () async {
-                            final msgs = await ChatSessionHistory.instance.loadMessages(e.id);
+                  onTap:
+                      isCurrent
+                          ? null
+                          : () async {
+                            final msgs = await ChatSessionHistory.instance
+                                .loadMessages(e.id);
                             if (!context.mounted) return;
                             Navigator.pop(context);
                             final cubit = context.read<BoardCubit>();
                             await cubit.createChatPanel(
-                              title: e.sessionName.isNotEmpty ? e.sessionName : 'Restored chat',
+                              title:
+                                  e.sessionName.isNotEmpty
+                                      ? e.sessionName
+                                      : 'Restored chat',
                               sessionName: e.sessionName,
                               workingDir: e.workingDir,
                               model: e.model,
                               messages: msgs,
                             );
                           },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color:
+                          isCurrent
+                              ? const Color(0xFF1A3A2A)
+                              : const Color(0xFF0F1219),
+                      borderRadius: BorderRadius.circular(10),
+                      border:
+                          isCurrent
+                              ? Border.all(
+                                color: const Color(0xFF34D399),
+                                width: 0.5,
+                              )
+                              : null,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 14,
+                          color:
+                              isCurrent
+                                  ? const Color(0xFF34D399)
+                                  : const Color(0xFF64748B),
                         ),
-                      // Delete
-                      _actionButton(
-                        icon: Icons.delete_outline,
-                        color: const Color(0xFFF87171),
-                        tooltip: 'Delete',
-                        onTap: () async {
-                          await ChatSessionHistory.instance.delete(e.id);
-                          _refresh();
-                        },
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                e.sessionName.isNotEmpty
+                                    ? e.sessionName
+                                    : 'Unnamed session',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      isCurrent
+                                          ? const Color(0xFF34D399)
+                                          : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${e.provider} • ${e.model} • ${e.messageCount} msgs',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          _formatDate(e.lastMessageAt ?? e.createdAt),
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Restore: create a new chat panel with this session's messages
+                        if (!isCurrent)
+                          _actionButton(
+                            icon: Icons.restore,
+                            color: const Color(0xFF60A5FA),
+                            tooltip: 'Restore as new chat',
+                            onTap: () async {
+                              final msgs = await ChatSessionHistory.instance
+                                  .loadMessages(e.id);
+                              if (!context.mounted) return;
+                              Navigator.pop(context);
+                              final cubit = context.read<BoardCubit>();
+                              await cubit.createChatPanel(
+                                title:
+                                    e.sessionName.isNotEmpty
+                                        ? e.sessionName
+                                        : 'Restored chat',
+                                sessionName: e.sessionName,
+                                workingDir: e.workingDir,
+                                model: e.model,
+                                messages: msgs,
+                              );
+                            },
+                          ),
+                        // Delete
+                        _actionButton(
+                          icon: Icons.delete_outline,
+                          color: const Color(0xFFF87171),
+                          tooltip: 'Delete',
+                          onTap: () async {
+                            await ChatSessionHistory.instance.delete(e.id);
+                            _refresh();
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 );
               },
             );
