@@ -4186,20 +4186,45 @@ class _ChatHeaderMenu extends StatelessWidget {
   }
 }
 
-class _ChatSessionHistoryDialog extends StatelessWidget {
+class _ChatSessionHistoryDialog extends StatefulWidget {
   const _ChatSessionHistoryDialog({required this.panelId});
   final String panelId;
+
+  @override
+  State<_ChatSessionHistoryDialog> createState() => _ChatSessionHistoryDialogState();
+}
+
+class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
+  late Future<List<ChatSessionEntry>> _entriesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _entriesFuture = ChatSessionHistory.instance.loadAll();
+  }
+
+  void _refresh() {
+    setState(() {
+      _entriesFuture = ChatSessionHistory.instance.loadAll();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
-      title: const Text('Session history', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16)),
+      title: const Row(
+        children: [
+          Icon(Icons.history, size: 18, color: Color(0xFF94A3B8)),
+          SizedBox(width: 8),
+          Text('Session history', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16)),
+        ],
+      ),
       content: SizedBox(
-        width: 360,
-        height: 400,
+        width: 380,
+        height: 420,
         child: FutureBuilder<List<ChatSessionEntry>>(
-          future: ChatSessionHistory.instance.loadAll(),
+          future: _entriesFuture,
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
@@ -4207,43 +4232,98 @@ class _ChatSessionHistoryDialog extends StatelessWidget {
             final entries = snapshot.data!;
             if (entries.isEmpty) {
               return const Center(
-                child: Text('No sessions yet', style: TextStyle(color: Color(0xFF64748B))),
+                child: Text(
+                  'No sessions yet.\nStart chatting to see history here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                ),
               );
             }
-            return ListView.builder(
+            return ListView.separated(
               itemCount: entries.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 4),
               itemBuilder: (context, index) {
                 final e = entries[index];
-                final isCurrent = e.id == panelId;
+                final isCurrent = e.id == widget.panelId;
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
                     color: isCurrent ? const Color(0xFF1A3A2A) : const Color(0xFF0F1219),
-                    borderRadius: BorderRadius.circular(8),
-                    border: isCurrent ? Border.all(color: const Color(0xFF34D399), width: 0.5) : null,
+                    borderRadius: BorderRadius.circular(10),
+                    border: isCurrent
+                        ? Border.all(color: const Color(0xFF34D399), width: 0.5)
+                        : null,
                   ),
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(
-                      Icons.chat_bubble_outline,
-                      size: 16,
-                      color: isCurrent ? const Color(0xFF34D399) : const Color(0xFF64748B),
-                    ),
-                    title: Text(
-                      e.sessionName.isNotEmpty ? e.sessionName : 'Unnamed session',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isCurrent ? const Color(0xFF34D399) : const Color(0xFFE2E8F0),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        size: 14,
+                        color: isCurrent ? const Color(0xFF34D399) : const Color(0xFF64748B),
                       ),
-                    ),
-                    subtitle: Text(
-                      '${e.provider} • ${e.model} • ${e.messageCount} msgs',
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                    ),
-                    trailing: Text(
-                      _formatDate(e.lastMessageAt ?? e.createdAt),
-                      style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
-                    ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              e.sessionName.isNotEmpty ? e.sessionName : 'Unnamed session',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isCurrent
+                                    ? const Color(0xFF34D399)
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${e.provider} • ${e.model} • ${e.messageCount} msgs',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        _formatDate(e.lastMessageAt ?? e.createdAt),
+                        style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
+                      ),
+                      const SizedBox(width: 6),
+                      // Restore: create a new chat panel with this session's messages
+                      if (!isCurrent)
+                        _actionButton(
+                          icon: Icons.restore,
+                          color: const Color(0xFF60A5FA),
+                          tooltip: 'Restore as new chat',
+                          onTap: () async {
+                            final msgs = await ChatSessionHistory.instance.loadMessages(e.id);
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            final cubit = context.read<BoardCubit>();
+                            await cubit.createChatPanel(
+                              title: e.sessionName.isNotEmpty ? e.sessionName : 'Restored chat',
+                              sessionName: e.sessionName,
+                              model: e.model,
+                            );
+                            // The new panel is now focused — store messages so ChatPanelWidget can pick them up
+                            final board = cubit.state.activeBoard;
+                            if (board != null) {
+                              final newPanel = board.panels.last;
+                              ChatSessionHistory.restoredMessages[newPanel.id] = msgs;
+                            }
+                          },
+                        ),
+                      // Delete
+                      _actionButton(
+                        icon: Icons.delete_outline,
+                        color: const Color(0xFFF87171),
+                        tooltip: 'Delete',
+                        onTap: () async {
+                          await ChatSessionHistory.instance.delete(e.id);
+                          _refresh();
+                        },
+                      ),
+                    ],
                   ),
                 );
               },
@@ -4257,6 +4337,25 @@ class _ChatSessionHistoryDialog extends StatelessWidget {
           child: const Text('Close'),
         ),
       ],
+    );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 14, color: color),
+        ),
+      ),
     );
   }
 

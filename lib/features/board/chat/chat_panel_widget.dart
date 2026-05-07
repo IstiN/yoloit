@@ -110,6 +110,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     if (savedUsage is Map) {
       _lastUsage = ChatTokenUsage.fromJson(Map<String, dynamic>.from(savedUsage));
     }
+
+    // Check for messages restored from session history (via toolbar)
+    final restored = ChatSessionHistory.restoredMessages.remove(widget.panel.id);
+    if (restored != null && restored.isNotEmpty && _messages.isEmpty) {
+      for (final m in restored) {
+        try {
+          final msg = ChatMessage.fromJson(m);
+          _messages.add(msg);
+          if (msg.tokenUsage != null) {
+            _totalOutputTokens += msg.tokenUsage!.outputTokens;
+          }
+        } catch (_) {}
+      }
+      if (_messages.isNotEmpty) {
+        _isFirstMessage = false;
+        _scrollToBottom();
+        // Persist so they survive reload
+        WidgetsBinding.instance.addPostFrameCallback((_) => _persistMessages());
+      }
+    }
   }
 
   static const _maxSavedMessages = 100;

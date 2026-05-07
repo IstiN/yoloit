@@ -15,6 +15,11 @@ class ChatSessionHistory {
 
   static const _key = 'chat_session_history';
 
+  /// Temporary store for messages to restore into a newly created panel.
+  /// Key is the new panel ID, value is the message list.
+  /// ChatPanelWidget checks this in initState and consumes the entry.
+  static final Map<String, List<Map<String, dynamic>>> restoredMessages = {};
+
   /// Save or update a session entry (metadata + messages).
   Future<void> upsert(
     ChatSessionEntry entry, {
