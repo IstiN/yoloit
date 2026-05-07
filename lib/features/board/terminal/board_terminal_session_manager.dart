@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
+import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
@@ -17,6 +18,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   final _ptyService = PtyService.instance;
   final Map<String, AgentSession> _sessions = {};
   final Map<String, StreamSubscription<String>> _outputSubs = {};
+  final Map<String, List<String>> _envGroupIdsBySession = {};
 
   AgentSession? sessionFor(String id) => _sessions[id];
   bool isLive(String id) => _sessions.containsKey(id);
@@ -28,18 +30,21 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       sessionId: config.sessionId,
       sessionName: config.sessionName,
       workingDir: config.workingDir,
+      envGroupIds: config.envGroupIds,
     );
   }
 
   Future<AgentSession> createSession({
     required String sessionName,
     required String workingDir,
+    List<String> envGroupIds = const [],
   }) async {
     final sessionId = 'board_terminal_${DateTime.now().millisecondsSinceEpoch}';
     return _spawn(
       sessionId: sessionId,
       sessionName: sessionName,
       workingDir: workingDir,
+      envGroupIds: envGroupIds,
     );
   }
 
@@ -58,6 +63,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
                 ? current.displayName
                 : sessionName.trim(),
         workingDir: current.workspacePath,
+        envGroupIds: _envGroupIdsBySession[sessionId] ?? const [],
         createdAt: DateTime.now(),
         lastActiveAt: DateTime.now(),
       ),
@@ -75,11 +81,13 @@ class BoardTerminalSessionManager extends ChangeNotifier {
           id: session.id,
           sessionName: session.displayName,
           workingDir: session.workspacePath,
+          envGroupIds: _envGroupIdsBySession[session.id] ?? const [],
           createdAt: DateTime.now(),
           lastActiveAt: DateTime.now(),
         ),
       );
     }
+    _envGroupIdsBySession.remove(sessionId);
     notifyListeners();
   }
 
@@ -95,8 +103,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     required String sessionId,
     required String sessionName,
     required String workingDir,
+    required List<String> envGroupIds,
   }) async {
     _outputSubs.remove(sessionId)?.cancel();
+    _envGroupIdsBySession[sessionId] = List<String>.from(envGroupIds);
     final session = AgentSession(
       id: sessionId,
       type: AgentType.terminal,
@@ -104,10 +114,13 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       status: AgentStatus.live,
       customName: sessionName,
     );
+    final extraEnv = await GlobalEnvGroupsService.instance
+        .resolveSelectedGroups(envGroupIds);
     final pty = _ptyService.launch(
       sessionId: sessionId,
       workspacePath: workingDir,
       label: session.displayName,
+      extraEnv: extraEnv,
     );
     _sessions[sessionId] = session;
     _attachPty(pty, session);
@@ -116,6 +129,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
         id: session.id,
         sessionName: session.displayName,
         workingDir: session.workspacePath,
+        envGroupIds: envGroupIds,
         createdAt: DateTime.now(),
         lastActiveAt: DateTime.now(),
       ),

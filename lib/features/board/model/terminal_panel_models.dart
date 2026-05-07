@@ -3,11 +3,13 @@ class BoardTerminalConfig {
     required this.sessionId,
     required this.sessionName,
     required this.workingDir,
+    this.envGroupIds = const [],
   });
 
   final String sessionId;
   final String sessionName;
   final String workingDir;
+  final List<String> envGroupIds;
 
   bool get isConfigured => workingDir.trim().isNotEmpty;
 
@@ -15,6 +17,7 @@ class BoardTerminalConfig {
     'sessionId': sessionId,
     'sessionName': sessionName,
     'workingDir': workingDir,
+    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
   };
 
   factory BoardTerminalConfig.fromJson(Map<String, dynamic> json) {
@@ -22,6 +25,7 @@ class BoardTerminalConfig {
       sessionId: json['sessionId'] as String? ?? '',
       sessionName: json['sessionName'] as String? ?? '',
       workingDir: json['workingDir'] as String? ?? '',
+      envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
     );
   }
 
@@ -29,11 +33,13 @@ class BoardTerminalConfig {
     String? sessionId,
     String? sessionName,
     String? workingDir,
+    List<String>? envGroupIds,
   }) {
     return BoardTerminalConfig(
       sessionId: sessionId ?? this.sessionId,
       sessionName: sessionName ?? this.sessionName,
       workingDir: workingDir ?? this.workingDir,
+      envGroupIds: envGroupIds ?? this.envGroupIds,
     );
   }
 }

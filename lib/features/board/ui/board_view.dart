@@ -22,6 +22,7 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
+import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key});
@@ -4426,6 +4427,7 @@ class _ChatHeaderMenu extends StatelessWidget {
       builder: (ctx) {
         var mode = config.mode;
         var reasoningEffort = config.reasoningEffort;
+        var envGroupIds = List<String>.from(config.envGroupIds);
         return StatefulBuilder(
           builder:
               (ctx, setDialogState) => AlertDialog(
@@ -4507,6 +4509,13 @@ class _ChatHeaderMenu extends StatelessWidget {
                             (v) => setDialogState(() => reasoningEffort = v),
                       ),
                       const SizedBox(height: 12),
+                      EnvGroupSelectionField(
+                        selectedGroupIds: envGroupIds,
+                        onChanged:
+                            (value) =>
+                                setDialogState(() => envGroupIds = value),
+                      ),
+                      const SizedBox(height: 12),
                       const Text(
                         'Max autopilot continues',
                         style: TextStyle(
@@ -4576,6 +4585,7 @@ class _ChatHeaderMenu extends StatelessWidget {
                       final updatedConfig = config.copyWith(
                         mode: () => mode,
                         reasoningEffort: () => reasoningEffort,
+                        envGroupIds: envGroupIds,
                         maxAutopilotContinues: maxCont,
                         customArgs: customArgs,
                       );
@@ -4675,6 +4685,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                               sessionName: e.sessionName,
                               workingDir: e.workingDir,
                               model: e.model,
+                              envGroupIds: e.envGroupIds,
                               messages: msgs,
                             );
                           },
@@ -4764,6 +4775,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                                 sessionName: e.sessionName,
                                 workingDir: e.workingDir,
                                 model: e.model,
+                                envGroupIds: e.envGroupIds,
                                 messages: msgs,
                               );
                             },

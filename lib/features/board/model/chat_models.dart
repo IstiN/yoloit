@@ -53,7 +53,8 @@ class ChatMessage extends Equatable {
     'role': role.name,
     'content': content,
     if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
-    if (toolCalls.isNotEmpty) 'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
+    if (toolCalls.isNotEmpty)
+      'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
     if (toolName != null) 'toolName': toolName,
     if (toolCallId != null) 'toolCallId': toolCallId,
     if (tokenUsage != null) 'tokenUsage': tokenUsage!.toJson(),
@@ -70,20 +71,30 @@ class ChatMessage extends Equatable {
       id: json['id'] as String? ?? '',
       role: role,
       content: json['content'] as String? ?? '',
-      timestamp: json['timestamp'] != null
-          ? DateTime.tryParse(json['timestamp'] as String)
-          : null,
-      toolCalls: (json['toolCalls'] as List?)
-          ?.map((e) => ChatToolCall.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList() ?? const [],
+      timestamp:
+          json['timestamp'] != null
+              ? DateTime.tryParse(json['timestamp'] as String)
+              : null,
+      toolCalls:
+          (json['toolCalls'] as List?)
+              ?.map(
+                (e) =>
+                    ChatToolCall.fromJson(Map<String, dynamic>.from(e as Map)),
+              )
+              .toList() ??
+          const [],
       toolName: json['toolName'] as String?,
       toolCallId: json['toolCallId'] as String?,
-      tokenUsage: json['tokenUsage'] is Map
-          ? ChatTokenUsage.fromJson(Map<String, dynamic>.from(json['tokenUsage'] as Map))
-          : null,
-      metadata: json['metadata'] is Map
-          ? Map<String, dynamic>.from(json['metadata'] as Map)
-          : null,
+      tokenUsage:
+          json['tokenUsage'] is Map
+              ? ChatTokenUsage.fromJson(
+                Map<String, dynamic>.from(json['tokenUsage'] as Map),
+              )
+              : null,
+      metadata:
+          json['metadata'] is Map
+              ? Map<String, dynamic>.from(json['metadata'] as Map)
+              : null,
     );
   }
 
@@ -115,8 +126,16 @@ class ChatMessage extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, role, content, timestamp, toolCalls, toolName,
-    toolCallId, isStreaming, tokenUsage, metadata,
+    id,
+    role,
+    content,
+    timestamp,
+    toolCalls,
+    toolName,
+    toolCallId,
+    isStreaming,
+    tokenUsage,
+    metadata,
   ];
 }
 
@@ -158,9 +177,10 @@ class ChatToolCall extends Equatable {
   factory ChatToolCall.fromJson(Map<String, dynamic> json) => ChatToolCall(
     toolCallId: json['toolCallId'] as String? ?? '',
     toolName: json['toolName'] as String? ?? '',
-    arguments: json['arguments'] is Map
-        ? Map<String, dynamic>.from(json['arguments'] as Map)
-        : <String, dynamic>{},
+    arguments:
+        json['arguments'] is Map
+            ? Map<String, dynamic>.from(json['arguments'] as Map)
+            : <String, dynamic>{},
     result: json['result'] as String?,
     success: json['success'] as bool?,
   );
@@ -185,7 +205,12 @@ class ChatToolCall extends Equatable {
 
   @override
   List<Object?> get props => [
-    toolCallId, toolName, arguments, result, isRunning, success,
+    toolCallId,
+    toolName,
+    arguments,
+    result,
+    isRunning,
+    success,
   ];
 }
 
@@ -260,8 +285,12 @@ class ChatTokenUsage extends Equatable {
 
   @override
   List<Object?> get props => [
-    outputTokens, premiumRequests, totalApiDurationMs,
-    sessionDurationMs, linesAdded, linesRemoved,
+    outputTokens,
+    premiumRequests,
+    totalApiDurationMs,
+    sessionDurationMs,
+    linesAdded,
+    linesRemoved,
   ];
 }
 
@@ -270,17 +299,17 @@ class ChatTokenUsage extends Equatable {
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum ChatEventType {
-  sessionStatus,       // mcp_server_status, servers_loaded, skills_loaded, tools_updated
-  userMessage,         // user.message
-  assistantTurnStart,  // assistant.turn_start
+  sessionStatus, // mcp_server_status, servers_loaded, skills_loaded, tools_updated
+  userMessage, // user.message
+  assistantTurnStart, // assistant.turn_start
   assistantMessageStart, // assistant.message_start
-  assistantDelta,      // assistant.message_delta
-  assistantMessage,    // assistant.message (complete)
-  assistantTurnEnd,    // assistant.turn_end
-  toolStart,           // tool.execution_start
-  toolComplete,        // tool.execution_complete
-  askUser,             // ask_user.question
-  result,              // result (session complete)
+  assistantDelta, // assistant.message_delta
+  assistantMessage, // assistant.message (complete)
+  assistantTurnEnd, // assistant.turn_end
+  toolStart, // tool.execution_start
+  toolComplete, // tool.execution_complete
+  askUser, // ask_user.question
+  result, // result (session complete)
   unknown,
 }
 
@@ -420,7 +449,15 @@ class ChatEvent extends Equatable {
   }
 
   @override
-  List<Object?> get props => [type, rawType, data, id, timestamp, parentId, ephemeral];
+  List<Object?> get props => [
+    type,
+    rawType,
+    data,
+    id,
+    timestamp,
+    parentId,
+    ephemeral,
+  ];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -438,6 +475,7 @@ class ChatSessionConfig extends Equatable {
     this.mode,
     this.maxAutopilotContinues = 99,
     this.customArgs = const [],
+    this.envGroupIds = const [],
   });
 
   final String sessionName;
@@ -464,6 +502,9 @@ class ChatSessionConfig extends Equatable {
   /// Custom extra CLI arguments (provider-specific).
   final List<String> customArgs;
 
+  /// Global env groups selected for this session. Last selected group wins.
+  final List<String> envGroupIds;
+
   Map<String, dynamic> toJson() => {
     'sessionName': sessionName,
     'workingDir': workingDir,
@@ -474,6 +515,7 @@ class ChatSessionConfig extends Equatable {
     if (mode != null) 'mode': mode,
     'maxAutopilotContinues': maxAutopilotContinues,
     if (customArgs.isNotEmpty) 'customArgs': customArgs,
+    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
   };
 
   factory ChatSessionConfig.fromJson(Map<String, dynamic> json) {
@@ -487,6 +529,7 @@ class ChatSessionConfig extends Equatable {
       mode: json['mode'] as String?,
       maxAutopilotContinues: json['maxAutopilotContinues'] as int? ?? 99,
       customArgs: (json['customArgs'] as List?)?.cast<String>() ?? const [],
+      envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
     );
   }
 
@@ -500,22 +543,37 @@ class ChatSessionConfig extends Equatable {
     String? Function()? mode,
     int? maxAutopilotContinues,
     List<String>? customArgs,
+    List<String>? envGroupIds,
   }) {
     return ChatSessionConfig(
       sessionName: sessionName ?? this.sessionName,
       workingDir: workingDir ?? this.workingDir,
       provider: provider ?? this.provider,
       model: model ?? this.model,
-      reasoningEffort: reasoningEffort != null ? reasoningEffort() : this.reasoningEffort,
+      reasoningEffort:
+          reasoningEffort != null ? reasoningEffort() : this.reasoningEffort,
       autopilot: autopilot ?? this.autopilot,
       mode: mode != null ? mode() : this.mode,
-      maxAutopilotContinues: maxAutopilotContinues ?? this.maxAutopilotContinues,
+      maxAutopilotContinues:
+          maxAutopilotContinues ?? this.maxAutopilotContinues,
       customArgs: customArgs ?? this.customArgs,
+      envGroupIds: envGroupIds ?? this.envGroupIds,
     );
   }
 
   @override
-  List<Object?> get props => [sessionName, workingDir, provider, model, reasoningEffort, autopilot, mode, maxAutopilotContinues, customArgs];
+  List<Object?> get props => [
+    sessionName,
+    workingDir,
+    provider,
+    model,
+    reasoningEffort,
+    autopilot,
+    mode,
+    maxAutopilotContinues,
+    customArgs,
+    envGroupIds,
+  ];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -538,18 +596,55 @@ class ChatModelInfo {
 
 /// Copilot CLI available models.
 const List<ChatModelInfo> kCopilotModels = [
-  ChatModelInfo(id: 'claude-sonnet-4.6', displayName: 'Claude Sonnet 4.6', costMultiplier: 1, isDefault: true),
-  ChatModelInfo(id: 'claude-sonnet-4.5', displayName: 'Claude Sonnet 4.5', costMultiplier: 1),
-  ChatModelInfo(id: 'claude-haiku-4.5', displayName: 'Claude Haiku 4.5', costMultiplier: 0.33),
-  ChatModelInfo(id: 'claude-opus-4.7', displayName: 'Claude Opus 4.7', costMultiplier: 15),
-  ChatModelInfo(id: 'claude-opus-4.6', displayName: 'Claude Opus 4.6', costMultiplier: 3),
-  ChatModelInfo(id: 'claude-opus-4.5', displayName: 'Claude Opus 4.5', costMultiplier: 3),
+  ChatModelInfo(
+    id: 'claude-sonnet-4.6',
+    displayName: 'Claude Sonnet 4.6',
+    costMultiplier: 1,
+    isDefault: true,
+  ),
+  ChatModelInfo(
+    id: 'claude-sonnet-4.5',
+    displayName: 'Claude Sonnet 4.5',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(
+    id: 'claude-haiku-4.5',
+    displayName: 'Claude Haiku 4.5',
+    costMultiplier: 0.33,
+  ),
+  ChatModelInfo(
+    id: 'claude-opus-4.7',
+    displayName: 'Claude Opus 4.7',
+    costMultiplier: 15,
+  ),
+  ChatModelInfo(
+    id: 'claude-opus-4.6',
+    displayName: 'Claude Opus 4.6',
+    costMultiplier: 3,
+  ),
+  ChatModelInfo(
+    id: 'claude-opus-4.5',
+    displayName: 'Claude Opus 4.5',
+    costMultiplier: 3,
+  ),
   ChatModelInfo(id: 'gpt-5.5', displayName: 'GPT-5.5', costMultiplier: 7.5),
   ChatModelInfo(id: 'gpt-5.4', displayName: 'GPT-5.4', costMultiplier: 1),
-  ChatModelInfo(id: 'gpt-5.3-codex', displayName: 'GPT-5.3-Codex', costMultiplier: 1),
-  ChatModelInfo(id: 'gpt-5.2-codex', displayName: 'GPT-5.2-Codex', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'gpt-5.3-codex',
+    displayName: 'GPT-5.3-Codex',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(
+    id: 'gpt-5.2-codex',
+    displayName: 'GPT-5.2-Codex',
+    costMultiplier: 1,
+  ),
   ChatModelInfo(id: 'gpt-5.2', displayName: 'GPT-5.2', costMultiplier: 1),
-  ChatModelInfo(id: 'gpt-5.4-mini', displayName: 'GPT-5.4 mini', costMultiplier: 0.33),
+  ChatModelInfo(
+    id: 'gpt-5.4-mini',
+    displayName: 'GPT-5.4 mini',
+    costMultiplier: 0.33,
+  ),
   ChatModelInfo(id: 'gpt-5-mini', displayName: 'GPT-5 mini', costMultiplier: 0),
   ChatModelInfo(id: 'gpt-4.1', displayName: 'GPT-4.1', costMultiplier: 0),
 ];

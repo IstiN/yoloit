@@ -7,6 +7,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
+import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 
@@ -45,7 +46,9 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     final nextConfig = _readConfig(widget.panel.state);
     if (nextConfig.sessionId != _config.sessionId ||
         nextConfig.sessionName != _config.sessionName ||
-        nextConfig.workingDir != _config.workingDir) {
+        nextConfig.workingDir != _config.workingDir ||
+        nextConfig.envGroupIds.join('\u0000') !=
+            _config.envGroupIds.join('\u0000')) {
       _config = nextConfig;
       _session =
           _config.sessionId.isEmpty
@@ -100,7 +103,11 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     }
   }
 
-  Future<void> _startSession(String workingDir, String sessionName) async {
+  Future<void> _startSession(
+    String workingDir,
+    String sessionName,
+    List<String> envGroupIds,
+  ) async {
     final trimmedDir = workingDir.trim();
     if (trimmedDir.isEmpty) return;
     final trimmedName =
@@ -110,12 +117,14 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     final session = await _manager.createSession(
       sessionName: trimmedName,
       workingDir: trimmedDir,
+      envGroupIds: envGroupIds,
     );
     if (!mounted) return;
     final nextConfig = BoardTerminalConfig(
       sessionId: session.id,
       sessionName: session.displayName,
       workingDir: trimmedDir,
+      envGroupIds: envGroupIds,
     );
     context.read<BoardCubit>().updatePanelTitle(
       widget.panel.id,
@@ -261,7 +270,12 @@ class _BoardTerminalInfoBar extends StatelessWidget {
 class _BoardTerminalSetupView extends StatefulWidget {
   const _BoardTerminalSetupView({required this.onStart});
 
-  final Future<void> Function(String workingDir, String sessionName) onStart;
+  final Future<void> Function(
+    String workingDir,
+    String sessionName,
+    List<String> envGroupIds,
+  )
+  onStart;
 
   @override
   State<_BoardTerminalSetupView> createState() =>
@@ -271,6 +285,7 @@ class _BoardTerminalSetupView extends StatefulWidget {
 class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
   final _dirCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
+  List<String> _selectedEnvGroupIds = const [];
 
   @override
   void dispose() {
@@ -372,12 +387,23 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
               isDense: true,
             ),
           ),
+          const SizedBox(height: 14),
+          EnvGroupSelectionField(
+            selectedGroupIds: _selectedEnvGroupIds,
+            onChanged: (value) {
+              setState(() => _selectedEnvGroupIds = value);
+            },
+          ),
           const Spacer(),
           FilledButton(
             onPressed:
                 _dirCtrl.text.trim().isEmpty
                     ? null
-                    : () => widget.onStart(_dirCtrl.text, _nameCtrl.text),
+                    : () => widget.onStart(
+                      _dirCtrl.text,
+                      _nameCtrl.text,
+                      _selectedEnvGroupIds,
+                    ),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF22C55E),
               foregroundColor: const Color(0xFF0F172A),
@@ -540,6 +566,7 @@ class _BoardTerminalSessionHistoryDialogState
                                       sessionId: entry.id,
                                       sessionName: entry.sessionName,
                                       workingDir: entry.workingDir,
+                                      envGroupIds: entry.envGroupIds,
                                     );
                               },
                       child: Container(
@@ -615,6 +642,7 @@ class _BoardTerminalSessionHistoryDialogState
                                         sessionId: entry.id,
                                         sessionName: entry.sessionName,
                                         workingDir: entry.workingDir,
+                                        envGroupIds: entry.envGroupIds,
                                       );
                                 },
                               ),

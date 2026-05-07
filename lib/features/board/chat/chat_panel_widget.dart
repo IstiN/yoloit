@@ -14,6 +14,7 @@ import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 
 /// The chat UI rendered inside a board panel.
@@ -78,6 +79,24 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
   }
 
+  @override
+  void didUpdateWidget(covariant ChatPanelWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldRaw = oldWidget.panel.state['config'];
+    final newRaw = widget.panel.state['config'];
+    if (oldRaw is Map && newRaw is Map) {
+      final nextConfig = ChatSessionConfig.fromJson(
+        Map<String, dynamic>.from(newRaw),
+      );
+      final previousConfig = ChatSessionConfig.fromJson(
+        Map<String, dynamic>.from(oldRaw),
+      );
+      if (nextConfig != previousConfig && nextConfig != _config) {
+        setState(() => _config = nextConfig);
+      }
+    }
+  }
+
   void _initConfig() {
     final raw = widget.panel.state['config'];
     if (raw is Map) {
@@ -139,6 +158,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         provider: _provider.providerId,
         model: _config.model,
         workingDir: _config.workingDir,
+        envGroupIds: _config.envGroupIds,
         createdAt: DateTime.now(),
         lastMessageAt: _messages.isNotEmpty ? DateTime.now() : null,
         messageCount: _messages.length,
@@ -1110,11 +1130,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ).then((selected) {
       if (selected != null && selected != _config.model) {
         setState(() {
-          _config = ChatSessionConfig(
-            sessionName: _config.sessionName,
-            workingDir: _config.workingDir,
-            model: selected,
-          );
+          _config = _config.copyWith(model: selected);
         });
         _persistMessages();
       }
@@ -1129,10 +1145,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             currentPanelId: widget.panel.id,
             onRestore: (entry, messages) {
               setState(() {
-                _config = ChatSessionConfig(
+                _config = _config.copyWith(
                   sessionName: entry.sessionName,
                   workingDir: entry.workingDir,
                   model: entry.model,
+                  envGroupIds: entry.envGroupIds,
                 );
                 _messages.clear();
                 for (final m in messages) {
@@ -1382,6 +1399,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   late TextEditingController _sessionCtrl;
   late TextEditingController _dirCtrl;
   late String _selectedModel;
+  late List<String> _selectedEnvGroupIds;
 
   @override
   void initState() {
@@ -1389,6 +1407,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     _sessionCtrl = TextEditingController(text: widget.config.sessionName);
     _dirCtrl = TextEditingController(text: widget.config.workingDir);
     _selectedModel = widget.config.model;
+    _selectedEnvGroupIds = List<String>.from(widget.config.envGroupIds);
   }
 
   @override
@@ -1410,6 +1429,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
         sessionName: sessionName,
         workingDir: dir,
         model: _selectedModel,
+        envGroupIds: _selectedEnvGroupIds,
       ),
     );
   }
@@ -1454,6 +1474,13 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                 onChanged: (_) {},
               ),
             ),
+          ),
+          const SizedBox(height: 14),
+          EnvGroupSelectionField(
+            selectedGroupIds: _selectedEnvGroupIds,
+            onChanged: (value) {
+              setState(() => _selectedEnvGroupIds = value);
+            },
           ),
           const SizedBox(height: 14),
 

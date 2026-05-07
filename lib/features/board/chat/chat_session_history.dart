@@ -129,6 +129,7 @@ class ChatSessionEntry {
     required this.model,
     required this.workingDir,
     required this.createdAt,
+    this.envGroupIds = const [],
     this.lastMessageAt,
     this.messageCount = 0,
   });
@@ -138,6 +139,7 @@ class ChatSessionEntry {
   final String provider;
   final String model;
   final String workingDir;
+  final List<String> envGroupIds;
   final DateTime createdAt;
   final DateTime? lastMessageAt;
   final int messageCount;
@@ -148,21 +150,27 @@ class ChatSessionEntry {
     'provider': provider,
     'model': model,
     'workingDir': workingDir,
+    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
     'createdAt': createdAt.toIso8601String(),
     'lastMessageAt': lastMessageAt?.toIso8601String(),
     'messageCount': messageCount,
   };
 
-  factory ChatSessionEntry.fromJson(Map<String, dynamic> json) => ChatSessionEntry(
-    id: json['id'] as String? ?? '',
-    sessionName: json['sessionName'] as String? ?? '',
-    provider: json['provider'] as String? ?? 'copilot',
-    model: json['model'] as String? ?? '',
-    workingDir: json['workingDir'] as String? ?? '',
-    createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
-    lastMessageAt: json['lastMessageAt'] != null
-        ? DateTime.tryParse(json['lastMessageAt'] as String)
-        : null,
-    messageCount: json['messageCount'] as int? ?? 0,
-  );
+  factory ChatSessionEntry.fromJson(Map<String, dynamic> json) =>
+      ChatSessionEntry(
+        id: json['id'] as String? ?? '',
+        sessionName: json['sessionName'] as String? ?? '',
+        provider: json['provider'] as String? ?? 'copilot',
+        model: json['model'] as String? ?? '',
+        workingDir: json['workingDir'] as String? ?? '',
+        envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
+        createdAt:
+            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+            DateTime.now(),
+        lastMessageAt:
+            json['lastMessageAt'] != null
+                ? DateTime.tryParse(json['lastMessageAt'] as String)
+                : null,
+        messageCount: json['messageCount'] as int? ?? 0,
+      );
 }

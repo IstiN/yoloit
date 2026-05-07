@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 
 /// [ChatProvider] implementation that wraps the GitHub Copilot CLI.
 ///
@@ -112,11 +113,13 @@ class CopilotCliProvider extends ChatProvider {
     debugPrint('[CopilotCli] cwd: ${config.workingDir}');
 
     try {
+      final extraEnv = await GlobalEnvGroupsService.instance
+          .resolveSelectedGroups(config.envGroupIds);
       final process = await Process.start(
         'copilot',
         args,
         workingDirectory: config.workingDir,
-        environment: Platform.environment,
+        environment: {...Platform.environment, ...extraEnv},
       );
       _processes[config.sessionName] = process;
 

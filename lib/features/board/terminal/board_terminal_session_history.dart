@@ -67,12 +67,14 @@ class BoardTerminalSessionEntry {
     required this.sessionName,
     required this.workingDir,
     required this.createdAt,
+    this.envGroupIds = const [],
     this.lastActiveAt,
   });
 
   final String id;
   final String sessionName;
   final String workingDir;
+  final List<String> envGroupIds;
   final DateTime createdAt;
   final DateTime? lastActiveAt;
 
@@ -80,6 +82,7 @@ class BoardTerminalSessionEntry {
     'id': id,
     'sessionName': sessionName,
     'workingDir': workingDir,
+    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
     'createdAt': createdAt.toIso8601String(),
     'lastActiveAt': lastActiveAt?.toIso8601String(),
   };
@@ -89,6 +92,7 @@ class BoardTerminalSessionEntry {
       id: json['id'] as String? ?? '',
       sessionName: json['sessionName'] as String? ?? '',
       workingDir: json['workingDir'] as String? ?? '',
+      envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
@@ -103,6 +107,7 @@ class BoardTerminalSessionEntry {
     String? id,
     String? sessionName,
     String? workingDir,
+    List<String>? envGroupIds,
     DateTime? createdAt,
     DateTime? lastActiveAt,
   }) {
@@ -110,6 +115,7 @@ class BoardTerminalSessionEntry {
       id: id ?? this.id,
       sessionName: sessionName ?? this.sessionName,
       workingDir: workingDir ?? this.workingDir,
+      envGroupIds: envGroupIds ?? this.envGroupIds,
       createdAt: createdAt ?? this.createdAt,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );

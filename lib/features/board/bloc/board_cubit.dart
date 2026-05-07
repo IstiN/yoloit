@@ -148,6 +148,7 @@ class BoardCubit extends Cubit<BoardState> {
     String? sessionName,
     String workingDir = '',
     String model = 'gpt-5-mini',
+    List<String> envGroupIds = const [],
     List<Map<String, dynamic>>? messages,
   }) async {
     final board = state.activeBoard;
@@ -162,6 +163,7 @@ class BoardCubit extends Cubit<BoardState> {
           sessionName ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
       workingDir: workingDir,
       model: model,
+      envGroupIds: envGroupIds,
     );
     final panelState = <String, dynamic>{'config': config.toJson()};
     if (messages != null && messages.isNotEmpty) {
@@ -189,6 +191,7 @@ class BoardCubit extends Cubit<BoardState> {
     String? sessionId,
     String? sessionName,
     String workingDir = '',
+    List<String> envGroupIds = const [],
   }) async {
     final board = state.activeBoard;
     if (board == null) return;
@@ -201,6 +204,7 @@ class BoardCubit extends Cubit<BoardState> {
       sessionId: sessionId ?? '',
       sessionName: sessionName ?? '',
       workingDir: workingDir,
+      envGroupIds: envGroupIds,
     );
     final panel = BoardPanelInstance(
       id: _nextId('panel'),

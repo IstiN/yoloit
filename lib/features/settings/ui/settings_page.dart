@@ -12,6 +12,7 @@ import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
+import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/ui/skills_panel.dart';
@@ -23,6 +24,7 @@ import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 const _kCategories = [
   'Appearance',
   'AI Agents',
+  'Environment',
   'Notifications',
   'Sessions',
   'Shortcuts',
@@ -40,17 +42,21 @@ class SettingsPage extends StatefulWidget {
     return showDialog<void>(
       context: context,
       barrierColor: Colors.black.withAlpha(160),
-      builder: (_) => BlocProvider(
-        create: (_) => SkillsCubit(),
-        child: BlocProvider.value(
-          value: wsCubit,
-          child: const Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: EdgeInsets.symmetric(horizontal: 60, vertical: 40),
-            child: SettingsPage(),
+      builder:
+          (_) => BlocProvider(
+            create: (_) => SkillsCubit(),
+            child: BlocProvider.value(
+              value: wsCubit,
+              child: const Dialog(
+                backgroundColor: Colors.transparent,
+                insetPadding: EdgeInsets.symmetric(
+                  horizontal: 60,
+                  vertical: 40,
+                ),
+                child: SettingsPage(),
+              ),
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -150,8 +156,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 style: TextStyle(
                   color: isActive ? colors.primary : AppColors.textSecondary,
                   fontSize: 13,
-                  fontWeight:
-                      isActive ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ),
@@ -163,61 +168,69 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildContent() {
     // Skills panel needs full height, not scrollable wrapper
-    if (_selectedCategory == 5) {
+    if (_selectedCategory == 6) {
       return const SkillsPanel();
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: switch (_selectedCategory) {
         0 => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionHeader(title: 'Appearance'),
-              const SizedBox(height: 12),
-              _ThemeSelector(),
-            ],
-          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Appearance'),
+            const SizedBox(height: 12),
+            _ThemeSelector(),
+          ],
+        ),
         1 => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionHeader(title: 'AI Agents'),
-              const SizedBox(height: 12),
-              _AgentSettingsSection(),
-            ],
-          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'AI Agents'),
+            const SizedBox(height: 12),
+            _AgentSettingsSection(),
+          ],
+        ),
         2 => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionHeader(title: 'Notifications'),
-              const SizedBox(height: 12),
-              const _NotificationsSection(),
-            ],
-          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Environment'),
+            const SizedBox(height: 12),
+            const GlobalEnvGroupsSection(),
+          ],
+        ),
         3 => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionHeader(title: 'Sessions'),
-              const SizedBox(height: 12),
-              _SessionSettings(),
-            ],
-          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Notifications'),
+            const SizedBox(height: 12),
+            const _NotificationsSection(),
+          ],
+        ),
         4 => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionHeader(title: 'Keyboard Shortcuts'),
-              const SizedBox(height: 12),
-              _ShortcutsTable(),
-            ],
-          ),
-        6 => const SetupGuideEmbedded(),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Sessions'),
+            const SizedBox(height: 12),
+            _SessionSettings(),
+          ],
+        ),
+        5 => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Keyboard Shortcuts'),
+            const SizedBox(height: 12),
+            _ShortcutsTable(),
+          ],
+        ),
+        7 => const SetupGuideEmbedded(),
         _ => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _SectionHeader(title: 'About'),
-              const SizedBox(height: 12),
-              _AboutSection(),
-            ],
-          ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'About'),
+            const SizedBox(height: 12),
+            _AboutSection(),
+          ],
+        ),
       },
     );
   }
@@ -263,11 +276,12 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
 
   Future<void> _loadConfigs() async {
     final configs = await _service.load();
-    if (mounted) setState(() {
-      _configs = configs;
-      _defaultAgentId = _service.defaultAgentId;
-      _loading = false;
-    });
+    if (mounted)
+      setState(() {
+        _configs = configs;
+        _defaultAgentId = _service.defaultAgentId;
+        _loading = false;
+      });
   }
 
   Future<void> _saveConfigs() async {
@@ -326,23 +340,28 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
             border: Border.all(color: colors.border),
           ),
           child: Column(
-            children: configs.indexed.map(((int, AgentConfig) e) {
-              final (index, config) = e;
-              final isLast = index == configs.length - 1;
-              final isDefault = config.id == _defaultAgentId;
-              return Column(
-                children: [
-                  _AgentRow(
-                    config: config,
-                    isDefault: isDefault,
-                    onChanged: (updated) => _updateConfig(index, updated),
-                    onDelete: config.isBuiltIn ? null : () => _deleteConfig(index),
-                    onSetDefault: () => _setDefault(isDefault ? null : config.id),
-                  ),
-                  if (!isLast) Divider(height: 1, color: colors.border),
-                ],
-              );
-            }).toList(),
+            children:
+                configs.indexed.map(((int, AgentConfig) e) {
+                  final (index, config) = e;
+                  final isLast = index == configs.length - 1;
+                  final isDefault = config.id == _defaultAgentId;
+                  return Column(
+                    children: [
+                      _AgentRow(
+                        config: config,
+                        isDefault: isDefault,
+                        onChanged: (updated) => _updateConfig(index, updated),
+                        onDelete:
+                            config.isBuiltIn
+                                ? null
+                                : () => _deleteConfig(index),
+                        onSetDefault:
+                            () => _setDefault(isDefault ? null : config.id),
+                      ),
+                      if (!isLast) Divider(height: 1, color: colors.border),
+                    ],
+                  );
+                }).toList(),
           ),
         ),
         const SizedBox(height: 12),
@@ -411,11 +430,13 @@ class _AgentRowState extends State<_AgentRow> {
   }
 
   void _emit() {
-    widget.onChanged(widget.config.copyWith(
-      displayName: _nameCtrl.text,
-      iconLabel: _iconCtrl.text,
-      launchCommand: _cmdCtrl.text,
-    ));
+    widget.onChanged(
+      widget.config.copyWith(
+        displayName: _nameCtrl.text,
+        iconLabel: _iconCtrl.text,
+        launchCommand: _cmdCtrl.text,
+      ),
+    );
   }
 
   @override
@@ -429,8 +450,8 @@ class _AgentRowState extends State<_AgentRow> {
           // Visibility toggle
           Switch(
             value: widget.config.visible,
-            onChanged: (v) =>
-                widget.onChanged(widget.config.copyWith(visible: v)),
+            onChanged:
+                (v) => widget.onChanged(widget.config.copyWith(visible: v)),
             activeColor: colors.primary,
           ),
           const SizedBox(width: 8),
@@ -533,7 +554,10 @@ class _AgentRowState extends State<_AgentRow> {
           // Default star button
           const SizedBox(width: 4),
           Tooltip(
-            message: widget.isDefault ? 'Default agent (click to unset)' : 'Set as default agent',
+            message:
+                widget.isDefault
+                    ? 'Default agent (click to unset)'
+                    : 'Set as default agent',
             child: GestureDetector(
               onTap: widget.onSetDefault,
               child: Icon(
@@ -578,54 +602,56 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: AppThemePreset.values.map((preset) {
-        final isActive = preset == current;
-        return GestureDetector(
-          onTap: () {
-            ThemeManager.instance.setTheme(preset);
-            setState(() {});
-          },
-          child: Container(
-            width: 100,
-            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? colors.primary.withAlpha(30)
-                  : colors.background,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isActive ? colors.primary : colors.border,
-                width: isActive ? 2 : 1,
+      children:
+          AppThemePreset.values.map((preset) {
+            final isActive = preset == current;
+            return GestureDetector(
+              onTap: () {
+                ThemeManager.instance.setTheme(preset);
+                setState(() {});
+              },
+              child: Container(
+                width: 100,
+                padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                decoration: BoxDecoration(
+                  color:
+                      isActive
+                          ? colors.primary.withAlpha(30)
+                          : colors.background,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isActive ? colors.primary : colors.border,
+                    width: isActive ? 2 : 1,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: preset.theme.colorScheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: colors.border),
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      preset.label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isActive ? colors.primary : AppColors.textMuted,
+                        fontSize: 11,
+                        fontWeight:
+                            isActive ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: preset.theme.colorScheme.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: colors.border),
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  preset.label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isActive ? colors.primary : AppColors.textMuted,
-                    fontSize: 11,
-                    fontWeight:
-                        isActive ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 }
@@ -671,44 +697,48 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...grouped.entries.map((entry) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    entry.key.toUpperCase(),
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
-                    ),
+        ...grouped.entries.map(
+          (entry) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  entry.key.toUpperCase(),
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.8,
                   ),
                 ),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: colors.border),
-                  ),
-                  child: Column(
-                    children: entry.value.indexed.map(((int, HotkeyDefinition) e) {
-                      final (index, def) = e;
-                      final isLast = index == entry.value.length - 1;
-                      return _HotkeyRow(
-                        definition: def,
-                        isLast: isLast,
-                        onEdit: () => _showKeyCapture(context, def),
-                        onReset: def.isOverridden
-                            ? () => _registry.resetBinding(def.id)
-                            : null,
-                      );
-                    }).toList(),
-                  ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.border),
                 ),
-                const SizedBox(height: 16),
-              ],
-            )),
+                child: Column(
+                  children:
+                      entry.value.indexed.map(((int, HotkeyDefinition) e) {
+                        final (index, def) = e;
+                        final isLast = index == entry.value.length - 1;
+                        return _HotkeyRow(
+                          definition: def,
+                          isLast: isLast,
+                          onEdit: () => _showKeyCapture(context, def),
+                          onReset:
+                              def.isOverridden
+                                  ? () => _registry.resetBinding(def.id)
+                                  : null,
+                        );
+                      }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
         if (hasAny)
           TextButton.icon(
             onPressed: () => _registry.resetAll(),
@@ -723,7 +753,10 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
     );
   }
 
-  Future<void> _showKeyCapture(BuildContext context, HotkeyDefinition def) async {
+  Future<void> _showKeyCapture(
+    BuildContext context,
+    HotkeyDefinition def,
+  ) async {
     final result = await showDialog<SingleActivator>(
       context: context,
       barrierColor: Colors.black54,
@@ -754,9 +787,8 @@ class _HotkeyRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : Border(bottom: BorderSide(color: colors.border)),
+        border:
+            isLast ? null : Border(bottom: BorderSide(color: colors.border)),
       ),
       child: Row(
         children: [
@@ -765,9 +797,10 @@ class _HotkeyRow extends StatelessWidget {
             child: Text(
               definition.description,
               style: TextStyle(
-                color: definition.isOverridden
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+                color:
+                    definition.isOverridden
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
                 fontSize: 13,
               ),
             ),
@@ -778,7 +811,8 @@ class _HotkeyRow extends StatelessWidget {
           if (definition.isOverridden) ...[
             const SizedBox(width: 6),
             Tooltip(
-              message: 'Default: ${HotkeyDefinition.formatActivator(definition.defaultActivator)}',
+              message:
+                  'Default: ${HotkeyDefinition.formatActivator(definition.defaultActivator)}',
               child: GestureDetector(
                 onTap: onReset,
                 child: Icon(
@@ -863,7 +897,9 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _focusNode.requestFocus(),
+    );
   }
 
   @override
@@ -890,7 +926,8 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
     if (modifiers.contains(key)) return;
 
     // Escape = cancel
-    if (key == LogicalKeyboardKey.escape && !HardwareKeyboard.instance.isMetaPressed) {
+    if (key == LogicalKeyboardKey.escape &&
+        !HardwareKeyboard.instance.isMetaPressed) {
       Navigator.of(context).pop();
       return;
     }
@@ -904,15 +941,18 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
     );
 
     // Check for conflict
-    final conflict = HotkeyRegistry.instance.definitions
-        .where((d) => d.id != widget.definition.id)
-        .where((d) =>
-            d.currentActivator.trigger.keyId == key.keyId &&
-            d.currentActivator.meta == activator.meta &&
-            d.currentActivator.shift == activator.shift &&
-            d.currentActivator.alt == activator.alt &&
-            d.currentActivator.control == activator.control)
-        .firstOrNull;
+    final conflict =
+        HotkeyRegistry.instance.definitions
+            .where((d) => d.id != widget.definition.id)
+            .where(
+              (d) =>
+                  d.currentActivator.trigger.keyId == key.keyId &&
+                  d.currentActivator.meta == activator.meta &&
+                  d.currentActivator.shift == activator.shift &&
+                  d.currentActivator.alt == activator.alt &&
+                  d.currentActivator.control == activator.control,
+            )
+            .firstOrNull;
 
     setState(() {
       _captured = activator;
@@ -970,30 +1010,35 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
                       width: _captured != null ? 2 : 1,
                     ),
                   ),
-                  child: _captured == null
-                      ? Text(
-                          'Press a key combination…',
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 14,
+                  child:
+                      _captured == null
+                          ? Text(
+                            'Press a key combination…',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 14,
+                            ),
+                          )
+                          : Text(
+                            HotkeyDefinition.formatActivator(_captured!),
+                            style: TextStyle(
+                              color: colors.primary,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'monospace',
+                            ),
                           ),
-                        )
-                      : Text(
-                          HotkeyDefinition.formatActivator(_captured!),
-                          style: TextStyle(
-                            color: colors.primary,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
                 ),
               ),
               if (_conflict != null) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.warning_amber, size: 14, color: Colors.orange),
+                    const Icon(
+                      Icons.warning_amber,
+                      size: 14,
+                      color: Colors.orange,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -1017,9 +1062,10 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: _captured == null
-                        ? null
-                        : () => Navigator.of(context).pop(_captured),
+                    onPressed:
+                        _captured == null
+                            ? null
+                            : () => Navigator.of(context).pop(_captured),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
                       foregroundColor: Colors.white,
@@ -1053,38 +1099,60 @@ class _AboutSectionState extends State<_AboutSection> {
   @override
   void initState() {
     super.initState();
-    SessionPrefs.isAutoUpdateCheckEnabled()
-        .then((v) { if (mounted) setState(() => _autoCheck = v); });
+    SessionPrefs.isAutoUpdateCheckEnabled().then((v) {
+      if (mounted) setState(() => _autoCheck = v);
+    });
     // Eagerly load the real version from Info.plist so the UI shows it.
-    UpdateService.getAppVersion().then((_) { if (mounted) setState(() {}); });
+    UpdateService.getAppVersion().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _checkNow() async {
-    setState(() { _checking = true; _upToDateMsg = null; _updateInfo = null; });
+    setState(() {
+      _checking = true;
+      _upToDateMsg = null;
+      _updateInfo = null;
+    });
     final info = await UpdateService.checkForUpdate(force: true);
     if (!mounted) return;
     setState(() {
       _checking = false;
       _updateInfo = info;
-      if (info == null) _upToDateMsg = 'You are on the latest version (${UpdateService.currentVersion}).';
+      if (info == null)
+        _upToDateMsg =
+            'You are on the latest version (${UpdateService.currentVersion}).';
     });
   }
 
   Future<void> _installUpdate(UpdateInfo info) async {
-    setState(() { _installing = true; _installProgress = null; _installStatus = 'Preparing…'; });
+    setState(() {
+      _installing = true;
+      _installProgress = null;
+      _installStatus = 'Preparing…';
+    });
     try {
       await UpdateService.downloadAndInstall(
         info,
         onProgress: (progress, status) {
-          if (mounted) setState(() { _installProgress = progress; _installStatus = status; });
+          if (mounted)
+            setState(() {
+              _installProgress = progress;
+              _installStatus = status;
+            });
         },
       );
       // If we get here without exit(), the installer opened browser fallback.
     } catch (e) {
       if (mounted) {
-        setState(() { _installing = false; });
+        setState(() {
+          _installing = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: $e'), backgroundColor: AppColors.neonRed),
+          SnackBar(
+            content: Text('Update failed: $e'),
+            backgroundColor: AppColors.neonRed,
+          ),
         );
       }
     }
@@ -1113,24 +1181,47 @@ class _AboutSectionState extends State<_AboutSection> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('YoLoIT — AI Orchestrator',
-                            style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                        const Text(
+                          'YoLoIT — AI Orchestrator',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Text('v${UpdateService.currentVersion}',
-                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                            Text(
+                              'v${UpdateService.currentVersion}',
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 11,
+                              ),
+                            ),
                             if (UpdateService.isDevBuild) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.neonOrange.withAlpha(30),
                                   borderRadius: BorderRadius.circular(3),
-                                  border: Border.all(color: AppColors.neonOrange.withAlpha(80)),
+                                  border: Border.all(
+                                    color: AppColors.neonOrange.withAlpha(80),
+                                  ),
                                 ),
-                                child: const Text('DEV',
-                                    style: TextStyle(color: AppColors.neonOrange, fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                                child: const Text(
+                                  'DEV',
+                                  style: TextStyle(
+                                    color: AppColors.neonOrange,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
                             ],
                           ],
@@ -1143,11 +1234,17 @@ class _AboutSectionState extends State<_AboutSection> {
               const SizedBox(height: 8),
               const Text(
                 'A Flutter desktop app for orchestrating AI CLI tools (GitHub Copilot, Claude Code) with embedded PTY terminals and git workspace management.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.6),
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  height: 1.6,
+                ),
               ),
               const SizedBox(height: 6),
-              const Text('Platform: macOS (primary) • Windows (coming soon)',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+              const Text(
+                'Platform: macOS (primary) • Windows (coming soon)',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              ),
             ],
           ),
         ),
@@ -1164,16 +1261,27 @@ class _AboutSectionState extends State<_AboutSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Updates',
-                  style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
+              const Text(
+                'Updates',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 12),
 
               // Auto-check toggle
               Row(
                 children: [
                   const Expanded(
-                    child: Text('Auto-check for updates',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    child: Text(
+                      'Auto-check for updates',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                   Switch(
                     value: _autoCheck,
@@ -1186,8 +1294,10 @@ class _AboutSectionState extends State<_AboutSection> {
                 ],
               ),
               const SizedBox(height: 4),
-              const Text('Checks GitHub releases once per day in release builds.',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+              const Text(
+                'Checks GitHub releases once per day in release builds.',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+              ),
 
               const SizedBox(height: 16),
 
@@ -1196,13 +1306,20 @@ class _AboutSectionState extends State<_AboutSection> {
                 children: [
                   ElevatedButton.icon(
                     onPressed: _checking ? null : _checkNow,
-                    icon: _checking
-                        ? const SizedBox(
-                            width: 12, height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
-                          )
-                        : const Icon(Icons.search, size: 14),
-                    label: Text(_checking ? 'Checking...' : 'Check for Updates'),
+                    icon:
+                        _checking
+                            ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: Colors.white,
+                              ),
+                            )
+                            : const Icon(Icons.search, size: 14),
+                    label: Text(
+                      _checking ? 'Checking...' : 'Check for Updates',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.surfaceElevated,
                       foregroundColor: AppColors.textPrimary,
@@ -1217,11 +1334,23 @@ class _AboutSectionState extends State<_AboutSection> {
               // Result
               if (_upToDateMsg != null) ...[
                 const SizedBox(height: 10),
-                Row(children: [
-                  const Icon(Icons.check_circle_outline, size: 14, color: AppColors.neonGreen),
-                  const SizedBox(width: 6),
-                  Text(_upToDateMsg!, style: const TextStyle(color: AppColors.neonGreen, fontSize: 11)),
-                ]),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline,
+                      size: 14,
+                      color: AppColors.neonGreen,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _upToDateMsg!,
+                      style: const TextStyle(
+                        color: AppColors.neonGreen,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ],
 
               if (_updateInfo != null) ...[
@@ -1230,8 +1359,13 @@ class _AboutSectionState extends State<_AboutSection> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_installStatus,
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                      Text(
+                        _installStatus,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       LinearProgressIndicator(
                         value: _installProgress,
@@ -1240,8 +1374,13 @@ class _AboutSectionState extends State<_AboutSection> {
                         minHeight: 3,
                       ),
                       const SizedBox(height: 4),
-                      const Text('App will restart automatically after install.',
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                      const Text(
+                        'App will restart automatically after install.',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                        ),
+                      ),
                     ],
                   ),
                 ] else
@@ -1263,7 +1402,11 @@ class _AboutSectionState extends State<_AboutSection> {
 }
 
 class _UpdateAvailableCard extends StatelessWidget {
-  const _UpdateAvailableCard({required this.info, required this.onDownload, required this.onSkip});
+  const _UpdateAvailableCard({
+    required this.info,
+    required this.onDownload,
+    required this.onSkip,
+  });
   final UpdateInfo info;
   final VoidCallback onDownload;
   final VoidCallback onSkip;
@@ -1282,10 +1425,20 @@ class _UpdateAvailableCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.system_update_alt_rounded, size: 14, color: AppColors.neonBlue),
+              const Icon(
+                Icons.system_update_alt_rounded,
+                size: 14,
+                color: AppColors.neonBlue,
+              ),
               const SizedBox(width: 8),
-              Text('${info.tagName} is available!',
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(
+                '${info.tagName} is available!',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
           if (info.releaseNotes.isNotEmpty) ...[
@@ -1294,7 +1447,11 @@ class _UpdateAvailableCard extends StatelessWidget {
               info.releaseNotes.length > 200
                   ? '${info.releaseNotes.substring(0, 200)}...'
                   : info.releaseNotes,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 10, height: 1.5),
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 10,
+                height: 1.5,
+              ),
             ),
           ],
           const SizedBox(height: 12),
@@ -1314,8 +1471,10 @@ class _UpdateAvailableCard extends StatelessWidget {
               const SizedBox(width: 8),
               TextButton(
                 onPressed: onSkip,
-                child: const Text('Skip this version',
-                    style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                child: const Text(
+                  'Skip this version',
+                  style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+                ),
               ),
             ],
           ),
@@ -1358,7 +1517,11 @@ class _SessionSettingsState extends State<_SessionSettings> {
   Future<void> _loadLogs() async {
     setState(() => _logsLoading = true);
     final logs = await _logging.listLogs();
-    if (mounted) setState(() { _logs = logs; _logsLoading = false; });
+    if (mounted)
+      setState(() {
+        _logs = logs;
+        _logsLoading = false;
+      });
   }
 
   Future<void> _deleteLog(String path) async {
@@ -1386,9 +1549,10 @@ class _SessionSettingsState extends State<_SessionSettings> {
           _ToggleRow(
             icon: Icons.terminal,
             title: 'Keep sessions alive after closing app',
-            subtitle: _tmux.available
-                ? 'Uses tmux — sessions survive app restart'
-                : 'Requires tmux — install with: brew install tmux',
+            subtitle:
+                _tmux.available
+                    ? 'Uses tmux — sessions survive app restart'
+                    : 'Requires tmux — install with: brew install tmux',
             value: _tmuxOn && _tmux.available,
             enabled: _tmux.available,
             onChanged: (v) async {
@@ -1406,7 +1570,10 @@ class _SessionSettingsState extends State<_SessionSettings> {
             onChanged: (v) async {
               await _logging.setEnabled(v);
               if (mounted) {
-                setState(() { _loggingOn = v; if (!v) _showLogs = false; });
+                setState(() {
+                  _loggingOn = v;
+                  if (!v) _showLogs = false;
+                });
               }
             },
           ),
@@ -1420,7 +1587,10 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 _loadLogs();
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 child: Row(
                   children: [
                     Icon(
@@ -1444,11 +1614,16 @@ class _SessionSettingsState extends State<_SessionSettings> {
           _ToggleRow(
             icon: Icons.bug_report_outlined,
             title: 'Log app diagnostics to file',
-            subtitle: 'Saved to ~/Library/Logs/yoloit/app.log (max 5 MB, rotates)',
+            subtitle:
+                'Saved to ~/Library/Logs/yoloit/app.log (max 5 MB, rotates)',
             value: _appLoggingOn,
             onChanged: (v) async {
               await AppLogger.instance.setEnabled(v);
-              if (mounted) setState(() { _appLoggingOn = v; if (!v) _showAppLog = false; });
+              if (mounted)
+                setState(() {
+                  _appLoggingOn = v;
+                  if (!v) _showAppLog = false;
+                });
             },
           ),
           if (_appLoggingOn) ...[
@@ -1459,7 +1634,10 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 if (_showAppLog) _loadAppLog();
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 child: Row(
                   children: [
                     Icon(
@@ -1478,7 +1656,10 @@ class _SessionSettingsState extends State<_SessionSettings> {
                         await AppLogger.instance.clearLog();
                         if (_showAppLog) _loadAppLog();
                       },
-                      child: const Text('Clear', style: TextStyle(fontSize: 12)),
+                      child: const Text(
+                        'Clear',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
@@ -1496,7 +1677,11 @@ class _SessionSettingsState extends State<_SessionSettings> {
   Future<void> _loadAppLog() async {
     setState(() => _appLogLoading = true);
     final content = await AppLogger.instance.readLog();
-    if (mounted) setState(() { _appLogContent = content; _appLogLoading = false; });
+    if (mounted)
+      setState(() {
+        _appLogContent = content;
+        _appLogLoading = false;
+      });
   }
 
   Widget _buildAppLogSection(BuildContext context) {
@@ -1512,9 +1697,14 @@ class _SessionSettingsState extends State<_SessionSettings> {
           Row(
             children: [
               Expanded(
-                child: Text('~/.config/yoloit/app.log',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 11,
-                        fontFamily: 'monospace')),
+                child: Text(
+                  '~/.config/yoloit/app.log',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  ),
+                ),
               ),
               TextButton(
                 onPressed: () async {
@@ -1568,13 +1758,19 @@ class _SessionSettingsState extends State<_SessionSettings> {
             children: [
               Text(
                 '${_logs.length} file(s)',
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                ),
               ),
               const Spacer(),
               if (_logs.isNotEmpty)
                 TextButton(
                   onPressed: _clearAll,
-                  child: const Text('Clear all', style: TextStyle(fontSize: 12)),
+                  child: const Text(
+                    'Clear all',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 16),
@@ -1587,20 +1783,31 @@ class _SessionSettingsState extends State<_SessionSettings> {
             ],
           ),
           if (_logsLoading)
-            const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+            const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
           else if (_logs.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('No logs yet.', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              child: Text(
+                'No logs yet.',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
             )
           else
-            ...(_logs.take(10).map(
-              (log) => _LogRow(
-                log: log,
-                onDelete: () => _deleteLog(log.path),
-                onView: () => _showLogContent(context, log),
-              ),
-            )),
+            ...(_logs
+                .take(10)
+                .map(
+                  (log) => _LogRow(
+                    log: log,
+                    onDelete: () => _deleteLog(log.path),
+                    onView: () => _showLogContent(context, log),
+                  ),
+                )),
         ],
       ),
     );
@@ -1610,11 +1817,15 @@ class _SessionSettingsState extends State<_SessionSettings> {
     final colors = context.appColors;
     showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
-        backgroundColor: colors.surface,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
-        child: _LogViewerDialog(log: log),
-      ),
+      builder:
+          (_) => Dialog(
+            backgroundColor: colors.surface,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 40,
+              vertical: 40,
+            ),
+            child: _LogViewerDialog(log: log),
+          ),
     );
   }
 }
@@ -1652,13 +1863,17 @@ class _ToggleRow extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: enabled ? AppColors.textPrimary : AppColors.textMuted,
+                    color:
+                        enabled ? AppColors.textPrimary : AppColors.textMuted,
                     fontSize: 13,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -1692,7 +1907,11 @@ class _LogRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          const Icon(Icons.insert_drive_file_outlined, size: 14, color: AppColors.textMuted),
+          const Icon(
+            Icons.insert_drive_file_outlined,
+            size: 14,
+            color: AppColors.textMuted,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: GestureDetector(
@@ -1708,11 +1927,18 @@ class _LogRow extends StatelessWidget {
               ),
             ),
           ),
-          Text(log.sizeLabel, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+          Text(
+            log.sizeLabel,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+          ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onDelete,
-            child: const Icon(Icons.close, size: 14, color: AppColors.textMuted),
+            child: const Icon(
+              Icons.close,
+              size: 14,
+              color: AppColors.textMuted,
+            ),
           ),
         ],
       ),
@@ -1760,11 +1986,20 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                     ),
                   ),
                 ),
-                Text(widget.log.sizeLabel,
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                Text(
+                  widget.log.sizeLabel,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18, color: AppColors.textMuted),
+                  icon: const Icon(
+                    Icons.close,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(minWidth: 28, minHeight: 28),
@@ -1774,20 +2009,21 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
           ),
           Divider(height: 1, color: colors.border),
           Expanded(
-            child: _content == null
-                ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: SelectableText(
-                      _content!,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        height: 1.6,
+            child:
+                _content == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: SelectableText(
+                        _content!,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          height: 1.6,
+                        ),
                       ),
                     ),
-                  ),
           ),
         ],
       ),
@@ -1868,7 +2104,10 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
           ),
           TextButton(
             onPressed: () => _pickDirectory(context),
-            child: Text('Change…', style: TextStyle(fontSize: 12, color: colors.primary)),
+            child: Text(
+              'Change…',
+              style: TextStyle(fontSize: 12, color: colors.primary),
+            ),
           ),
           if (!isDefault)
             TextButton(
@@ -1921,7 +2160,11 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const SizedBox(height: 48, child: Center(child: CircularProgressIndicator()));
+    if (_loading)
+      return const SizedBox(
+        height: 48,
+        child: Center(child: CircularProgressIndicator()),
+      );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1945,12 +2188,13 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
           subtitle: 'Plays when agent is waiting for tool approval',
           value: _approvalSoundEnabled && _agentSoundsEnabled,
           enabled: _agentSoundsEnabled,
-          onChanged: _agentSoundsEnabled
-              ? (v) {
-                  setState(() => _approvalSoundEnabled = v);
-                  SessionPrefs.saveApprovalSoundEnabled(v);
-                }
-              : null,
+          onChanged:
+              _agentSoundsEnabled
+                  ? (v) {
+                    setState(() => _approvalSoundEnabled = v);
+                    SessionPrefs.saveApprovalSoundEnabled(v);
+                  }
+                  : null,
         ),
         const SizedBox(height: 8),
         _SettingsToggle(
@@ -1958,12 +2202,13 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
           subtitle: 'Plays when agent finishes responding',
           value: _completionSoundEnabled && _agentSoundsEnabled,
           enabled: _agentSoundsEnabled,
-          onChanged: _agentSoundsEnabled
-              ? (v) {
-                  setState(() => _completionSoundEnabled = v);
-                  SessionPrefs.saveCompletionSoundEnabled(v);
-                }
-              : null,
+          onChanged:
+              _agentSoundsEnabled
+                  ? (v) {
+                    setState(() => _completionSoundEnabled = v);
+                    SessionPrefs.saveCompletionSoundEnabled(v);
+                  }
+                  : null,
         ),
       ],
     );
@@ -2004,7 +2249,8 @@ class _SettingsToggle extends StatelessWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: enabled ? AppColors.textPrimary : AppColors.textMuted,
+                    color:
+                        enabled ? AppColors.textPrimary : AppColors.textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -2012,7 +2258,10 @@ class _SettingsToggle extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
