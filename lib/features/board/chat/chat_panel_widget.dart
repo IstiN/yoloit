@@ -33,6 +33,9 @@ class ChatPanelWidget extends StatefulWidget {
   /// Used by [_BoardPanelCard] to animate the border glow.
   static final Map<String, ValueNotifier<bool>> processingNotifiers = {};
 
+  /// Fires whenever any panel's processing state changes. Used by minimap.
+  static final ValueNotifier<int> processingChangeNotifier = ValueNotifier(0);
+
   @override
   State<ChatPanelWidget> createState() => _ChatPanelWidgetState();
 }
@@ -169,6 +172,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   void _setProcessing(bool value) {
     _isProcessing = value;
     processingNotifier.value = value;
+    // Notify minimap and other global listeners
+    ChatPanelWidget.processingChangeNotifier.value++;
     if (value) {
       _glowCtrl.repeat(reverse: true);
     } else {
@@ -177,9 +182,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
   }
 
+  bool _isSending = false;
+
   Future<void> _sendMessage() async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
+    if (_isSending) return; // prevent re-entrance
 
     // Handle /model command
     if (text == '/model') {
@@ -188,6 +196,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       return;
     }
 
+    _isSending = true;
     _inputController.clear();
 
     // If currently processing, finalize any partial response first
@@ -232,6 +241,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _eventSub = stream.listen(
       _handleEvent,
       onError: (Object error) {
+        _isSending = false;
         setState(() {
           _setProcessing(false);
           _messages.add(ChatMessage(
@@ -245,6 +255,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _scrollToBottom();
       },
       onDone: () {
+        _isSending = false;
         setState(() {
           _setProcessing(false);
           // Finalize any streaming message

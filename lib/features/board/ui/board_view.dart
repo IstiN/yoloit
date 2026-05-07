@@ -535,22 +535,25 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 ),
                                 if (_showMinimap) ...[
                                   const SizedBox(height: 6),
-                                  _BoardMiniMap(
-                                    panels: activeBoard.panels,
-                                    processingPanelIds: ChatPanelWidget.processingNotifiers.entries
-                                        .where((e) => e.value.value)
-                                        .map((e) => e.key)
-                                        .toSet(),
-                                    transformCtrl: _transformController,
-                                    viewportSize:
-                                        _viewportSize ?? const Size(1, 1),
-                                    origin: _canvasOrigin,
-                                    onPanTo:
-                                        (center) => _centerViewportOn(
-                                          activeBoard,
-                                          center,
-                                          persist: true,
-                                        ),
+                                  ValueListenableBuilder<int>(
+                                    valueListenable: ChatPanelWidget.processingChangeNotifier,
+                                    builder: (context, _, __) => _BoardMiniMap(
+                                      panels: activeBoard.panels,
+                                      processingPanelIds: ChatPanelWidget.processingNotifiers.entries
+                                          .where((e) => e.value.value)
+                                          .map((e) => e.key)
+                                          .toSet(),
+                                      transformCtrl: _transformController,
+                                      viewportSize:
+                                          _viewportSize ?? const Size(1, 1),
+                                      origin: _canvasOrigin,
+                                      onPanTo:
+                                          (center) => _centerViewportOn(
+                                            activeBoard,
+                                            center,
+                                            persist: true,
+                                          ),
+                                    ),
                                   ),
                                 ],
                               ],

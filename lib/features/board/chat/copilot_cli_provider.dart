@@ -42,7 +42,7 @@ class CopilotCliProvider extends ChatProvider {
     required ChatSessionConfig config,
     required bool isFirstMessage,
   }) {
-    final controller = StreamController<ChatEvent>.broadcast();
+    final controller = StreamController<ChatEvent>();
 
     _runProcess(
       message: message,
