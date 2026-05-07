@@ -190,6 +190,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     _inputController.clear();
 
+    // If currently processing, finalize any partial response first
+    if (_isProcessing) {
+      _eventSub?.cancel();
+      _eventSub = null;
+      _provider.stop(_config.sessionName);
+      setState(() {
+        _finalizeStreamingMessage();
+        _streamingContent = '';
+        _streamingMessageId = null;
+        _activeToolCalls.clear();
+      });
+    }
+
     // Add user message
     setState(() {
       _messages.add(ChatMessage(
