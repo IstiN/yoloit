@@ -644,31 +644,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             bottomRight: Radius.circular(16),
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            MarkdownBody(
-              data: processedContent,
-              onTapLink: (text, href, title) {
-                if (href != null && href.isNotEmpty) {
-                  PlatformLauncher.instance.openUrl(href);
-                }
-              },
-              styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
-                a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
-                code: const TextStyle(fontSize: 11.5, color: Color(0xFF34D399), backgroundColor: Color(0xFF0D1117)),
-                codeblockDecoration: BoxDecoration(
-                  color: const Color(0xFF0D1117),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1E293B)),
+        child: processedContent.isEmpty
+            ? const _TypingIndicator()
+            : MarkdownBody(
+                data: processedContent,
+                onTapLink: (text, href, title) {
+                  if (href != null && href.isNotEmpty) {
+                    PlatformLauncher.instance.openUrl(href);
+                  }
+                },
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
+                  a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
+                  code: const TextStyle(fontSize: 11.5, color: Color(0xFF34D399), backgroundColor: Color(0xFF0D1117)),
+                  codeblockDecoration: BoxDecoration(
+                    color: const Color(0xFF0D1117),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 6),
-            const _TypingIndicator(),
-          ],
-        ),
       ),
     );
   }
@@ -1225,7 +1220,7 @@ class _AssistantBubble extends StatelessWidget {
             ),
             child: SelectionArea(
               child: MarkdownBody(
-                data: processedContent.isEmpty ? '_thinking…_' : processedContent,
+                data: processedContent.isEmpty ? ' ' : processedContent,
                 selectable: false,
                 onTapLink: (text, href, title) {
                   if (href != null && href.isNotEmpty) {

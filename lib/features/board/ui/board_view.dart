@@ -2040,6 +2040,7 @@ class _BoardPanelCard extends StatelessWidget {
                             child: Text(
                               panel.title,
                               overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,
@@ -2064,11 +2065,16 @@ class _BoardPanelCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             if (onEditNote != null)
-                              IconButton(
-                                tooltip: 'Edit note',
-                                onPressed: onEditNote,
-                                icon: const Icon(Icons.edit_outlined, size: 16),
-                                splashRadius: 16,
+                              SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: IconButton(
+                                  tooltip: 'Edit note',
+                                  onPressed: onEditNote,
+                                  icon: const Icon(Icons.edit_outlined, size: 16),
+                                  splashRadius: 14,
+                                  padding: EdgeInsets.zero,
+                                ),
                               ),
                           ],
                           if (panel.type == ChatPanelPlugin.kTypeId)
@@ -2077,11 +2083,16 @@ class _BoardPanelCard extends StatelessWidget {
                               onEditColor: onEditColor,
                               onUpdateState: onUpdateState,
                             ),
-                          IconButton(
-                            tooltip: 'Remove panel',
-                            onPressed: onDelete,
-                            icon: const Icon(Icons.close, size: 16),
-                            splashRadius: 16,
+                          SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: IconButton(
+                              tooltip: 'Remove panel',
+                              onPressed: onDelete,
+                              icon: const Icon(Icons.close, size: 16),
+                              splashRadius: 14,
+                              padding: EdgeInsets.zero,
+                            ),
                           ),
                         ],
                       ),
@@ -3998,11 +4009,14 @@ class _ChatHeaderMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: PopupMenuButton<String>(
       icon: const Icon(Icons.more_horiz, size: 16, color: AppColors.textMuted),
-      splashRadius: 16,
+      splashRadius: 14,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(maxWidth: 36, maxHeight: 36),
+      constraints: const BoxConstraints(maxWidth: 28, maxHeight: 28),
       color: const Color(0xFF1E293B),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       itemBuilder: (context) => [
@@ -4037,6 +4051,7 @@ class _ChatHeaderMenu extends StatelessWidget {
             onEditColor();
         }
       },
+      ),
     );
   }
 
