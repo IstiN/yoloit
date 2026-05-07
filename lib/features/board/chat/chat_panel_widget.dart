@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
@@ -435,6 +437,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _config = config;
           _isFirstMessage = true;
         });
+        // Update panel title to session name
+        if (config.sessionName.isNotEmpty) {
+          context.read<BoardCubit>().updatePanelTitle(
+            widget.panel.id, config.sessionName,
+          );
+        }
         // Persist config to panel state
         widget.onUpdateState({
           ...widget.panel.state,
