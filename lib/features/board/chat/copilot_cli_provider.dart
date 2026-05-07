@@ -8,15 +8,12 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 
 /// [ChatProvider] implementation that wraps the GitHub Copilot CLI.
 ///
-/// Runs `copilot` with `--output-format json --allow-all` and parses
+/// Runs `copilot` with `--output-format json --yolo` and parses
 /// the NDJSON output into [ChatEvent] objects.
 class CopilotCliProvider extends ChatProvider {
   CopilotCliProvider();
 
   final Map<String, Process> _processes = {};
-  // Track sessions that have been started in this provider instance.
-  // Prevents using --resume for a session that copilot CLI doesn't know about.
-  final Set<String> _startedSessions = {};
 
   @override
   String get providerId => 'copilot';
@@ -41,6 +38,7 @@ class CopilotCliProvider extends ChatProvider {
     required String message,
     required ChatSessionConfig config,
     required bool isFirstMessage,
+    List<String> attachments = const [],
   }) {
     final controller = StreamController<ChatEvent>();
 
@@ -48,6 +46,7 @@ class CopilotCliProvider extends ChatProvider {
       message: message,
       config: config,
       isFirstMessage: isFirstMessage,
+      attachments: attachments,
       controller: controller,
     );
 
@@ -58,6 +57,7 @@ class CopilotCliProvider extends ChatProvider {
     required String message,
     required ChatSessionConfig config,
     required bool isFirstMessage,
+    required List<String> attachments,
     required StreamController<ChatEvent> controller,
   }) async {
     // Kill any existing process for this session
@@ -65,17 +65,41 @@ class CopilotCliProvider extends ChatProvider {
 
     final args = <String>[
       '--output-format', 'json',
-      '--allow-all',
+      '--yolo',
       '--model', config.model,
     ];
 
-    if (isFirstMessage || !_startedSessions.contains(config.sessionName)) {
+    // Reasoning effort
+    if (config.reasoningEffort != null) {
+      args.addAll(['--reasoning-effort', config.reasoningEffort!]);
+    }
+
+    // Autopilot mode
+    if (config.autopilot) {
+      args.addAll(['--max-autopilot-continues', '${config.maxAutopilotContinues}']);
+    }
+
+    // Agent mode
+    if (config.mode != null && config.mode!.isNotEmpty) {
+      args.addAll(['--mode', config.mode!]);
+    }
+
+    // Session name/resume
+    if (isFirstMessage) {
       args.addAll(['--name', config.sessionName]);
-      _startedSessions.add(config.sessionName);
     } else {
       args.addAll(['--resume', config.sessionName]);
     }
 
+    // Attachments
+    for (final path in attachments) {
+      args.addAll(['--attachment', path]);
+    }
+
+    // Custom args
+    args.addAll(config.customArgs);
+
+    // Prompt
     args.addAll(['-p', message]);
 
     debugPrint('[CopilotCli] Running: copilot ${args.join(' ')}');

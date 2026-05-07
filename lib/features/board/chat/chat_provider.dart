@@ -35,10 +35,12 @@ abstract class ChatProvider {
   ///
   /// [config] contains session name, working dir, model, etc.
   /// [isFirstMessage] indicates whether this is a new session (vs resume).
+  /// [attachments] optional file paths to attach (images, documents).
   Stream<ChatEvent> sendMessage({
     required String message,
     required ChatSessionConfig config,
     required bool isFirstMessage,
+    List<String> attachments = const [],
   });
 
   /// Stop any running process for [sessionName].

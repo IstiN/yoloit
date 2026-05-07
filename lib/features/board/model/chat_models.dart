@@ -433,6 +433,11 @@ class ChatSessionConfig extends Equatable {
     required this.workingDir,
     this.provider = 'copilot',
     this.model = 'gpt-5-mini',
+    this.reasoningEffort,
+    this.autopilot = false,
+    this.mode,
+    this.maxAutopilotContinues = 99,
+    this.customArgs = const [],
   });
 
   final String sessionName;
@@ -444,11 +449,31 @@ class ChatSessionConfig extends Equatable {
   /// Model to use.
   final String model;
 
+  /// Reasoning effort level: low, medium, high, xhigh (null = default).
+  final String? reasoningEffort;
+
+  /// Whether to run in autopilot mode (--autopilot flag).
+  final bool autopilot;
+
+  /// Agent mode: interactive, plan, autopilot (null = default/interactive).
+  final String? mode;
+
+  /// Max autopilot continuation messages.
+  final int maxAutopilotContinues;
+
+  /// Custom extra CLI arguments (provider-specific).
+  final List<String> customArgs;
+
   Map<String, dynamic> toJson() => {
     'sessionName': sessionName,
     'workingDir': workingDir,
     'provider': provider,
     'model': model,
+    if (reasoningEffort != null) 'reasoningEffort': reasoningEffort,
+    'autopilot': autopilot,
+    if (mode != null) 'mode': mode,
+    'maxAutopilotContinues': maxAutopilotContinues,
+    if (customArgs.isNotEmpty) 'customArgs': customArgs,
   };
 
   factory ChatSessionConfig.fromJson(Map<String, dynamic> json) {
@@ -457,6 +482,11 @@ class ChatSessionConfig extends Equatable {
       workingDir: json['workingDir'] as String? ?? '',
       provider: json['provider'] as String? ?? 'copilot',
       model: json['model'] as String? ?? 'gpt-5-mini',
+      reasoningEffort: json['reasoningEffort'] as String?,
+      autopilot: json['autopilot'] as bool? ?? false,
+      mode: json['mode'] as String?,
+      maxAutopilotContinues: json['maxAutopilotContinues'] as int? ?? 99,
+      customArgs: (json['customArgs'] as List?)?.cast<String>() ?? const [],
     );
   }
 
@@ -465,17 +495,27 @@ class ChatSessionConfig extends Equatable {
     String? workingDir,
     String? provider,
     String? model,
+    String? Function()? reasoningEffort,
+    bool? autopilot,
+    String? Function()? mode,
+    int? maxAutopilotContinues,
+    List<String>? customArgs,
   }) {
     return ChatSessionConfig(
       sessionName: sessionName ?? this.sessionName,
       workingDir: workingDir ?? this.workingDir,
       provider: provider ?? this.provider,
       model: model ?? this.model,
+      reasoningEffort: reasoningEffort != null ? reasoningEffort() : this.reasoningEffort,
+      autopilot: autopilot ?? this.autopilot,
+      mode: mode != null ? mode() : this.mode,
+      maxAutopilotContinues: maxAutopilotContinues ?? this.maxAutopilotContinues,
+      customArgs: customArgs ?? this.customArgs,
     );
   }
 
   @override
-  List<Object?> get props => [sessionName, workingDir, provider, model];
+  List<Object?> get props => [sessionName, workingDir, provider, model, reasoningEffort, autopilot, mode, maxAutopilotContinues, customArgs];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

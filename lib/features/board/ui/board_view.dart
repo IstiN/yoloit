@@ -14,6 +14,7 @@ import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
+import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
@@ -4089,6 +4090,17 @@ class _ChatHeaderMenu extends StatelessWidget {
           ),
         ),
         const PopupMenuItem(
+          value: 'settings',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.tune, size: 14, color: Color(0xFF94A3B8)),
+              SizedBox(width: 8),
+              Text('CLI settings', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
           value: 'history',
           height: 36,
           child: Row(
@@ -4115,6 +4127,8 @@ class _ChatHeaderMenu extends StatelessWidget {
         switch (value) {
           case 'rename':
             _showRenameDialog(context);
+          case 'settings':
+            _showSettingsDialog(context);
           case 'history':
             _showSessionHistory(context);
           case 'color':
@@ -4185,6 +4199,104 @@ class _ChatHeaderMenu extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => _ChatSessionHistoryDialog(panelId: panel.id),
+    );
+  }
+
+  void _showSettingsDialog(BuildContext context) {
+    final config = ChatSessionConfig.fromJson(
+      Map<String, dynamic>.from(panel.state['config'] as Map? ?? {}),
+    );
+    final customArgsCtrl = TextEditingController(text: config.customArgs.join(' '));
+    final maxContinuesCtrl = TextEditingController(text: '${config.maxAutopilotContinues}');
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        var mode = config.mode;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: const Text('CLI Settings', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 14)),
+            content: SizedBox(
+              width: 320,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Agent Mode', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                  const SizedBox(height: 4),
+                  DropdownButton<String?>(
+                    value: mode,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF1E293B),
+                    style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('Default (interactive)')),
+                      DropdownMenuItem(value: 'interactive', child: Text('Interactive')),
+                      DropdownMenuItem(value: 'plan', child: Text('Plan')),
+                      DropdownMenuItem(value: 'autopilot', child: Text('Autopilot')),
+                    ],
+                    onChanged: (v) => setDialogState(() => mode = v),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Max autopilot continues', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: maxContinuesCtrl,
+                    style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '99',
+                      hintStyle: const TextStyle(color: Color(0xFF475569)),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Custom args', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: customArgsCtrl,
+                    style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 12),
+                    decoration: InputDecoration(
+                      hintText: '--flag value ...',
+                      hintStyle: const TextStyle(color: Color(0xFF475569)),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  final argsText = customArgsCtrl.text.trim();
+                  final customArgs = argsText.isEmpty
+                      ? <String>[]
+                      : argsText.split(RegExp(r'\s+'));
+                  final maxCont = int.tryParse(maxContinuesCtrl.text.trim()) ?? 99;
+                  final updatedConfig = config.copyWith(
+                    mode: () => mode,
+                    maxAutopilotContinues: maxCont,
+                    customArgs: customArgs,
+                  );
+                  onUpdateState?.call({
+                    ...panel.state,
+                    'config': updatedConfig.toJson(),
+                  });
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

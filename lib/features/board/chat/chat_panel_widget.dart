@@ -523,6 +523,44 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          // Autopilot toggle
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _config = _config.copyWith(autopilot: !_config.autopilot);
+              });
+              _persistMessages();
+            },
+            child: Tooltip(
+              message: _config.autopilot ? 'Autopilot ON' : 'Autopilot OFF',
+              child: Icon(
+                Icons.rocket_launch,
+                size: 12,
+                color: _config.autopilot
+                    ? const Color(0xFF34D399)
+                    : const Color(0xFF334155),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Reasoning effort
+          GestureDetector(
+            onTap: _cycleReasoningEffort,
+            child: Tooltip(
+              message: 'Effort: ${_config.reasoningEffort ?? 'default'}',
+              child: Text(
+                _reasoningLabel(),
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w600,
+                  color: _config.reasoningEffort != null
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFF334155),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
           Text(
             _config.model,
             style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
@@ -553,6 +591,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         ],
       ),
     );
+  }
+
+  String _reasoningLabel() {
+    return switch (_config.reasoningEffort) {
+      'low' => 'Lo',
+      'medium' => 'Med',
+      'high' => 'Hi',
+      'xhigh' => 'X',
+      _ => 'Ef',
+    };
+  }
+
+  void _cycleReasoningEffort() {
+    const levels = [null, 'low', 'medium', 'high', 'xhigh'];
+    final currentIdx = levels.indexOf(_config.reasoningEffort);
+    final nextIdx = (currentIdx + 1) % levels.length;
+    setState(() {
+      _config = _config.copyWith(reasoningEffort: () => levels[nextIdx]);
+    });
+    _persistMessages();
   }
 
   Widget _buildEmptyState() {
