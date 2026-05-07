@@ -7,6 +7,8 @@ import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/board/model/terminal_panel_models.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 
 class BoardCubit extends Cubit<BoardState> {
   BoardCubit() : super(const BoardState());
@@ -156,7 +158,8 @@ class BoardCubit extends Cubit<BoardState> {
       preferredHeight: 500,
     );
     final config = ChatSessionConfig(
-      sessionName: sessionName ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
+      sessionName:
+          sessionName ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
       workingDir: workingDir,
       model: model,
     );
@@ -170,6 +173,46 @@ class BoardCubit extends Cubit<BoardState> {
       title: title?.trim().isNotEmpty == true ? title!.trim() : 'AI Chat',
       bounds: bounds,
       state: panelState,
+      zIndex:
+          board.panels.fold<int>(
+            0,
+            (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+          ) +
+          1,
+    );
+    await addPanel(panel);
+    await focusPanel(panel.id);
+  }
+
+  Future<void> createTerminalPanel({
+    String? title,
+    String? sessionId,
+    String? sessionName,
+    String workingDir = '',
+  }) async {
+    final board = state.activeBoard;
+    if (board == null) return;
+    final bounds = _nextAvailableBounds(
+      board,
+      preferredWidth: 520,
+      preferredHeight: 360,
+    );
+    final config = BoardTerminalConfig(
+      sessionId: sessionId ?? '',
+      sessionName: sessionName ?? '',
+      workingDir: workingDir,
+    );
+    final panel = BoardPanelInstance(
+      id: _nextId('panel'),
+      type: BoardTerminalPanelPlugin.kTypeId,
+      title:
+          title?.trim().isNotEmpty == true
+              ? title!.trim()
+              : (sessionName?.trim().isNotEmpty == true
+                  ? sessionName!.trim()
+                  : 'Terminal'),
+      bounds: bounds,
+      state: {'config': config.toJson()},
       zIndex:
           board.panels.fold<int>(
             0,
@@ -353,9 +396,10 @@ class BoardCubit extends Cubit<BoardState> {
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
     await _updateBoard(targetId, (board) {
-      final updated = board.drawings.map((d) {
-        return d.id == drawingId ? d.copyWith(position: position) : d;
-      }).toList();
+      final updated =
+          board.drawings.map((d) {
+            return d.id == drawingId ? d.copyWith(position: position) : d;
+          }).toList();
       return board.copyWith(drawings: updated);
     });
   }
@@ -364,8 +408,7 @@ class BoardCubit extends Cubit<BoardState> {
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
     await _updateBoard(targetId, (board) {
-      final updated =
-          board.drawings.where((d) => d.id != drawingId).toList();
+      final updated = board.drawings.where((d) => d.id != drawingId).toList();
       return board.copyWith(drawings: updated);
     });
   }

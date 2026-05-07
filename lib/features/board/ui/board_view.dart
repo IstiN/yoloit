@@ -19,6 +19,8 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
 
 class BoardView extends StatefulWidget {
@@ -607,6 +609,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 onAddNote:
                                     () => _showMarkdownNoteDialog(context),
                                 onAddChat: () => _addChatPanel(context),
+                                onAddTerminal: () => _addTerminalPanel(context),
                               ),
                             ),
                             // ── Cancel connection button ───────────────────────
@@ -1388,6 +1391,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     context.read<BoardCubit>().createChatPanel();
   }
 
+  void _addTerminalPanel(BuildContext context) {
+    context.read<BoardCubit>().createTerminalPanel();
+  }
+
   Future<void> _showMarkdownNoteDialog(
     BuildContext context, {
     BoardPanelInstance? panel,
@@ -2159,7 +2166,9 @@ class _BoardPanelCard extends StatelessWidget {
                     Expanded(
                       child: Padding(
                         padding:
-                            panel.type == ChatPanelPlugin.kTypeId
+                            panel.type == ChatPanelPlugin.kTypeId ||
+                                    panel.type ==
+                                        BoardTerminalPanelPlugin.kTypeId
                                 ? EdgeInsets.zero
                                 : const EdgeInsets.all(12),
                         child: _buildPanelContent(context, panel),
@@ -2766,6 +2775,7 @@ class _BoardToolsPanel extends StatelessWidget {
     required this.onToggle,
     this.onAddNote,
     this.onAddChat,
+    this.onAddTerminal,
   });
 
   final bool visible;
@@ -2778,6 +2788,7 @@ class _BoardToolsPanel extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback? onAddNote;
   final VoidCallback? onAddChat;
+  final VoidCallback? onAddTerminal;
 
   @override
   Widget build(BuildContext context) {
@@ -2986,6 +2997,104 @@ class _BoardToolsPanel extends StatelessWidget {
                               Icons.auto_awesome,
                               size: 18,
                               color: Color(0xFF34D399),
+                            ),
+                          ),
+                        ),
+                      ),
+                ),
+              ],
+              if (onAddTerminal != null) ...[
+                const SizedBox(height: 4),
+                Builder(
+                  builder:
+                      (btnCtx) => Tooltip(
+                        message: 'Terminal',
+                        child: GestureDetector(
+                          onTap: () {
+                            final box = btnCtx.findRenderObject() as RenderBox?;
+                            if (box == null) return;
+                            final pos = box.localToGlobal(
+                              Offset(box.size.width, 0),
+                            );
+                            showMenu<String>(
+                              context: btnCtx,
+                              position: RelativeRect.fromLTRB(
+                                pos.dx + 4,
+                                pos.dy,
+                                pos.dx + 220,
+                                pos.dy + 100,
+                              ),
+                              color: const Color(0xFF1E293B),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              items: const [
+                                PopupMenuItem(
+                                  value: 'new',
+                                  height: 36,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.add,
+                                        size: 14,
+                                        color: Color(0xFF22C55E),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'New terminal',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFE2E8F0),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'history',
+                                  height: 36,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.history,
+                                        size: 14,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Terminal history',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFE2E8F0),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ).then((value) {
+                              if (value == 'new') {
+                                onAddTerminal!();
+                              } else if (value == 'history') {
+                                showDialog(
+                                  context: btnCtx,
+                                  builder:
+                                      (_) =>
+                                          const BoardTerminalSessionHistoryDialog(),
+                                );
+                              }
+                            });
+                          },
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.terminal,
+                              size: 18,
+                              color: Color(0xFF22C55E),
                             ),
                           ),
                         ),
