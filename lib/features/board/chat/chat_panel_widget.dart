@@ -565,29 +565,55 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Widget _buildMessageList() {
+    final hasRunningTools = _activeToolCalls.values.any((t) => t.isRunning);
+    final showStreaming = _streamingContent.isNotEmpty;
+    // Show thinking indicator when processing but no streaming content and no running tools
+    final showThinking = _isProcessing && !showStreaming && !hasRunningTools;
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       itemCount: _messages.length
-          + (_streamingContent.isNotEmpty ? 1 : 0)
-          + (_activeToolCalls.values.any((t) => t.isRunning) ? 1 : 0),
+          + (showStreaming ? 1 : 0)
+          + (hasRunningTools ? 1 : 0)
+          + (showThinking ? 1 : 0),
       itemBuilder: (context, index) {
-        // Active tool calls indicator
         final runningTools = _activeToolCalls.values.where((t) => t.isRunning).toList();
-        final hasRunningTools = runningTools.isNotEmpty;
 
         if (index < _messages.length) {
           return _buildMessageBubble(_messages[index]);
         }
 
+        final extra = index - _messages.length;
+
         // Running tools indicator
-        if (hasRunningTools && index == _messages.length) {
+        if (hasRunningTools && extra == 0) {
           return _buildRunningToolsCard(runningTools);
         }
 
         // Streaming content
-        if (_streamingContent.isNotEmpty) {
+        if (showStreaming) {
           return _buildStreamingBubble();
+        }
+
+        // Thinking indicator (pulsing dots)
+        if (showThinking) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF161D2A),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: const _TypingIndicator(),
+            ),
+          );
         }
 
         return const SizedBox.shrink();
@@ -712,9 +738,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildInputBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 24, 14),
+      margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
+      padding: const EdgeInsets.fromLTRB(10, 8, 22, 12),
       decoration: const BoxDecoration(
         color: Color(0xFF0F1219),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(14),
+          bottomRight: Radius.circular(14),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
