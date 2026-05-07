@@ -145,8 +145,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                 onCreateBoard: () => _createBoard(context),
                 onRenameBoard: () => _renameBoard(context, activeBoard),
                 onDeleteBoard: () => _deleteBoard(context, activeBoard),
-                onAddMarkdownNote: () => _showMarkdownNoteDialog(context),
-                onAddChat: () => _addChatPanel(context),
               ),
               Expanded(
                 child: DecoratedBox(
@@ -1729,8 +1727,6 @@ class _BoardToolbar extends StatelessWidget {
     required this.onCreateBoard,
     required this.onRenameBoard,
     required this.onDeleteBoard,
-    required this.onAddMarkdownNote,
-    required this.onAddChat,
   });
 
   final BoardDocument board;
@@ -1739,8 +1735,6 @@ class _BoardToolbar extends StatelessWidget {
   final VoidCallback onCreateBoard;
   final VoidCallback onRenameBoard;
   final VoidCallback onDeleteBoard;
-  final VoidCallback onAddMarkdownNote;
-  final VoidCallback onAddChat;
 
   @override
   Widget build(BuildContext context) {
@@ -1803,22 +1797,6 @@ class _BoardToolbar extends StatelessWidget {
             onPressed: onDeleteBoard,
             icon: const Icon(Icons.delete_outline),
             label: const Text('Delete'),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: onAddMarkdownNote,
-            icon: const Icon(Icons.note_add_outlined),
-            label: const Text('Add note'),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: onAddChat,
-            icon: const Icon(Icons.smart_toy_outlined),
-            label: const Text('Add chat'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF34D399),
-              foregroundColor: const Color(0xFF0F172A),
-            ),
           ),
         ],
       ),
@@ -2053,7 +2031,9 @@ class _BoardPanelCard extends StatelessWidget {
                             BoardPluginRegistry.instance.pluginFor(panel.type)?.icon
                                 ?? Icons.dashboard_customize_outlined,
                             size: 16,
-                            color: AppColors.textMuted,
+                            color: panel.type == ChatPanelPlugin.kTypeId
+                                ? const Color(0xFF34D399)
+                                : AppColors.textMuted,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -2063,30 +2043,39 @@ class _BoardPanelCard extends StatelessWidget {
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,
+                                fontSize: 13,
                               ),
                             ),
                           ),
-                          GestureDetector(
-                            onTap: onEditColor,
-                            child: Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: accent ?? const Color(0xFF64748B),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withAlpha(100),
+                          if (panel.type != ChatPanelPlugin.kTypeId) ...[
+                            GestureDetector(
+                              onTap: onEditColor,
+                              child: Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: accent ?? const Color(0xFF64748B),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withAlpha(100),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (onEditNote != null)
-                            IconButton(
-                              tooltip: 'Edit note',
-                              onPressed: onEditNote,
-                              icon: const Icon(Icons.edit_outlined, size: 16),
-                              splashRadius: 16,
+                            const SizedBox(width: 8),
+                            if (onEditNote != null)
+                              IconButton(
+                                tooltip: 'Edit note',
+                                onPressed: onEditNote,
+                                icon: const Icon(Icons.edit_outlined, size: 16),
+                                splashRadius: 16,
+                              ),
+                          ],
+                          if (panel.type == ChatPanelPlugin.kTypeId)
+                            _ChatHeaderMenu(
+                              panel: panel,
+                              onEditColor: onEditColor,
+                              onUpdateState: onUpdateState,
                             ),
                           IconButton(
                             tooltip: 'Remove panel',
@@ -3989,5 +3978,120 @@ class _ChatGlowWrapperState extends State<_ChatGlowWrapper>
       },
       child: widget.child,
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chat header menu (⋯ button with rename/color options)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ChatHeaderMenu extends StatelessWidget {
+  const _ChatHeaderMenu({
+    required this.panel,
+    required this.onEditColor,
+    this.onUpdateState,
+  });
+
+  final BoardPanelInstance panel;
+  final VoidCallback onEditColor;
+  final ValueChanged<Map<String, dynamic>>? onUpdateState;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_horiz, size: 16, color: AppColors.textMuted),
+      splashRadius: 16,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(maxWidth: 36, maxHeight: 36),
+      color: const Color(0xFF1E293B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'rename',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.edit_outlined, size: 14, color: Color(0xFF94A3B8)),
+              SizedBox(width: 8),
+              Text('Rename session', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'color',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.palette_outlined, size: 14, color: Color(0xFF94A3B8)),
+              SizedBox(width: 8),
+              Text('Change color', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
+            ],
+          ),
+        ),
+      ],
+      onSelected: (value) {
+        switch (value) {
+          case 'rename':
+            _showRenameDialog(context);
+          case 'color':
+            onEditColor();
+        }
+      },
+    );
+  }
+
+  void _showRenameDialog(BuildContext context) {
+    final config = panel.state['config'] as Map<String, dynamic>?;
+    final currentName = config?['sessionName'] as String? ?? panel.title;
+    final ctrl = TextEditingController(text: currentName);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Rename session', style: TextStyle(color: Color(0xFFE2E8F0))),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: Color(0xFFE2E8F0)),
+          decoration: InputDecoration(
+            hintText: 'Session name',
+            hintStyle: const TextStyle(color: Color(0xFF475569)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onSubmitted: (_) {
+            _applyRename(ctx, ctrl.text);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => _applyRename(ctx, ctrl.text),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyRename(BuildContext ctx, String newName) {
+    final name = newName.trim();
+    if (name.isEmpty) return;
+    Navigator.pop(ctx);
+
+    final config = Map<String, dynamic>.from(
+      panel.state['config'] as Map<String, dynamic>? ?? {},
+    );
+    config['sessionName'] = name;
+
+    final cubit = ctx.read<BoardCubit>();
+    cubit.updatePanelTitle(panel.id, name);
+    onUpdateState?.call({
+      ...panel.state,
+      'config': config,
+    });
   }
 }

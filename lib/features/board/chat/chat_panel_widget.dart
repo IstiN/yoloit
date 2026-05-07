@@ -935,67 +935,88 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Provider type selector
           const Text(
-            'Setup AI Chat',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFE2E8F0),
+            'Provider',
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: const Color(0xFF1A2030),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: 'copilot',
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1E293B),
+                style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                items: const [
+                  DropdownMenuItem(value: 'copilot', child: Text('GitHub Copilot')),
+                ],
+                onChanged: (_) {},
+              ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // Working directory
           const Text(
             'Working Directory',
-            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 4),
           Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _dirCtrl,
-                  readOnly: true,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
-                  decoration: InputDecoration(
-                    hintText: 'Select a project folder…',
-                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF334155)),
+                child: GestureDetector(
+                  onTap: () async {
+                    final dir = await FilePicker.getDirectoryPath(
+                      dialogTitle: 'Select working directory',
+                    );
+                    if (dir != null) {
+                      setState(() => _dirCtrl.text = dir);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFF1A2030),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    isDense: true,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.folder_outlined, size: 16, color: Color(0xFF34D399)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _dirCtrl.text.isEmpty ? 'Select folder…' : _dirCtrl.text.split('/').last,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _dirCtrl.text.isEmpty ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
-              IconButton(
-                icon: const Icon(Icons.folder_open, size: 20, color: Color(0xFF34D399)),
-                splashRadius: 18,
-                tooltip: 'Browse…',
-                onPressed: () async {
-                  final dir = await FilePicker.getDirectoryPath(
-                    dialogTitle: 'Select working directory',
-                  );
-                  if (dir != null) {
-                    setState(() => _dirCtrl.text = dir);
-                  }
-                },
-              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Session name (optional)
+          // Session name
           const Text(
-            'Session Name (optional)',
-            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            'Session Name',
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 4),
           TextField(
@@ -1004,27 +1025,29 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             decoration: InputDecoration(
               hintText: 'auto-generated if empty',
               hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+              filled: true,
+              fillColor: const Color(0xFF1A2030),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF334155)),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               isDense: true,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // Model selector
           const Text(
             'Model',
-            style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF334155)),
+              borderRadius: BorderRadius.circular(10),
+              color: const Color(0xFF1A2030),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
@@ -1060,14 +1083,15 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
 
           const Spacer(),
 
-          FilledButton.icon(
+          FilledButton(
             onPressed: _dirCtrl.text.trim().isEmpty ? null : _start,
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Start Chat'),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF34D399),
               foregroundColor: const Color(0xFF0F172A),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
+            child: const Text('Start Chat', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),

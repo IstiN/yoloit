@@ -269,6 +269,18 @@ class BoardCubit extends Cubit<BoardState> {
     );
   }
 
+  Future<void> updatePanelTitle(
+    String panelId,
+    String title, {
+    String? boardId,
+  }) async {
+    await updatePanel(
+      panelId,
+      (panel) => panel.copyWith(title: title),
+      boardId: boardId,
+    );
+  }
+
   Future<void> removePanel(String panelId, {String? boardId}) async {
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
