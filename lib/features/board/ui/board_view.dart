@@ -579,6 +579,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               onToggle: () => setState(
                                 () => _showToolsPanel = !_showToolsPanel,
                               ),
+                              onAddNote: () => _showMarkdownNoteDialog(context),
+                              onAddChat: () => _addChatPanel(context),
                             ),
                           ),
                           // ── Cancel connection button ───────────────────────
@@ -2694,6 +2696,8 @@ class _BoardToolsPanel extends StatelessWidget {
     required this.onDrawSettingsChanged,
     required this.onConnectSettingsChanged,
     required this.onToggle,
+    this.onAddNote,
+    this.onAddChat,
   });
 
   final bool visible;
@@ -2704,6 +2708,8 @@ class _BoardToolsPanel extends StatelessWidget {
   final ValueChanged<DrawSettings> onDrawSettingsChanged;
   final ValueChanged<ConnectSettings> onConnectSettingsChanged;
   final VoidCallback onToggle;
+  final VoidCallback? onAddNote;
+  final VoidCallback? onAddChat;
 
   @override
   Widget build(BuildContext context) {
@@ -2789,6 +2795,61 @@ class _BoardToolsPanel extends StatelessWidget {
             ),
           ],
         ],
+        // ── Add panel buttons (always visible) ───────────────────────────
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xE50B0D12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF2A3040)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onAddNote != null)
+                Tooltip(
+                  message: 'Add note',
+                  child: GestureDetector(
+                    onTap: onAddNote,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.note_add_outlined,
+                        size: 18,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              if (onAddChat != null) ...[
+                const SizedBox(height: 4),
+                Tooltip(
+                  message: 'Add AI Chat',
+                  child: GestureDetector(
+                    onTap: onAddChat,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        size: 18,
+                        color: Color(0xFF34D399),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }

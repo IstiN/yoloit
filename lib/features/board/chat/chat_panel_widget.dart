@@ -163,6 +163,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
+    // Handle /model command
+    if (text == '/model') {
+      _inputController.clear();
+      _showModelPicker(context);
+      return;
+    }
+
     _inputController.clear();
 
     // Add user message
@@ -428,20 +435,25 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   // ── Chat view ─────────────────────────────────────────────────────────────
 
   Widget _buildChatView() {
-    return Column(
-      children: [
-        // Model + session info bar
-        _buildInfoBar(),
-        const Divider(height: 1),
-        // Messages
-        Expanded(
-          child: _messages.isEmpty && !_isProcessing
-              ? _buildEmptyState()
-              : _buildMessageList(),
-        ),
-        // Input
-        _buildInputBar(),
-      ],
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(16),
+        bottomRight: Radius.circular(16),
+      ),
+      child: Column(
+        children: [
+          // Session info bar
+          _buildInfoBar(),
+          // Messages
+          Expanded(
+            child: _messages.isEmpty && !_isProcessing
+                ? _buildEmptyState()
+                : _buildMessageList(),
+          ),
+          // Input
+          _buildInputBar(),
+        ],
+      ),
     );
   }
 
@@ -454,31 +466,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       ),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => _showModelPicker(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A2030),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.auto_awesome, size: 11, color: Color(0xFF34D399)),
-                  const SizedBox(width: 4),
-                  Text(
-                    _config.model,
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-                  ),
-                  const Icon(Icons.expand_more, size: 12, color: Color(0xFF64748B)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
           const Icon(Icons.folder_outlined, size: 11, color: Color(0xFF475569)),
-          const SizedBox(width: 3),
+          const SizedBox(width: 4),
           Expanded(
             child: Text(
               _shortPath(_config.workingDir),
@@ -486,11 +475,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (_totalOutputTokens > 0)
+          Text(
+            _config.model,
+            style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
+          ),
+          if (_totalOutputTokens > 0) ...[
+            const SizedBox(width: 6),
             Text(
               '∑${_totalOutputTokens}',
               style: const TextStyle(fontSize: 9, color: Color(0xFF6366F1)),
             ),
+          ],
           if (_isProcessing)
             const Padding(
               padding: EdgeInsets.only(left: 6),
@@ -528,35 +523,33 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Widget _buildMessageList() {
-    return SelectionArea(
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        itemCount: _messages.length
-            + (_streamingContent.isNotEmpty ? 1 : 0)
-            + (_activeToolCalls.values.any((t) => t.isRunning) ? 1 : 0),
-        itemBuilder: (context, index) {
-          // Active tool calls indicator
-          final runningTools = _activeToolCalls.values.where((t) => t.isRunning).toList();
-          final hasRunningTools = runningTools.isNotEmpty;
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      itemCount: _messages.length
+          + (_streamingContent.isNotEmpty ? 1 : 0)
+          + (_activeToolCalls.values.any((t) => t.isRunning) ? 1 : 0),
+      itemBuilder: (context, index) {
+        // Active tool calls indicator
+        final runningTools = _activeToolCalls.values.where((t) => t.isRunning).toList();
+        final hasRunningTools = runningTools.isNotEmpty;
 
-          if (index < _messages.length) {
-            return _buildMessageBubble(_messages[index]);
-          }
+        if (index < _messages.length) {
+          return _buildMessageBubble(_messages[index]);
+        }
 
-          // Running tools indicator
-          if (hasRunningTools && index == _messages.length) {
-            return _buildRunningToolsCard(runningTools);
-          }
+        // Running tools indicator
+        if (hasRunningTools && index == _messages.length) {
+          return _buildRunningToolsCard(runningTools);
+        }
 
-          // Streaming content
-          if (_streamingContent.isNotEmpty) {
-            return _buildStreamingBubble();
-          }
+        // Streaming content
+        if (_streamingContent.isNotEmpty) {
+          return _buildStreamingBubble();
+        }
 
-          return const SizedBox.shrink();
-        },
-      ),
+        return const SizedBox.shrink();
+      },
     );
   }
 
@@ -682,14 +675,28 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildInputBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(10, 8, 18, 8),
       decoration: const BoxDecoration(
         color: Color(0xFF0F1219),
-        border: Border(top: BorderSide(color: Color(0xFF1E293B), width: 0.5)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // Model selector (bottom-left)
+          GestureDetector(
+            onTap: () => _showModelPicker(context),
+            child: Container(
+              width: 28,
+              height: 28,
+              margin: const EdgeInsets.only(bottom: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A2030),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF34D399)),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Focus(
               onKeyEvent: (node, event) {
@@ -700,13 +707,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   _sendMessage();
                   return KeyEventResult.handled;
                 }
-                // Cmd+V (macOS) or Ctrl+V → smart paste
+                // Cmd+V (macOS) or Ctrl+V → smart paste — intercept fully
                 final isCmd = HardwareKeyboard.instance.isMetaPressed;
                 final isCtrl = HardwareKeyboard.instance.isControlPressed;
                 if (event.logicalKey == LogicalKeyboardKey.keyV && (isCmd || isCtrl)) {
                   _handleSmartPaste();
-                  // Don't return handled here — _handleSmartPaste decides
-                  // whether to block or allow default paste asynchronously
+                  return KeyEventResult.handled;
                 }
                 return KeyEventResult.ignored;
               },
@@ -743,13 +749,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           GestureDetector(
             onTap: _sendMessage,
             child: Container(
-              width: 32,
-              height: 32,
+              width: 28,
+              height: 28,
+              margin: const EdgeInsets.only(bottom: 2),
               decoration: BoxDecoration(
                 color: const Color(0xFF34D399),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.arrow_upward, color: Color(0xFF0F172A), size: 18),
+              child: const Icon(Icons.arrow_upward, color: Color(0xFF0F172A), size: 16),
             ),
           ),
         ],
@@ -769,8 +776,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (reader.canProvide(Formats.png) || reader.canProvide(Formats.jpeg)) {
         final path = await ClipboardFileService.instance.saveClipboardToFile();
         if (path != null && mounted) {
-          _inputController.text = path;
-          _inputController.selection = TextSelection.collapsed(offset: path.length);
+          _insertTextAtCursor(path);
         }
         return;
       }
@@ -781,23 +787,31 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         if (text != null && text.isNotEmpty) {
           final wordCount = text.trim().split(RegExp(r'\s+')).length;
           if (wordCount <= 1000) {
-            // Short text — let default paste handle it (already happened)
+            // Short text — paste inline manually (we blocked default paste)
+            if (mounted) _insertTextAtCursor(text);
             return;
           }
-          // Long text — save to file, replace whatever got pasted
+          // Long text — save to file
           final path = await ClipboardFileService.instance.saveClipboardToFile();
           if (path != null && mounted) {
-            // Schedule after frame to override default paste
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _inputController.text = path;
-              _inputController.selection = TextSelection.collapsed(offset: path.length);
-            });
+            _insertTextAtCursor(path);
           }
         }
       }
     } catch (e) {
       debugPrint('[ChatPanel] Smart paste error: $e');
     }
+  }
+
+  void _insertTextAtCursor(String text) {
+    final sel = _inputController.selection;
+    final current = _inputController.text;
+    final before = sel.isValid ? current.substring(0, sel.start) : current;
+    final after = sel.isValid ? current.substring(sel.end) : '';
+    _inputController.text = '$before$text$after';
+    _inputController.selection = TextSelection.collapsed(
+      offset: before.length + text.length,
+    );
   }
 
   String _shortPath(String path) {
@@ -1112,9 +1126,11 @@ class _UserBubble extends StatelessWidget {
                     ),
                   ],
                 )
-              : Text(
-                  content,
-                  style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.4),
+              : SelectionArea(
+                  child: Text(
+                    content,
+                    style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.4),
+                  ),
                 ),
         ),
       ),
@@ -1183,32 +1199,35 @@ class _AssistantBubble extends StatelessWidget {
                 bottomRight: Radius.circular(16),
               ),
             ),
-            child: MarkdownBody(
-              data: processedContent.isEmpty ? '_thinking…_' : processedContent,
-              onTapLink: (text, href, title) {
-                if (href != null && href.isNotEmpty) {
-                  PlatformLauncher.instance.openUrl(href);
-                }
-              },
-              styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
-                a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
-                code: const TextStyle(
-                  fontSize: 11.5,
-                  fontFamily: 'JetBrains Mono',
-                  color: Color(0xFF34D399),
-                  backgroundColor: Color(0xFF0D1117),
+            child: SelectionArea(
+              child: MarkdownBody(
+                data: processedContent.isEmpty ? '_thinking…_' : processedContent,
+                selectable: false,
+                onTapLink: (text, href, title) {
+                  if (href != null && href.isNotEmpty) {
+                    PlatformLauncher.instance.openUrl(href);
+                  }
+                },
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1), height: 1.5),
+                  a: const TextStyle(fontSize: 13, color: Color(0xFF60A5FA), decoration: TextDecoration.underline),
+                  code: const TextStyle(
+                    fontSize: 11.5,
+                    fontFamily: 'JetBrains Mono',
+                    color: Color(0xFF34D399),
+                    backgroundColor: Color(0xFF0D1117),
+                  ),
+                  codeblockDecoration: BoxDecoration(
+                    color: const Color(0xFF0D1117),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF1E293B)),
+                  ),
+                  codeblockPadding: const EdgeInsets.all(10),
+                  listBullet: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  h1: const TextStyle(fontSize: 16, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
+                  h2: const TextStyle(fontSize: 14, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
+                  h3: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w500),
                 ),
-                codeblockDecoration: BoxDecoration(
-                  color: const Color(0xFF0D1117),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                ),
-                codeblockPadding: const EdgeInsets.all(10),
-                listBullet: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                h1: const TextStyle(fontSize: 16, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
-                h2: const TextStyle(fontSize: 14, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w600),
-                h3: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w500),
               ),
             ),
           ),
