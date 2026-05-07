@@ -690,17 +690,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Model selector (bottom-left)
-          GestureDetector(
-            onTap: () => _showModelPicker(context),
-            child: Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(bottom: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A2030),
-                borderRadius: BorderRadius.circular(14),
+          Builder(
+            builder: (btnContext) => GestureDetector(
+              onTap: () => _showModelPicker(btnContext),
+              child: Container(
+                width: 28,
+                height: 28,
+                margin: const EdgeInsets.only(bottom: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2030),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF34D399)),
               ),
-              child: const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF34D399)),
             ),
           ),
           const SizedBox(width: 8),
@@ -829,19 +831,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   void _showModelPicker(BuildContext context) {
     final models = _provider.availableModels;
-    // Position the popup above the model button (bottom-left of input bar)
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
-    final size = renderBox.size;
-    final offset = renderBox.localToGlobal(Offset(0, size.height));
-    // Show menu anchored to bottom-left, growing upward
+    final buttonPos = renderBox.localToGlobal(Offset.zero);
+    final menuHeight = (models.length * 32.0).clamp(0.0, 520.0);
+    // Position directly above the button
     showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
-        offset.dx + 10,
-        offset.dy - size.height - (models.length * 32.0).clamp(0, 500),
-        offset.dx + 220,
-        offset.dy,
+        buttonPos.dx,
+        buttonPos.dy - menuHeight,
+        buttonPos.dx + 260,
+        buttonPos.dy,
       ),
       color: const Color(0xFF1E293B),
       items: models.map((m) => PopupMenuItem<String>(
