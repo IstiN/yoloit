@@ -4300,16 +4300,23 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                             if (!context.mounted) return;
                             Navigator.pop(context);
                             final cubit = context.read<BoardCubit>();
+                            // Create panel with full config + messages so it skips setup view
                             await cubit.createChatPanel(
                               title: e.sessionName.isNotEmpty ? e.sessionName : 'Restored chat',
                               sessionName: e.sessionName,
+                              workingDir: e.workingDir,
                               model: e.model,
                             );
-                            // The new panel is now focused — store messages so ChatPanelWidget can pick them up
+                            // Inject messages into the panel state directly
                             final board = cubit.state.activeBoard;
-                            if (board != null) {
+                            if (board != null && msgs.isNotEmpty) {
                               final newPanel = board.panels.last;
-                              ChatSessionHistory.restoredMessages[newPanel.id] = msgs;
+                              await cubit.updatePanel(newPanel.id, (p) =>
+                                p.copyWith(state: {
+                                  ...p.state,
+                                  'messages': msgs,
+                                }),
+                              );
                             }
                           },
                         ),
