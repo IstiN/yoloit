@@ -2829,20 +2829,67 @@ class _BoardToolsPanel extends StatelessWidget {
                 ),
               if (onAddChat != null) ...[
                 const SizedBox(height: 4),
-                Tooltip(
-                  message: 'Add AI Chat',
-                  child: GestureDetector(
-                    onTap: onAddChat,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome,
-                        size: 18,
-                        color: Color(0xFF34D399),
+                Builder(
+                  builder: (btnCtx) => Tooltip(
+                    message: 'AI Chat',
+                    child: GestureDetector(
+                      onTap: () {
+                        final box = btnCtx.findRenderObject() as RenderBox?;
+                        if (box == null) return;
+                        final pos = box.localToGlobal(Offset(box.size.width, 0));
+                        showMenu<String>(
+                          context: btnCtx,
+                          position: RelativeRect.fromLTRB(
+                            pos.dx + 4, pos.dy, pos.dx + 200, pos.dy + 100,
+                          ),
+                          color: const Color(0xFF1E293B),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          items: const [
+                            PopupMenuItem(
+                              value: 'new',
+                              height: 36,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.add, size: 14, color: Color(0xFF34D399)),
+                                  SizedBox(width: 8),
+                                  Text('New chat', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'history',
+                              height: 36,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.history, size: 14, color: Color(0xFF94A3B8)),
+                                  SizedBox(width: 8),
+                                  Text('Session history', style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0))),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ).then((value) {
+                          if (value == 'new') {
+                            onAddChat!();
+                          } else if (value == 'history') {
+                            showDialog(
+                              context: btnCtx,
+                              builder: (_) => const _ChatSessionHistoryDialog(panelId: ''),
+                            );
+                          }
+                        });
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          size: 18,
+                          color: Color(0xFF34D399),
+                        ),
                       ),
                     ),
                   ),
@@ -3930,12 +3977,18 @@ class _ChatGlowWrapperState extends State<_ChatGlowWrapper>
       duration: const Duration(milliseconds: 1200),
     );
     _attachNotifier();
+    // The child widget may register its notifier after us; retry next frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_notifier == null && mounted) _attachNotifier();
+    });
   }
 
   @override
   void didUpdateWidget(_ChatGlowWrapper old) {
     super.didUpdateWidget(old);
     if (old.panelId != widget.panelId) _attachNotifier();
+    // Re-attach if notifier appeared late
+    if (_notifier == null) _attachNotifier();
   }
 
   void _attachNotifier() {
