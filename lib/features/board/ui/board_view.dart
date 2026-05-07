@@ -4256,17 +4256,8 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                       sessionName: e.sessionName,
                       workingDir: e.workingDir,
                       model: e.model,
+                      messages: msgs,
                     );
-                    final board = cubit.state.activeBoard;
-                    if (board != null && msgs.isNotEmpty) {
-                      final newPanel = board.panels.last;
-                      await cubit.updatePanel(newPanel.id, (p) =>
-                        p.copyWith(state: {
-                          ...p.state,
-                          'messages': msgs,
-                        }),
-                      );
-                    }
                   },
                   child: Container(
                   decoration: BoxDecoration(
@@ -4323,24 +4314,13 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                             if (!context.mounted) return;
                             Navigator.pop(context);
                             final cubit = context.read<BoardCubit>();
-                            // Create panel with full config + messages so it skips setup view
                             await cubit.createChatPanel(
                               title: e.sessionName.isNotEmpty ? e.sessionName : 'Restored chat',
                               sessionName: e.sessionName,
                               workingDir: e.workingDir,
                               model: e.model,
+                              messages: msgs,
                             );
-                            // Inject messages into the panel state directly
-                            final board = cubit.state.activeBoard;
-                            if (board != null && msgs.isNotEmpty) {
-                              final newPanel = board.panels.last;
-                              await cubit.updatePanel(newPanel.id, (p) =>
-                                p.copyWith(state: {
-                                  ...p.state,
-                                  'messages': msgs,
-                                }),
-                              );
-                            }
                           },
                         ),
                       // Delete

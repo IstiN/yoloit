@@ -14,6 +14,9 @@ class CopilotCliProvider extends ChatProvider {
   CopilotCliProvider();
 
   final Map<String, Process> _processes = {};
+  // Track sessions that have been started in this provider instance.
+  // Prevents using --resume for a session that copilot CLI doesn't know about.
+  final Set<String> _startedSessions = {};
 
   @override
   String get providerId => 'copilot';
@@ -66,8 +69,9 @@ class CopilotCliProvider extends ChatProvider {
       '--model', config.model,
     ];
 
-    if (isFirstMessage) {
+    if (isFirstMessage || !_startedSessions.contains(config.sessionName)) {
       args.addAll(['--name', config.sessionName]);
+      _startedSessions.add(config.sessionName);
     } else {
       args.addAll(['--resume', config.sessionName]);
     }

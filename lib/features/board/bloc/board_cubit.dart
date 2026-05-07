@@ -146,6 +146,7 @@ class BoardCubit extends Cubit<BoardState> {
     String? sessionName,
     String workingDir = '',
     String model = 'gpt-5-mini',
+    List<Map<String, dynamic>>? messages,
   }) async {
     final board = state.activeBoard;
     if (board == null) return;
@@ -159,12 +160,16 @@ class BoardCubit extends Cubit<BoardState> {
       workingDir: workingDir,
       model: model,
     );
+    final panelState = <String, dynamic>{'config': config.toJson()};
+    if (messages != null && messages.isNotEmpty) {
+      panelState['messages'] = messages;
+    }
     final panel = BoardPanelInstance(
       id: _nextId('panel'),
       type: ChatPanelPlugin.kTypeId,
       title: title?.trim().isNotEmpty == true ? title!.trim() : 'AI Chat',
       bounds: bounds,
-      state: {'config': config.toJson()},
+      state: panelState,
       zIndex:
           board.panels.fold<int>(
             0,
