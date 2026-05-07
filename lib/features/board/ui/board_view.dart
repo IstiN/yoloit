@@ -4245,7 +4245,30 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
               itemBuilder: (context, index) {
                 final e = entries[index];
                 final isCurrent = e.id == widget.panelId;
-                return Container(
+                return GestureDetector(
+                  onTap: isCurrent ? null : () async {
+                    final msgs = await ChatSessionHistory.instance.loadMessages(e.id);
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                    final cubit = context.read<BoardCubit>();
+                    await cubit.createChatPanel(
+                      title: e.sessionName.isNotEmpty ? e.sessionName : 'Restored chat',
+                      sessionName: e.sessionName,
+                      workingDir: e.workingDir,
+                      model: e.model,
+                    );
+                    final board = cubit.state.activeBoard;
+                    if (board != null && msgs.isNotEmpty) {
+                      final newPanel = board.panels.last;
+                      await cubit.updatePanel(newPanel.id, (p) =>
+                        p.copyWith(state: {
+                          ...p.state,
+                          'messages': msgs,
+                        }),
+                      );
+                    }
+                  },
+                  child: Container(
                   decoration: BoxDecoration(
                     color: isCurrent ? const Color(0xFF1A3A2A) : const Color(0xFF0F1219),
                     borderRadius: BorderRadius.circular(10),
@@ -4332,6 +4355,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                       ),
                     ],
                   ),
+                ),
                 );
               },
             );

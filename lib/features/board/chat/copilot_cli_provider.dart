@@ -138,7 +138,10 @@ class CopilotCliProvider extends ChatProvider {
         } catch (_) {}
       }
 
-      _processes.remove(config.sessionName);
+      // Only remove if this is still the active process (not replaced by a newer one)
+      if (_processes[config.sessionName] == process) {
+        _processes.remove(config.sessionName);
+      }
       await controller.close();
     } catch (e, st) {
       debugPrint('[CopilotCli] Failed to start process: $e');
@@ -154,6 +157,11 @@ class CopilotCliProvider extends ChatProvider {
     if (process != null) {
       debugPrint('[CopilotCli] Killing process for session: $sessionName');
       process.kill(ProcessSignal.sigterm);
+      // Wait for the process to actually exit before returning
+      await process.exitCode.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => -1,
+      );
     }
   }
 
