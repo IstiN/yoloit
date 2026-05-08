@@ -8,6 +8,7 @@ import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
+import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 
 class BoardCubit extends Cubit<BoardState> {
@@ -221,6 +222,36 @@ class BoardCubit extends Cubit<BoardState> {
           board.panels.fold<int>(
             0,
             (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+          ) +
+          1,
+    );
+    await addPanel(panel);
+    await focusPanel(panel.id);
+  }
+
+  /// Creates a panel for any registered plugin type using its default size and
+  /// initial state. Use for generic plugins (kanban, checklist, etc.).
+  Future<void> createGenericPanel(String typeId) async {
+    final board = state.activeBoard;
+    if (board == null) return;
+    final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
+    if (plugin == null) return;
+    final size = plugin.defaultSize;
+    final bounds = _nextAvailableBounds(
+      board,
+      preferredWidth: size.width,
+      preferredHeight: size.height,
+    );
+    final panel = BoardPanelInstance(
+      id: _nextId('panel'),
+      type: typeId,
+      title: plugin.displayName,
+      bounds: bounds,
+      state: plugin.initialState,
+      zIndex:
+          board.panels.fold<int>(
+            0,
+            (value, p) => p.zIndex > value ? p.zIndex : value,
           ) +
           1,
     );

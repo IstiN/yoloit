@@ -611,6 +611,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                     () => _showMarkdownNoteDialog(context),
                                 onAddChat: () => _addChatPanel(context),
                                 onAddTerminal: () => _addTerminalPanel(context),
+                                onAddGeneric:
+                                    (typeId) => context
+                                        .read<BoardCubit>()
+                                        .createGenericPanel(typeId),
                               ),
                             ),
                             // ── Cancel connection button ───────────────────────
@@ -2782,6 +2786,7 @@ class _BoardToolsPanel extends StatelessWidget {
     this.onAddNote,
     this.onAddChat,
     this.onAddTerminal,
+    this.onAddGeneric,
   });
 
   final bool visible;
@@ -2795,6 +2800,7 @@ class _BoardToolsPanel extends StatelessWidget {
   final VoidCallback? onAddNote;
   final VoidCallback? onAddChat;
   final VoidCallback? onAddTerminal;
+  final ValueChanged<String>? onAddGeneric;
 
   @override
   Widget build(BuildContext context) {
@@ -3101,6 +3107,93 @@ class _BoardToolsPanel extends StatelessWidget {
                               Icons.terminal,
                               size: 18,
                               color: Color(0xFF22C55E),
+                            ),
+                          ),
+                        ),
+                      ),
+                ),
+              ],
+              // ── Generic plugin catalog button ────────────────────────────
+              if (onAddGeneric != null) ...[
+                const SizedBox(height: 4),
+                Builder(
+                  builder:
+                      (btnCtx) => Tooltip(
+                        message: 'Add panel',
+                        child: GestureDetector(
+                          onTap: () {
+                            final box =
+                                btnCtx.findRenderObject() as RenderBox?;
+                            if (box == null) return;
+                            final pos = box.localToGlobal(
+                              Offset(box.size.width, 0),
+                            );
+                            // Build menu items from all generic plugins
+                            const genericTypes = [
+                              'board.kanban',
+                              'board.webpage',
+                              'board.code.snippet',
+                              'board.checklist',
+                              'board.files',
+                            ];
+                            final pluginEntries =
+                                genericTypes.map((typeId) {
+                                  final plugin = BoardPluginRegistry.instance
+                                      .pluginFor(typeId);
+                                  if (plugin == null) return null;
+                                  return PopupMenuItem<String>(
+                                    value: typeId,
+                                    height: 36,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          plugin.icon,
+                                          size: 14,
+                                          color: plugin.accentColor
+                                              .withAlpha(200),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          plugin.displayName,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Color(0xFFE2E8F0),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).whereType<PopupMenuItem<String>>().toList();
+
+                            showMenu<String>(
+                              context: btnCtx,
+                              position: RelativeRect.fromLTRB(
+                                pos.dx + 4,
+                                pos.dy,
+                                pos.dx + 200,
+                                pos.dy + 100,
+                              ),
+                              color: const Color(0xFF1E293B),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              items: pluginEntries,
+                            ).then((typeId) {
+                              if (typeId != null) {
+                                onAddGeneric!(typeId);
+                              }
+                            });
+                          },
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.add_box_outlined,
+                              size: 18,
+                              color: Color(0xFF94A3B8),
                             ),
                           ),
                         ),
