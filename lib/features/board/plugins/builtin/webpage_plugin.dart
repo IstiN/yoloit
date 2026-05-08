@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -21,7 +22,7 @@ class WebpagePlugin extends BoardPanelPlugin {
   Color get accentColor => const Color(0xFF0EA5E9);
 
   @override
-  Size get defaultSize => const Size(360, 220);
+  Size get defaultSize => const Size(700, 500);
 
   @override
   Map<String, dynamic> get initialState => {'url': '', 'title': '', 'favicon': ''};
@@ -55,19 +56,44 @@ class _WebpageContentState extends State<_WebpageContent> {
   static const Color _accent = Color(0xFF0EA5E9);
 
   late final TextEditingController _urlCtrl;
+  WebViewController? _controller;
 
   @override
   void initState() {
     super.initState();
-    _urlCtrl = TextEditingController(
-      text: widget.panel.state['url'] as String? ?? '',
-    );
+    final savedUrl = widget.panel.state['url'] as String? ?? '';
+    _urlCtrl = TextEditingController(text: savedUrl);
+    if (savedUrl.isNotEmpty) {
+      _initController(savedUrl);
+    }
+  }
+
+  @override
+  void didUpdateWidget(_WebpageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final newUrl = widget.panel.state['url'] as String? ?? '';
+    final oldUrl = oldWidget.panel.state['url'] as String? ?? '';
+    if (newUrl != oldUrl && newUrl.isNotEmpty) {
+      _urlCtrl.text = newUrl;
+      if (_controller == null) {
+        _initController(newUrl);
+      } else {
+        _controller!.loadRequest(Uri.parse(newUrl));
+      }
+    }
   }
 
   @override
   void dispose() {
     _urlCtrl.dispose();
     super.dispose();
+  }
+
+  void _initController(String url) {
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(Uri.parse(url));
+    setState(() {});
   }
 
   String get _currentUrl => widget.panel.state['url'] as String? ?? '';
@@ -98,139 +124,153 @@ class _WebpageContentState extends State<_WebpageContent> {
       'url': url,
       'title': url.isEmpty ? '' : _hostname(url),
     });
+    if (url.isNotEmpty) {
+      if (_controller == null) {
+        _initController(url);
+      } else {
+        _controller!.loadRequest(Uri.parse(url));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final url = _currentUrl;
 
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // URL bar
-          Row(
-            children: [
-              const Icon(Icons.link, size: 16, color: Color(0xFF0EA5E9)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: TextField(
-                  controller: _urlCtrl,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'https://example.com',
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF0EA5E9)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF0EA5E9), width: 2),
-                    ),
-                  ),
-                  onSubmitted: (_) => _commit(),
-                ),
-              ),
-              const SizedBox(width: 6),
-              FilledButton(
-                onPressed: _commit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _accent,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  minimumSize: const Size(0, 36),
-                ),
-                child: const Text('Go', style: TextStyle(fontSize: 13)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Preview card
-          if (url.isEmpty)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.language, size: 40, color: _accent.withOpacity(0.4)),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Enter a URL above',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _accent.withOpacity(0.2)),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _accent.withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.language, size: 20, color: Color(0xFF0EA5E9)),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _hostname(url),
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                url.length > 50 ? '${url.substring(0, 50)}…' : url,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF64748B),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => PlatformLauncher.instance.openUrl(url),
-                        icon: const Icon(Icons.open_in_browser, size: 16),
-                        label: const Text('Open in Browser'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _accent,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Compact URL bar (~32-36px height)
+        SizedBox(
+          height: 36,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Row(
+              children: [
+                const Icon(Icons.link, size: 14, color: Color(0xFF0EA5E9)),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: TextField(
+                    controller: _urlCtrl,
+                    style: const TextStyle(fontSize: 12),
+                    decoration: InputDecoration(
+                      hintText: 'https://example.com',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: Color(0xFF0EA5E9)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF0EA5E9),
+                          width: 1.5,
                         ),
                       ),
                     ),
-                  ],
+                    onSubmitted: (_) => _commit(),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 4),
+                if (_controller != null) ...[
+                  _NavBtn(
+                    icon: Icons.arrow_back,
+                    tooltip: 'Back',
+                    onPressed: () => _controller?.goBack(),
+                  ),
+                  _NavBtn(
+                    icon: Icons.arrow_forward,
+                    tooltip: 'Forward',
+                    onPressed: () => _controller?.goForward(),
+                  ),
+                  _NavBtn(
+                    icon: Icons.refresh,
+                    tooltip: 'Reload',
+                    onPressed: () => _controller?.reload(),
+                  ),
+                ],
+                if (url.isNotEmpty)
+                  _NavBtn(
+                    icon: Icons.open_in_browser,
+                    tooltip: 'Open in Browser',
+                    onPressed: () => PlatformLauncher.instance.openUrl(url),
+                  ),
+                SizedBox(
+                  height: 28,
+                  child: FilledButton(
+                    onPressed: _commit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(0, 28),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                    child: const Text('Go'),
+                  ),
+                ),
+              ],
             ),
-        ],
+          ),
+        ),
+        const Divider(height: 1, thickness: 0.5),
+        // Content area
+        Expanded(
+          child: url.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.language,
+                        size: 40,
+                        color: _accent.withOpacity(0.4),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Enter a URL above',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : _controller != null
+              ? WebViewWidget(controller: _controller!)
+              : const Center(child: CircularProgressIndicator()),
+        ),
+      ],
+    );
+  }
+}
+
+class _NavBtn extends StatelessWidget {
+  const _NavBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 15, color: const Color(0xFF94A3B8)),
+        ),
       ),
     );
   }

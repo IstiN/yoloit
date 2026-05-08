@@ -60,6 +60,7 @@ dependencies:
   crypto: ^3.0.0
   vector_math: 2.2.0
   cryptography: ^2.9.0
+  webview_flutter: ^4.13.1
 
 dev_dependencies:
   flutter_test:

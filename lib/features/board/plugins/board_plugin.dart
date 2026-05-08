@@ -9,6 +9,7 @@ class BoardPanelRenderContext {
     required this.onDelete,
     required this.onUpdateState,
     required this.onShowEditor,
+    this.onCreateLinkedPanel,
   });
 
   final bool isSelected;
@@ -16,6 +17,15 @@ class BoardPanelRenderContext {
   final VoidCallback onDelete;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
   final VoidCallback onShowEditor;
+
+  /// Creates a new panel linked to the current one and returns its id.
+  /// [typeId] is the plugin type, [state] is the initial state, [title] is the
+  /// panel title.
+  final Future<String?> Function(
+    String typeId,
+    Map<String, dynamic> state,
+    String title,
+  )? onCreateLinkedPanel;
 }
 
 /// Abstract base class for board panel plugins.

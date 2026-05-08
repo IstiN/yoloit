@@ -53,6 +53,10 @@ IconData _iconForExtension(String ext) => switch (ext.toLowerCase()) {
   _ => Icons.insert_drive_file_outlined,
 };
 
+bool _isPreviewable(String ext) => const {
+  'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',
+}.contains(ext.toLowerCase());
+
 class _FilesContent extends StatefulWidget {
   const _FilesContent({required this.panel, required this.renderContext});
 
@@ -185,6 +189,19 @@ class _FilesContentState extends State<_FilesContent> {
                       onReveal: () =>
                           PlatformLauncher.instance.revealInFinder(path),
                       onDelete: () => _removeFile(id),
+                      onOpenAsPanel: _isPreviewable(ext)
+                          ? () async {
+                              await widget.renderContext.onCreateLinkedPanel
+                                  ?.call(
+                                'board.file.preview',
+                                {
+                                  'path': file['path'] as String,
+                                  'title': file['name'] as String,
+                                },
+                                file['name'] as String,
+                              );
+                            }
+                          : null,
                     );
                   },
                 ),
@@ -201,6 +218,7 @@ class _FileTile extends StatefulWidget {
     required this.icon,
     required this.onReveal,
     required this.onDelete,
+    this.onOpenAsPanel,
   });
 
   final String name;
@@ -208,6 +226,7 @@ class _FileTile extends StatefulWidget {
   final IconData icon;
   final VoidCallback onReveal;
   final VoidCallback onDelete;
+  final VoidCallback? onOpenAsPanel;
 
   @override
   State<_FileTile> createState() => _FileTileState();
@@ -255,6 +274,15 @@ class _FileTileState extends State<_FileTile> {
               ),
             ),
             if (_hovered) ...[
+              if (widget.onOpenAsPanel != null)
+                IconButton(
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  tooltip: 'Open as preview panel',
+                  onPressed: widget.onOpenAsPanel,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  color: const Color(0xFF8B5CF6),
+                ),
               IconButton(
                 icon: const Icon(Icons.folder_open_outlined, size: 16),
                 tooltip: 'Reveal in Finder',

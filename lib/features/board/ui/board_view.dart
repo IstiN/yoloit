@@ -294,6 +294,38 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                       ),
                                                     );
                                               },
+                                              onCreateLinkedPanel: (typeId, state, title) async {
+                                                final cubit = context.read<BoardCubit>();
+                                                final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
+                                                final size = plugin?.defaultSize ?? const Size(460, 380);
+                                                final board = cubit.state.activeBoard;
+                                                if (board == null) return null;
+                                                final currentBounds = panel.bounds;
+                                                final newBounds = BoardPanelBounds(
+                                                  x: currentBounds.x + currentBounds.width + 20,
+                                                  y: currentBounds.y,
+                                                  width: size.width,
+                                                  height: size.height,
+                                                );
+                                                final newPanel = BoardPanelInstance(
+                                                  id: 'panel-\${DateTime.now().millisecondsSinceEpoch}',
+                                                  type: typeId,
+                                                  title: title,
+                                                  bounds: newBounds,
+                                                  state: state,
+                                                  zIndex: board.panels.fold<int>(0, (v, p) => p.zIndex > v ? p.zIndex : v) + 1,
+                                                );
+                                                await cubit.addPanel(newPanel);
+                                                await cubit.upsertLink(BoardPanelLink(
+                                                  id: 'link-\${DateTime.now().millisecondsSinceEpoch}',
+                                                  fromPanelId: panel.id,
+                                                  toPanelId: newPanel.id,
+                                                  style: BoardLinkStyle.arrow,
+                                                  behavior: BoardLinkBehavior.dynamic,
+                                                  geometry: BoardLinkGeometry.bezier,
+                                                ));
+                                                return newPanel.id;
+                                              },
                                               connectMode:
                                                   _activeTool ==
                                                   BoardToolId.connect,
@@ -1970,6 +2002,7 @@ class _BoardPanelCard extends StatelessWidget {
     required this.onEditColor,
     this.onEditNote,
     this.onUpdateState,
+    this.onCreateLinkedPanel,
     this.connectMode = false,
     this.connectSourceId,
     this.onConnectTap,
@@ -1986,6 +2019,7 @@ class _BoardPanelCard extends StatelessWidget {
   final VoidCallback onEditColor;
   final VoidCallback? onEditNote;
   final ValueChanged<Map<String, dynamic>>? onUpdateState;
+  final Future<String?> Function(String typeId, Map<String, dynamic> state, String title)? onCreateLinkedPanel;
   final bool connectMode;
   final String? connectSourceId;
   final VoidCallback? onConnectTap;
@@ -1993,7 +2027,6 @@ class _BoardPanelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final markdown = panel.state['markdown'] as String? ?? '';
     final accent = panel.color;
     final panelFill =
         accent == null
@@ -2291,6 +2324,7 @@ class _BoardPanelCard extends StatelessWidget {
           onDelete: onDelete,
           onUpdateState: onUpdateState ?? (_) {},
           onShowEditor: onEditNote ?? () {},
+          onCreateLinkedPanel: onCreateLinkedPanel,
         ),
       );
     }
@@ -2756,6 +2790,7 @@ class _BoardMiniMapPainter extends CustomPainter {
       'board.code.snippet'  => const Color(0xCC10B981),
       'board.checklist'     => const Color(0xCCF59E0B),
       'board.files'         => const Color(0xCCEC4899),
+      'board.file.preview'  => const Color(0xCC8B5CF6),
       _ => const Color(0xCC64748B),
     };
   }
@@ -3135,6 +3170,7 @@ class _BoardToolsPanel extends StatelessWidget {
                               'board.code.snippet',
                               'board.checklist',
                               'board.files',
+                              'board.file.preview',
                             ];
                             final pluginEntries =
                                 genericTypes.map((typeId) {
