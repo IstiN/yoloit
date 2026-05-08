@@ -241,7 +241,16 @@ class _WebpageContentState extends State<_WebpageContent> {
                   ),
                 )
               : _controller != null
-              ? WebViewWidget(controller: _controller!)
+              // MouseRegion releases Flutter keyboard focus so WKWebView
+              // can receive native keyboard input (macOS KVO/firstResponder).
+              ? MouseRegion(
+                  onEnter: (_) => FocusScope.of(context).unfocus(),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => FocusScope.of(context).unfocus(),
+                    child: WebViewWidget(controller: _controller!),
+                  ),
+                )
               : const Center(child: CircularProgressIndicator()),
         ),
       ],
