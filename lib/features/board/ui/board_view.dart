@@ -189,13 +189,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                           key: _viewportKey,
                           children: [
                             Positioned.fill(
-                              child: IgnorePointer(
-                                child: CustomPaint(
-                                  painter: _InfiniteBoardGridPainter(
-                                    transformCtrl: _transformController,
-                                    origin: _canvasOrigin,
-                                    minorColor: colors.divider.withAlpha(60),
-                                    majorColor: colors.divider.withAlpha(110),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTapDown:
+                                    isFocusedWebpagePanel
+                                        ? (_) {
+                                          _boardWebFocusLog(
+                                            'backgroundTap -> clearFocusedPanel',
+                                          );
+                                          context
+                                              .read<BoardCubit>()
+                                              .clearFocusedPanel();
+                                        }
+                                        : null,
+                                child: IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: _InfiniteBoardGridPainter(
+                                      transformCtrl: _transformController,
+                                      origin: _canvasOrigin,
+                                      minorColor: colors.divider.withAlpha(60),
+                                      majorColor: colors.divider.withAlpha(110),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -240,47 +254,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
-                                    // Clicking empty canvas clears focused webpage panel,
-                                    // returning board-level interactions.
-                                    if (isFocusedWebpagePanel)
-                                      Positioned.fill(
-                                        child: GestureDetector(
-                                          behavior: HitTestBehavior.translucent,
-                                          onTapDown: (details) {
-                                            final boardPoint =
-                                                _boardPointFromGlobal(
-                                                  details.globalPosition,
-                                                );
-                                            if (boardPoint == null) {
-                                              _boardWebFocusLog(
-                                                'canvasTap boardPoint=null global=${_fmtOffset(details.globalPosition)}',
-                                              );
-                                              return;
-                                            }
-                                            final hitPanel = activeBoard.panels
-                                                .where((p) => !p.hidden)
-                                                .any(
-                                                  (p) => Rect.fromLTWH(
-                                                    p.bounds.x,
-                                                    p.bounds.y,
-                                                    p.bounds.width,
-                                                    p.bounds.height,
-                                                  ).contains(boardPoint),
-                                                );
-                                            _boardWebFocusLog(
-                                              'canvasTap global=${_fmtOffset(details.globalPosition)} board=${_fmtOffset(boardPoint)} hitPanel=$hitPanel focused=$focusedPanelId',
-                                            );
-                                            if (!hitPanel) {
-                                              _boardWebFocusLog(
-                                                'canvasTap -> clearFocusedPanel',
-                                              );
-                                              context
-                                                  .read<BoardCubit>()
-                                                  .clearFocusedPanel();
-                                            }
-                                          },
-                                        ),
-                                      ),
                                     // ── Link delete badges ─────────────────────
                                     if (_activeTool == BoardToolId.select)
                                       ..._buildLinkDeleteBadges(
