@@ -160,6 +160,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   @override
   Widget build(BuildContext context) {
     final url = _currentUrl;
+    final isSelected = widget.renderContext.isSelected;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -266,14 +267,35 @@ class _WebpageContentState extends State<_WebpageContent> {
                     ],
                   ),
                 )
-              : _controller != null
+              : _controller == null
+              ? const Center(child: CircularProgressIndicator())
+              : !isSelected
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(
+                        Icons.touch_app_outlined,
+                        size: 32,
+                        color: Color(0xFF64748B),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Select this panel to activate WebView',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               // MouseRegion releases Flutter keyboard focus so WKWebView
               // can receive native keyboard input (macOS firstResponder).
-              ? MouseRegion(
+              : MouseRegion(
                   onEnter: (_) => FocusScope.of(context).unfocus(),
                   child: WebViewWidget(controller: _controller!),
-                )
-              : const Center(child: CircularProgressIndicator()),
+                ),
         ),
       ],
     );

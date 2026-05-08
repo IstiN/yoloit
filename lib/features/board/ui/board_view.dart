@@ -1177,7 +1177,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   void _boardDebugLog(String message) {
-    if (!kDebugMode) return;
+    if (!kDebugMode || !const bool.fromEnvironment('YOLOIT_BOARD_DEBUG')) {
+      return;
+    }
     debugPrint('[BoardView] $message');
   }
 
@@ -2054,8 +2056,9 @@ class _BoardPanelCard extends StatelessWidget {
       child: _ChatGlowWrapper(
         panelId: panel.id,
         borderRadius: BorderRadius.circular(16),
-        child: GestureDetector(
-          onTap: onTap,
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => onTap(),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: panelFill,
