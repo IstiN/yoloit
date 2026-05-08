@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
@@ -275,6 +277,28 @@ class _WebpageContentState extends State<_WebpageContent> {
                     Positioned.fill(
                       child: WebViewWidget(controller: _controller!),
                     ),
+                    // When selected, consume scroll events so InteractiveViewer
+                    // doesn't zoom when user scrolls inside the web page.
+                    if (isSelected)
+                      Positioned.fill(
+                        child: Listener(
+                          behavior: HitTestBehavior.translucent,
+                          onPointerSignal: (event) {
+                            if (event is PointerScrollEvent) {
+                              if (kDebugMode) {
+                                debugPrint(
+                                  '[BoardWebFocus] consuming scroll in WebView',
+                                );
+                              }
+                              GestureBinding.instance.pointerSignalResolver
+                                  .register(event, (event) {
+                                // Consumed — prevents InteractiveViewer zoom
+                              });
+                            }
+                          },
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
                     // When NOT selected, overlay captures clicks → focus panel
                     if (!isSelected)
                       Positioned.fill(

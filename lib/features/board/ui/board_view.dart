@@ -172,44 +172,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                         _scheduleFocusedPanelVisibilityIfNeeded(activeBoard);
                         final focusedPanelId =
                             activeBoard.viewport.focusedPanelId;
-                        final focusedPanel =
-                            focusedPanelId == null
-                                ? null
-                                : activeBoard.panels
-                                    .where((p) => p.id == focusedPanelId)
-                                    .cast<BoardPanelInstance?>()
-                                    .firstWhere(
-                                      (p) => p != null,
-                                      orElse: () => null,
-                                    );
-                        final isFocusedWebpagePanel =
-                            focusedPanel?.type == 'board.webpage';
 
                         return Stack(
                           key: _viewportKey,
                           children: [
                             Positioned.fill(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTapDown:
-                                    isFocusedWebpagePanel
-                                        ? (_) {
-                                          _boardWebFocusLog(
-                                            'backgroundTap -> clearFocusedPanel',
-                                          );
-                                          context
-                                              .read<BoardCubit>()
-                                              .clearFocusedPanel();
-                                        }
-                                        : null,
-                                child: IgnorePointer(
-                                  child: CustomPaint(
-                                    painter: _InfiniteBoardGridPainter(
-                                      transformCtrl: _transformController,
-                                      origin: _canvasOrigin,
-                                      minorColor: colors.divider.withAlpha(60),
-                                      majorColor: colors.divider.withAlpha(110),
-                                    ),
+                              child: IgnorePointer(
+                                child: CustomPaint(
+                                  painter: _InfiniteBoardGridPainter(
+                                    transformCtrl: _transformController,
+                                    origin: _canvasOrigin,
+                                    minorColor: colors.divider.withAlpha(60),
+                                    majorColor: colors.divider.withAlpha(110),
                                   ),
                                 ),
                               ),
@@ -223,9 +197,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               ),
                               // Disable pan only while actively drawing (drawPointer held)
                               panEnabled:
-                                  ((_activeTool != BoardToolId.draw ||
-                                          _drawPointer == null) &&
-                                      !isFocusedWebpagePanel),
+                                  (_activeTool != BoardToolId.draw ||
+                                      _drawPointer == null),
                               transformationController: _transformController,
                               onInteractionStart: (_) {
                                 _isViewportInteracting = true;
@@ -243,6 +216,39 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 child: Stack(
                                   clipBehavior: Clip.none,
                                   children: [
+                                    // ── Canvas tap: clear focus when tapping empty space ──
+                                    if (focusedPanelId != null)
+                                      Positioned.fill(
+                                        child: Listener(
+                                          behavior:
+                                              HitTestBehavior.translucent,
+                                          onPointerDown: (e) {
+                                            final pos = e.localPosition;
+                                            final hitPanel =
+                                                activeBoard.panels.any((p) {
+                                              if (p.hidden) return false;
+                                              final rect = Rect.fromLTWH(
+                                                p.bounds.x +
+                                                    _canvasOrigin.dx,
+                                                p.bounds.y +
+                                                    _canvasOrigin.dy,
+                                                p.bounds.width,
+                                                p.bounds.height,
+                                              );
+                                              return rect.contains(pos);
+                                            });
+                                            if (!hitPanel) {
+                                              _boardWebFocusLog(
+                                                'canvasPointerDown -> clearFocusedPanel pos=$pos',
+                                              );
+                                              context
+                                                  .read<BoardCubit>()
+                                                  .clearFocusedPanel();
+                                            }
+                                          },
+                                          child: const SizedBox.expand(),
+                                        ),
+                                      ),
                                     Positioned.fill(
                                       child: IgnorePointer(
                                         child: CustomPaint(
@@ -2096,9 +2102,7 @@ class _BoardPanelCard extends StatelessWidget {
         panelId: panel.id,
         borderRadius: BorderRadius.circular(16),
         child: Listener(
-          behavior: isWebpage
-              ? HitTestBehavior.opaque
-              : HitTestBehavior.deferToChild,
+          behavior: HitTestBehavior.deferToChild,
           onPointerDown: (_) {
             if (isWebpage) {
               if (!isFocused) {
@@ -2108,6 +2112,12 @@ class _BoardPanelCard extends StatelessWidget {
                   );
                 }
                 onTap();
+              } else {
+                if (kDebugMode) {
+                  debugPrint(
+                    '[BoardWebFocus] panelPointerDown -> already focused, releasing Flutter focus panel=${panel.id}',
+                  );
+                }
               }
               // Release ALL Flutter keyboard focus so the native WKWebView
               // can become firstResponder and receive keyboard input.
