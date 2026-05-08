@@ -2747,6 +2747,11 @@ class _BoardMiniMapPainter extends CustomPainter {
   Color _colorForPanelType(String type) {
     return switch (type) {
       'board.note.markdown' => const Color(0xCCE879F9),
+      'board.kanban'        => const Color(0xCC6366F1),
+      'board.webpage'       => const Color(0xCC0EA5E9),
+      'board.code.snippet'  => const Color(0xCC10B981),
+      'board.checklist'     => const Color(0xCCF59E0B),
+      'board.files'         => const Color(0xCCEC4899),
       _ => const Color(0xCC64748B),
     };
   }

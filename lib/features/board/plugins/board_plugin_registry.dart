@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/checklist_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/code_snippet_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/files_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/kanban_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 
 /// Global registry for [BoardPanelPlugin] implementations.
@@ -50,6 +55,11 @@ class BoardPluginRegistry {
 
   void _registerBuiltins() {
     register(const MarkdownNotePlugin());
+    register(const KanbanPlugin());
+    register(const WebpagePlugin());
+    register(const CodeSnippetPlugin());
+    register(const ChecklistPlugin());
+    register(const FilesPlugin());
     register(const ChatPanelPlugin());
     register(const BoardTerminalPanelPlugin());
   }
