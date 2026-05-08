@@ -155,8 +155,10 @@ class CopilotCliProvider extends ChatProvider {
             },
           );
 
+      final stderrBuf = StringBuffer();
       process.stderr.transform(utf8.decoder).listen((chunk) {
         debugPrint('[CopilotCli] stderr: $chunk');
+        stderrBuf.write(chunk);
       });
 
       final exitCode = await process.exitCode;
@@ -169,6 +171,16 @@ class CopilotCliProvider extends ChatProvider {
           final json = jsonDecode(remaining) as Map<String, dynamic>;
           controller.add(ChatEvent.fromJson(json));
         } catch (_) {}
+      }
+
+      // If process exited with error and no events were emitted, surface stderr
+      if (exitCode != 0) {
+        final errText = stderrBuf.toString().trim();
+        controller.addError(
+          errText.isNotEmpty
+              ? errText
+              : 'Process exited with code $exitCode',
+        );
       }
 
       // Only remove if this is still the active process (not replaced by a newer one)
