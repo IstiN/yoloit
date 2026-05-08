@@ -59,9 +59,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _canvasExpansionScheduled = false;
   bool _isPanelDragging = false;
   bool _isViewportInteracting = false;
-  /// Guard: when a panel tap triggers focusPanel(), suppress the
-  /// immediately following onInteractionStart from clearing focus.
-  bool _panelJustTapped = false;
   Offset? _lastPanelDragBoardPointer;
   String? _syncedBoardId;
   String? _autoFitKey;
@@ -217,21 +214,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 _isViewportInteracting = true;
                                 _boardDebugLog('interaction.start');
                                 _stopPanAnimation();
-                                // Clear focused panel when user starts
-                                // panning/zooming the board canvas.
-                                // Skip if a panel was just tapped — its
-                                // Listener.onPointerDown already set focus
-                                // and this would undo it immediately.
-                                if (focusedPanelId != null &&
-                                    !_panelJustTapped) {
-                                  _boardWebFocusLog(
-                                    'interaction.start -> clearFocusedPanel',
-                                  );
-                                  context
-                                      .read<BoardCubit>()
-                                      .clearFocusedPanel();
-                                }
-                                _panelJustTapped = false;
+                                // Focus clearing moved to the canvas
+                                // background Listener below — it only
+                                // fires when clicking empty space, not
+                                // on panels.
                               },
                               onInteractionEnd: (_) {
                                 _isViewportInteracting = false;
@@ -255,6 +241,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
+                                    // ── Canvas background tap — clear focus ──
+                                    // Stack hit-tests children in reverse order
+                                    // (last child first).  Panels are added
+                                    // AFTER this Listener, so they absorb
+                                    // clicks first.  Only clicks on empty
+                                    // canvas reach this Listener.
+                                    Positioned.fill(
+                                      child: Listener(
+                                        behavior: HitTestBehavior.translucent,
+                                        onPointerDown: (_) {
+                                          if (focusedPanelId != null) {
+                                            _boardWebFocusLog(
+                                              'canvas tap -> clearFocusedPanel',
+                                            );
+                                            context
+                                                .read<BoardCubit>()
+                                                .clearFocusedPanel();
+                                          }
+                                        },
+                                      ),
+                                    ),
                                     // ── Link delete badges ─────────────────────
                                     if (_activeTool == BoardToolId.select)
                                       ..._buildLinkDeleteBadges(
@@ -276,12 +283,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               key: ValueKey(panel.id),
                                               panel: panel,
                                               positionOffset: _canvasOrigin,
-                                              onTap: () {
-                                                  _panelJustTapped = true;
-                                                  context
+                                              onTap:
+                                                  () => context
                                                       .read<BoardCubit>()
-                                                      .focusPanel(panel.id);
-                                                },
+                                                      .focusPanel(panel.id),
                                               onMove:
                                                   (details) =>
                                                       _movePanelWithEdgePan(
@@ -2457,6 +2462,21 @@ class _WebViewOverlay extends StatelessWidget {
         final screenW = panel.bounds.width * scale;
         final screenH =
             (panel.bounds.height - _contentOffsetY) * scale;
+
+        if (kDebugMode) {
+          debugPrint(
+            '[WebViewOverlay] scale=${scale.toStringAsFixed(3)} '
+            'panelW=${panel.bounds.width.toStringAsFixed(0)} '
+            'panelH=${panel.bounds.height.toStringAsFixed(0)} '
+            'screenW=${screenW.toStringAsFixed(0)} '
+            'screenH=${screenH.toStringAsFixed(0)} '
+            'pos=(${screenPos.dx.toStringAsFixed(0)},${screenPos.dy.toStringAsFixed(0)}) '
+            'matrix[0]=${matrix.storage[0].toStringAsFixed(4)} '
+            'matrix[5]=${matrix.storage[5].toStringAsFixed(4)} '
+            'matrix[12]=${matrix.storage[12].toStringAsFixed(0)} '
+            'matrix[13]=${matrix.storage[13].toStringAsFixed(0)}',
+          );
+        }
 
         if (screenW < 1 || screenH < 1) return const SizedBox.shrink();
 
