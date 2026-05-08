@@ -2038,6 +2038,7 @@ class _BoardPanelCard extends StatelessWidget {
       (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
     );
     final isFocused = panel.id == focusedPanelId;
+    final isWebpage = panel.type == 'board.webpage';
     final accent = panel.color;
     final panelFill =
         accent == null
@@ -2061,8 +2062,9 @@ class _BoardPanelCard extends StatelessWidget {
         panelId: panel.id,
         borderRadius: BorderRadius.circular(16),
         child: Listener(
-          behavior: HitTestBehavior.translucent,
+          behavior: HitTestBehavior.deferToChild,
           onPointerDown: (_) {
+            if (isWebpage) return;
             if (!isFocused) {
               onTap();
             }
