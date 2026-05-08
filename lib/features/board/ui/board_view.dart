@@ -170,6 +170,20 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                         );
                         _scheduleAutoFitIfNeeded(activeBoard);
                         _scheduleFocusedPanelVisibilityIfNeeded(activeBoard);
+                        final focusedPanelId =
+                            activeBoard.viewport.focusedPanelId;
+                        final focusedPanel =
+                            focusedPanelId == null
+                                ? null
+                                : activeBoard.panels
+                                    .where((p) => p.id == focusedPanelId)
+                                    .cast<BoardPanelInstance?>()
+                                    .firstWhere(
+                                      (p) => p != null,
+                                      orElse: () => null,
+                                    );
+                        final isFocusedWebpagePanel =
+                            focusedPanel?.type == 'board.webpage';
 
                         return Stack(
                           key: _viewportKey,
@@ -195,8 +209,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               ),
                               // Disable pan only while actively drawing (drawPointer held)
                               panEnabled:
-                                  _activeTool != BoardToolId.draw ||
-                                  _drawPointer == null,
+                                  ((_activeTool != BoardToolId.draw ||
+                                          _drawPointer == null) &&
+                                      !isFocusedWebpagePanel),
                               transformationController: _transformController,
                               onInteractionStart: (_) {
                                 _isViewportInteracting = true;
