@@ -247,20 +247,33 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         child: GestureDetector(
                                           behavior: HitTestBehavior.translucent,
                                           onTapDown: (details) {
-                                            final point = details.localPosition;
+                                            final boardPoint =
+                                                _boardPointFromGlobal(
+                                                  details.globalPosition,
+                                                );
+                                            if (boardPoint == null) {
+                                              _boardWebFocusLog(
+                                                'canvasTap boardPoint=null global=${_fmtOffset(details.globalPosition)}',
+                                              );
+                                              return;
+                                            }
                                             final hitPanel = activeBoard.panels
                                                 .where((p) => !p.hidden)
                                                 .any(
                                                   (p) => Rect.fromLTWH(
-                                                    p.bounds.x +
-                                                        _canvasOrigin.dx,
-                                                    p.bounds.y +
-                                                        _canvasOrigin.dy,
+                                                    p.bounds.x,
+                                                    p.bounds.y,
                                                     p.bounds.width,
                                                     p.bounds.height,
-                                                  ).contains(point),
+                                                  ).contains(boardPoint),
                                                 );
+                                            _boardWebFocusLog(
+                                              'canvasTap global=${_fmtOffset(details.globalPosition)} board=${_fmtOffset(boardPoint)} hitPanel=$hitPanel focused=$focusedPanelId',
+                                            );
                                             if (!hitPanel) {
+                                              _boardWebFocusLog(
+                                                'canvasTap -> clearFocusedPanel',
+                                              );
                                               context
                                                   .read<BoardCubit>()
                                                   .clearFocusedPanel();
@@ -1226,6 +1239,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     debugPrint('[BoardView] $message');
   }
 
+  void _boardWebFocusLog(String message) {
+    if (!kDebugMode) return;
+    debugPrint('[BoardWebFocus] $message');
+  }
+
   String _fmt(double value) => value.toStringAsFixed(2);
 
   String _fmtOffset(Offset offset) =>
@@ -2109,6 +2127,11 @@ class _BoardPanelCard extends StatelessWidget {
           onPointerDown: (_) {
             if (isWebpage) {
               if (!isFocused) {
+                if (kDebugMode) {
+                  debugPrint(
+                    '[BoardWebFocus] panelPointerDown -> focus webpage panel=${panel.id}',
+                  );
+                }
                 onTap();
               }
               return;
