@@ -2439,10 +2439,6 @@ class _WebViewOverlay extends StatelessWidget {
 
         if (screenW < 1 || screenH < 1) return const SizedBox.shrink();
 
-        // The WebView is sized at the panel's NATIVE resolution so the
-        // web content layout stays stable. FittedBox visually scales it
-        // to match the board zoom — the same "zoom into a photo" effect
-        // as other panels inside InteractiveViewer.
         return Stack(
           children: [
             Positioned(
@@ -2455,15 +2451,7 @@ class _WebViewOverlay extends StatelessWidget {
                   bottomLeft: Radius.circular(16 * scale),
                   bottomRight: Radius.circular(16 * scale),
                 ),
-                child: FittedBox(
-                  fit: BoxFit.fill,
-                  alignment: Alignment.topLeft,
-                  child: SizedBox(
-                    width: panel.bounds.width,
-                    height: panel.bounds.height - _contentOffsetY,
-                    child: child!,
-                  ),
-                ),
+                child: child!,
               ),
             ),
           ],
