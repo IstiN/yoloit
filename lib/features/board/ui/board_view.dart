@@ -447,12 +447,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             // offset issues on macOS. Render the live WebView
                             // outside the transform, positioned at the panel's
                             // computed screen rect.
+                            // Positioned.fill gives this tight constraints so
+                            // the inner Stack has a proper hit-test area and
+                            // blocks events from reaching InteractiveViewer.
                             if (focusedPanelId != null)
-                              _WebViewOverlay(
-                                panels: activeBoard.panels,
-                                focusedPanelId: focusedPanelId!,
-                                transformController: _transformController,
-                                canvasOrigin: _canvasOrigin,
+                              Positioned.fill(
+                                child: _WebViewOverlay(
+                                  panels: activeBoard.panels,
+                                  focusedPanelId: focusedPanelId!,
+                                  transformController: _transformController,
+                                  canvasOrigin: _canvasOrigin,
+                                ),
                               ),
                             // ── Draw gesture capture overlay ─────────────────
                             // Uses Listener with translucent so InteractiveViewer
@@ -2433,14 +2438,6 @@ class _WebViewOverlay extends StatelessWidget {
             (panel.bounds.height - _contentOffsetY) * scale;
 
         if (screenW < 1 || screenH < 1) return const SizedBox.shrink();
-
-        if (kDebugMode) {
-          debugPrint(
-            '[WebViewOverlay] panel=${panel.id} screenPos=$screenPos '
-            'size=${screenW.toStringAsFixed(0)}x${screenH.toStringAsFixed(0)} '
-            'scale=${scale.toStringAsFixed(2)}',
-          );
-        }
 
         return Stack(
           children: [
