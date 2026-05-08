@@ -56,15 +56,22 @@ class _WebpageContentState extends State<_WebpageContent> {
   static const Color _accent = Color(0xFF0EA5E9);
 
   late final TextEditingController _urlCtrl;
+  late final FocusNode _urlFocus;
   WebViewController? _controller;
 
   @override
   void initState() {
     super.initState();
+    _urlFocus = FocusNode();
     final savedUrl = widget.panel.state['url'] as String? ?? '';
     _urlCtrl = TextEditingController(text: savedUrl);
     if (savedUrl.isNotEmpty) {
       _initController(savedUrl);
+    } else {
+      // Auto-focus URL field when panel is new (no URL yet)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _urlFocus.requestFocus();
+      });
     }
   }
 
@@ -86,12 +93,29 @@ class _WebpageContentState extends State<_WebpageContent> {
   @override
   void dispose() {
     _urlCtrl.dispose();
+    _urlFocus.dispose();
     super.dispose();
   }
 
   void _initController(String url) {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onUrlChange: (change) {
+            final newUrl = change.url ?? '';
+            if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {
+              setState(() => _urlCtrl.text = newUrl);
+              // Persist updated URL to panel state
+              widget.renderContext.onUpdateState({
+                ...widget.panel.state,
+                'url': newUrl,
+                'title': _hostname(newUrl),
+              });
+            }
+          },
+        ),
+      )
       ..loadRequest(Uri.parse(url));
     setState(() {});
   }
@@ -152,6 +176,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                 Expanded(
                   child: TextField(
                     controller: _urlCtrl,
+                    focusNode: _urlFocus,
                     style: const TextStyle(fontSize: 12),
                     decoration: InputDecoration(
                       hintText: 'https://example.com',
@@ -172,6 +197,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                         ),
                       ),
                     ),
+                    onTap: () => _urlFocus.requestFocus(),
                     onSubmitted: (_) => _commit(),
                   ),
                 ),

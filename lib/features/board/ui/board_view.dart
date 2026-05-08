@@ -105,10 +105,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return KeyboardListener(
+    // Use Focus with canRequestFocus:false so the board handles shortcuts
+    // (ESC) without stealing keyboard focus away from TextFields or WebViews.
+    return Focus(
       focusNode: _boardFocus,
-      autofocus: true,
-      onKeyEvent: (event) {
+      autofocus: false,
+      canRequestFocus: false,
+      onKeyEvent: (_, event) {
         if (event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.escape) {
           if (_connectSourceId != null) {
@@ -116,8 +119,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
               _connectSourceId = null;
               _connectPreviewPointer = null;
             });
+            return KeyEventResult.handled;
           }
         }
+        return KeyEventResult.ignored;
       },
       child: BlocBuilder<BoardCubit, BoardState>(
         builder: (context, state) {
@@ -721,7 +726,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           );
         },
       ), // BlocBuilder
-    ); // KeyboardListener
+    ); // Focus
   }
 
   void _syncViewport(BoardDocument board) {
