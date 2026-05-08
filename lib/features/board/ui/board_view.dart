@@ -2034,6 +2034,10 @@ class _BoardPanelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final focusedPanelId = context.select<BoardCubit, String?>(
+      (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
+    );
+    final isFocused = panel.id == focusedPanelId;
     final accent = panel.color;
     final panelFill =
         accent == null
@@ -2058,36 +2062,18 @@ class _BoardPanelCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Listener(
           behavior: HitTestBehavior.translucent,
-          onPointerDown: (_) => onTap(),
+          onPointerDown: (_) {
+            if (!isFocused) {
+              onTap();
+            }
+          },
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: panelFill,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color:
-                    panel.id ==
-                            context.select<BoardCubit, String?>(
-                              (cubit) =>
-                                  cubit
-                                      .state
-                                      .activeBoard
-                                      ?.viewport
-                                      .focusedPanelId,
-                            )
-                        ? colors.primary
-                        : borderColor,
-                width:
-                    panel.id ==
-                            context.select<BoardCubit, String?>(
-                              (cubit) =>
-                                  cubit
-                                      .state
-                                      .activeBoard
-                                      ?.viewport
-                                      .focusedPanelId,
-                            )
-                        ? 1.5
-                        : 1,
+                color: isFocused ? colors.primary : borderColor,
+                width: isFocused ? 1.5 : 1,
               ),
               boxShadow: [
                 BoxShadow(

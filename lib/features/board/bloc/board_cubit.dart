@@ -100,6 +100,20 @@ class BoardCubit extends Cubit<BoardState> {
         0,
         (value, panel) => panel.zIndex > value ? panel.zIndex : value,
       );
+      BoardPanelInstance? focusedPanel;
+      for (final panel in board.panels) {
+        if (panel.id == panelId) {
+          focusedPanel = panel;
+          break;
+        }
+      }
+      final alreadyTopAndFocused =
+          board.viewport.focusedPanelId == panelId &&
+          focusedPanel != null &&
+          focusedPanel.zIndex >= maxZ;
+      if (alreadyTopAndFocused) {
+        return board;
+      }
       final updatedPanels =
           board.panels
               .map(
