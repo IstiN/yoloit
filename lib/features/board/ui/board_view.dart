@@ -204,6 +204,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 _isViewportInteracting = true;
                                 _boardDebugLog('interaction.start');
                                 _stopPanAnimation();
+                                // Clear focused panel when user starts
+                                // panning/zooming the board canvas.
+                                if (focusedPanelId != null) {
+                                  _boardWebFocusLog(
+                                    'interaction.start -> clearFocusedPanel',
+                                  );
+                                  context
+                                      .read<BoardCubit>()
+                                      .clearFocusedPanel();
+                                }
                               },
                               onInteractionEnd: (_) {
                                 _isViewportInteracting = false;
@@ -216,39 +226,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 child: Stack(
                                   clipBehavior: Clip.none,
                                   children: [
-                                    // ── Canvas tap: clear focus when tapping empty space ──
-                                    if (focusedPanelId != null)
-                                      Positioned.fill(
-                                        child: Listener(
-                                          behavior:
-                                              HitTestBehavior.translucent,
-                                          onPointerDown: (e) {
-                                            final pos = e.localPosition;
-                                            final hitPanel =
-                                                activeBoard.panels.any((p) {
-                                              if (p.hidden) return false;
-                                              final rect = Rect.fromLTWH(
-                                                p.bounds.x +
-                                                    _canvasOrigin.dx,
-                                                p.bounds.y +
-                                                    _canvasOrigin.dy,
-                                                p.bounds.width,
-                                                p.bounds.height,
-                                              );
-                                              return rect.contains(pos);
-                                            });
-                                            if (!hitPanel) {
-                                              _boardWebFocusLog(
-                                                'canvasPointerDown -> clearFocusedPanel pos=$pos',
-                                              );
-                                              context
-                                                  .read<BoardCubit>()
-                                                  .clearFocusedPanel();
-                                            }
-                                          },
-                                          child: const SizedBox.expand(),
-                                        ),
-                                      ),
                                     Positioned.fill(
                                       child: IgnorePointer(
                                         child: CustomPaint(

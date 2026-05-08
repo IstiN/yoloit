@@ -271,45 +271,63 @@ class _WebpageContentState extends State<_WebpageContent> {
                 )
               : _controller == null
               ? const Center(child: CircularProgressIndicator())
+              : !isSelected
+              // Not selected → show lightweight preview, click to focus
+              ? GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.renderContext.onFocus,
+                  child: Container(
+                    color: const Color(0xFFF8FAFC),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.language,
+                            size: 32,
+                            color: Color(0xFF94A3B8),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _hostname(url),
+                            style: const TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Click to interact',
+                            style: TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              // Selected → live WebView + scroll event consumption
               : Stack(
                   children: [
-                    // Always render the live WebView
                     Positioned.fill(
                       child: WebViewWidget(controller: _controller!),
                     ),
-                    // When selected, consume scroll events so InteractiveViewer
-                    // doesn't zoom when user scrolls inside the web page.
-                    if (isSelected)
-                      Positioned.fill(
-                        child: Listener(
-                          behavior: HitTestBehavior.translucent,
-                          onPointerSignal: (event) {
-                            if (event is PointerScrollEvent) {
-                              if (kDebugMode) {
-                                debugPrint(
-                                  '[BoardWebFocus] consuming scroll in WebView',
-                                );
-                              }
-                              GestureBinding.instance.pointerSignalResolver
-                                  .register(event, (event) {
-                                // Consumed — prevents InteractiveViewer zoom
-                              });
-                            }
-                          },
-                          child: const SizedBox.expand(),
-                        ),
+                    // Consume scroll events so InteractiveViewer doesn't zoom
+                    Positioned.fill(
+                      child: Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerSignal: (event) {
+                          if (event is PointerScrollEvent) {
+                            GestureBinding.instance.pointerSignalResolver
+                                .register(event, (event) {});
+                          }
+                        },
+                        child: const SizedBox.expand(),
                       ),
-                    // When NOT selected, overlay captures clicks → focus panel
-                    if (!isSelected)
-                      Positioned.fill(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: widget.renderContext.onFocus,
-                          child: Container(
-                            color: Colors.black.withOpacity(0.02),
-                          ),
-                        ),
-                      ),
+                    ),
                   ],
                 ),
         ),
