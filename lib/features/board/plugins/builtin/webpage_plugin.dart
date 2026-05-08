@@ -78,15 +78,6 @@ class _WebpageContentState extends State<_WebpageContent> {
   @override
   void didUpdateWidget(_WebpageContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final becameSelected =
-        widget.renderContext.isSelected && !oldWidget.renderContext.isSelected;
-    if (becameSelected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          FocusScope.of(context).unfocus();
-        }
-      });
-    }
     final newUrl = widget.panel.state['url'] as String? ?? '';
     final oldUrl = oldWidget.panel.state['url'] as String? ?? '';
     if (newUrl != oldUrl && newUrl.isNotEmpty) {
@@ -278,35 +269,24 @@ class _WebpageContentState extends State<_WebpageContent> {
                 )
               : _controller == null
               ? const Center(child: CircularProgressIndicator())
-              : !isSelected
-              ? InkWell(
-                  onTap: widget.renderContext.onFocus,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(
-                          Icons.touch_app_outlined,
-                          size: 32,
-                          color: Color(0xFF64748B),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Click to focus panel and activate WebView',
-                          style: TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 12,
+              : Stack(
+                  children: [
+                    // Always render the live WebView
+                    Positioned.fill(
+                      child: WebViewWidget(controller: _controller!),
+                    ),
+                    // When NOT selected, overlay captures clicks → focus panel
+                    if (!isSelected)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: widget.renderContext.onFocus,
+                          child: Container(
+                            color: Colors.black.withOpacity(0.02),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                )
-              // MouseRegion releases Flutter keyboard focus so WKWebView
-              // can receive native keyboard input (macOS firstResponder).
-              : MouseRegion(
-                  onEnter: (_) => FocusScope.of(context).unfocus(),
-                  child: WebViewWidget(controller: _controller!),
+                      ),
+                  ],
                 ),
         ),
       ],

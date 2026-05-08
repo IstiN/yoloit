@@ -2096,7 +2096,9 @@ class _BoardPanelCard extends StatelessWidget {
         panelId: panel.id,
         borderRadius: BorderRadius.circular(16),
         child: Listener(
-          behavior: HitTestBehavior.deferToChild,
+          behavior: isWebpage
+              ? HitTestBehavior.opaque
+              : HitTestBehavior.deferToChild,
           onPointerDown: (_) {
             if (isWebpage) {
               if (!isFocused) {
@@ -2107,6 +2109,9 @@ class _BoardPanelCard extends StatelessWidget {
                 }
                 onTap();
               }
+              // Release ALL Flutter keyboard focus so the native WKWebView
+              // can become firstResponder and receive keyboard input.
+              FocusManager.instance.primaryFocus?.unfocus();
               return;
             }
             if (!isFocused) {
@@ -2246,7 +2251,8 @@ class _BoardPanelCard extends StatelessWidget {
                         padding:
                             panel.type == ChatPanelPlugin.kTypeId ||
                                     panel.type ==
-                                        BoardTerminalPanelPlugin.kTypeId
+                                        BoardTerminalPanelPlugin.kTypeId ||
+                                    panel.type == 'board.webpage'
                                 ? EdgeInsets.zero
                                 : const EdgeInsets.all(12),
                         child: _buildPanelContent(context, panel),
