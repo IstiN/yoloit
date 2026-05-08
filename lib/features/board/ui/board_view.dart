@@ -40,6 +40,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   static const double _edgePanZone = 120;
   static const double _edgePanMaxStep = 18;
 
+  /// Extract the 2D uniform scale from a Matrix4.
+  /// `getMaxScaleOnAxis()` returns max(scaleX, scaleY, 1.0) — wrong when
+  /// zoomed out (scale < 1) because the Z column is always 1.
+  static double _scaleOf(Matrix4 m) {
+    final s = m.storage;
+    return math.sqrt(s[0] * s[0] + s[1] * s[1]);
+  }
+
   final FocusNode _boardFocus = FocusNode();
 
   final TransformationController _transformController =
@@ -51,6 +59,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _canvasExpansionScheduled = false;
   bool _isPanelDragging = false;
   bool _isViewportInteracting = false;
+  /// Guard: when a panel tap triggers focusPanel(), suppress the
+  /// immediately following onInteractionStart from clearing focus.
+  bool _panelJustTapped = false;
   Offset? _lastPanelDragBoardPointer;
   String? _syncedBoardId;
   String? _autoFitKey;
@@ -208,7 +219,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 _stopPanAnimation();
                                 // Clear focused panel when user starts
                                 // panning/zooming the board canvas.
-                                if (focusedPanelId != null) {
+                                // Skip if a panel was just tapped — its
+                                // Listener.onPointerDown already set focus
+                                // and this would undo it immediately.
+                                if (focusedPanelId != null &&
+                                    !_panelJustTapped) {
                                   _boardWebFocusLog(
                                     'interaction.start -> clearFocusedPanel',
                                   );
@@ -216,6 +231,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       .read<BoardCubit>()
                                       .clearFocusedPanel();
                                 }
+                                _panelJustTapped = false;
                               },
                               onInteractionEnd: (_) {
                                 _isViewportInteracting = false;
@@ -260,10 +276,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               key: ValueKey(panel.id),
                                               panel: panel,
                                               positionOffset: _canvasOrigin,
-                                              onTap:
-                                                  () => context
+                                              onTap: () {
+                                                  _panelJustTapped = true;
+                                                  context
                                                       .read<BoardCubit>()
-                                                      .focusPanel(panel.id),
+                                                      .focusPanel(panel.id);
+                                                },
                                               onMove:
                                                   (details) =>
                                                       _movePanelWithEdgePan(
@@ -779,7 +797,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   Future<void> _persistViewport(BuildContext context, BoardDocument board) {
     final matrix = _transformController.value.storage;
-    final scale = _transformController.value.getMaxScaleOnAxis();
+    final scale = _scaleOf(_transformController.value);
     final translation = Offset(
       matrix[12] + (_canvasOrigin.dx * scale),
       matrix[13] + (_canvasOrigin.dy * scale),
@@ -929,7 +947,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }) {
     final screen = _viewportSize ?? MediaQuery.sizeOf(context);
     if (screen.isEmpty) return;
-    final scale = _transformController.value.getMaxScaleOnAxis();
+    final scale = _scaleOf(_transformController.value);
     final tx = canvasCenter.dx - screen.width / (2 * scale);
     final ty = canvasCenter.dy - screen.height / (2 * scale);
     _boardDebugLog(
@@ -1036,7 +1054,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     );
     if (screenDelta == Offset.zero) return;
 
-    final scale = _transformController.value.getMaxScaleOnAxis();
+    final scale = _scaleOf(_transformController.value);
     if (scale == 0) return;
 
     final matrix = _transformController.value.clone();
@@ -1112,7 +1130,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       return;
     }
 
-    final scale = _transformController.value.getMaxScaleOnAxis();
+    final scale = _scaleOf(_transformController.value);
     final matrix = _transformController.value.clone();
     final storage = matrix.storage;
     storage[12] -= addLeft * scale;
@@ -1232,7 +1250,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   String _fmtMatrix(Matrix4 matrix) {
     final storage = matrix.storage;
-    return 'scale=${_fmt(matrix.getMaxScaleOnAxis())} t=${_fmtOffset(Offset(storage[12], storage[13]))}';
+    return 'scale=${_fmt(_scaleOf(matrix))} t=${_fmtOffset(Offset(storage[12], storage[13]))}';
   }
 
   // ── Tool actions ──────────────────────────────────────────────────────────
@@ -2427,7 +2445,10 @@ class _WebViewOverlay extends StatelessWidget {
     return ValueListenableBuilder<Matrix4>(
       valueListenable: transformController,
       builder: (context, matrix, child) {
-        final scale = matrix.getMaxScaleOnAxis();
+        // Extract 2D scale from the X-axis column of the matrix.
+        // getMaxScaleOnAxis() returns max(scaleX, scaleY, 1.0) which
+        // is always >= 1 — wrong when zoomed out (scale < 1).
+        final scale = _BoardViewState._scaleOf(matrix);
         final canvasPos = Offset(
           panel.bounds.x + canvasOrigin.dx,
           panel.bounds.y + canvasOrigin.dy + _contentOffsetY,
@@ -2513,7 +2534,7 @@ class _InfiniteBoardGridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = transformCtrl.value.getMaxScaleOnAxis().clamp(0.0001, 1000.0);
+    final scale = _BoardViewState._scaleOf(transformCtrl.value).clamp(0.0001, 1000.0);
     final translation = transformCtrl.value.storage;
     final tx = translation[12] + (origin.dx * scale);
     final ty = translation[13] + (origin.dy * scale);
