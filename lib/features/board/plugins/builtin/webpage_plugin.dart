@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
@@ -10,6 +9,10 @@ class WebpagePlugin extends BoardPanelPlugin {
   const WebpagePlugin();
 
   static const String kTypeId = 'board.webpage';
+
+  /// Shared controller cache so the board view can render WebViews
+  /// outside the InteractiveViewer transform to avoid coordinate offset.
+  static final Map<String, WebViewController> controllers = {};
 
   @override
   String get typeId => kTypeId;
@@ -94,6 +97,7 @@ class _WebpageContentState extends State<_WebpageContent> {
 
   @override
   void dispose() {
+    WebpagePlugin.controllers.remove(widget.panel.id);
     _urlCtrl.dispose();
     _urlFocus.dispose();
     super.dispose();
@@ -108,7 +112,6 @@ class _WebpageContentState extends State<_WebpageContent> {
             final newUrl = change.url ?? '';
             if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {
               setState(() => _urlCtrl.text = newUrl);
-              // Persist updated URL to panel state
               widget.renderContext.onUpdateState({
                 ...widget.panel.state,
                 'url': newUrl,
@@ -119,6 +122,9 @@ class _WebpageContentState extends State<_WebpageContent> {
         ),
       )
       ..loadRequest(Uri.parse(url));
+    // Expose controller so the board view can render the WebView
+    // outside the InteractiveViewer transform.
+    WebpagePlugin.controllers[widget.panel.id] = _controller!;
     setState(() {});
   }
 
@@ -246,7 +252,9 @@ class _WebpageContentState extends State<_WebpageContent> {
           ),
         ),
         const Divider(height: 1, thickness: 0.5),
-        // Content area
+        // Content area — always a placeholder; the live WebView is
+        // rendered by the board view outside the InteractiveViewer
+        // transform to avoid native platform view coordinate offset.
         Expanded(
           child: url.isEmpty
               ? Center(
@@ -272,7 +280,6 @@ class _WebpageContentState extends State<_WebpageContent> {
               : _controller == null
               ? const Center(child: CircularProgressIndicator())
               : !isSelected
-              // Not selected → show lightweight preview, click to focus
               ? GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: widget.renderContext.onFocus,
@@ -309,27 +316,8 @@ class _WebpageContentState extends State<_WebpageContent> {
                     ),
                   ),
                 )
-              // Selected → live WebView + scroll event consumption
-              : Stack(
-                  children: [
-                    Positioned.fill(
-                      child: WebViewWidget(controller: _controller!),
-                    ),
-                    // Consume scroll events so InteractiveViewer doesn't zoom
-                    Positioned.fill(
-                      child: Listener(
-                        behavior: HitTestBehavior.translucent,
-                        onPointerSignal: (event) {
-                          if (event is PointerScrollEvent) {
-                            GestureBinding.instance.pointerSignalResolver
-                                .register(event, (event) {});
-                          }
-                        },
-                        child: const SizedBox.expand(),
-                      ),
-                    ),
-                  ],
-                ),
+              // Selected → transparent placeholder (WebView overlay covers this)
+              : Container(color: Colors.white),
         ),
       ],
     );

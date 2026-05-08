@@ -22,7 +22,9 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key});
@@ -439,6 +441,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 ),
                               ),
                             ),
+                            // ── WebView overlay ───────────────────────────────
+                            // Native platform views (WKWebView) inside
+                            // InteractiveViewer's Transform have coordinate
+                            // offset issues on macOS. Render the live WebView
+                            // outside the transform, positioned at the panel's
+                            // computed screen rect.
+                            if (focusedPanelId != null)
+                              _WebViewOverlay(
+                                panels: activeBoard.panels,
+                                focusedPanelId: focusedPanelId!,
+                                transformController: _transformController,
+                                canvasOrigin: _canvasOrigin,
+                              ),
                             // ── Draw gesture capture overlay ─────────────────
                             // Uses Listener with translucent so InteractiveViewer
                             // still receives trackpad scroll / pinch-to-zoom events.
@@ -2367,6 +2382,85 @@ class _BoardPanelCard extends StatelessWidget {
         'Unknown: ${panel.type}',
         style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WebView overlay — renders the focused webpage panel's WebView OUTSIDE the
+// InteractiveViewer's Transform widget, avoiding the fundamental coordinate
+// mismatch between Flutter's transform and native macOS platform views.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WebViewOverlay extends StatelessWidget {
+  const _WebViewOverlay({
+    required this.panels,
+    required this.focusedPanelId,
+    required this.transformController,
+    required this.canvasOrigin,
+  });
+
+  final List<BoardPanelInstance> panels;
+  final String focusedPanelId;
+  final TransformationController transformController;
+  final Offset canvasOrigin;
+
+  /// Header (44) + URL bar (36) + divider (1) = content area starts at 81px.
+  static const double _contentOffsetY = 81.0;
+
+  @override
+  Widget build(BuildContext context) {
+    // Only render for webpage panels.
+    final panel = panels
+        .where((p) => p.id == focusedPanelId && p.type == WebpagePlugin.kTypeId)
+        .firstOrNull;
+    if (panel == null) return const SizedBox.shrink();
+
+    final controller = WebpagePlugin.controllers[panel.id];
+    if (controller == null) return const SizedBox.shrink();
+
+    return ValueListenableBuilder<Matrix4>(
+      valueListenable: transformController,
+      builder: (context, matrix, child) {
+        final scale = matrix.getMaxScaleOnAxis();
+        final canvasPos = Offset(
+          panel.bounds.x + canvasOrigin.dx,
+          panel.bounds.y + canvasOrigin.dy + _contentOffsetY,
+        );
+        final screenPos = MatrixUtils.transformPoint(matrix, canvasPos);
+        final screenW = panel.bounds.width * scale;
+        final screenH =
+            (panel.bounds.height - _contentOffsetY) * scale;
+
+        if (screenW < 1 || screenH < 1) return const SizedBox.shrink();
+
+        if (kDebugMode) {
+          debugPrint(
+            '[WebViewOverlay] panel=${panel.id} screenPos=$screenPos '
+            'size=${screenW.toStringAsFixed(0)}x${screenH.toStringAsFixed(0)} '
+            'scale=${scale.toStringAsFixed(2)}',
+          );
+        }
+
+        return Stack(
+          children: [
+            Positioned(
+              left: screenPos.dx,
+              top: screenPos.dy,
+              width: screenW,
+              height: screenH,
+              child: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16 * scale),
+                  bottomRight: Radius.circular(16 * scale),
+                ),
+                child: child!,
+              ),
+            ),
+          ],
+        );
+      },
+      child: WebViewWidget(controller: controller),
     );
   }
 }
