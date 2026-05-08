@@ -240,6 +240,34 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
+                                    // Clicking empty canvas clears focused webpage panel,
+                                    // returning board-level interactions.
+                                    if (isFocusedWebpagePanel)
+                                      Positioned.fill(
+                                        child: GestureDetector(
+                                          behavior: HitTestBehavior.translucent,
+                                          onTapDown: (details) {
+                                            final point = details.localPosition;
+                                            final hitPanel = activeBoard.panels
+                                                .where((p) => !p.hidden)
+                                                .any(
+                                                  (p) => Rect.fromLTWH(
+                                                    p.bounds.x +
+                                                        _canvasOrigin.dx,
+                                                    p.bounds.y +
+                                                        _canvasOrigin.dy,
+                                                    p.bounds.width,
+                                                    p.bounds.height,
+                                                  ).contains(point),
+                                                );
+                                            if (!hitPanel) {
+                                              context
+                                                  .read<BoardCubit>()
+                                                  .clearFocusedPanel();
+                                            }
+                                          },
+                                        ),
+                                      ),
                                     // ── Link delete badges ─────────────────────
                                     if (_activeTool == BoardToolId.select)
                                       ..._buildLinkDeleteBadges(
@@ -2079,7 +2107,12 @@ class _BoardPanelCard extends StatelessWidget {
         child: Listener(
           behavior: HitTestBehavior.deferToChild,
           onPointerDown: (_) {
-            if (isWebpage) return;
+            if (isWebpage) {
+              if (!isFocused) {
+                onTap();
+              }
+              return;
+            }
             if (!isFocused) {
               onTap();
             }

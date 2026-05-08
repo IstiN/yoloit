@@ -130,6 +130,19 @@ class BoardCubit extends Cubit<BoardState> {
     });
   }
 
+  Future<void> clearFocusedPanel({String? boardId}) async {
+    final targetId = boardId ?? state.activeBoard?.id;
+    if (targetId == null) return;
+    await _updateBoard(targetId, (board) {
+      if (board.viewport.focusedPanelId == null) {
+        return board;
+      }
+      return board.copyWith(
+        viewport: board.viewport.copyWith(clearFocusedPanelId: true),
+      );
+    });
+  }
+
   Future<void> createMarkdownNote({
     required String title,
     required String markdown,
