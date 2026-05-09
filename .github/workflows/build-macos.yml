@@ -137,6 +137,7 @@ jobs:
             echo "signed=false" >> $GITHUB_OUTPUT
           else
             echo "✅ Signing certificate found — importing..."
+            security delete-keychain build.keychain 2>/dev/null || true
             security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
             security default-keychain -s build.keychain
             security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" build.keychain
