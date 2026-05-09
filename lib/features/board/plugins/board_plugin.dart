@@ -10,6 +10,7 @@ class BoardPanelRenderContext {
     required this.onUpdateState,
     required this.onShowEditor,
     this.onCreateLinkedPanel,
+    this.onResize,
   });
 
   final bool isSelected;
@@ -17,6 +18,9 @@ class BoardPanelRenderContext {
   final VoidCallback onDelete;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
   final VoidCallback onShowEditor;
+
+  /// Resize the panel to exact width × height.
+  final void Function(double width, double height)? onResize;
 
   /// Creates a new panel linked to the current one and returns its id.
   /// [typeId] is the plugin type, [state] is the initial state, [title] is the

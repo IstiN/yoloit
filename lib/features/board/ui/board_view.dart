@@ -994,9 +994,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ) {
     _panViewportNearEdge(details.globalPosition);
     final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
+    var newWidth = panel.bounds.width + delta.dx;
+    // Cap webpage panels at 1440px wide.
+    if (panel.type == WebpagePlugin.kTypeId && newWidth > 1440) {
+      newWidth = 1440;
+    }
     context.read<BoardCubit>().resizePanel(
       panel.id,
-      width: panel.bounds.width + delta.dx,
+      width: newWidth,
       height: panel.bounds.height + delta.dy,
     );
   }
@@ -2400,6 +2405,11 @@ class _BoardPanelCard extends StatelessWidget {
           onUpdateState: onUpdateState ?? (_) {},
           onShowEditor: onEditNote ?? () {},
           onCreateLinkedPanel: onCreateLinkedPanel,
+          onResize: (w, h) => context.read<BoardCubit>().resizePanel(
+                panel.id,
+                width: w,
+                height: h,
+              ),
         ),
       );
     }

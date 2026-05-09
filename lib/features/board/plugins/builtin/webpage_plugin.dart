@@ -304,6 +304,22 @@ class _WebpageContentState extends State<_WebpageContent> {
                     tooltip: 'Open in Browser',
                     onPressed: () => PlatformLauncher.instance.openUrl(url),
                   ),
+                // ── Viewport presets ──
+                _SizePresetBtn(
+                  icon: Icons.phone_iphone,
+                  tooltip: 'Mobile (375×667)',
+                  onPressed: () => widget.renderContext.onResize?.call(375, 667 + 81),
+                ),
+                _SizePresetBtn(
+                  icon: Icons.tablet_mac,
+                  tooltip: 'Tablet (768×1024)',
+                  onPressed: () => widget.renderContext.onResize?.call(768, 1024 + 81),
+                ),
+                _SizePresetBtn(
+                  icon: Icons.laptop_mac,
+                  tooltip: 'Desktop (1280×800)',
+                  onPressed: () => widget.renderContext.onResize?.call(1280, 800 + 81),
+                ),
                 SizedBox(
                   height: 28,
                   child: FilledButton(
@@ -378,6 +394,33 @@ class _NavBtn extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(4),
           child: Icon(icon, size: 15, color: const Color(0xFF94A3B8)),
+        ),
+      ),
+    );
+  }
+}
+
+class _SizePresetBtn extends StatelessWidget {
+  const _SizePresetBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 15, color: const Color(0xFF64748B)),
         ),
       ),
     );
