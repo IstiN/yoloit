@@ -57,6 +57,9 @@ class _KanbanContentState extends State<_KanbanContent> {
   static const Color _bg = Color(0xFF0B0D12);
   static const Color _colBg = Color(0xFF141821);
   static const Color _border = Color(0xFF2A3040);
+  static const Color _lightBg = Color(0xFFF8FAFC);
+  static const Color _lightColBg = Color(0xFFFFFFFF);
+  static const Color _lightBorder = Color(0xFFDDE3EE);
 
   static const List<Color> _columnColorPalette = [
     Color(0xFF6366F1), // indigo (default)
@@ -270,9 +273,12 @@ class _KanbanContentState extends State<_KanbanContent> {
   Widget build(BuildContext context) {
     final columns = _columns;
     final cards = _cards;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final bg = isLight ? _lightBg : _bg;
+    final border = isLight ? _lightBorder : _border;
 
     return Container(
-      color: _bg,
+      color: bg,
       child: Column(
         children: [
           // ── Top bar with edit toggle ──
@@ -280,8 +286,8 @@ class _KanbanContentState extends State<_KanbanContent> {
             Container(
               height: 28,
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFF2A3040))),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: border)),
               ),
               child: Row(
                 children: [
@@ -329,7 +335,7 @@ class _KanbanContentState extends State<_KanbanContent> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: _border),
+                                  border: Border.all(color: border),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(
@@ -372,13 +378,17 @@ class _KanbanContentState extends State<_KanbanContent> {
       onMove: (_) => setState(() => _dragOverCol = ci),
       builder: (ctx, candidateData, rejectedData) {
         final color = _colColor(ci);
+        final isLight = Theme.of(ctx).brightness == Brightness.light;
+        final colBg = isLight ? _lightColBg : _colBg;
+        final border = isLight ? _lightBorder : _border;
+        final inputBg = isLight ? _lightBg : _bg;
         return Container(
           width: 180,
           decoration: BoxDecoration(
-            color: isDragOver ? color.withAlpha(20) : _colBg,
+            color: isDragOver ? color.withAlpha(20) : colBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isDragOver ? color.withAlpha(100) : _border,
+              color: isDragOver ? color.withAlpha(100) : border,
               width: isDragOver ? 1.5 : 1,
             ),
           ),
@@ -388,7 +398,7 @@ class _KanbanContentState extends State<_KanbanContent> {
             children: [
               // ── Column header ──────────────────────────────────────────
               _buildColumnHeader(ci, columns, colCards.length),
-              const Divider(height: 1, color: Color(0xFF2A3040)),
+              Divider(height: 1, color: border),
               // ── Cards ──────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.all(6),
@@ -412,7 +422,7 @@ class _KanbanContentState extends State<_KanbanContent> {
                             hintStyle: const TextStyle(fontSize: 12),
                             isDense: true,
                             filled: true,
-                            fillColor: const Color(0xFF0B0D12),
+                            fillColor: inputBg,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 6,
@@ -690,17 +700,28 @@ class _CardTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final cardBg = isLight ? const Color(0xFFFFFFFF) : const Color(0xFF1E2433);
+    final border = isLight ? const Color(0xFFDDE3EE) : const Color(0xFF2A3040);
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        const Color(0xFFE2E8F0);
+    final muted =
+        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF4B5563);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E2433),
+        color: cardBg,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF2A3040)),
+        border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color:
+                isLight
+                    ? Colors.black.withAlpha(15)
+                    : Colors.black.withOpacity(0.15),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -710,22 +731,22 @@ class _CardTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Drag handle
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(right: 6, top: 1),
             child: Icon(
               Icons.drag_indicator,
               size: 12,
-              color: Color(0xFF4B5563),
+              color: muted,
             ),
           ),
           // Title
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFFE2E8F0),
+                color: textColor,
               ),
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
@@ -737,7 +758,7 @@ class _CardTile extends StatelessWidget {
             height: 18,
             child: IconButton(
               padding: EdgeInsets.zero,
-              icon: const Icon(Icons.close, size: 11, color: Color(0xFF4B5563)),
+                icon: Icon(Icons.close, size: 11, color: muted),
               onPressed: onDelete,
             ),
           ),

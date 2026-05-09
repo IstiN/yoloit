@@ -1359,25 +1359,29 @@ class _ResourceChipState extends State<_ResourceChip> {
   Widget build(BuildContext context) {
     final mem = formatBytes(_snap.totalMemoryBytes);
     final cpu = _snap.totalCpuPercent;
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        const Color(0xFFB0B0D0);
     return GestureDetector(
       onTap: () => _toggle(context),
       child: Container(
         height: 22,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF0E0E2A),
+          color: colors.surface,
           borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: const Color(0xFF32327A)),
+          border: Border.all(color: colors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.memory, size: 11, color: Color(0xFF7C7CFF)),
+            Icon(Icons.memory, size: 11, color: colors.primary),
             const SizedBox(width: 4),
             Text(
               cpu > 0 ? '${cpu.toStringAsFixed(1)}%  $mem' : mem,
-              style: const TextStyle(
-                color: Color(0xFFB0B0D0),
+              style: TextStyle(
+                color: textColor,
                 fontSize: 10,
                 fontFamily: 'monospace',
               ),

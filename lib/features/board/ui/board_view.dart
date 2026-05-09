@@ -2054,6 +2054,7 @@ class _OverlayIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -2062,16 +2063,23 @@ class _OverlayIconButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xE50B0D12),
+            color:
+                Theme.of(context).brightness == Brightness.light
+                    ? colors.surface
+                    : const Color(0xE50B0D12),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: active ? const Color(0x8060A5FA) : const Color(0xFF2A3040),
+              color: active ? colors.primary.withAlpha(128) : colors.border,
             ),
           ),
           child: Icon(
             icon,
             size: 15,
-            color: active ? const Color(0xFF60A5FA) : AppColors.textMuted,
+            color:
+                active
+                    ? colors.primary
+                    : Theme.of(context).textTheme.bodySmall?.color ??
+                        AppColors.textMuted,
           ),
         ),
       ),
@@ -3208,6 +3216,15 @@ class _BoardToolsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textMuted;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textPrimary;
+    final panelBg =
+        Theme.of(context).brightness == Brightness.light
+            ? colors.surface
+            : const Color(0xE50B0D12);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -3225,9 +3242,9 @@ class _BoardToolsPanel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xE50B0D12),
+              color: panelBg,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2A3040)),
+              border: Border.all(color: colors.border),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -3263,7 +3280,7 @@ class _BoardToolsPanel extends StatelessWidget {
                           color:
                               activeTool == tool.id
                                   ? tool.accentColor
-                                  : AppColors.textMuted,
+                                  : mutedColor,
                         ),
                       ),
                     ),
@@ -3294,9 +3311,9 @@ class _BoardToolsPanel extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: const Color(0xE50B0D12),
+            color: panelBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF2A3040)),
+            border: Border.all(color: colors.border),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -3312,10 +3329,10 @@ class _BoardToolsPanel extends StatelessWidget {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.note_add_outlined,
                         size: 18,
-                        color: AppColors.textMuted,
+                        color: mutedColor,
                       ),
                     ),
                   ),
@@ -3341,11 +3358,11 @@ class _BoardToolsPanel extends StatelessWidget {
                                 pos.dx + 200,
                                 pos.dy + 100,
                               ),
-                              color: const Color(0xFF1E293B),
+                              color: colors.surfaceElevated,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              items: const [
+                              items: [
                                 PopupMenuItem(
                                   value: 'new',
                                   height: 36,
@@ -3359,10 +3376,10 @@ class _BoardToolsPanel extends StatelessWidget {
                                       SizedBox(width: 8),
                                       Text(
                                         'New chat',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFFE2E8F0),
-                                        ),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: textColor,
+                                          ),
                                       ),
                                     ],
                                   ),
@@ -3380,10 +3397,10 @@ class _BoardToolsPanel extends StatelessWidget {
                                       SizedBox(width: 8),
                                       Text(
                                         'Session history',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFFE2E8F0),
-                                        ),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: textColor,
+                                          ),
                                       ),
                                     ],
                                   ),
@@ -3440,11 +3457,11 @@ class _BoardToolsPanel extends StatelessWidget {
                                 pos.dx + 220,
                                 pos.dy + 100,
                               ),
-                              color: const Color(0xFF1E293B),
+                              color: colors.surfaceElevated,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              items: const [
+                              items: [
                                 PopupMenuItem(
                                   value: 'new',
                                   height: 36,
@@ -3458,10 +3475,10 @@ class _BoardToolsPanel extends StatelessWidget {
                                       SizedBox(width: 8),
                                       Text(
                                         'New terminal',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFFE2E8F0),
-                                        ),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: textColor,
+                                          ),
                                       ),
                                     ],
                                   ),
@@ -3479,10 +3496,10 @@ class _BoardToolsPanel extends StatelessWidget {
                                       SizedBox(width: 8),
                                       Text(
                                         'Terminal history',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFFE2E8F0),
-                                        ),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: textColor,
+                                          ),
                                       ),
                                     ],
                                   ),
@@ -3560,10 +3577,10 @@ class _BoardToolsPanel extends StatelessWidget {
                                         const SizedBox(width: 8),
                                         Text(
                                           plugin.displayName,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFFE2E8F0),
-                                          ),
+                                           style: TextStyle(
+                                             fontSize: 12,
+                                             color: textColor,
+                                           ),
                                         ),
                                       ],
                                     ),
@@ -3578,7 +3595,7 @@ class _BoardToolsPanel extends StatelessWidget {
                                 pos.dx + 200,
                                 pos.dy + 100,
                               ),
-                              color: const Color(0xFF1E293B),
+                              color: colors.surfaceElevated,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -3595,10 +3612,10 @@ class _BoardToolsPanel extends StatelessWidget {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.add_box_outlined,
                               size: 18,
-                              color: Color(0xFF94A3B8),
+                              color: mutedColor,
                             ),
                           ),
                         ),
