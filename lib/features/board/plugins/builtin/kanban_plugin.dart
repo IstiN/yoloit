@@ -142,6 +142,30 @@ class _KanbanContentState extends State<_KanbanContent> {
     });
   }
 
+  void _moveColumn(int from, int to) {
+    if (from == to) return;
+    final cols = List<String>.from(_columns);
+    final col = cols.removeAt(from);
+    cols.insert(to, col);
+    // Remap card columnIndex values to follow the move.
+    final cards = _cards.map((c) {
+      var ci = c['columnIndex'] as int? ?? 0;
+      if (ci == from) {
+        ci = to;
+      } else if (from < to && ci > from && ci <= to) {
+        ci -= 1;
+      } else if (from > to && ci >= to && ci < from) {
+        ci += 1;
+      }
+      return {...c, 'columnIndex': ci};
+    }).toList();
+    widget.renderContext.onUpdateState({
+      ...widget.panel.state,
+      'columns': cols,
+      'cards': cards,
+    });
+  }
+
   void _renameColumn(int ci, String name) {
     final cols = List<String>.from(_columns);
     cols[ci] = name.trim().isEmpty ? 'Column ${ci + 1}' : name.trim();
@@ -363,6 +387,18 @@ class _KanbanContentState extends State<_KanbanContent> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         children: [
+          // Move left
+          if (ci > 0)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.chevron_left, size: 14, color: Color(0xFF64748B)),
+                tooltip: 'Move left',
+                onPressed: () => _moveColumn(ci, ci - 1),
+              ),
+            ),
           // Name (editable on double-tap)
           Expanded(
             child:
@@ -403,6 +439,18 @@ class _KanbanContentState extends State<_KanbanContent> {
                       ),
                     ),
           ),
+          // Move right
+          if (ci < columns.length - 1)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.chevron_right, size: 14, color: Color(0xFF64748B)),
+                tooltip: 'Move right',
+                onPressed: () => _moveColumn(ci, ci + 1),
+              ),
+            ),
           // Count badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
