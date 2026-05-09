@@ -60,6 +60,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _canvasExpansionScheduled = false;
   bool _isPanelDragging = false;
   bool _isViewportInteracting = false;
+  bool _isViewportZooming = false;
+  double _interactionStartScale = 1.0;
   Offset? _lastPanelDragBoardPointer;
   String? _syncedBoardId;
   String? _autoFitKey;
@@ -211,17 +213,34 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   (_activeTool != BoardToolId.draw ||
                                       _drawPointer == null),
                               transformationController: _transformController,
-                              onInteractionStart: (_) {
-                                setState(() => _isViewportInteracting = true);
+                              onInteractionStart: (details) {
+                                _interactionStartScale = _BoardViewState._scaleOf(
+                                  _transformController.value,
+                                );
+                                setState(() {
+                                  _isViewportInteracting = true;
+                                  _isViewportZooming = false;
+                                });
                                 _boardDebugLog('interaction.start');
                                 _stopPanAnimation();
-                                // Focus clearing moved to the canvas
-                                // background Listener below — it only
-                                // fires when clicking empty space, not
-                                // on panels.
+                              },
+                              onInteractionUpdate: (details) {
+                                // Detect zoom by comparing current scale to
+                                // the scale at interaction start.
+                                if (!_isViewportZooming) {
+                                  final currentScale = _BoardViewState._scaleOf(
+                                    _transformController.value,
+                                  );
+                                  if ((currentScale - _interactionStartScale).abs() > 0.01) {
+                                    setState(() => _isViewportZooming = true);
+                                  }
+                                }
                               },
                               onInteractionEnd: (_) {
-                                setState(() => _isViewportInteracting = false);
+                                setState(() {
+                                  _isViewportInteracting = false;
+                                  _isViewportZooming = false;
+                                });
                                 _boardDebugLog('interaction.end');
                                 _persistViewport(context, activeBoard);
                               },
@@ -502,7 +521,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 focusedPanelId: focusedPanelId,
                                 transformController: _transformController,
                                 canvasOrigin: _canvasOrigin,
-                                isInteracting: _isViewportInteracting,
+                                isInteracting: _isViewportZooming,
                               ),
                             ),
                             // ── Draw gesture capture overlay ─────────────────

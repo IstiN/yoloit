@@ -164,7 +164,7 @@ class _WebpageContentState extends State<_WebpageContent> {
           onUrlChange: (change) {
             final newUrl = change.url ?? '';
             if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {
-              setState(() => _urlCtrl.text = newUrl);
+              if (mounted) setState(() => _urlCtrl.text = newUrl);
               widget.renderContext.onUpdateState({
                 ...widget.panel.state,
                 'url': newUrl,
@@ -196,7 +196,7 @@ class _WebpageContentState extends State<_WebpageContent> {
     // Expose controller so the board view can render the WebView
     // outside the InteractiveViewer transform.
     WebpagePlugin.controllers[widget.panel.id] = _controller!;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   String get _currentUrl => widget.panel.state['url'] as String? ?? '';
@@ -304,21 +304,38 @@ class _WebpageContentState extends State<_WebpageContent> {
                     tooltip: 'Open in Browser',
                     onPressed: () => PlatformLauncher.instance.openUrl(url),
                   ),
-                // ── Viewport presets ──
-                _SizePresetBtn(
-                  icon: Icons.phone_iphone,
-                  tooltip: 'Mobile (375×667)',
-                  onPressed: () => widget.renderContext.onResize?.call(375, 667 + 81),
-                ),
-                _SizePresetBtn(
-                  icon: Icons.tablet_mac,
-                  tooltip: 'Tablet (768×1024)',
-                  onPressed: () => widget.renderContext.onResize?.call(768, 1024 + 81),
-                ),
-                _SizePresetBtn(
-                  icon: Icons.laptop_mac,
-                  tooltip: 'Desktop (1280×800)',
-                  onPressed: () => widget.renderContext.onResize?.call(1280, 800 + 81),
+                // ── Viewport presets (via PopupMenu to save space) ──
+                PopupMenuButton<String>(
+                  tooltip: 'Resize panel',
+                  padding: EdgeInsets.zero,
+                  iconSize: 15,
+                  icon: const Icon(Icons.aspect_ratio, size: 15, color: Color(0xFF64748B)),
+                  onSelected: (value) {
+                    final resize = widget.renderContext.onResize;
+                    if (resize == null) return;
+                    switch (value) {
+                      case 'mobile':
+                        resize(375, 667 + 81);
+                      case 'tablet':
+                        resize(768, 1024 + 81);
+                      case 'desktop':
+                        resize(1280, 800 + 81);
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'mobile', child: Row(children: [
+                      Icon(Icons.phone_iphone, size: 16), SizedBox(width: 8),
+                      Text('Mobile  375 × 667'),
+                    ])),
+                    PopupMenuItem(value: 'tablet', child: Row(children: [
+                      Icon(Icons.tablet_mac, size: 16), SizedBox(width: 8),
+                      Text('Tablet  768 × 1024'),
+                    ])),
+                    PopupMenuItem(value: 'desktop', child: Row(children: [
+                      Icon(Icons.laptop_mac, size: 16), SizedBox(width: 8),
+                      Text('Desktop  1280 × 800'),
+                    ])),
+                  ],
                 ),
                 SizedBox(
                   height: 28,
@@ -394,33 +411,6 @@ class _NavBtn extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(4),
           child: Icon(icon, size: 15, color: const Color(0xFF94A3B8)),
-        ),
-      ),
-    );
-  }
-}
-
-class _SizePresetBtn extends StatelessWidget {
-  const _SizePresetBtn({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 15, color: const Color(0xFF64748B)),
         ),
       ),
     );
