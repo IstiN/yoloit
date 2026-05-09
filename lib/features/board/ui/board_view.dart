@@ -350,8 +350,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   width: size.width,
                                                   height: size.height,
                                                 );
+                                                final ts = DateTime.now().microsecondsSinceEpoch;
                                                 final newPanel = BoardPanelInstance(
-                                                  id: 'panel-\${DateTime.now().millisecondsSinceEpoch}',
+                                                  id: 'panel-$ts',
                                                   type: typeId,
                                                   title: title,
                                                   bounds: newBounds,
@@ -360,7 +361,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 );
                                                 await cubit.addPanel(newPanel);
                                                 await cubit.upsertLink(BoardPanelLink(
-                                                  id: 'link-\${DateTime.now().millisecondsSinceEpoch}',
+                                                  id: 'link-$ts',
                                                   fromPanelId: panel.id,
                                                   toPanelId: newPanel.id,
                                                   style: BoardLinkStyle.arrow,
