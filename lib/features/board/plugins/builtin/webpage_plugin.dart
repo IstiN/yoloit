@@ -140,6 +140,22 @@ class _WebpageContentState extends State<_WebpageContent> {
                 "document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}'",
               );
             }
+            // Intercept target="_blank" links and window.open → route
+            // to Flutter via YoloNewTab channel.
+            _controller!.runJavaScript('''
+(function(){
+  if(window.__yoloNewTabSetup) return;
+  window.__yoloNewTabSetup=true;
+  window.open=function(u){if(u)YoloNewTab.postMessage(u);return null;};
+  document.addEventListener('click',function(e){
+    var a=e.target;while(a&&a.tagName!=='A')a=a.parentElement;
+    if(a&&a.target==='_blank'&&a.href){
+      e.preventDefault();e.stopPropagation();
+      YoloNewTab.postMessage(a.href);
+    }
+  },true);
+})();
+''');
             // Brief delay for CSS zoom to take effect before revealing.
             Future.delayed(const Duration(milliseconds: 80), () {
               loading.value = false;
@@ -159,6 +175,24 @@ class _WebpageContentState extends State<_WebpageContent> {
         ),
       )
       ..loadRequest(Uri.parse(url));
+
+    // Intercept target="_blank" links → create new panel with link.
+    _controller!.addJavaScriptChannel(
+      'YoloNewTab',
+      onMessageReceived: (message) {
+        final tabUrl = message.message;
+        if (tabUrl.isEmpty) return;
+        final createLinked = widget.renderContext.onCreateLinkedPanel;
+        if (createLinked != null) {
+          createLinked(
+            WebpagePlugin.kTypeId,
+            {'url': tabUrl, 'title': _hostname(tabUrl), 'favicon': ''},
+            _hostname(tabUrl),
+          );
+        }
+      },
+    );
+
     // Expose controller so the board view can render the WebView
     // outside the InteractiveViewer transform.
     WebpagePlugin.controllers[widget.panel.id] = _controller!;
@@ -205,7 +239,6 @@ class _WebpageContentState extends State<_WebpageContent> {
   @override
   Widget build(BuildContext context) {
     final url = _currentUrl;
-    final isSelected = widget.renderContext.isSelected;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -289,9 +322,9 @@ class _WebpageContentState extends State<_WebpageContent> {
           ),
         ),
         const Divider(height: 1, thickness: 0.5),
-        // Content area — always a placeholder; the live WebView is
-        // rendered by the board view outside the InteractiveViewer
-        // transform to avoid native platform view coordinate offset.
+        // Content area — always a background placeholder; the live
+        // WebView is rendered by the board view as an overlay outside
+        // the InteractiveViewer transform.
         Expanded(
           child: url.isEmpty
               ? Center(
@@ -316,44 +349,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                 )
               : _controller == null
               ? const Center(child: CircularProgressIndicator())
-              : !isSelected
-              ? GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: widget.renderContext.onFocus,
-                  child: Container(
-                    color: const Color(0xFFF8FAFC),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.language,
-                            size: 32,
-                            color: Color(0xFF94A3B8),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _hostname(url),
-                            style: const TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Click to interact',
-                            style: TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              // Selected → transparent placeholder (WebView overlay covers this)
+              // WebView overlay covers this area; just show white bg.
               : Container(color: Colors.white),
         ),
       ],

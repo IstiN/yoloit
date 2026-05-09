@@ -468,21 +468,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             // ── WebView overlay ───────────────────────────────
                             // Native platform views (WKWebView) inside
                             // InteractiveViewer's Transform have coordinate
-                            // offset issues on macOS. Render the live WebView
-                            // outside the transform, positioned at the panel's
-                            // computed screen rect.
-                            // Positioned.fill gives this tight constraints so
-                            // the inner Stack has a proper hit-test area and
-                            // blocks events from reaching InteractiveViewer.
-                            if (focusedPanelId != null)
-                              Positioned.fill(
-                                child: _WebViewOverlay(
-                                  panels: activeBoard.panels,
-                                  focusedPanelId: focusedPanelId!,
-                                  transformController: _transformController,
-                                  canvasOrigin: _canvasOrigin,
-                                ),
+                            // offset issues on macOS. Render live WebViews
+                            // outside the transform, positioned at each
+                            // panel's computed screen rect.
+                            Positioned.fill(
+                              child: _WebViewOverlays(
+                                panels: activeBoard.panels,
+                                focusedPanelId: focusedPanelId,
+                                transformController: _transformController,
+                                canvasOrigin: _canvasOrigin,
                               ),
+                            ),
                             // ── Draw gesture capture overlay ─────────────────
                             // Uses Listener with translucent so InteractiveViewer
                             // still receives trackpad scroll / pinch-to-zoom events.
@@ -2416,13 +2412,62 @@ class _BoardPanelCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WebView overlay — renders the focused webpage panel's WebView OUTSIDE the
+// WebView overlays — renders live WebViews for ALL webpage panels OUTSIDE the
 // InteractiveViewer's Transform widget, avoiding the fundamental coordinate
 // mismatch between Flutter's transform and native macOS platform views.
+//
+// Unfocused panels: visible but input blocked (click → focus that panel).
+// Focused panel:    full interaction, on top z-order.
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _WebViewOverlay extends StatefulWidget {
-  const _WebViewOverlay({
+/// Static CSS zoom manager — debounces zoom injection per panel so
+/// continuous board zoom doesn't flood WebViews with 60-fps JS calls.
+class _CssZoomManager {
+  static final Map<String, double> _lastZoom = {};
+  static final Map<String, Timer> _timers = {};
+
+  /// Apply CSS zoom.  [immediate] skips debounce (use on first inject
+  /// or after page navigation).
+  static void apply(
+    WebViewController controller,
+    String panelId,
+    double scale, {
+    bool immediate = false,
+  }) {
+    WebpagePlugin.pendingCssZoom[panelId] = scale;
+
+    final last = _lastZoom[panelId] ?? -1;
+    if ((last - scale).abs() < 0.005) return;
+
+    if (immediate || last < 0) {
+      _lastZoom[panelId] = scale;
+      _inject(controller, scale);
+      return;
+    }
+
+    _timers[panelId]?.cancel();
+    final target = scale;
+    _timers[panelId] = Timer(const Duration(milliseconds: 200), () {
+      if ((_lastZoom[panelId]! - target).abs() < 0.005) return;
+      _lastZoom[panelId] = target;
+      _inject(controller, target);
+    });
+  }
+
+  static void reset(String panelId) {
+    _lastZoom.remove(panelId);
+    _timers.remove(panelId)?.cancel();
+  }
+
+  static void _inject(WebViewController controller, double scale) {
+    controller.runJavaScript(
+      "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}'",
+    );
+  }
+}
+
+class _WebViewOverlays extends StatelessWidget {
+  const _WebViewOverlays({
     required this.panels,
     required this.focusedPanelId,
     required this.transformController,
@@ -2430,120 +2475,114 @@ class _WebViewOverlay extends StatefulWidget {
   });
 
   final List<BoardPanelInstance> panels;
-  final String focusedPanelId;
+  final String? focusedPanelId;
   final TransformationController transformController;
   final Offset canvasOrigin;
 
-  /// Header (44) + URL bar (36) + divider (1) = content area starts at 81px.
+  /// Header (44) + URL bar (36) + divider (1) = content starts at 81px.
   static const double _contentOffsetY = 81.0;
 
-  @override
-  State<_WebViewOverlay> createState() => _WebViewOverlayState();
-}
-
-class _WebViewOverlayState extends State<_WebViewOverlay> {
-  /// Last CSS zoom value successfully injected.
-  double _lastCssZoom = -1;
-
-  /// Debounce timer to avoid injecting CSS zoom on every frame
-  /// during continuous board zoom (causes visible jitter).
-  Timer? _zoomDebounce;
-
-  @override
-  void deactivate() {
-    _zoomDebounce?.cancel();
-    _lastCssZoom = -1;
-    super.deactivate();
-  }
-
-  @override
-  void dispose() {
-    _zoomDebounce?.cancel();
-    super.dispose();
-  }
-
-  /// Schedule CSS zoom injection.  On first call (overlay just
-  /// appeared, or after page navigation) injects immediately.
-  /// During continuous board zoom, debounces to avoid 60-fps JS
-  /// calls that cause visible page jitter.
-  void _applyCssZoom(
-    WebViewController controller,
+  Rect? _screenRect(
+    BoardPanelInstance panel,
+    Matrix4 matrix,
     double scale,
-    String panelId,
   ) {
-    // Always store the desired zoom so onPageFinished can re-inject.
-    WebpagePlugin.pendingCssZoom[panelId] = scale;
-
-    // First call → inject immediately so the page looks correct
-    // as soon as the overlay appears.
-    if (_lastCssZoom < 0) {
-      _lastCssZoom = scale;
-      _injectZoom(controller, scale);
-      return;
-    }
-
-    // Skip if zoom hasn't changed meaningfully.
-    if ((_lastCssZoom - scale).abs() < 0.005) return;
-
-    // Debounce: inject 200 ms after the last matrix change so
-    // continuous pinch-zoom doesn't flood the WebView with JS.
-    _zoomDebounce?.cancel();
-    final target = scale;
-    _zoomDebounce = Timer(const Duration(milliseconds: 200), () {
-      if ((_lastCssZoom - target).abs() < 0.005) return;
-      _lastCssZoom = target;
-      _injectZoom(controller, target);
-    });
-  }
-
-  void _injectZoom(WebViewController controller, double scale) {
-    controller.runJavaScript(
-      "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}'",
+    final canvasPos = Offset(
+      panel.bounds.x + canvasOrigin.dx,
+      panel.bounds.y + canvasOrigin.dy + _contentOffsetY,
     );
+    final screenPos = MatrixUtils.transformPoint(matrix, canvasPos);
+    final w = panel.bounds.width * scale;
+    final h = (panel.bounds.height - _contentOffsetY) * scale;
+    if (w < 1 || h < 1) return null;
+    return Rect.fromLTWH(screenPos.dx, screenPos.dy, w, h);
   }
 
   @override
   Widget build(BuildContext context) {
-    final panel = widget.panels
-        .where((p) =>
-            p.id == widget.focusedPanelId &&
-            p.type == WebpagePlugin.kTypeId)
-        .firstOrNull;
-    if (panel == null) return const SizedBox.shrink();
+    final webPanels = panels
+        .where(
+          (p) =>
+              p.type == WebpagePlugin.kTypeId &&
+              !p.hidden &&
+              WebpagePlugin.controllers.containsKey(p.id),
+        )
+        .toList();
 
-    final controller = WebpagePlugin.controllers[panel.id];
-    if (controller == null) return const SizedBox.shrink();
+    if (webPanels.isEmpty) return const SizedBox.shrink();
 
     return ValueListenableBuilder<Matrix4>(
-      valueListenable: widget.transformController,
-      builder: (context, matrix, child) {
+      valueListenable: transformController,
+      builder: (context, matrix, _) {
         final scale = _BoardViewState._scaleOf(matrix);
-        final canvasPos = Offset(
-          panel.bounds.x + widget.canvasOrigin.dx,
-          panel.bounds.y + widget.canvasOrigin.dy +
-              _WebViewOverlay._contentOffsetY,
-        );
-        final screenPos = MatrixUtils.transformPoint(matrix, canvasPos);
-        final screenW = panel.bounds.width * scale;
-        final screenH =
-            (panel.bounds.height - _WebViewOverlay._contentOffsetY) * scale;
+        final children = <Widget>[];
 
-        if (screenW < 1 || screenH < 1) return const SizedBox.shrink();
+        // ── 1. Unfocused WebView overlays (bottom z-order) ──
+        for (final panel in webPanels) {
+          if (panel.id == focusedPanelId) continue;
+          final rect = _screenRect(panel, matrix, scale);
+          if (rect == null) continue;
 
-        // Schedule CSS zoom (debounced during continuous zoom).
-        _applyCssZoom(controller, scale, panel.id);
+          final ctrl = WebpagePlugin.controllers[panel.id]!;
+          _CssZoomManager.apply(ctrl, panel.id, scale);
 
-        return Stack(
-          children: [
-            // Opaque background absorbs clicks outside the WebView
-            // rect, preventing them from falling through to the
-            // canvas background Listener (which would clear focus).
+          children.add(
+            Positioned(
+              key: ValueKey('wv-${panel.id}'),
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height,
+              child: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16 * scale),
+                  bottomRight: Radius.circular(16 * scale),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    WebViewWidget(controller: ctrl),
+                    // Loading overlay for unfocused panels
+                    ValueListenableBuilder<bool>(
+                      valueListenable:
+                          WebpagePlugin.pageLoading[panel.id] ??
+                              ValueNotifier<bool>(false),
+                      builder: (_, isLoading, __) {
+                        if (!isLoading) return const SizedBox.shrink();
+                        return const ColoredBox(color: Color(0xFFF8FAFC));
+                      },
+                    ),
+                    // Absorb clicks → focus this panel
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (kDebugMode) {
+                          debugPrint(
+                            '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
+                          );
+                        }
+                        context.read<BoardCubit>().focusPanel(panel.id);
+                        FocusManager.instance.primaryFocus?.unfocus();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // ── 2. Focused panel's full-screen background (click outside → unfocus) ──
+        final focusedPanel =
+            webPanels
+                .where((p) => p.id == focusedPanelId)
+                .firstOrNull;
+        if (focusedPanel != null) {
+          children.add(
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  // Tap outside the WebView rect but inside the
-                  // overlay → unfocus the panel.
                   if (kDebugMode) {
                     debugPrint(
                       '[BoardWebFocus] overlay outside tap -> clearFocusedPanel',
@@ -2553,38 +2592,57 @@ class _WebViewOverlayState extends State<_WebViewOverlay> {
                 },
               ),
             ),
-            Positioned(
-              left: screenPos.dx,
-              top: screenPos.dy,
-              width: screenW,
-              height: screenH,
-              child: ClipRRect(
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(16 * scale),
-                  bottomRight: Radius.circular(16 * scale),
+          );
+        }
+
+        // ── 3. Focused WebView overlay (top z-order, full interaction) ──
+        if (focusedPanel != null) {
+          final rect = _screenRect(focusedPanel, matrix, scale);
+          if (rect != null) {
+            final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
+            _CssZoomManager.apply(
+              ctrl,
+              focusedPanel.id,
+              scale,
+              immediate: true,
+            );
+
+            children.add(
+              Positioned(
+                key: ValueKey('wv-focused-${focusedPanel.id}'),
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(16 * scale),
+                    bottomRight: Radius.circular(16 * scale),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      WebViewWidget(controller: ctrl),
+                      // Loading overlay (navigation flash hide)
+                      ValueListenableBuilder<bool>(
+                        valueListenable:
+                            WebpagePlugin.pageLoading[focusedPanel.id] ??
+                                ValueNotifier<bool>(false),
+                        builder: (_, isLoading, __) {
+                          if (!isLoading) return const SizedBox.shrink();
+                          return const ColoredBox(color: Color(0xFFF8FAFC));
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                child: child!,
               ),
-            ),
-          ],
-        );
+            );
+          }
+        }
+
+        return Stack(children: children);
       },
-      // Wrap WebView in a Stack with a loading overlay that hides
-      // the flash of unzoomed content during page navigation.
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          WebViewWidget(controller: controller),
-          ValueListenableBuilder<bool>(
-            valueListenable: WebpagePlugin.pageLoading[panel.id] ??
-                ValueNotifier<bool>(false),
-            builder: (_, isLoading, __) {
-              if (!isLoading) return const SizedBox.shrink();
-              return const ColoredBox(color: Color(0xFFF8FAFC));
-            },
-          ),
-        ],
-      ),
     );
   }
 }
