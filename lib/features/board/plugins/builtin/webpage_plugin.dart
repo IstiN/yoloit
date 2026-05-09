@@ -321,6 +321,27 @@ class _WebpageContentState extends State<_WebpageContent> {
                       case 'desktop':
                         resize(1280, 800 + 81);
                     }
+                    // After panel resize, the native WKWebView frame updates
+                    // but the page may not reflow.  Force a viewport refresh
+                    // once the frame catches up.
+                    final panelId = widget.panel.id;
+                    final ctrl = _controller;
+                    if (ctrl != null) {
+                      Future.delayed(const Duration(milliseconds: 200), () {
+                        // Reset CSS zoom to 1.0 temporarily so the WKWebView
+                        // lays out content at the actual native frame width,
+                        // then re-apply the board-scale zoom.
+                        final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
+                        ctrl.runJavaScript(
+                          "document.documentElement.style.zoom='1';"
+                          "window.dispatchEvent(new Event('resize'));"
+                          "setTimeout(()=>{"
+                          "document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';"
+                          "window.dispatchEvent(new Event('resize'));"
+                          "},100);",
+                        );
+                      });
+                    }
                   },
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'mobile', child: Row(children: [
