@@ -37,6 +37,33 @@ class BoardCubit extends Cubit<BoardState> {
                 ),
               )
               .toList();
+      // Deduplicate panels that share the same ID (caused by a prior
+      // escaped-interpolation bug in onCreateLinkedPanel).
+      var needsResave = false;
+      boards = boards.map((board) {
+        final seen = <String>{};
+        final unique = <BoardPanelInstance>[];
+        for (final p in board.panels) {
+          if (seen.add(p.id)) {
+            unique.add(p);
+          } else {
+            needsResave = true;
+          }
+        }
+        // Also remove links referencing deleted panels.
+        final ids = unique.map((p) => p.id).toSet();
+        final validLinks = board.links
+            .where((l) => ids.contains(l.fromPanelId) && ids.contains(l.toPanelId))
+            .toList();
+        if (unique.length != board.panels.length || validLinks.length != board.links.length) {
+          return board.copyWith(panels: unique, links: validLinks);
+        }
+        return board;
+      }).toList();
+      if (needsResave) {
+        debugPrint('[BoardCubit] removed duplicate-ID panels, re-saving');
+        await _persist(boards: boards, activeBoardId: rawActiveId);
+      }
       if (boards.isEmpty) {
         boards = [_buildDefaultBoard(name: 'Board 1')];
         await _persist(boards: boards, activeBoardId: boards.first.id);
