@@ -45,6 +45,7 @@ class ChatPanelPlugin extends BoardPanelPlugin {
     return ChatPanelWidget(
       panel: panel,
       onUpdateState: renderContext.onUpdateState,
+      onCreateLinkedPanel: renderContext.onCreateLinkedPanel,
     );
   }
 }

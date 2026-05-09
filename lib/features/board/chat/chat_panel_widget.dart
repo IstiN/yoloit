@@ -25,10 +25,16 @@ class ChatPanelWidget extends StatefulWidget {
     super.key,
     required this.panel,
     required this.onUpdateState,
+    this.onCreateLinkedPanel,
   });
 
   final BoardPanelInstance panel;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
+  final Future<String?> Function(
+    String typeId,
+    Map<String, dynamic> state,
+    String title,
+  )? onCreateLinkedPanel;
 
   /// Global registry of processing notifiers keyed by panel ID.
   /// Used by [_BoardPanelCard] to animate the border glow.
@@ -190,6 +196,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         );
       }
     });
+  }
+
+  void _handleLinkTap(String? href) {
+    if (href == null || href.isEmpty) return;
+    final createPanel = widget.onCreateLinkedPanel;
+    if (createPanel != null &&
+        (href.startsWith('http://') || href.startsWith('https://'))) {
+      // Open as a new webpage panel linked to this chat
+      final uri = Uri.tryParse(href);
+      final title = uri?.host ?? href;
+      createPanel('board.webpage', {'url': href}, title);
+    } else {
+      PlatformLauncher.instance.openUrl(href);
+    }
   }
 
   void _setProcessing(bool value) {
@@ -882,9 +902,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 : MarkdownBody(
                   data: processedContent,
                   onTapLink: (text, href, title) {
-                    if (href != null && href.isNotEmpty) {
-                      PlatformLauncher.instance.openUrl(href);
-                    }
+                    _handleLinkTap(href);
                   },
                   styleSheet: MarkdownStyleSheet(
                     p: const TextStyle(
@@ -1807,9 +1825,7 @@ class _AssistantBubble extends StatelessWidget {
                   data: processedContent,
                   selectable: false,
                   onTapLink: (text, href, title) {
-                    if (href != null && href.isNotEmpty) {
-                      PlatformLauncher.instance.openUrl(href);
-                    }
+                    _handleLinkTap(href);
                   },
                   styleSheet: MarkdownStyleSheet(
                     p: const TextStyle(
