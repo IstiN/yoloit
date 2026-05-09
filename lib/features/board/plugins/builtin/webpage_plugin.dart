@@ -14,6 +14,10 @@ class WebpagePlugin extends BoardPanelPlugin {
   /// outside the InteractiveViewer transform to avoid coordinate offset.
   static final Map<String, WebViewController> controllers = {};
 
+  /// Desired CSS zoom per panel.  Updated by the WebView overlay,
+  /// read by [onPageFinished] to re-inject zoom after navigation.
+  static final Map<String, double> pendingCssZoom = {};
+
   @override
   String get typeId => kTypeId;
 
@@ -98,6 +102,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   @override
   void dispose() {
     WebpagePlugin.controllers.remove(widget.panel.id);
+    WebpagePlugin.pendingCssZoom.remove(widget.panel.id);
     _urlCtrl.dispose();
     _urlFocus.dispose();
     super.dispose();
@@ -108,6 +113,16 @@ class _WebpageContentState extends State<_WebpageContent> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onPageFinished: (_) {
+            // Re-inject CSS zoom after every page load.  Navigation
+            // replaces the DOM so the previous zoom style is lost.
+            final zoom = WebpagePlugin.pendingCssZoom[widget.panel.id];
+            if (zoom != null) {
+              _controller!.runJavaScript(
+                "document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}'",
+              );
+            }
+          },
           onUrlChange: (change) {
             final newUrl = change.url ?? '';
             if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {

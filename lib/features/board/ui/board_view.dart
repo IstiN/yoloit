@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -2441,38 +2442,61 @@ class _WebViewOverlay extends StatefulWidget {
 }
 
 class _WebViewOverlayState extends State<_WebViewOverlay> {
-  /// Last CSS zoom value injected into the WebView.
-  /// Used to avoid redundant JS calls during continuous zoom.
+  /// Last CSS zoom value successfully injected.
   double _lastCssZoom = -1;
+
+  /// Debounce timer to avoid injecting CSS zoom on every frame
+  /// during continuous board zoom (causes visible jitter).
+  Timer? _zoomDebounce;
 
   @override
   void deactivate() {
-    // Reset CSS zoom to 1 so the WebView isn't stuck at a stale
-    // zoom level the next time the overlay appears.
-    final panel = widget.panels
-        .where((p) =>
-            p.id == widget.focusedPanelId &&
-            p.type == WebpagePlugin.kTypeId)
-        .firstOrNull;
-    if (panel != null) {
-      final ctrl = WebpagePlugin.controllers[panel.id];
-      ctrl?.runJavaScript("document.documentElement.style.zoom='1'");
-    }
+    _zoomDebounce?.cancel();
     _lastCssZoom = -1;
     super.deactivate();
   }
 
-  /// Inject CSS zoom so content layouts at the panel's canvas width
-  /// regardless of board zoom.  Without this, the WebView reflows
-  /// content for each screen-pixel size (making text look huge when
-  /// zoomed out).
-  void _applyCssZoom(WebViewController controller, double scale) {
-    // Throttle: only inject when scale changed noticeably.
+  @override
+  void dispose() {
+    _zoomDebounce?.cancel();
+    super.dispose();
+  }
+
+  /// Schedule CSS zoom injection.  On first call (overlay just
+  /// appeared, or after page navigation) injects immediately.
+  /// During continuous board zoom, debounces to avoid 60-fps JS
+  /// calls that cause visible page jitter.
+  void _applyCssZoom(
+    WebViewController controller,
+    double scale,
+    String panelId,
+  ) {
+    // Always store the desired zoom so onPageFinished can re-inject.
+    WebpagePlugin.pendingCssZoom[panelId] = scale;
+
+    // First call → inject immediately so the page looks correct
+    // as soon as the overlay appears.
+    if (_lastCssZoom < 0) {
+      _lastCssZoom = scale;
+      _injectZoom(controller, scale);
+      return;
+    }
+
+    // Skip if zoom hasn't changed meaningfully.
     if ((_lastCssZoom - scale).abs() < 0.005) return;
-    _lastCssZoom = scale;
-    // CSS zoom on <html>: scales visually AND changes effective
-    // layout viewport.  zoom=0.5 → viewport doubles, content
-    // renders at 2× width but visually shrinks to fit frame.
+
+    // Debounce: inject 200 ms after the last matrix change so
+    // continuous pinch-zoom doesn't flood the WebView with JS.
+    _zoomDebounce?.cancel();
+    final target = scale;
+    _zoomDebounce = Timer(const Duration(milliseconds: 200), () {
+      if ((_lastCssZoom - target).abs() < 0.005) return;
+      _lastCssZoom = target;
+      _injectZoom(controller, target);
+    });
+  }
+
+  void _injectZoom(WebViewController controller, double scale) {
     controller.runJavaScript(
       "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}'",
     );
@@ -2480,7 +2504,6 @@ class _WebViewOverlayState extends State<_WebViewOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    // Only render for webpage panels.
     final panel = widget.panels
         .where((p) =>
             p.id == widget.focusedPanelId &&
@@ -2507,11 +2530,29 @@ class _WebViewOverlayState extends State<_WebViewOverlay> {
 
         if (screenW < 1 || screenH < 1) return const SizedBox.shrink();
 
-        // Inject CSS zoom so content stays at canvas-width layout.
-        _applyCssZoom(controller, scale);
+        // Schedule CSS zoom (debounced during continuous zoom).
+        _applyCssZoom(controller, scale, panel.id);
 
         return Stack(
           children: [
+            // Opaque background absorbs clicks outside the WebView
+            // rect, preventing them from falling through to the
+            // canvas background Listener (which would clear focus).
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  // Tap outside the WebView rect but inside the
+                  // overlay → unfocus the panel.
+                  if (kDebugMode) {
+                    debugPrint(
+                      '[BoardWebFocus] overlay outside tap -> clearFocusedPanel',
+                    );
+                  }
+                  context.read<BoardCubit>().clearFocusedPanel();
+                },
+              ),
+            ),
             Positioned(
               left: screenPos.dx,
               top: screenPos.dy,
