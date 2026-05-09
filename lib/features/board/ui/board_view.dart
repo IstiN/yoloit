@@ -2420,7 +2420,7 @@ class _BoardPanelCard extends StatelessWidget {
 // mismatch between Flutter's transform and native macOS platform views.
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _WebViewOverlay extends StatelessWidget {
+class _WebViewOverlay extends StatefulWidget {
   const _WebViewOverlay({
     required this.panels,
     required this.focusedPanelId,
@@ -2437,10 +2437,54 @@ class _WebViewOverlay extends StatelessWidget {
   static const double _contentOffsetY = 81.0;
 
   @override
+  State<_WebViewOverlay> createState() => _WebViewOverlayState();
+}
+
+class _WebViewOverlayState extends State<_WebViewOverlay> {
+  /// Last CSS zoom value injected into the WebView.
+  /// Used to avoid redundant JS calls during continuous zoom.
+  double _lastCssZoom = -1;
+
+  @override
+  void deactivate() {
+    // Reset CSS zoom to 1 so the WebView isn't stuck at a stale
+    // zoom level the next time the overlay appears.
+    final panel = widget.panels
+        .where((p) =>
+            p.id == widget.focusedPanelId &&
+            p.type == WebpagePlugin.kTypeId)
+        .firstOrNull;
+    if (panel != null) {
+      final ctrl = WebpagePlugin.controllers[panel.id];
+      ctrl?.runJavaScript("document.documentElement.style.zoom='1'");
+    }
+    _lastCssZoom = -1;
+    super.deactivate();
+  }
+
+  /// Inject CSS zoom so content layouts at the panel's canvas width
+  /// regardless of board zoom.  Without this, the WebView reflows
+  /// content for each screen-pixel size (making text look huge when
+  /// zoomed out).
+  void _applyCssZoom(WebViewController controller, double scale) {
+    // Throttle: only inject when scale changed noticeably.
+    if ((_lastCssZoom - scale).abs() < 0.005) return;
+    _lastCssZoom = scale;
+    // CSS zoom on <html>: scales visually AND changes effective
+    // layout viewport.  zoom=0.5 → viewport doubles, content
+    // renders at 2× width but visually shrinks to fit frame.
+    controller.runJavaScript(
+      "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}'",
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Only render for webpage panels.
-    final panel = panels
-        .where((p) => p.id == focusedPanelId && p.type == WebpagePlugin.kTypeId)
+    final panel = widget.panels
+        .where((p) =>
+            p.id == widget.focusedPanelId &&
+            p.type == WebpagePlugin.kTypeId)
         .firstOrNull;
     if (panel == null) return const SizedBox.shrink();
 
@@ -2448,37 +2492,23 @@ class _WebViewOverlay extends StatelessWidget {
     if (controller == null) return const SizedBox.shrink();
 
     return ValueListenableBuilder<Matrix4>(
-      valueListenable: transformController,
+      valueListenable: widget.transformController,
       builder: (context, matrix, child) {
-        // Extract 2D scale from the X-axis column of the matrix.
-        // getMaxScaleOnAxis() returns max(scaleX, scaleY, 1.0) which
-        // is always >= 1 — wrong when zoomed out (scale < 1).
         final scale = _BoardViewState._scaleOf(matrix);
         final canvasPos = Offset(
-          panel.bounds.x + canvasOrigin.dx,
-          panel.bounds.y + canvasOrigin.dy + _contentOffsetY,
+          panel.bounds.x + widget.canvasOrigin.dx,
+          panel.bounds.y + widget.canvasOrigin.dy +
+              _WebViewOverlay._contentOffsetY,
         );
         final screenPos = MatrixUtils.transformPoint(matrix, canvasPos);
         final screenW = panel.bounds.width * scale;
         final screenH =
-            (panel.bounds.height - _contentOffsetY) * scale;
-
-        if (kDebugMode) {
-          debugPrint(
-            '[WebViewOverlay] scale=${scale.toStringAsFixed(3)} '
-            'panelW=${panel.bounds.width.toStringAsFixed(0)} '
-            'panelH=${panel.bounds.height.toStringAsFixed(0)} '
-            'screenW=${screenW.toStringAsFixed(0)} '
-            'screenH=${screenH.toStringAsFixed(0)} '
-            'pos=(${screenPos.dx.toStringAsFixed(0)},${screenPos.dy.toStringAsFixed(0)}) '
-            'matrix[0]=${matrix.storage[0].toStringAsFixed(4)} '
-            'matrix[5]=${matrix.storage[5].toStringAsFixed(4)} '
-            'matrix[12]=${matrix.storage[12].toStringAsFixed(0)} '
-            'matrix[13]=${matrix.storage[13].toStringAsFixed(0)}',
-          );
-        }
+            (panel.bounds.height - _WebViewOverlay._contentOffsetY) * scale;
 
         if (screenW < 1 || screenH < 1) return const SizedBox.shrink();
+
+        // Inject CSS zoom so content stays at canvas-width layout.
+        _applyCssZoom(controller, scale);
 
         return Stack(
           children: [
