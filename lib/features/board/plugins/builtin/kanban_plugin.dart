@@ -482,7 +482,16 @@ class _KanbanContentState extends State<_KanbanContent> {
   }
 
   Widget _buildColumnHeader(int ci, List<String> columns, int cardCount) {
-    final color = _colColor(ci);
+    final baseColor = _colColor(ci);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final color =
+        isLight && baseColor.computeLuminance() > 0.50
+            ? Color.lerp(baseColor, Colors.black, 0.45)!
+            : (isLight && baseColor.computeLuminance() > 0.40)
+            ? Color.lerp(baseColor, Colors.black, 0.25)!
+            : baseColor;
+    final muted =
+        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Column(
@@ -558,7 +567,11 @@ class _KanbanContentState extends State<_KanbanContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
-                  color: color.withAlpha(30),
+                  color: color.withAlpha(isLight ? 45 : 30),
+                  border: Border.all(
+                    color: color.withAlpha(isLight ? 75 : 45),
+                    width: 0.6,
+                  ),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -588,7 +601,7 @@ class _KanbanContentState extends State<_KanbanContent> {
                   height: 20,
                   child: IconButton(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.tune, size: 13, color: Color(0xFF64748B)),
+                    icon: Icon(Icons.tune, size: 13, color: muted),
                     tooltip: 'Edit columns',
                     onPressed: () => setState(() => _editMode = true),
                   ),
@@ -600,7 +613,7 @@ class _KanbanContentState extends State<_KanbanContent> {
                   height: 20,
                   child: IconButton(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.remove, size: 13, color: Color(0xFF64748B)),
+                    icon: Icon(Icons.remove, size: 13, color: muted),
                     tooltip: 'Delete column',
                     onPressed: () => _deleteColumn(ci),
                   ),
@@ -624,7 +637,10 @@ class _KanbanContentState extends State<_KanbanContent> {
                         color: c,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.white : Colors.transparent,
+                          color:
+                              isSelected
+                                  ? (isLight ? Colors.black : Colors.white)
+                                  : Colors.transparent,
                           width: isSelected ? 1.5 : 0,
                         ),
                       ),
