@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -575,29 +576,30 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Widget _buildInfoBar() {
+    final colors = context.appColors;
+    final muted =
+        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D1117),
-        border: Border(
-          bottom: BorderSide(color: Color(0xFF1E293B), width: 0.5),
-        ),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(bottom: BorderSide(color: colors.border, width: 0.5)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.folder_outlined, size: 11, color: Color(0xFF475569)),
+          Icon(Icons.folder_outlined, size: 11, color: muted),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
               _shortPath(_config.workingDir),
-              style: const TextStyle(fontSize: 10, color: Color(0xFF475569)),
+              style: TextStyle(fontSize: 10, color: muted),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           ChatProviderIcon(
             provider: _config.provider,
             size: 14,
-            color: const Color(0xFF64748B),
+            color: muted,
           ),
           const SizedBox(width: 8),
           // Autopilot toggle
@@ -614,9 +616,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 Icons.rocket_launch,
                 size: 12,
                 color:
-                    _config.autopilot
-                        ? const Color(0xFF34D399)
-                        : const Color(0xFF334155),
+                         _config.autopilot
+                             ? const Color(0xFF34D399)
+                             : muted,
               ),
             ),
           ),
@@ -637,8 +639,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   border: Border.all(
                     color:
                         _config.reasoningEffort != null
-                            ? const Color(0x80F59E0B)
-                            : const Color(0xFF334155),
+                             ? const Color(0x80F59E0B)
+                             : colors.border,
                     width: 0.6,
                   ),
                 ),
@@ -649,8 +651,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     fontWeight: FontWeight.w700,
                     color:
                         _config.reasoningEffort != null
-                            ? const Color(0xFFF59E0B)
-                            : const Color(0xFF64748B),
+                             ? const Color(0xFFF59E0B)
+                             : muted,
                   ),
                 ),
               ),
@@ -659,13 +661,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           const SizedBox(width: 6),
           Text(
             _config.model,
-            style: const TextStyle(fontSize: 9, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 9, color: muted),
           ),
           if (_totalOutputTokens > 0) ...[
             const SizedBox(width: 6),
             Text(
               '∑${_totalOutputTokens}',
-              style: const TextStyle(fontSize: 9, color: Color(0xFF6366F1)),
+              style: TextStyle(fontSize: 9, color: colors.primary),
             ),
           ],
           if (_isProcessing)
@@ -683,10 +685,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           const SizedBox(width: 4),
           GestureDetector(
             onTap: () => _showSessionHistoryDialog(context),
-            child: const Icon(
+            child: Icon(
               Icons.history,
               size: 13,
-              color: Color(0xFF475569),
+              color: muted,
             ),
           ),
         ],
@@ -725,9 +727,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             color: Colors.white.withAlpha(30),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Send a message to start',
-            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            style: TextStyle(
+              fontSize: 13,
+              color:
+                  Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.color ?? const Color(0xFF64748B),
+            ),
           ),
         ],
       ),
@@ -774,8 +782,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
             child: Container(
               padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Color(0xFF161D2A),
+              decoration: BoxDecoration(
+                color: context.appColors.surfaceElevated,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(4),
                   topRight: Radius.circular(16),
@@ -880,6 +888,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Widget _buildStreamingBubble() {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ?? const Color(0xFFCBD5E1);
+    final codeBg = colors.surface;
     final processedContent = _streamingContent.replaceAll(
       RegExp(r'<br\s*/?>'),
       '\n',
@@ -888,8 +900,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: const BoxDecoration(
-          color: Color(0xFF161D2A),
+        decoration: BoxDecoration(
+          color: colors.surfaceElevated,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(4),
             topRight: Radius.circular(16),
@@ -906,25 +918,25 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     _handleLinkTap(href);
                   },
                   styleSheet: MarkdownStyleSheet(
-                    p: const TextStyle(
+                    p: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFFCBD5E1),
+                      color: textColor,
                       height: 1.5,
                     ),
-                    a: const TextStyle(
+                    a: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF60A5FA),
+                      color: colors.primary,
                       decoration: TextDecoration.underline,
                     ),
-                    code: const TextStyle(
+                    code: TextStyle(
                       fontSize: 11.5,
-                      color: Color(0xFF34D399),
-                      backgroundColor: Color(0xFF0D1117),
+                      color: colors.terminalPrompt,
+                      backgroundColor: codeBg,
                     ),
                     codeblockDecoration: BoxDecoration(
-                      color: const Color(0xFF0D1117),
+                      color: codeBg,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      border: Border.all(color: colors.border),
                     ),
                   ),
                 ),
@@ -933,11 +945,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Widget _buildInputBar() {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ?? const Color(0xFFE2E8F0);
+    final hintColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF475569);
     return Container(
       margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
       padding: const EdgeInsets.fromLTRB(10, 8, 22, 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F1219),
+      decoration: BoxDecoration(
+        color: colors.surface,
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(14),
           bottomRight: Radius.circular(14),
@@ -956,13 +973,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     height: 28,
                     margin: const EdgeInsets.only(bottom: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A2030),
+                      color: colors.surfaceElevated,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.auto_awesome,
                       size: 14,
-                      color: Color(0xFF34D399),
+                      color: colors.terminalPrompt,
                     ),
                   ),
                 ),
@@ -991,19 +1008,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               child: TextField(
                 controller: _inputController,
                 focusNode: _inputFocusNode,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: Color(0xFFE2E8F0),
+                  color: textColor,
                   height: 1.4,
                 ),
                 decoration: InputDecoration(
                   hintText: _isProcessing ? 'Agent working…' : 'Message…',
-                  hintStyle: const TextStyle(
+                  hintStyle: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF475569),
+                    color: hintColor,
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF1A2030),
+                  fillColor: colors.surfaceElevated,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -1014,8 +1031,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF34D399),
+                    borderSide: BorderSide(
+                      color: colors.terminalPrompt,
                       width: 0.8,
                     ),
                   ),
@@ -1038,12 +1055,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               height: 28,
               margin: const EdgeInsets.only(bottom: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF34D399),
+                color: colors.terminalPrompt,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.arrow_upward,
-                color: Color(0xFF0F172A),
+                color: Theme.of(context).colorScheme.onPrimary,
                 size: 16,
               ),
             ),
@@ -1757,6 +1774,12 @@ class _AssistantBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ?? const Color(0xFFCBD5E1);
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B);
+    final codeBg = colors.surface;
     // Preprocess: replace <br> tags with newlines for markdown rendering
     final processedContent = content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
 
@@ -1814,8 +1837,8 @@ class _AssistantBubble extends StatelessWidget {
           if (processedContent.trim().isNotEmpty)
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Color(0xFF161D2A),
+              decoration: BoxDecoration(
+                color: colors.surfaceElevated,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(4),
                   topRight: Radius.circular(16),
@@ -1835,45 +1858,45 @@ class _AssistantBubble extends StatelessWidget {
                     }
                   },
                   styleSheet: MarkdownStyleSheet(
-                    p: const TextStyle(
+                    p: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFFCBD5E1),
+                      color: textColor,
                       height: 1.5,
                     ),
-                    a: const TextStyle(
+                    a: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF60A5FA),
+                      color: colors.primary,
                       decoration: TextDecoration.underline,
                     ),
-                    code: const TextStyle(
+                    code: TextStyle(
                       fontSize: 11.5,
                       fontFamily: 'JetBrains Mono',
-                      color: Color(0xFF34D399),
-                      backgroundColor: Color(0xFF0D1117),
+                      color: colors.terminalPrompt,
+                      backgroundColor: codeBg,
                     ),
                     codeblockDecoration: BoxDecoration(
-                      color: const Color(0xFF0D1117),
+                      color: codeBg,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF1E293B)),
+                      border: Border.all(color: colors.border),
                     ),
                     codeblockPadding: const EdgeInsets.all(10),
-                    listBullet: const TextStyle(
+                    listBullet: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF64748B),
+                      color: mutedColor,
                     ),
-                    h1: const TextStyle(
+                    h1: TextStyle(
                       fontSize: 16,
-                      color: Color(0xFFE2E8F0),
+                      color: textColor,
                       fontWeight: FontWeight.w600,
                     ),
-                    h2: const TextStyle(
+                    h2: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFFE2E8F0),
+                      color: textColor,
                       fontWeight: FontWeight.w600,
                     ),
-                    h3: const TextStyle(
+                    h3: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFFE2E8F0),
+                      color: textColor,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
