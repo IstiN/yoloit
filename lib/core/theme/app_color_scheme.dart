@@ -66,7 +66,14 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
   // ── Factory helpers ──────────────────────────────────────────────────────────
 
   /// Derives a full scheme from an accent [color] and optional [bg] tint seed.
-  factory AppColorScheme.fromAccent(Color accent, {Color? bgSeed}) {
+  factory AppColorScheme.fromAccent(
+    Color accent, {
+    Color? bgSeed,
+    Brightness brightness = Brightness.dark,
+  }) {
+    if (brightness == Brightness.light) {
+      return AppColorScheme._lightFromAccent(accent);
+    }
     final bg = bgSeed ?? const Color(0xFF090918);
     final sur = _mixBg(bg, accent, 0.04);
     final surEl = _mixBg(bg, accent, 0.08);
@@ -92,6 +99,36 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       tabBorder: accent,
       tabActiveBg: _mixBg(bg, accent, 0.15),
       tabInactiveBg: _mixBg(bg, accent, 0.06),
+    );
+  }
+
+  factory AppColorScheme._lightFromAccent(Color accent) {
+    const bg = Color(0xFFF8F9FB);
+    final sur = Color.lerp(bg, accent, 0.03)!;
+    final surEl = Color.lerp(bg, accent, 0.06)!;
+    final surHi = Color.lerp(bg, accent, 0.10)!;
+    final bor = Color.lerp(const Color(0xFFD0D5DD), accent, 0.12)!;
+    final div = Color.lerp(const Color(0xFFE4E7EC), accent, 0.08)!;
+    final termBg = Color.lerp(bg, Colors.white, 0.5)!;
+    final accentDark = Color.lerp(accent, Colors.black, 0.20)!;
+    return AppColorScheme(
+      primary: accentDark,
+      primaryLight: Color.lerp(accent, Colors.white, 0.40)!,
+      primaryDark: Color.lerp(accent, Colors.black, 0.35)!,
+      primaryGlow: accent.withAlpha(30),
+      background: bg,
+      surface: sur,
+      surfaceElevated: surEl,
+      surfaceHighlight: surHi,
+      border: bor,
+      divider: div,
+      terminalBackground: termBg,
+      sidebar: accentDark,
+      sidebarGlow: accent.withAlpha(20),
+      terminalPrompt: accentDark,
+      tabBorder: accentDark,
+      tabActiveBg: Color.lerp(bg, accent, 0.12)!,
+      tabInactiveBg: Color.lerp(bg, accent, 0.04)!,
     );
   }
 

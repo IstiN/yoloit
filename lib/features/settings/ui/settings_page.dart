@@ -179,6 +179,10 @@ class _SettingsPageState extends State<SettingsPage> {
           children: [
             const _SectionHeader(title: 'Appearance'),
             const SizedBox(height: 12),
+            _BrightnessToggle(),
+            const SizedBox(height: 16),
+            const _SectionHeader(title: 'Accent Color'),
+            const SizedBox(height: 12),
             _ThemeSelector(),
           ],
         ),
@@ -584,6 +588,83 @@ class _AgentRowState extends State<_AgentRow> {
           ] else
             const SizedBox(width: 36),
         ],
+      ),
+    );
+  }
+}
+
+class _BrightnessToggle extends StatefulWidget {
+  @override
+  State<_BrightnessToggle> createState() => _BrightnessToggleState();
+}
+
+class _BrightnessToggleState extends State<_BrightnessToggle> {
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final isDark = ThemeManager.instance.isDark;
+    return Row(
+      children: [
+        _buildModeButton(
+          icon: Icons.dark_mode_outlined,
+          label: 'Dark',
+          isActive: isDark,
+          colors: colors,
+          onTap: () {
+            ThemeManager.instance.setBrightness(Brightness.dark);
+            setState(() {});
+          },
+        ),
+        const SizedBox(width: 8),
+        _buildModeButton(
+          icon: Icons.light_mode_outlined,
+          label: 'Light',
+          isActive: !isDark,
+          colors: colors,
+          onTap: () {
+            ThemeManager.instance.setBrightness(Brightness.light);
+            setState(() {});
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required AppColorScheme colors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 100,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isActive ? colors.primary.withAlpha(30) : colors.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? colors.primary : colors.border,
+            width: isActive ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 22, color: isActive ? colors.primary : colors.border),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? colors.primary : Theme.of(context).textTheme.bodySmall?.color,
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -9,9 +9,12 @@ class ThemeManager extends ChangeNotifier {
   static final ThemeManager instance = ThemeManager._();
 
   AppThemePreset _current = AppThemePreset.neonPurple;
+  Brightness _brightness = Brightness.dark;
 
   AppThemePreset get current => _current;
-  ThemeData get theme => _current.theme;
+  Brightness get brightness => _brightness;
+  bool get isDark => _brightness == Brightness.dark;
+  ThemeData get theme => _current.themeForBrightness(_brightness);
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -20,6 +23,8 @@ class ThemeManager extends ChangeNotifier {
       (t) => t.name == name,
       orElse: () => AppThemePreset.neonPurple,
     );
+    final bright = prefs.getString('theme_brightness') ?? 'dark';
+    _brightness = bright == 'light' ? Brightness.light : Brightness.dark;
     AppColors.setAccent(_current.color);
     notifyListeners();
   }
@@ -30,5 +35,19 @@ class ThemeManager extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme_preset', preset.name);
+  }
+
+  Future<void> setBrightness(Brightness brightness) async {
+    _brightness = brightness;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'theme_brightness',
+      brightness == Brightness.light ? 'light' : 'dark',
+    );
+  }
+
+  Future<void> toggleBrightness() async {
+    await setBrightness(isDark ? Brightness.light : Brightness.dark);
   }
 }
