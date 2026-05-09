@@ -212,7 +212,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       _drawPointer == null),
                               transformationController: _transformController,
                               onInteractionStart: (_) {
-                                _isViewportInteracting = true;
+                                setState(() => _isViewportInteracting = true);
                                 _boardDebugLog('interaction.start');
                                 _stopPanAnimation();
                                 // Focus clearing moved to the canvas
@@ -221,7 +221,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 // on panels.
                               },
                               onInteractionEnd: (_) {
-                                _isViewportInteracting = false;
+                                setState(() => _isViewportInteracting = false);
                                 _boardDebugLog('interaction.end');
                                 _persistViewport(context, activeBoard);
                               },
@@ -478,6 +478,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 focusedPanelId: focusedPanelId,
                                 transformController: _transformController,
                                 canvasOrigin: _canvasOrigin,
+                                isInteracting: _isViewportInteracting,
                               ),
                             ),
                             // ── Draw gesture capture overlay ─────────────────
@@ -2473,12 +2474,14 @@ class _WebViewOverlays extends StatelessWidget {
     required this.focusedPanelId,
     required this.transformController,
     required this.canvasOrigin,
+    required this.isInteracting,
   });
 
   final List<BoardPanelInstance> panels;
   final String? focusedPanelId;
   final TransformationController transformController;
   final Offset canvasOrigin;
+  final bool isInteracting;
 
   /// Header (44) + URL bar (36) + divider (1) = content starts at 81px.
   static const double _contentOffsetY = 81.0;
@@ -2511,6 +2514,11 @@ class _WebViewOverlays extends StatelessWidget {
         .toList();
 
     if (webPanels.isEmpty) return const SizedBox.shrink();
+
+    // During active pinch-to-zoom / pan, hide overlays to avoid
+    // visual desync — native NSView frame updates lag behind
+    // the GPU-rendered InteractiveViewer transform.
+    if (isInteracting) return const SizedBox.shrink();
 
     return LayoutBuilder(
       builder: (context, constraints) {
