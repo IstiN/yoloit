@@ -58,6 +58,17 @@ class _KanbanContentState extends State<_KanbanContent> {
   static const Color _colBg = Color(0xFF141821);
   static const Color _border = Color(0xFF2A3040);
 
+  static const List<Color> _columnColorPalette = [
+    Color(0xFF6366F1), // indigo (default)
+    Color(0xFF0EA5E9), // sky
+    Color(0xFF10B981), // emerald
+    Color(0xFFF59E0B), // amber
+    Color(0xFFEF4444), // red
+    Color(0xFFEC4899), // pink
+    Color(0xFF8B5CF6), // violet
+    Color(0xFF64748B), // slate
+  ];
+
   // ── State helpers ──────────────────────────────────────────────────────────
 
   List<String> get _columns =>
@@ -65,6 +76,22 @@ class _KanbanContentState extends State<_KanbanContent> {
           ?.map((e) => e.toString())
           .toList() ??
       ['Backlog', 'Todo', 'In Progress', 'Done'];
+
+  /// Per-column color stored as hex string keyed by column index.
+  Map<String, String> get _columnColors {
+    final raw = widget.panel.state['columnColors'];
+    if (raw is Map) return Map<String, String>.from(raw);
+    return {};
+  }
+
+  Color _colColor(int ci) {
+    final hex = _columnColors['$ci'];
+    if (hex != null && hex.isNotEmpty) {
+      final v = int.tryParse(hex, radix: 16);
+      if (v != null) return Color(v);
+    }
+    return _accent;
+  }
 
   List<_CardData> get _cards =>
       (widget.panel.state['cards'] as List?)
@@ -74,6 +101,8 @@ class _KanbanContentState extends State<_KanbanContent> {
       [];
 
   // ── Local UI state ─────────────────────────────────────────────────────────
+
+  bool _editMode = false;
 
   // per-column add-card controllers
   final Map<int, TextEditingController> _addCtrl = {};
@@ -159,10 +188,37 @@ class _KanbanContentState extends State<_KanbanContent> {
       }
       return {...c, 'columnIndex': ci};
     }).toList();
+    // Remap column colors.
+    final oldColors = _columnColors;
+    final newColors = <String, String>{};
+    for (int i = 0; i < cols.length; i++) {
+      int oldIdx;
+      if (i == to) {
+        oldIdx = from;
+      } else if (from < to && i >= from && i < to) {
+        oldIdx = i + 1;
+      } else if (from > to && i > to && i <= from) {
+        oldIdx = i - 1;
+      } else {
+        oldIdx = i;
+      }
+      final c = oldColors['$oldIdx'];
+      if (c != null) newColors['$i'] = c;
+    }
     widget.renderContext.onUpdateState({
       ...widget.panel.state,
       'columns': cols,
       'cards': cards,
+      'columnColors': newColors,
+    });
+  }
+
+  void _setColumnColor(int ci, Color color) {
+    final colors = Map<String, String>.from(_columnColors);
+    colors['$ci'] = color.toARGB32().toRadixString(16).padLeft(8, '0');
+    widget.renderContext.onUpdateState({
+      ...widget.panel.state,
+      'columnColors': colors,
     });
   }
 
@@ -217,47 +273,79 @@ class _KanbanContentState extends State<_KanbanContent> {
 
     return Container(
       color: _bg,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Column(
         children: [
-          // Columns
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+          // ── Top bar with edit toggle ──
+          if (_editMode)
+            Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0xFF2A3040))),
+              ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (int ci = 0; ci < columns.length; ci++) ...[
-                    _buildColumn(ci, columns, cards),
-                    const SizedBox(width: 8),
-                  ],
-                  // Add column button
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Tooltip(
-                      message: 'Add column',
-                      child: InkWell(
-                        onTap: _addColumn,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: _border),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            size: 16,
-                            color: Color(0xFF6366F1),
-                          ),
-                        ),
-                      ),
+                  const Icon(Icons.tune, size: 12, color: _accent),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Edit columns',
+                    style: TextStyle(fontSize: 11, color: _accent, fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => setState(() => _editMode = false),
+                    child: const Text(
+                      'Done',
+                      style: TextStyle(fontSize: 11, color: _accent, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
               ),
+            ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (int ci = 0; ci < columns.length; ci++) ...[
+                          _buildColumn(ci, columns, cards),
+                          const SizedBox(width: 8),
+                        ],
+                        // Add column button
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Tooltip(
+                            message: 'Add column',
+                            child: InkWell(
+                              onTap: _addColumn,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: _border),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.add,
+                                  size: 16,
+                                  color: Color(0xFF6366F1),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -283,13 +371,14 @@ class _KanbanContentState extends State<_KanbanContent> {
       onLeave: (_) => setState(() => _dragOverCol = null),
       onMove: (_) => setState(() => _dragOverCol = ci),
       builder: (ctx, candidateData, rejectedData) {
+        final color = _colColor(ci);
         return Container(
           width: 180,
           decoration: BoxDecoration(
-            color: isDragOver ? _accent.withAlpha(20) : _colBg,
+            color: isDragOver ? color.withAlpha(20) : _colBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isDragOver ? _accent.withAlpha(100) : _border,
+              color: isDragOver ? color.withAlpha(100) : _border,
               width: isDragOver ? 1.5 : 1,
             ),
           ),
@@ -383,111 +472,155 @@ class _KanbanContentState extends State<_KanbanContent> {
   }
 
   Widget _buildColumnHeader(int ci, List<String> columns, int cardCount) {
+    final color = _colColor(ci);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Move left
-          if (ci > 0)
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.chevron_left, size: 14, color: Color(0xFF64748B)),
-                tooltip: 'Move left',
-                onPressed: () => _moveColumn(ci, ci - 1),
+          Row(
+            children: [
+              // Move left (edit mode only)
+              if (_editMode && ci > 0)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(Icons.chevron_left, size: 14, color: color),
+                    tooltip: 'Move left',
+                    onPressed: () => _moveColumn(ci, ci - 1),
+                  ),
+                ),
+              // Name (editable on double-tap)
+              Expanded(
+                child:
+                    _renamingCol == ci
+                        ? TextField(
+                          controller: _renameCtrl,
+                          autofocus: true,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 2,
+                              horizontal: 4,
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          onSubmitted: (v) => _renameColumn(ci, v),
+                          onEditingComplete:
+                              () => _renameColumn(ci, _renameCtrl.text),
+                        )
+                        : GestureDetector(
+                          onDoubleTap: () {
+                            _renameCtrl.text = columns[ci];
+                            setState(() => _renamingCol = ci);
+                          },
+                          child: Text(
+                            columns[ci],
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
               ),
-            ),
-          // Name (editable on double-tap)
-          Expanded(
-            child:
-                _renamingCol == ci
-                    ? TextField(
-                      controller: _renameCtrl,
-                      autofocus: true,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _accent,
-                      ),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          vertical: 2,
-                          horizontal: 4,
+              // Move right (edit mode only)
+              if (_editMode && ci < columns.length - 1)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(Icons.chevron_right, size: 14, color: color),
+                    tooltip: 'Move right',
+                    onPressed: () => _moveColumn(ci, ci + 1),
+                  ),
+                ),
+              // Count badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: color.withAlpha(30),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$cardCount',
+                  style: TextStyle(fontSize: 10, color: color),
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Add card button
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: Icon(Icons.add, size: 13, color: color),
+                  tooltip: 'Add card',
+                  onPressed: () {
+                    _addCtrl.putIfAbsent(ci, () => TextEditingController());
+                    setState(() => _adding[ci] = true);
+                  },
+                ),
+              ),
+              // Edit mode toggle (on first column header only, when not in edit mode)
+              if (!_editMode && ci == 0)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.tune, size: 13, color: Color(0xFF64748B)),
+                    tooltip: 'Edit columns',
+                    onPressed: () => setState(() => _editMode = true),
+                  ),
+                ),
+              // Delete column (edit mode only, not the last one)
+              if (_editMode && _columns.length > 1)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.remove, size: 13, color: Color(0xFF64748B)),
+                    tooltip: 'Delete column',
+                    onPressed: () => _deleteColumn(ci),
+                  ),
+                ),
+            ],
+          ),
+          // ── Color picker row (edit mode only) ──
+          if (_editMode)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: _columnColorPalette.map((c) {
+                  final isSelected = c.toARGB32() == color.toARGB32();
+                  return GestureDetector(
+                    onTap: () => _setColumnColor(ci, c),
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      margin: const EdgeInsets.only(right: 3),
+                      decoration: BoxDecoration(
+                        color: c,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? Colors.white : Colors.transparent,
+                          width: isSelected ? 1.5 : 0,
                         ),
-                        border: InputBorder.none,
-                      ),
-                      onSubmitted: (v) => _renameColumn(ci, v),
-                      onEditingComplete:
-                          () => _renameColumn(ci, _renameCtrl.text),
-                    )
-                    : GestureDetector(
-                      onDoubleTap: () {
-                        _renameCtrl.text = columns[ci];
-                        setState(() => _renamingCol = ci);
-                      },
-                      child: Text(
-                        columns[ci],
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: _accent,
-                        ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-          ),
-          // Move right
-          if (ci < columns.length - 1)
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.chevron_right, size: 14, color: Color(0xFF64748B)),
-                tooltip: 'Move right',
-                onPressed: () => _moveColumn(ci, ci + 1),
-              ),
-            ),
-          // Count badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: _accent.withAlpha(30),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$cardCount',
-              style: const TextStyle(fontSize: 10, color: _accent),
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Add card button
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: const Icon(Icons.add, size: 13, color: _accent),
-              tooltip: 'Add card',
-              onPressed: () {
-                _addCtrl.putIfAbsent(ci, () => TextEditingController());
-                setState(() => _adding[ci] = true);
-              },
-            ),
-          ),
-          // Delete column (only if it's not the last one)
-          if (_columns.length > 1)
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.remove, size: 13, color: Color(0xFF64748B)),
-                tooltip: 'Delete column',
-                onPressed: () => _deleteColumn(ci),
+                  );
+                }).toList(),
               ),
             ),
         ],
