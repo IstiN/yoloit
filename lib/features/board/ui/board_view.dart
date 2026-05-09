@@ -2511,137 +2511,135 @@ class _WebViewOverlays extends StatelessWidget {
 
     if (webPanels.isEmpty) return const SizedBox.shrink();
 
-    return ValueListenableBuilder<Matrix4>(
-      valueListenable: transformController,
-      builder: (context, matrix, _) {
-        final scale = _BoardViewState._scaleOf(matrix);
-        final children = <Widget>[];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportRect = Rect.fromLTWH(
+          0,
+          0,
+          constraints.maxWidth,
+          constraints.maxHeight,
+        );
 
-        // ── 1. Unfocused WebView overlays (bottom z-order) ──
-        for (final panel in webPanels) {
-          if (panel.id == focusedPanelId) continue;
-          final rect = _screenRect(panel, matrix, scale);
-          if (rect == null) continue;
+        return ValueListenableBuilder<Matrix4>(
+          valueListenable: transformController,
+          builder: (context, matrix, _) {
+            final scale = _BoardViewState._scaleOf(matrix);
+            final children = <Widget>[];
 
-          final ctrl = WebpagePlugin.controllers[panel.id]!;
-          _CssZoomManager.apply(ctrl, panel.id, scale);
+            // ── 1. Unfocused WebView overlays (bottom z-order) ──
+            for (final panel in webPanels) {
+              if (panel.id == focusedPanelId) continue;
+              final rect = _screenRect(panel, matrix, scale);
+              if (rect == null) continue;
+              // Viewport culling — skip off-screen panels.
+              if (!rect.overlaps(viewportRect)) continue;
 
-          children.add(
-            Positioned(
-              key: ValueKey('wv-${panel.id}'),
-              left: rect.left,
-              top: rect.top,
-              width: rect.width,
-              height: rect.height,
-              child: ClipRRect(
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(16 * scale),
-                  bottomRight: Radius.circular(16 * scale),
-                ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    WebViewWidget(controller: ctrl),
-                    // Loading overlay for unfocused panels
-                    ValueListenableBuilder<bool>(
-                      valueListenable:
-                          WebpagePlugin.pageLoading[panel.id] ??
-                              ValueNotifier<bool>(false),
-                      builder: (_, isLoading, __) {
-                        if (!isLoading) return const SizedBox.shrink();
-                        return const ColoredBox(color: Color(0xFFF8FAFC));
-                      },
+              final ctrl = WebpagePlugin.controllers[panel.id]!;
+              _CssZoomManager.apply(ctrl, panel.id, scale);
+
+              children.add(
+                Positioned(
+                  key: ValueKey('wv-${panel.id}'),
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(16 * scale),
+                      bottomRight: Radius.circular(16 * scale),
                     ),
-                    // Absorb clicks → focus this panel
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {
-                        if (kDebugMode) {
-                          debugPrint(
-                            '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
-                          );
-                        }
-                        context.read<BoardCubit>().focusPanel(panel.id);
-                        FocusManager.instance.primaryFocus?.unfocus();
-                      },
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        const ColoredBox(color: Colors.white),
+                        WebViewWidget(controller: ctrl),
+                        // Loading overlay
+                        ValueListenableBuilder<bool>(
+                          valueListenable:
+                              WebpagePlugin.pageLoading[panel.id] ??
+                                  ValueNotifier<bool>(false),
+                          builder: (_, isLoading, __) {
+                            if (!isLoading) return const SizedBox.shrink();
+                            return const ColoredBox(color: Color(0xFFF8FAFC));
+                          },
+                        ),
+                        // Absorb clicks → focus this panel
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (kDebugMode) {
+                              debugPrint(
+                                '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
+                              );
+                            }
+                            context.read<BoardCubit>().focusPanel(panel.id);
+                            FocusManager.instance.primaryFocus?.unfocus();
+                          },
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          );
-        }
+              );
+            }
 
-        // ── 2. Focused panel's full-screen background (click outside → unfocus) ──
-        final focusedPanel =
-            webPanels
+            // ── 2. Focused WebView overlay (top z-order, full interaction) ──
+            // No full-screen background — the canvas Listener inside
+            // InteractiveViewer handles unfocusing when clicking empty space.
+            final focusedPanel = webPanels
                 .where((p) => p.id == focusedPanelId)
                 .firstOrNull;
-        if (focusedPanel != null) {
-          children.add(
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (kDebugMode) {
-                    debugPrint(
-                      '[BoardWebFocus] overlay outside tap -> clearFocusedPanel',
-                    );
-                  }
-                  context.read<BoardCubit>().clearFocusedPanel();
-                },
-              ),
-            ),
-          );
-        }
+            if (focusedPanel != null) {
+              final rect = _screenRect(focusedPanel, matrix, scale);
+              if (rect != null) {
+                final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
+                _CssZoomManager.apply(
+                  ctrl,
+                  focusedPanel.id,
+                  scale,
+                  immediate: true,
+                );
 
-        // ── 3. Focused WebView overlay (top z-order, full interaction) ──
-        if (focusedPanel != null) {
-          final rect = _screenRect(focusedPanel, matrix, scale);
-          if (rect != null) {
-            final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
-            _CssZoomManager.apply(
-              ctrl,
-              focusedPanel.id,
-              scale,
-              immediate: true,
-            );
-
-            children.add(
-              Positioned(
-                key: ValueKey('wv-focused-${focusedPanel.id}'),
-                left: rect.left,
-                top: rect.top,
-                width: rect.width,
-                height: rect.height,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(16 * scale),
-                    bottomRight: Radius.circular(16 * scale),
-                  ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      WebViewWidget(controller: ctrl),
-                      // Loading overlay (navigation flash hide)
-                      ValueListenableBuilder<bool>(
-                        valueListenable:
-                            WebpagePlugin.pageLoading[focusedPanel.id] ??
-                                ValueNotifier<bool>(false),
-                        builder: (_, isLoading, __) {
-                          if (!isLoading) return const SizedBox.shrink();
-                          return const ColoredBox(color: Color(0xFFF8FAFC));
-                        },
+                children.add(
+                  Positioned(
+                    key: ValueKey('wv-focused-${focusedPanel.id}'),
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(16 * scale),
+                        bottomRight: Radius.circular(16 * scale),
                       ),
-                    ],
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          const ColoredBox(color: Colors.white),
+                          WebViewWidget(controller: ctrl),
+                          // Loading overlay (navigation flash hide)
+                          ValueListenableBuilder<bool>(
+                            valueListenable:
+                                WebpagePlugin.pageLoading[focusedPanel.id] ??
+                                    ValueNotifier<bool>(false),
+                            builder: (_, isLoading, __) {
+                              if (!isLoading) return const SizedBox.shrink();
+                              return const ColoredBox(color: Color(0xFFF8FAFC));
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }
-        }
+                );
+              }
+            }
 
-        return Stack(children: children);
+            if (children.isEmpty) return const SizedBox.shrink();
+            return Stack(children: children);
+          },
+        );
       },
     );
   }
