@@ -802,6 +802,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           content: message.content,
           toolCalls: message.toolCalls,
           tokenUsage: message.tokenUsage,
+          onLinkTap: _handleLinkTap,
         );
       case ChatRole.tool:
         return _ToolResultCard(
@@ -1747,10 +1748,12 @@ class _AssistantBubble extends StatelessWidget {
     required this.content,
     this.toolCalls = const [],
     this.tokenUsage,
+    this.onLinkTap,
   });
   final String content;
   final List<ChatToolCall> toolCalls;
   final ChatTokenUsage? tokenUsage;
+  final void Function(String? href)? onLinkTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1825,7 +1828,11 @@ class _AssistantBubble extends StatelessWidget {
                   data: processedContent,
                   selectable: false,
                   onTapLink: (text, href, title) {
-                    _handleLinkTap(href);
+                    if (onLinkTap != null) {
+                      onLinkTap!(href);
+                    } else if (href != null && href.isNotEmpty) {
+                      PlatformLauncher.instance.openUrl(href);
+                    }
                   },
                   styleSheet: MarkdownStyleSheet(
                     p: const TextStyle(
