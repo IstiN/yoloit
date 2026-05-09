@@ -344,9 +344,33 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 final board = cubit.state.activeBoard;
                                                 if (board == null) return null;
                                                 final currentBounds = panel.bounds;
+                                                // Place to the right of the source panel, then
+                                                // stack downward if that slot is already taken.
+                                                final baseX = currentBounds.x + currentBounds.width + 40;
+                                                var baseY = currentBounds.y;
+                                                final occupiedRects = board.panels
+                                                    .where((p) => !p.hidden)
+                                                    .map((p) => Rect.fromLTWH(
+                                                          p.bounds.x, p.bounds.y,
+                                                          p.bounds.width, p.bounds.height,
+                                                        ))
+                                                    .toList();
+                                                var candidate = Rect.fromLTWH(
+                                                  baseX, baseY, size.width, size.height,
+                                                );
+                                                // Shift down until no overlap with existing panels.
+                                                var attempts = 0;
+                                                while (attempts < 50 &&
+                                                    occupiedRects.any((r) => r.overlaps(candidate))) {
+                                                  baseY += size.height + 20;
+                                                  candidate = Rect.fromLTWH(
+                                                    baseX, baseY, size.width, size.height,
+                                                  );
+                                                  attempts++;
+                                                }
                                                 final newBounds = BoardPanelBounds(
-                                                  x: currentBounds.x + currentBounds.width + 20,
-                                                  y: currentBounds.y,
+                                                  x: baseX,
+                                                  y: baseY,
                                                   width: size.width,
                                                   height: size.height,
                                                 );
