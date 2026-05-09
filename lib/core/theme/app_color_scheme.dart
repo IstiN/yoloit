@@ -103,13 +103,13 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
   }
 
   factory AppColorScheme._lightFromAccent(Color accent) {
-    const bg = Color(0xFFF8F9FB);
-    final sur = Color.lerp(bg, accent, 0.03)!;
-    final surEl = Color.lerp(bg, accent, 0.06)!;
-    final surHi = Color.lerp(bg, accent, 0.10)!;
-    final bor = Color.lerp(const Color(0xFFD0D5DD), accent, 0.12)!;
-    final div = Color.lerp(const Color(0xFFE4E7EC), accent, 0.08)!;
-    final termBg = Color.lerp(bg, Colors.white, 0.5)!;
+    const bg = Color(0xFFF5F7FB);
+    final sur = Color.lerp(const Color(0xFFEEF2F8), accent, 0.03)!;
+    final surEl = Color.lerp(const Color(0xFFE8EEF7), accent, 0.05)!;
+    final surHi = Color.lerp(const Color(0xFFE1E9F4), accent, 0.08)!;
+    final bor = Color.lerp(const Color(0xFFC9D2DF), accent, 0.10)!;
+    final div = Color.lerp(const Color(0xFFD8DFEA), accent, 0.06)!;
+    final termBg = Color.lerp(bg, const Color(0xFFEFF3F9), 0.6)!;
     final accentDark = Color.lerp(accent, Colors.black, 0.20)!;
     return AppColorScheme(
       primary: accentDark,
