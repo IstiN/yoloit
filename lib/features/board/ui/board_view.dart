@@ -2569,7 +2569,22 @@ class _WebViewOverlayState extends State<_WebViewOverlay> {
           ],
         );
       },
-      child: WebViewWidget(controller: controller),
+      // Wrap WebView in a Stack with a loading overlay that hides
+      // the flash of unzoomed content during page navigation.
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          WebViewWidget(controller: controller),
+          ValueListenableBuilder<bool>(
+            valueListenable: WebpagePlugin.pageLoading[panel.id] ??
+                ValueNotifier<bool>(false),
+            builder: (_, isLoading, __) {
+              if (!isLoading) return const SizedBox.shrink();
+              return const ColoredBox(color: Color(0xFFF8FAFC));
+            },
+          ),
+        ],
+      ),
     );
   }
 }

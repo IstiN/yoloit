@@ -18,6 +18,12 @@ class WebpagePlugin extends BoardPanelPlugin {
   /// read by [onPageFinished] to re-inject zoom after navigation.
   static final Map<String, double> pendingCssZoom = {};
 
+  /// Loading state per panel.  Set to true on page start, false
+  /// after CSS zoom is applied in onPageFinished.  The overlay
+  /// shows a white cover during loading to hide the flash of
+  /// unzoomed content between page load and CSS zoom injection.
+  static final Map<String, ValueNotifier<bool>> pageLoading = {};
+
   @override
   String get typeId => kTypeId;
 
@@ -103,25 +109,41 @@ class _WebpageContentState extends State<_WebpageContent> {
   void dispose() {
     WebpagePlugin.controllers.remove(widget.panel.id);
     WebpagePlugin.pendingCssZoom.remove(widget.panel.id);
+    WebpagePlugin.pageLoading.remove(widget.panel.id)?.dispose();
     _urlCtrl.dispose();
     _urlFocus.dispose();
     super.dispose();
   }
 
   void _initController(String url) {
+    final panelId = widget.panel.id;
+    final loading = WebpagePlugin.pageLoading.putIfAbsent(
+      panelId,
+      () => ValueNotifier<bool>(false),
+    );
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onPageStarted: (_) {
+            // Hide WebView content while the new page loads to prevent
+            // the flash of unzoomed content.
+            loading.value = true;
+          },
           onPageFinished: (_) {
             // Re-inject CSS zoom after every page load.  Navigation
             // replaces the DOM so the previous zoom style is lost.
-            final zoom = WebpagePlugin.pendingCssZoom[widget.panel.id];
+            final zoom = WebpagePlugin.pendingCssZoom[panelId];
             if (zoom != null) {
               _controller!.runJavaScript(
                 "document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}'",
               );
             }
+            // Brief delay for CSS zoom to take effect before revealing.
+            Future.delayed(const Duration(milliseconds: 80), () {
+              loading.value = false;
+            });
           },
           onUrlChange: (change) {
             final newUrl = change.url ?? '';
