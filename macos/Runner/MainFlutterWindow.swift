@@ -10,6 +10,11 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // Register custom plugins
+    WebViewZoomPlugin.register(
+      with: flutterViewController.registrar(forPlugin: "WebViewZoomPlugin")
+    )
+
     super.awakeFromNib()
   }
 }

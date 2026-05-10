@@ -130,15 +130,11 @@ class _WebpageContentState extends State<_WebpageContent> {
             loading.value = true;
           },
           onPageFinished: (_) {
-            // Re-inject CSS zoom so page reflows at panel's logical width.
-            // zoom = boardScale → CSS layout width = panel.logicalWidth.
-            // Board injects the correct zoom on gesture-end; here we use
-            // whatever was last stored (default 1.0 on first load).
-            final panelId = widget.panel.id;
-            final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
+            // pageZoom is set natively via WebViewZoomService (macOS only).
+            // CSS zoom is no longer injected — it conflicts with pageZoom.
+            // Only inject the new-tab intercept JS.
             _controller!.runJavaScript('''
 (function(){
-  document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
   window.dispatchEvent(new Event('resize'));
   if(window.__yoloNewTabSetup) return;
   window.__yoloNewTabSetup=true;
@@ -345,6 +341,54 @@ class _WebpageContentState extends State<_WebpageContent> {
 })();
 ''');
         debugPrint('[WebExp] D: Reset body minWidth');
+
+      // ── E: Override window.innerWidth ─────────────────────────────────
+      case 'override_inner_width':
+        await ctrl.runJavaScript(r'''
+(function(){
+  const target = 1278;
+  try {
+    Object.defineProperty(window, 'innerWidth', {get: function(){ return target; }, configurable: true});
+    Object.defineProperty(window, 'outerWidth', {get: function(){ return target; }, configurable: true});
+    window.dispatchEvent(new Event('resize'));
+    console.log('[WebExp] E: override innerWidth=' + window.innerWidth);
+  } catch(e) {
+    console.log('[WebExp] E: failed: ' + e);
+  }
+})();
+''');
+        debugPrint('[WebExp] E: override window.innerWidth=1278');
+
+      case 'override_inner_width_zoom':
+        await ctrl.runJavaScript(r'''
+(function(){
+  const target = 1278;
+  try {
+    Object.defineProperty(window, 'innerWidth', {get: function(){ return target; }, configurable: true});
+    Object.defineProperty(window, 'outerWidth', {get: function(){ return target; }, configurable: true});
+    document.documentElement.style.zoom = '0.5';
+    window.dispatchEvent(new Event('resize'));
+    console.log('[WebExp] E+B: innerWidth=' + window.innerWidth + ' zoom=0.5 bodyW=' + document.body.clientWidth);
+  } catch(e) {
+    console.log('[WebExp] E+B: failed: ' + e);
+  }
+})();
+''');
+        debugPrint('[WebExp] E+B: override innerWidth=1278 + zoom=0.5');
+
+      case 'override_inner_width_reset':
+        await ctrl.runJavaScript(r'''
+(function(){
+  try {
+    Object.defineProperty(window, 'innerWidth', {get: undefined, configurable: true});
+    Object.defineProperty(window, 'outerWidth', {get: undefined, configurable: true});
+  } catch(e) {}
+  document.documentElement.style.zoom = '';
+  window.dispatchEvent(new Event('resize'));
+  console.log('[WebExp] E: reset, innerWidth=' + window.innerWidth);
+})();
+''');
+        debugPrint('[WebExp] E: reset innerWidth override');
     }
 
     // Log state after experiment
@@ -520,6 +564,19 @@ class _WebpageContentState extends State<_WebpageContent> {
                       PopupMenuItem(
                         value: 'min_width_reset',
                         child: Row(children: [Icon(Icons.width_normal, size: 16), SizedBox(width: 8), Text('D: body minWidth reset')]),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'override_inner_width',
+                        child: Row(children: [Icon(Icons.code, size: 16), SizedBox(width: 8), Text('E: override innerWidth=1278')]),
+                      ),
+                      PopupMenuItem(
+                        value: 'override_inner_width_zoom',
+                        child: Row(children: [Icon(Icons.code, size: 16), SizedBox(width: 8), Text('E: innerWidth=1278 + zoom=0.5')]),
+                      ),
+                      PopupMenuItem(
+                        value: 'override_inner_width_reset',
+                        child: Row(children: [Icon(Icons.code, size: 16), SizedBox(width: 8), Text('E: innerWidth reset')]),
                       ),
                     ],
                   ),
