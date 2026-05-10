@@ -647,3 +647,99 @@ const List<ChatModelInfo> kCopilotModels = [
   ChatModelInfo(id: 'gpt-5-mini', displayName: 'GPT-5 mini', costMultiplier: 0),
   ChatModelInfo(id: 'gpt-4.1', displayName: 'GPT-4.1', costMultiplier: 0),
 ];
+
+/// Cursor Agent available models.
+const List<ChatModelInfo> kCursorModels = [
+  // Fast / cheap
+  ChatModelInfo(
+    id: 'gpt-5.4-nano-medium',
+    displayName: 'GPT-5.4 Nano',
+    costMultiplier: 0.1,
+    isDefault: true,
+  ),
+  ChatModelInfo(
+    id: 'gpt-5.4-mini-medium',
+    displayName: 'GPT-5.4 Mini',
+    costMultiplier: 0.2,
+  ),
+  ChatModelInfo(
+    id: 'gpt-5-mini',
+    displayName: 'GPT-5 Mini',
+    costMultiplier: 0.2,
+  ),
+  ChatModelInfo(id: 'gemini-3-flash', displayName: 'Gemini 3 Flash', costMultiplier: 0.1),
+
+  // Standard
+  ChatModelInfo(
+    id: 'gpt-5.4-medium',
+    displayName: 'GPT-5.4',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(id: 'gpt-5.2', displayName: 'GPT-5.2', costMultiplier: 1),
+  ChatModelInfo(id: 'gpt-5.1', displayName: 'GPT-5.1', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'claude-4.6-sonnet-medium',
+    displayName: 'Sonnet 4.6',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(
+    id: 'claude-4.5-sonnet',
+    displayName: 'Sonnet 4.5',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(id: 'claude-4-sonnet', displayName: 'Sonnet 4', costMultiplier: 1),
+  ChatModelInfo(id: 'kimi-k2.5', displayName: 'Kimi K2.5', costMultiplier: 0.5),
+  ChatModelInfo(id: 'gemini-3.1-pro', displayName: 'Gemini 3.1 Pro', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'gpt-5.3-codex',
+    displayName: 'Codex 5.3',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(id: 'gpt-5.2-codex', displayName: 'Codex 5.2', costMultiplier: 1),
+
+  // Premium
+  ChatModelInfo(
+    id: 'gpt-5.5-medium',
+    displayName: 'GPT-5.5',
+    costMultiplier: 5,
+  ),
+  ChatModelInfo(id: 'grok-4.3', displayName: 'Grok 4.3', costMultiplier: 2),
+  ChatModelInfo(
+    id: 'claude-opus-4-7-medium',
+    displayName: 'Opus 4.7',
+    costMultiplier: 5,
+  ),
+  ChatModelInfo(
+    id: 'claude-4.6-opus-high',
+    displayName: 'Opus 4.6',
+    costMultiplier: 3,
+  ),
+  ChatModelInfo(
+    id: 'claude-4.5-opus-high',
+    displayName: 'Opus 4.5',
+    costMultiplier: 3,
+  ),
+
+  // Thinking models
+  ChatModelInfo(
+    id: 'claude-4.6-sonnet-medium-thinking',
+    displayName: 'Sonnet 4.6 Thinking',
+    costMultiplier: 2,
+  ),
+  ChatModelInfo(
+    id: 'claude-4.5-sonnet-thinking',
+    displayName: 'Sonnet 4.5 Thinking',
+    costMultiplier: 2,
+  ),
+  ChatModelInfo(
+    id: 'claude-opus-4-7-thinking-medium',
+    displayName: 'Opus 4.7 Thinking',
+    costMultiplier: 8,
+  ),
+  ChatModelInfo(
+    id: 'claude-4.6-opus-high-thinking',
+    displayName: 'Opus 4.6 Thinking',
+    costMultiplier: 6,
+  ),
+  ChatModelInfo(id: 'composer-2', displayName: 'Composer 2', costMultiplier: 1),
+];

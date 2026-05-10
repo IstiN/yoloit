@@ -12,6 +12,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
+import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -77,13 +78,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   void initState() {
     super.initState();
     _initConfig();
-    _provider = CopilotCliProvider();
+    _provider = _providerForId(_config.provider);
     _glowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
     // Register processing notifier for board-level glow
     ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
+  }
+
+  static ChatProvider _providerForId(String id) {
+    return switch (id) {
+      'cursor' => CursorAgentProvider(),
+      _ => CopilotCliProvider(),
+    };
   }
 
   @override
@@ -547,6 +555,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       models: _provider.availableModels,
       onStart: (config) {
         setState(() {
+          // Switch provider if it changed
+          if (config.provider != _config.provider) {
+            _provider.dispose();
+            _provider = _providerForId(config.provider);
+          }
           _config = config;
           _isFirstMessage = true;
         });
@@ -1452,14 +1465,24 @@ class _ChatSetupView extends StatefulWidget {
 class _ChatSetupViewState extends State<_ChatSetupView> {
   late TextEditingController _sessionCtrl;
   late TextEditingController _dirCtrl;
+  late String _selectedProvider;
   late String _selectedModel;
   late List<String> _selectedEnvGroupIds;
+
+  static const _providers = [
+    ('copilot', 'GitHub Copilot'),
+    ('cursor', 'Cursor Agent'),
+  ];
+
+  List<ChatModelInfo> get _modelsForProvider =>
+      _selectedProvider == 'cursor' ? kCursorModels : kCopilotModels;
 
   @override
   void initState() {
     super.initState();
     _sessionCtrl = TextEditingController(text: widget.config.sessionName);
     _dirCtrl = TextEditingController(text: widget.config.workingDir);
+    _selectedProvider = widget.config.provider;
     _selectedModel = widget.config.model;
     _selectedEnvGroupIds = List<String>.from(widget.config.envGroupIds);
   }
@@ -1478,11 +1501,21 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     if (sessionName.isEmpty) {
       sessionName = 'chat-${DateTime.now().millisecondsSinceEpoch}';
     }
+    // Ensure selected model is valid for the chosen provider
+    final validModels = _modelsForProvider;
+    final model =
+        validModels.any((m) => m.id == _selectedModel)
+            ? _selectedModel
+            : (validModels.firstWhere(
+              (m) => m.isDefault,
+              orElse: () => validModels.first,
+            ).id);
     widget.onStart(
       ChatSessionConfig(
         sessionName: sessionName,
         workingDir: dir,
-        model: _selectedModel,
+        provider: _selectedProvider,
+        model: model,
         envGroupIds: _selectedEnvGroupIds,
       ),
     );
@@ -1519,23 +1552,38 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: 'copilot',
+                value: _selectedProvider,
                 isExpanded: true,
                 dropdownColor: dropdownFill,
                 style: inputTextStyle,
-                items: const [
-                  DropdownMenuItem(
-                    value: 'copilot',
-                    child: Row(
-                      children: [
-                        ChatProviderIcon(provider: 'copilot', size: 16),
-                        SizedBox(width: 8),
-                        Text('GitHub Copilot'),
-                      ],
-                    ),
-                  ),
-                ],
-                onChanged: (_) {},
+                items: _providers
+                    .map(
+                      (p) => DropdownMenuItem(
+                        value: p.$1,
+                        child: Row(
+                          children: [
+                            ChatProviderIcon(provider: p.$1, size: 16),
+                            const SizedBox(width: 8),
+                            Text(p.$2),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() {
+                    _selectedProvider = v;
+                    // Reset model to default for the new provider
+                    final models = _modelsForProvider;
+                    _selectedModel = models
+                        .firstWhere(
+                          (m) => m.isDefault,
+                          orElse: () => models.first,
+                        )
+                        .id;
+                  });
+                },
               ),
             ),
           ),
@@ -1644,7 +1692,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                 dropdownColor: dropdownFill,
                 style: inputTextStyle,
                 items:
-                    widget.models
+                    _modelsForProvider
                         .map(
                           (m) => DropdownMenuItem(
                             value: m.id,

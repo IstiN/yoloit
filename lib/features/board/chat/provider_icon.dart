@@ -22,6 +22,21 @@ class ChatProviderIcon extends StatelessWidget {
         height: size,
         colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
       ),
+      'cursor' => SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: Text(
+            'C',
+            style: TextStyle(
+              fontSize: size * 0.75,
+              fontWeight: FontWeight.w700,
+              color: color,
+              height: 1,
+            ),
+          ),
+        ),
+      ),
       _ => Icon(Icons.auto_awesome, size: size, color: color),
     };
   }
