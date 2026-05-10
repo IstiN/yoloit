@@ -130,11 +130,15 @@ class _WebpageContentState extends State<_WebpageContent> {
             loading.value = true;
           },
           onPageFinished: (_) {
-            // pageZoom is set natively via WebViewZoomService (macOS only).
-            // CSS zoom is no longer injected — it conflicts with pageZoom.
-            // Only inject the new-tab intercept JS.
+            // Re-inject CSS zoom so page reflows at panel's logical width.
+            // zoom = boardScale → CSS layout width = panel.logicalWidth.
+            // This makes sites like YouTube use desktop layout widths in CSS,
+            // even when the WKWebView NSView frame is smaller due to board zoom.
+            final panelId = widget.panel.id;
+            final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
             _controller!.runJavaScript('''
 (function(){
+  document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
   window.dispatchEvent(new Event('resize'));
   if(window.__yoloNewTabSetup) return;
   window.__yoloNewTabSetup=true;
