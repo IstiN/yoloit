@@ -404,6 +404,15 @@ class _WebpageContentState extends State<_WebpageContent> {
     debugPrint('[WebExp] ══════════════════════════════════════════');
   }
 
+  void _showViewportLab(BuildContext context) {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => _ViewportLabDialog(controller: ctrl),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final url = _currentUrl;
@@ -516,73 +525,18 @@ class _WebpageContentState extends State<_WebpageContent> {
                     ])),
                   ],
                 ),
-                // ── 🔬 Viewport debug experiments ──────────────────────────
+                // ── 🔬 Viewport Lab (interactive experiment panel) ─────────
                 if (_controller != null)
-                  PopupMenuButton<String>(
-                    tooltip: 'Viewport experiments (debug)',
-                    padding: EdgeInsets.zero,
-                    iconSize: 15,
-                    icon: const Icon(Icons.science_outlined, size: 15, color: Color(0xFFE67E22)),
-                    onSelected: (id) => _runExperiment(id),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
-                        value: 'info',
-                        child: Row(children: [Icon(Icons.info_outline, size: 16), SizedBox(width: 8), Text('📊 Log frame & UA info')]),
+                  Tooltip(
+                    message: 'Viewport Lab',
+                    child: InkWell(
+                      onTap: () => _showViewportLab(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.science_outlined, size: 15, color: Color(0xFFE67E22)),
                       ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: 'ua_desktop',
-                        child: Row(children: [Icon(Icons.laptop_mac, size: 16), SizedBox(width: 8), Text('A: UA → Desktop Chrome')]),
-                      ),
-                      PopupMenuItem(
-                        value: 'ua_reset',
-                        child: Row(children: [Icon(Icons.restore, size: 16), SizedBox(width: 8), Text('A: UA → reset (reload)')]),
-                      ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: 'zoom_0_5',
-                        child: Row(children: [Icon(Icons.zoom_out, size: 16), SizedBox(width: 8), Text('B: html zoom = 0.5')]),
-                      ),
-                      PopupMenuItem(
-                        value: 'zoom_0_75',
-                        child: Row(children: [Icon(Icons.zoom_out, size: 16), SizedBox(width: 8), Text('B: html zoom = 0.75')]),
-                      ),
-                      PopupMenuItem(
-                        value: 'zoom_1',
-                        child: Row(children: [Icon(Icons.zoom_in, size: 16), SizedBox(width: 8), Text('B: html zoom = 1.0 (reset)')]),
-                      ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: 'scale_body',
-                        child: Row(children: [Icon(Icons.transform, size: 16), SizedBox(width: 8), Text('C: body transform scale(0.5)')]),
-                      ),
-                      PopupMenuItem(
-                        value: 'scale_reset',
-                        child: Row(children: [Icon(Icons.transform, size: 16), SizedBox(width: 8), Text('C: body transform reset')]),
-                      ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: 'min_width',
-                        child: Row(children: [Icon(Icons.width_full, size: 16), SizedBox(width: 8), Text('D: body minWidth=1280px')]),
-                      ),
-                      PopupMenuItem(
-                        value: 'min_width_reset',
-                        child: Row(children: [Icon(Icons.width_normal, size: 16), SizedBox(width: 8), Text('D: body minWidth reset')]),
-                      ),
-                      PopupMenuDivider(),
-                      PopupMenuItem(
-                        value: 'override_inner_width',
-                        child: Row(children: [Icon(Icons.code, size: 16), SizedBox(width: 8), Text('E: override innerWidth=1278')]),
-                      ),
-                      PopupMenuItem(
-                        value: 'override_inner_width_zoom',
-                        child: Row(children: [Icon(Icons.code, size: 16), SizedBox(width: 8), Text('E: innerWidth=1278 + zoom=0.5')]),
-                      ),
-                      PopupMenuItem(
-                        value: 'override_inner_width_reset',
-                        child: Row(children: [Icon(Icons.code, size: 16), SizedBox(width: 8), Text('E: innerWidth reset')]),
-                      ),
-                    ],
+                    ),
                   ),
                 SizedBox(
                   height: 28,
@@ -658,6 +612,344 @@ class _NavBtn extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(4),
           child: Icon(icon, size: 15, color: const Color(0xFF94A3B8)),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔬 Interactive Viewport Lab dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ViewportLabDialog extends StatefulWidget {
+  const _ViewportLabDialog({required this.controller});
+  final WebViewController controller;
+
+  @override
+  State<_ViewportLabDialog> createState() => _ViewportLabDialogState();
+}
+
+class _ViewportLabDialogState extends State<_ViewportLabDialog> {
+  // ── A: User Agent ──────────────────────────────────────────────────────────
+  bool _useDesktopUA = true;
+
+  // ── B: CSS zoom on <html> ──────────────────────────────────────────────────
+  bool _cssZoomEnabled = true;
+  final TextEditingController _cssZoomCtrl = TextEditingController(text: '0.5');
+
+  // ── C: body transform scale ───────────────────────────────────────────────
+  bool _bodyScaleEnabled = false;
+  final TextEditingController _bodyScaleCtrl = TextEditingController(text: '0.5');
+
+  // ── D: body minWidth ──────────────────────────────────────────────────────
+  bool _minWidthEnabled = false;
+  final TextEditingController _minWidthCtrl = TextEditingController(text: '1280');
+
+  // ── E: override window.innerWidth ─────────────────────────────────────────
+  bool _overrideInnerWidthEnabled = false;
+  final TextEditingController _innerWidthCtrl = TextEditingController(text: '1278');
+
+  // ── Result state ──────────────────────────────────────────────────────────
+  String? _result;
+  bool _applying = false;
+
+  @override
+  void dispose() {
+    _cssZoomCtrl.dispose();
+    _bodyScaleCtrl.dispose();
+    _minWidthCtrl.dispose();
+    _innerWidthCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _apply() async {
+    setState(() { _applying = true; _result = null; });
+    final ctrl = widget.controller;
+    try {
+      // A: User Agent
+      if (_useDesktopUA) {
+        await ctrl.setUserAgent(
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) '
+          'Chrome/124.0.0.0 Safari/537.36',
+        );
+      } else {
+        await ctrl.setUserAgent(null);
+      }
+
+      // Build JS that applies all enabled options at once, then reads state
+      final cssZoom = _cssZoomCtrl.text.trim();
+      final bodyScale = _bodyScaleCtrl.text.trim();
+      final minWidth = _minWidthCtrl.text.trim();
+      final innerWidth = _innerWidthCtrl.text.trim();
+
+      final sb = StringBuffer('(function(){\n');
+
+      // B: CSS zoom
+      if (_cssZoomEnabled && cssZoom.isNotEmpty) {
+        sb.writeln("  document.documentElement.style.zoom='$cssZoom';");
+      } else {
+        sb.writeln("  document.documentElement.style.zoom='';");
+      }
+
+      // C: body transform scale
+      if (_bodyScaleEnabled && bodyScale.isNotEmpty) {
+        sb.writeln("  var b=document.body;");
+        sb.writeln("  b.style.transform='scale($bodyScale)';");
+        sb.writeln("  b.style.transformOrigin='top left';");
+        sb.writeln("  b.style.width=(100/parseFloat('$bodyScale'))+'%';");
+      } else {
+        sb.writeln("  document.body.style.transform='';");
+        sb.writeln("  document.body.style.transformOrigin='';");
+        sb.writeln("  document.body.style.width='';");
+      }
+
+      // D: minWidth
+      if (_minWidthEnabled && minWidth.isNotEmpty) {
+        sb.writeln("  document.body.style.minWidth='${minWidth}px';");
+      } else {
+        sb.writeln("  document.body.style.minWidth='';");
+      }
+
+      // E: override innerWidth
+      if (_overrideInnerWidthEnabled && innerWidth.isNotEmpty) {
+        sb.writeln("  var iw=parseInt('$innerWidth');");
+        sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+        sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+      } else {
+        sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}");
+        sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}");
+      }
+
+      sb.writeln("  window.dispatchEvent(new Event('resize'));");
+      sb.writeln("  return JSON.stringify({");
+      sb.writeln("    innerWidth: window.innerWidth,");
+      sb.writeln("    innerHeight: window.innerHeight,");
+      sb.writeln("    zoom: document.documentElement.style.zoom||'none',");
+      sb.writeln("    bodyClientW: document.body?document.body.clientWidth:null,");
+      sb.writeln("    bodyScrollW: document.body?document.body.scrollWidth:null,");
+      sb.writeln("    transform: document.body?document.body.style.transform:'none',");
+      sb.writeln("    minWidth: document.body?document.body.style.minWidth:'none',");
+      sb.writeln("  });");
+      sb.writeln('})()');
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final raw = await ctrl.runJavaScriptReturningResult(sb.toString());
+      final pretty = raw.toString()
+          .replaceAll('{', '{\n  ')
+          .replaceAll(',', ',\n  ')
+          .replaceAll('}', '\n}');
+      setState(() { _result = pretty; });
+      debugPrint('[ViewportLab] Result: $raw');
+    } catch (e) {
+      setState(() { _result = 'Error: $e'; });
+    } finally {
+      setState(() { _applying = false; });
+    }
+  }
+
+  Future<void> _resetAll() async {
+    setState(() { _applying = true; _result = null; });
+    try {
+      await widget.controller.setUserAgent(null);
+      await widget.controller.runJavaScript('''
+(function(){
+  document.documentElement.style.zoom='';
+  document.body.style.transform='';
+  document.body.style.transformOrigin='';
+  document.body.style.width='';
+  document.body.style.minWidth='';
+  try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}
+  try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}
+  window.dispatchEvent(new Event('resize'));
+})();
+''');
+      setState(() { _result = 'All CSS overrides reset.'; });
+    } finally {
+      setState(() { _applying = false; });
+    }
+  }
+
+  Widget _row({
+    required bool enabled,
+    required String label,
+    required ValueChanged<bool?> onToggle,
+    required TextEditingController ctrl,
+    required String suffix,
+    String? hint,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Checkbox(value: enabled, onChanged: onToggle, visualDensity: VisualDensity.compact),
+          const SizedBox(width: 4),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+          SizedBox(
+            width: 90,
+            child: TextField(
+              controller: ctrl,
+              enabled: enabled,
+              style: const TextStyle(fontSize: 12),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                border: const OutlineInputBorder(),
+                hintText: hint,
+                suffixText: suffix,
+                suffixStyle: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(40),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                children: [
+                  const Icon(Icons.science_outlined, color: Color(0xFFE67E22), size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Viewport Lab',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+
+              // A: User Agent
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _useDesktopUA,
+                      onChanged: (v) => setState(() => _useDesktopUA = v ?? false),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text(
+                        'A: Desktop Chrome User Agent',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // B: CSS zoom
+              _row(
+                enabled: _cssZoomEnabled,
+                label: 'B: html CSS zoom',
+                onToggle: (v) => setState(() => _cssZoomEnabled = v ?? false),
+                ctrl: _cssZoomCtrl,
+                suffix: '×',
+                hint: '0.5',
+              ),
+
+              // C: body transform scale
+              _row(
+                enabled: _bodyScaleEnabled,
+                label: 'C: body transform scale',
+                onToggle: (v) => setState(() => _bodyScaleEnabled = v ?? false),
+                ctrl: _bodyScaleCtrl,
+                suffix: '×',
+                hint: '0.5',
+              ),
+
+              // D: body minWidth
+              _row(
+                enabled: _minWidthEnabled,
+                label: 'D: body minWidth',
+                onToggle: (v) => setState(() => _minWidthEnabled = v ?? false),
+                ctrl: _minWidthCtrl,
+                suffix: 'px',
+                hint: '1280',
+              ),
+
+              // E: override window.innerWidth
+              _row(
+                enabled: _overrideInnerWidthEnabled,
+                label: 'E: override innerWidth/outerWidth',
+                onToggle: (v) => setState(() => _overrideInnerWidthEnabled = v ?? false),
+                ctrl: _innerWidthCtrl,
+                suffix: 'px',
+                hint: '1278',
+              ),
+
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+
+              // Result area
+              if (_result != null)
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _result!,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                  ),
+                ),
+              if (_result != null) const SizedBox(height: 12),
+
+              // Buttons
+              Row(
+                children: [
+                  OutlinedButton(
+                    onPressed: _applying ? null : _resetAll,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                    child: const Text('Reset All'),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: _applying ? null : _apply,
+                    icon: _applying
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.play_arrow, size: 16),
+                    label: const Text('Apply'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFE67E22),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
