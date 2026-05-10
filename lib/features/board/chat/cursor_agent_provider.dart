@@ -29,7 +29,7 @@ class CursorAgentProvider extends ChatProvider {
   List<ChatModelInfo> get availableModels => kCursorModels;
 
   @override
-  bool get supportsImages => false;
+  bool get supportsImages => true;
 
   @override
   ChatImageMode get imageMode => ChatImageMode.filePath;
@@ -49,6 +49,7 @@ class CursorAgentProvider extends ChatProvider {
       message: message,
       config: config,
       isFirstMessage: isFirstMessage,
+      attachments: attachments,
       controller: controller,
     );
     return controller.stream;
@@ -58,6 +59,7 @@ class CursorAgentProvider extends ChatProvider {
     required String message,
     required ChatSessionConfig config,
     required bool isFirstMessage,
+    required List<String> attachments,
     required StreamController<ChatEvent> controller,
   }) async {
     await stop(config.sessionName);
@@ -88,8 +90,11 @@ class CursorAgentProvider extends ChatProvider {
       args.addAll(['--mode', config.mode!]);
     }
 
-    // Prompt as positional argument
-    args.add(message);
+    // Prompt as positional argument.
+    // Cursor-agent has no --attachment flag — image paths are embedded in the
+    // prompt text so the agent can read them via its shell/file tools.
+    final promptParts = [message, ...attachments];
+    args.add(promptParts.join(' '));
 
     debugPrint('[CursorAgent] Running: cursor-agent ${args.join(' ')}');
     debugPrint('[CursorAgent] cwd: ${config.workingDir}');
