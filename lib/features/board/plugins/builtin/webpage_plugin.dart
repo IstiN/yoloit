@@ -726,6 +726,29 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       }
 
       sb.writeln("  window.dispatchEvent(new Event('resize'));");
+      // After CSS applied, force video players to recalculate their size
+      // using the new CSS layout width (not window.innerWidth)
+      sb.writeln(r"""
+  (function(){
+    // YouTube: force player to use the container's CSS width
+    var ytPlayer = document.getElementById('movie_player');
+    if (ytPlayer) {
+      var pw = ytPlayer.parentElement ? ytPlayer.parentElement.clientWidth : ytPlayer.clientWidth;
+      var ph = Math.round(pw * 9 / 16);
+      ytPlayer.style.width = pw + 'px';
+      ytPlayer.style.height = ph + 'px';
+    }
+    // Also dispatch resize on the player element so YouTube's JS picks it up
+    var players = document.querySelectorAll('#movie_player, [data-player-slot], ytd-player');
+    players.forEach(function(p){ p.dispatchEvent(new Event('resize', {bubbles:true})); });
+    // Generic: fix video elements whose height looks wrong
+    document.querySelectorAll('iframe[allowfullscreen]').forEach(function(f){
+      if(f.width && !f.style.height){
+        f.style.height = Math.round(f.clientWidth * 9/16) + 'px';
+      }
+    });
+  })();
+""");
       sb.writeln("  return JSON.stringify({");
       sb.writeln("    innerWidth: window.innerWidth,");
       sb.writeln("    innerHeight: window.innerHeight,");
@@ -733,13 +756,16 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       sb.writeln("    bodyClientW: document.body?document.body.clientWidth:null,");
       sb.writeln("    bodyClientH: document.body?document.body.clientHeight:null,");
       sb.writeln("    bodyScrollW: document.body?document.body.scrollWidth:null,");
+      // YouTube player info
+      sb.writeln("    ytW: (function(){var p=document.getElementById('movie_player');return p?p.clientWidth:null;})(),");
+      sb.writeln("    ytH: (function(){var p=document.getElementById('movie_player');return p?p.clientHeight:null;})(),");
       sb.writeln("    transform: document.body?document.body.style.transform:'none',");
-      sb.writeln("    minWidth: document.body?document.body.style.minWidth:'none',");
       sb.writeln("    minHeight: document.body?document.body.style.minHeight:'none',");
       sb.writeln("  });");
       sb.writeln('})()');
 
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
       final raw = await ctrl.runJavaScriptReturningResult(sb.toString());
       final pretty = raw.toString()
           .replaceAll('{', '{\n  ')
@@ -907,6 +933,23 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
                 ctrl: _innerWidthCtrl,
                 suffix: 'px',
                 hint: '1278',
+              ),
+
+              const SizedBox(height: 8),
+              // Info note
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE67E22).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
+                ),
+                child: const Text(
+                  '⚡ B (zoom) is auto-injected at board scale.\n'
+                  '⚠️ C (body scale) breaks video aspect-ratio — use B only.\n'
+                  'Apply forces YouTube #movie_player to resize after CSS change.',
+                  style: TextStyle(fontSize: 11, height: 1.5),
+                ),
               ),
 
               const SizedBox(height: 12),
