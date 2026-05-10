@@ -474,8 +474,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final usage = event.usageData;
         if (usage != null) {
           final codeChanges = usage['codeChanges'] as Map<String, dynamic>?;
+          final outputTokens = (usage['outputTokens'] as num?)?.toInt() ?? 0;
           setState(() {
+            // Accumulate output tokens (providers like cursor report them only at result)
+            if (outputTokens > 0) {
+              _totalOutputTokens += outputTokens;
+            }
             _lastUsage = ChatTokenUsage(
+              outputTokens: outputTokens,
               premiumRequests: (usage['premiumRequests'] as num?)?.toInt() ?? 0,
               totalApiDurationMs:
                   (usage['totalApiDurationMs'] as num?)?.toInt() ?? 0,
