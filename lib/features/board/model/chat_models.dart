@@ -22,6 +22,7 @@ class ChatMessage extends Equatable {
     this.isStreaming = false,
     this.tokenUsage,
     this.metadata,
+    this.attachments = const [],
   });
 
   final String id;
@@ -47,6 +48,9 @@ class ChatMessage extends Equatable {
   /// Extra metadata (e.g. ask_user choices).
   final Map<String, dynamic>? metadata;
 
+  /// File paths attached to this message (images, documents, etc.).
+  final List<String> attachments;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'role': role.name,
@@ -58,6 +62,7 @@ class ChatMessage extends Equatable {
     if (toolCallId != null) 'toolCallId': toolCallId,
     if (tokenUsage != null) 'tokenUsage': tokenUsage!.toJson(),
     if (metadata != null) 'metadata': metadata,
+    if (attachments.isNotEmpty) 'attachments': attachments,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -94,6 +99,8 @@ class ChatMessage extends Equatable {
           json['metadata'] is Map
               ? Map<String, dynamic>.from(json['metadata'] as Map)
               : null,
+      attachments:
+          (json['attachments'] as List?)?.cast<String>() ?? const [],
     );
   }
 
@@ -108,6 +115,7 @@ class ChatMessage extends Equatable {
     bool? isStreaming,
     ChatTokenUsage? tokenUsage,
     Map<String, dynamic>? metadata,
+    List<String>? attachments,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -120,6 +128,7 @@ class ChatMessage extends Equatable {
       isStreaming: isStreaming ?? this.isStreaming,
       tokenUsage: tokenUsage ?? this.tokenUsage,
       metadata: metadata ?? this.metadata,
+      attachments: attachments ?? this.attachments,
     );
   }
 
@@ -135,6 +144,7 @@ class ChatMessage extends Equatable {
     isStreaming,
     tokenUsage,
     metadata,
+    attachments,
   ];
 }
 

@@ -264,13 +264,31 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       });
     }
 
-    // Add user message
+    // Start streaming
+    // Extract file paths from message text and pass as attachments.
+    // Any absolute path token (starts with /) is treated as an attachment.
+    final filePathRe = RegExp(r'^/.+');
+    final imageExtRe = RegExp(
+      r'\.(png|jpg|jpeg|gif|webp|bmp)$',
+      caseSensitive: false,
+    );
+    final tokens = text.split(RegExp(r'\s+'));
+    final attachments =
+        tokens.where((t) => filePathRe.hasMatch(t)).toList();
+    final promptText =
+        tokens
+            .where((t) => !filePathRe.hasMatch(t))
+            .join(' ')
+            .trim();
+
+    // Add user message — store attachments separately, content without paths
     setState(() {
       _messages.add(
         ChatMessage(
           id: 'user-${DateTime.now().millisecondsSinceEpoch}',
           role: ChatRole.user,
-          content: text,
+          content: promptText,
+          attachments: attachments,
           timestamp: DateTime.now(),
         ),
       );
@@ -282,28 +300,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     _scrollToBottom();
 
-    // Start streaming
-    // Extract image file paths from message text and pass as attachments
-    final _imageExtRe = RegExp(
-      r'\.(png|jpg|jpeg|gif|webp|bmp)$',
-      caseSensitive: false,
-    );
-    final tokens = text.split(RegExp(r'\s+'));
-    final attachments =
-        tokens
-            .where((t) => t.startsWith('/') && _imageExtRe.hasMatch(t))
+    // For providers that support native attachment (copilot uses --attachment)
+    // pass only image files as attachments; others get path embedded in prompt.
+    final imageAttachments =
+        attachments
+            .where((t) => imageExtRe.hasMatch(t))
             .toList();
-    final promptText =
-        tokens
-            .where((t) => !(t.startsWith('/') && _imageExtRe.hasMatch(t)))
-            .join(' ')
-            .trim();
 
     final stream = _provider.sendMessage(
       message: promptText.isNotEmpty ? promptText : text,
       config: _config,
       isFirstMessage: _isFirstMessage,
-      attachments: attachments,
+      attachments: imageAttachments,
     );
 
     _isFirstMessage = false;
@@ -840,7 +848,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Widget _buildMessageBubble(ChatMessage message) {
     switch (message.role) {
       case ChatRole.user:
-        return _UserBubble(content: message.content);
+        return _UserBubble(
+          content: message.content,
+          attachments: message.attachments,
+        );
       case ChatRole.assistant:
         return _AssistantBubble(
           content: message.content,
@@ -1757,18 +1768,14 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _UserBubble extends StatelessWidget {
-  const _UserBubble({required this.content});
+  const _UserBubble({required this.content, this.attachments = const []});
   final String content;
+  final List<String> attachments;
 
   @override
   Widget build(BuildContext context) {
-    // Check if content is a file reference (from clipboard paste)
-    final isImageFile =
-        content.startsWith('/') &&
-        RegExp(
-          r'\.(png|jpg|jpeg|gif|webp|bmp)$',
-          caseSensitive: false,
-        ).hasMatch(content);
+    final hasText = content.trim().isNotEmpty;
+    final hasAttachments = attachments.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
@@ -1776,55 +1783,226 @@ class _UserBubble extends StatelessWidget {
         alignment: Alignment.centerRight,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
               colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: const BorderRadius.only(
+            borderRadius: BorderRadius.only(
               topLeft: Radius.circular(16),
               topRight: Radius.circular(16),
               bottomLeft: Radius.circular(16),
               bottomRight: Radius.circular(4),
             ),
           ),
-          child:
-              isImageFile
-                  ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            maxHeight: 200,
-                            maxWidth: 300,
-                          ),
-                          child: Image.file(File(content), fit: BoxFit.contain),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        content.split('/').last,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFFBFDBFE),
-                        ),
-                      ),
-                    ],
-                  )
-                  : SelectionArea(
-                    child: Text(
-                      content,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white,
-                        height: 1.4,
-                      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasAttachments)
+                Padding(
+                  padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                  child: _AttachmentPreviewSection(
+                    paths: attachments,
+                    onLight: false,
+                  ),
+                ),
+              if (hasText)
+                SelectionArea(
+                  child: Text(
+                    content,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white,
+                      height: 1.4,
                     ),
                   ),
+                ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shows image thumbnails + file chips for a list of file paths.
+/// Used in both user bubbles (attachments) and assistant bubbles (detected paths).
+class _AttachmentPreviewSection extends StatelessWidget {
+  const _AttachmentPreviewSection({
+    required this.paths,
+    this.onLight = true,
+  });
+
+  final List<String> paths;
+
+  /// True when rendered on a light background (assistant bubble), false on dark (user bubble).
+  final bool onLight;
+
+  static final _imageRe = RegExp(
+    r'\.(png|jpg|jpeg|gif|webp|bmp|svg)$',
+    caseSensitive: false,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final images = paths.where((p) => _imageRe.hasMatch(p)).toList();
+    final files = paths.where((p) => !_imageRe.hasMatch(p)).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (images.isNotEmpty) _buildImageGrid(context, images),
+        if (images.isNotEmpty && files.isNotEmpty) const SizedBox(height: 6),
+        if (files.isNotEmpty) _buildFileChips(context, files),
+      ],
+    );
+  }
+
+  Widget _buildImageGrid(BuildContext context, List<String> imagePaths) {
+    if (imagePaths.length == 1) {
+      return _ImageThumbnail(
+        path: imagePaths.first,
+        maxWidth: 280,
+        maxHeight: 200,
+      );
+    }
+    // Multiple images: wrap in a row
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      alignment: WrapAlignment.end,
+      children:
+          imagePaths
+              .map(
+                (p) => _ImageThumbnail(path: p, maxWidth: 140, maxHeight: 120),
+              )
+              .toList(),
+    );
+  }
+
+  Widget _buildFileChips(BuildContext context, List<String> filePaths) {
+    final chipBg = onLight
+        ? Theme.of(context).colorScheme.surfaceContainerHighest
+        : Colors.white.withOpacity(0.15);
+    final textColor = onLight
+        ? Theme.of(context).colorScheme.onSurface
+        : Colors.white;
+    final iconColor = onLight
+        ? Theme.of(context).colorScheme.primary
+        : const Color(0xFFBFDBFE);
+
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      alignment: WrapAlignment.end,
+      children:
+          filePaths.map((p) {
+            final name = p.split('/').last;
+            return GestureDetector(
+              onTap: () => _revealInFinder(p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: chipBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: onLight
+                        ? Theme.of(context).colorScheme.outline.withOpacity(0.3)
+                        : Colors.white24,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.insert_drive_file_outlined,
+                      size: 13,
+                      color: iconColor,
+                    ),
+                    const SizedBox(width: 4),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 200),
+                      child: Text(
+                        name,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11, color: textColor),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+    );
+  }
+
+  void _revealInFinder(String path) {
+    Process.run('open', ['-R', path]);
+  }
+}
+
+/// Tappable image thumbnail that opens in Preview on tap.
+class _ImageThumbnail extends StatelessWidget {
+  const _ImageThumbnail({
+    required this.path,
+    this.maxWidth = 280,
+    this.maxHeight = 200,
+  });
+
+  final String path;
+  final double maxWidth;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(path);
+    final name = path.split('/').last;
+
+    return GestureDetector(
+      onTap: () => Process.run('open', [path]),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+              ),
+              child: Image.file(
+                file,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 80,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.black12,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    size: 24,
+                    color: Colors.white38,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 9, color: Color(0xFFBFDBFE)),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
@@ -1983,9 +2161,38 @@ class _AssistantBubble extends StatelessWidget {
                 style: TextStyle(fontSize: 9, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
               ),
             ),
+
+          // Detected file paths in assistant response
+          Builder(
+            builder: (_) {
+              final detectedPaths = _extractFilePaths(content);
+              if (detectedPaths.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: _AttachmentPreviewSection(
+                  paths: detectedPaths,
+                  onLight: true,
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
+  }
+
+  static final _absPathRe = RegExp(r'(?<![`\w])(\/[\w./\-_ ]+\.[\w]{1,10})(?![`\w])');
+
+  /// Extract unique absolute file paths mentioned in assistant text.
+  static List<String> _extractFilePaths(String text) {
+    final matches = _absPathRe.allMatches(text);
+    final seen = <String>{};
+    final result = <String>[];
+    for (final m in matches) {
+      final path = m.group(1)!.trim();
+      if (seen.add(path)) result.add(path);
+    }
+    return result;
   }
 }
 
