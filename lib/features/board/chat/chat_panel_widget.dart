@@ -221,6 +221,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
   }
 
+  /// Open a local file path: board preview for supported types, system open otherwise.
+  void _handleOpenFile(String path) {
+    if (path.isEmpty) return;
+    final ext = path.split('.').last.toLowerCase();
+    const boardPreviewable = {
+      // images
+      'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',
+      // video
+      'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'wmv', 'flv',
+      // audio
+      'mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'opus', 'wma',
+    };
+    final createPanel = widget.onCreateLinkedPanel;
+    if (createPanel != null && boardPreviewable.contains(ext)) {
+      final title = path.split('/').last;
+      createPanel('board.file.preview', {'path': path, 'title': title}, title);
+    } else {
+      Process.run('open', [path]);
+    }
+  }
+
   void _setProcessing(bool value) {
     _isProcessing = value;
     processingNotifier.value = value;
@@ -851,6 +872,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         return _UserBubble(
           content: message.content,
           attachments: message.attachments,
+          onOpenFile: _handleOpenFile,
         );
       case ChatRole.assistant:
         return _AssistantBubble(
@@ -858,6 +880,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           toolCalls: message.toolCalls,
           tokenUsage: message.tokenUsage,
           onLinkTap: _handleLinkTap,
+          onOpenFile: _handleOpenFile,
         );
       case ChatRole.tool:
         return _ToolResultCard(
@@ -1768,9 +1791,14 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _UserBubble extends StatelessWidget {
-  const _UserBubble({required this.content, this.attachments = const []});
+  const _UserBubble({
+    required this.content,
+    this.attachments = const [],
+    this.onOpenFile,
+  });
   final String content;
   final List<String> attachments;
+  final void Function(String path)? onOpenFile;
 
   static final _pathTokenRe = RegExp(r'^/\S+');
 
@@ -1825,6 +1853,7 @@ class _UserBubble extends StatelessWidget {
                   child: _AttachmentPreviewSection(
                     paths: resolved.paths,
                     onLight: false,
+                    onOpenFile: onOpenFile,
                   ),
                 ),
               if (hasText)
@@ -1852,12 +1881,16 @@ class _AttachmentPreviewSection extends StatelessWidget {
   const _AttachmentPreviewSection({
     required this.paths,
     this.onLight = true,
+    this.onOpenFile,
   });
 
   final List<String> paths;
 
   /// True when rendered on a light background (assistant bubble), false on dark (user bubble).
   final bool onLight;
+
+  /// Called when the user taps a file — uses board preview or system open.
+  final void Function(String path)? onOpenFile;
 
   static final _imageRe = RegExp(
     r'\.(png|jpg|jpeg|gif|webp|bmp|svg)$',
@@ -1886,9 +1919,9 @@ class _AttachmentPreviewSection extends StatelessWidget {
         path: imagePaths.first,
         maxWidth: 280,
         maxHeight: 200,
+        onOpenFile: onOpenFile,
       );
     }
-    // Multiple images: wrap in a row
     return Wrap(
       spacing: 6,
       runSpacing: 6,
@@ -1896,7 +1929,12 @@ class _AttachmentPreviewSection extends StatelessWidget {
       children:
           imagePaths
               .map(
-                (p) => _ImageThumbnail(path: p, maxWidth: 140, maxHeight: 120),
+                (p) => _ImageThumbnail(
+                  path: p,
+                  maxWidth: 140,
+                  maxHeight: 120,
+                  onOpenFile: onOpenFile,
+                ),
               )
               .toList(),
     );
@@ -1921,7 +1959,14 @@ class _AttachmentPreviewSection extends StatelessWidget {
           filePaths.map((p) {
             final name = p.split('/').last;
             return GestureDetector(
-              onTap: () => _revealInFinder(p),
+              onTap: () {
+                if (onOpenFile != null) {
+                  onOpenFile!(p);
+                } else {
+                  // Fallback: reveal in Finder
+                  Process.run('open', ['-R', p]);
+                }
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8,
@@ -1960,23 +2005,21 @@ class _AttachmentPreviewSection extends StatelessWidget {
           }).toList(),
     );
   }
-
-  void _revealInFinder(String path) {
-    Process.run('open', ['-R', path]);
-  }
 }
 
-/// Tappable image thumbnail that opens in Preview on tap.
+/// Tappable image thumbnail that opens via [onOpenFile] on tap.
 class _ImageThumbnail extends StatelessWidget {
   const _ImageThumbnail({
     required this.path,
     this.maxWidth = 280,
     this.maxHeight = 200,
+    this.onOpenFile,
   });
 
   final String path;
   final double maxWidth;
   final double maxHeight;
+  final void Function(String path)? onOpenFile;
 
   @override
   Widget build(BuildContext context) {
@@ -1984,7 +2027,13 @@ class _ImageThumbnail extends StatelessWidget {
     final name = path.split('/').last;
 
     return GestureDetector(
-      onTap: () => Process.run('open', [path]),
+      onTap: () {
+        if (onOpenFile != null) {
+          onOpenFile!(path);
+        } else {
+          Process.run('open', [path]);
+        }
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -2033,11 +2082,13 @@ class _AssistantBubble extends StatelessWidget {
     this.toolCalls = const [],
     this.tokenUsage,
     this.onLinkTap,
+    this.onOpenFile,
   });
   final String content;
   final List<ChatToolCall> toolCalls;
   final ChatTokenUsage? tokenUsage;
   final void Function(String? href)? onLinkTap;
+  final void Function(String path)? onOpenFile;
 
   @override
   Widget build(BuildContext context) {
@@ -2191,6 +2242,7 @@ class _AssistantBubble extends StatelessWidget {
                 child: _AttachmentPreviewSection(
                   paths: detectedPaths,
                   onLight: true,
+                  onOpenFile: onOpenFile,
                 ),
               );
             },
