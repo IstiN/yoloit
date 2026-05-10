@@ -124,10 +124,6 @@ class WebViewZoomPlugin: NSObject, FlutterPlugin {
     var count = 0
     if let webView = view as? WKWebView {
       applyBounds(to: webView, viewportWidth: width)
-      // Enable HTML5 Fullscreen API (required for YouTube fullscreen button).
-      if #available(macOS 12.3, *) {
-        webView.configuration.preferences.isElementFullscreenEnabled = true
-      }
       let oid = ObjectIdentifier(webView)
       if !observedWebViews.contains(oid) {
         observedWebViews.insert(oid)
