@@ -145,19 +145,20 @@ class WebViewZoomPlugin: NSObject, FlutterPlugin {
     return count
   }
 
-  /// Apply NSView bounds so the WKWebView's JS viewport = viewportWidth,
-  /// while keeping the frame (screen rect) unchanged.
-  /// When viewportWidth <= 0, reset bounds to match frame (disable trick).
+  /// Set WKWebView.pageZoom so the JS viewport width equals viewportWidth.
+  ///
+  /// pageZoom = frame.width / viewportWidth → window.innerWidth = viewportWidth,
+  /// document.documentElement.clientWidth = viewportWidth. WebKit handles all
+  /// coordinate mapping (mouse, scroll) through the same transform.
+  /// When viewportWidth <= 0, reset pageZoom to 1.0.
   private func applyBounds(to webView: WKWebView, viewportWidth: CGFloat) {
     let frame = webView.frame
-    guard frame.width > 0, frame.height > 0 else { return }
+    guard frame.width > 0 else { return }
     if viewportWidth <= 0 {
-      // Reset: bounds = frame size (default AppKit behaviour)
-      webView.setBoundsSize(frame.size)
+      webView.pageZoom = 1.0
       return
     }
-    let boundsH = frame.height * viewportWidth / frame.width
-    webView.setBoundsSize(NSSize(width: viewportWidth, height: boundsH))
+    webView.pageZoom = frame.width / viewportWidth
   }
 
   // MARK: - WKUserScript install

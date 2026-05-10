@@ -245,18 +245,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 final scale = _BoardViewState._scaleOf(
                                   _transformController.value,
                                 );
-                                // Re-inject CSS zoom into all web panels after
-                                // gesture ends so content reflows to match the
-                                // new board scale (zoom = boardScale makes the
-                                // CSS layout width = panel.logicalWidth).
+                                // pageZoom is updated by Swift frame observer; just dispatch resize.
                                 for (final panel in activeBoard.panels) {
                                   if (panel.type != WebpagePlugin.kTypeId) continue;
                                   final ctrl = WebpagePlugin.controllers[panel.id];
                                   if (ctrl == null) continue;
-                                  WebpagePlugin.pendingCssZoom[panel.id] = scale;
                                   ctrl.runJavaScript(
-                                    "document.documentElement.style.zoom="
-                                    "'${scale.toStringAsFixed(4)}';"
                                     "window.dispatchEvent(new Event('resize'));",
                                   );
                                 }
@@ -2580,13 +2574,9 @@ class _WebViewOverlays extends StatelessWidget {
 
               final ctrl = WebpagePlugin.controllers[panel.id]!;
 
-              // Seed CSS zoom for this panel if not yet set (first render).
+              // pageZoom in Swift handles viewport width. No CSS zoom needed.
               if (!WebpagePlugin.pendingCssZoom.containsKey(panel.id)) {
-                WebpagePlugin.pendingCssZoom[panel.id] = scale;
-                ctrl.runJavaScript(
-                  "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
-                  "window.dispatchEvent(new Event('resize'));",
-                );
+                WebpagePlugin.pendingCssZoom[panel.id] = 1.0;
               };
 
               children.add(
@@ -2647,13 +2637,9 @@ class _WebViewOverlays extends StatelessWidget {
               if (rect != null) {
                 final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
 
-                // Seed CSS zoom for focused panel if not yet set.
+                // pageZoom in Swift handles viewport width via frame observer.
                 if (!WebpagePlugin.pendingCssZoom.containsKey(focusedPanel.id)) {
-                  WebpagePlugin.pendingCssZoom[focusedPanel.id] = scale;
-                  ctrl.runJavaScript(
-                    "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
-                    "window.dispatchEvent(new Event('resize'));",
-                  );
+                  WebpagePlugin.pendingCssZoom[focusedPanel.id] = 1.0;
                 };
 
                 children.add(

@@ -141,10 +141,8 @@ class _WebpageContentState extends State<_WebpageContent> {
                 // This makes sites like YouTube use desktop layout widths in CSS,
                 // even when the WKWebView NSView frame is smaller due to board zoom.
                 final panelId = widget.panel.id;
-                final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
                 _controller!.runJavaScript('''
 (function(){
-  document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
   window.dispatchEvent(new Event('resize'));
   if(window.__yoloNewTabSetup) return;
   window.__yoloNewTabSetup=true;
