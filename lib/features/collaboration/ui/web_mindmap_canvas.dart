@@ -236,7 +236,10 @@ class _WebMindMapCanvasState extends State<WebMindMapCanvas> {
                             // Connectors
                             Positioned.fill(
                               child: CustomPaint(
-                                painter: _ConnectorsPainter(state),
+                                painter: _ConnectorsPainter(
+                                  state,
+                                  borderColor: ctx.appColors.border,
+                                ),
                               ),
                             ),
                             // Node cards with drag + resize handles
@@ -728,7 +731,7 @@ class _QBtn extends StatelessWidget {
                   fontSize: 9,
                   color: accent
                       ? const Color(0xFFFF7A8A)
-                      : const Color(0xFF6B7898),
+                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
             ],
@@ -895,11 +898,12 @@ class _WebToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xEE0F1218),
-        border: Border.all(color: const Color(0xFF1E2330)),
+        color: colors.surface,
+        border: Border.all(color: colors.border),
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 10)],
       ),
@@ -1006,7 +1010,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
   void _openDropdown() {
     setState(() => _open = true);
     _overlay = OverlayEntry(
-      builder: (_) => GestureDetector(
+      builder: (ctx) => GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: _close,
         child: Stack(
@@ -1023,8 +1027,8 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                   width: 180,
                   constraints: const BoxConstraints(maxHeight: 260),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F1218),
-                    border: Border.all(color: const Color(0xFF1E2330)),
+                    color: ctx.appColors.surface,
+                    border: Border.all(color: ctx.appColors.border),
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: const [BoxShadow(color: Color(0x88000000), blurRadius: 16)],
                   ),
@@ -1055,7 +1059,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                         ),
                       ),
                       if (widget.savedViews.isNotEmpty)
-                        const Divider(height: 1, color: Color(0xFF1E2330)),
+                        Divider(height: 1, color: ctx.appColors.border),
                       for (final name in widget.savedViews.keys)
                         InkWell(
                           onTap: () {
@@ -1074,7 +1078,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                                   size: 11,
                                   color: widget.activeViewName == name
                                       ? const Color(0xFF60A5FA)
-                                      : const Color(0xFF4A5568),
+                                      : Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
@@ -1082,7 +1086,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                                     name,
                                     style: TextStyle(
                                       fontSize: 10.5,
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color: Theme.of(ctx).colorScheme.onSurface,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1092,11 +1096,14 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                           ),
                         ),
                       if (widget.savedViews.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           child: Text(
                             'No saved views yet',
-                            style: TextStyle(fontSize: 10, color: Color(0xFF4A5568)),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                            ),
                           ),
                         ),
                     ],
@@ -1227,7 +1234,7 @@ class _WebMiniMap extends StatelessWidget {
             width: _mapW,
             height: _mapH,
             decoration: BoxDecoration(
-              color: const Color(0xE50B0D12),
+              color: ctx.appColors.surface,
               border: Border.all(color: const Color(0x3060A5FA)),
               borderRadius: BorderRadius.circular(8),
               boxShadow: const [
@@ -1457,7 +1464,7 @@ class _SidebarRow extends StatelessWidget {
                   child: Icon(
                     expanded ? Icons.expand_less : Icons.expand_more,
                     size: 13,
-                    color: const Color(0xFF6B7898),
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                   ),
                 ),
               )
@@ -1482,7 +1489,7 @@ class _SidebarRow extends StatelessWidget {
                   hidden ? Icons.visibility_off : Icons.visibility,
                   size: isWs ? 13 : 11,
                   color: hidden
-                      ? const Color(0xFF4A5680)
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                       : (isWs
                             ? const Color(0xFF7C6BFF)
                             : const Color(0x997C6BFF)),
@@ -1493,7 +1500,9 @@ class _SidebarRow extends StatelessWidget {
             Icon(
               icon,
               size: isWs ? 13 : 11,
-              color: hidden ? const Color(0xFF4A5680) : color,
+              color: hidden
+                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                  : color,
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -1504,7 +1513,7 @@ class _SidebarRow extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: isWs ? FontWeight.w700 : FontWeight.normal,
                   color: hidden
-                      ? const Color(0xFF4A5680)
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                       : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
@@ -1514,7 +1523,7 @@ class _SidebarRow extends StatelessWidget {
               Icon(
                 expanded ? Icons.expand_less : Icons.expand_more,
                 size: 13,
-                color: const Color(0xFF6B7898),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
           ],
         ),
@@ -1528,13 +1537,14 @@ class _SidebarRow extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _ConnectorsPainter extends CustomPainter {
-  const _ConnectorsPainter(this.state);
+  const _ConnectorsPainter(this.state, {required this.borderColor});
   final MindMapState state;
+  final Color borderColor;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF1E2D40)
+      ..color = borderColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
@@ -1569,7 +1579,8 @@ class _ConnectorsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ConnectorsPainter old) => old.state != state;
+  bool shouldRepaint(_ConnectorsPainter old) =>
+      old.state != state || old.borderColor != borderColor;
 }
 
 // ── Dot-grid painter ───────────────────────────────────────────────────────
@@ -1616,8 +1627,6 @@ class _GridPainter extends CustomPainter {
 class _RemoteWorkspaceDialog {
   _RemoteWorkspaceDialog._();
 
-  static const _kBg = Color(0xFF12151C);
-  static const _kHint = Color(0xFF6B7898);
   static const _kAccent = Color(0xFF7C6BFF);
 
   /// Shows a dialog asking for workspace name + folder path.
@@ -1688,10 +1697,10 @@ class _WorkspaceFormDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bg = _RemoteWorkspaceDialog._kBg;
+    final bg = context.appColors.surfaceElevated;
     final border = context.appColors.border;
     final text = Theme.of(context).colorScheme.onSurface;
-    const hint = _RemoteWorkspaceDialog._kHint;
+    final hint = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
     const accent = _RemoteWorkspaceDialog._kAccent;
 
     return AlertDialog(
@@ -1711,7 +1720,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (nameCtrl != null) ...[
-              const Text(
+              Text(
                 'Name',
                 style: TextStyle(color: hint, fontSize: 11),
               ),
@@ -1720,7 +1729,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
                 controller: nameCtrl,
                 autofocus: true,
                 style: TextStyle(color: text, fontSize: 13),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'My Project',
                   hintStyle: TextStyle(color: hint),
                   isDense: true,
@@ -1728,7 +1737,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
-            const Text(
+            Text(
               'Folder path',
               style: TextStyle(color: hint, fontSize: 11),
             ),
@@ -1741,14 +1750,14 @@ class _WorkspaceFormDialog extends StatelessWidget {
                 fontSize: 13,
                 fontFamily: 'monospace',
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: '~/projects/my-app',
                 hintStyle: TextStyle(color: hint),
                 isDense: true,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'You can use ~ for your home directory',
               style: TextStyle(color: hint, fontSize: 11),
             ),
@@ -1758,7 +1767,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: onCancel,
-          child: const Text('Cancel', style: TextStyle(color: hint)),
+          child: Text('Cancel', style: TextStyle(color: hint)),
         ),
         TextButton(
           onPressed: onConfirm,

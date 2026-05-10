@@ -240,11 +240,11 @@ class _HostTab extends StatelessWidget {
       builder: (ctx, state) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Start a server so others on your local network can connect '
             'and mirror your Mindmap board in real time.',
             style: TextStyle(
-              color: Color(0xFF9AA3BF),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               fontSize: 12,
               height: 1.5,
             ),
@@ -377,6 +377,7 @@ class _HostActiveView extends StatelessWidget {
   Widget build(BuildContext context) {
     final remoteUrl = state.webClientUrl;
     final localUrl = state.localUrl;
+    final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor =
         Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
@@ -389,7 +390,7 @@ class _HostActiveView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1A12),
+            color: colors.surface,
             border: Border.all(color: const Color(0x4034D399)),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -445,8 +446,8 @@ class _HostActiveView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0A0F1A),
-              border: Border.all(color: const Color(0xFF1E3A20)),
+              color: colors.surface,
+              border: Border.all(color: colors.border),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -647,6 +648,7 @@ class _GuestActiveView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -654,7 +656,7 @@ class _GuestActiveView extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1020),
+            color: colors.surface,
             border: Border.all(color: const Color(0x4060A5FA)),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -722,7 +724,7 @@ class _PrimaryBtn extends StatelessWidget {
       child: Container(
         height: 36,
         decoration: BoxDecoration(
-          color: enabled ? const Color(0xFF7C3AED) : const Color(0xFF2A2A40),
+          color: enabled ? const Color(0xFF7C3AED) : context.appColors.surfaceElevated,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -878,7 +880,7 @@ class _CollabToolBtnState extends State<_CollabToolBtn> {
             decoration: BoxDecoration(
               color: _hovered
                   ? colors.surfaceElevated
-                  : const Color(0xFF1A1E2A),
+                  : colors.surfaceElevated,
               border: Border.all(
                 color: _hovered
                     ? widget.color.withAlpha(160)

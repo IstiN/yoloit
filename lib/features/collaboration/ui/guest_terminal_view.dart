@@ -159,7 +159,7 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
                 size: 14,
                 color: _mobileKbActive
                     ? Colors.white
-                    : const Color(0xFF6B7898),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
           ),
@@ -268,8 +268,8 @@ class _MobileInputBar extends StatelessWidget {
                   ),
                   decoration: InputDecoration(
                     hintText: 'Type command…',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF3D4A6B),
+                    hintStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                       fontSize: 13,
                     ),
                     contentPadding: const EdgeInsets.symmetric(

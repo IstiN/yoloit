@@ -1005,7 +1005,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                           color: accentColor,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withAlpha(60),
+                            color: Theme.of(context).colorScheme.onSurface.withAlpha(60),
                             width: 1,
                           ),
                         ),

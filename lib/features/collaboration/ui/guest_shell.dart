@@ -96,7 +96,7 @@ class _GuestShellState extends State<GuestShell> {
     final cubit = ctx.read<CollaborationCubit>();
     final colors = ctx.appColors;
     return Scaffold(
-      backgroundColor: const Color(0xFF070714),
+      backgroundColor: colors.terminalBackground,
       body: Center(
         child: Container(
           width: 420,
@@ -104,7 +104,7 @@ class _GuestShellState extends State<GuestShell> {
           decoration: BoxDecoration(
             color: colors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF1E2330), width: 1),
+            border: Border.all(color: colors.border, width: 1),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x60000000),
@@ -148,10 +148,10 @@ class _GuestShellState extends State<GuestShell> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const Text(
+                      Text(
                         'Connect to a running desktop session',
                         style: TextStyle(
-                          color: Color(0xFF6B7898),
+                          color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
                           fontSize: 11,
                         ),
                       ),
@@ -234,11 +234,14 @@ class _GuestShellState extends State<GuestShell> {
 
               // ── Hint ─────────────────────────────────────────────────
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'The YoLoIT desktop app must be running and sharing the Space\n'
                 '(toolbar → Share → Start Hosting).',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF4A5568), fontSize: 11),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -249,8 +252,8 @@ class _GuestShellState extends State<GuestShell> {
 
   Widget _label(String text) => Text(
     text,
-    style: const TextStyle(
-      color: Color(0xFF6B7898),
+    style: TextStyle(
+      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
       fontSize: 12,
       fontWeight: FontWeight.w500,
     ),
@@ -266,16 +269,19 @@ class _GuestShellState extends State<GuestShell> {
         ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: Color(0xFF3D4A6B), fontSize: 14),
+          hintStyle: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            fontSize: 14,
+          ),
           filled: true,
-          fillColor: const Color(0xFF0A0F1A),
+          fillColor: context.appColors.surface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF1E2330)),
+            borderSide: BorderSide(color: context.appColors.border),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF1E2330)),
+            borderSide: BorderSide(color: context.appColors.border),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
@@ -292,7 +298,7 @@ class _GuestShellState extends State<GuestShell> {
 
   Widget _buildCanvas(BuildContext ctx, CollaborationState collab) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070714),
+      backgroundColor: ctx.appColors.terminalBackground,
       body: Column(
         children: [
           _buildTopBar(ctx, collab),
@@ -356,7 +362,10 @@ class _GuestShellState extends State<GuestShell> {
             const SizedBox(width: 12),
             Text(
               '${collab.peerCount} peer${collab.peerCount > 1 ? 's' : ''}',
-              style: const TextStyle(color: Color(0xFF6B7898), fontSize: 11),
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                fontSize: 11,
+              ),
             ),
           ],
           const Spacer(),
@@ -364,7 +373,7 @@ class _GuestShellState extends State<GuestShell> {
             icon: const Icon(Icons.link_off, size: 14),
             label: const Text('Disconnect'),
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF6B7898),
+              foregroundColor: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
               textStyle: const TextStyle(fontSize: 12),
             ),
             onPressed: () => ctx.read<CollaborationCubit>().disconnect(),

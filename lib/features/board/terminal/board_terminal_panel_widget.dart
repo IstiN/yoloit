@@ -592,7 +592,7 @@ class _BoardTerminalSessionHistoryDialogState
                         decoration: BoxDecoration(
                           color:
                               isCurrent
-                                  ? const Color(0xFF153225)
+                                  ? colors.surfaceElevated
                                   : colors.surface,
                           borderRadius: BorderRadius.circular(10),
                           border:

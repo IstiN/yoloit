@@ -792,9 +792,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           vertical: 8,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: const Color(
-                                            0xFF1E1E2E,
-                                          ).withAlpha(220),
+                                          color: colors.surfaceElevated.withAlpha(220),
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
@@ -1384,17 +1382,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                     border: Border.all(
                       color:
                           isHovered
-                              ? Colors.white.withAlpha(80)
+                              ? Theme.of(context).colorScheme.onSurface.withAlpha(80)
                               : linkColor.withAlpha(50),
                       width: 1,
                     ),
                   ),
                   child:
                       isHovered
-                          ? const Icon(
+                          ? Icon(
                             Icons.close,
                             size: 12,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onSurface,
                           )
                           : null,
                 ),
@@ -3828,6 +3826,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
                     showArrow: settings.showArrow,
                     color: activeColor,
                     borderColor: colors.border,
+                    panelColor: colors.surface,
                   ),
                   child: const SizedBox.expand(),
                 ),
@@ -4378,6 +4377,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                     showArrow: _showArrow,
                     color: _color,
                     borderColor: colors.border,
+                    panelColor: colors.surface,
                   ),
                   child: const SizedBox.expand(),
                 ),
@@ -4404,7 +4404,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                           color:
                               _geometry == geo
                                   ? _color.withAlpha(30)
-                                  : const Color(0xFF131620),
+                                  : colors.surface,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color:
@@ -4533,12 +4533,14 @@ class _LinkPreviewPainter extends CustomPainter {
     required this.showArrow,
     required this.color,
     required this.borderColor,
+    required this.panelColor,
   });
 
   final BoardLinkGeometry geometry;
   final bool showArrow;
   final Color color;
   final Color borderColor;
+  final Color panelColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -4549,7 +4551,7 @@ class _LinkPreviewPainter extends CustomPainter {
     // Draw mock panels
     final panelPaint =
         Paint()
-          ..color = const Color(0xFF1E2535)
+          ..color = panelColor
           ..style = PaintingStyle.fill;
     final panelBorderPaint =
         Paint()
@@ -4623,7 +4625,8 @@ class _LinkPreviewPainter extends CustomPainter {
       old.geometry != geometry ||
       old.showArrow != showArrow ||
       old.color != color ||
-      old.borderColor != borderColor;
+      old.borderColor != borderColor ||
+      old.panelColor != panelColor;
 }
 
 /// Tiny icon-sized link preview used inside the geometry selector buttons.
@@ -5240,7 +5243,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                     decoration: BoxDecoration(
                       color:
                           isCurrent
-                              ? const Color(0xFF1A3A2A)
+                              ? colors.surfaceElevated
                               : colors.surface,
                       borderRadius: BorderRadius.circular(10),
                       border:

@@ -901,9 +901,7 @@ class _ViewsButton extends StatelessWidget {
               height: 30,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
-                color: hasViews
-                    ? const Color(0xFF16192A)
-                    : const Color(0xFF12151C),
+                color: context.appColors.surfaceElevated,
                 border: Border.all(
                   color: hasViews
                       ? const Color(0xFF7C6BFF)
@@ -1023,7 +1021,7 @@ class _ViewsSheetState extends State<_ViewsSheet> {
                     ],
                   ),
                 ),
-                const Divider(height: 1, color: Color(0xFF1E2330)),
+                Divider(height: 1, color: context.appColors.divider),
                 // Save current layout row.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
@@ -1038,9 +1036,9 @@ class _ViewsSheetState extends State<_ViewsSheet> {
                           ),
                           decoration: InputDecoration(
                             hintText: state.activeViewName ?? 'View name…',
-                            hintStyle: const TextStyle(
+                            hintStyle: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF4A5680),
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                             ),
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(
@@ -1096,15 +1094,15 @@ class _ViewsSheetState extends State<_ViewsSheet> {
                   ),
                 ),
                 if (state.savedViews.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(14, 6, 14, 14),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
                     child: Text(
                       'No saved views yet',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF4A5680)),
+                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                     ),
                   )
                 else ...[
-                  const Divider(height: 1, color: Color(0xFF1E2330)),
+                  Divider(height: 1, color: context.appColors.divider),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 240),
                     child: ListView(
@@ -1161,7 +1159,7 @@ class _ViewRow extends StatelessWidget {
               size: 13,
               color: isActive
                   ? const Color(0xFF7C6BFF)
-                  : const Color(0xFF4A5680),
+                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1171,23 +1169,23 @@ class _ViewRow extends StatelessWidget {
                   fontSize: 12,
                   color: isActive
                       ? Theme.of(context).colorScheme.onSurface
-                      : const Color(0xFF9BAACB),
+                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ),
             Text(
               '${snapshot.positions.length} nodes',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF4A5680)),
+              style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             ),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: onDelete,
               behavior: HitTestBehavior.opaque,
-              child: const Icon(
+              child: Icon(
                 Icons.delete_outline,
                 size: 13,
-                color: Color(0xFF4A5680),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
           ],
@@ -1218,7 +1216,7 @@ class _ToolBtn extends StatelessWidget {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: const Color(0xFF12151C),
+            color: context.appColors.surfaceElevated,
             border: Border.all(color: colors.border),
             borderRadius: BorderRadius.circular(6),
           ),
@@ -1302,7 +1300,7 @@ class _WsRow extends StatelessWidget {
                   hidden ? Icons.visibility_off : Icons.visibility,
                   size: 13,
                   color: hidden
-                      ? const Color(0xFF4A5680)
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                       : const Color(0xFF7C6BFF),
                 ),
               ),
@@ -1311,7 +1309,7 @@ class _WsRow extends StatelessWidget {
             Icon(
               Icons.folder_copy_outlined,
               size: 13,
-              color: hidden ? const Color(0xFF4A5680) : const Color(0xFF7C6BFF),
+              color: hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : const Color(0xFF7C6BFF),
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -1322,7 +1320,7 @@ class _WsRow extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: hidden
-                      ? const Color(0xFF4A5680)
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                       : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
@@ -1464,7 +1462,7 @@ class _TreeRow extends StatelessWidget {
                   hidden ? Icons.visibility_off : Icons.visibility,
                   size: 11,
                   color: hidden
-                      ? const Color(0xFF4A5680)
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                       : const Color(0x997C6BFF),
                 ),
               ),
@@ -1473,7 +1471,7 @@ class _TreeRow extends StatelessWidget {
             Icon(
               m.icon,
               size: 11,
-              color: hidden ? const Color(0xFF3D475E) : effectiveColor,
+              color: hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.3) : effectiveColor,
             ),
             const SizedBox(width: 5),
             Expanded(
@@ -1483,8 +1481,8 @@ class _TreeRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   color: hidden
-                      ? const Color(0xFF4A5680)
-                      : const Color(0xFFB0B8D0),
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ),
@@ -1560,8 +1558,8 @@ class _SidebarToggle extends StatelessWidget {
           width: 28,
           height: 48,
           decoration: BoxDecoration(
-            color: const Color(0xEE0F1218),
-            border: Border.all(color: const Color(0xFF1E2330)),
+            color: context.appColors.surfaceElevated,
+            border: Border.all(color: context.appColors.border),
             borderRadius: const BorderRadius.only(
               topRight: Radius.circular(8),
               bottomRight: Radius.circular(8),
@@ -1588,7 +1586,7 @@ Future<void> _createWorkspace(BuildContext context) async {
     name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF12151C),
+        backgroundColor: colors.surfaceElevated,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(color: colors.border),
@@ -1666,7 +1664,7 @@ class _SidebarActionState extends State<_SidebarAction> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: _hovered ? const Color(0xFF2A1E66) : const Color(0xFF1A1E2A),
+            color: _hovered ? const Color(0xFF2A1E66) : colors.surfaceElevated,
             border: Border.all(
               color: _hovered
                   ? const Color(0xFF7C6BFF)
@@ -1683,7 +1681,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                 size: 12,
                 color: _hovered
                     ? const Color(0xFFC084FC)
-                    : const Color(0xFF9AA3BF),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
               const SizedBox(width: 6),
               Text(
@@ -1693,7 +1691,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                   fontWeight: FontWeight.w600,
                   color: _hovered
                       ? Theme.of(context).colorScheme.onSurface
-                      : const Color(0xFF9AA3BF),
+                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ],

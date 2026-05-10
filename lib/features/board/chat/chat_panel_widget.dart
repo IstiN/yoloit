@@ -595,7 +595,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Widget _buildInfoBar() {
     final colors = context.appColors;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B);
+        Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -741,7 +741,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           Icon(
             Icons.chat_bubble_outline,
             size: 40,
-            color: Colors.white.withAlpha(30),
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(30),
           ),
           const SizedBox(height: 12),
           Text(
@@ -751,7 +751,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               color:
                   Theme.of(
                     context,
-                  ).textTheme.bodySmall?.color ?? const Color(0xFF64748B),
+                  ).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
         ],
@@ -907,7 +907,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Widget _buildStreamingBubble() {
     final colors = context.appColors;
     final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ?? const Color(0xFFCBD5E1);
+        Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
     final codeBg = colors.surface;
     final processedContent = _streamingContent.replaceAll(
       RegExp(r'<br\s*/?>'),
@@ -964,9 +964,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Widget _buildInputBar() {
     final colors = context.appColors;
     final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ?? const Color(0xFFE2E8F0);
+        Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
     final hintColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF475569);
+        Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
     return Container(
       margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
       padding: const EdgeInsets.fromLTRB(10, 8, 22, 12),
@@ -1301,7 +1301,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                   decoration: BoxDecoration(
                     color:
                         isCurrent
-                            ? const Color(0xFF1A3A2A)
+                            ? colors.surfaceElevated
                             : colors.surface,
                     borderRadius: BorderRadius.circular(10),
                     border:
@@ -1494,7 +1494,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     final colorScheme = Theme.of(context).colorScheme;
     final labelStyle = TextStyle(
       fontSize: 11,
-      color: Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B),
+      color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
     );
     final inputTextStyle = TextStyle(fontSize: 12, color: colorScheme.onSurface);
     final hintStyle = TextStyle(
@@ -1660,7 +1660,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                                             ? const Color(0xFF34D399)
                                             : m.costMultiplier > 3
                                             ? const Color(0xFFF87171)
-                                            : const Color(0xFF94A3B8),
+                                            : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                   ),
                                 ),
                               ],
@@ -1792,9 +1792,9 @@ class _AssistantBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ?? const Color(0xFFCBD5E1);
+        Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B);
+        Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
     final codeBg = colors.surface;
     // Preprocess: replace <br> tags with newlines for markdown rendering
     final processedContent = content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
@@ -2110,7 +2110,7 @@ class _AskUserCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               question,
-              style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0)),
+              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
             ),
             if (choices.isNotEmpty) ...[
               const SizedBox(height: 8),

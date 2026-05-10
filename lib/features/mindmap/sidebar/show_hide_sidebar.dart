@@ -295,8 +295,8 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
         Container(
           width: _width,
           decoration: BoxDecoration(
-            color: const Color(0xEE0F1218),
-            border: Border.all(color: const Color(0xFF1E2330)),
+            color: context.appColors.surfaceElevated,
+            border: Border.all(color: context.appColors.border),
             borderRadius: BorderRadius.circular(10),
             boxShadow: const [
               BoxShadow(color: Color(0x80000000), blurRadius: 18),
@@ -373,7 +373,7 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                 ),
               // ── Quick search filter ─────────────────────────────────────
               _QuickFilterBar(controller: _filterCtrl),
-              const Divider(height: 1, color: Color(0xFF1E2330)),
+              Divider(height: 1, color: context.appColors.divider),
               if (widget.onCreateWorkspace != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
@@ -389,14 +389,14 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                   children: [
                     ..._buildNodes(widget.data.workspaces, depth: 0),
                     if (widget.data.orphans.isNotEmpty) ...[
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(10, 8, 8, 2),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 8, 2),
                         child: Text(
                           'OTHER',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF4A5680),
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                             letterSpacing: 1,
                           ),
                         ),
@@ -852,7 +852,7 @@ class _SidebarTreeRow extends StatelessWidget {
                     node.hidden ? Icons.visibility_off : Icons.visibility,
                     size: 13,
                     color: node.hidden
-                        ? const Color(0xFF4A5680)
+                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                         : const Color(0xFF7C6BFF),
                   ),
                 ),
@@ -861,7 +861,7 @@ class _SidebarTreeRow extends StatelessWidget {
               Icon(
                 Icons.folder_copy_outlined,
                 size: 13,
-                color: node.hidden ? const Color(0xFF4A5680) : const Color(0xFF7C6BFF),
+                color: node.hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : const Color(0xFF7C6BFF),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -872,7 +872,7 @@ class _SidebarTreeRow extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: node.hidden
-                        ? const Color(0xFF4A5680)
+                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                         : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
@@ -909,7 +909,7 @@ class _SidebarTreeRow extends StatelessWidget {
                     node.hidden ? Icons.visibility_off : Icons.visibility,
                     size: 11,
                     color: node.hidden
-                        ? const Color(0xFF4A5680)
+                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                         : const Color(0x997C6BFF),
                   ),
                 ),
@@ -918,7 +918,7 @@ class _SidebarTreeRow extends StatelessWidget {
               Icon(
                 icon,
                 size: 11,
-                color: node.hidden ? const Color(0xFF3D475E) : color,
+                color: node.hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.3) : color,
               ),
               const SizedBox(width: 5),
               Expanded(
@@ -928,8 +928,8 @@ class _SidebarTreeRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     color: node.hidden
-                        ? const Color(0xFF4A5680)
-                        : const Color(0xFFB0B8D0),
+                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                   ),
                 ),
               ),
@@ -1014,10 +1014,10 @@ class _SidebarTreeRow extends StatelessWidget {
         value: 'hide_children',
         height: 32,
         child: Row(
-          children: const [
-            Icon(Icons.visibility_off_outlined, size: 13, color: Color(0xFF9AA3BF)),
-            SizedBox(width: 8),
-            Text('Hide all below', style: TextStyle(fontSize: 12, color: Color(0xFF9AA3BF))),
+          children: [
+            Icon(Icons.visibility_off_outlined, size: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+            const SizedBox(width: 8),
+            Text('Hide all below', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
           ],
         ),
       ));
@@ -1027,10 +1027,10 @@ class _SidebarTreeRow extends StatelessWidget {
         value: 'show_children',
         height: 32,
         child: Row(
-          children: const [
-            Icon(Icons.visibility_outlined, size: 13, color: Color(0xFF9AA3BF)),
-            SizedBox(width: 8),
-            Text('Show all below', style: TextStyle(fontSize: 12, color: Color(0xFF9AA3BF))),
+          children: [
+            Icon(Icons.visibility_outlined, size: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+            const SizedBox(width: 8),
+            Text('Show all below', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
           ],
         ),
       ));
@@ -1056,7 +1056,7 @@ class _SidebarTreeRow extends StatelessWidget {
     showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 1, position.dy + 1),
-      color: const Color(0xFF1A1E2A),
+      color: context.appColors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
         side: BorderSide(color: context.appColors.border),
@@ -1083,17 +1083,17 @@ class _SidebarTreeRow extends StatelessWidget {
       position: RelativeRect.fromLTRB(
         position.dx, position.dy, position.dx + 1, position.dy + 1,
       ),
-      color: const Color(0xFF1A1E2A),
+      color: context.appColors.surfaceElevated,
       items: [
         if (node.path != null && node.path!.isNotEmpty)
           PopupMenuItem<String>(
             value: 'copy_path',
             height: 32,
             child: Row(
-              children: const [
-                Icon(Icons.copy_outlined, size: 14, color: Color(0xFFB0B0D0)),
-                SizedBox(width: 8),
-                Text('Copy path', style: TextStyle(fontSize: 12, color: Color(0xFFB0B0D0))),
+              children: [
+                Icon(Icons.copy_outlined, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                const SizedBox(width: 8),
+                Text('Copy path', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
               ],
             ),
           ),
@@ -1120,14 +1120,14 @@ class _SidebarTreeRow extends StatelessWidget {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dlgCtx) => AlertDialog(
-          backgroundColor: const Color(0xFF1A1E2A),
+          backgroundColor: context.appColors.surfaceElevated,
           title: Text(
             'Delete "${node.label}"?',
             style: TextStyle(fontSize: 14, color: Theme.of(dlgCtx).colorScheme.onSurface),
           ),
-          content: const Text(
+          content: Text(
             'This will remove the workspace. Sessions and files will not be affected.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF9AA3BF)),
+            style: TextStyle(fontSize: 12, color: Theme.of(dlgCtx).colorScheme.onSurface.withOpacity(0.6)),
           ),
           actions: [
             TextButton(
@@ -1157,16 +1157,16 @@ class _SidebarTreeRow extends StatelessWidget {
       position: RelativeRect.fromLTRB(
         position.dx, position.dy, position.dx + 1, position.dy + 1,
       ),
-      color: const Color(0xFF1A1E2A),
+      color: context.appColors.surfaceElevated,
       items: [
         PopupMenuItem<String>(
           value: 'rename',
           height: 32,
           child: Row(
-            children: const [
-              Icon(Icons.drive_file_rename_outline, size: 14, color: Color(0xFFB0B0D0)),
-              SizedBox(width: 8),
-              Text('Rename Session', style: TextStyle(fontSize: 12, color: Color(0xFFB0B0D0))),
+            children: [
+              Icon(Icons.drive_file_rename_outline, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              const SizedBox(width: 8),
+              Text('Rename Session', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
             ],
           ),
         ),
@@ -1205,26 +1205,26 @@ class _SidebarTreeRow extends StatelessWidget {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1E2A),
+        backgroundColor: context.appColors.surfaceElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: const Text('Rename Session', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+        title: Text('Rename Session', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600)),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
           decoration: InputDecoration(
             hintText: 'Session name...',
-            hintStyle: const TextStyle(color: Color(0xFF6B7280)),
+            hintStyle: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5)),
             filled: true,
             fillColor: context.appColors.surface,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF2D3748))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: context.appColors.border)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF7C6BFF))),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
           onSubmitted: (v) => Navigator.pop(ctx, v),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5)))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, controller.text),
             child: const Text('Rename', style: TextStyle(color: Color(0xFF7C6BFF), fontWeight: FontWeight.w600)),
@@ -1247,15 +1247,15 @@ class _SidebarTreeRow extends StatelessWidget {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1E2A),
+        backgroundColor: context.appColors.surfaceElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: const Text('Close Session', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-        content: const Text(
+        title: Text('Close Session', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600)),
+        content: Text(
           'Would you like to pause the session (keep it running in the background) or kill it permanently?',
-          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13, height: 1.5),
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6), fontSize: 13, height: 1.5),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280)))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5)))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'pause'),
             child: const Text('Pause', style: TextStyle(color: Color(0xFF7C6BFF), fontWeight: FontWeight.w600)),
@@ -1330,8 +1330,8 @@ class _SidebarToggle extends StatelessWidget {
           width: 28,
           height: 48,
           decoration: BoxDecoration(
-            color: const Color(0xEE0F1218),
-            border: Border.all(color: const Color(0xFF1E2330)),
+            color: context.appColors.surfaceElevated,
+            border: Border.all(color: context.appColors.border),
             borderRadius: const BorderRadius.only(
               topRight: Radius.circular(8),
               bottomRight: Radius.circular(8),
@@ -1379,7 +1379,7 @@ class _SidebarActionState extends State<_SidebarAction> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: _hovered ? const Color(0xFF2A1E66) : const Color(0xFF1A1E2A),
+            color: _hovered ? const Color(0xFF2A1E66) : colors.surfaceElevated,
             border: Border.all(
               color: _hovered
                   ? const Color(0xFF7C6BFF)
@@ -1396,7 +1396,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                 size: 12,
                 color: _hovered
                     ? const Color(0xFFC084FC)
-                    : const Color(0xFF9AA3BF),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
               const SizedBox(width: 6),
               Text(
@@ -1406,7 +1406,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                   fontWeight: FontWeight.w600,
                   color: _hovered
                       ? Theme.of(context).colorScheme.onSurface
-                      : const Color(0xFF9AA3BF),
+                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ],
@@ -1426,21 +1426,21 @@ class _QuickFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF0D1018),
+      color: context.appColors.surface,
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       child: Row(
         children: [
-          const Icon(Icons.search, size: 12, color: Color(0xFF4A5680)),
+          Icon(Icons.search, size: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
           const SizedBox(width: 6),
           Expanded(
             child: TextField(
               controller: controller,
-              style: const TextStyle(fontSize: 11, color: Color(0xFFD0D8F0)),
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface),
               cursorColor: const Color(0xFF7C6BFF),
               cursorWidth: 1.5,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Quick filter…',
-                hintStyle: TextStyle(fontSize: 11, color: Color(0xFF3A4460)),
+                hintStyle: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
@@ -1453,7 +1453,7 @@ class _QuickFilterBar extends StatelessWidget {
                 ? const SizedBox.shrink()
                 : GestureDetector(
                     onTap: controller.clear,
-                    child: const Icon(Icons.close, size: 12, color: Color(0xFF4A5680)),
+                    child: Icon(Icons.close, size: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                   ),
           ),
         ],
@@ -1481,7 +1481,7 @@ class _TypeFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return Container(
-      color: const Color(0xFF0D1018),
+      color: colors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Wrap(
         spacing: 4,
@@ -1494,7 +1494,7 @@ class _TypeFilterBar extends StatelessWidget {
               duration: const Duration(milliseconds: 150),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: hidden ? const Color(0xFF1A1E2A) : const Color(0xFF1E1840),
+                color: hidden ? colors.surfaceElevated : const Color(0xFF1E1840),
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(
                   color: hidden ? colors.border : const Color(0xFF5C4FCC),
@@ -1504,19 +1504,19 @@ class _TypeFilterBar extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(c.icon, size: 10,
-                    color: hidden ? const Color(0xFF4A5680) : const Color(0xFF9B8FFF)),
+                    color: hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : const Color(0xFF9B8FFF)),
                   const SizedBox(width: 3),
                   Text(
                     c.label,
                     style: TextStyle(
                       fontSize: 9,
-                      color: hidden ? const Color(0xFF4A5680) : const Color(0xFFB0A8FF),
+                      color: hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : const Color(0xFFB0A8FF),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   if (hidden) ...[
                     const SizedBox(width: 3),
-                    const Icon(Icons.visibility_off, size: 8, color: Color(0xFF4A5680)),
+                    Icon(Icons.visibility_off, size: 8, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                   ],
                 ],
               ),
