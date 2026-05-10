@@ -699,10 +699,13 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
         sb.writeln("  b.style.transform='scale($bodyScale)';");
         sb.writeln("  b.style.transformOrigin='top left';");
         sb.writeln("  b.style.width=(100/parseFloat('$bodyScale'))+'%';");
+        // Compensate height so video players / fixed-height containers render correctly
+        sb.writeln("  b.style.minHeight=(100/parseFloat('$bodyScale'))+'vh';");
       } else {
         sb.writeln("  document.body.style.transform='';");
         sb.writeln("  document.body.style.transformOrigin='';");
         sb.writeln("  document.body.style.width='';");
+        sb.writeln("  document.body.style.minHeight='';");
       }
 
       // D: minWidth
@@ -728,9 +731,11 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       sb.writeln("    innerHeight: window.innerHeight,");
       sb.writeln("    zoom: document.documentElement.style.zoom||'none',");
       sb.writeln("    bodyClientW: document.body?document.body.clientWidth:null,");
+      sb.writeln("    bodyClientH: document.body?document.body.clientHeight:null,");
       sb.writeln("    bodyScrollW: document.body?document.body.scrollWidth:null,");
       sb.writeln("    transform: document.body?document.body.style.transform:'none',");
       sb.writeln("    minWidth: document.body?document.body.style.minWidth:'none',");
+      sb.writeln("    minHeight: document.body?document.body.style.minHeight:'none',");
       sb.writeln("  });");
       sb.writeln('})()');
 
@@ -760,6 +765,7 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
   document.body.style.transformOrigin='';
   document.body.style.width='';
   document.body.style.minWidth='';
+  document.body.style.minHeight='';
   try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}
   try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}
   window.dispatchEvent(new Event('resize'));
