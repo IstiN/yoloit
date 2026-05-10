@@ -218,6 +218,131 @@ class _WebpageContentState extends State<_WebpageContent> {
     }
   }
 
+  Future<void> _runExperiment(String id) async {
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    debugPrint('[WebExp] ══════════════════════════════════════════');
+    debugPrint('[WebExp] Running experiment: $id');
+
+    switch (id) {
+      // ── 📊 Info ────────────────────────────────────────────────────────
+      case 'info':
+        final info = await ctrl.runJavaScriptReturningResult('''
+(function(){
+  return JSON.stringify({
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    outerWidth: window.outerWidth,
+    bodyClientWidth: document.body ? document.body.clientWidth : null,
+    bodyScrollWidth: document.body ? document.body.scrollWidth : null,
+    htmlZoom: document.documentElement.style.zoom || 'none',
+    htmlTransform: document.documentElement.style.transform || 'none',
+    userAgent: navigator.userAgent,
+    viewport: (()=>{var vp=document.querySelector("meta[name=viewport]");return vp?vp.content:"none";})()
+  });
+})()
+''');
+        debugPrint('[WebExp] INFO: $info');
+
+      // ── A: User Agent ──────────────────────────────────────────────────
+      case 'ua_desktop':
+        await ctrl.setUserAgent(
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) '
+          'Chrome/124.0.0.0 Safari/537.36',
+        );
+        await ctrl.reload();
+        debugPrint('[WebExp] A: Set desktop Chrome UA, reloading...');
+
+      case 'ua_reset':
+        await ctrl.setUserAgent(null);
+        await ctrl.reload();
+        debugPrint('[WebExp] A: Reset UA to default, reloading...');
+
+      // ── B: CSS zoom on <html> ──────────────────────────────────────────
+      case 'zoom_0_5':
+        await ctrl.runJavaScript(
+          "document.documentElement.style.zoom='0.5';"
+          "window.dispatchEvent(new Event('resize'));"
+          "console.log('[WebExp] B: zoom=0.5, innerWidth='+window.innerWidth);",
+        );
+        debugPrint('[WebExp] B: Set html zoom=0.5');
+
+      case 'zoom_0_75':
+        await ctrl.runJavaScript(
+          "document.documentElement.style.zoom='0.75';"
+          "window.dispatchEvent(new Event('resize'));"
+          "console.log('[WebExp] B: zoom=0.75, innerWidth='+window.innerWidth);",
+        );
+        debugPrint('[WebExp] B: Set html zoom=0.75');
+
+      case 'zoom_1':
+        await ctrl.runJavaScript(
+          "document.documentElement.style.zoom='';"
+          "window.dispatchEvent(new Event('resize'));"
+          "console.log('[WebExp] B: zoom reset, innerWidth='+window.innerWidth);",
+        );
+        debugPrint('[WebExp] B: Reset html zoom');
+
+      // ── C: CSS transform scale on <body> ───────────────────────────────
+      case 'scale_body':
+        await ctrl.runJavaScript('''
+(function(){
+  var b=document.body;
+  b.style.transform='scale(0.5)';
+  b.style.transformOrigin='top left';
+  b.style.width='200%';
+  window.dispatchEvent(new Event('resize'));
+  console.log('[WebExp] C: body scale(0.5), bodyClientWidth='+b.clientWidth);
+})();
+''');
+        debugPrint('[WebExp] C: body transform scale(0.5) + width=200%');
+
+      case 'scale_reset':
+        await ctrl.runJavaScript('''
+(function(){
+  var b=document.body;
+  b.style.transform='';
+  b.style.transformOrigin='';
+  b.style.width='';
+  window.dispatchEvent(new Event('resize'));
+  console.log('[WebExp] C: body transform reset');
+})();
+''');
+        debugPrint('[WebExp] C: body transform reset');
+
+      // ── D: Force minWidth on body ──────────────────────────────────────
+      case 'min_width':
+        await ctrl.runJavaScript('''
+(function(){
+  document.body.style.minWidth='1280px';
+  window.dispatchEvent(new Event('resize'));
+  console.log('[WebExp] D: minWidth=1280px set, scrollWidth='+document.body.scrollWidth);
+})();
+''');
+        debugPrint('[WebExp] D: Set body minWidth=1280px');
+
+      case 'min_width_reset':
+        await ctrl.runJavaScript('''
+(function(){
+  document.body.style.minWidth='';
+  window.dispatchEvent(new Event('resize'));
+  console.log('[WebExp] D: minWidth reset');
+})();
+''');
+        debugPrint('[WebExp] D: Reset body minWidth');
+    }
+
+    // Log state after experiment
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final after = await ctrl.runJavaScriptReturningResult(
+      'JSON.stringify({innerWidth:window.innerWidth,zoom:document.documentElement.style.zoom||"none",bodyW:document.body?document.body.clientWidth:null})',
+    );
+    debugPrint('[WebExp] After state: $after');
+    debugPrint('[WebExp] ══════════════════════════════════════════');
+  }
+
   @override
   Widget build(BuildContext context) {
     final url = _currentUrl;
@@ -330,6 +455,61 @@ class _WebpageContentState extends State<_WebpageContent> {
                     ])),
                   ],
                 ),
+                // ── 🔬 Viewport debug experiments ──────────────────────────
+                if (_controller != null)
+                  PopupMenuButton<String>(
+                    tooltip: 'Viewport experiments (debug)',
+                    padding: EdgeInsets.zero,
+                    iconSize: 15,
+                    icon: const Icon(Icons.science_outlined, size: 15, color: Color(0xFFE67E22)),
+                    onSelected: (id) => _runExperiment(id),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'info',
+                        child: Row(children: [Icon(Icons.info_outline, size: 16), SizedBox(width: 8), Text('📊 Log frame & UA info')]),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'ua_desktop',
+                        child: Row(children: [Icon(Icons.laptop_mac, size: 16), SizedBox(width: 8), Text('A: UA → Desktop Chrome')]),
+                      ),
+                      PopupMenuItem(
+                        value: 'ua_reset',
+                        child: Row(children: [Icon(Icons.restore, size: 16), SizedBox(width: 8), Text('A: UA → reset (reload)')]),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'zoom_0_5',
+                        child: Row(children: [Icon(Icons.zoom_out, size: 16), SizedBox(width: 8), Text('B: html zoom = 0.5')]),
+                      ),
+                      PopupMenuItem(
+                        value: 'zoom_0_75',
+                        child: Row(children: [Icon(Icons.zoom_out, size: 16), SizedBox(width: 8), Text('B: html zoom = 0.75')]),
+                      ),
+                      PopupMenuItem(
+                        value: 'zoom_1',
+                        child: Row(children: [Icon(Icons.zoom_in, size: 16), SizedBox(width: 8), Text('B: html zoom = 1.0 (reset)')]),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'scale_body',
+                        child: Row(children: [Icon(Icons.transform, size: 16), SizedBox(width: 8), Text('C: body transform scale(0.5)')]),
+                      ),
+                      PopupMenuItem(
+                        value: 'scale_reset',
+                        child: Row(children: [Icon(Icons.transform, size: 16), SizedBox(width: 8), Text('C: body transform reset')]),
+                      ),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'min_width',
+                        child: Row(children: [Icon(Icons.width_full, size: 16), SizedBox(width: 8), Text('D: body minWidth=1280px')]),
+                      ),
+                      PopupMenuItem(
+                        value: 'min_width_reset',
+                        child: Row(children: [Icon(Icons.width_normal, size: 16), SizedBox(width: 8), Text('D: body minWidth reset')]),
+                      ),
+                    ],
+                  ),
                 SizedBox(
                   height: 28,
                   child: FilledButton(
