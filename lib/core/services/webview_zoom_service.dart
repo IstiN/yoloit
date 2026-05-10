@@ -46,5 +46,19 @@ class WebViewZoomService {
       return 0;
     }
   }
+
+  /// Forces WKWebView.bounds.width = [width] so that `window.innerWidth` and
+  /// `document.documentElement.clientWidth` always equal [width] regardless
+  /// of board zoom. macOS natively scales rendering + coordinate mapping.
+  ///
+  /// Pass 0 to disable and reset bounds to match the frame.
+  static Future<int> setFixedViewportWidth(double width) async {
+    try {
+      final n = await _channel.invokeMethod<int>('setFixedViewportWidth', width);
+      return n ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
 }
 

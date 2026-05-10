@@ -145,11 +145,6 @@ class _WebpageContentState extends State<_WebpageContent> {
                 _controller!.runJavaScript('''
 (function(){
   document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
-  // Force layout viewport to 1280px so sites like YouTube use desktop
-  // column widths (Polymer measures element.clientWidth, not innerWidth).
-  // The CSS zoom above then scales it visually to fit the panel.
-  document.documentElement.style.width='1280px';
-  document.documentElement.style.minWidth='1280px';
   window.dispatchEvent(new Event('resize'));
   if(window.__yoloNewTabSetup) return;
   window.__yoloNewTabSetup=true;
@@ -163,6 +158,10 @@ class _WebpageContentState extends State<_WebpageContent> {
   },true);
 })();
 ''');
+                // Apply the native viewport-width fix: sets WKWebView bounds so
+                // window.innerWidth and document.documentElement.clientWidth = 1280.
+                // macOS handles the visual scaling and coordinate mapping natively.
+                WebViewZoomService.setFixedViewportWidth(1280);
                 Future.delayed(const Duration(milliseconds: 150), () {
                   loading.value = false;
                 });
@@ -938,8 +937,6 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       await widget.controller.runJavaScript('''
 (function(){
   document.documentElement.style.zoom='';
-  document.documentElement.style.width='';
-  document.documentElement.style.minWidth='';
   document.body.style.transform='';
   document.body.style.transformOrigin='';
   document.body.style.width='';
@@ -993,29 +990,15 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
           ytPlayerHeight.isNotEmpty;
 
       // Build documentStart script. This runs BEFORE any page JS.
-      // Key insight: YouTube's Polymer layout uses element.clientWidth (not
-      // window.innerWidth) for player column sizing.  We must force
-      // document.documentElement.style.width = '1280px' so the layout
-      // viewport is 1280 CSS pixels wide; the CSS zoom then scales it
-      // visually to fit the panel.  This is the only reliable way to
-      // get YouTube to render a full-width desktop player.
+      // The native WKWebView bounds fix handles the real viewport width.
+      // This script overrides window.innerWidth as a belt-and-suspenders
+      // measure for responsive breakpoints.
       final sb = StringBuffer('(function(){\n');
-      // Always force layout width to 1280px (the desktop viewport target).
-      sb.writeln("  var applyLayoutWidth = function(){");
-      sb.writeln("    if(document.documentElement){");
-      sb.writeln("      document.documentElement.style.width='1280px';");
-      sb.writeln("      document.documentElement.style.minWidth='1280px';");
-      sb.writeln("    }");
-      sb.writeln("  };");
-      sb.writeln("  applyLayoutWidth();");
-      sb.writeln("  document.addEventListener('DOMContentLoaded', applyLayoutWidth);");
-      // Override window.innerWidth so responsive JS code (e.g. YouTube
-      // breakpoints) also sees the desktop width.
+      // Always override window.innerWidth to the fixed viewport target.
       sb.writeln("  var iw = 1280;");
       sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
       sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
       if (useInner && innerWidth.isNotEmpty && innerWidth != '1280') {
-        // Allow override if user explicitly set a different value
         sb.writeln("  iw = $innerWidth;");
       }
       // Apply CSS zoom on every DOMContentLoaded so reflow happens before JS.
