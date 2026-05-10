@@ -20,6 +20,10 @@ class WebpagePlugin extends BoardPanelPlugin {
   /// Formula: zoom = boardScale → CSS layout width = panel.logicalWidth.
   static final Map<String, double> pendingCssZoom = {};
 
+  /// Target JS viewport width per panel (375/768/1280). Used when a page
+  /// reloads to restore the correct pageZoom via setFixedViewportWidth.
+  static final Map<String, double> viewportTargets = {};
+
   /// Loading state per panel.  Set to true on page start, false on
   /// page finish.  The overlay shows a white cover during loading to
   /// hide the flash of unstyled content.
@@ -114,6 +118,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   void dispose() {
     WebpagePlugin.controllers.remove(widget.panel.id);
     WebpagePlugin.pendingCssZoom.remove(widget.panel.id);
+    WebpagePlugin.viewportTargets.remove(widget.panel.id);
     WebpagePlugin.pageLoading.remove(widget.panel.id)?.dispose();
     _urlCtrl.dispose();
     _urlFocus.dispose();
@@ -156,10 +161,11 @@ class _WebpageContentState extends State<_WebpageContent> {
   },true);
 })();
 ''');
-                // Apply the native viewport-width fix: sets WKWebView bounds so
-                // window.innerWidth and document.documentElement.clientWidth = 1280.
-                // macOS handles the visual scaling and coordinate mapping natively.
-                WebViewZoomService.setFixedViewportWidth(1280);
+                // Apply the native viewport-width fix: sets WKWebView pageZoom so
+                // window.innerWidth = targetViewportWidth. Uses per-panel target
+                // (set by mode switch) or defaults to 1280 (desktop).
+                final target = WebpagePlugin.viewportTargets[panelId] ?? 1280.0;
+                WebViewZoomService.setFixedViewportWidth(target);
                 Future.delayed(const Duration(milliseconds: 150), () {
                   loading.value = false;
                 });
@@ -502,20 +508,33 @@ class _WebpageContentState extends State<_WebpageContent> {
                   onSelected: (value) {
                     final resize = widget.renderContext.onResize;
                     if (resize == null) return;
+                    final double targetViewportWidth;
                     switch (value) {
                       case 'mobile':
                         resize(375, 667 + 81);
+                        targetViewportWidth = 375;
                       case 'tablet':
                         resize(768, 1024 + 81);
+                        targetViewportWidth = 768;
                       case 'desktop':
                         resize(1280, 800 + 81);
+                        targetViewportWidth = 1280;
+                      case 'fill':
+                        final screen = MediaQuery.sizeOf(context);
+                        final w = (screen.width * 0.9).clamp(800.0, 2560.0);
+                        final h = (screen.height * 0.85).clamp(600.0, 1600.0);
+                        resize(w, h);
+                        targetViewportWidth = w.clamp(1280.0, 2560.0);
                       default:
                         return;
                     }
-                    // Trigger a resize event so page reflows at new panel size.
+                    // Update native WKWebView pageZoom so viewport = targetViewportWidth.
+                    // Also persist per-panel so page reloads restore the same target.
+                    WebpagePlugin.viewportTargets[widget.panel.id] = targetViewportWidth;
+                    WebViewZoomService.setFixedViewportWidth(targetViewportWidth);
                     final ctrl = _controller;
                     if (ctrl != null) {
-                      Future.delayed(const Duration(milliseconds: 200), () {
+                      Future.delayed(const Duration(milliseconds: 300), () {
                         ctrl.runJavaScript(
                           "window.dispatchEvent(new Event('resize'));",
                         );
@@ -523,8 +542,8 @@ class _WebpageContentState extends State<_WebpageContent> {
                     }
                   },
                   itemBuilder:
-                      (_) => const [
-                        PopupMenuItem(
+                      (_) => [
+                        const PopupMenuItem(
                           value: 'mobile',
                           child: Row(
                             children: [
@@ -534,7 +553,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                             ],
                           ),
                         ),
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'tablet',
                           child: Row(
                             children: [
@@ -544,13 +563,23 @@ class _WebpageContentState extends State<_WebpageContent> {
                             ],
                           ),
                         ),
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'desktop',
                           child: Row(
                             children: [
                               Icon(Icons.laptop_mac, size: 16),
                               SizedBox(width: 8),
                               Text('Desktop  1280 × 800'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'fill',
+                          child: Row(
+                            children: [
+                              Icon(Icons.open_in_full, size: 16),
+                              SizedBox(width: 8),
+                              Text('Fill Screen'),
                             ],
                           ),
                         ),
