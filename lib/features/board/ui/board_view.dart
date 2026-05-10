@@ -520,7 +520,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 focusedPanelId: focusedPanelId,
                                 transformController: _transformController,
                                 canvasOrigin: _canvasOrigin,
-                                isInteracting: _isViewportZooming,
+                                isInteracting: _isViewportInteracting,
                               ),
                             ),
                             // ── Draw gesture capture overlay ─────────────────
@@ -2482,66 +2482,6 @@ class _BoardPanelCard extends StatelessWidget {
 // Focused panel:    full interaction, on top z-order.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Static CSS zoom manager — debounces zoom injection per panel so
-/// continuous board zoom doesn't flood WebViews with 60-fps JS calls.
-class _CssZoomManager {
-  static final Map<String, double> _lastZoom = {};
-  static final Map<String, Timer> _timers = {};
-
-  /// Apply CSS zoom.  [immediate] skips debounce (use on first inject
-  /// or after page navigation).
-  static void apply(
-    WebViewController controller,
-    String panelId,
-    double scale, {
-    bool immediate = false,
-  }) {
-    WebpagePlugin.pendingCssZoom[panelId] = scale;
-
-    final last = _lastZoom[panelId] ?? -1;
-    if ((last - scale).abs() < 0.005) return;
-
-    if (immediate || last < 0) {
-      _lastZoom[panelId] = scale;
-      _inject(controller, panelId, scale);
-      return;
-    }
-
-    _timers[panelId]?.cancel();
-    final target = scale;
-    _timers[panelId] = Timer(const Duration(milliseconds: 200), () {
-      if ((_lastZoom[panelId]! - target).abs() < 0.005) return;
-      _lastZoom[panelId] = target;
-      _inject(controller, panelId, target);
-    });
-  }
-
-  static void reset(String panelId) {
-    _lastZoom.remove(panelId);
-    _timers.remove(panelId)?.cancel();
-  }
-
-  static void _inject(WebViewController controller, String panelId, double scale) {
-    final vw = WebpagePlugin.pendingViewportWidth[panelId];
-    if (vw != null) {
-      // Re-assert fixed viewport width so that the board zoom doesn't cause
-      // the page to reflow at the (scaled) native frame width.
-      controller.runJavaScript(
-        "(function(){"
-        "var vp=document.querySelector('meta[name=viewport]');"
-        "if(!vp){vp=document.createElement('meta');vp.name='viewport';document.head.appendChild(vp);}"
-        "vp.content='width=$vw,initial-scale=1';"
-        "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
-        "})();",
-      );
-    } else {
-      controller.runJavaScript(
-        "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}'",
-      );
-    }
-  }
-}
-
 class _WebViewOverlays extends StatelessWidget {
   const _WebViewOverlays({
     required this.panels,
@@ -2618,7 +2558,6 @@ class _WebViewOverlays extends StatelessWidget {
               if (!rect.overlaps(viewportRect)) continue;
 
               final ctrl = WebpagePlugin.controllers[panel.id]!;
-              _CssZoomManager.apply(ctrl, panel.id, scale);
 
               children.add(
                 Positioned(
@@ -2677,12 +2616,6 @@ class _WebViewOverlays extends StatelessWidget {
               final rect = _screenRect(focusedPanel, matrix, scale);
               if (rect != null) {
                 final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
-                _CssZoomManager.apply(
-                  ctrl,
-                  focusedPanel.id,
-                  scale,
-                  immediate: true,
-                );
 
                 children.add(
                   Positioned(
