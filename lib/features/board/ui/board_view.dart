@@ -241,6 +241,24 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   _isViewportZooming = false;
                                 });
                                 _boardDebugLog('interaction.end');
+                                // After gesture ends, re-inject CSS zoom into
+                                // all web panels so content reflows to match
+                                // the new board scale (zoom = boardScale
+                                // makes the CSS layout width = panel.width).
+                                final scale = _BoardViewState._scaleOf(
+                                  _transformController.value,
+                                );
+                                for (final panel in activeBoard.panels) {
+                                  if (panel.type != WebpagePlugin.kTypeId) continue;
+                                  final ctrl = WebpagePlugin.controllers[panel.id];
+                                  if (ctrl == null) continue;
+                                  WebpagePlugin.pendingCssZoom[panel.id] = scale;
+                                  ctrl.runJavaScript(
+                                    "document.documentElement.style.zoom="
+                                    "'${scale.toStringAsFixed(4)}';"
+                                    "window.dispatchEvent(new Event('resize'));",
+                                  );
+                                }
                                 _persistViewport(context, activeBoard);
                               },
                               child: SizedBox(
@@ -2559,6 +2577,17 @@ class _WebViewOverlays extends StatelessWidget {
 
               final ctrl = WebpagePlugin.controllers[panel.id]!;
 
+              // Seed the zoom for this panel if not yet set (first render).
+              // This ensures onPageFinished uses the correct board scale even
+              // before any gesture has occurred.
+              if (!WebpagePlugin.pendingCssZoom.containsKey(panel.id)) {
+                WebpagePlugin.pendingCssZoom[panel.id] = scale;
+                ctrl.runJavaScript(
+                  "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
+                  "window.dispatchEvent(new Event('resize'));",
+                );
+              }
+
               children.add(
                 Positioned(
                   key: ValueKey('wv-${panel.id}'),
@@ -2616,6 +2645,15 @@ class _WebViewOverlays extends StatelessWidget {
               final rect = _screenRect(focusedPanel, matrix, scale);
               if (rect != null) {
                 final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
+
+                // Seed zoom for focused panel if not yet set.
+                if (!WebpagePlugin.pendingCssZoom.containsKey(focusedPanel.id)) {
+                  WebpagePlugin.pendingCssZoom[focusedPanel.id] = scale;
+                  ctrl.runJavaScript(
+                    "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
+                    "window.dispatchEvent(new Event('resize'));",
+                  );
+                }
 
                 children.add(
                   Positioned(

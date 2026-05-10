@@ -14,6 +14,11 @@ class WebpagePlugin extends BoardPanelPlugin {
   /// outside the InteractiveViewer transform to avoid coordinate offset.
   static final Map<String, WebViewController> controllers = {};
 
+  /// Last known CSS zoom per panel (= board scale at gesture-end).
+  /// Read by [onPageFinished] to re-inject after navigation.
+  /// Formula: zoom = boardScale → CSS layout width = panel.logicalWidth.
+  static final Map<String, double> pendingCssZoom = {};
+
   /// Loading state per panel.  Set to true on page start, false on
   /// page finish.  The overlay shows a white cover during loading to
   /// hide the flash of unstyled content.
@@ -103,6 +108,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   @override
   void dispose() {
     WebpagePlugin.controllers.remove(widget.panel.id);
+    WebpagePlugin.pendingCssZoom.remove(widget.panel.id);
     WebpagePlugin.pageLoading.remove(widget.panel.id)?.dispose();
     _urlCtrl.dispose();
     _urlFocus.dispose();
@@ -124,9 +130,16 @@ class _WebpageContentState extends State<_WebpageContent> {
             loading.value = true;
           },
           onPageFinished: (_) {
-            // Intercept target="_blank" links and window.open.
+            // Re-inject CSS zoom so page reflows at panel's logical width.
+            // zoom = boardScale → CSS layout width = panel.logicalWidth.
+            // Board injects the correct zoom on gesture-end; here we use
+            // whatever was last stored (default 1.0 on first load).
+            final panelId = widget.panel.id;
+            final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
             _controller!.runJavaScript('''
 (function(){
+  document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
+  window.dispatchEvent(new Event('resize'));
   if(window.__yoloNewTabSetup) return;
   window.__yoloNewTabSetup=true;
   window.open=function(u){if(u)YoloNewTab.postMessage(u);return null;};
@@ -139,7 +152,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   },true);
 })();
 ''');
-            Future.delayed(const Duration(milliseconds: 80), () {
+            Future.delayed(const Duration(milliseconds: 150), () {
               loading.value = false;
             });
           },
