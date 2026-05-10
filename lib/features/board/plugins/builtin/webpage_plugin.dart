@@ -41,7 +41,11 @@ class WebpagePlugin extends BoardPanelPlugin {
   Size get defaultSize => const Size(700, 500);
 
   @override
-  Map<String, dynamic> get initialState => {'url': '', 'title': '', 'favicon': ''};
+  Map<String, dynamic> get initialState => {
+    'url': '',
+    'title': '',
+    'favicon': '',
+  };
 
   @override
   bool get hasEditor => false;
@@ -123,21 +127,22 @@ class _WebpageContentState extends State<_WebpageContent> {
       () => ValueNotifier<bool>(false),
     );
 
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            loading.value = true;
-          },
-          onPageFinished: (_) {
-            // Re-inject CSS zoom so page reflows at panel's logical width.
-            // zoom = boardScale → CSS layout width = panel.logicalWidth.
-            // This makes sites like YouTube use desktop layout widths in CSS,
-            // even when the WKWebView NSView frame is smaller due to board zoom.
-            final panelId = widget.panel.id;
-            final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
-            _controller!.runJavaScript('''
+    _controller =
+        WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setNavigationDelegate(
+            NavigationDelegate(
+              onPageStarted: (_) {
+                loading.value = true;
+              },
+              onPageFinished: (_) {
+                // Re-inject CSS zoom so page reflows at panel's logical width.
+                // zoom = boardScale → CSS layout width = panel.logicalWidth.
+                // This makes sites like YouTube use desktop layout widths in CSS,
+                // even when the WKWebView NSView frame is smaller due to board zoom.
+                final panelId = widget.panel.id;
+                final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
+                _controller!.runJavaScript('''
 (function(){
   document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
   window.dispatchEvent(new Event('resize'));
@@ -153,24 +158,24 @@ class _WebpageContentState extends State<_WebpageContent> {
   },true);
 })();
 ''');
-            Future.delayed(const Duration(milliseconds: 150), () {
-              loading.value = false;
-            });
-          },
-          onUrlChange: (change) {
-            final newUrl = change.url ?? '';
-            if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {
-              if (mounted) setState(() => _urlCtrl.text = newUrl);
-              widget.renderContext.onUpdateState({
-                ...widget.panel.state,
-                'url': newUrl,
-                'title': _hostname(newUrl),
-              });
-            }
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(url));
+                Future.delayed(const Duration(milliseconds: 150), () {
+                  loading.value = false;
+                });
+              },
+              onUrlChange: (change) {
+                final newUrl = change.url ?? '';
+                if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {
+                  if (mounted) setState(() => _urlCtrl.text = newUrl);
+                  widget.renderContext.onUpdateState({
+                    ...widget.panel.state,
+                    'url': newUrl,
+                    'title': _hostname(newUrl),
+                  });
+                }
+              },
+            ),
+          )
+          ..loadRequest(Uri.parse(url));
 
     // Intercept target="_blank" links → create new panel with link.
     _controller!.addJavaScriptChannel(
@@ -180,11 +185,11 @@ class _WebpageContentState extends State<_WebpageContent> {
         if (tabUrl.isEmpty) return;
         final createLinked = widget.renderContext.onCreateLinkedPanel;
         if (createLinked != null) {
-          createLinked(
-            WebpagePlugin.kTypeId,
-            {'url': tabUrl, 'title': _hostname(tabUrl), 'favicon': ''},
-            _hostname(tabUrl),
-          );
+          createLinked(WebpagePlugin.kTypeId, {
+            'url': tabUrl,
+            'title': _hostname(tabUrl),
+            'favicon': '',
+          }, _hostname(tabUrl));
         }
       },
     );
@@ -487,7 +492,11 @@ class _WebpageContentState extends State<_WebpageContent> {
                   tooltip: 'Resize panel',
                   padding: EdgeInsets.zero,
                   iconSize: 15,
-                  icon: const Icon(Icons.aspect_ratio, size: 15, color: Color(0xFF64748B)),
+                  icon: const Icon(
+                    Icons.aspect_ratio,
+                    size: 15,
+                    color: Color(0xFF64748B),
+                  ),
                   onSelected: (value) {
                     final resize = widget.renderContext.onResize;
                     if (resize == null) return;
@@ -511,20 +520,39 @@ class _WebpageContentState extends State<_WebpageContent> {
                       });
                     }
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'mobile', child: Row(children: [
-                      Icon(Icons.phone_iphone, size: 16), SizedBox(width: 8),
-                      Text('Mobile  375 × 667'),
-                    ])),
-                    PopupMenuItem(value: 'tablet', child: Row(children: [
-                      Icon(Icons.tablet_mac, size: 16), SizedBox(width: 8),
-                      Text('Tablet  768 × 1024'),
-                    ])),
-                    PopupMenuItem(value: 'desktop', child: Row(children: [
-                      Icon(Icons.laptop_mac, size: 16), SizedBox(width: 8),
-                      Text('Desktop  1280 × 800'),
-                    ])),
-                  ],
+                  itemBuilder:
+                      (_) => const [
+                        PopupMenuItem(
+                          value: 'mobile',
+                          child: Row(
+                            children: [
+                              Icon(Icons.phone_iphone, size: 16),
+                              SizedBox(width: 8),
+                              Text('Mobile  375 × 667'),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'tablet',
+                          child: Row(
+                            children: [
+                              Icon(Icons.tablet_mac, size: 16),
+                              SizedBox(width: 8),
+                              Text('Tablet  768 × 1024'),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'desktop',
+                          child: Row(
+                            children: [
+                              Icon(Icons.laptop_mac, size: 16),
+                              SizedBox(width: 8),
+                              Text('Desktop  1280 × 800'),
+                            ],
+                          ),
+                        ),
+                      ],
                 ),
                 // ── 🔬 Viewport Lab (interactive experiment panel) ─────────
                 if (_controller != null)
@@ -535,7 +563,11 @@ class _WebpageContentState extends State<_WebpageContent> {
                       borderRadius: BorderRadius.circular(4),
                       child: const Padding(
                         padding: EdgeInsets.all(4),
-                        child: Icon(Icons.science_outlined, size: 15, color: Color(0xFFE67E22)),
+                        child: Icon(
+                          Icons.science_outlined,
+                          size: 15,
+                          color: Color(0xFFE67E22),
+                        ),
                       ),
                     ),
                   ),
@@ -561,31 +593,32 @@ class _WebpageContentState extends State<_WebpageContent> {
         // WebView is rendered by the board view as an overlay outside
         // the InteractiveViewer transform.
         Expanded(
-          child: url.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.language,
-                        size: 40,
-                        color: _accent.withOpacity(0.4),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Enter a URL above',
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 13,
+          child:
+              url.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.language,
+                          size: 40,
+                          color: _accent.withOpacity(0.4),
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              : _controller == null
-              ? const Center(child: CircularProgressIndicator())
-              // WebView overlay covers this area; just show white bg.
-              : Container(color: Colors.white),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Enter a URL above',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : _controller == null
+                  ? const Center(child: CircularProgressIndicator())
+                  // WebView overlay covers this area; just show white bg.
+                  : Container(color: Colors.white),
         ),
       ],
     );
@@ -641,15 +674,30 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
 
   // ── C: body transform scale ───────────────────────────────────────────────
   bool _bodyScaleEnabled = false;
-  final TextEditingController _bodyScaleCtrl = TextEditingController(text: '0.5');
+  final TextEditingController _bodyScaleCtrl = TextEditingController(
+    text: '0.5',
+  );
 
   // ── D: body minWidth ──────────────────────────────────────────────────────
   bool _minWidthEnabled = false;
-  final TextEditingController _minWidthCtrl = TextEditingController(text: '1280');
+  final TextEditingController _minWidthCtrl = TextEditingController(
+    text: '1280',
+  );
 
   // ── E: override window.innerWidth ─────────────────────────────────────────
   bool _overrideInnerWidthEnabled = false;
-  final TextEditingController _innerWidthCtrl = TextEditingController(text: '1278');
+  final TextEditingController _innerWidthCtrl = TextEditingController(
+    text: '1278',
+  );
+
+  // ── F: force YouTube player dimensions ────────────────────────────────────
+  bool _ytPlayerFixEnabled = true;
+  final TextEditingController _ytPlayerWidthCtrl = TextEditingController(
+    text: '1242',
+  );
+  final TextEditingController _ytPlayerHeightCtrl = TextEditingController(
+    text: '699',
+  );
 
   // ── Result state ──────────────────────────────────────────────────────────
   String? _result;
@@ -661,11 +709,16 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
     _bodyScaleCtrl.dispose();
     _minWidthCtrl.dispose();
     _innerWidthCtrl.dispose();
+    _ytPlayerWidthCtrl.dispose();
+    _ytPlayerHeightCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _apply() async {
-    setState(() { _applying = true; _result = null; });
+    setState(() {
+      _applying = true;
+      _result = null;
+    });
     final ctrl = widget.controller;
     try {
       // A: User Agent
@@ -684,6 +737,8 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       final bodyScale = _bodyScaleCtrl.text.trim();
       final minWidth = _minWidthCtrl.text.trim();
       final innerWidth = _innerWidthCtrl.text.trim();
+      final ytPlayerWidth = _ytPlayerWidthCtrl.text.trim();
+      final ytPlayerHeight = _ytPlayerHeightCtrl.text.trim();
 
       final sb = StringBuffer('(function(){\n');
 
@@ -719,11 +774,75 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       // E: override innerWidth
       if (_overrideInnerWidthEnabled && innerWidth.isNotEmpty) {
         sb.writeln("  var iw=parseInt('$innerWidth');");
-        sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
-        sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+        sb.writeln(
+          "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+        );
+        sb.writeln(
+          "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+        );
       } else {
-        sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}");
-        sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}");
+        sb.writeln(
+          "  try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}",
+        );
+        sb.writeln(
+          "  try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}",
+        );
+      }
+
+      if (_ytPlayerFixEnabled &&
+          ytPlayerWidth.isNotEmpty &&
+          ytPlayerHeight.isNotEmpty) {
+        sb.writeln("  window.__yoloitYtPlayerW=parseInt('$ytPlayerWidth');");
+        sb.writeln("  window.__yoloitYtPlayerH=parseInt('$ytPlayerHeight');");
+        sb.writeln(r"""
+  (function(){
+    var w = window.__yoloitYtPlayerW;
+    var h = window.__yoloitYtPlayerH;
+    var css = ''
+      + 'ytd-watch-flexy, ytd-watch-flexy[flexy], ytd-watch-flexy[fullscreen] {'
+      + '  --ytd-watch-flexy-player-width: '+w+'px !important;'
+      + '  --ytd-watch-flexy-player-height: '+h+'px !important;'
+      + '  --ytd-watch-flexy-width-ratio: 16 !important;'
+      + '  --ytd-watch-flexy-height-ratio: 9 !important;'
+      + '}'
+      + '#player, #player-container, #player-container-inner, #player-container-outer, ytd-player, #movie_player, .html5-video-player {'
+      + '  width: '+w+'px !important; max-width: '+w+'px !important;'
+      + '  height: '+h+'px !important; min-height: '+h+'px !important;'
+      + '}'
+      + '#player-container-outer { padding-top: 0 !important; }'
+      + 'video.html5-main-video { width: '+w+'px !important; height: '+h+'px !important; object-fit: contain !important; }';
+    var style = document.getElementById('yoloit-yt-player-fix');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'yoloit-yt-player-fix';
+      (document.head || document.documentElement).appendChild(style);
+    }
+    style.textContent = css;
+    var apply = function(){
+      ['#player', '#player-container', '#player-container-inner', '#player-container-outer', 'ytd-player', '#movie_player'].forEach(function(sel){
+        document.querySelectorAll(sel).forEach(function(el){
+          el.style.setProperty('width', w + 'px', 'important');
+          el.style.setProperty('max-width', w + 'px', 'important');
+          el.style.setProperty('height', h + 'px', 'important');
+          el.style.setProperty('min-height', h + 'px', 'important');
+        });
+      });
+      var player = document.getElementById('movie_player');
+      if (player && player.setSize) {
+        try { player.setSize(w, h); } catch(e) {}
+      }
+      window.dispatchEvent(new Event('resize'));
+    };
+    apply();
+    setTimeout(apply, 250);
+    setTimeout(apply, 1000);
+    setTimeout(apply, 2500);
+  })();
+""");
+      } else {
+        sb.writeln(
+          "  var oldStyle=document.getElementById('yoloit-yt-player-fix'); if(oldStyle) oldStyle.remove();",
+        );
       }
 
       sb.writeln("  window.dispatchEvent(new Event('resize'));");
@@ -754,35 +873,59 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       sb.writeln("    innerWidth: window.innerWidth,");
       sb.writeln("    innerHeight: window.innerHeight,");
       sb.writeln("    zoom: document.documentElement.style.zoom||'none',");
-      sb.writeln("    bodyClientW: document.body?document.body.clientWidth:null,");
-      sb.writeln("    bodyClientH: document.body?document.body.clientHeight:null,");
-      sb.writeln("    bodyScrollW: document.body?document.body.scrollWidth:null,");
+      sb.writeln(
+        "    bodyClientW: document.body?document.body.clientWidth:null,",
+      );
+      sb.writeln(
+        "    bodyClientH: document.body?document.body.clientHeight:null,",
+      );
+      sb.writeln(
+        "    bodyScrollW: document.body?document.body.scrollWidth:null,",
+      );
       // YouTube player info
-      sb.writeln("    ytW: (function(){var p=document.getElementById('movie_player');return p?p.clientWidth:null;})(),");
-      sb.writeln("    ytH: (function(){var p=document.getElementById('movie_player');return p?p.clientHeight:null;})(),");
-      sb.writeln("    transform: document.body?document.body.style.transform:'none',");
-      sb.writeln("    minHeight: document.body?document.body.style.minHeight:'none',");
+      sb.writeln(
+        "    ytW: (function(){var p=document.getElementById('movie_player');return p?p.clientWidth:null;})(),",
+      );
+      sb.writeln(
+        "    ytH: (function(){var p=document.getElementById('movie_player');return p?p.clientHeight:null;})(),",
+      );
+      sb.writeln(
+        "    transform: document.body?document.body.style.transform:'none',",
+      );
+      sb.writeln(
+        "    minHeight: document.body?document.body.style.minHeight:'none',",
+      );
       sb.writeln("  });");
       sb.writeln('})()');
 
       await Future<void>.delayed(const Duration(milliseconds: 400));
 
       final raw = await ctrl.runJavaScriptReturningResult(sb.toString());
-      final pretty = raw.toString()
+      final pretty = raw
+          .toString()
           .replaceAll('{', '{\n  ')
           .replaceAll(',', ',\n  ')
           .replaceAll('}', '\n}');
-      setState(() { _result = pretty; });
+      setState(() {
+        _result = pretty;
+      });
       debugPrint('[ViewportLab] Result: $raw');
     } catch (e) {
-      setState(() { _result = 'Error: $e'; });
+      setState(() {
+        _result = 'Error: $e';
+      });
     } finally {
-      setState(() { _applying = false; });
+      setState(() {
+        _applying = false;
+      });
     }
   }
 
   Future<void> _resetAll() async {
-    setState(() { _applying = true; _result = null; });
+    setState(() {
+      _applying = true;
+      _result = null;
+    });
     try {
       await widget.controller.setUserAgent(null);
       // Also clear native WKUserScripts and reload.
@@ -795,14 +938,19 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
   document.body.style.width='';
   document.body.style.minWidth='';
   document.body.style.minHeight='';
+  var oldStyle=document.getElementById('yoloit-yt-player-fix'); if(oldStyle) oldStyle.remove();
   try{Object.defineProperty(window,'innerWidth',{get:undefined,configurable:true});}catch(e){}
   try{Object.defineProperty(window,'outerWidth',{get:undefined,configurable:true});}catch(e){}
   window.dispatchEvent(new Event('resize'));
 })();
 ''');
-      setState(() { _result = 'All CSS overrides reset.'; });
+      setState(() {
+        _result = 'All CSS overrides reset.';
+      });
     } finally {
-      setState(() { _applying = false; });
+      setState(() {
+        _applying = false;
+      });
     }
   }
 
@@ -810,7 +958,10 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
   /// This is the ONLY way to override window.innerWidth BEFORE YouTube's
   /// player JS measures it during initialization.
   Future<void> _applyAndReload() async {
-    setState(() { _applying = true; _result = null; });
+    setState(() {
+      _applying = true;
+      _result = null;
+    });
     try {
       // Set UA first (takes effect on next reload)
       if (_useDesktopUA) {
@@ -825,28 +976,97 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
 
       final cssZoom = _cssZoomCtrl.text.trim();
       final innerWidth = _innerWidthCtrl.text.trim();
+      final ytPlayerWidth = _ytPlayerWidthCtrl.text.trim();
+      final ytPlayerHeight = _ytPlayerHeightCtrl.text.trim();
       final useZoom = _cssZoomEnabled && cssZoom.isNotEmpty;
       final useInner = _overrideInnerWidthEnabled && innerWidth.isNotEmpty;
+      final useYtFix =
+          _ytPlayerFixEnabled &&
+          ytPlayerWidth.isNotEmpty &&
+          ytPlayerHeight.isNotEmpty;
 
       // Build documentStart script. This runs BEFORE any page JS.
       final sb = StringBuffer('(function(){\n');
       if (useInner) {
         sb.writeln("  var iw = $innerWidth;");
         sb.writeln("  var ih = Math.round(iw * 9 / 16);");
-        sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
-        sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+        sb.writeln(
+          "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+        );
+        sb.writeln(
+          "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+        );
         // Optionally also override innerHeight so video player picks correct aspect.
-        sb.writeln("  // Don't override innerHeight - let real viewport drive it");
+        sb.writeln(
+          "  // Don't override innerHeight - let real viewport drive it",
+        );
       }
       // Apply CSS zoom on every DOMContentLoaded so reflow happens before JS.
       if (useZoom) {
-        sb.writeln("  var applyZoom = function(){ if(document.documentElement) document.documentElement.style.zoom='$cssZoom'; };");
+        sb.writeln(
+          "  var applyZoom = function(){ if(document.documentElement) document.documentElement.style.zoom='$cssZoom'; };",
+        );
         sb.writeln("  applyZoom();");
-        sb.writeln("  document.addEventListener('DOMContentLoaded', applyZoom);");
+        sb.writeln(
+          "  document.addEventListener('DOMContentLoaded', applyZoom);",
+        );
+      }
+      if (useYtFix) {
+        sb.writeln("  var ytW = $ytPlayerWidth;");
+        sb.writeln("  var ytH = $ytPlayerHeight;");
+        sb.writeln(r"""
+  var installYtFix = function(){
+    var css = ''
+      + 'ytd-watch-flexy, ytd-watch-flexy[flexy], ytd-watch-flexy[fullscreen] {'
+      + '  --ytd-watch-flexy-player-width: '+ytW+'px !important;'
+      + '  --ytd-watch-flexy-player-height: '+ytH+'px !important;'
+      + '  --ytd-watch-flexy-width-ratio: 16 !important;'
+      + '  --ytd-watch-flexy-height-ratio: 9 !important;'
+      + '}'
+      + '#player, #player-container, #player-container-inner, #player-container-outer, ytd-player, #movie_player, .html5-video-player {'
+      + '  width: '+ytW+'px !important; max-width: '+ytW+'px !important;'
+      + '  height: '+ytH+'px !important; min-height: '+ytH+'px !important;'
+      + '}'
+      + '#player-container-outer { padding-top: 0 !important; }'
+      + 'video.html5-main-video { width: '+ytW+'px !important; height: '+ytH+'px !important; object-fit: contain !important; }';
+    var style = document.getElementById('yoloit-yt-player-fix');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'yoloit-yt-player-fix';
+      (document.head || document.documentElement).appendChild(style);
+    }
+    style.textContent = css;
+    var applySize = function(){
+      ['#player', '#player-container', '#player-container-inner', '#player-container-outer', 'ytd-player', '#movie_player'].forEach(function(sel){
+        document.querySelectorAll(sel).forEach(function(el){
+          el.style.setProperty('width', ytW + 'px', 'important');
+          el.style.setProperty('max-width', ytW + 'px', 'important');
+          el.style.setProperty('height', ytH + 'px', 'important');
+          el.style.setProperty('min-height', ytH + 'px', 'important');
+        });
+      });
+      var player = document.getElementById('movie_player');
+      if (player && player.setSize) {
+        try { player.setSize(ytW, ytH); } catch(e) {}
+      }
+      window.dispatchEvent(new Event('resize'));
+    };
+    applySize();
+    setTimeout(applySize, 250);
+    setTimeout(applySize, 1000);
+    setTimeout(applySize, 2500);
+    setTimeout(applySize, 5000);
+  };
+  installYtFix();
+  document.addEventListener('DOMContentLoaded', installYtFix);
+""");
       }
       sb.writeln('})();');
 
-      final installed = await WebViewZoomService.installInitScript(sb.toString(), reload: true);
+      final installed = await WebViewZoomService.installInitScript(
+        sb.toString(),
+        reload: true,
+      );
 
       // Wait for reload to finish, then sample state.
       await Future<void>.delayed(const Duration(milliseconds: 1500));
@@ -860,6 +1080,8 @@ JSON.stringify({
   bodyClientH: document.body?document.body.clientHeight:null,
   ytW: (function(){var p=document.getElementById('movie_player');return p?p.clientWidth:null;})(),
   ytH: (function(){var p=document.getElementById('movie_player');return p?p.clientHeight:null;})(),
+  playerOuterW: (function(){var p=document.querySelector('#player-container-outer');return p?p.clientWidth:null;})(),
+  playerOuterH: (function(){var p=document.querySelector('#player-container-outer');return p?p.clientHeight:null;})(),
   zoom: document.documentElement.style.zoom||'none',
   ua: navigator.userAgent.substring(0,60)
 })
@@ -867,17 +1089,24 @@ JSON.stringify({
         afterRaw = r.toString();
       } catch (_) {}
 
-      final pretty = '✓ Installed on $installed WKWebView(s).\n\n'
-          + afterRaw
+      final pretty =
+          '✓ Installed on $installed WKWebView(s).\n\n' +
+          afterRaw
               .replaceAll('{', '{\n  ')
               .replaceAll(',', ',\n  ')
               .replaceAll('}', '\n}');
-      setState(() { _result = pretty; });
+      setState(() {
+        _result = pretty;
+      });
       debugPrint('[ViewportLab] After reload: $afterRaw');
     } catch (e) {
-      setState(() { _result = 'Error: $e'; });
+      setState(() {
+        _result = 'Error: $e';
+      });
     } finally {
-      setState(() { _applying = false; });
+      setState(() {
+        _applying = false;
+      });
     }
   }
 
@@ -893,7 +1122,11 @@ JSON.stringify({
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Checkbox(value: enabled, onChanged: onToggle, visualDensity: VisualDensity.compact),
+          Checkbox(
+            value: enabled,
+            onChanged: onToggle,
+            visualDensity: VisualDensity.compact,
+          ),
           const SizedBox(width: 4),
           Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
           SizedBox(
@@ -904,7 +1137,10 @@ JSON.stringify({
               style: const TextStyle(fontSize: 12),
               decoration: InputDecoration(
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 6,
+                ),
                 border: const OutlineInputBorder(),
                 hintText: hint,
                 suffixText: suffix,
@@ -932,12 +1168,19 @@ JSON.stringify({
               // Header
               Row(
                 children: [
-                  const Icon(Icons.science_outlined, color: Color(0xFFE67E22), size: 18),
+                  const Icon(
+                    Icons.science_outlined,
+                    color: Color(0xFFE67E22),
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
                       'Viewport Lab',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -959,7 +1202,8 @@ JSON.stringify({
                   children: [
                     Checkbox(
                       value: _useDesktopUA,
-                      onChanged: (v) => setState(() => _useDesktopUA = v ?? false),
+                      onChanged:
+                          (v) => setState(() => _useDesktopUA = v ?? false),
                       visualDensity: VisualDensity.compact,
                     ),
                     const SizedBox(width: 4),
@@ -1007,10 +1251,77 @@ JSON.stringify({
               _row(
                 enabled: _overrideInnerWidthEnabled,
                 label: 'E: override innerWidth/outerWidth',
-                onToggle: (v) => setState(() => _overrideInnerWidthEnabled = v ?? false),
+                onToggle:
+                    (v) =>
+                        setState(() => _overrideInnerWidthEnabled = v ?? false),
                 ctrl: _innerWidthCtrl,
                 suffix: 'px',
                 hint: '1278',
+              ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _ytPlayerFixEnabled,
+                      onChanged:
+                          (v) =>
+                              setState(() => _ytPlayerFixEnabled = v ?? false),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 4),
+                    const Expanded(
+                      child: Text(
+                        'F: force YouTube player W/H',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 74,
+                      child: TextField(
+                        controller: _ytPlayerWidthCtrl,
+                        enabled: _ytPlayerFixEnabled,
+                        style: const TextStyle(fontSize: 12),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(),
+                          suffixText: 'w',
+                          suffixStyle: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 74,
+                      child: TextField(
+                        controller: _ytPlayerHeightCtrl,
+                        enabled: _ytPlayerFixEnabled,
+                        style: const TextStyle(fontSize: 12),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(),
+                          suffixText: 'h',
+                          suffixStyle: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 8),
@@ -1020,13 +1331,15 @@ JSON.stringify({
                 decoration: BoxDecoration(
                   color: const Color(0xFFE67E22).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
+                  border: Border.all(
+                    color: const Color(0xFFE67E22).withOpacity(0.3),
+                  ),
                 ),
                 child: const Text(
                   '⚡ Apply: runtime CSS only (after page load).\n'
-                  '🔄 Apply (Reload): inject E + B as WKUserScript at\n'
-                  '   documentStart, then reload — fixes YouTube video\n'
-                  '   aspect ratio (player measures innerWidth on init).',
+                  '🔄 Apply (Reload): inject E + B + F as WKUserScript at\n'
+                  '   documentStart, then reload. F overrides YouTube\n'
+                  '   flexy player width/height variables.',
                   style: TextStyle(fontSize: 11, height: 1.5),
                 ),
               ),
@@ -1040,12 +1353,16 @@ JSON.stringify({
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     _result!,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               if (_result != null) const SizedBox(height: 12),
@@ -1056,7 +1373,10 @@ JSON.stringify({
                   OutlinedButton(
                     onPressed: _applying ? null : _resetAll,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                     child: const Text('Reset'),
@@ -1067,20 +1387,31 @@ JSON.stringify({
                     icon: const Icon(Icons.play_arrow, size: 14),
                     label: const Text('Apply'),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: _applying ? null : _applyAndReload,
-                    icon: _applying
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.refresh, size: 14),
+                    icon:
+                        _applying
+                            ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.refresh, size: 14),
                     label: const Text('Apply (Reload)'),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFE67E22),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                   ),
