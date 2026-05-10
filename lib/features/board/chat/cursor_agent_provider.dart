@@ -19,6 +19,12 @@ class CursorAgentProvider extends ChatProvider {
   final Map<String, String> _sessionIds = {};
   final Map<String, Process> _processes = {};
 
+  /// Tracks model_call_ids that have started streaming (have seen first delta).
+  final Set<String> _streamingTurns = {};
+
+  /// The model_call_id (or generated id) of the currently streaming message.
+  String? _currentStreamId;
+
   @override
   String get providerId => 'cursor';
 
@@ -63,11 +69,14 @@ class CursorAgentProvider extends ChatProvider {
     required StreamController<ChatEvent> controller,
   }) async {
     await stop(config.sessionName);
+    _streamingTurns.clear();
+    _currentStreamId = null;
 
     final args = <String>[
       '--print',
       '--output-format',
       'stream-json',
+      '--stream-partial-output',
       '--yolo',
       '--model',
       config.model,
@@ -139,8 +148,8 @@ class CursorAgentProvider extends ChatProvider {
                     );
                   }
 
-                  final event = _parseCursorEvent(json);
-                  if (event != null) {
+                  final events = _parseCursorEvent(json);
+                  for (final event in events) {
                     controller.add(event);
                   }
                 } catch (e) {
@@ -169,8 +178,9 @@ class CursorAgentProvider extends ChatProvider {
       if (remaining.isNotEmpty) {
         try {
           final json = jsonDecode(remaining) as Map<String, dynamic>;
-          final event = _parseCursorEvent(json);
-          if (event != null) controller.add(event);
+          for (final event in _parseCursorEvent(json)) {
+            controller.add(event);
+          }
         } catch (_) {}
       }
 
@@ -192,44 +202,88 @@ class CursorAgentProvider extends ChatProvider {
     }
   }
 
-  /// Translate a cursor-agent stream-json event into a [ChatEvent].
-  /// Returns null for events we intentionally ignore (thinking deltas, user echoes).
-  ChatEvent? _parseCursorEvent(Map<String, dynamic> json) {
+  /// Translate a cursor-agent stream-json event into [ChatEvent]s.
+  /// Returns empty list for events we intentionally ignore.
+  List<ChatEvent> _parseCursorEvent(Map<String, dynamic> json) {
     final type = json['type'] as String? ?? '';
     final subtype = json['subtype'] as String?;
 
     switch (type) {
       case 'system':
-        return ChatEvent(
-          type: ChatEventType.sessionStatus,
-          rawType: 'cursor.system.$subtype',
-          data: Map<String, dynamic>.from(json),
-        );
+        return [
+          ChatEvent(
+            type: ChatEventType.sessionStatus,
+            rawType: 'cursor.system.$subtype',
+            data: Map<String, dynamic>.from(json),
+          ),
+        ];
 
       case 'user':
-        // Echo of the user's message — we already add it to the chat UI
-        return ChatEvent(
-          type: ChatEventType.userMessage,
-          rawType: 'cursor.user',
-          data: const {},
-        );
+        return [
+          ChatEvent(
+            type: ChatEventType.userMessage,
+            rawType: 'cursor.user',
+            data: const {},
+          ),
+        ];
 
       case 'thinking':
-        // We skip thinking deltas to avoid noise; completed is also ignored.
-        return null;
+        return [];
 
       case 'assistant':
         final message = json['message'] as Map<String, dynamic>?;
         final content = _extractTextContent(message?['content']);
         final modelCallId = json['model_call_id'] as String?;
-        final msgId =
-            modelCallId ?? 'cursor-${DateTime.now().millisecondsSinceEpoch}';
-        return ChatEvent(
-          type: ChatEventType.assistantMessage,
-          rawType: 'cursor.assistant',
-          data: {'content': content, 'messageId': msgId},
-          id: msgId,
-        );
+        final hasTimestamp = json.containsKey('timestamp_ms');
+
+        if (hasTimestamp) {
+          // Delta chunk (--stream-partial-output)
+          final isFirst = !_streamingTurns.contains(modelCallId ?? '_');
+          if (modelCallId != null) _streamingTurns.add(modelCallId);
+
+          if (isFirst) {
+            final startId =
+                modelCallId ?? 'cursor-${DateTime.now().millisecondsSinceEpoch}';
+            _currentStreamId = startId;
+            // Emit messageStart + first delta together
+            return [
+              ChatEvent(
+                type: ChatEventType.assistantMessageStart,
+                rawType: 'cursor.assistant.start',
+                data: {'messageId': startId},
+                id: startId,
+              ),
+              ChatEvent(
+                type: ChatEventType.assistantDelta,
+                rawType: 'cursor.assistant.delta',
+                data: {'deltaContent': content},
+              ),
+            ];
+          }
+          return [
+            ChatEvent(
+              type: ChatEventType.assistantDelta,
+              rawType: 'cursor.assistant.delta',
+              data: {'deltaContent': content},
+            ),
+          ];
+        } else {
+          // Final complete message (no timestamp_ms)
+          final msgId =
+              modelCallId ??
+              _currentStreamId ??
+              'cursor-${DateTime.now().millisecondsSinceEpoch}';
+          if (modelCallId != null) _streamingTurns.remove(modelCallId);
+          _currentStreamId = null;
+          return [
+            ChatEvent(
+              type: ChatEventType.assistantMessage,
+              rawType: 'cursor.assistant',
+              data: {'content': content, 'messageId': msgId},
+              id: msgId,
+            ),
+          ];
+        }
 
       case 'tool_call':
         if (subtype == 'started') {
@@ -238,17 +292,20 @@ class CursorAgentProvider extends ChatProvider {
           final description =
               toolCall?['description'] as String? ?? 'tool call';
           final shellArgs =
-              ((toolCall?['shellToolCall'] as Map?)?['args'] as Map?);
+              (toolCall?['shellToolCall'] as Map<String, dynamic>?)?['args']
+                  as Map<String, dynamic>?;
           final command = shellArgs?['command'] as String? ?? '';
-          return ChatEvent(
-            type: ChatEventType.toolStart,
-            rawType: 'cursor.tool_call.started',
-            data: {
-              'toolCallId': callId,
-              'toolName': description,
-              'arguments': {'command': command},
-            },
-          );
+          return [
+            ChatEvent(
+              type: ChatEventType.toolStart,
+              rawType: 'cursor.tool_call.started',
+              data: {
+                'toolCallId': callId,
+                'toolName': description,
+                'arguments': {'command': command},
+              },
+            ),
+          ];
         } else if (subtype == 'completed') {
           final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
           final toolCall = json['tool_call'] as Map<String, dynamic>?;
@@ -262,33 +319,38 @@ class CursorAgentProvider extends ChatProvider {
               successData?['interleavedOutput'] as String? ??
               successData?['stdout'] as String? ??
               '';
-          return ChatEvent(
-            type: ChatEventType.toolComplete,
-            rawType: 'cursor.tool_call.completed',
-            data: {
-              'toolCallId': callId,
-              'success': isSuccess && exitCode == 0,
-              'result': {'content': output},
-            },
-          );
+          return [
+            ChatEvent(
+              type: ChatEventType.toolComplete,
+              rawType: 'cursor.tool_call.completed',
+              data: {
+                'toolCallId': callId,
+                'success': isSuccess && exitCode == 0,
+                'result': {'content': output},
+              },
+            ),
+          ];
         }
-        return null;
+        return [];
 
       case 'result':
         final usage = json['usage'] as Map<String, dynamic>?;
-        return ChatEvent(
-          type: ChatEventType.result,
-          rawType: 'cursor.result',
-          data: {
-            'usage': {
-              'outputTokens': (usage?['outputTokens'] as num?)?.toInt() ?? 0,
-              'totalApiDurationMs': (json['duration_ms'] as num?)?.toInt() ?? 0,
+        return [
+          ChatEvent(
+            type: ChatEventType.result,
+            rawType: 'cursor.result',
+            data: {
+              'usage': {
+                'outputTokens': (usage?['outputTokens'] as num?)?.toInt() ?? 0,
+                'totalApiDurationMs':
+                    (json['duration_ms'] as num?)?.toInt() ?? 0,
+              },
             },
-          },
-        );
+          ),
+        ];
 
       default:
-        return null;
+        return [];
     }
   }
 
