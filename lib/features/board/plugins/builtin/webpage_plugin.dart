@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/services/webview_zoom_service.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -784,6 +785,8 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
     setState(() { _applying = true; _result = null; });
     try {
       await widget.controller.setUserAgent(null);
+      // Also clear native WKUserScripts and reload.
+      await WebViewZoomService.clearInitScripts(reload: true);
       await widget.controller.runJavaScript('''
 (function(){
   document.documentElement.style.zoom='';
@@ -798,6 +801,81 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
 })();
 ''');
       setState(() { _result = 'All CSS overrides reset.'; });
+    } finally {
+      setState(() { _applying = false; });
+    }
+  }
+
+  /// Install JS at documentStart via WKUserScript and reload page.
+  /// This is the ONLY way to override window.innerWidth BEFORE YouTube's
+  /// player JS measures it during initialization.
+  Future<void> _applyAndReload() async {
+    setState(() { _applying = true; _result = null; });
+    try {
+      // Set UA first (takes effect on next reload)
+      if (_useDesktopUA) {
+        await widget.controller.setUserAgent(
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) '
+          'Chrome/124.0.0.0 Safari/537.36',
+        );
+      } else {
+        await widget.controller.setUserAgent(null);
+      }
+
+      final cssZoom = _cssZoomCtrl.text.trim();
+      final innerWidth = _innerWidthCtrl.text.trim();
+      final useZoom = _cssZoomEnabled && cssZoom.isNotEmpty;
+      final useInner = _overrideInnerWidthEnabled && innerWidth.isNotEmpty;
+
+      // Build documentStart script. This runs BEFORE any page JS.
+      final sb = StringBuffer('(function(){\n');
+      if (useInner) {
+        sb.writeln("  var iw = $innerWidth;");
+        sb.writeln("  var ih = Math.round(iw * 9 / 16);");
+        sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+        sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+        // Optionally also override innerHeight so video player picks correct aspect.
+        sb.writeln("  // Don't override innerHeight - let real viewport drive it");
+      }
+      // Apply CSS zoom on every DOMContentLoaded so reflow happens before JS.
+      if (useZoom) {
+        sb.writeln("  var applyZoom = function(){ if(document.documentElement) document.documentElement.style.zoom='$cssZoom'; };");
+        sb.writeln("  applyZoom();");
+        sb.writeln("  document.addEventListener('DOMContentLoaded', applyZoom);");
+      }
+      sb.writeln('})();');
+
+      final installed = await WebViewZoomService.installInitScript(sb.toString(), reload: true);
+
+      // Wait for reload to finish, then sample state.
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      String afterRaw = '';
+      try {
+        final r = await widget.controller.runJavaScriptReturningResult('''
+JSON.stringify({
+  innerWidth: window.innerWidth,
+  innerHeight: window.innerHeight,
+  bodyClientW: document.body?document.body.clientWidth:null,
+  bodyClientH: document.body?document.body.clientHeight:null,
+  ytW: (function(){var p=document.getElementById('movie_player');return p?p.clientWidth:null;})(),
+  ytH: (function(){var p=document.getElementById('movie_player');return p?p.clientHeight:null;})(),
+  zoom: document.documentElement.style.zoom||'none',
+  ua: navigator.userAgent.substring(0,60)
+})
+''');
+        afterRaw = r.toString();
+      } catch (_) {}
+
+      final pretty = '✓ Installed on $installed WKWebView(s).\n\n'
+          + afterRaw
+              .replaceAll('{', '{\n  ')
+              .replaceAll(',', ',\n  ')
+              .replaceAll('}', '\n}');
+      setState(() { _result = pretty; });
+      debugPrint('[ViewportLab] After reload: $afterRaw');
+    } catch (e) {
+      setState(() { _result = 'Error: $e'; });
     } finally {
       setState(() { _applying = false; });
     }
@@ -945,9 +1023,10 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
                   border: Border.all(color: const Color(0xFFE67E22).withOpacity(0.3)),
                 ),
                 child: const Text(
-                  '⚡ B (zoom) is auto-injected at board scale.\n'
-                  '⚠️ C (body scale) breaks video aspect-ratio — use B only.\n'
-                  'Apply forces YouTube #movie_player to resize after CSS change.',
+                  '⚡ Apply: runtime CSS only (after page load).\n'
+                  '🔄 Apply (Reload): inject E + B as WKUserScript at\n'
+                  '   documentStart, then reload — fixes YouTube video\n'
+                  '   aspect ratio (player measures innerWidth on init).',
                   style: TextStyle(fontSize: 11, height: 1.5),
                 ),
               ),
@@ -977,21 +1056,31 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
                   OutlinedButton(
                     onPressed: _applying ? null : _resetAll,
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
-                    child: const Text('Reset All'),
+                    child: const Text('Reset'),
                   ),
                   const Spacer(),
-                  FilledButton.icon(
+                  OutlinedButton.icon(
                     onPressed: _applying ? null : _apply,
+                    icon: const Icon(Icons.play_arrow, size: 14),
+                    label: const Text('Apply'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _applying ? null : _applyAndReload,
                     icon: _applying
                         ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.play_arrow, size: 16),
-                    label: const Text('Apply'),
+                        : const Icon(Icons.refresh, size: 14),
+                    label: const Text('Apply (Reload)'),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFE67E22),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                   ),
