@@ -1,3 +1,5 @@
+import 'dart:io' show Platform, File;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
@@ -11,7 +13,24 @@ import 'package:yoloit/core/theme/theme_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
+  // On macOS, media_kit's default `DynamicLibrary.open('Mpv.framework/Mpv')`
+  // collides with media_kit_video's linked `@rpath/Mpv.framework/Versions/A/Mpv`
+  // because dyld treats them as different lookup keys → loads Mpv twice →
+  // duplicate ObjC class registration → SIGABRT in mpv core threads.
+  //
+  // Force absolute path matching the linker's resolved @rpath so dyld
+  // deduplicates the dylib.
+  String? libmpvPath;
+  if (Platform.isMacOS) {
+    final exe = Platform.resolvedExecutable;
+    // .../YoLoIT.app/Contents/MacOS/YoLoIT  →  .../YoLoIT.app/Contents/Frameworks/Mpv.framework/Versions/A/Mpv
+    final exeDir = File(exe).parent.path;
+    final candidate = '$exeDir/../Frameworks/Mpv.framework/Versions/A/Mpv';
+    if (File(candidate).existsSync()) {
+      libmpvPath = candidate;
+    }
+  }
+  MediaKit.ensureInitialized(libmpv: libmpvPath);
 
   // Init app-level file logger early (before FlutterError hook) so it can
   // capture errors that occur during startup.
