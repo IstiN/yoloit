@@ -61,7 +61,8 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
 
   // ── Shortcut ──────────────────────────────────────────────────────────────────
   static AppColorScheme of(BuildContext context) =>
-      Theme.of(context).extension<AppColorScheme>()!;
+      Theme.of(context).extension<AppColorScheme>() ??
+      AppColorScheme.fromAccent(const Color(0xFF7C3AED));
 
   // ── Factory helpers ──────────────────────────────────────────────────────────
 

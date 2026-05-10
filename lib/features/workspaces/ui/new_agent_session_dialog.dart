@@ -214,10 +214,10 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'New Agent Session',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -243,8 +243,8 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel',
-                        style: TextStyle(color: AppColors.textMuted)),
+                    child: Text('Cancel',
+                        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface)),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
@@ -280,7 +280,7 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
         child: DropdownButton<AgentType>(
           value: _agentType,
           dropdownColor: colors.surfaceHighlight,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
           isExpanded: true,
           items: AgentType.values.map((t) {
             return DropdownMenuItem(
@@ -358,10 +358,10 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
   }) {
     return TextField(
       controller: controller,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+        hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -499,7 +499,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
           controller: _ctrl,
           focusNode: _focusNode,
           autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
           onChanged: (v) => setState(() => _query = v.trim()),
           onSubmitted: (v) {
             final q = v.trim();
@@ -512,7 +512,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
           decoration: InputDecoration(
             hintText: 'Search or create branch…',
             hintStyle:
-                const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -527,16 +527,16 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
             suffixIcon: _open
                 ? GestureDetector(
                     onTap: _close,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
                       child: Icon(Icons.close,
-                          size: 14, color: AppColors.textMuted),
+                          size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                     ),
                   )
-                : const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Icon(Icons.unfold_more,
-                        size: 14, color: AppColors.textMuted),
+                        size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                   ),
             suffixIconConstraints: const BoxConstraints(minWidth: 0),
             border: OutlineInputBorder(
@@ -592,13 +592,13 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 children: [
                   if (filtered.isEmpty && !showCreate)
-                    const Padding(
+                    Padding(
                       padding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       child: Text(
                         'No branches found',
                         style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 11),
+                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
                       ),
                     ),
                   ...filtered.map((branch) {
@@ -665,7 +665,7 @@ class _BranchRow extends StatelessWidget {
             Icon(
               isActive ? Icons.account_tree_outlined : Icons.call_split,
               size: 12,
-              color: isActive ? colors.primary : AppColors.textMuted,
+              color: isActive ? colors.primary : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -673,8 +673,8 @@ class _BranchRow extends StatelessWidget {
                 branch,
                 style: TextStyle(
                   color: isCurrent
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
+                      ? Theme.of(context).colorScheme.onSurface
+                      : (Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface),
                   fontSize: 12,
                   fontWeight:
                       isCurrent ? FontWeight.w500 : FontWeight.normal,
@@ -715,7 +715,7 @@ class _CreateRow extends StatelessWidget {
             Text(
               'Create ',
               style: TextStyle(
-                  color: AppColors.textMuted, fontSize: 12),
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
             ),
             Expanded(
               child: Text(
@@ -746,8 +746,8 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-          color: AppColors.textMuted, fontSize: 10, letterSpacing: 0.8),
+      style: TextStyle(
+          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10, letterSpacing: 0.8),
     );
   }
 }
@@ -769,8 +769,8 @@ class _BusyRow extends StatelessWidget {
                 strokeWidth: 1.5, color: colors.primary),
           ),
           const SizedBox(width: 8),
-          const Text('Creating worktree…',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+          Text('Creating worktree…',
+              style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
         ],
       ),
     );

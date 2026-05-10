@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_state.dart';
@@ -175,13 +176,14 @@ class _WebMindMapCanvasState extends State<WebMindMapCanvas> {
                   Positioned.fill(
                     child: ListenableBuilder(
                       listenable: _transform,
-                      builder: (_, __) => CustomPaint(
+                      builder: (lbCtx, __) => CustomPaint(
                         painter: _GridPainter(
                           offset: Offset(
                             _transform.value.getTranslation().x,
                             _transform.value.getTranslation().y,
                           ),
                           scale: _transform.value.getMaxScaleOnAxis(),
+                          dotColor: lbCtx.appColors.surfaceElevated,
                         ),
                       ),
                     ),
@@ -652,12 +654,13 @@ class _MobileQuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xF00D1117),
-        border: Border.all(color: const Color(0xFF2A3040)),
+        color: colors.surface,
+        border: Border.all(color: colors.border),
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 8)],
       ),
@@ -691,6 +694,7 @@ class _QBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -698,12 +702,12 @@ class _QBtn extends StatelessWidget {
         decoration: BoxDecoration(
           color: accent
               ? const Color(0x33FF4F6A)
-              : const Color(0xFF1A1F2E),
+              : colors.surfaceElevated,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: accent
                 ? const Color(0x80FF4F6A)
-                : const Color(0xFF2A3040),
+                : colors.border,
           ),
         ),
         child: Column(
@@ -714,7 +718,7 @@ class _QBtn extends StatelessWidget {
               size: 16,
               color: accent
                   ? const Color(0xFFFF7A8A)
-                  : const Color(0xFFCBD5E1),
+                  : Theme.of(context).colorScheme.onSurface,
             ),
             if (label.isNotEmpty) ...[
               const SizedBox(height: 1),
@@ -953,7 +957,7 @@ class _ToolBtn extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(6),
-          child: Icon(icon, size: 16, color: const Color(0xFFCBD5E1)),
+          child: Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurface),
         ),
       ),
     );
@@ -1078,9 +1082,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                                     name,
                                     style: TextStyle(
                                       fontSize: 10.5,
-                                      color: widget.activeViewName == name
-                                          ? const Color(0xFFE8E8FF)
-                                          : const Color(0xFFCBD5E1),
+                                      color: Theme.of(context).colorScheme.onSurface,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -1134,7 +1136,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                   size: 16,
                   color: _open
                       ? const Color(0xFF60A5FA)
-                      : const Color(0xFFCBD5E1),
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
                 if (widget.savedViews.isNotEmpty) ...[
                   const SizedBox(width: 2),
@@ -1367,6 +1369,11 @@ class _WebSidebarState extends State<_WebSidebar> {
         buildShowHideSidebarSnapshotPayloadFromMindMapState(widget.state),
       ),
       onToggleHide: widget.onToggleHide,
+      onToggleGroup: (ids) {
+        for (final id in ids) {
+          collab.sendGuestEvent('node_toggle_hide', {'id': id});
+        }
+      },
       onFocusNode: widget.onFocusNode,
       onShowAll: cubit.showAllNodes,
       onCreateWorkspace: () async {
@@ -1461,7 +1468,7 @@ class _SidebarRow extends StatelessWidget {
                   width: 1,
                   height: 16,
                   margin: const EdgeInsets.only(right: 5),
-                  color: const Color(0xFF2A3040),
+                  color: context.appColors.border,
                 ),
               SizedBox(width: depth > 0 ? 10 : 16),
             ],
@@ -1498,9 +1505,7 @@ class _SidebarRow extends StatelessWidget {
                   fontWeight: isWs ? FontWeight.w700 : FontWeight.normal,
                   color: hidden
                       ? const Color(0xFF4A5680)
-                      : (isWs
-                            ? const Color(0xFFE8E8FF)
-                            : const Color(0xFFCBD5E1)),
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -1570,13 +1575,18 @@ class _ConnectorsPainter extends CustomPainter {
 // ── Dot-grid painter ───────────────────────────────────────────────────────
 
 class _GridPainter extends CustomPainter {
-  const _GridPainter({required this.offset, required this.scale});
+  const _GridPainter({
+    required this.offset,
+    required this.scale,
+    required this.dotColor,
+  });
   final Offset offset;
   final double scale;
+  final Color dotColor;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF1E293B);
+    final paint = Paint()..color = dotColor;
     const base = 30.0;
     final step = base * scale;
     if (step < 4) return;
@@ -1596,7 +1606,7 @@ class _GridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GridPainter old) =>
-      old.offset != offset || old.scale != scale;
+      old.offset != offset || old.scale != scale || old.dotColor != dotColor;
 }
 
 // ---------------------------------------------------------------------------
@@ -1607,8 +1617,6 @@ class _RemoteWorkspaceDialog {
   _RemoteWorkspaceDialog._();
 
   static const _kBg = Color(0xFF12151C);
-  static const _kBorder = Color(0xFF2A3040);
-  static const _kText = Color(0xFFE8E8FF);
   static const _kHint = Color(0xFF6B7898);
   static const _kAccent = Color(0xFF7C6BFF);
 
@@ -1681,8 +1689,8 @@ class _WorkspaceFormDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const bg = _RemoteWorkspaceDialog._kBg;
-    const border = _RemoteWorkspaceDialog._kBorder;
-    const text = _RemoteWorkspaceDialog._kText;
+    final border = context.appColors.border;
+    final text = Theme.of(context).colorScheme.onSurface;
     const hint = _RemoteWorkspaceDialog._kHint;
     const accent = _RemoteWorkspaceDialog._kAccent;
 
@@ -1690,11 +1698,11 @@ class _WorkspaceFormDialog extends StatelessWidget {
       backgroundColor: bg,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: border),
+        side: BorderSide(color: border),
       ),
       title: Text(
         title,
-        style: const TextStyle(color: text, fontSize: 14),
+        style: TextStyle(color: text, fontSize: 14),
       ),
       content: SizedBox(
         width: 360,
@@ -1711,7 +1719,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
               TextField(
                 controller: nameCtrl,
                 autofocus: true,
-                style: const TextStyle(color: text, fontSize: 13),
+                style: TextStyle(color: text, fontSize: 13),
                 decoration: const InputDecoration(
                   hintText: 'My Project',
                   hintStyle: TextStyle(color: hint),
@@ -1728,7 +1736,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
             TextField(
               controller: pathCtrl,
               autofocus: nameCtrl == null,
-              style: const TextStyle(
+              style: TextStyle(
                 color: text,
                 fontSize: 13,
                 fontFamily: 'monospace',

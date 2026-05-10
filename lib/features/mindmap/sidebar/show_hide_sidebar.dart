@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_state.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
@@ -314,13 +315,13 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                       color: Color(0xFF7C6BFF),
                     ),
                     const SizedBox(width: 6),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Show / Hide',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFFE8E8FF),
+                          color: Theme.of(context).colorScheme.onSurface,
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -352,12 +353,12 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                       ),
                     InkWell(
                       onTap: () => setState(() => _collapsed = true),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
                         child: Icon(
                           Icons.chevron_left,
                           size: 14,
-                          color: Color(0xFF6B7898),
+                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -824,8 +825,13 @@ class _SidebarTreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
     final icon = _typeIcons[node.type] ?? Icons.circle;
-    final color = _typeColors[node.type] ?? const Color(0xFF64748B);
+    final rawColor = _typeColors[node.type];
+    final color = (rawColor == null || rawColor == const Color(0xFF6B7898) || rawColor == const Color(0xFF64748B))
+        ? mutedColor
+        : rawColor;
     final hasChildren = node.children.isNotEmpty;
     final isAgent = node.type == 'agent';
 
@@ -867,14 +873,14 @@ class _SidebarTreeRow extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     color: node.hidden
                         ? const Color(0xFF4A5680)
-                        : const Color(0xFFE8E8FF),
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
               Icon(
                 expanded ? Icons.expand_less : Icons.expand_more,
                 size: 13,
-                color: const Color(0xFF6B7898),
+                color: mutedColor,
               ),
             ],
           ),
@@ -892,7 +898,7 @@ class _SidebarTreeRow extends StatelessWidget {
                 width: 1,
                 height: 16,
                 margin: const EdgeInsets.only(right: 5),
-                color: const Color(0xFF2A3040),
+                color: colors.border,
               ),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -932,7 +938,7 @@ class _SidebarTreeRow extends StatelessWidget {
                 Icon(
                   expanded ? Icons.expand_less : Icons.expand_more,
                   size: 11,
-                  color: const Color(0xFF6B7898),
+                  color: mutedColor,
                 ),
               ],
               if (node.type == 'diff')
@@ -1053,7 +1059,7 @@ class _SidebarTreeRow extends StatelessWidget {
       color: const Color(0xFF1A1E2A),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
-        side: const BorderSide(color: Color(0xFF2A3040)),
+        side: BorderSide(color: context.appColors.border),
       ),
       items: items,
     ).then((value) {
@@ -1113,11 +1119,11 @@ class _SidebarTreeRow extends StatelessWidget {
           : node.id;
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
+        builder: (dlgCtx) => AlertDialog(
           backgroundColor: const Color(0xFF1A1E2A),
           title: Text(
             'Delete "${node.label}"?',
-            style: const TextStyle(fontSize: 14, color: Color(0xFFE8E8FF)),
+            style: TextStyle(fontSize: 14, color: Theme.of(dlgCtx).colorScheme.onSurface),
           ),
           content: const Text(
             'This will remove the workspace. Sessions and files will not be affected.',
@@ -1210,7 +1216,7 @@ class _SidebarTreeRow extends StatelessWidget {
             hintText: 'Session name...',
             hintStyle: const TextStyle(color: Color(0xFF6B7280)),
             filled: true,
-            fillColor: const Color(0xFF0D1117),
+            fillColor: context.appColors.surface,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF2D3748))),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF7C6BFF))),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1362,6 +1368,7 @@ class _SidebarActionState extends State<_SidebarAction> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -1376,7 +1383,7 @@ class _SidebarActionState extends State<_SidebarAction> {
             border: Border.all(
               color: _hovered
                   ? const Color(0xFF7C6BFF)
-                  : const Color(0xFF2A3040),
+                  : colors.border,
             ),
             borderRadius: BorderRadius.circular(6),
           ),
@@ -1398,7 +1405,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: _hovered
-                      ? const Color(0xFFE8E8FF)
+                      ? Theme.of(context).colorScheme.onSurface
                       : const Color(0xFF9AA3BF),
                 ),
               ),
@@ -1472,6 +1479,7 @@ class _TypeFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       color: const Color(0xFF0D1018),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1489,7 +1497,7 @@ class _TypeFilterBar extends StatelessWidget {
                 color: hidden ? const Color(0xFF1A1E2A) : const Color(0xFF1E1840),
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(
-                  color: hidden ? const Color(0xFF2A3040) : const Color(0xFF5C4FCC),
+                  color: hidden ? colors.border : const Color(0xFF5C4FCC),
                 ),
               ),
               child: Row(

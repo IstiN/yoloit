@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/utils/git_init_prompt.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/collaboration/ui/collaboration_button.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
@@ -487,8 +488,9 @@ class _MindMapCanvasState extends State<_MindMapCanvas> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
-      color: const Color(0xFF0D0F14),
+      color: colors.surface,
       child: LayoutBuilder(
         builder: (ctx, constraints) {
           final viewportSize = Size(
@@ -645,16 +647,16 @@ class _MindMapCanvasState extends State<_MindMapCanvas> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0D1117),
+                            color: colors.surface,
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFF2A3040)),
+                            border: Border.all(color: colors.border),
                           ),
                           child: Icon(
                             _showMinimap ? Icons.map : Icons.map_outlined,
                             size: 12,
                             color: _showMinimap
                                 ? const Color(0xFF60A5FA)
-                                : const Color(0xFF6B7898),
+                                : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                           ),
                         ),
                       ),
@@ -884,6 +886,7 @@ class _ViewsButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return BlocBuilder<MindMapCubit, MindMapState>(
       buildWhen: (p, n) =>
           p.savedViews.length != n.savedViews.length ||
@@ -904,7 +907,7 @@ class _ViewsButton extends StatelessWidget {
                 border: Border.all(
                   color: hasViews
                       ? const Color(0xFF7C6BFF)
-                      : const Color(0xFF2A3040),
+                      : colors.border,
                 ),
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -915,7 +918,7 @@ class _ViewsButton extends StatelessWidget {
                     size: 13,
                     color: hasViews
                         ? const Color(0xFF7C6BFF)
-                        : const Color(0xFF6B7898),
+                        : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -924,7 +927,7 @@ class _ViewsButton extends StatelessWidget {
                       fontSize: 11,
                       color: hasViews
                           ? const Color(0xFF9D8FFF)
-                          : const Color(0xFF6B7898),
+                          : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -970,14 +973,15 @@ class _ViewsSheetState extends State<_ViewsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
         width: 320,
         margin: const EdgeInsets.only(bottom: 60),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F1218),
-          border: Border.all(color: const Color(0xFF2A3040)),
+          color: colors.surface,
+          border: Border.all(color: colors.border),
           borderRadius: BorderRadius.circular(12),
           boxShadow: const [
             BoxShadow(color: Color(0xA0000000), blurRadius: 24),
@@ -998,22 +1002,22 @@ class _ViewsSheetState extends State<_ViewsSheet> {
                         color: Color(0xFF7C6BFF),
                       ),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Saved Views',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFFE8E8FF),
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
-                        child: const Icon(
+                        child: Icon(
                           Icons.close,
                           size: 14,
-                          color: Color(0xFF6B7898),
+                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -1028,9 +1032,9 @@ class _ViewsSheetState extends State<_ViewsSheet> {
                       Expanded(
                         child: TextField(
                           controller: _ctrl,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFFE8E8FF),
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                           decoration: InputDecoration(
                             hintText: state.activeViewName ?? 'View name…',
@@ -1045,8 +1049,8 @@ class _ViewsSheetState extends State<_ViewsSheet> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF2A3040),
+                              borderSide: BorderSide(
+                                color: colors.border,
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -1166,7 +1170,7 @@ class _ViewRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: isActive
-                      ? const Color(0xFFE8E8FF)
+                      ? Theme.of(context).colorScheme.onSurface
                       : const Color(0xFF9BAACB),
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                 ),
@@ -1205,6 +1209,7 @@ class _ToolBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: tooltip,
       child: GestureDetector(
@@ -1214,10 +1219,10 @@ class _ToolBtn extends StatelessWidget {
           height: 30,
           decoration: BoxDecoration(
             color: const Color(0xFF12151C),
-            border: Border.all(color: const Color(0xFF2A3040)),
+            border: Border.all(color: colors.border),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Icon(icon, size: 15, color: const Color(0xFF6B7898)),
+          child: Icon(icon, size: 15, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
         ),
       ),
     );
@@ -1318,14 +1323,14 @@ class _WsRow extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: hidden
                       ? const Color(0xFF4A5680)
-                      : const Color(0xFFE8E8FF),
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
             Icon(
               expanded ? Icons.expand_less : Icons.expand_more,
               size: 13,
-              color: const Color(0xFF6B7898),
+              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
             ),
           ],
         ),
@@ -1430,7 +1435,10 @@ class _TreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
     final m = _meta;
+    final effectiveColor = m.color == const Color(0xFF6B7898) ? mutedColor : m.color;
     final indent = 10.0 + depth * 14.0;
     return InkWell(
       // Row tap: expand/collapse if it has children; otherwise focus the node.
@@ -1444,7 +1452,7 @@ class _TreeRow extends StatelessWidget {
               width: 1,
               height: 16,
               margin: const EdgeInsets.only(right: 5),
-              color: const Color(0xFF2A3040),
+              color: colors.border,
             ),
             // Eye icon — always toggles hide/show (independent of row tap).
             GestureDetector(
@@ -1465,7 +1473,7 @@ class _TreeRow extends StatelessWidget {
             Icon(
               m.icon,
               size: 11,
-              color: hidden ? const Color(0xFF3D475E) : m.color,
+              color: hidden ? const Color(0xFF3D475E) : effectiveColor,
             ),
             const SizedBox(width: 5),
             Expanded(
@@ -1485,7 +1493,7 @@ class _TreeRow extends StatelessWidget {
               Icon(
                 expanded ? Icons.expand_less : Icons.expand_more,
                 size: 11,
-                color: const Color(0xFF6B7898),
+                color: mutedColor,
               ),
             ],
           ],
@@ -1573,6 +1581,7 @@ class _SidebarToggle extends StatelessWidget {
 // ── Sidebar actions ────────────────────────────────────────────────────────
 
 Future<void> _createWorkspace(BuildContext context) async {
+  final colors = context.appColors;
   final controller = TextEditingController();
   final String? name;
   try {
@@ -1582,27 +1591,27 @@ Future<void> _createWorkspace(BuildContext context) async {
         backgroundColor: const Color(0xFF12151C),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: Color(0xFF2A3040)),
+          side: BorderSide(color: colors.border),
         ),
-        title: const Text(
+        title: Text(
           'New Workspace',
-          style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: Color(0xFFE8E8FF)),
-          decoration: const InputDecoration(
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
+          decoration: InputDecoration(
             hintText: 'Workspace name',
-            hintStyle: TextStyle(color: Color(0xFF6B7898)),
+            hintStyle: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFF6B7898)),
+              style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface),
             ),
           ),
           TextButton(
@@ -1646,6 +1655,7 @@ class _SidebarActionState extends State<_SidebarAction> {
   bool _hovered = false;
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -1660,7 +1670,7 @@ class _SidebarActionState extends State<_SidebarAction> {
             border: Border.all(
               color: _hovered
                   ? const Color(0xFF7C6BFF)
-                  : const Color(0xFF2A3040),
+                  : colors.border,
             ),
             borderRadius: BorderRadius.circular(6),
           ),
@@ -1682,7 +1692,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: _hovered
-                      ? const Color(0xFFE8E8FF)
+                      ? Theme.of(context).colorScheme.onSurface
                       : const Color(0xFF9AA3BF),
                 ),
               ),

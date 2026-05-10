@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 import 'package:yoloit/features/collaboration/ui/guest_terminal_view.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/presentation.dart';
@@ -135,11 +136,12 @@ class _FallbackCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1117),
-        border: Border.all(color: const Color(0xFF2A3040), width: 1.5),
+        color: colors.surface,
+        border: Border.all(color: colors.border, width: 1.5),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -147,15 +149,15 @@ class _FallbackCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(nodeId,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 10,
-                  color: Color(0xFF6B7898),
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   fontFamily: 'monospace')),
           const SizedBox(height: 4),
           for (final e in content.entries.where((e) => e.value is String))
             Text('${e.key}: ${e.value}',
-                style: const TextStyle(
-                    fontSize: 10, color: Color(0xFFCBD5E1))),
+                style: TextStyle(
+                    fontSize: 10, color: Theme.of(context).colorScheme.onSurface)),
         ],
       ),
     );

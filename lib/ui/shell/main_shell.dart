@@ -10,7 +10,6 @@ import 'package:yoloit/core/hotkeys/hotkeys.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/mindmap/mindmap_view.dart';
@@ -434,6 +433,7 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
   Widget build(BuildContext context) {
     return BlocBuilder<FileEditorCubit, FileEditorState>(
       builder: (context, editorState) {
+        final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
         final showWorkspace = widget.workspaceVis == PanelVisibility.open;
         final workspaceCollapsed =
             widget.workspaceVis == PanelVisibility.collapsed;
@@ -469,8 +469,8 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                                   ActivityRailItem(
                                     iconWidget: SvgPicture.asset(
                                       'assets/images/yoloit_mark.svg',
-                                      colorFilter: const ColorFilter.mode(
-                                        AppColors.textMuted,
+                                      colorFilter: ColorFilter.mode(
+                                        mutedColor,
                                         BlendMode.srcIn,
                                       ),
                                     ),
@@ -512,8 +512,8 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                                 title: 'WORKSPACES',
                                 iconWidget: SvgPicture.asset(
                                   'assets/images/yoloit_mark.svg',
-                                  colorFilter: const ColorFilter.mode(
-                                    AppColors.textMuted,
+                                  colorFilter: ColorFilter.mode(
+                                    mutedColor,
                                     BlendMode.srcIn,
                                   ),
                                 ),
@@ -1044,17 +1044,17 @@ class _TitleBar extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.search,
                             size: 15,
-                            color: AppColors.textMuted,
+                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                           ),
                           const SizedBox(width: 8),
-                          const Flexible(
+                          Flexible(
                             child: Text(
                               'Quick open…',
                               style: TextStyle(
-                                color: AppColors.textMuted,
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                                 fontSize: 14,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -1064,7 +1064,7 @@ class _TitleBar extends StatelessWidget {
                           Text(
                             isWindows ? 'Ctrl+O' : '⌘O',
                             style: TextStyle(
-                              color: AppColors.textMuted.withAlpha(120),
+                              color: (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface).withAlpha(120),
                               fontSize: 12,
                             ),
                           ),
@@ -1171,7 +1171,7 @@ class _PanelToggleButton extends StatelessWidget {
             child: Icon(
               icon,
               size: 16,
-              color: active ? colors.primary : AppColors.textMuted,
+              color: active ? colors.primary : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
               semanticLabel: tooltip,
             ),
           ),
@@ -1269,10 +1269,12 @@ class _WinBtnState extends State<_WinBtn> {
 
   @override
   Widget build(BuildContext context) {
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final secondaryColor = Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
     final hoverColor =
         widget.isClose
             ? const Color(0xFFE81123)
-            : AppColors.textMuted.withAlpha(40);
+            : mutedColor.withAlpha(40);
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
@@ -1290,7 +1292,7 @@ class _WinBtnState extends State<_WinBtn> {
               color:
                   _hovered && widget.isClose
                       ? Colors.white
-                      : AppColors.textSecondary,
+                      : secondaryColor,
             ),
           ),
         ),
@@ -1362,7 +1364,7 @@ class _ResourceChipState extends State<_ResourceChip> {
     final colors = context.appColors;
     final textColor =
         Theme.of(context).textTheme.bodySmall?.color ??
-        const Color(0xFFB0B0D0);
+        Theme.of(context).colorScheme.onSurface;
     return GestureDetector(
       onTap: () => _toggle(context),
       child: Container(
@@ -1427,6 +1429,9 @@ class _ResourcePanelState extends State<_ResourcePanel> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
     final host = _snap.host;
     final ramSharePercent =
         host.totalBytes > 0
@@ -1467,9 +1472,9 @@ class _ResourcePanelState extends State<_ResourcePanel> {
             color: Colors.transparent,
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF16163A),
+                color: colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF32327A)),
+                border: Border.all(color: colors.border),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 16),
                 ],
@@ -1483,17 +1488,17 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                     padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.monitor_heart_outlined,
                           size: 13,
-                          color: Color(0xFF7C7CFF),
+                          color: colors.primary,
                         ),
                         const SizedBox(width: 6),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'RESOURCE USAGE',
                             style: TextStyle(
-                              color: Color(0xFFE0E0F0),
+                              color: onSurface,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 1,
@@ -1503,27 +1508,27 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                         GestureDetector(
                           onTap:
                               () => ResourceMonitorService.instance.pollNow(),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Icon(
                               Icons.refresh,
                               size: 13,
-                              color: Color(0xFF6060A0),
+                              color: mutedColor,
                             ),
                           ),
                         ),
                         GestureDetector(
                           onTap: widget.onClose,
-                          child: const Icon(
+                          child: Icon(
                             Icons.close,
                             size: 12,
-                            color: Color(0xFF6060A0),
+                            color: mutedColor,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Divider(height: 1, color: Color(0xFF32327A)),
+                  Divider(height: 1, color: colors.border),
 
                   // 3-column metric grid: CPU total%, Memory total, RAM share%
                   Padding(
@@ -1548,7 +1553,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                       ],
                     ),
                   ),
-                  const Divider(height: 1, color: Color(0xFF32327A)),
+                  Divider(height: 1, color: colors.border),
 
                   // HOST section
                   Padding(
@@ -1559,10 +1564,10 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                         Tooltip(
                           message:
                               'Total RAM of your Mac (all processes combined)',
-                          child: const Text(
+                          child: Text(
                             'SYSTEM RAM',
                             style: TextStyle(
-                              color: Color(0xFF6060A0),
+                              color: mutedColor,
                               fontSize: 9,
                               letterSpacing: 0.8,
                             ),
@@ -1573,8 +1578,8 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                           children: [
                             Text(
                               '${formatBytes(host.usedBytes)} used / ${formatBytes(host.totalBytes)} total',
-                              style: const TextStyle(
-                                color: Color(0xFFB0B0D0),
+                              style: TextStyle(
+                                color: onSurface,
                                 fontSize: 10,
                               ),
                             ),
@@ -1588,7 +1593,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                             height: 4,
                             child: LinearProgressIndicator(
                               value: (host.usedPercent / 100).clamp(0.0, 1.0),
-                              backgroundColor: const Color(0xFF2A2A5A),
+                              backgroundColor: colors.surfaceElevated,
                               valueColor: AlwaysStoppedAnimation<Color>(
                                 memBarColor,
                               ),
@@ -1599,10 +1604,10 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                         // Load avg row
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'LOAD AVG',
                               style: TextStyle(
-                                color: Color(0xFF6060A0),
+                                color: mutedColor,
                                 fontSize: 9,
                                 letterSpacing: 0.8,
                               ),
@@ -1610,8 +1615,8 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                             const SizedBox(width: 8),
                             Text(
                               host.loadAverage1m.toStringAsFixed(2),
-                              style: const TextStyle(
-                                color: Color(0xFFB0B0D0),
+                              style: TextStyle(
+                                color: onSurface,
                                 fontSize: 10,
                                 fontFamily: 'monospace',
                               ),
@@ -1625,13 +1630,13 @@ class _ResourcePanelState extends State<_ResourcePanel> {
 
                   // SESSIONS section (registered PTYs)
                   if (registeredSessions.isNotEmpty) ...[
-                    const Divider(height: 1, color: Color(0xFF32327A)),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(14, 8, 14, 4),
+                    Divider(height: 1, color: colors.border),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
                       child: Text(
                         'SESSIONS',
                         style: TextStyle(
-                          color: Color(0xFF6060A0),
+                          color: mutedColor,
                           fontSize: 9,
                           letterSpacing: 0.8,
                         ),
@@ -1642,13 +1647,13 @@ class _ResourcePanelState extends State<_ResourcePanel> {
 
                   // AGENTS section (ps-scanned unregistered agents)
                   if (agentSessions.isNotEmpty) ...[
-                    const Divider(height: 1, color: Color(0xFF32327A)),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(14, 8, 14, 4),
+                    Divider(height: 1, color: colors.border),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
                       child: Text(
                         'AGENTS & TOOLS',
                         style: TextStyle(
-                          color: Color(0xFF6060A0),
+                          color: mutedColor,
                           fontSize: 9,
                           letterSpacing: 0.8,
                         ),
@@ -1675,14 +1680,16 @@ class _StatCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF6060A0),
+            style: TextStyle(
+              color: mutedColor,
               fontSize: 9,
               letterSpacing: 0.6,
             ),
@@ -1690,8 +1697,8 @@ class _StatCell extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
-            style: const TextStyle(
-              color: Color(0xFFE0E0F0),
+            style: TextStyle(
+              color: onSurface,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -1708,24 +1715,27 @@ class _SessionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 3, 14, 3),
       child: Row(
         children: [
-          const Icon(Icons.circle, size: 5, color: Color(0xFF7C7CFF)),
+          Icon(Icons.circle, size: 5, color: colors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               formatSessionLabel(session.label),
-              style: const TextStyle(color: Color(0xFFB0B0D0), fontSize: 11),
+              style: TextStyle(color: onSurface, fontSize: 11),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 8),
           Text(
             '${session.cpuPercent.toStringAsFixed(1)}%',
-            style: const TextStyle(
-              color: Color(0xFF8080B0),
+            style: TextStyle(
+              color: mutedColor,
               fontSize: 10,
               fontFamily: 'monospace',
             ),
@@ -1735,8 +1745,8 @@ class _SessionRow extends StatelessWidget {
             width: 56,
             child: Text(
               formatBytes(session.memoryBytes),
-              style: const TextStyle(
-                color: Color(0xFF8080B0),
+              style: TextStyle(
+                color: mutedColor,
                 fontSize: 10,
                 fontFamily: 'monospace',
               ),

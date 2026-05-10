@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import '../bloc/collaboration_cubit.dart';
 import '../bloc/collaboration_state.dart';
 import '../collaboration_ports.dart';
@@ -93,6 +94,7 @@ class _GuestShellState extends State<GuestShell> {
 
   Widget _buildConnectScreen(BuildContext ctx, CollaborationState collab) {
     final cubit = ctx.read<CollaborationCubit>();
+    final colors = ctx.appColors;
     return Scaffold(
       backgroundColor: const Color(0xFF070714),
       body: Center(
@@ -100,7 +102,7 @@ class _GuestShellState extends State<GuestShell> {
           width: 420,
           padding: const EdgeInsets.all(36),
           decoration: BoxDecoration(
-            color: const Color(0xFF0D1117),
+            color: colors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFF1E2330), width: 1),
             boxShadow: const [
@@ -135,18 +137,18 @@ class _GuestShellState extends State<GuestShell> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'YoLoIT Space',
                         style: TextStyle(
-                          color: Color(0xFFE8E8FF),
+                          color: Theme.of(ctx).colorScheme.onSurface,
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      Text(
+                      const Text(
                         'Connect to a running desktop session',
                         style: TextStyle(
                           color: Color(0xFF6B7898),
@@ -258,7 +260,10 @@ class _GuestShellState extends State<GuestShell> {
       TextField(
         controller: c,
         keyboardType: number ? TextInputType.number : TextInputType.text,
-        style: const TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontSize: 14,
+        ),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Color(0xFF3D4A6B), fontSize: 14),
@@ -300,16 +305,16 @@ class _GuestShellState extends State<GuestShell> {
   Widget _buildTopBar(BuildContext ctx, CollaborationState collab) {
     return Container(
       height: 44,
-      color: const Color(0xFF0D1117),
+      color: ctx.appColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           const Icon(Icons.hub_rounded, color: Color(0xFF4B9EFF), size: 16),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             'YoLoIT Space',
             style: TextStyle(
-              color: Color(0xFFE8E8FF),
+              color: Theme.of(ctx).colorScheme.onSurface,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),

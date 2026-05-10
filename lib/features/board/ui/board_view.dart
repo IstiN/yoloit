@@ -9,7 +9,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
@@ -606,27 +605,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(
+                                          Icon(
                                             Icons.dashboard_customize_outlined,
                                             size: 32,
-                                            color: AppColors.textMuted,
+                                            color: Theme.of(context).textTheme.bodySmall?.color,
                                           ),
                                           const SizedBox(height: 12),
                                           Text(
                                             'Board foundation is ready',
-                                            style: const TextStyle(
-                                              color: AppColors.textPrimary,
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.onSurface,
                                               fontWeight: FontWeight.w600,
                                               fontSize: 16,
                                             ),
                                           ),
                                           const SizedBox(height: 8),
-                                          const Text(
+                                          Text(
                                             'Create named boards and start with markdown notes. '
                                             'The first panel will open in a free slot, and links will support static and dynamic lines/arrows.',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
-                                              color: AppColors.textMuted,
+                                              color: Theme.of(context).textTheme.bodySmall?.color,
                                               fontSize: 13,
                                             ),
                                           ),
@@ -1960,7 +1959,7 @@ class _BoardToolbar extends StatelessWidget {
                 value: board.id,
                 dropdownColor: colors.surface,
                 borderRadius: BorderRadius.circular(12),
-                iconEnabledColor: AppColors.textMuted,
+                iconEnabledColor: Theme.of(context).textTheme.bodySmall?.color,
                 items: [
                   for (final item in boards)
                     DropdownMenuItem<String>(
@@ -2027,11 +2026,11 @@ class _ToolbarChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: AppColors.textMuted),
+          Icon(icon, size: 16, color: Theme.of(context).textTheme.bodySmall?.color),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontSize: 12),
           ),
         ],
       ),
@@ -2079,7 +2078,7 @@ class _OverlayIconButton extends StatelessWidget {
                 active
                     ? colors.primary
                     : Theme.of(context).textTheme.bodySmall?.color ??
-                        AppColors.textMuted,
+                        Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ),
@@ -2263,7 +2262,7 @@ class _BoardPanelCard extends StatelessWidget {
                                         ?.icon ??
                                     Icons.dashboard_customize_outlined,
                                 size: 16,
-                                color: AppColors.textMuted,
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                               ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -2271,8 +2270,8 @@ class _BoardPanelCard extends StatelessWidget {
                                 panel.title,
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 13,
                                 ),
@@ -2285,7 +2284,7 @@ class _BoardPanelCard extends StatelessWidget {
                                   width: 16,
                                   height: 16,
                                   decoration: BoxDecoration(
-                                    color: accent ?? const Color(0xFF64748B),
+                                    color: accent ?? (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: Colors.white.withAlpha(100),
@@ -2357,10 +2356,10 @@ class _BoardPanelCard extends StatelessWidget {
                     onPanUpdate: onResize,
                     onPanEnd: (_) => onDragEnd(),
                     onPanCancel: onDragEnd,
-                    child: const Icon(
+                    child: Icon(
                       Icons.drag_handle,
                       size: 14,
-                      color: AppColors.textMuted,
+                      color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
                   ),
                 ),
@@ -2468,7 +2467,7 @@ class _BoardPanelCard extends StatelessWidget {
     return Center(
       child: Text(
         'Unknown: ${panel.type}',
-        style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontSize: 12),
       ),
     );
   }
@@ -2504,7 +2503,7 @@ class _CssZoomManager {
 
     if (immediate || last < 0) {
       _lastZoom[panelId] = scale;
-      _inject(controller, scale);
+      _inject(controller, panelId, scale);
       return;
     }
 
@@ -2513,7 +2512,7 @@ class _CssZoomManager {
     _timers[panelId] = Timer(const Duration(milliseconds: 200), () {
       if ((_lastZoom[panelId]! - target).abs() < 0.005) return;
       _lastZoom[panelId] = target;
-      _inject(controller, target);
+      _inject(controller, panelId, target);
     });
   }
 
@@ -2522,10 +2521,24 @@ class _CssZoomManager {
     _timers.remove(panelId)?.cancel();
   }
 
-  static void _inject(WebViewController controller, double scale) {
-    controller.runJavaScript(
-      "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}'",
-    );
+  static void _inject(WebViewController controller, String panelId, double scale) {
+    final vw = WebpagePlugin.pendingViewportWidth[panelId];
+    if (vw != null) {
+      // Re-assert fixed viewport width so that the board zoom doesn't cause
+      // the page to reflow at the (scaled) native frame width.
+      controller.runJavaScript(
+        "(function(){"
+        "var vp=document.querySelector('meta[name=viewport]');"
+        "if(!vp){vp=document.createElement('meta');vp.name='viewport';document.head.appendChild(vp);}"
+        "vp.content='width=$vw,initial-scale=1';"
+        "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
+        "})();",
+      );
+    } else {
+      controller.runJavaScript(
+        "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}'",
+      );
+    }
   }
 }
 
@@ -3045,6 +3058,7 @@ class _BoardMiniMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AnimatedBuilder(
       animation: transformCtrl,
       builder: (context, _) {
@@ -3064,8 +3078,8 @@ class _BoardMiniMap extends StatelessWidget {
             width: _mapW,
             height: _mapH,
             decoration: BoxDecoration(
-              color: const Color(0xE50B0D12),
-              border: Border.all(color: const Color(0x3060A5FA)),
+              color: colors.surface.withAlpha(0xE5),
+              border: Border.all(color: colors.primary.withAlpha(0x50)),
               borderRadius: BorderRadius.circular(8),
               boxShadow: const [
                 BoxShadow(color: Color(0x66000000), blurRadius: 10),
@@ -3218,9 +3232,9 @@ class _BoardToolsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textMuted;
+        Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
     final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textPrimary;
+        Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
     final panelBg =
         Theme.of(context).brightness == Brightness.light
             ? colors.surface
@@ -3392,7 +3406,7 @@ class _BoardToolsPanel extends StatelessWidget {
                                       Icon(
                                         Icons.history,
                                         size: 14,
-                                        color: Color(0xFF94A3B8),
+                                        color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                                       ),
                                       SizedBox(width: 8),
                                       Text(
@@ -3491,7 +3505,7 @@ class _BoardToolsPanel extends StatelessWidget {
                                       Icon(
                                         Icons.history,
                                         size: 14,
-                                        color: Color(0xFF94A3B8),
+                                        color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                                       ),
                                       SizedBox(width: 8),
                                       Text(
@@ -3557,6 +3571,7 @@ class _BoardToolsPanel extends StatelessWidget {
                               'board.checklist',
                               'board.files',
                               'board.file.preview',
+                              'board.playlist',
                             ];
                             final pluginEntries =
                                 genericTypes.map((typeId) {
@@ -3642,22 +3657,25 @@ class _DrawSettingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
     return Container(
       width: 160,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: const Color(0xE50B0D12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A3040)),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'Draw settings',
             style: TextStyle(
-              color: AppColors.textMuted,
+              color: mutedColor,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -3750,9 +3768,9 @@ class _DrawSettingsPanel extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           // Stroke width slider
-          const Text(
+          Text(
             'Size',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+            style: TextStyle(color: mutedColor, fontSize: 11),
           ),
           SliderTheme(
             data: SliderThemeData(
@@ -3762,7 +3780,7 @@ class _DrawSettingsPanel extends StatelessWidget {
               activeTrackColor: settings.strokeColor,
               thumbColor: settings.strokeColor,
               overlayColor: settings.strokeColor.withAlpha(40),
-              inactiveTrackColor: const Color(0xFF2A3040),
+              inactiveTrackColor: colors.border,
             ),
             child: Slider(
               value: settings.strokeWidth,
@@ -3792,6 +3810,9 @@ class _ConnectSettingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
     final activeColor = settings.color;
     return Container(
       width: 200,
@@ -3799,16 +3820,16 @@ class _ConnectSettingsPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xE50B0D12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A3040)),
+        border: Border.all(color: colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             'Connect',
             style: TextStyle(
-              color: AppColors.textMuted,
+              color: mutedColor,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -3820,9 +3841,9 @@ class _ConnectSettingsPanel extends StatelessWidget {
             width: double.infinity,
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF0B0D12),
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF2A3040)),
+                border: Border.all(color: colors.border),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -3832,6 +3853,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
                     geometry: settings.geometry,
                     showArrow: settings.showArrow,
                     color: activeColor,
+                    borderColor: colors.border,
                   ),
                   child: const SizedBox.expand(),
                 ),
@@ -3860,7 +3882,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
                           color:
                               settings.geometry == geo
                                   ? activeColor.withAlpha(160)
-                                  : const Color(0xFF2A3040),
+                                  : colors.border,
                         ),
                       ),
                       child: Column(
@@ -3873,7 +3895,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
                               color:
                                   settings.geometry == geo
                                       ? activeColor
-                                      : AppColors.textMuted,
+                                      : mutedColor,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -3888,7 +3910,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
                               color:
                                   settings.geometry == geo
                                       ? activeColor
-                                      : AppColors.textMuted,
+                                      : mutedColor,
                             ),
                           ),
                         ],
@@ -3904,9 +3926,9 @@ class _ConnectSettingsPanel extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Arrow',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: mutedColor, fontSize: 11),
               ),
               Transform.scale(
                 scale: 0.75,
@@ -4354,6 +4376,9 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
     return AlertDialog(
       title: const Text('Link style'),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -4367,9 +4392,9 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
             Container(
               height: 100,
               decoration: BoxDecoration(
-                color: const Color(0xFF0B0D12),
+                color: colors.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2A3040)),
+                border: Border.all(color: colors.border),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -4378,6 +4403,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                     geometry: _geometry,
                     showArrow: _showArrow,
                     color: _color,
+                    borderColor: colors.border,
                   ),
                   child: const SizedBox.expand(),
                 ),
@@ -4385,9 +4411,9 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
             ),
             const SizedBox(height: 16),
             // ── Geometry selector ────────────────────────────────────────
-            const Text(
+            Text(
               'Line style',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 12, color: mutedColor),
             ),
             const SizedBox(height: 8),
             Row(
@@ -4410,7 +4436,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                             color:
                                 _geometry == geo
                                     ? _color.withAlpha(180)
-                                    : const Color(0xFF2A3040),
+                                    : colors.border,
                             width: _geometry == geo ? 2 : 1,
                           ),
                         ),
@@ -4424,7 +4450,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                                 color:
                                     _geometry == geo
                                         ? _color
-                                        : AppColors.textMuted,
+                                        : mutedColor,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -4439,7 +4465,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                                 color:
                                     _geometry == geo
                                         ? _color
-                                        : AppColors.textMuted,
+                                        : mutedColor,
                               ),
                             ),
                           ],
@@ -4465,9 +4491,9 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
             ),
             const SizedBox(height: 12),
             // ── Color swatches ───────────────────────────────────────────
-            const Text(
+            Text(
               'Color',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              style: TextStyle(fontSize: 12, color: mutedColor),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -4532,11 +4558,13 @@ class _LinkPreviewPainter extends CustomPainter {
     required this.geometry,
     required this.showArrow,
     required this.color,
+    required this.borderColor,
   });
 
   final BoardLinkGeometry geometry;
   final bool showArrow;
   final Color color;
+  final Color borderColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -4551,7 +4579,7 @@ class _LinkPreviewPainter extends CustomPainter {
           ..style = PaintingStyle.fill;
     final panelBorderPaint =
         Paint()
-          ..color = const Color(0xFF2A3040)
+          ..color = borderColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1;
     final leftPanel = Rect.fromCenter(center: start, width: 56, height: 32);
@@ -4620,7 +4648,8 @@ class _LinkPreviewPainter extends CustomPainter {
   bool shouldRepaint(covariant _LinkPreviewPainter old) =>
       old.geometry != geometry ||
       old.showArrow != showArrow ||
-      old.color != color;
+      old.color != color ||
+      old.borderColor != borderColor;
 }
 
 /// Tiny icon-sized link preview used inside the geometry selector buttons.
@@ -4768,23 +4797,29 @@ class _ChatHeaderMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final secondaryColor = Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return SizedBox(
       width: 28,
       height: 28,
       child: PopupMenuButton<String>(
-        icon: const Icon(
+        icon: Icon(
           Icons.more_horiz,
           size: 16,
-          color: AppColors.textMuted,
+          color: mutedColor,
         ),
         splashRadius: 14,
         padding: EdgeInsets.zero,
         iconSize: 16,
-        color: const Color(0xFF1E293B),
+        color: colors.surfaceElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         itemBuilder:
-            (context) => [
-              const PopupMenuItem(
+            (menuCtx) => [
+              PopupMenuItem(
                 value: 'rename',
                 height: 36,
                 child: Row(
@@ -4792,45 +4827,45 @@ class _ChatHeaderMenu extends StatelessWidget {
                     Icon(
                       Icons.edit_outlined,
                       size: 14,
-                      color: Color(0xFF94A3B8),
+                      color: secondaryColor,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       'Rename session',
-                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                      style: TextStyle(fontSize: 12, color: onSurface),
                     ),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'settings',
                 height: 36,
                 child: Row(
                   children: [
-                    Icon(Icons.tune, size: 14, color: Color(0xFF94A3B8)),
-                    SizedBox(width: 8),
+                    Icon(Icons.tune, size: 14, color: secondaryColor),
+                    const SizedBox(width: 8),
                     Text(
                       'CLI settings',
-                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                      style: TextStyle(fontSize: 12, color: onSurface),
                     ),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'history',
                 height: 36,
                 child: Row(
                   children: [
-                    Icon(Icons.history, size: 14, color: Color(0xFF94A3B8)),
-                    SizedBox(width: 8),
+                    Icon(Icons.history, size: 14, color: secondaryColor),
+                    const SizedBox(width: 8),
                     Text(
                       'Session history',
-                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                      style: TextStyle(fontSize: 12, color: onSurface),
                     ),
                   ],
                 ),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'color',
                 height: 36,
                 child: Row(
@@ -4838,12 +4873,12 @@ class _ChatHeaderMenu extends StatelessWidget {
                     Icon(
                       Icons.palette_outlined,
                       size: 14,
-                      color: Color(0xFF94A3B8),
+                      color: secondaryColor,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       'Change color',
-                      style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                      style: TextStyle(fontSize: 12, color: onSurface),
                     ),
                   ],
                 ),
@@ -4875,38 +4910,44 @@ class _ChatHeaderMenu extends StatelessWidget {
     showDialog(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
-            title: const Text(
-              'Rename session',
-              style: TextStyle(color: Color(0xFFE2E8F0)),
-            ),
-            content: TextField(
-              controller: ctrl,
-              autofocus: true,
-              style: const TextStyle(color: Color(0xFFE2E8F0)),
-              decoration: InputDecoration(
-                hintText: 'Session name',
-                hintStyle: const TextStyle(color: Color(0xFF475569)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+          (ctx) {
+            final colors = ctx.appColors;
+            final onSurface = Theme.of(ctx).colorScheme.onSurface;
+            final mutedColor = Theme.of(ctx).textTheme.bodySmall?.color ??
+                Theme.of(ctx).colorScheme.onSurface;
+            return AlertDialog(
+              backgroundColor: colors.surfaceElevated,
+              title: Text(
+                'Rename session',
+                style: TextStyle(color: onSurface),
+              ),
+              content: TextField(
+                controller: ctrl,
+                autofocus: true,
+                style: TextStyle(color: onSurface),
+                decoration: InputDecoration(
+                  hintText: 'Session name',
+                  hintStyle: TextStyle(color: mutedColor),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
+                onSubmitted: (_) {
+                  _applyRename(ctx, ctrl.text, cubit);
+                },
               ),
-              onSubmitted: (_) {
-                _applyRename(ctx, ctrl.text, cubit);
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => _applyRename(ctx, ctrl.text, cubit),
-                child: const Text('Rename'),
-              ),
-            ],
-          ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => _applyRename(ctx, ctrl.text, cubit),
+                  child: const Text('Rename'),
+                ),
+              ],
+            );
+          },
     );
   }
 
@@ -4945,16 +4986,22 @@ class _ChatHeaderMenu extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) {
+        final colors = ctx.appColors;
+        final onSurface = Theme.of(ctx).colorScheme.onSurface;
+        final secondaryColor = Theme.of(ctx).textTheme.bodyMedium?.color ??
+            Theme.of(ctx).colorScheme.onSurface;
+        final mutedColor = Theme.of(ctx).textTheme.bodySmall?.color ??
+            Theme.of(ctx).colorScheme.onSurface;
         var mode = config.mode;
         var reasoningEffort = config.reasoningEffort;
         var envGroupIds = List<String>.from(config.envGroupIds);
         return StatefulBuilder(
           builder:
               (ctx, setDialogState) => AlertDialog(
-                backgroundColor: const Color(0xFF1E293B),
-                title: const Text(
+                backgroundColor: colors.surfaceElevated,
+                title: Text(
                   'CLI Settings',
-                  style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 14),
+                  style: TextStyle(color: onSurface, fontSize: 14),
                 ),
                 content: SizedBox(
                   width: 320,
@@ -4962,10 +5009,10 @@ class _ChatHeaderMenu extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Agent Mode',
                         style: TextStyle(
-                          color: Color(0xFF94A3B8),
+                          color: secondaryColor,
                           fontSize: 11,
                         ),
                       ),
@@ -4973,9 +5020,9 @@ class _ChatHeaderMenu extends StatelessWidget {
                       DropdownButton<String?>(
                         value: mode,
                         isExpanded: true,
-                        dropdownColor: const Color(0xFF1E293B),
-                        style: const TextStyle(
-                          color: Color(0xFFE2E8F0),
+                        dropdownColor: colors.surfaceElevated,
+                        style: TextStyle(
+                          color: onSurface,
                           fontSize: 12,
                         ),
                         items: const [
@@ -4996,10 +5043,10 @@ class _ChatHeaderMenu extends StatelessWidget {
                         onChanged: (v) => setDialogState(() => mode = v),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Reasoning effort',
                         style: TextStyle(
-                          color: Color(0xFF94A3B8),
+                          color: secondaryColor,
                           fontSize: 11,
                         ),
                       ),
@@ -5007,9 +5054,9 @@ class _ChatHeaderMenu extends StatelessWidget {
                       DropdownButton<String?>(
                         value: reasoningEffort,
                         isExpanded: true,
-                        dropdownColor: const Color(0xFF1E293B),
-                        style: const TextStyle(
-                          color: Color(0xFFE2E8F0),
+                        dropdownColor: colors.surfaceElevated,
+                        style: TextStyle(
+                          color: onSurface,
                           fontSize: 12,
                         ),
                         items: const [
@@ -5036,24 +5083,24 @@ class _ChatHeaderMenu extends StatelessWidget {
                                 setDialogState(() => envGroupIds = value),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Max autopilot continues',
                         style: TextStyle(
-                          color: Color(0xFF94A3B8),
+                          color: secondaryColor,
                           fontSize: 11,
                         ),
                       ),
                       const SizedBox(height: 4),
                       TextField(
                         controller: maxContinuesCtrl,
-                        style: const TextStyle(
-                          color: Color(0xFFE2E8F0),
+                        style: TextStyle(
+                          color: onSurface,
                           fontSize: 12,
                         ),
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           hintText: '99',
-                          hintStyle: const TextStyle(color: Color(0xFF475569)),
+                          hintStyle: TextStyle(color: mutedColor),
                           isDense: true,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
@@ -5061,23 +5108,23 @@ class _ChatHeaderMenu extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         'Custom args',
                         style: TextStyle(
-                          color: Color(0xFF94A3B8),
+                          color: secondaryColor,
                           fontSize: 11,
                         ),
                       ),
                       const SizedBox(height: 4),
                       TextField(
                         controller: customArgsCtrl,
-                        style: const TextStyle(
-                          color: Color(0xFFE2E8F0),
+                        style: TextStyle(
+                          color: onSurface,
                           fontSize: 12,
                         ),
                         decoration: InputDecoration(
                           hintText: '--flag value ...',
-                          hintStyle: const TextStyle(color: Color(0xFF475569)),
+                          hintStyle: TextStyle(color: mutedColor),
                           isDense: true,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
@@ -5150,15 +5197,21 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final secondaryColor = Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return AlertDialog(
-      backgroundColor: const Color(0xFF1E293B),
-      title: const Row(
+      backgroundColor: colors.surfaceElevated,
+      title: Row(
         children: [
-          Icon(Icons.history, size: 18, color: Color(0xFF94A3B8)),
-          SizedBox(width: 8),
+          Icon(Icons.history, size: 18, color: secondaryColor),
+          const SizedBox(width: 8),
           Text(
             'Session history',
-            style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16),
+            style: TextStyle(color: onSurface, fontSize: 16),
           ),
         ],
       ),
@@ -5173,11 +5226,11 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
             }
             final entries = snapshot.data!;
             if (entries.isEmpty) {
-              return const Center(
+              return Center(
                 child: Text(
                   'No sessions yet.\nStart chatting to see history here.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  style: TextStyle(color: mutedColor, fontSize: 13),
                 ),
               );
             }
@@ -5214,7 +5267,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                       color:
                           isCurrent
                               ? const Color(0xFF1A3A2A)
-                              : const Color(0xFF0F1219),
+                              : colors.surface,
                       borderRadius: BorderRadius.circular(10),
                       border:
                           isCurrent
@@ -5236,7 +5289,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                           color:
                               isCurrent
                                   ? const Color(0xFF34D399)
-                                  : const Color(0xFF64748B),
+                                  : mutedColor,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -5253,15 +5306,15 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                                   color:
                                       isCurrent
                                           ? const Color(0xFF34D399)
-                                          : const Color(0xFFE2E8F0),
+                                          : onSurface,
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 '${e.provider} • ${e.model} • ${e.messageCount} msgs',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
-                                  color: Color(0xFF64748B),
+                                  color: mutedColor,
                                 ),
                               ),
                             ],
@@ -5269,9 +5322,9 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                         ),
                         Text(
                           _formatDate(e.lastMessageAt ?? e.createdAt),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 9,
-                            color: Color(0xFF475569),
+                            color: mutedColor,
                           ),
                         ),
                         const SizedBox(width: 6),

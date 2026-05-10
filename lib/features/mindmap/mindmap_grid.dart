@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 import 'package:yoloit/features/mindmap/nodes/node_registry.dart';
 import 'package:yoloit/features/mindmap/widgets/mindmap_connector.dart';
@@ -93,6 +94,7 @@ class GridMindMapCanvas extends StatefulWidget {
 class _GridMindMapCanvasState extends State<GridMindMapCanvas> {
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final wsNodes = widget.nodes.whereType<WorkspaceNodeData>().toList();
     final gridPositions = computeGridPositions(
       nodes:          widget.nodes,
@@ -108,7 +110,7 @@ class _GridMindMapCanvasState extends State<GridMindMapCanvas> {
     final defaultSizeMap = {for (final nd in widget.nodes) nd.id: nd.defaultSize};
 
     return Container(
-      color: const Color(0xFF0D0F14),
+      color: colors.surface,
       child: Stack(
         children: [
           InteractiveViewer(
@@ -125,7 +127,7 @@ class _GridMindMapCanvasState extends State<GridMindMapCanvas> {
                 clipBehavior: Clip.none,
                 children: [
                   // Dot-grid background.
-                  Positioned.fill(child: CustomPaint(painter: _DotGridPainter())),
+                  Positioned.fill(child: CustomPaint(painter: _DotGridPainter(dotColor: colors.border.withAlpha(0x8C)))),
 
                   // Cell outlines.
                   for (var wi = 0; wi < wsNodes.length; wi++)
@@ -231,21 +233,23 @@ class _CellOutline extends StatelessWidget {
 }
 
 class _DotGridPainter extends CustomPainter {
-  static final _paint = Paint()
-    ..color = const Color(0x8C3A4560)
-    ..style = PaintingStyle.fill;
+  const _DotGridPainter({required this.dotColor});
+  final Color dotColor;
   static const _spacing = 28.0;
   static const _dotR    = 0.9;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = dotColor
+      ..style = PaintingStyle.fill;
     for (double x = 14; x < size.width; x += _spacing) {
       for (double y = 14; y < size.height; y += _spacing) {
-        canvas.drawCircle(Offset(x, y), _dotR, _paint);
+        canvas.drawCircle(Offset(x, y), _dotR, paint);
       }
     }
   }
 
   @override
-  bool shouldRepaint(_DotGridPainter old) => false;
+  bool shouldRepaint(_DotGridPainter old) => old.dotColor != dotColor;
 }

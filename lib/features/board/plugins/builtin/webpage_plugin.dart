@@ -18,6 +18,13 @@ class WebpagePlugin extends BoardPanelPlugin {
   /// read by [onPageFinished] to re-inject zoom after navigation.
   static final Map<String, double> pendingCssZoom = {};
 
+  /// Fixed CSS viewport width (logical pixels) per panel.  When set,
+  /// onPageFinished injects a <meta viewport> so the page always renders
+  /// at this CSS width regardless of the native WKWebView frame size
+  /// (which changes when the board canvas is zoomed).  CSS zoom then
+  /// scales the fixed-width layout to fit the actual frame.
+  static final Map<String, int> pendingViewportWidth = {};
+
   /// Loading state per panel.  Set to true on page start, false
   /// after CSS zoom is applied in onPageFinished.  The overlay
   /// shows a white cover during loading to hide the flash of
@@ -109,6 +116,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   void dispose() {
     WebpagePlugin.controllers.remove(widget.panel.id);
     WebpagePlugin.pendingCssZoom.remove(widget.panel.id);
+    WebpagePlugin.pendingViewportWidth.remove(widget.panel.id);
     WebpagePlugin.pageLoading.remove(widget.panel.id)?.dispose();
     _urlCtrl.dispose();
     _urlFocus.dispose();
@@ -122,6 +130,15 @@ class _WebpageContentState extends State<_WebpageContent> {
       () => ValueNotifier<bool>(false),
     );
 
+    // Register the intended CSS-pixel viewport width for this panel.
+    // The board view scales the WebView's native frame with the board zoom,
+    // so we fix the CSS viewport via <meta viewport> and counter-scale with
+    // CSS zoom.  Default to the panel's current logical width.
+    WebpagePlugin.pendingViewportWidth.putIfAbsent(
+      panelId,
+      () => widget.panel.bounds.width.round(),
+    );
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
@@ -132,18 +149,19 @@ class _WebpageContentState extends State<_WebpageContent> {
             loading.value = true;
           },
           onPageFinished: (_) {
-            // Re-inject CSS zoom after every page load.  Navigation
-            // replaces the DOM so the previous zoom style is lost.
-            final zoom = WebpagePlugin.pendingCssZoom[panelId];
-            if (zoom != null) {
-              _controller!.runJavaScript(
-                "document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}'",
-              );
-            }
-            // Intercept target="_blank" links and window.open → route
-            // to Flutter via YoloNewTab channel.
+            // Inject fixed viewport width + CSS zoom so that p2z on the
+            // board canvas does NOT cause the page to reflow.  The viewport
+            // meta locks the CSS layout width; CSS zoom counter-scales the
+            // rendered output to fit the (smaller/larger) native frame.
+            final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
+            final vw = WebpagePlugin.pendingViewportWidth[panelId] ??
+                widget.panel.bounds.width.round();
             _controller!.runJavaScript('''
 (function(){
+  var vp=document.querySelector('meta[name=viewport]');
+  if(!vp){vp=document.createElement('meta');vp.name='viewport';document.head.appendChild(vp);}
+  vp.content='width=$vw,initial-scale=1';
+  document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
   if(window.__yoloNewTabSetup) return;
   window.__yoloNewTabSetup=true;
   window.open=function(u){if(u)YoloNewTab.postMessage(u);return null;};
@@ -313,32 +331,36 @@ class _WebpageContentState extends State<_WebpageContent> {
                   onSelected: (value) {
                     final resize = widget.renderContext.onResize;
                     if (resize == null) return;
+                    int targetVw;
                     switch (value) {
                       case 'mobile':
                         resize(375, 667 + 81);
+                        targetVw = 375;
                       case 'tablet':
                         resize(768, 1024 + 81);
+                        targetVw = 768;
                       case 'desktop':
                         resize(1280, 800 + 81);
+                        targetVw = 1280;
+                      default:
+                        return;
                     }
-                    // After panel resize, the native WKWebView frame updates
-                    // but the page may not reflow.  Force a viewport refresh
-                    // once the frame catches up.
+                    // Update the fixed CSS viewport width for this panel and
+                    // re-inject so the page reflows at the new viewport size.
                     final panelId = widget.panel.id;
+                    WebpagePlugin.pendingViewportWidth[panelId] = targetVw;
                     final ctrl = _controller;
                     if (ctrl != null) {
                       Future.delayed(const Duration(milliseconds: 200), () {
-                        // Reset CSS zoom to 1.0 temporarily so the WKWebView
-                        // lays out content at the actual native frame width,
-                        // then re-apply the board-scale zoom.
                         final zoom = WebpagePlugin.pendingCssZoom[panelId] ?? 1.0;
                         ctrl.runJavaScript(
-                          "document.documentElement.style.zoom='1';"
-                          "window.dispatchEvent(new Event('resize'));"
-                          "setTimeout(()=>{"
+                          "(function(){"
+                          "var vp=document.querySelector('meta[name=viewport]');"
+                          "if(!vp){vp=document.createElement('meta');vp.name='viewport';document.head.appendChild(vp);}"
+                          "vp.content='width=$targetVw,initial-scale=1';"
                           "document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';"
                           "window.dispatchEvent(new Event('resize'));"
-                          "},100);",
+                          "})();",
                         );
                       });
                     }

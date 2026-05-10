@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
@@ -223,30 +224,33 @@ class _BoardTerminalInfoBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D1117),
+      decoration: BoxDecoration(
+        color: colors.surface,
         border: Border(
-          bottom: BorderSide(color: Color(0xFF1E293B), width: 0.5),
+          bottom: BorderSide(color: colors.border, width: 0.5),
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.folder_outlined, size: 12, color: Color(0xFF475569)),
+          Icon(Icons.folder_outlined, size: 12, color: mutedColor),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               _shortPath(config.workingDir),
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 10, color: mutedColor),
             ),
           ),
           GestureDetector(
             onTap: onHistory,
-            child: const Tooltip(
+            child: Tooltip(
               message: 'Terminal history',
-              child: Icon(Icons.history, size: 14, color: Color(0xFF64748B)),
+              child: Icon(Icons.history, size: 14, color: mutedColor),
             ),
           ),
           const SizedBox(width: 8),
@@ -296,23 +300,27 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Create terminal',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFFE2E8F0),
+              color: onSurface,
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Working Directory',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            style: TextStyle(fontSize: 11, color: mutedColor),
           ),
           const SizedBox(height: 4),
           GestureDetector(
@@ -332,7 +340,7 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: const Color(0xFF1A2030),
+                color: colors.surfaceElevated,
               ),
               child: Row(
                 children: [
@@ -349,9 +357,7 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
                       style: TextStyle(
                         fontSize: 12,
                         color:
-                            _dirCtrl.text.isEmpty
-                                ? const Color(0xFF475569)
-                                : const Color(0xFFE2E8F0),
+                            _dirCtrl.text.isEmpty ? mutedColor : onSurface,
                       ),
                     ),
                   ),
@@ -360,22 +366,22 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Session Name',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            style: TextStyle(fontSize: 11, color: mutedColor),
           ),
           const SizedBox(height: 4),
           TextField(
             controller: _nameCtrl,
-            style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+            style: TextStyle(fontSize: 12, color: onSurface),
             decoration: InputDecoration(
               hintText: 'Defaults to folder name',
-              hintStyle: const TextStyle(
+              hintStyle: TextStyle(
                 fontSize: 12,
-                color: Color(0xFF475569),
+                color: mutedColor,
               ),
               filled: true,
-              fillColor: const Color(0xFF1A2030),
+              fillColor: colors.surfaceElevated,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
@@ -406,7 +412,7 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
                     ),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF22C55E),
-              foregroundColor: const Color(0xFF0F172A),
+              foregroundColor: colors.surface,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -438,27 +444,30 @@ class _TerminalDisconnectedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.terminal, size: 40, color: Color(0xFF475569)),
+            Icon(Icons.terminal, size: 40, color: mutedColor),
             const SizedBox(height: 12),
             Text(
               sessionName.isEmpty ? 'Terminal ended' : '$sessionName ended',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFFE2E8F0),
+                color: onSurface,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               workingDir,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 11, color: mutedColor),
             ),
             const SizedBox(height: 14),
             Row(
@@ -513,15 +522,21 @@ class _BoardTerminalSessionHistoryDialogState
   @override
   Widget build(BuildContext context) {
     final manager = BoardTerminalSessionManager.instance;
+    final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final secondaryColor = Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return AlertDialog(
-      backgroundColor: const Color(0xFF1E293B),
-      title: const Row(
+      backgroundColor: colors.surfaceElevated,
+      title: Row(
         children: [
-          Icon(Icons.history, size: 18, color: Color(0xFF94A3B8)),
-          SizedBox(width: 8),
+          Icon(Icons.history, size: 18, color: secondaryColor),
+          const SizedBox(width: 8),
           Text(
             'Terminal history',
-            style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16),
+            style: TextStyle(color: onSurface, fontSize: 16),
           ),
         ],
       ),
@@ -539,10 +554,10 @@ class _BoardTerminalSessionHistoryDialogState
                 }
                 final entries = snapshot.data!;
                 if (entries.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
                       'No terminal sessions yet.',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      style: TextStyle(color: mutedColor, fontSize: 13),
                     ),
                   );
                 }
@@ -578,7 +593,7 @@ class _BoardTerminalSessionHistoryDialogState
                           color:
                               isCurrent
                                   ? const Color(0xFF153225)
-                                  : const Color(0xFF0F1219),
+                                  : colors.surface,
                           borderRadius: BorderRadius.circular(10),
                           border:
                               isCurrent
@@ -596,7 +611,7 @@ class _BoardTerminalSessionHistoryDialogState
                               color:
                                   isLive
                                       ? const Color(0xFF22C55E)
-                                      : const Color(0xFF64748B),
+                                      : mutedColor,
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -613,16 +628,16 @@ class _BoardTerminalSessionHistoryDialogState
                                       color:
                                           isCurrent
                                               ? const Color(0xFF22C55E)
-                                              : const Color(0xFFE2E8F0),
+                                              : onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${isLive ? 'live' : 'saved'} • ${entry.workingDir}',
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 10,
-                                      color: Color(0xFF64748B),
+                                      color: mutedColor,
                                     ),
                                   ),
                                 ],

@@ -549,6 +549,7 @@ class _ImmersiveButtonState extends State<_ImmersiveButton> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: widget.tooltip,
       waitDuration: const Duration(milliseconds: 600),
@@ -564,21 +565,21 @@ class _ImmersiveButtonState extends State<_ImmersiveButton> {
             height: 26,
             decoration: BoxDecoration(
               color: _hovered
-                  ? const Color(0xFF1E2330)
-                  : const Color(0xCC0B0D12),
+                  ? colors.surfaceHighlight
+                  : colors.surface.withAlpha(0xCC),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
                 color: _hovered
-                    ? const Color(0xFF60A5FA)
-                    : const Color(0x4060A5FA),
+                    ? colors.primary
+                    : colors.primary.withAlpha(0x40),
               ),
             ),
             child: Icon(
               widget.icon,
               size: 14,
               color: _hovered
-                  ? const Color(0xFF60A5FA)
-                  : const Color(0x9060A5FA),
+                  ? colors.primary
+                  : colors.primary.withAlpha(0x90),
             ),
           ),
         ),
@@ -596,32 +597,35 @@ class _MarkdownPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final bodyColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final mutedColor = onSurface.withAlpha(120);
     final sheet = MarkdownStyleSheet(
-      h1: const TextStyle(color: AppColors.textPrimary, fontSize: 28, fontWeight: FontWeight.w700, height: 1.4),
-      h2: const TextStyle(color: AppColors.textPrimary, fontSize: 22, fontWeight: FontWeight.w700, height: 1.4),
-      h3: const TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w600, height: 1.4),
-      h4: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
-      p: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.65),
-      strong: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
-      em: const TextStyle(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
-      code: TextStyle(color: AppColors.neonGreen, backgroundColor: AppColors.textMuted.withAlpha(30), fontSize: 13, fontFamily: 'monospace'),
+      h1: TextStyle(color: onSurface, fontSize: 28, fontWeight: FontWeight.w700, height: 1.4),
+      h2: TextStyle(color: onSurface, fontSize: 22, fontWeight: FontWeight.w700, height: 1.4),
+      h3: TextStyle(color: onSurface, fontSize: 18, fontWeight: FontWeight.w600, height: 1.4),
+      h4: TextStyle(color: onSurface, fontSize: 16, fontWeight: FontWeight.w600),
+      p: TextStyle(color: bodyColor, fontSize: 14, height: 1.65),
+      strong: TextStyle(color: onSurface, fontWeight: FontWeight.w700),
+      em: TextStyle(color: bodyColor, fontStyle: FontStyle.italic),
+      code: TextStyle(color: colors.primary, backgroundColor: colors.primary.withAlpha(20), fontSize: 13, fontFamily: 'monospace'),
       codeblockDecoration: BoxDecoration(
-        color: const Color(0xFF0D0D1F),
+        color: colors.surfaceElevated,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.textMuted.withAlpha(40)),
+        border: Border.all(color: mutedColor.withAlpha(40)),
       ),
       codeblockPadding: const EdgeInsets.all(14),
       blockquoteDecoration: BoxDecoration(
         border: Border(left: BorderSide(color: colors.primary, width: 3)),
       ),
       blockquotePadding: const EdgeInsets.only(left: 12),
-      blockquote: const TextStyle(color: AppColors.textMuted, fontSize: 14, fontStyle: FontStyle.italic),
-      listBullet: const TextStyle(color: AppColors.textMuted, fontSize: 14),
-      tableHead: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
-      tableBody: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-      tableBorder: TableBorder.all(color: AppColors.textMuted.withAlpha(40)),
+      blockquote: TextStyle(color: mutedColor, fontSize: 14, fontStyle: FontStyle.italic),
+      listBullet: TextStyle(color: mutedColor, fontSize: 14),
+      tableHead: TextStyle(color: onSurface, fontWeight: FontWeight.w600, fontSize: 13),
+      tableBody: TextStyle(color: bodyColor, fontSize: 13),
+      tableBorder: TableBorder.all(color: mutedColor.withAlpha(40)),
       horizontalRuleDecoration: BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.textMuted.withAlpha(60))),
+        border: Border(top: BorderSide(color: mutedColor.withAlpha(60))),
       ),
       a: TextStyle(color: colors.primary, decoration: TextDecoration.underline),
     );
@@ -674,21 +678,21 @@ class _ImagePreview extends StatelessWidget {
                 Icon(
                   Icons.image_outlined,
                   size: 14,
-                  color: AppColors.textMuted,
+                  color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   fileName,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
                     fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   ext.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
                     fontSize: 11,
                   ),
                 ),
@@ -702,10 +706,10 @@ class _ImagePreview extends StatelessWidget {
               child: Center(
                 child: Image.file(
                   File(filePath),
-                  errorBuilder: (_, __, ___) => const Center(
+                  errorBuilder: (_, __, ___) => Center(
                     child: Text(
                       'Cannot load image',
-                      style: TextStyle(color: AppColors.textMuted),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withAlpha(120)),
                     ),
                   ),
                 ),
@@ -755,7 +759,7 @@ class _TabBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          bottom: BorderSide(color: const Color(0xFF32327A), width: 1),
+          bottom: BorderSide(color: colors.border, width: 1),
         ),
       ),
       child: Row(
@@ -812,31 +816,33 @@ class _Tab extends StatefulWidget {
 
 class _TabState extends State<_Tab> {
   Future<void> _showTabMenu(BuildContext context, Offset globalPos) async {
+    final colors = context.appColors;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
           globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy),
-      color: const Color(0xFF12151C),
+      color: colors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: Color(0xFF2A3040)),
+        side: BorderSide(color: colors.border),
       ),
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'close',
           child: Text('✕ Close',
-              style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE))),
+              style: TextStyle(fontSize: 12, color: onSurface)),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'close_others',
           child: Text('✕ Close Others',
-              style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE))),
+              style: TextStyle(fontSize: 12, color: onSurface)),
         ),
         if (widget.onPopOut != null)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'pop_out',
             child: Text('⬡ Open in Map panel',
-                style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE))),
+                style: TextStyle(fontSize: 12, color: onSurface)),
           ),
       ],
     );
@@ -892,7 +898,7 @@ class _TabState extends State<_Tab> {
                     widget.tab.isDiff ? Icons.difference : fileInfo!.icon,
                     size: 12,
                     color: widget.tab.isDiff
-                        ? AppColors.textMuted
+                        ? Theme.of(context).colorScheme.onSurface.withAlpha(120)
                         : fileInfo!.color,
                   ),
                   const SizedBox(width: 5),
@@ -902,7 +908,7 @@ class _TabState extends State<_Tab> {
                       style: TextStyle(
                         color: widget.isActive
                             ? colors.primaryLight
-                            : AppColors.textMuted,
+                            : Theme.of(context).colorScheme.onSurface.withAlpha(120),
                         fontSize: 12,
                         fontWeight: widget.isActive
                             ? FontWeight.w600
@@ -954,7 +960,7 @@ class _TabCloseButtonState extends State<_TabCloseButton> {
           child: Icon(
             Icons.close,
             size: 11,
-            color: _hovering ? AppColors.textPrimary : const Color(0xFFAAB0CC),
+            color: _hovering ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withAlpha(180),
           ),
         ),
       ),
@@ -1455,8 +1461,12 @@ class _EditorBodyState extends State<_EditorBody> {
     await showDialog<void>(
       context: ctx,
       barrierColor: Colors.black54,
-      builder: (dctx) => Dialog(
-        backgroundColor: const Color(0xFF1A1A2E),
+      builder: (dctx) {
+        final onSurface = Theme.of(dctx).colorScheme.onSurface;
+        final mutedColor = onSurface.withAlpha(120);
+        final borderColor = context.appColors.border;
+        return Dialog(
+        backgroundColor: context.appColors.surfaceElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1464,10 +1474,10 @@ class _EditorBodyState extends State<_EditorBody> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Go to Line',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: onSurface,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1477,21 +1487,21 @@ class _EditorBodyState extends State<_EditorBody> {
                 controller: inputCtrl,
                 autofocus: true,
                 keyboardType: TextInputType.number,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: onSurface,
                   fontSize: 13,
                 ),
                 decoration: InputDecoration(
                   hintText: '1 – $lineCount',
-                  hintStyle: const TextStyle(color: AppColors.textMuted),
-                  border: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF2A2A4E)),
+                  hintStyle: TextStyle(color: mutedColor),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: borderColor),
                   ),
-                  enabledBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF2A2A4E)),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: borderColor),
                   ),
-                  focusedBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF7C3AED)),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: context.appColors.primary),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -1509,7 +1519,7 @@ class _EditorBodyState extends State<_EditorBody> {
             ],
           ),
         ),
-      ),
+      );},
     );
     inputCtrl.dispose();
   }
@@ -1641,8 +1651,8 @@ class _EditorBodyState extends State<_EditorBody> {
                                         gutterStyle: GutterStyle(
                                           width: 72,
                                           margin: 8,
-                                          textStyle: const TextStyle(
-                                            color: AppColors.textMuted,
+                                          textStyle: TextStyle(
+                                            color: Theme.of(context).colorScheme.onSurface.withAlpha(100),
                                             fontFamily: 'monospace',
                                           ),
                                           background: colors.surfaceElevated,

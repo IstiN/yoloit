@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -49,6 +53,16 @@ bool _isImageExt(String ext) {
 
 bool _isSvgExt(String ext) => ext.toLowerCase() == 'svg';
 
+bool _isVideoExt(String ext) {
+  return const {'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'wmv', 'flv'}
+      .contains(ext.toLowerCase());
+}
+
+bool _isAudioExt(String ext) {
+  return const {'mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'opus', 'wma'}
+      .contains(ext.toLowerCase());
+}
+
 class _FilePreviewContent extends StatefulWidget {
   const _FilePreviewContent({required this.panel, required this.renderContext});
 
@@ -85,11 +99,14 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.image_outlined, size: 48, color: _accent.withOpacity(0.4)),
+            Icon(Icons.perm_media_outlined, size: 48, color: _accent.withOpacity(0.4)),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No file selected',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodySmall?.color,
+                fontSize: 13,
+              ),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -135,6 +152,12 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
         child: Image.file(File(path), fit: BoxFit.contain),
       );
     }
+    if (_isVideoExt(ext)) {
+      return _VideoPreview(key: ValueKey(path), path: path);
+    }
+    if (_isAudioExt(ext)) {
+      return _AudioPreview(key: ValueKey(path), path: path);
+    }
 
     // Other file types
     final fileName = path.split(Platform.pathSeparator).last;
@@ -151,15 +174,17 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
             child: const Icon(Icons.insert_drive_file_outlined, size: 48, color: _accent),
           ),
           const SizedBox(height: 12),
-          Text(
-            fileName,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFFE2E8F0),
+          Builder(
+            builder: (ctx) => Text(
+              fileName,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(ctx).colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
             ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -176,6 +201,236 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     );
   }
 }
+
+// ─── Video Player ─────────────────────────────────────────────────────────────
+
+class _VideoPreview extends StatefulWidget {
+  const _VideoPreview({super.key, required this.path});
+  final String path;
+
+  @override
+  State<_VideoPreview> createState() => _VideoPreviewState();
+}
+
+class _VideoPreviewState extends State<_VideoPreview> {
+  late final Player _player;
+  late final VideoController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _player = Player();
+    _controller = VideoController(_player);
+    _player.open(Media(widget.path), play: false);
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Video(
+      controller: _controller,
+      controls: AdaptiveVideoControls,
+    );
+  }
+}
+
+// ─── Audio Player ─────────────────────────────────────────────────────────────
+
+class _AudioPreview extends StatefulWidget {
+  const _AudioPreview({super.key, required this.path});
+  final String path;
+
+  @override
+  State<_AudioPreview> createState() => _AudioPreviewState();
+}
+
+class _AudioPreviewState extends State<_AudioPreview> {
+  static const Color _accent = Color(0xFF8B5CF6);
+
+  late final Player _player;
+  Duration _total = Duration.zero;
+  Duration _position = Duration.zero;
+  bool _isPlaying = false;
+  final List<StreamSubscription<dynamic>> _subs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _player = Player();
+    _subs.add(_player.stream.playing.listen((v) {
+      if (mounted) setState(() => _isPlaying = v);
+    }));
+    _subs.add(_player.stream.position.listen((p) {
+      if (mounted) setState(() => _position = p);
+    }));
+    _subs.add(_player.stream.duration.listen((d) {
+      if (mounted) setState(() => _total = d);
+    }));
+    _player.open(Media(widget.path), play: false);
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subs) {
+      s.cancel();
+    }
+    _player.dispose();
+    super.dispose();
+  }
+
+  String _fmt(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final isPlaying = _isPlaying;
+    final fileName = widget.path.split(Platform.pathSeparator).last;
+    final progress = _total.inMilliseconds > 0
+        ? (_position.inMilliseconds / _total.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Album art placeholder
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: _accent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.music_note_rounded, size: 48, color: _accent),
+          ),
+          const SizedBox(height: 16),
+
+          // File name
+          Text(
+            fileName,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 20),
+
+          // Progress bar
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: _accent,
+              inactiveTrackColor: colors.border,
+              thumbColor: _accent,
+              overlayColor: _accent.withOpacity(0.15),
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            ),
+            child: Slider(
+              value: progress,
+              onChanged: (v) {
+                final target = Duration(
+                  milliseconds: (v * _total.inMilliseconds).round(),
+                );
+                _player.seek(target);
+              },
+            ),
+          ),
+
+          // Time labels
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _fmt(_position),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
+                Text(
+                  _fmt(_total),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Rewind 10s
+              IconButton(
+                icon: const Icon(Icons.replay_10_rounded),
+                iconSize: 28,
+                color: Theme.of(context).colorScheme.onSurface,
+                onPressed: () => _player.seek(
+                  Duration(milliseconds: (_position.inMilliseconds - 10000).clamp(0, _total.inMilliseconds)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Play/Pause
+              GestureDetector(
+                onTap: () {
+                  if (isPlaying) {
+                    _player.pause();
+                  } else {
+                    _player.play();
+                  }
+                },
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Forward 10s
+              IconButton(
+                icon: const Icon(Icons.forward_10_rounded),
+                iconSize: 28,
+                color: Theme.of(context).colorScheme.onSurface,
+                onPressed: () => _player.seek(
+                  Duration(milliseconds: (_position.inMilliseconds + 10000).clamp(0, _total.inMilliseconds)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Toolbar ──────────────────────────────────────────────────────────────────
 
 class _Toolbar extends StatelessWidget {
   const _Toolbar({
@@ -200,9 +455,9 @@ class _Toolbar extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 200),
             child: Text(
               fileName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: Color(0xFF94A3B8),
+                color: Theme.of(context).textTheme.bodySmall?.color,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
@@ -234,3 +489,4 @@ class _Toolbar extends StatelessWidget {
     );
   }
 }
+

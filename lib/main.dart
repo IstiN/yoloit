@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:yoloit/app.dart';
 import 'package:yoloit/core/config/app_config.dart';
@@ -10,6 +11,7 @@ import 'package:yoloit/core/theme/theme_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
 
   // Init app-level file logger early (before FlutterError hook) so it can
   // capture errors that occur during startup.

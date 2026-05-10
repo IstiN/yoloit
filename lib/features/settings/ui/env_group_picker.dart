@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 
 class EnvGroupSelectionField extends StatefulWidget {
@@ -42,12 +42,13 @@ class _EnvGroupSelectionFieldState extends State<EnvGroupSelectionField> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.label,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+          style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
         ),
         const SizedBox(height: 4),
         FutureBuilder<List<String>>(
@@ -73,7 +74,7 @@ class _EnvGroupSelectionFieldState extends State<EnvGroupSelectionField> {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  color: const Color(0xFF1A2030),
+                  color: colors.surfaceElevated,
                 ),
                 child: Row(
                   children: [
@@ -93,20 +94,20 @@ class _EnvGroupSelectionFieldState extends State<EnvGroupSelectionField> {
                           fontSize: 12,
                           color:
                               names.isEmpty
-                                  ? const Color(0xFF475569)
-                                  : const Color(0xFFE2E8F0),
+                                  ? (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface)
+                                  : Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
                     Text(
                       '${widget.selectedGroupIds.length}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF64748B),
+                        color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(Icons.tune, size: 14, color: Color(0xFF64748B)),
+                    Icon(Icons.tune, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                   ],
                 ),
               ),
@@ -183,6 +184,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final selectedGroups =
         _selectedIds
             .map((id) {
@@ -194,7 +196,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
             .whereType<GlobalEnvGroup>()
             .toList();
     return Dialog(
-      backgroundColor: const Color(0xFF16163A),
+      backgroundColor: colors.surfaceElevated,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520, maxHeight: 620),
         child: Padding(
@@ -202,18 +204,18 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Select Env Groups',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Later groups override earlier groups when the same key appears multiple times.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
               ),
               const SizedBox(height: 14),
               if (_loading)
@@ -222,9 +224,9 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                 )
               else ...[
                 if (selectedGroups.isNotEmpty) ...[
-                  const Text(
+                  Text(
                     'Selected order',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
                   ),
                   const SizedBox(height: 6),
                   ...selectedGroups.indexed.map((entry) {
@@ -237,9 +239,9 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F1219),
+                        color: colors.surface,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF334155)),
+                        border: Border.all(color: colors.border),
                       ),
                       child: Row(
                         children: [
@@ -264,8 +266,8 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                           Expanded(
                             child: Text(
                               '${group.name} • ${group.values.length} vars',
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 12,
                               ),
                             ),
@@ -276,7 +278,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                                     ? null
                                     : () => _moveSelected(index, -1),
                             icon: const Icon(Icons.arrow_upward, size: 14),
-                            color: AppColors.textMuted,
+                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                             splashRadius: 14,
                           ),
                           IconButton(
@@ -285,7 +287,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                                     ? null
                                     : () => _moveSelected(index, 1),
                             icon: const Icon(Icons.arrow_downward, size: 14),
-                            color: AppColors.textMuted,
+                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                             splashRadius: 14,
                           ),
                         ],
@@ -294,20 +296,20 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                   }),
                   const SizedBox(height: 10),
                 ],
-                const Text(
+                Text(
                   'Available groups',
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
                 ),
                 const SizedBox(height: 6),
                 Expanded(
                   child:
                       _groups.isEmpty
-                          ? const Center(
+                          ? Center(
                             child: Text(
                               'No global env groups yet.\nCreate them in Settings → Environment.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: AppColors.textMuted,
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                                 fontSize: 12,
                               ),
                             ),
@@ -326,15 +328,15 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                                 contentPadding: EdgeInsets.zero,
                                 title: Text(
                                   group.name,
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurface,
                                     fontSize: 13,
                                   ),
                                 ),
                                 subtitle: Text(
                                   '${group.values.length} variables',
-                                  style: const TextStyle(
-                                    color: AppColors.textMuted,
+                                  style: TextStyle(
+                                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                                     fontSize: 11,
                                   ),
                                 ),

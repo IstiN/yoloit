@@ -186,10 +186,10 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Manage global env variable groups. They are stored securely and can be attached to board chats and board terminals. If multiple selected groups contain the same key, the last selected group wins.',
           style: TextStyle(
-            color: AppColors.textMuted,
+            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
             fontSize: 12,
             height: 1.5,
           ),
@@ -220,11 +220,11 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
         ),
         const SizedBox(height: 10),
         if (_groups.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 18),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
             child: Text(
               'No env groups yet. Create one or import a .env file.',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
             ),
           )
         else
@@ -251,16 +251,16 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                             controller: TextEditingController(text: group.name),
                             onChanged:
                                 (value) => _renameGroup(groupIndex, value),
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
                             decoration: InputDecoration(
                               isDense: true,
                               hintText: 'Group name',
-                              hintStyle: const TextStyle(
-                                color: AppColors.textMuted,
+                              hintStyle: TextStyle(
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                                 fontSize: 13,
                               ),
                               contentPadding: const EdgeInsets.symmetric(
@@ -298,10 +298,10 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                     ),
                     const SizedBox(height: 10),
                     if (vars.isEmpty)
-                      const Text(
+                      Text(
                         'No variables yet.',
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                           fontSize: 11,
                         ),
                       )
@@ -359,7 +359,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                                       : Icons.visibility_outlined,
                                   size: 16,
                                 ),
-                                color: AppColors.textMuted,
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                                 splashRadius: 14,
                               ),
                               IconButton(
@@ -442,15 +442,15 @@ class _EnvFieldState extends State<_EnvField> {
       controller: _controller,
       obscureText: widget.obscure,
       onChanged: widget.onChanged,
-      style: const TextStyle(
-        color: AppColors.textPrimary,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: 12,
         fontFamily: 'monospace',
       ),
       decoration: InputDecoration(
         isDense: true,
         hintText: widget.hint,
-        hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+        hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

@@ -109,17 +109,17 @@ class _SettingsPageState extends State<SettingsPage> {
       padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
       child: Row(
         children: [
-          const Text(
+          Text(
             'Settings',
             style: TextStyle(
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.close, size: 18, color: AppColors.textMuted),
+            icon: Icon(Icons.close, size: 18, color: Theme.of(context).textTheme.bodySmall?.color),
             onPressed: () => Navigator.of(context).pop(),
             tooltip: 'Close',
             padding: EdgeInsets.zero,
@@ -154,7 +154,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Text(
                 _kCategories[index],
                 style: TextStyle(
-                  color: isActive ? colors.primary : AppColors.textSecondary,
+                  color: isActive ? colors.primary : Theme.of(context).textTheme.bodyMedium?.color,
                   fontSize: 13,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                 ),
@@ -335,7 +335,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
             'Star (★) an agent to make it open automatically for new workspaces.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+            style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
           ),
         ),
         Container(
@@ -468,7 +468,7 @@ class _AgentRowState extends State<_AgentRow> {
               onChanged: (_) => _emit(),
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,
                 fontFamily: 'monospace',
               ),
@@ -496,15 +496,15 @@ class _AgentRowState extends State<_AgentRow> {
             child: TextField(
               controller: _nameCtrl,
               onChanged: (_) => _emit(),
-              style: const TextStyle(
-                color: AppColors.textPrimary,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 13,
               ),
               decoration: InputDecoration(
                 isDense: true,
                 hintText: 'Name',
-                hintStyle: const TextStyle(
-                  color: AppColors.textMuted,
+                hintStyle: TextStyle(
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   fontSize: 13,
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -528,16 +528,16 @@ class _AgentRowState extends State<_AgentRow> {
             child: TextField(
               controller: _cmdCtrl,
               onChanged: (_) => _emit(),
-              style: const TextStyle(
-                color: AppColors.textPrimary,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 12,
                 fontFamily: 'monospace',
               ),
               decoration: InputDecoration(
                 isDense: true,
                 hintText: 'launch command (empty = plain shell)',
-                hintStyle: const TextStyle(
-                  color: AppColors.textMuted,
+                hintStyle: TextStyle(
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -567,7 +567,7 @@ class _AgentRowState extends State<_AgentRow> {
               child: Icon(
                 widget.isDefault ? Icons.star : Icons.star_border,
                 size: 18,
-                color: widget.isDefault ? Colors.amber : AppColors.textMuted,
+                color: widget.isDefault ? Colors.amber : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -575,10 +575,10 @@ class _AgentRowState extends State<_AgentRow> {
           if (widget.onDelete != null) ...[
             const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.delete_outline,
                 size: 18,
-                color: AppColors.textMuted,
+                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
               ),
               onPressed: widget.onDelete,
               tooltip: 'Delete agent',
@@ -722,7 +722,7 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
                       preset.label,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: isActive ? colors.primary : AppColors.textMuted,
+                        color: isActive ? colors.primary : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                         fontSize: 11,
                         fontWeight:
                             isActive ? FontWeight.w600 : FontWeight.normal,
@@ -787,7 +787,7 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
                 child: Text(
                   entry.key.toUpperCase(),
                   style: TextStyle(
-                    color: AppColors.textMuted,
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -826,7 +826,7 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
             icon: const Icon(Icons.restart_alt, size: 14),
             label: const Text('Reset all to defaults'),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.textMuted,
+              foregroundColor: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
               textStyle: const TextStyle(fontSize: 12),
             ),
           ),
@@ -880,8 +880,8 @@ class _HotkeyRow extends StatelessWidget {
               style: TextStyle(
                 color:
                     definition.isOverridden
-                        ? AppColors.textPrimary
-                        : AppColors.textSecondary,
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                 fontSize: 13,
               ),
             ),
@@ -899,7 +899,7 @@ class _HotkeyRow extends StatelessWidget {
                 child: Icon(
                   Icons.restart_alt,
                   size: 14,
-                  color: AppColors.textMuted,
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -1069,8 +1069,8 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
             children: [
               Text(
                 'Remap: ${widget.definition.description}',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1096,7 +1096,7 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
                           ? Text(
                             'Press a key combination…',
                             style: TextStyle(
-                              color: AppColors.textMuted,
+                              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                               fontSize: 14,
                             ),
                           )
@@ -1262,10 +1262,10 @@ class _AboutSectionState extends State<_AboutSection> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'YoLoIT — AI Orchestrator',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1275,8 +1275,8 @@ class _AboutSectionState extends State<_AboutSection> {
                           children: [
                             Text(
                               'v${UpdateService.currentVersion}',
-                              style: const TextStyle(
-                                color: AppColors.textMuted,
+                              style: TextStyle(
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                                 fontSize: 11,
                               ),
                             ),
@@ -1313,18 +1313,18 @@ class _AboutSectionState extends State<_AboutSection> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'A Flutter desktop app for orchestrating AI CLI tools (GitHub Copilot, Claude Code) with embedded PTY terminals and git workspace management.',
                 style: TextStyle(
-                  color: AppColors.textMuted,
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                   height: 1.6,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Platform: macOS (primary) • Windows (coming soon)',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
               ),
             ],
           ),
@@ -1342,10 +1342,10 @@ class _AboutSectionState extends State<_AboutSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Updates',
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1355,11 +1355,11 @@ class _AboutSectionState extends State<_AboutSection> {
               // Auto-check toggle
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Auto-check for updates',
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                         fontSize: 12,
                       ),
                     ),
@@ -1375,9 +1375,9 @@ class _AboutSectionState extends State<_AboutSection> {
                 ],
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Checks GitHub releases once per day in release builds.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
               ),
 
               const SizedBox(height: 16),
@@ -1403,7 +1403,7 @@ class _AboutSectionState extends State<_AboutSection> {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.surfaceElevated,
-                      foregroundColor: AppColors.textPrimary,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       textStyle: const TextStyle(fontSize: 11),
                       side: BorderSide(color: colors.border),
                       elevation: 0,
@@ -1442,8 +1442,8 @@ class _AboutSectionState extends State<_AboutSection> {
                     children: [
                       Text(
                         _installStatus,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                           fontSize: 11,
                         ),
                       ),
@@ -1455,10 +1455,10 @@ class _AboutSectionState extends State<_AboutSection> {
                         minHeight: 3,
                       ),
                       const SizedBox(height: 4),
-                      const Text(
+                      Text(
                         'App will restart automatically after install.',
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                           fontSize: 10,
                         ),
                       ),
@@ -1514,8 +1514,8 @@ class _UpdateAvailableCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '${info.tagName} is available!',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1528,8 +1528,8 @@ class _UpdateAvailableCard extends StatelessWidget {
               info.releaseNotes.length > 200
                   ? '${info.releaseNotes.substring(0, 200)}...'
                   : info.releaseNotes,
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                 fontSize: 10,
                 height: 1.5,
               ),
@@ -1552,9 +1552,9 @@ class _UpdateAvailableCard extends StatelessWidget {
               const SizedBox(width: 8),
               TextButton(
                 onPressed: onSkip,
-                child: const Text(
+                child: Text(
                   'Skip this version',
-                  style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+                  style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                 ),
               ),
             ],
@@ -1677,7 +1677,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                     Icon(
                       _showLogs ? Icons.expand_less : Icons.expand_more,
                       size: 16,
-                      color: AppColors.textMuted,
+                      color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     ),
                     SizedBox(width: 8),
                     Text(
@@ -1724,7 +1724,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                     Icon(
                       _showAppLog ? Icons.expand_less : Icons.expand_more,
                       size: 16,
-                      color: AppColors.textMuted,
+                      color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1781,7 +1781,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 child: Text(
                   '~/.config/yoloit/app.log',
                   style: TextStyle(
-                    color: AppColors.textMuted,
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -1812,10 +1812,10 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 padding: const EdgeInsets.all(8),
                 child: SelectableText(
                   _appLogContent,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
-                    color: AppColors.textMuted,
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -1839,8 +1839,8 @@ class _SessionSettingsState extends State<_SessionSettings> {
             children: [
               Text(
                 '${_logs.length} file(s)',
-                style: const TextStyle(
-                  color: AppColors.textMuted,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                 ),
               ),
@@ -1859,7 +1859,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 tooltip: 'Refresh',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color: AppColors.textMuted,
+                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
               ),
             ],
           ),
@@ -1872,11 +1872,11 @@ class _SessionSettingsState extends State<_SessionSettings> {
               ),
             )
           else if (_logs.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
                 'No logs yet.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
               ),
             )
           else
@@ -1935,7 +1935,7 @@ class _ToggleRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.textMuted),
+          Icon(icon, size: 18, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1945,14 +1945,14 @@ class _ToggleRow extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color:
-                        enabled ? AppColors.textPrimary : AppColors.textMuted,
+                        enabled ? Theme.of(context).colorScheme.onSurface : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 13,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                   ),
                 ),
@@ -1988,10 +1988,10 @@ class _LogRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.insert_drive_file_outlined,
             size: 14,
-            color: AppColors.textMuted,
+            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -2010,15 +2010,15 @@ class _LogRow extends StatelessWidget {
           ),
           Text(
             log.sizeLabel,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+            style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
           ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onDelete,
-            child: const Icon(
+            child: Icon(
               Icons.close,
               size: 14,
-              color: AppColors.textMuted,
+              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -2060,8 +2060,8 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                 Expanded(
                   child: Text(
                     widget.log.name,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2069,17 +2069,17 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                 ),
                 Text(
                   widget.log.sizeLabel,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 12,
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.close,
                     size: 18,
-                    color: AppColors.textMuted,
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   ),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
@@ -2097,8 +2097,8 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                       padding: const EdgeInsets.all(16),
                       child: SelectableText(
                         _content!,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
+                        style: TextStyle(
+                          color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                           fontSize: 12,
                           fontFamily: 'monospace',
                           height: 1.6,
@@ -2160,21 +2160,21 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Icon(Icons.folder_open, size: 16, color: AppColors.textMuted),
+          Icon(Icons.folder_open, size: 16, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Workspace storage',
-                  style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _currentPath,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -2193,9 +2193,9 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
           if (!isDefault)
             TextButton(
               onPressed: () => _resetPath(context),
-              child: const Text(
+              child: Text(
                 'Reset',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface),
               ),
             ),
         ],
@@ -2251,7 +2251,7 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
       children: [
         Text(
           'Sound alerts when AI agents change state.',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
         ),
         const SizedBox(height: 16),
         _SettingsToggle(
@@ -2331,7 +2331,7 @@ class _SettingsToggle extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color:
-                        enabled ? AppColors.textPrimary : AppColors.textMuted,
+                        enabled ? Theme.of(context).colorScheme.onSurface : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -2339,8 +2339,8 @@ class _SettingsToggle extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                   ),
                 ),

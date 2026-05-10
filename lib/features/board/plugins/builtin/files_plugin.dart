@@ -55,6 +55,8 @@ IconData _iconForExtension(String ext) => switch (ext.toLowerCase()) {
 
 bool _isPreviewable(String ext) => const {
   'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',
+  'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v',
+  'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg',
 }.contains(ext.toLowerCase());
 
 class _FilesContent extends StatefulWidget {

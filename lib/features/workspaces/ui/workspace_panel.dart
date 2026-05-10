@@ -118,7 +118,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
           trailing: Icon(
             _showThemePicker ? Icons.expand_less : Icons.chevron_right,
             size: 14,
-            color: AppColors.textMuted,
+            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -166,7 +166,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                     child: Text(
                       t.label,
                       style: TextStyle(
-                        color: isActive ? t.color : AppColors.textSecondary,
+                        color: isActive ? t.color : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                         fontSize: 12,
                         fontWeight:
                             isActive ? FontWeight.w600 : FontWeight.normal,
@@ -231,36 +231,36 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF16163A),
+        backgroundColor: ctx.appColors.surfaceElevated,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: Color(0xFF32327A)),
+          side: BorderSide(color: ctx.appColors.border),
         ),
-        title: const Text(
+        title: Text(
           'New Workspace',
-          style: TextStyle(color: Color(0xFFE0E0F0), fontSize: 14),
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: Color(0xFFE0E0F0), fontSize: 13),
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
           decoration: InputDecoration(
             hintText: 'Workspace name',
-            hintStyle: const TextStyle(color: Color(0xFF6060A0), fontSize: 13),
+            hintStyle: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
             filled: true,
-            fillColor: const Color(0xFF0E0E2A),
+            fillColor: ctx.appColors.surface,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF32327A)),
+              borderSide: BorderSide(color: ctx.appColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF32327A)),
+              borderSide: BorderSide(color: ctx.appColors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF7C7CFF)),
+              borderSide: BorderSide(color: ctx.appColors.primary),
             ),
           ),
           onSubmitted: (v) {
@@ -271,16 +271,16 @@ class WorkspacePanelState extends State<WorkspacePanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+            child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
           ),
           TextButton(
             onPressed: () {
               final trimmed = controller.text.trim();
               if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
             },
-            child: const Text(
+            child: Text(
               'Next →',
-              style: TextStyle(color: Color(0xFF7C7CFF), fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(color: ctx.appColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -338,36 +338,36 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF16163A),
+        backgroundColor: ctx.appColors.surfaceElevated,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: Color(0xFF32327A)),
+          side: BorderSide(color: ctx.appColors.border),
         ),
-        title: const Text(
+        title: Text(
           'Rename Workspace',
-          style: TextStyle(color: Color(0xFFE0E0F0), fontSize: 14),
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14),
         ),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: Color(0xFFE0E0F0), fontSize: 13),
+          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
           decoration: InputDecoration(
             hintText: 'Workspace name',
-            hintStyle: const TextStyle(color: Color(0xFF6060A0), fontSize: 13),
+            hintStyle: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
             filled: true,
-            fillColor: const Color(0xFF0E0E2A),
+            fillColor: ctx.appColors.surface,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF32327A)),
+              borderSide: BorderSide(color: ctx.appColors.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF32327A)),
+              borderSide: BorderSide(color: ctx.appColors.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF7C7CFF)),
+              borderSide: BorderSide(color: ctx.appColors.primary),
             ),
           ),
           onSubmitted: (v) {
@@ -378,16 +378,16 @@ class WorkspacePanelState extends State<WorkspacePanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+            child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
           ),
           TextButton(
             onPressed: () {
               final trimmed = controller.text.trim();
               if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
             },
-            child: const Text(
+            child: Text(
               'Rename',
-              style: TextStyle(color: Color(0xFF7C7CFF), fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(color: ctx.appColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -444,24 +444,24 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF16163A),
+        backgroundColor: ctx.appColors.surfaceElevated,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: Color(0xFF32327A)),
+          side: BorderSide(color: ctx.appColors.border),
         ),
-        title: Text(title, style: const TextStyle(color: Color(0xFFE0E0F0), fontSize: 14)),
-        content: Text(message, style: const TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+        title: Text(title, style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14)),
+        content: Text(message, style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+            child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
               confirmLabel,
               style: TextStyle(
-                color: isDestructive ? Colors.red.shade300 : const Color(0xFF7C7CFF),
+                color: isDestructive ? Colors.red.shade300 : ctx.appColors.primary,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -507,12 +507,12 @@ class _PathChipState extends State<_PathChip> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.folder_outlined, size: 9, color: AppColors.textMuted),
+              Icon(Icons.folder_outlined, size: 9, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
               const SizedBox(width: 3),
               Flexible(
                 child: Text(
                   name,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 9),
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 9),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -604,11 +604,11 @@ class _WorkspaceListState extends State<_WorkspaceList> {
           padding: const EdgeInsets.fromLTRB(12, 12, 8, 4),
           child: Row(
             children: [
-              const Flexible(
+              Flexible(
                 child: Text(
                   'Workspaces / Repositories',
                   style: TextStyle(
-                    color: AppColors.textMuted,
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -636,14 +636,14 @@ class _WorkspaceListState extends State<_WorkspaceList> {
                   border: Border.all(color: colors.border),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.folder_open_outlined, size: 14, color: AppColors.textMuted),
-                    SizedBox(width: 8),
+                    Icon(Icons.folder_open_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                    const SizedBox(width: 8),
                     Flexible(
                       child: Text(
                         'Open a folder...',
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -872,10 +872,10 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
         offset.dx,
         offset.dy + 200,
       ),
-      color: const Color(0xFF16163A),
+      color: context.appColors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: const Color(0xFF32327A)),
+        side: BorderSide(color: context.appColors.border),
       ),
       items: [
         for (final type in AgentType.values)
@@ -885,7 +885,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
             child: Row(children: [
               Text(type.iconLabel, style: const TextStyle(fontSize: 13)),
               const SizedBox(width: 8),
-              Text('Start ${type.displayName}', style: const TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+              Text('Start ${type.displayName}', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
             ]),
           ),
         const PopupMenuDivider(height: 1),
@@ -893,36 +893,36 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
           value: 'rename',
           height: 36,
           child: Row(children: [
-            const Icon(Icons.drive_file_rename_outline, size: 14, color: Color(0xFFB0B0D0)),
+            Icon(Icons.drive_file_rename_outline, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
             const SizedBox(width: 8),
-            const Text('Rename', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+            Text('Rename', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
           ]),
         ),
         PopupMenuItem(
           value: 'add_folder',
           height: 36,
           child: Row(children: [
-            const Icon(Icons.create_new_folder_outlined, size: 14, color: Color(0xFFB0B0D0)),
+            Icon(Icons.create_new_folder_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
             const SizedBox(width: 8),
-            const Text('Add Folder', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+            Text('Add Folder', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
           ]),
         ),
         PopupMenuItem(
           value: 'add_skill',
           height: 36,
           child: Row(children: [
-            const Icon(Icons.extension_outlined, size: 14, color: Color(0xFFB0B0D0)),
+            Icon(Icons.extension_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
             const SizedBox(width: 8),
-            const Text('Add Skill', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+            Text('Add Skill', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
           ]),
         ),
         PopupMenuItem(
           value: 'secrets',
           height: 36,
           child: Row(children: [
-            const Icon(Icons.key_outlined, size: 14, color: Color(0xFFB0B0D0)),
+            Icon(Icons.key_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
             const SizedBox(width: 8),
-            const Text('Workspace Secrets', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+            Text('Workspace Secrets', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
           ]),
         ),
         PopupMenuItem(
@@ -1016,7 +1016,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                       child: Text(
                         ws.name,
                         style: TextStyle(
-                          color: widget.isActive ? AppColors.textPrimary : AppColors.textSecondary,
+                          color: widget.isActive ? Theme.of(context).colorScheme.onSurface : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1109,12 +1109,12 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.alt_route, size: 10, color: AppColors.textMuted),
+                      Icon(Icons.alt_route, size: 10, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                       const SizedBox(width: 3),
                       Flexible(
                         child: Text(
                           'Git Branch: ${ws.gitBranch}',
-                          style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1135,7 +1135,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                           ),
                         ),
                       if (ws.addedLines > 0 && ws.removedLines > 0)
-                        const Text(' / ', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                        Text(' / ', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10)),
                       if (ws.removedLines > 0)
                         Text(
                           '-${ws.removedLines}',
@@ -1145,9 +1145,9 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      const Text(
+                      Text(
                         ' lines',
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
                       ),
                     ],
                   ),
@@ -1199,12 +1199,12 @@ class _SetupItemState extends State<_SetupItem> {
             color: _hovering ? colors.surfaceHighlight : Colors.transparent,
             child: Row(
               children: [
-                Icon(widget.icon, size: 14, color: AppColors.textSecondary),
+                Icon(widget.icon, size: 14, color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     widget.label,
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
                   ),
                 ),
                 if (widget.trailing != null) widget.trailing!,
@@ -1241,7 +1241,7 @@ class _SmallIconButton extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(3),
-            child: Icon(icon, size: 12, color: color ?? AppColors.textMuted),
+            child: Icon(icon, size: 12, color: color ?? Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
           ),
         ),
       ),
@@ -1305,16 +1305,16 @@ class _SecretsDialogState extends State<_SecretsDialog> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.lock_outline, size: 18, color: AppColors.textPrimary),
+                  Icon(Icons.lock_outline, size: 18, color: Theme.of(context).colorScheme.onSurface),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           '🔐 Workspace Secrets',
                           style: TextStyle(
-                            color: AppColors.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1322,7 +1322,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                         const SizedBox(height: 2),
                         Text(
                           'Injected as env vars when launching agents in ${widget.workspaceName}',
-                          style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
                         ),
                       ],
                     ),
@@ -1334,11 +1334,11 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                 const Center(child: CircularProgressIndicator())
               else ...[
                 if (entries.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'No secrets yet. Add a KEY=VALUE pair.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
                     ),
                   )
                 else
@@ -1379,7 +1379,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                               icon: Icon(
                                 revealed ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                                 size: 16,
-                                color: AppColors.textMuted,
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                               ),
                               splashRadius: 14,
                               tooltip: revealed ? 'Hide' : 'Reveal',
@@ -1412,7 +1412,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+                    child: Text('Cancel', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface)),
                   ),
                   SizedBox(width: 8),
                   ElevatedButton(
@@ -1453,10 +1453,10 @@ class _SecretTextField extends StatelessWidget {
     return TextFormField(
       initialValue: initialValue,
       obscureText: obscure,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
+        hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
         contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         isDense: true,
         filled: true,
@@ -1513,13 +1513,13 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                     padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                     child: Row(
                       children: [
-                        Icon(Icons.terminal, size: 12, color: AppColors.textMuted),
+                        Icon(Icons.terminal, size: 12, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
                         const SizedBox(width: 6),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Active Sessions',
                             style: TextStyle(
-                              color: AppColors.textMuted,
+                              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.8,
@@ -1547,7 +1547,7 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                         Icon(
                           _expanded ? Icons.expand_less : Icons.expand_more,
                           size: 14,
-                          color: AppColors.textMuted,
+                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                         ),
                       ],
                     ),
@@ -1557,12 +1557,12 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                   ...agentSessions.map((s) => _AgentSessionRow(session: s)),
                   ...runSessions.map((s) => _RunSessionRow(session: s)),
                   if (total == 0)
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                       child: Text(
                         'No active sessions',
                         style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 10),
+                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
                       ),
                     ),
                 ],
@@ -1593,7 +1593,7 @@ class _AgentSessionRowState extends State<_AgentSessionRow> {
     final colors = context.appColors;
     final s = widget.session;
     final isLive = s.status == AgentStatus.live;
-    final dotColor = isLive ? AppColors.neonGreen : AppColors.textMuted;
+    final dotColor = isLive ? AppColors.neonGreen : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -1615,8 +1615,8 @@ class _AgentSessionRowState extends State<_AgentSessionRow> {
             Expanded(
               child: Text(
                 s.workspacePath.split('/').last,
-                style: const TextStyle(
-                    color: AppColors.textSecondary, fontSize: 10),
+                style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1664,7 +1664,7 @@ class _RunSessionRowState extends State<_RunSessionRow> {
     final (dotColor, icon) = switch (s.status) {
       RunStatus.running => (AppColors.neonGreen, Icons.play_arrow),
       RunStatus.failed => (AppColors.neonRed, Icons.error_outline),
-      _ => (AppColors.textMuted, Icons.stop_circle_outlined),
+      _ => (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, Icons.stop_circle_outlined),
     };
 
     return MouseRegion(
@@ -1690,8 +1690,8 @@ class _RunSessionRowState extends State<_RunSessionRow> {
               Expanded(
                 child: Text(
                   s.config.name,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 10),
+                  style: TextStyle(
+                      color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1757,33 +1757,33 @@ class _AddSkillToWorkspaceDialogState extends State<_AddSkillToWorkspaceDialog> 
             : <SkillEntry>[];
 
         return AlertDialog(
-          backgroundColor: const Color(0xFF16163A),
+          backgroundColor: context.appColors.surfaceElevated,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: Color(0xFF32327A)),
+            side: BorderSide(color: context.appColors.border),
           ),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Add Skills to Workspace',
-                style: TextStyle(color: Color(0xFFE0E0F0), fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 2),
               Text(
                 widget.workspace.name,
-                style: const TextStyle(color: Color(0xFF7C7CFF), fontSize: 11),
+                style: TextStyle(color: context.appColors.primary, fontSize: 11),
               ),
             ],
           ),
           content: SizedBox(
             width: 320,
             child: installedSkills.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Text(
                       'No skills installed yet.\nInstall skills from the Skills panel first.',
-                      style: TextStyle(color: Color(0xFF8080B0), fontSize: 12),
+                      style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
                       textAlign: TextAlign.center,
                     ),
                   )
@@ -1820,7 +1820,7 @@ class _AddSkillToWorkspaceDialogState extends State<_AddSkillToWorkspaceDialog> 
                                         _enabled.add(skill.id);
                                       }
                                     }),
-                                    activeColor: const Color(0xFF7C7CFF),
+                                    activeColor: context.appColors.primary,
                                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                     visualDensity: VisualDensity.compact,
                                   ),
@@ -1832,12 +1832,12 @@ class _AddSkillToWorkspaceDialogState extends State<_AddSkillToWorkspaceDialog> 
                                     children: [
                                       Text(
                                         skill.name,
-                                        style: const TextStyle(color: Color(0xFFE0E0F0), fontSize: 12, fontWeight: FontWeight.w500),
+                                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w500),
                                       ),
                                       if (skill.description.isNotEmpty)
                                         Text(
                                           skill.description,
-                                          style: const TextStyle(color: Color(0xFF8080B0), fontSize: 11),
+                                          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -1855,15 +1855,15 @@ class _AddSkillToWorkspaceDialogState extends State<_AddSkillToWorkspaceDialog> 
           actions: [
             TextButton(
               onPressed: _saving ? null : () => Navigator.of(context).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFFB0B0D0), fontSize: 12)),
+              child: Text('Cancel', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
             ),
             TextButton(
               onPressed: _saving ? null : () => _save(context),
               child: _saving
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text(
+                  : Text(
                       'Apply',
-                      style: TextStyle(color: Color(0xFF7C7CFF), fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: context.appColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
                     ),
             ),
           ],

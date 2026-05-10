@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import '../bloc/collaboration_cubit.dart';
 import '../bloc/collaboration_state.dart';
 import '../collaboration_ports.dart';
@@ -80,14 +81,15 @@ class _CollaborationDialogState extends State<_CollaborationDialog>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Material(
         color: Colors.transparent,
         child: Container(
           width: 420,
           decoration: BoxDecoration(
-            color: const Color(0xFF111318),
-            border: Border.all(color: const Color(0xFF2A3040)),
+            color: colors.surface,
+            border: Border.all(color: colors.border),
             borderRadius: BorderRadius.circular(12),
             boxShadow: const [
               BoxShadow(
@@ -112,20 +114,21 @@ class _CollaborationDialogState extends State<_CollaborationDialog>
                       color: Color(0xFF7C3AED),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
+                    Text(
                       'Share Space',
                       style: TextStyle(
-                        color: Color(0xFFE8E8FF),
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.close,
                         size: 16,
-                        color: Color(0xFF64748B),
+                        color: Theme.of(context).textTheme.bodySmall?.color ??
+                            Theme.of(context).colorScheme.onSurface,
                       ),
                       padding: EdgeInsets.zero,
                       onPressed: () => Navigator.pop(context),
@@ -176,6 +179,7 @@ class _IdleView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -184,18 +188,20 @@ class _IdleView extends StatelessWidget {
         Container(
           height: 34,
           decoration: BoxDecoration(
-            color: const Color(0xFF0D0F14),
+            color: colors.surface,
             borderRadius: BorderRadius.circular(8),
           ),
           child: TabBar(
             controller: tabs,
             indicatorSize: TabBarIndicatorSize.tab,
             indicator: BoxDecoration(
-              color: const Color(0xFF1E2340),
+              color: colors.surfaceElevated,
               borderRadius: BorderRadius.circular(6),
             ),
-            labelColor: const Color(0xFFE8E8FF),
-            unselectedLabelColor: const Color(0xFF64748B),
+            labelColor: Theme.of(context).colorScheme.onSurface,
+            unselectedLabelColor:
+                Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface,
             labelStyle: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -371,6 +377,9 @@ class _HostActiveView extends StatelessWidget {
   Widget build(BuildContext context) {
     final remoteUrl = state.webClientUrl;
     final localUrl = state.localUrl;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -419,9 +428,9 @@ class _HostActiveView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    const Text(
+                    Text(
                       'connected',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                      style: TextStyle(color: mutedColor, fontSize: 11),
                     ),
                   ],
                 ),
@@ -462,8 +471,8 @@ class _HostActiveView extends StatelessWidget {
                       ),
                       Text(
                         localUrl,
-                        style: const TextStyle(
-                          color: Color(0xFFE8E8FF),
+                        style: TextStyle(
+                          color: onSurface,
                           fontSize: 12,
                           fontFamily: 'monospace',
                         ),
@@ -485,7 +494,7 @@ class _HostActiveView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D1117),
+              color: context.appColors.surface,
               border: Border.all(color: const Color(0xFF3B5BDB)),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -512,8 +521,8 @@ class _HostActiveView extends StatelessWidget {
                     Expanded(
                       child: Text(
                         remoteUrl,
-                        style: const TextStyle(
-                          color: Color(0xFFE8E8FF),
+                        style: TextStyle(
+                          color: onSurface,
                           fontSize: 12,
                           fontFamily: 'monospace',
                           fontWeight: FontWeight.w600,
@@ -537,10 +546,10 @@ class _HostActiveView extends StatelessWidget {
         // ── Peers list ───────────────────────────────────────────────
         if (state.peers.isNotEmpty) ...[
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Connected peers:',
             style: TextStyle(
-              color: Color(0xFF64748B),
+              color: mutedColor,
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
@@ -565,8 +574,8 @@ class _HostActiveView extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     e.value.name.isNotEmpty ? e.value.name : e.key,
-                    style: const TextStyle(
-                      color: Color(0xFFE8E8FF),
+                    style: TextStyle(
+                      color: onSurface,
                       fontSize: 12,
                     ),
                   ),
@@ -575,13 +584,13 @@ class _HostActiveView extends StatelessWidget {
             ),
         ] else ...[
           const SizedBox(height: 10),
-          const Row(
+          Row(
             children: [
-              Icon(Icons.hourglass_empty, size: 12, color: Color(0xFF64748B)),
-              SizedBox(width: 6),
+              Icon(Icons.hourglass_empty, size: 12, color: mutedColor),
+              const SizedBox(width: 6),
               Text(
                 'Waiting for peers to connect…',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                style: TextStyle(color: mutedColor, fontSize: 12),
               ),
             ],
           ),
@@ -621,7 +630,7 @@ class _UrlActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2035),
+          color: context.appColors.surfaceElevated,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Icon(icon, size: 14, color: const Color(0xFF7B9EFF)),
@@ -670,8 +679,8 @@ class _GuestActiveView extends StatelessWidget {
                   ),
                   Text(
                     state.address,
-                    style: const TextStyle(
-                      color: Color(0xFFE8E8FF),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 14,
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.w600,
@@ -790,30 +799,35 @@ class _DarkTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return TextField(
       controller: controller,
       enabled: enabled,
-      style: const TextStyle(
-        color: Color(0xFFE8E8FF),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: 13,
         fontFamily: 'monospace',
       ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF44446A), fontSize: 12),
+        hintStyle: TextStyle(
+          color: Theme.of(context).textTheme.bodySmall?.color ??
+              Theme.of(context).colorScheme.onSurface,
+          fontSize: 12,
+        ),
         filled: true,
-        fillColor: const Color(0xFF0D0F14),
+        fillColor: colors.surface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 10,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF2A3040)),
+          borderSide: BorderSide(color: colors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF2A3040)),
+          borderSide: BorderSide(color: colors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
@@ -849,6 +863,7 @@ class _CollabToolBtnState extends State<_CollabToolBtn> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
@@ -862,12 +877,12 @@ class _CollabToolBtnState extends State<_CollabToolBtn> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             decoration: BoxDecoration(
               color: _hovered
-                  ? const Color(0xFF1E2340)
+                  ? colors.surfaceElevated
                   : const Color(0xFF1A1E2A),
               border: Border.all(
                 color: _hovered
                     ? widget.color.withAlpha(160)
-                    : const Color(0xFF2A3040),
+                    : colors.border,
               ),
               borderRadius: BorderRadius.circular(6),
             ),

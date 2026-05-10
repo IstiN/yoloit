@@ -275,10 +275,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _scrollToBottom();
 
     // Start streaming
+    // Extract image file paths from message text and pass as attachments
+    final _imageExtRe = RegExp(
+      r'\.(png|jpg|jpeg|gif|webp|bmp)$',
+      caseSensitive: false,
+    );
+    final tokens = text.split(RegExp(r'\s+'));
+    final attachments =
+        tokens
+            .where((t) => t.startsWith('/') && _imageExtRe.hasMatch(t))
+            .toList();
+    final promptText =
+        tokens
+            .where((t) => !(t.startsWith('/') && _imageExtRe.hasMatch(t)))
+            .join(' ')
+            .trim();
+
     final stream = _provider.sendMessage(
-      message: text,
+      message: promptText.isNotEmpty ? promptText : text,
       config: _config,
       isFirstMessage: _isFirstMessage,
+      attachments: attachments,
     );
 
     _isFirstMessage = false;
@@ -1116,7 +1133,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         buttonPos.dx + 260,
         buttonPos.dy,
       ),
-      color: const Color(0xFF1E293B),
+      color: context.appColors.surface,
       items:
           models
               .map(
@@ -1142,7 +1159,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                             color:
                                 m.id == _config.model
                                     ? const Color(0xFF34D399)
-                                    : const Color(0xFFE2E8F0),
+                                    : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -1155,7 +1172,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                                   ? const Color(0xFF34D399)
                                   : m.costMultiplier > 3
                                   ? const Color(0xFFF87171)
-                                  : const Color(0xFF64748B),
+                                  : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -1242,15 +1259,16 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AlertDialog(
-      backgroundColor: const Color(0xFF1E293B),
-      title: const Row(
+      backgroundColor: colors.surface,
+      title: Row(
         children: [
-          Icon(Icons.history, size: 18, color: Color(0xFF94A3B8)),
-          SizedBox(width: 8),
+          Icon(Icons.history, size: 18, color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface),
+          const SizedBox(width: 8),
           Text(
             'Session history',
-            style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 16),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16),
           ),
         ],
       ),
@@ -1265,11 +1283,11 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
             }
             final entries = snapshot.data!;
             if (entries.isEmpty) {
-              return const Center(
+              return Center(
                 child: Text(
                   'No sessions yet.\nStart chatting to see history here.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 13),
                 ),
               );
             }
@@ -1284,7 +1302,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                     color:
                         isCurrent
                             ? const Color(0xFF1A3A2A)
-                            : const Color(0xFF0F1219),
+                            : colors.surface,
                     borderRadius: BorderRadius.circular(10),
                     border:
                         isCurrent
@@ -1306,7 +1324,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                         color:
                             isCurrent
                                 ? const Color(0xFF34D399)
-                                : const Color(0xFF64748B),
+                                : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -1323,15 +1341,15 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                                 color:
                                     isCurrent
                                         ? const Color(0xFF34D399)
-                                        : const Color(0xFFE2E8F0),
+                                        : Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${e.provider} • ${e.model} • ${e.messageCount} msgs',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
-                                color: Color(0xFF64748B),
+                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ],
@@ -1339,9 +1357,9 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                       ),
                       Text(
                         _formatDate(e.lastMessageAt ?? e.createdAt),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 9,
-                          color: Color(0xFF475569),
+                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -1472,29 +1490,39 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final colorScheme = Theme.of(context).colorScheme;
+    final labelStyle = TextStyle(
+      fontSize: 11,
+      color: Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B),
+    );
+    final inputTextStyle = TextStyle(fontSize: 12, color: colorScheme.onSurface);
+    final hintStyle = TextStyle(
+      fontSize: 12,
+      color: colorScheme.onSurface.withAlpha(100),
+    );
+    final inputFill = colors.surfaceElevated;
+    final dropdownFill = colors.surface;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Provider type selector
-          const Text(
-            'Provider',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-          ),
+          Text('Provider', style: labelStyle),
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              color: const Color(0xFF1A2030),
+              color: inputFill,
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: 'copilot',
                 isExpanded: true,
-                dropdownColor: const Color(0xFF1E293B),
-                style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                dropdownColor: dropdownFill,
+                style: inputTextStyle,
                 items: const [
                   DropdownMenuItem(
                     value: 'copilot',
@@ -1521,10 +1549,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
           const SizedBox(height: 14),
 
           // Working directory
-          const Text(
-            'Working Directory',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-          ),
+          Text('Working Directory', style: labelStyle),
           const SizedBox(height: 4),
           Row(
             children: [
@@ -1545,7 +1570,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                     ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      color: const Color(0xFF1A2030),
+                      color: inputFill,
                     ),
                     child: Row(
                       children: [
@@ -1564,8 +1589,8 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                               fontSize: 12,
                               color:
                                   _dirCtrl.text.isEmpty
-                                      ? const Color(0xFF475569)
-                                      : const Color(0xFFE2E8F0),
+                                      ? colorScheme.onSurface.withAlpha(120)
+                                      : colorScheme.onSurface,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1580,22 +1605,16 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
           const SizedBox(height: 14),
 
           // Session name
-          const Text(
-            'Session Name',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-          ),
+          Text('Session Name', style: labelStyle),
           const SizedBox(height: 4),
           TextField(
             controller: _sessionCtrl,
-            style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+            style: inputTextStyle,
             decoration: InputDecoration(
               hintText: 'auto-generated if empty',
-              hintStyle: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF475569),
-              ),
+              hintStyle: hintStyle,
               filled: true,
-              fillColor: const Color(0xFF1A2030),
+              fillColor: inputFill,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
@@ -1610,23 +1629,20 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
           const SizedBox(height: 14),
 
           // Model selector
-          const Text(
-            'Model',
-            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-          ),
+          Text('Model', style: labelStyle),
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              color: const Color(0xFF1A2030),
+              color: inputFill,
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _selectedModel,
                 isExpanded: true,
-                dropdownColor: const Color(0xFF1E293B),
-                style: const TextStyle(fontSize: 12, color: Color(0xFFE2E8F0)),
+                dropdownColor: dropdownFill,
+                style: inputTextStyle,
                 items:
                     widget.models
                         .map(
@@ -1910,7 +1926,7 @@ class _AssistantBubble extends StatelessWidget {
               padding: const EdgeInsets.only(top: 3, left: 6),
               child: Text(
                 '${tokenUsage!.outputTokens} tok',
-                style: const TextStyle(fontSize: 9, color: Color(0xFF3B4A5F)),
+                style: TextStyle(fontSize: 9, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
               ),
             ),
         ],
@@ -1940,6 +1956,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final statusIcon =
         widget.success == null
             ? Icons.hourglass_top
@@ -1948,7 +1965,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
             : Icons.error_outline;
     final statusColor =
         widget.success == null
-            ? const Color(0xFF94A3B8)
+            ? Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface
             : widget.success!
             ? const Color(0xFF34D399)
             : const Color(0xFFF87171);
@@ -1960,9 +1977,9 @@ class _ToolResultCardState extends State<_ToolResultCard> {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0x0AFFFFFF),
+            color: colors.surfaceHighlight,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF334155)),
+            border: Border.all(color: colors.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1974,15 +1991,15 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                   Icon(
                     Icons.build_outlined,
                     size: 12,
-                    color: const Color(0xFF94A3B8),
+                    color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       widget.toolName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFCBD5E1),
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1990,7 +2007,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
                     size: 16,
-                    color: const Color(0xFF64748B),
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
                   ),
                 ],
               ),
@@ -2001,15 +2018,15 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: colors.surface,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: SelectableText(
                       widget.content,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontFamily: 'monospace',
-                        color: Color(0xFF94A3B8),
+                        color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -2176,8 +2193,8 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                 child: Container(
                   width: 5,
                   height: 5,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF94A3B8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                     shape: BoxShape.circle,
                   ),
                 ),

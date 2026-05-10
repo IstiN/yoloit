@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/collaboration/services/guest_terminal_registry.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 
@@ -88,6 +89,7 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
     // enclosing canvas. Wrapping in ScrollableCardRegion disables canvas
     // pan while the pointer is over the terminal, letting xterm consume
     // two-finger scroll / wheel events for scrollback.
+    final colors = context.appColors;
     final terminalWidget = ScrollableCardRegion(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -99,7 +101,7 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
           }
         },
         child: ColoredBox(
-          color: const Color(0xFF0A0A0F),
+          color: colors.terminalBackground,
           child: TerminalView(
             _terminal,
             controller: _controller,
@@ -144,12 +146,12 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
               decoration: BoxDecoration(
                 color: _mobileKbActive
                     ? const Color(0xFF4B9EFF).withAlpha(200)
-                    : const Color(0xFF1A1F2E),
+                    : colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: _mobileKbActive
                       ? const Color(0xFF4B9EFF)
-                      : const Color(0xFF2A3040),
+                      : colors.border,
                 ),
               ),
               child: Icon(
@@ -211,8 +213,9 @@ class _MobileInputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
-      color: const Color(0xFF0D1117),
+      color: colors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -233,14 +236,14 @@ class _MobileInputBar extends StatelessWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1F2E),
+                        color: colors.surfaceElevated,
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF2A3040)),
+                        border: Border.all(color: colors.border),
                       ),
                       child: Text(
                         label,
-                        style: const TextStyle(
-                          color: Color(0xFFCBD5E1),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 11,
                           fontFamily: 'JetBrainsMono',
                         ),
@@ -258,31 +261,31 @@ class _MobileInputBar extends StatelessWidget {
                 child: TextField(
                   controller: inputCtrl,
                   focusNode: inputFocus,
-                  style: const TextStyle(
-                    color: Color(0xFFE8E8FF),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 13,
                     fontFamily: 'JetBrainsMono',
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Type command…',
-                    hintStyle: TextStyle(
+                    hintStyle: const TextStyle(
                       color: Color(0xFF3D4A6B),
                       fontSize: 13,
                     ),
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 6,
                     ),
                     isDense: true,
                     filled: true,
-                    fillColor: Color(0xFF0A0A0F),
+                    fillColor: colors.terminalBackground,
                     border: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF2A3040)),
+                      borderSide: BorderSide(color: colors.border),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF2A3040)),
+                      borderSide: BorderSide(color: colors.border),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(
                         color: Color(0xFF4B9EFF),
                         width: 1.5,

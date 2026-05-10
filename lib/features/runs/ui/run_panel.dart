@@ -66,7 +66,7 @@ class _RunPanelViewState extends State<_RunPanelView> {
     final state = widget.state;
 
     return Container(
-      color: AppColors.terminalBackground,
+      color: colors.terminalBackground,
       child: Row(
         children: [
           // Left: configurations list (always visible)
@@ -110,7 +110,7 @@ class _ConsoleHeader extends StatelessWidget {
       height: 36,
       decoration: BoxDecoration(
         color: colors.surface,
-        border: Border(bottom: BorderSide(color: const Color(0xFF32327A), width: 1)),
+        border: Border(bottom: BorderSide(color: colors.border, width: 1)),
       ),
       child: Row(
         children: [
@@ -164,7 +164,7 @@ class _ConsoleHeader extends StatelessWidget {
             _HeaderButton(
               tooltip: 'Clear output',
               icon: Icons.clear_all_rounded,
-              iconColor: AppColors.textMuted,
+              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
               onTap: () => cubit.clearOutput(activeSession.id),
             ),
           ],
@@ -194,7 +194,7 @@ class _SessionTab extends StatelessWidget {
     final colors = context.appColors;
     final isRunning = session.status == RunStatus.running;
     final dotColor = session.config.color ??
-        (isRunning ? AppColors.neonGreen : AppColors.textMuted);
+        (isRunning ? AppColors.neonGreen : Theme.of(context).colorScheme.onSurface.withAlpha(120));
 
     return GestureDetector(
       onTap: onTap,
@@ -237,8 +237,8 @@ class _SessionTab extends StatelessWidget {
                 session.config.name,
                 style: TextStyle(
                   color: isActive
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(context).textTheme.bodyMedium?.color,
                   fontSize: 11,
                   fontWeight:
                       isActive ? FontWeight.w600 : FontWeight.normal,
@@ -249,10 +249,10 @@ class _SessionTab extends StatelessWidget {
             const SizedBox(width: 4),
             GestureDetector(
               onTap: onClose,
-              child: const Icon(
+              child: Icon(
                 Icons.close,
                 size: 10,
-                color: AppColors.textMuted,
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
               ),
             ),
           ],
@@ -294,8 +294,8 @@ class _HeaderButton extends StatelessWidget {
               : Text(
                   label ?? '',
                   style: textStyle ??
-                      const TextStyle(
-                          color: AppColors.textPrimary, fontSize: 12),
+                      TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
                 ),
         ),
       ),
@@ -322,10 +322,10 @@ class _ConfigList extends StatelessWidget {
             height: 28,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             alignment: Alignment.centerLeft,
-            child: const Text(
+            child: Text(
               'CONFIGURATIONS',
               style: TextStyle(
-                color: AppColors.textMuted,
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.8,
@@ -429,7 +429,7 @@ class _ConfigItemState extends State<_ConfigItem> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final dotColor =
-        widget.config.color ?? AppColors.textSecondary;
+        widget.config.color ?? Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -455,8 +455,8 @@ class _ConfigItemState extends State<_ConfigItem> {
             Expanded(
               child: Text(
                 widget.config.name,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
                   fontSize: 11,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -486,7 +486,7 @@ class _ConfigItemState extends State<_ConfigItem> {
               opacity: (_hovering || widget.isRunning) ? 1.0 : 0.0,
               child: _SmallIconButton(
                 icon: Icons.more_vert,
-                color: AppColors.textMuted,
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
                 tooltip: 'Options',
                 onTap: (_hovering || widget.isRunning)
                     ? () => _showMenu(context)
@@ -513,12 +513,12 @@ class _ConfigItemState extends State<_ConfigItem> {
       ),
       color: context.appColors.surfaceElevated,
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'edit',
           height: 32,
           child: Text('Edit',
               style: TextStyle(
-                  color: AppColors.textPrimary, fontSize: 12)),
+                  color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
         ),
         const PopupMenuItem(
           value: 'delete',
@@ -599,6 +599,7 @@ class _ConsoleState extends State<_Console> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final session = widget.state.activeSession;
 
     if (session == null) {
@@ -624,21 +625,21 @@ class _ConsoleState extends State<_Console> {
       child: GestureDetector(
         onTap: _focusNode.requestFocus,
         child: Container(
-          color: AppColors.terminalBackground,
+          color: colors.terminalBackground,
           child: Column(
             children: [
               Container(
                 height: 24,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                color: AppColors.surface,
+                color: colors.surface,
                 child: ClipRect(
                   child: Row(
                     children: [
                       Expanded(
                         child: Text(
                           '> ${session.config.command}',
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
                             fontSize: 11,
                             fontFamily: 'monospace',
                           ),
@@ -649,8 +650,8 @@ class _ConsoleState extends State<_Console> {
                         const SizedBox(width: 6),
                         Text(
                           _formatTime(session.startedAt!),
-                          style: const TextStyle(
-                              color: AppColors.textMuted, fontSize: 10),
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withAlpha(120), fontSize: 10),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -659,8 +660,8 @@ class _ConsoleState extends State<_Console> {
                         message: 'Copy all (⌘A)',
                         child: InkWell(
                           onTap: _copyAll,
-                          child: const Icon(Icons.copy_outlined,
-                              size: 12, color: AppColors.textMuted),
+                          child: Icon(Icons.copy_outlined,
+                              size: 12, color: Theme.of(context).colorScheme.onSurface.withAlpha(120)),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -670,11 +671,11 @@ class _ConsoleState extends State<_Console> {
               ),
               Expanded(
                 child: output.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'No output yet…',
                           style: TextStyle(
-                              color: AppColors.textMuted, fontSize: 12),
+                              color: Theme.of(context).colorScheme.onSurface.withAlpha(120), fontSize: 12),
                         ),
                       )
                     : _FullLogView(
@@ -769,7 +770,7 @@ class _EmptyConsole extends StatelessWidget {
     final cubit = context.read<RunCubit>();
 
     return Container(
-      color: AppColors.terminalBackground,
+      color: colors.terminalBackground,
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -786,10 +787,10 @@ class _EmptyConsole extends StatelessWidget {
                   size: 32, color: colors.primary),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Run Configurations',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -799,8 +800,8 @@ class _EmptyConsole extends StatelessWidget {
               hasWorkspace
                   ? 'Select a configuration from the left panel to run it'
                   : 'Open a workspace to get started',
-              style: const TextStyle(
-                  color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withAlpha(120), fontSize: 12),
             ),
             if (hasWorkspace && configs.isNotEmpty) ...[
               const SizedBox(height: 20),
@@ -851,8 +852,8 @@ class _RunQuickButton extends StatelessWidget {
             Icon(Icons.play_arrow_rounded, size: 12, color: dotColor),
             const SizedBox(width: 4),
             Text(config.name,
-                style: const TextStyle(
-                    color: AppColors.textPrimary, fontSize: 12)),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
           ],
         ),
       ),

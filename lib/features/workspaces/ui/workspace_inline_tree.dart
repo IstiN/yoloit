@@ -196,8 +196,8 @@ class _RepoTree extends StatelessWidget {
                 Expanded(
                   child: Text(
                     repoName,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
+                    style: TextStyle(
+                      color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
@@ -224,22 +224,18 @@ class _BranchRow extends StatelessWidget {
   final bool isLast;
   final bool hasSession;
 
-  Color _dotColor() {
-    if (entry.isMain) return AppColors.neonGreen;
-    if (hasSession) return AppColors.neonBlue;
-    return AppColors.textMuted;
-  }
-
   @override
   Widget build(BuildContext context) {
     final branch = entry.branch ?? entry.commit ?? '(detached)';
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final dotColor = entry.isMain ? AppColors.neonGreen : hasSession ? AppColors.neonBlue : mutedColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 1, 8, 1),
       child: Row(
         children: [
           Text(
             isLast ? '└─ ' : '├─ ',
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+            style: TextStyle(color: mutedColor, fontSize: 10),
           ),
           Container(
             width: 6,
@@ -247,14 +243,14 @@ class _BranchRow extends StatelessWidget {
             margin: const EdgeInsets.only(right: 6),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: _dotColor(),
+              color: dotColor,
             ),
           ),
           Expanded(
             child: Text(
               branch,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                 fontSize: 11,
               ),
               overflow: TextOverflow.ellipsis,
@@ -272,17 +268,18 @@ class _AddBranchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
     return GestureDetector(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(28, 1, 8, 1),
         child: Row(
           children: [
-            const Text('└─ ', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
-            const Flexible(
+            Text('└─ ', style: TextStyle(color: mutedColor, fontSize: 10)),
+            Flexible(
               child: Text(
                 '＋ new branch...',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: mutedColor, fontSize: 11),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -311,7 +308,7 @@ class _AddBranchField extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 2, 8, 2),
       child: Row(
         children: [
-          const Text('└─ ', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+          Text('└─ ', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10)),
           Expanded(
             child: TextField(
               controller: controller,
@@ -319,7 +316,7 @@ class _AddBranchField extends StatelessWidget {
               style: TextStyle(color: colors.primary, fontSize: 11),
               decoration: InputDecoration(
                 hintText: 'branch-name',
-                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
                 filled: false,
@@ -341,7 +338,7 @@ class _AddBranchField extends StatelessWidget {
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onCancel,
-            child: const Icon(Icons.close, size: 11, color: AppColors.textMuted),
+            child: Icon(Icons.close, size: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
           ),
         ],
       ),
@@ -393,15 +390,16 @@ class _SessionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(12, 8, 8, 4),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
           child: Text(
             'Agent Sessions',
             style: TextStyle(
-              color: AppColors.textMuted,
+              color: mutedColor,
               fontSize: 10,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.8,
@@ -440,20 +438,15 @@ class _SessionRow extends StatefulWidget {
 class _SessionRowState extends State<_SessionRow> {
   bool _hovered = false;
 
-  Color _statusColor() {
-    switch (widget.session.status) {
-      case AgentStatus.live:
-        return AppColors.neonGreen;
-      case AgentStatus.idle:
-        return AppColors.textMuted;
-      case AgentStatus.error:
-        return AppColors.neonRed;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final statusColor = switch (widget.session.status) {
+      AgentStatus.live => AppColors.neonGreen,
+      AgentStatus.idle => mutedColor,
+      AgentStatus.error => AppColors.neonRed,
+    };
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -465,7 +458,7 @@ class _SessionRowState extends State<_SessionRow> {
           children: [
             Text(
               widget.isLast ? '└─ ' : '├─ ',
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+              style: TextStyle(color: mutedColor, fontSize: 10),
             ),
             Container(
               width: 6,
@@ -473,19 +466,19 @@ class _SessionRowState extends State<_SessionRow> {
               margin: const EdgeInsets.only(right: 6),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _statusColor(),
+                color: statusColor,
               ),
             ),
             Text(
               widget.session.type.iconLabel,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+              style: TextStyle(color: mutedColor, fontSize: 10),
             ),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 widget.label,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
                   fontSize: 11,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -495,7 +488,7 @@ class _SessionRowState extends State<_SessionRow> {
               GestureDetector(
                 onTap: () =>
                     context.read<TerminalCubit>().closeSession(widget.session.id),
-                child: const Icon(Icons.close, size: 12, color: AppColors.textMuted),
+                child: Icon(Icons.close, size: 12, color: mutedColor),
               ),
           ],
         ),
@@ -519,20 +512,25 @@ class _NewSessionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => _showDialog(context),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 2, 8, 4),
-        child: Row(
-          children: [
-            const Text('└─ ', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
-            const Flexible(
-              child: Text(
-                '＋ New Agent Session',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
-                overflow: TextOverflow.ellipsis,
-              ),
+      child: Builder(
+        builder: (context) {
+          final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(28, 2, 8, 4),
+            child: Row(
+              children: [
+                Text('└─ ', style: TextStyle(color: mutedColor, fontSize: 10)),
+                Flexible(
+                  child: Text(
+                    '＋ New Agent Session',
+                    style: TextStyle(color: mutedColor, fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
