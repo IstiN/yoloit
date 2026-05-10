@@ -1772,10 +1772,29 @@ class _UserBubble extends StatelessWidget {
   final String content;
   final List<String> attachments;
 
+  static final _pathTokenRe = RegExp(r'^/\S+');
+
+  /// Resolve all file paths: merge explicit attachments with any inline paths
+  /// found in content (backward-compat for messages saved before the
+  /// attachments field was added).
+  static ({List<String> paths, String text}) _resolve(
+    String content,
+    List<String> attachments,
+  ) {
+    final tokens = content.split(RegExp(r'\s+'));
+    final inlinePaths = tokens.where((t) => _pathTokenRe.hasMatch(t)).toList();
+    final textOnly =
+        tokens.where((t) => !_pathTokenRe.hasMatch(t)).join(' ').trim();
+
+    final allPaths = <String>{...attachments, ...inlinePaths}.toList();
+    return (paths: allPaths, text: textOnly);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final hasText = content.trim().isNotEmpty;
-    final hasAttachments = attachments.isNotEmpty;
+    final resolved = _resolve(content, attachments);
+    final hasText = resolved.text.isNotEmpty;
+    final hasAttachments = resolved.paths.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
@@ -1804,14 +1823,14 @@ class _UserBubble extends StatelessWidget {
                 Padding(
                   padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
                   child: _AttachmentPreviewSection(
-                    paths: attachments,
+                    paths: resolved.paths,
                     onLight: false,
                   ),
                 ),
               if (hasText)
                 SelectionArea(
                   child: Text(
-                    content,
+                    resolved.text,
                     style: const TextStyle(
                       fontSize: 13,
                       color: Colors.white,
