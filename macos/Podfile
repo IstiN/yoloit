@@ -38,5 +38,25 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_macos_build_settings(target)
+
+    # Fix media_kit duplicate Mpv.framework loading on macOS.
+    # media_kit 1.x calls dlopen() with a path that may differ from the
+    # linked @rpath, causing dyld to load Mpv twice → duplicate ObjC classes
+    # → SIGABRT in mpv core threads.
+    # Solution: add a build phase that re-signs Mpv.framework with a canonical
+    # install name so dyld deduplicates it regardless of how it is opened.
+    if target.name == 'Pods-Runner'
+      phase_name = 'Fix media_kit Mpv duplicate framework'
+      existing = target.shell_script_build_phases.find { |p| p.name == phase_name }
+      unless existing
+        phase = target.new_shell_script_build_phase(phase_name)
+        phase.shell_script = <<~SCRIPT
+          MPV="$BUILT_PRODUCTS_DIR/$FRAMEWORKS_FOLDER_PATH/Mpv.framework/Versions/A/Mpv"
+          if [ -f "$MPV" ]; then
+            install_name_tool -id "@rpath/Mpv.framework/Versions/A/Mpv" "$MPV" 2>/dev/null || true
+          fi
+        SCRIPT
+      end
+    end
   end
 end
