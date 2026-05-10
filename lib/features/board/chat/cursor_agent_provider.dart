@@ -19,10 +19,8 @@ class CursorAgentProvider extends ChatProvider {
   final Map<String, String> _sessionIds = {};
   final Map<String, Process> _processes = {};
 
-  /// Tracks model_call_ids that have started streaming (have seen first delta).
-  final Set<String> _streamingTurns = {};
-
-  /// The model_call_id (or generated id) of the currently streaming message.
+  /// The generated id of the currently streaming assistant message.
+  /// Non-null means we are mid-stream; null means the stream is idle.
   String? _currentStreamId;
 
   @override
@@ -69,7 +67,6 @@ class CursorAgentProvider extends ChatProvider {
     required StreamController<ChatEvent> controller,
   }) async {
     await stop(config.sessionName);
-    _streamingTurns.clear();
     _currentStreamId = null;
 
     final args = <String>[
@@ -237,9 +234,10 @@ class CursorAgentProvider extends ChatProvider {
         final hasTimestamp = json.containsKey('timestamp_ms');
 
         if (hasTimestamp) {
-          // Delta chunk (--stream-partial-output)
-          final isFirst = !_streamingTurns.contains(modelCallId ?? '_');
-          if (modelCallId != null) _streamingTurns.add(modelCallId);
+          // Delta chunk (--stream-partial-output).
+          // Use _currentStreamId == null to detect the first delta of a new
+          // assistant turn (model_call_id is absent from delta events).
+          final isFirst = _currentStreamId == null;
 
           if (isFirst) {
             final startId =
@@ -268,13 +266,12 @@ class CursorAgentProvider extends ChatProvider {
             ),
           ];
         } else {
-          // Final complete message (no timestamp_ms)
+          // Final complete message (no timestamp_ms) — end of this turn.
           final msgId =
               modelCallId ??
               _currentStreamId ??
               'cursor-${DateTime.now().millisecondsSinceEpoch}';
-          if (modelCallId != null) _streamingTurns.remove(modelCallId);
-          _currentStreamId = null;
+          _currentStreamId = null; // reset so next turn starts fresh
           return [
             ChatEvent(
               type: ChatEventType.assistantMessage,
@@ -289,12 +286,7 @@ class CursorAgentProvider extends ChatProvider {
         if (subtype == 'started') {
           final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
           final toolCall = json['tool_call'] as Map<String, dynamic>?;
-          final description =
-              toolCall?['description'] as String? ?? 'tool call';
-          final shellArgs =
-              (toolCall?['shellToolCall'] as Map<String, dynamic>?)?['args']
-                  as Map<String, dynamic>?;
-          final command = shellArgs?['command'] as String? ?? '';
+          final (description, command) = _extractToolInfo(toolCall);
           return [
             ChatEvent(
               type: ChatEventType.toolStart,
@@ -309,23 +301,14 @@ class CursorAgentProvider extends ChatProvider {
         } else if (subtype == 'completed') {
           final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
           final toolCall = json['tool_call'] as Map<String, dynamic>?;
-          final shellTool =
-              toolCall?['shellToolCall'] as Map<String, dynamic>?;
-          final result = shellTool?['result'] as Map<String, dynamic>?;
-          final isSuccess = result?.containsKey('success') == true;
-          final successData = result?['success'] as Map<String, dynamic>?;
-          final exitCode = (successData?['exitCode'] as num?)?.toInt() ?? 0;
-          final output =
-              successData?['interleavedOutput'] as String? ??
-              successData?['stdout'] as String? ??
-              '';
+          final (isSuccess, output) = _extractToolResult(toolCall);
           return [
             ChatEvent(
               type: ChatEventType.toolComplete,
               rawType: 'cursor.tool_call.completed',
               data: {
                 'toolCallId': callId,
-                'success': isSuccess && exitCode == 0,
+                'success': isSuccess,
                 'result': {'content': output},
               },
             ),
@@ -366,6 +349,72 @@ class CursorAgentProvider extends ChatProvider {
     if (content is String) return content;
     return '';
   }
+
+  /// Extract tool description and primary argument from cursor tool_call JSON.
+  /// Cursor supports many tool types (shellToolCall, readFile, editFile, …).
+  (String description, String command) _extractToolInfo(
+    Map<String, dynamic>? toolCall,
+  ) {
+    if (toolCall == null) return ('tool call', '');
+    for (final key in toolCall.keys) {
+      final nested = toolCall[key] as Map<String, dynamic>?;
+      if (nested == null) continue;
+      final description =
+          nested['description'] as String? ?? _toolKeyToName(key);
+      final args = nested['args'] as Map<String, dynamic>?;
+      final command =
+          args?['command'] as String? ??
+          nested['path'] as String? ??
+          nested['filePath'] as String? ??
+          '';
+      return (description, command);
+    }
+    return ('tool call', '');
+  }
+
+  /// Extract success/output from cursor tool_call completed JSON.
+  (bool isSuccess, String output) _extractToolResult(
+    Map<String, dynamic>? toolCall,
+  ) {
+    if (toolCall == null) return (true, '');
+    for (final key in toolCall.keys) {
+      final nested = toolCall[key] as Map<String, dynamic>?;
+      if (nested == null) continue;
+      final result = nested['result'] as Map<String, dynamic>?;
+      if (result == null) return (true, '');
+      if (result.containsKey('success')) {
+        final successData = result['success'] as Map<String, dynamic>?;
+        final exitCode = (successData?['exitCode'] as num?)?.toInt() ?? 0;
+        final output =
+            successData?['interleavedOutput'] as String? ??
+            successData?['stdout'] as String? ??
+            successData?['content'] as String? ??
+            '';
+        return (exitCode == 0, output);
+      }
+      if (result.containsKey('failure')) {
+        final failData = result['failure'] as Map<String, dynamic>?;
+        final msg = failData?['message'] as String? ?? '';
+        return (false, msg);
+      }
+      // Unknown result format — treat as success
+      return (true, result.toString());
+    }
+    return (true, '');
+  }
+
+  /// Convert camelCase cursor tool key to a human-readable label.
+  String _toolKeyToName(String key) => switch (key) {
+    'shellToolCall' => 'Shell',
+    'readFile' => 'Read File',
+    'editFile' => 'Edit File',
+    'listDir' => 'List Dir',
+    'searchFiles' => 'Search Files',
+    'createFile' => 'Create File',
+    'deleteFile' => 'Delete File',
+    'moveFile' => 'Move File',
+    _ => key,
+  };
 
   /// Cursor call_ids can contain newline characters — sanitize for use as keys.
   String _sanitizeCallId(String id) => id.replaceAll('\n', '_');
