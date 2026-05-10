@@ -145,6 +145,11 @@ class _WebpageContentState extends State<_WebpageContent> {
                 _controller!.runJavaScript('''
 (function(){
   document.documentElement.style.zoom='${zoom.toStringAsFixed(4)}';
+  // Force layout viewport to 1280px so sites like YouTube use desktop
+  // column widths (Polymer measures element.clientWidth, not innerWidth).
+  // The CSS zoom above then scales it visually to fit the panel.
+  document.documentElement.style.width='1280px';
+  document.documentElement.style.minWidth='1280px';
   window.dispatchEvent(new Event('resize'));
   if(window.__yoloNewTabSetup) return;
   window.__yoloNewTabSetup=true;
@@ -933,6 +938,8 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       await widget.controller.runJavaScript('''
 (function(){
   document.documentElement.style.zoom='';
+  document.documentElement.style.width='';
+  document.documentElement.style.minWidth='';
   document.body.style.transform='';
   document.body.style.transformOrigin='';
   document.body.style.width='';
@@ -986,20 +993,30 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
           ytPlayerHeight.isNotEmpty;
 
       // Build documentStart script. This runs BEFORE any page JS.
+      // Key insight: YouTube's Polymer layout uses element.clientWidth (not
+      // window.innerWidth) for player column sizing.  We must force
+      // document.documentElement.style.width = '1280px' so the layout
+      // viewport is 1280 CSS pixels wide; the CSS zoom then scales it
+      // visually to fit the panel.  This is the only reliable way to
+      // get YouTube to render a full-width desktop player.
       final sb = StringBuffer('(function(){\n');
-      if (useInner) {
-        sb.writeln("  var iw = $innerWidth;");
-        sb.writeln("  var ih = Math.round(iw * 9 / 16);");
-        sb.writeln(
-          "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
-        );
-        sb.writeln(
-          "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
-        );
-        // Optionally also override innerHeight so video player picks correct aspect.
-        sb.writeln(
-          "  // Don't override innerHeight - let real viewport drive it",
-        );
+      // Always force layout width to 1280px (the desktop viewport target).
+      sb.writeln("  var applyLayoutWidth = function(){");
+      sb.writeln("    if(document.documentElement){");
+      sb.writeln("      document.documentElement.style.width='1280px';");
+      sb.writeln("      document.documentElement.style.minWidth='1280px';");
+      sb.writeln("    }");
+      sb.writeln("  };");
+      sb.writeln("  applyLayoutWidth();");
+      sb.writeln("  document.addEventListener('DOMContentLoaded', applyLayoutWidth);");
+      // Override window.innerWidth so responsive JS code (e.g. YouTube
+      // breakpoints) also sees the desktop width.
+      sb.writeln("  var iw = 1280;");
+      sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+      sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+      if (useInner && innerWidth.isNotEmpty && innerWidth != '1280') {
+        // Allow override if user explicitly set a different value
+        sb.writeln("  iw = $innerWidth;");
       }
       // Apply CSS zoom on every DOMContentLoaded so reflow happens before JS.
       if (useZoom) {
@@ -1076,6 +1093,7 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
 JSON.stringify({
   innerWidth: window.innerWidth,
   innerHeight: window.innerHeight,
+  htmlClientW: document.documentElement?document.documentElement.clientWidth:null,
   bodyClientW: document.body?document.body.clientWidth:null,
   bodyClientH: document.body?document.body.clientHeight:null,
   ytW: (function(){var p=document.getElementById('movie_player');return p?p.clientWidth:null;})(),
@@ -1083,6 +1101,7 @@ JSON.stringify({
   playerOuterW: (function(){var p=document.querySelector('#player-container-outer');return p?p.clientWidth:null;})(),
   playerOuterH: (function(){var p=document.querySelector('#player-container-outer');return p?p.clientHeight:null;})(),
   zoom: document.documentElement.style.zoom||'none',
+  htmlW: document.documentElement?document.documentElement.style.width:'?',
   ua: navigator.userAgent.substring(0,60)
 })
 ''');

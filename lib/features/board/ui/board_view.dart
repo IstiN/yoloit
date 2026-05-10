@@ -257,6 +257,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   ctrl.runJavaScript(
                                     "document.documentElement.style.zoom="
                                     "'${scale.toStringAsFixed(4)}';"
+                                    "document.documentElement.style.width='1280px';"
+                                    "document.documentElement.style.minWidth='1280px';"
                                     "window.dispatchEvent(new Event('resize'));",
                                   );
                                 }
@@ -2585,6 +2587,8 @@ class _WebViewOverlays extends StatelessWidget {
                 WebpagePlugin.pendingCssZoom[panel.id] = scale;
                 ctrl.runJavaScript(
                   "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
+                  "document.documentElement.style.width='1280px';"
+                  "document.documentElement.style.minWidth='1280px';"
                   "window.dispatchEvent(new Event('resize'));",
                 );
               };
@@ -2652,6 +2656,8 @@ class _WebViewOverlays extends StatelessWidget {
                   WebpagePlugin.pendingCssZoom[focusedPanel.id] = scale;
                   ctrl.runJavaScript(
                     "document.documentElement.style.zoom='${scale.toStringAsFixed(4)}';"
+                    "document.documentElement.style.width='1280px';"
+                    "document.documentElement.style.minWidth='1280px';"
                     "window.dispatchEvent(new Event('resize'));",
                   );
                 };
