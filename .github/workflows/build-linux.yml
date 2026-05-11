@@ -40,7 +40,7 @@ jobs:
             libx11-dev libxext-dev libxrender-dev \
             libxrandr-dev libxi-dev libxcursor-dev \
             libxdamage-dev libxinerama-dev \
-            libasound2-dev
+            libasound2-dev libmpv-dev
 
       # ── Flutter ──────────────────────────────────────────────────────────────
       - name: Setup Flutter
