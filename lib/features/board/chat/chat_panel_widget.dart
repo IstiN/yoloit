@@ -1838,46 +1838,53 @@ class _UserBubbleState extends State<_UserBubble> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.65,
                   ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(4),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (hasAttachments)
-                      Padding(
-                        padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                        child: _AttachmentPreviewSection(
-                          paths: resolved.paths,
-                          onLight: false,
-                          onOpenFile: widget.onOpenFile,
-                        ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    if (hasText)
-                      SelectionArea(
-                        child: Text(
-                          resolved.text,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.white,
-                            height: 1.4,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(4),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (hasAttachments)
+                          Padding(
+                            padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                            child: _AttachmentPreviewSection(
+                              paths: resolved.paths,
+                              onLight: false,
+                              onOpenFile: widget.onOpenFile,
+                            ),
                           ),
-                        ),
-                      ),
-                  ],
+                        if (hasText)
+                          SelectionArea(
+                            child: Text(
+                              resolved.text,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.white,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               AnimatedOpacity(
@@ -2216,69 +2223,76 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceElevated,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
+                  Flexible(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.65,
                       ),
-                    ),
-                    child: SelectionArea(
-                      child: MarkdownBody(
-                        data: processedContent,
-                        selectable: false,
-                        onTapLink: (text, href, title) {
-                          if (widget.onLinkTap != null) {
-                            widget.onLinkTap!(href);
-                          } else if (href != null && href.isNotEmpty) {
-                            PlatformLauncher.instance.openUrl(href);
-                          }
-                        },
-                        styleSheet: MarkdownStyleSheet(
-                          p: TextStyle(
-                            fontSize: 13,
-                            color: textColor,
-                            height: 1.5,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceElevated,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(16),
+                            bottomLeft: Radius.circular(16),
+                            bottomRight: Radius.circular(16),
                           ),
-                          a: TextStyle(
-                            fontSize: 13,
-                            color: colors.primary,
-                            decoration: TextDecoration.underline,
-                          ),
-                          code: TextStyle(
-                            fontSize: 11.5,
-                            fontFamily: 'JetBrains Mono',
-                            color: colors.terminalPrompt,
-                            backgroundColor: codeBg,
-                          ),
-                          codeblockDecoration: BoxDecoration(
-                            color: codeBg,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: colors.border),
-                          ),
-                          codeblockPadding: const EdgeInsets.all(10),
-                          listBullet: TextStyle(
-                            fontSize: 13,
-                            color: mutedColor,
-                          ),
-                          h1: TextStyle(
-                            fontSize: 16,
-                            color: textColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          h2: TextStyle(
-                            fontSize: 14,
-                            color: textColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          h3: TextStyle(
-                            fontSize: 13,
-                            color: textColor,
-                            fontWeight: FontWeight.w500,
+                        ),
+                        child: SelectionArea(
+                          child: MarkdownBody(
+                            data: processedContent,
+                            selectable: false,
+                            onTapLink: (text, href, title) {
+                              if (widget.onLinkTap != null) {
+                                widget.onLinkTap!(href);
+                              } else if (href != null && href.isNotEmpty) {
+                                PlatformLauncher.instance.openUrl(href);
+                              }
+                            },
+                            styleSheet: MarkdownStyleSheet(
+                              p: TextStyle(
+                                fontSize: 13,
+                                color: textColor,
+                                height: 1.5,
+                              ),
+                              a: TextStyle(
+                                fontSize: 13,
+                                color: colors.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                              code: TextStyle(
+                                fontSize: 11.5,
+                                fontFamily: 'JetBrains Mono',
+                                color: colors.terminalPrompt,
+                                backgroundColor: codeBg,
+                              ),
+                              codeblockDecoration: BoxDecoration(
+                                color: codeBg,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: colors.border),
+                              ),
+                              codeblockPadding: const EdgeInsets.all(10),
+                              listBullet: TextStyle(
+                                fontSize: 13,
+                                color: mutedColor,
+                              ),
+                              h1: TextStyle(
+                                fontSize: 16,
+                                color: textColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              h2: TextStyle(
+                                fontSize: 14,
+                                color: textColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              h3: TextStyle(
+                                fontSize: 13,
+                                color: textColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                         ),
                       ),
