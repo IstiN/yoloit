@@ -1835,64 +1835,63 @@ class _UserBubbleState extends State<_UserBubble> {
         child: MouseRegion(
           onEnter: (_) => setState(() => _isHovered = true),
           onExit: (_) => setState(() => _isHovered = false),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.65,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.65,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(4),
+                    ),
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(4),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (hasAttachments)
-                          Padding(
-                            padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                            child: _AttachmentPreviewSection(
-                              paths: resolved.paths,
-                              onLight: false,
-                              onOpenFile: widget.onOpenFile,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasAttachments)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                          child: _AttachmentPreviewSection(
+                            paths: resolved.paths,
+                            onLight: false,
+                            onOpenFile: widget.onOpenFile,
+                          ),
+                        ),
+                      if (hasText)
+                        SelectionArea(
+                          child: Text(
+                            resolved.text,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.white,
+                              height: 1.4,
                             ),
                           ),
-                        if (hasText)
-                          SelectionArea(
-                            child: Text(
-                              resolved.text,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.white,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
                 ),
-              ),
-              AnimatedOpacity(
-                opacity: _isHovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 100),
-                child: _BubbleMenu(textToCopy: resolved.text),
-              ),
-            ],
+                AnimatedOpacity(
+                  opacity: _isHovered ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 100),
+                  child: _BubbleMenu(textToCopy: resolved.text),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1907,23 +1906,30 @@ class _BubbleMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     final textColor = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.only(top: 2),
       child: SizedBox(
-        width: 32,
-        height: 32,
+        width: 28,
+        height: 20,
         child: Material(
-          color: colors.surface.withOpacity(0.9),
-          borderRadius: BorderRadius.circular(6),
+          color: Colors.transparent,
           child: InkWell(
-            onTap: () => Clipboard.setData(ClipboardData(text: textToCopy)),
-            borderRadius: BorderRadius.circular(6),
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: textToCopy));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Copied to clipboard'),
+                  duration: Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(4),
             child: Icon(
-              Icons.more_vert,
-              size: 18,
-              color: textColor,
+              Icons.more_horiz,
+              size: 16,
+              color: textColor.withOpacity(0.5),
             ),
           ),
         ),
@@ -2231,90 +2237,89 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
               ),
 
             if (processedContent.trim().isNotEmpty)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Flexible(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.65,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceElevated,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(4),
-                            topRight: Radius.circular(16),
-                            bottomLeft: Radius.circular(16),
-                            bottomRight: Radius.circular(16),
-                          ),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.65,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevated,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(16),
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(16),
                         ),
-                        child: SelectionArea(
-                          child: MarkdownBody(
-                            data: processedContent,
-                            selectable: false,
-                            onTapLink: (text, href, title) {
-                              if (widget.onLinkTap != null) {
-                                widget.onLinkTap!(href);
-                              } else if (href != null && href.isNotEmpty) {
-                                PlatformLauncher.instance.openUrl(href);
-                              }
-                            },
-                            styleSheet: MarkdownStyleSheet(
-                              p: TextStyle(
-                                fontSize: 13,
-                                color: textColor,
-                                height: 1.5,
-                              ),
-                              a: TextStyle(
-                                fontSize: 13,
-                                color: colors.primary,
-                                decoration: TextDecoration.underline,
-                              ),
-                              code: TextStyle(
-                                fontSize: 11.5,
-                                fontFamily: 'JetBrains Mono',
-                                color: colors.terminalPrompt,
-                                backgroundColor: codeBg,
-                              ),
-                              codeblockDecoration: BoxDecoration(
-                                color: codeBg,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: colors.border),
-                              ),
-                              codeblockPadding: const EdgeInsets.all(10),
-                              listBullet: TextStyle(
-                                fontSize: 13,
-                                color: mutedColor,
-                              ),
-                              h1: TextStyle(
-                                fontSize: 16,
-                                color: textColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              h2: TextStyle(
-                                fontSize: 14,
-                                color: textColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              h3: TextStyle(
-                                fontSize: 13,
-                                color: textColor,
-                                fontWeight: FontWeight.w500,
-                              ),
+                      ),
+                      child: SelectionArea(
+                        child: MarkdownBody(
+                          data: processedContent,
+                          selectable: false,
+                          onTapLink: (text, href, title) {
+                            if (widget.onLinkTap != null) {
+                              widget.onLinkTap!(href);
+                            } else if (href != null && href.isNotEmpty) {
+                              PlatformLauncher.instance.openUrl(href);
+                            }
+                          },
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(
+                              fontSize: 13,
+                              color: textColor,
+                              height: 1.5,
+                            ),
+                            a: TextStyle(
+                              fontSize: 13,
+                              color: colors.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                            code: TextStyle(
+                              fontSize: 11.5,
+                              fontFamily: 'JetBrains Mono',
+                              color: colors.terminalPrompt,
+                              backgroundColor: codeBg,
+                            ),
+                            codeblockDecoration: BoxDecoration(
+                              color: codeBg,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: colors.border),
+                            ),
+                            codeblockPadding: const EdgeInsets.all(10),
+                            listBullet: TextStyle(
+                              fontSize: 13,
+                              color: mutedColor,
+                            ),
+                            h1: TextStyle(
+                              fontSize: 16,
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            h2: TextStyle(
+                              fontSize: 14,
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            h3: TextStyle(
+                              fontSize: 13,
+                              color: textColor,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  AnimatedOpacity(
-                    opacity: _isHovered ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 100),
-                    child: _BubbleMenu(textToCopy: processedContent),
-                  ),
-                ],
+                    AnimatedOpacity(
+                      opacity: _isHovered ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 100),
+                      child: _BubbleMenu(textToCopy: processedContent),
+                    ),
+                  ],
+                ),
               ),
 
             if (widget.tokenUsage != null)
