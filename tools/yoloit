@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────────
+# yoloit — CLI client for the YoLoIT desktop app
+#
+# Communicates with the in-app HTTP server on localhost via curl.
+# The server writes its port to ~/.config/yoloit/cli.port on startup.
+# ──────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+PORT_FILE="${HOME}/.config/yoloit/cli.port"
+BASE=""
+
+_resolve_base() {
+  if [[ -n "$BASE" ]]; then return; fi
+  if [[ ! -f "$PORT_FILE" ]]; then
+    echo "Error: YoLoIT is not running (no port file at $PORT_FILE)" >&2
+    exit 1
+  fi
+  local port
+  port=$(cat "$PORT_FILE")
+  BASE="http://127.0.0.1:${port}/api"
+}
+
+_curl() {
+  _resolve_base
+  local method=$1 path=$2
+  shift 2
+  curl -s -X "$method" "${BASE}${path}" \
+    -H "Content-Type: application/json" "$@"
+}
+
+_get()    { _curl GET    "$1"; }
+_post()   { _curl POST   "$1" -d "${2:-{}}"; }
+_put()    { _curl PUT    "$1" -d "${2:-{}}"; }
+_delete() { _curl DELETE "$1"; }
+
+# ── Usage ──────────────────────────────────────────────────────────────
+
+usage() {
+  cat <<'EOF'
+yoloit — terminal interface for YoLoIT boards
+
+USAGE
+  yoloit <command> [args...]
+
+BOARD COMMANDS
+  boards                          List all boards
+  board <id|name>                 Show board details
+  board:create <name>             Create a new board
+  board:rename <id|name> <new>    Rename a board
+  board:delete <id|name>          Delete a board
+  board:focus <id|name>           Switch to board
+  board:snapshot <id|name>        Markdown snapshot of board layout
+
+PANEL COMMANDS
+  panels <board>                  List panels on a board
+  panel <board> <panel>           Show panel details & content
+  panel:create <board> <type> <title>  Create a panel
+  panel:rename <board> <panel> <new>   Rename panel
+  panel:move <board> <panel> <x> <y>   Move panel
+  panel:resize <board> <panel> <w> <h> Resize panel
+  panel:delete <board> <panel>         Delete panel
+
+PANEL ACTIONS (sent to panel handler)
+  do <board> <panel> <action> [json]   Execute a panel action
+
+LINK COMMANDS
+  links <board>                   List links
+  link:create <board> <from> <to> Link two panels
+  link:delete <board> <from> <to> Remove a link
+
+EXAMPLES
+  yoloit boards
+  yoloit board:create "My Board"
+  yoloit panels "My Board"
+  yoloit panel:create "My Board" board.note.markdown "Notes"
+  yoloit do "My Board" "Notes" set '{"content":"# Hello"}'
+  yoloit do "My Board" "Chat" send '{"message":"Hi!"}'
+  yoloit board:snapshot "My Board"
+EOF
+}
+
+# ── Helpers ────────────────────────────────────────────────────────────
+
+_encode() { python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$1"; }
+
+# ── Command dispatch ──────────────────────────────────────────────────
+
+cmd="${1:-help}"
+shift || true
+
+case "$cmd" in
+  # ── boards ──
+  boards)
+    _get "/boards" | python3 -m json.tool 2>/dev/null || _get "/boards"
+    ;;
+  board)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board <id|name>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _get "/boards/${bid}" | python3 -m json.tool 2>/dev/null || _get "/boards/${bid}"
+    ;;
+  board:create)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:create <name>" >&2; exit 1; }
+    _post "/boards" "{\"name\":\"$1\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:rename)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit board:rename <id|name> <new>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _put "/boards/${bid}" "{\"name\":\"$2\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:delete)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:delete <id|name>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _delete "/boards/${bid}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:focus)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:focus <id|name>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _put "/boards/${bid}" '{"focus":true}' | python3 -m json.tool 2>/dev/null
+    ;;
+  board:snapshot)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:snapshot <id|name>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _get "/boards/${bid}/snapshot"
+    ;;
+
+  # ── panels ──
+  panels)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit panels <board>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _get "/boards/${bid}/panels" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _get "/boards/${bid}/panels/${pid}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:create)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit panel:create <board> <type> <title>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _post "/boards/${bid}/panels" "{\"type\":\"$2\",\"title\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:rename)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit panel:rename <board> <panel> <new>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _put "/boards/${bid}/panels/${pid}" "{\"title\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:move)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit panel:move <board> <panel> <x> <y>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _put "/boards/${bid}/panels/${pid}" "{\"x\":$3,\"y\":$4}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:resize)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit panel:resize <board> <panel> <w> <h>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _put "/boards/${bid}/panels/${pid}" "{\"width\":$3,\"height\":$4}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:delete)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:delete <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _delete "/boards/${bid}/panels/${pid}" | python3 -m json.tool 2>/dev/null
+    ;;
+
+  # ── panel actions ──
+  do)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit do <board> <panel> <action> [json-body]" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2"); action=$3
+    body="${4:-{\}}"
+    # merge action into body JSON
+    merged=$(python3 -c "
+import json,sys
+b = json.loads(sys.argv[1])
+b['action'] = sys.argv[2]
+print(json.dumps(b))
+" "$body" "$action")
+    _post "/boards/${bid}/panels/${pid}/action" "$merged" | python3 -m json.tool 2>/dev/null
+    ;;
+
+  # ── links ──
+  links)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit links <board>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _get "/boards/${bid}/links" | python3 -m json.tool 2>/dev/null
+    ;;
+  link:create)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit link:create <board> <from> <to>" >&2; exit 1; }
+    bid=$(_encode "$1"); from=$(_encode "$2"); to=$(_encode "$3")
+    _post "/boards/${bid}/links/${from}/${to}" | python3 -m json.tool 2>/dev/null
+    ;;
+  link:delete)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit link:delete <board> <from> <to>" >&2; exit 1; }
+    bid=$(_encode "$1"); from=$(_encode "$2"); to=$(_encode "$3")
+    _delete "/boards/${bid}/links/${from}/${to}" | python3 -m json.tool 2>/dev/null
+    ;;
+
+  # ── help ──
+  help|--help|-h)
+    usage
+    ;;
+  *)
+    echo "Unknown command: $cmd" >&2
+    echo "Run 'yoloit help' for usage." >&2
+    exit 1
+    ;;
+esac

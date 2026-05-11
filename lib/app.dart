@@ -4,6 +4,16 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/cli/cli_server.dart';
+import 'package:yoloit/core/cli/handlers/chat_handler.dart';
+import 'package:yoloit/core/cli/handlers/checklist_handler.dart';
+import 'package:yoloit/core/cli/handlers/code_snippet_handler.dart';
+import 'package:yoloit/core/cli/handlers/files_handler.dart';
+import 'package:yoloit/core/cli/handlers/kanban_handler.dart';
+import 'package:yoloit/core/cli/handlers/note_handler.dart';
+import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
+import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
+import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -707,8 +717,26 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<CollaborationCubit>().startHosting();
+        _startCliServer();
       }
     });
+  }
+
+  void _startCliServer() {
+    final cubit = context.read<BoardCubit>();
+    final server = CliServer.instance;
+    // Register all panel CLI handlers
+    server.registerPanelHandler(const NoteCliHandler());
+    server.registerPanelHandler(const ChatCliHandler());
+    server.registerPanelHandler(const KanbanCliHandler());
+    server.registerPanelHandler(const WebpageCliHandler());
+    server.registerPanelHandler(const PlaylistCliHandler());
+    server.registerPanelHandler(const ChecklistCliHandler());
+    server.registerPanelHandler(const CodeSnippetCliHandler());
+    server.registerPanelHandler(const FilesCliHandler());
+    server.registerPanelHandler(const FilePreviewCliHandler());
+    server.registerPanelHandler(const TerminalCliHandler());
+    server.start(cubit);
   }
 
   @override
