@@ -1839,58 +1839,52 @@ class _UserBubbleState extends State<_UserBubble> {
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.65,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(4),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasAttachments)
-                        Padding(
-                          padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                          child: _AttachmentPreviewSection(
-                            paths: resolved.paths,
-                            onLight: false,
-                            onOpenFile: widget.onOpenFile,
-                          ),
-                        ),
-                      if (hasText)
-                        SelectionArea(
-                          child: Text(
-                            resolved.text,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.white,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                AnimatedOpacity(
-                  opacity: _isHovered ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 100),
-                  child: _BubbleMenu(textToCopy: resolved.text),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(4),
                 ),
-              ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasAttachments)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                      child: _AttachmentPreviewSection(
+                        paths: resolved.paths,
+                        onLight: false,
+                        onOpenFile: widget.onOpenFile,
+                      ),
+                    ),
+                  if (hasText)
+                    SelectionArea(
+                      child: Text(
+                        resolved.text,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  AnimatedOpacity(
+                    opacity: _isHovered ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 100),
+                    child: _BubbleMenu(textToCopy: resolved.text, light: true),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1901,14 +1895,17 @@ class _UserBubbleState extends State<_UserBubble> {
 
 /// Small menu button for chat bubbles — copy on click.
 class _BubbleMenu extends StatelessWidget {
-  const _BubbleMenu({required this.textToCopy});
+  const _BubbleMenu({required this.textToCopy, this.light = false});
   final String textToCopy;
+  final bool light;
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white;
+    final color = light
+        ? Colors.white.withOpacity(0.6)
+        : (Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey);
     return Padding(
-      padding: const EdgeInsets.only(top: 2),
+      padding: const EdgeInsets.only(top: 4),
       child: SizedBox(
         width: 28,
         height: 20,
@@ -1926,11 +1923,7 @@ class _BubbleMenu extends StatelessWidget {
               );
             },
             borderRadius: BorderRadius.circular(4),
-            child: Icon(
-              Icons.more_horiz,
-              size: 16,
-              color: textColor.withOpacity(0.5),
-            ),
+            child: Icon(Icons.more_horiz, size: 16, color: color),
           ),
         ),
       ),
@@ -2241,22 +2234,22 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.65,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceElevated,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(4),
-                          topRight: Radius.circular(16),
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
-                        ),
-                      ),
-                      child: SelectionArea(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(4),
+                      topRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SelectionArea(
                         child: MarkdownBody(
                           data: processedContent,
                           selectable: false,
@@ -2312,13 +2305,13 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                           ),
                         ),
                       ),
-                    ),
-                    AnimatedOpacity(
-                      opacity: _isHovered ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 100),
-                      child: _BubbleMenu(textToCopy: processedContent),
-                    ),
-                  ],
+                      AnimatedOpacity(
+                        opacity: _isHovered ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 100),
+                        child: _BubbleMenu(textToCopy: processedContent, light: false),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
