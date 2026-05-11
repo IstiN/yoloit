@@ -1907,14 +1907,25 @@ class _BubbleMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 28,
-      height: 28,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Clipboard.setData(ClipboardData(text: textToCopy)),
-          child: Icon(Icons.more_vert, size: 16, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+    final colors = context.appColors;
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: SizedBox(
+        width: 32,
+        height: 32,
+        child: Material(
+          color: colors.surface.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(6),
+          child: InkWell(
+            onTap: () => Clipboard.setData(ClipboardData(text: textToCopy)),
+            borderRadius: BorderRadius.circular(6),
+            child: Icon(
+              Icons.more_vert,
+              size: 18,
+              color: textColor,
+            ),
+          ),
         ),
       ),
     );
