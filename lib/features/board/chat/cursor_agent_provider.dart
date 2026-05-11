@@ -97,6 +97,11 @@ class CursorAgentProvider extends ChatProvider {
       args.addAll(['--mode', config.mode!]);
     }
 
+    // Autopilot mode
+    if (config.autopilot) {
+      args.add('--autopilot');
+    }
+
     // Prompt as positional argument.
     // Cursor-agent has no --attachment flag — image paths are embedded in the
     // prompt text so the agent can read them via its shell/file tools.

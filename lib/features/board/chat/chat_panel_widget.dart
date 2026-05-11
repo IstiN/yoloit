@@ -1790,7 +1790,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
 // Message bubbles
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _UserBubble extends StatelessWidget {
+class _UserBubble extends StatefulWidget {
   const _UserBubble({
     required this.content,
     this.attachments = const [],
@@ -1800,11 +1800,15 @@ class _UserBubble extends StatelessWidget {
   final List<String> attachments;
   final void Function(String path)? onOpenFile;
 
+  @override
+  State<_UserBubble> createState() => _UserBubbleState();
+}
+
+class _UserBubbleState extends State<_UserBubble> {
+  bool _isHovered = false;
+
   static final _pathTokenRe = RegExp(r'^/\S+');
 
-  /// Resolve all file paths: merge explicit attachments with any inline paths
-  /// found in content (backward-compat for messages saved before the
-  /// attachments field was added).
   static ({List<String> paths, String text}) _resolve(
     String content,
     List<String> attachments,
@@ -1820,7 +1824,7 @@ class _UserBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolved = _resolve(content, attachments);
+    final resolved = _resolve(widget.content, widget.attachments);
     final hasText = resolved.text.isNotEmpty;
     final hasAttachments = resolved.paths.isNotEmpty;
 
@@ -1828,45 +1832,59 @@ class _UserBubble extends StatelessWidget {
       padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
       child: Align(
         alignment: Alignment.centerRight,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
-              bottomRight: Radius.circular(4),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (hasAttachments)
-                Padding(
-                  padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                  child: _AttachmentPreviewSection(
-                    paths: resolved.paths,
-                    onLight: false,
-                    onOpenFile: onOpenFile,
+              AnimatedOpacity(
+                opacity: _isHovered ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 100),
+                child: _BubbleMenu(textToCopy: resolved.text),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(4),
                   ),
                 ),
-              if (hasText)
-                SelectionArea(
-                  child: Text(
-                    resolved.text,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.white,
-                      height: 1.4,
-                    ),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (hasAttachments)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                        child: _AttachmentPreviewSection(
+                          paths: resolved.paths,
+                          onLight: false,
+                          onOpenFile: widget.onOpenFile,
+                        ),
+                      ),
+                    if (hasText)
+                      SelectionArea(
+                        child: Text(
+                          resolved.text,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.white,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
@@ -2097,7 +2115,7 @@ class _ImageThumbnail extends StatelessWidget {
   }
 }
 
-class _AssistantBubble extends StatelessWidget {
+class _AssistantBubble extends StatefulWidget {
   const _AssistantBubble({
     required this.content,
     this.toolCalls = const [],
@@ -2112,170 +2130,14 @@ class _AssistantBubble extends StatelessWidget {
   final void Function(String path)? onOpenFile;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
-    final codeBg = colors.surface;
-    // Preprocess: replace <br> tags with newlines for markdown rendering
-    final processedContent = content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
+  State<_AssistantBubble> createState() => _AssistantBubbleState();
+}
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Tool call badges (if the assistant invoked tools in this message)
-          if (toolCalls.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children:
-                    toolCalls
-                        .map(
-                          (tc) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0x15FBBF24),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: const Color(0x30FBBF24),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.terminal_rounded,
-                                  size: 10,
-                                  color: Color(0xFFFBBF24),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  tc.toolName,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Color(0xFFFBBF24),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                        .toList(),
-              ),
-            ),
-
-          if (processedContent.trim().isNotEmpty)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colors.surfaceElevated,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-              ),
-              child: SelectionArea(
-                child: MarkdownBody(
-                  data: processedContent,
-                  selectable: false,
-                  onTapLink: (text, href, title) {
-                    if (onLinkTap != null) {
-                      onLinkTap!(href);
-                    } else if (href != null && href.isNotEmpty) {
-                      PlatformLauncher.instance.openUrl(href);
-                    }
-                  },
-                  styleSheet: MarkdownStyleSheet(
-                    p: TextStyle(
-                      fontSize: 13,
-                      color: textColor,
-                      height: 1.5,
-                    ),
-                    a: TextStyle(
-                      fontSize: 13,
-                      color: colors.primary,
-                      decoration: TextDecoration.underline,
-                    ),
-                    code: TextStyle(
-                      fontSize: 11.5,
-                      fontFamily: 'JetBrains Mono',
-                      color: colors.terminalPrompt,
-                      backgroundColor: codeBg,
-                    ),
-                    codeblockDecoration: BoxDecoration(
-                      color: codeBg,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: colors.border),
-                    ),
-                    codeblockPadding: const EdgeInsets.all(10),
-                    listBullet: TextStyle(
-                      fontSize: 13,
-                      color: mutedColor,
-                    ),
-                    h1: TextStyle(
-                      fontSize: 16,
-                      color: textColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    h2: TextStyle(
-                      fontSize: 14,
-                      color: textColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    h3: TextStyle(
-                      fontSize: 13,
-                      color: textColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Token usage
-          if (tokenUsage != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 3, left: 6),
-              child: Text(
-                '${tokenUsage!.outputTokens} tok',
-                style: TextStyle(fontSize: 9, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
-              ),
-            ),
-
-          // Detected file paths in assistant response
-          Builder(
-            builder: (_) {
-              final detectedPaths = _extractFilePaths(content);
-              if (detectedPaths.isEmpty) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: _AttachmentPreviewSection(
-                  paths: detectedPaths,
-                  onLight: true,
-                  onOpenFile: onOpenFile,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
+class _AssistantBubbleState extends State<_AssistantBubble> {
+  bool _isHovered = false;
 
   static final _absPathRe = RegExp(r'(?<![`\w])(\/[\w./\-_ ]+\.[\w]{1,10})(?![`\w])');
 
-  /// Extract unique absolute file paths mentioned in assistant text.
   static List<String> _extractFilePaths(String text) {
     final matches = _absPathRe.allMatches(text);
     final seen = <String>{};
@@ -2285,6 +2147,178 @@ class _AssistantBubble extends StatelessWidget {
       if (seen.add(path)) result.add(path);
     }
     return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+    final codeBg = colors.surface;
+    final processedContent = widget.content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.toolCalls.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children:
+                      widget.toolCalls
+                          .map(
+                            (tc) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0x15FBBF24),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: const Color(0x30FBBF24),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.terminal_rounded,
+                                    size: 10,
+                                    color: Color(0xFFFBBF24),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    tc.toolName,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFFFBBF24),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                ),
+              ),
+
+            if (processedContent.trim().isNotEmpty)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedOpacity(
+                    opacity: _isHovered ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 100),
+                    child: _BubbleMenu(textToCopy: processedContent),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceElevated,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: SelectionArea(
+                      child: MarkdownBody(
+                        data: processedContent,
+                        selectable: false,
+                        onTapLink: (text, href, title) {
+                          if (widget.onLinkTap != null) {
+                            widget.onLinkTap!(href);
+                          } else if (href != null && href.isNotEmpty) {
+                            PlatformLauncher.instance.openUrl(href);
+                          }
+                        },
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            fontSize: 13,
+                            color: textColor,
+                            height: 1.5,
+                          ),
+                          a: TextStyle(
+                            fontSize: 13,
+                            color: colors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                          code: TextStyle(
+                            fontSize: 11.5,
+                            fontFamily: 'JetBrains Mono',
+                            color: colors.terminalPrompt,
+                            backgroundColor: codeBg,
+                          ),
+                          codeblockDecoration: BoxDecoration(
+                            color: codeBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: colors.border),
+                          ),
+                          codeblockPadding: const EdgeInsets.all(10),
+                          listBullet: TextStyle(
+                            fontSize: 13,
+                            color: mutedColor,
+                          ),
+                          h1: TextStyle(
+                            fontSize: 16,
+                            color: textColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          h2: TextStyle(
+                            fontSize: 14,
+                            color: textColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          h3: TextStyle(
+                            fontSize: 13,
+                            color: textColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+            if (widget.tokenUsage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 3, left: 6),
+                child: Text(
+                  '${widget.tokenUsage!.outputTokens} tok',
+                  style: TextStyle(fontSize: 9, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                ),
+              ),
+
+            Builder(
+              builder: (_) {
+                final detectedPaths = _extractFilePaths(widget.content);
+                if (detectedPaths.isEmpty) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _AttachmentPreviewSection(
+                    paths: detectedPaths,
+                    onLight: true,
+                    onOpenFile: widget.onOpenFile,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
