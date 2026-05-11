@@ -1838,11 +1838,6 @@ class _UserBubbleState extends State<_UserBubble> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedOpacity(
-                opacity: _isHovered ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 100),
-                child: _BubbleMenu(textToCopy: resolved.text),
-              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: const BoxDecoration(
@@ -1884,6 +1879,11 @@ class _UserBubbleState extends State<_UserBubble> {
                       ),
                   ],
                 ),
+              ),
+              AnimatedOpacity(
+                opacity: _isHovered ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 100),
+                child: _BubbleMenu(textToCopy: resolved.text),
               ),
             ],
           ),
@@ -2216,11 +2216,6 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  AnimatedOpacity(
-                    opacity: _isHovered ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 100),
-                    child: _BubbleMenu(textToCopy: processedContent),
-                  ),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -2288,6 +2283,11 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                         ),
                       ),
                     ),
+                  ),
+                  AnimatedOpacity(
+                    opacity: _isHovered ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 100),
+                    child: _BubbleMenu(textToCopy: processedContent),
                   ),
                 ],
               ),
