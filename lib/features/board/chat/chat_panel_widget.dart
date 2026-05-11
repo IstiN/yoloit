@@ -1824,11 +1824,7 @@ class _UserBubble extends StatelessWidget {
     final hasText = resolved.text.isNotEmpty;
     final hasAttachments = resolved.paths.isNotEmpty;
 
-    return GestureDetector(
-      onSecondaryTap: () {
-        Clipboard.setData(ClipboardData(text: resolved.text));
-      },
-      child: Padding(
+    return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
       child: Align(
         alignment: Alignment.centerRight,
@@ -1875,6 +1871,26 @@ class _UserBubble extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Small menu button for chat bubbles — copy on click.
+class _BubbleMenu extends StatelessWidget {
+  const _BubbleMenu({required this.textToCopy});
+  final String textToCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => Clipboard.setData(ClipboardData(text: textToCopy)),
+          child: Icon(Icons.more_vert, size: 16, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+        ),
       ),
     );
   }
@@ -2106,11 +2122,7 @@ class _AssistantBubble extends StatelessWidget {
     // Preprocess: replace <br> tags with newlines for markdown rendering
     final processedContent = content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
 
-    return GestureDetector(
-      onSecondaryTap: () {
-        Clipboard.setData(ClipboardData(text: content));
-      },
-      child: Padding(
+    return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2257,7 +2269,6 @@ class _AssistantBubble extends StatelessWidget {
             },
           ),
         ],
-      ),
       ),
     );
   }
