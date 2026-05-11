@@ -39,7 +39,8 @@ jobs:
             libglib2.0-dev libpango1.0-dev \
             libx11-dev libxext-dev libxrender-dev \
             libxrandr-dev libxi-dev libxcursor-dev \
-            libxdamage-dev libxinerama-dev
+            libxdamage-dev libxinerama-dev \
+            libasound2-dev
 
       # ── Flutter ──────────────────────────────────────────────────────────────
       - name: Setup Flutter
