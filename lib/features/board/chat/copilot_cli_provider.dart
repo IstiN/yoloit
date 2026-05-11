@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -115,11 +116,15 @@ class CopilotCliProvider extends ChatProvider {
     try {
       final extraEnv = await GlobalEnvGroupsService.instance
           .resolveSelectedGroups(config.envGroupIds);
+      final baseEnv = {...Platform.environment, ...extraEnv};
+      final enrichedPath = PlatformShell.instance.enrichedPath(
+        baseEnv['PATH'] ?? '',
+      );
       final process = await Process.start(
         'copilot',
         args,
         workingDirectory: config.workingDir,
-        environment: {...Platform.environment, ...extraEnv},
+        environment: {...baseEnv, 'PATH': enrichedPath},
       );
       _processes[config.sessionName] = process;
 
