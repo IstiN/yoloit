@@ -1824,7 +1824,11 @@ class _UserBubble extends StatelessWidget {
     final hasText = resolved.text.isNotEmpty;
     final hasAttachments = resolved.paths.isNotEmpty;
 
-    return Padding(
+    return GestureDetector(
+      onSecondaryTap: () {
+        Clipboard.setData(ClipboardData(text: resolved.text));
+      },
+      child: Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
       child: Align(
         alignment: Alignment.centerRight,
@@ -1870,6 +1874,7 @@ class _UserBubble extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -2101,7 +2106,11 @@ class _AssistantBubble extends StatelessWidget {
     // Preprocess: replace <br> tags with newlines for markdown rendering
     final processedContent = content.replaceAll(RegExp(r'<br\s*/?>'), '\n');
 
-    return Padding(
+    return GestureDetector(
+      onSecondaryTap: () {
+        Clipboard.setData(ClipboardData(text: content));
+      },
+      child: Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2248,6 +2257,7 @@ class _AssistantBubble extends StatelessWidget {
             },
           ),
         ],
+      ),
       ),
     );
   }
