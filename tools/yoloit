@@ -55,6 +55,7 @@ BOARD COMMANDS
   board:svg <id|name> [file.svg]  Export SVG layout
   board:zoom <id|name> <scale>    Set viewport zoom (e.g. 0.5)
   board:fit <id|name> [WxH]       Auto-fit viewport to show all panels
+  board:arrange <id|name> [right|down] [hSpacing] [vSpacing]  Auto-layout panels as tree
 
 PANEL COMMANDS
   panels <board>                  List panels on a board
@@ -162,6 +163,14 @@ case "$cmd" in
     w=1280; h=800
     if [[ -n "${2:-}" ]]; then w="${2%%x*}"; h="${2##*x}"; fi
     _put "/boards/${bid}" "{\"fit\":true,\"viewportWidth\":${w},\"viewportHeight\":${h}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:arrange)
+    # board:arrange <board> [direction:right|down] [hSpacing] [vSpacing]
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:arrange <board> [right|down] [hSpacing] [vSpacing]" >&2; exit 1; }
+    bid=$(_encode "$1")
+    dir="${2:-right}"
+    hs="${3:-80}"; vs="${4:-60}"
+    _post "/boards/${bid}/arrange" "{\"direction\":\"${dir}\",\"hSpacing\":${hs},\"vSpacing\":${vs}}" | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── panels ──

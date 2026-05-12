@@ -227,6 +227,11 @@ class CliServer {
       final body = await _body(request);
       return _fitViewport(cubit, board, body);
     }
+    // POST /api/boards/:id/arrange → auto-layout panels in tree/mindmap structure
+    if (sub.length == 1 && sub[0] == 'arrange' && method == 'POST') {
+      final body = await _body(request);
+      return _arrangeBoard(cubit, board, body);
+    }
 
     return _notFound('Unknown board route');
   }
@@ -586,6 +591,125 @@ class CliServer {
       'ok': true,
       'viewport': {'scale': vp.scale, 'x': vp.translation.dx, 'y': vp.translation.dy},
       'bounds': {'minX': minX, 'minY': minY, 'maxX': maxX, 'maxY': maxY},
+    });
+  }
+
+  // ── Arrange implementation ─────────────────────────────────────────────
+
+  /// Auto-layout panels in a tree/mindmap structure based on link relationships.
+  ///
+  /// Body params:
+  /// - layout: "tree" (default) — BFS tree layout
+  /// - direction: "right" (default) | "down" — children expand right or down
+  /// - rootPanelId: optional root panel ID/title; if omitted, infers from links
+  /// - hSpacing: horizontal gap (default 80)
+  /// - vSpacing: vertical gap (default 60)
+  Future<shelf.Response> _arrangeBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> body,
+  ) async {
+    final direction = (body['direction'] as String?) ?? 'right';
+    final hSpacing = (body['hSpacing'] as num?)?.toDouble() ?? 80.0;
+    final vSpacing = (body['vSpacing'] as num?)?.toDouble() ?? 60.0;
+    final rootHint = body['rootPanelId'] as String?;
+
+    final panels = board.panels.where((p) => !p.hidden).toList();
+    if (panels.isEmpty) return _error('No panels to arrange');
+
+    // Build adjacency: fromId → [toId]
+    final children = <String, List<String>>{};
+    final hasIncoming = <String>{};
+    for (final link in board.links) {
+      children.putIfAbsent(link.fromPanelId, () => []).add(link.toPanelId);
+      hasIncoming.add(link.toPanelId);
+    }
+
+    // Collect all panel IDs in the linked graph
+    final linkedIds = {...children.keys, ...hasIncoming};
+    final unlinked = panels.where((p) => !linkedIds.contains(p.id)).toList();
+
+    // Determine root: hint → no-incoming node → first panel
+    BoardPanelInstance? root;
+    if (rootHint != null) {
+      root = _findPanel(board, rootHint);
+    }
+    root ??= panels.firstWhere(
+      (p) => linkedIds.contains(p.id) && !hasIncoming.contains(p.id),
+      orElse: () => panels.first,
+    );
+
+    // BFS to compute (depth, siblingIndex) for each node
+    final positions = <String, (int depth, int index)>{};
+    final siblingCount = <int, int>{}; // depth → next sibling index
+    final queue = <String>[root.id];
+    positions[root.id] = (0, 0);
+    siblingCount[0] = 1;
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeAt(0);
+      final (depth, _) = positions[current]!;
+      final kids = children[current] ?? [];
+      for (final kid in kids) {
+        if (positions.containsKey(kid)) continue; // avoid cycles
+        final idx = siblingCount[depth + 1] ?? 0;
+        positions[kid] = (depth + 1, idx);
+        siblingCount[depth + 1] = idx + 1;
+        queue.add(kid);
+      }
+    }
+
+    // Find max panel size for spacing calculations
+    final maxW = panels.map((p) => p.bounds.width).reduce((a, b) => a > b ? a : b);
+    final maxH = panels.map((p) => p.bounds.height).reduce((a, b) => a > b ? a : b);
+
+    // Assign x/y based on depth/index and direction
+    const originX = 80.0;
+    const originY = 80.0;
+
+    final moves = <String, (double x, double y)>{};
+    for (final entry in positions.entries) {
+      final panelId = entry.key;
+      final (depth, index) = entry.value;
+      double x, y;
+      if (direction == 'down') {
+        x = originX + index * (maxW + hSpacing);
+        y = originY + depth * (maxH + vSpacing);
+      } else {
+        // right (default): depth → column, index → row
+        x = originX + depth * (maxW + hSpacing);
+        y = originY + index * (maxH + vSpacing);
+      }
+      moves[panelId] = (x, y);
+    }
+
+    // Also arrange unlinked panels below the tree
+    if (unlinked.isNotEmpty) {
+      final treeMaxY = moves.values.isEmpty ? originY : moves.values.map((v) => v.$2).reduce((a, b) => a > b ? a : b);
+      final startY = treeMaxY + maxH + vSpacing * 2;
+      for (var i = 0; i < unlinked.length; i++) {
+        final x = originX + i * (maxW + hSpacing);
+        moves[unlinked[i].id] = (x, startY);
+      }
+    }
+
+    // Apply all position updates
+    for (final entry in moves.entries) {
+      final panelId = entry.key;
+      final (x, y) = entry.value;
+      await cubit.updatePanel(
+        panelId,
+        (p) => p.copyWith(bounds: p.bounds.copyWith(x: x, y: y)),
+        boardId: board.id,
+      );
+    }
+    _scheduleRebuild();
+
+    return _json({
+      'ok': true,
+      'arranged': moves.length,
+      'layout': 'tree',
+      'direction': direction,
     });
   }
 
