@@ -83,6 +83,8 @@ LINK COMMANDS
 SHORTHAND COMMANDS
   note <board> <panel> <text>             Set markdown note content
   note:append <board> <panel> <text>      Append text to note
+  note:wrap <board> <panel>               Enable auto-height (wraps to content)
+  note:nowrap <board> <panel>             Disable auto-height (fixed height)
   checklist:add <board> <panel> <item>    Add checklist item
   checklist:check <board> <panel> <id>    Check an item by ID
   checklist:uncheck <board> <panel> <id>  Uncheck an item
@@ -317,6 +319,18 @@ print(json.dumps(b))
     bid=$(_encode "$1"); pid=$(_encode "$2")
     shift 2; text="$*"
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"append\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  note:wrap)
+    # Enable auto-height: panel resizes to fit content
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit note:wrap <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"wrap"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  note:nowrap)
+    # Disable auto-height: panel keeps fixed height
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit note:nowrap <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"nowrap"}' | python3 -m json.tool 2>/dev/null
     ;;
   checklist:add)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:add <board> <panel> <item>" >&2; exit 1; }

@@ -9,7 +9,7 @@ class NoteCliHandler extends PanelCliHandler {
   String get typeId => 'board.note.markdown';
 
   @override
-  List<String> get supportedActions => ['set', 'get', 'append'];
+  List<String> get supportedActions => ['set', 'get', 'append', 'wrap', 'nowrap'];
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
@@ -47,6 +47,16 @@ class NoteCliHandler extends PanelCliHandler {
         return CliActionResult(
           message: 'Text appended',
           stateUpdate: {'markdown': '$current\n$text'},
+        );
+      case 'wrap':
+        return CliActionResult(
+          message: 'Auto-height enabled — panel will resize to fit content',
+          stateUpdate: {'autoHeight': true},
+        );
+      case 'nowrap':
+        return CliActionResult(
+          message: 'Auto-height disabled — panel has fixed height',
+          stateUpdate: {'autoHeight': false},
         );
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');

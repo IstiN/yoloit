@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -26,7 +27,7 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
   Size get defaultSize => const Size(360, 220);
 
   @override
-  Map<String, dynamic> get initialState => {'markdown': ''};
+  Map<String, dynamic> get initialState => {'markdown': '', 'autoHeight': false};
 
   @override
   bool get hasEditor => true;
@@ -38,6 +39,16 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
     BoardPanelRenderContext renderContext,
   ) {
     final markdown = panel.state['markdown'] as String? ?? '';
+    final autoHeight = panel.state['autoHeight'] as bool? ?? false;
+
+    if (autoHeight) {
+      return _AutoHeightNoteContent(
+        markdown: markdown,
+        panel: panel,
+        renderContext: renderContext,
+      );
+    }
+
     return ClipRect(
       child: SingleChildScrollView(
         child: MarkdownBody(
@@ -60,6 +71,74 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
     if (result == null) return false;
     onSave(result);
     return true;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-height content widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Renders the markdown body and, after each layout, resizes the panel height
+/// to exactly fit the rendered content (plus padding).
+/// Width stays at its current value — only height is adjusted.
+class _AutoHeightNoteContent extends StatefulWidget {
+  const _AutoHeightNoteContent({
+    required this.markdown,
+    required this.panel,
+    required this.renderContext,
+  });
+
+  final String markdown;
+  final BoardPanelInstance panel;
+  final BoardPanelRenderContext renderContext;
+
+  @override
+  State<_AutoHeightNoteContent> createState() => _AutoHeightNoteContentState();
+}
+
+class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
+  final _contentKey = GlobalKey();
+  static const double _padding = 16.0; // matches panel content padding
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleResize();
+  }
+
+  @override
+  void didUpdateWidget(_AutoHeightNoteContent old) {
+    super.didUpdateWidget(old);
+    if (old.markdown != widget.markdown) _scheduleResize();
+  }
+
+  void _scheduleResize() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _contentKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null) return;
+      final contentH = box.size.height;
+      final newH = contentH + _padding * 2;
+      final currentH = widget.panel.bounds.height;
+      // Only resize if difference is more than 4px to avoid jitter.
+      if ((newH - currentH).abs() > 4) {
+        widget.renderContext.onResize?.call(widget.panel.bounds.width, newH);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.all(_padding),
+        child: MarkdownBody(
+          key: _contentKey,
+          data: widget.markdown.isEmpty ? '*Empty note*' : widget.markdown,
+        ),
+      ),
+    );
   }
 }
 
