@@ -69,7 +69,7 @@ PANEL ACTIONS (sent to panel handler)
 LINK COMMANDS
   links <board>                   List links
   link:create <board> <from> <to> Link two panels
-  link:delete <board> <from> <to> Remove a link
+  link:delete <board> <link-id>   Remove a link by its ID
 
 EXAMPLES
   yoloit boards
@@ -219,9 +219,9 @@ print(json.dumps(b))
     _post "/boards/${bid}/links" "{\"from\":\"${from}\",\"to\":\"${to}\"}" | python3 -m json.tool 2>/dev/null
     ;;
   link:delete)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit link:delete <board> <from> <to>" >&2; exit 1; }
-    bid=$(_encode "$1"); from=$(_encode "$2"); to=$(_encode "$3")
-    _delete "/boards/${bid}/links/${from}/${to}" | python3 -m json.tool 2>/dev/null
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit link:delete <board> <link-id>" >&2; exit 1; }
+    bid=$(_encode "$1"); lid=$(_encode "$2")
+    _delete "/boards/${bid}/links/${lid}" | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── help ──

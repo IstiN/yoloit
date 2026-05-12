@@ -61,7 +61,12 @@ class CliServer {
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
   Future<void> start(BoardCubit cubit) async {
-    if (_server != null) return; // already running
+    // If server is already running but cubit changed (e.g. after hot restart),
+    // update cubit reference and return — routes close over _cubit field.
+    if (_server != null) {
+      _cubit = cubit;
+      return;
+    }
     _cubit = cubit;
 
     final handler = const shelf.Pipeline()
@@ -496,11 +501,18 @@ class CliServer {
     BoardDocument board,
     Map<String, dynamic> body,
   ) async {
-    final from = body['from'] as String?;
-    final to = body['to'] as String?;
-    if (from == null || to == null) {
+    final fromRaw = body['from'] as String?;
+    final toRaw = body['to'] as String?;
+    if (fromRaw == null || toRaw == null) {
       return _error('Missing "from" or "to" panel id');
     }
+
+    // Resolve panel names/titles to actual IDs.
+    final fromPanel = _findPanel(board, fromRaw);
+    final toPanel = _findPanel(board, toRaw);
+    if (fromPanel == null) return _error('Panel not found: $fromRaw');
+    if (toPanel == null) return _error('Panel not found: $toRaw');
+
     final styleStr = body['style'] as String? ?? 'arrow';
     final geoStr = body['geometry'] as String? ?? 'bezier';
 
@@ -515,8 +527,8 @@ class CliServer {
 
     final link = BoardPanelLink(
       id: 'link-${DateTime.now().millisecondsSinceEpoch}',
-      fromPanelId: from,
-      toPanelId: to,
+      fromPanelId: fromPanel.id,
+      toPanelId: toPanel.id,
       style: style,
       geometry: geo,
     );

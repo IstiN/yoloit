@@ -2126,7 +2126,7 @@ class _MarkdownToolButton extends StatelessWidget {
   }
 }
 
-class _BoardPanelCard extends StatelessWidget {
+class _BoardPanelCard extends StatefulWidget {
   const _BoardPanelCard({
     super.key,
     required this.panel,
@@ -2163,6 +2163,53 @@ class _BoardPanelCard extends StatelessWidget {
   final VoidCallback? onConnectTap;
 
   @override
+  State<_BoardPanelCard> createState() => _BoardPanelCardState();
+}
+
+class _BoardPanelCardState extends State<_BoardPanelCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entryController;
+  late final Animation<double> _opacity;
+  late final Animation<double> _scale;
+
+  // Convenience getters so build code can still use widget.panel etc.
+  BoardPanelInstance get panel => widget.panel;
+  Offset get positionOffset => widget.positionOffset;
+  VoidCallback get onTap => widget.onTap;
+  ValueChanged<DragUpdateDetails> get onMove => widget.onMove;
+  ValueChanged<DragUpdateDetails> get onResize => widget.onResize;
+  ValueChanged<DragStartDetails> get onDragStart => widget.onDragStart;
+  VoidCallback get onDragEnd => widget.onDragEnd;
+  VoidCallback get onDelete => widget.onDelete;
+  VoidCallback get onEditColor => widget.onEditColor;
+  VoidCallback? get onEditNote => widget.onEditNote;
+  ValueChanged<Map<String, dynamic>>? get onUpdateState => widget.onUpdateState;
+  Future<String?> Function(String, Map<String, dynamic>, String)? get onCreateLinkedPanel => widget.onCreateLinkedPanel;
+  bool get connectMode => widget.connectMode;
+  String? get connectSourceId => widget.connectSourceId;
+  VoidCallback? get onConnectTap => widget.onConnectTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _opacity = CurvedAnimation(parent: _entryController, curve: Curves.easeOut);
+    _scale = Tween<double>(begin: 0.88, end: 1.0).animate(
+      CurvedAnimation(parent: _entryController, curve: Curves.easeOutBack),
+    );
+    _entryController.forward();
+  }
+
+  @override
+  void dispose() {
+    _entryController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final focusedPanelId = context.select<BoardCubit, String?>(
@@ -2184,15 +2231,22 @@ class _BoardPanelCard extends StatelessWidget {
         accent == null
             ? colors.divider
             : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
-    return Positioned(
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
       left: panel.bounds.x + positionOffset.dx,
       top: panel.bounds.y + positionOffset.dy,
       width: panel.bounds.width,
       height: panel.bounds.height,
-      child: _ChatGlowWrapper(
-        panelId: panel.id,
-        borderRadius: BorderRadius.circular(16),
-        child: Listener(
+      child: FadeTransition(
+        opacity: _opacity,
+        child: ScaleTransition(
+          scale: _scale,
+          alignment: Alignment.topLeft,
+          child: _ChatGlowWrapper(
+            panelId: panel.id,
+            borderRadius: BorderRadius.circular(16),
+            child: Listener(
           behavior: HitTestBehavior.deferToChild,
           onPointerDown: (_) {
             if (isWebpage) {
@@ -2452,6 +2506,8 @@ class _BoardPanelCard extends StatelessWidget {
           ),
         ),
       ),
+    ),  // ScaleTransition
+    ),  // FadeTransition
     );
   }
 
