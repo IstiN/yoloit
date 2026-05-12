@@ -53,6 +53,8 @@ BOARD COMMANDS
   board:snapshot <id|name>        Markdown snapshot of board layout
   board:screenshot <id|name> [file.png]  Save PNG screenshot
   board:svg <id|name> [file.svg]  Export SVG layout
+  board:zoom <id|name> <scale>    Set viewport zoom (e.g. 0.5)
+  board:fit <id|name> [WxH]       Auto-fit viewport to show all panels
 
 PANEL COMMANDS
   panels <board>                  List panels on a board
@@ -148,6 +150,18 @@ case "$cmd" in
     curl -s -o "$outfile" "${BASE}/boards/${bid}/svg" \
       -H "Content-Type: application/json"
     echo "SVG saved to $outfile ($(wc -c < "$outfile" | tr -d ' ') bytes)"
+    ;;
+  board:zoom)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit board:zoom <id|name> <scale>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _put "/boards/${bid}" "{\"scale\":$2}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:fit)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:fit <id|name> [WxH]" >&2; exit 1; }
+    bid=$(_encode "$1")
+    w=1280; h=800
+    if [[ -n "${2:-}" ]]; then w="${2%%x*}"; h="${2##*x}"; fi
+    _put "/boards/${bid}" "{\"fit\":true,\"viewportWidth\":${w},\"viewportHeight\":${h}}" | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── panels ──

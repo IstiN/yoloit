@@ -217,6 +217,16 @@ class CliServer {
       _scheduleRebuild();
       return _json({'ok': true, 'message': 'Link deleted'});
     }
+    // PUT /api/boards/:id/viewport → set scale/translation
+    if (sub.length == 1 && sub[0] == 'viewport' && method == 'PUT') {
+      final body = await _body(request);
+      return _updateViewport(cubit, board, body);
+    }
+    // POST /api/boards/:id/fit → auto-fit viewport to show all panels
+    if (sub.length == 1 && sub[0] == 'fit' && method == 'POST') {
+      final body = await _body(request);
+      return _fitViewport(cubit, board, body);
+    }
 
     return _notFound('Unknown board route');
   }
@@ -355,6 +365,39 @@ class CliServer {
       await cubit.setActiveBoard(board.id);
       _scheduleRebuild();
     }
+    // Viewport update: scale, x (translationX), y (translationY)
+    if (body.containsKey('scale') || body.containsKey('x') || body.containsKey('y')) {
+      final scale = (body['scale'] as num?)?.toDouble() ?? board.viewport.scale;
+      final tx = (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
+      final ty = (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
+      final vp = board.viewport.copyWith(
+        scale: scale.clamp(0.1, 4.0),
+        translation: Offset(tx, ty),
+      );
+      await cubit.updateViewport(vp, boardId: board.id);
+      _scheduleRebuild();
+    }
+    // Fit all panels: fit=true auto-calculates scale+translation
+    if (body['fit'] == true) {
+      final panels = board.panels.where((p) => !p.hidden).toList();
+      if (panels.isNotEmpty) {
+        final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
+        final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
+        final maxX = panels.map((p) => p.bounds.x + p.bounds.width).reduce((a, b) => a > b ? a : b);
+        final maxY = panels.map((p) => p.bounds.y + p.bounds.height).reduce((a, b) => a > b ? a : b);
+        const pad = 80.0;
+        final vpW = (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0;
+        final vpH = (body['viewportHeight'] as num?)?.toDouble() ?? 800.0;
+        final scaleX = (vpW - pad * 2) / (maxX - minX);
+        final scaleY = (vpH - pad * 2) / (maxY - minY);
+        final s = (scaleX < scaleY ? scaleX : scaleY).clamp(0.1, 2.0);
+        final tx = (vpW - (maxX - minX) * s) / 2 - minX * s;
+        final ty = (vpH - (maxY - minY) * s) / 2 - minY * s;
+        final vp = board.viewport.copyWith(scale: s, translation: Offset(tx, ty));
+        await cubit.updateViewport(vp, boardId: board.id);
+        _scheduleRebuild();
+      }
+    }
     return _json({'ok': true});
   }
 
@@ -480,6 +523,70 @@ class CliServer {
     }
 
     return _json(result.toJson());
+  }
+
+  // ── Viewport implementations ───────────────────────────────────────────
+
+  Future<shelf.Response> _updateViewport(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> body,
+  ) async {
+    final scale = (body['scale'] as num?)?.toDouble() ?? board.viewport.scale;
+    final tx = (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
+    final ty = (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
+    final vp = board.viewport.copyWith(
+      scale: scale.clamp(0.1, 4.0),
+      translation: Offset(tx, ty),
+    );
+    await cubit.updateViewport(vp, boardId: board.id);
+    _scheduleRebuild();
+    return _json({'ok': true, 'viewport': {'scale': vp.scale, 'x': vp.translation.dx, 'y': vp.translation.dy}});
+  }
+
+  Future<shelf.Response> _fitViewport(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> body,
+  ) async {
+    final panels = board.panels.where((p) => !p.hidden).toList();
+    if (panels.isEmpty) return _error('No panels to fit');
+
+    // Bounding box of all panels
+    final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
+    final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
+    final maxX = panels.map((p) => p.bounds.x + p.bounds.width).reduce((a, b) => a > b ? a : b);
+    final maxY = panels.map((p) => p.bounds.y + p.bounds.height).reduce((a, b) => a > b ? a : b);
+
+    final contentW = maxX - minX;
+    final contentH = maxY - minY;
+    const padding = 80.0;
+
+    // Viewport size hint from body (fallback to 1280×800 typical window)
+    final vpW = (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0;
+    final vpH = (body['viewportHeight'] as num?)?.toDouble() ?? 800.0;
+
+    final scaleX = (vpW - padding * 2) / contentW;
+    final scaleY = (vpH - padding * 2) / contentH;
+    final scale = (scaleX < scaleY ? scaleX : scaleY).clamp(0.1, 2.0);
+
+    // Center content in viewport
+    final scaledW = contentW * scale;
+    final scaledH = contentH * scale;
+    final tx = (vpW - scaledW) / 2 - minX * scale;
+    final ty = (vpH - scaledH) / 2 - minY * scale;
+
+    final vp = board.viewport.copyWith(
+      scale: scale,
+      translation: Offset(tx, ty),
+    );
+    await cubit.updateViewport(vp, boardId: board.id);
+    _scheduleRebuild();
+    return _json({
+      'ok': true,
+      'viewport': {'scale': vp.scale, 'x': vp.translation.dx, 'y': vp.translation.dy},
+      'bounds': {'minX': minX, 'minY': minY, 'maxX': maxX, 'maxY': maxY},
+    });
   }
 
   // ── Link implementations ───────────────────────────────────────────────
