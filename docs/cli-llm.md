@@ -43,6 +43,9 @@ do B P ⟨action⟩ [args...]→generic
 |board.files|📁|320×400|
 |board.file.preview|🖼️|400×400|
 |board.terminal|⌨️|480×320|
+|board.filetree|🌳|320×500|
+|board.run_configs|▶️|600×400|
+|board.yolo_assistant|🤖|420×560|
 
 ## Shorthand
 ```
@@ -86,6 +89,9 @@ styles:`arrow|line`; geom:`bezier|straight|elbow`
 |💻|`get\|set⟨code,[lang]⟩`|
 |📁|`get\|open⟨path⟩`|
 |⌨️|`config\|set-dir⟨path⟩`|
+|🌳|`list[path]\|set-root⟨path⟩\|expand⟨path⟩\|collapse⟨path⟩\|open⟨path⟩\|refresh`|
+|▶️|`list\|add⟨name,cmd,[dir]⟩\|remove⟨id⟩\|run⟨id⟩\|stop⟨id⟩\|output[id]\|config⟨id⟩`|
+|🤖|`send⟨text⟩\|messages\|clear\|skills\|add-skill⟨s⟩\|remove-skill⟨s⟩\|mode⟨text\|voice⟩\|voice-start\|voice-stop`|
 
 ## YAML Bulk `board:apply`
 ```yaml

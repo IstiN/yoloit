@@ -5,10 +5,13 @@ import 'package:yoloit/features/board/plugins/builtin/checklist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/code_snippet_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/files_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/filetree_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/kanban_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/run_configs_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 
 /// Global registry for [BoardPanelPlugin] implementations.
@@ -64,8 +67,11 @@ class BoardPluginRegistry {
     register(const FilesPlugin());
     register(const FilePreviewPlugin());
     register(const PlaylistPlugin());
+    register(const RunConfigsPlugin());
     register(const ChatPanelPlugin());
     register(const BoardTerminalPanelPlugin());
+    register(const FileTreePlugin());
+    register(const YoloAssistantPlugin());
   }
 }
 

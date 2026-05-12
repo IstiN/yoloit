@@ -9,10 +9,13 @@ import 'package:yoloit/core/cli/handlers/chat_handler.dart';
 import 'package:yoloit/core/cli/handlers/checklist_handler.dart';
 import 'package:yoloit/core/cli/handlers/code_snippet_handler.dart';
 import 'package:yoloit/core/cli/handlers/files_handler.dart';
+import 'package:yoloit/core/cli/handlers/filetree_handler.dart';
 import 'package:yoloit/core/cli/handlers/kanban_handler.dart';
 import 'package:yoloit/core/cli/handlers/note_handler.dart';
 import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
+import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
 import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
+import 'package:yoloit/core/cli/handlers/assistant_handler.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
@@ -735,7 +738,10 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const CodeSnippetCliHandler());
     server.registerPanelHandler(const FilesCliHandler());
     server.registerPanelHandler(const FilePreviewCliHandler());
+    server.registerPanelHandler(const RunConfigsCliHandler());
     server.registerPanelHandler(const TerminalCliHandler());
+    server.registerPanelHandler(const FileTreeCliHandler());
+    server.registerPanelHandler(const AssistantCliHandler());
     server.start(cubit);
   }
 

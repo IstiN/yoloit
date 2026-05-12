@@ -63,6 +63,9 @@
 | `board.files` | Files | 320×400 |
 | `board.file.preview` | File Preview | 400×400 |
 | `board.terminal` | Terminal | 480×320 |
+| `board.filetree` | File Tree | 320×500 |
+| `board.run_configs` | Run Configs | 600×400 |
+| `board.yolo_assistant` | YoLo Assistant | 420×560 |
 
 ## Shorthand Commands
 | Command | Description | Example |
@@ -175,6 +178,40 @@
 |---|---|---|
 | `config` | — | Get terminal config |
 | `set-dir` | `path` | Set working directory |
+
+### File Tree (`board.filetree`)
+| Action | Args | Description |
+|---|---|---|
+| `list` | `path?` | List files in current/given dir |
+| `set-root` | `path` | Set root directory |
+| `expand` | `path` | Expand directory node |
+| `collapse` | `path` | Collapse directory node |
+| `open` | `path` | Open file (creates linked preview panel) |
+| `refresh` | — | Refresh tree from disk |
+
+### Run Configs (`board.run_configs`)
+| Action | Args | Description |
+|---|---|---|
+| `list` | — | List all configurations |
+| `add` | `name`, `command`, `workingDir?` | Add configuration |
+| `remove` | `id` | Remove configuration |
+| `run` | `id` | Start configuration |
+| `stop` | `id` | Stop running configuration |
+| `output` | `id?` | Get output of active/given config |
+| `config` | `id` | Get config details |
+
+### YoLo Assistant (`board.yolo_assistant`)
+| Action | Args | Description |
+|---|---|---|
+| `send` | `text` | Send message to assistant |
+| `messages` | — | Get conversation history |
+| `clear` | — | Clear conversation |
+| `skills` | — | List active skills |
+| `add-skill` | `skill` | Activate a skill |
+| `remove-skill` | `skill` | Deactivate a skill |
+| `mode` | `text\|voice` | Switch interaction mode |
+| `voice-start` | — | Start voice listening |
+| `voice-stop` | — | Stop voice listening |
 
 ## YAML Bulk Apply
 
