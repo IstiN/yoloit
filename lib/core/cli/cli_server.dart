@@ -9,6 +9,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
@@ -219,6 +220,10 @@ class CliServer {
     // GET /api/boards/:id/snapshot
     if (sub.length == 1 && sub[0] == 'snapshot' && method == 'GET') {
       return _boardSnapshot(board);
+    }
+    // POST /api/boards/:id/apply → apply YAML bulk operations
+    if (sub.length == 1 && sub[0] == 'apply' && method == 'POST') {
+      return _applyYaml(cubit, board, request);
     }
     // GET /api/boards/:id/screenshot
     if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
@@ -825,6 +830,908 @@ class CliServer {
       'layout': 'tree',
       'direction': direction,
     });
+  }
+
+  // ── YAML bulk apply implementation ───────────────────────────────────────
+
+  Future<shelf.Response> _applyYaml(
+    BoardCubit cubit,
+    BoardDocument board,
+    shelf.Request request,
+  ) async {
+    final raw = await request.readAsString();
+    if (raw.trim().isEmpty) {
+      return _yamlError('Empty YAML payload');
+    }
+
+    final parsed = loadYaml(raw);
+    final operations = _yamlOperations(parsed);
+    if (operations.isEmpty) {
+      return _yamlError(
+        'No operations found. Use a YAML list or a map with "operations".',
+      );
+    }
+
+    var currentBoard = board;
+    final refs = <String, String>{};
+    final pendingPanels = <String, BoardPanelInstance>{};
+    final results = <Map<String, dynamic>>[];
+
+    for (var i = 0; i < operations.length; i++) {
+      final opMap = _yamlMap(operations[i]);
+      if (opMap == null) {
+        return _yamlError('Operation ${i + 1} must be a YAML mapping');
+      }
+
+      final result = await _applyYamlOperation(
+        cubit,
+        currentBoard,
+        refs,
+        pendingPanels,
+        opMap,
+        index: i + 1,
+      );
+      results.add(result);
+      if (result['ok'] != true) {
+        return _yamlError(
+          'Operation ${i + 1} failed: ${result['error'] ?? result['message'] ?? 'unknown error'}',
+          details: {'failedAt': i + 1, 'results': results},
+        );
+      }
+      if (opMap['op'] == 'panel.create' || opMap['action'] == 'panel.create') {
+        final panelId = _string(result['panelId']);
+        final created = panelId == null ? null : pendingPanels[panelId];
+        if (created != null) {
+          currentBoard = currentBoard.copyWith(
+            panels: [...currentBoard.panels, created],
+          );
+        }
+      } else if (opMap['op'] == 'panel.delete' || opMap['action'] == 'panel.delete') {
+        final panelId = _string(result['panelId']);
+        if (panelId != null) {
+          currentBoard = currentBoard.copyWith(
+            panels: currentBoard.panels.where((panel) => panel.id != panelId).toList(),
+          );
+        }
+      }
+    }
+
+    _scheduleRebuild();
+    return _json({
+      'ok': true,
+      'applied': results.length,
+      'results': results,
+      if (refs.isNotEmpty) 'refs': refs,
+    });
+  }
+
+  List<dynamic> _yamlOperations(dynamic parsed) {
+    final root = _yamlToDart(parsed);
+    if (root is List) return root;
+    if (root is Map) {
+      for (final key in ['operations', 'ops', 'changes']) {
+        final value = root[key];
+        if (value is List) return value;
+      }
+      if (root.containsKey('op') || root.containsKey('action')) {
+        return [root];
+      }
+    }
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> _applyYamlOperation(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw,
+    {required int index}
+  ) async {
+    final op = _string(raw['op'] ?? raw['action']);
+    if (op == null || op.isEmpty) {
+      return {'ok': false, 'error': 'Missing "op" field'};
+    }
+
+    switch (op) {
+      case 'panel.create':
+        return _yamlCreatePanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'panel.update':
+        return _yamlUpdatePanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'panel.move':
+        return _yamlMovePanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'panel.resize':
+        return _yamlResizePanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'panel.delete':
+        return _yamlDeletePanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'panel.focus':
+        return _yamlFocusPanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'panel.color':
+        return _yamlColorPanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'panel.hide':
+      case 'panel.show':
+        return _yamlHideShowPanel(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          hidden: op == 'panel.hide',
+          index: index,
+        );
+      case 'panel.action':
+        return _yamlPanelAction(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+
+      case 'link.create':
+        return _yamlCreateLink(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'link.delete':
+        return _yamlDeleteLink(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          index: index,
+        );
+      case 'link.update':
+      case 'link.style':
+      case 'link.color':
+        return _yamlUpdateLink(
+          cubit,
+          board,
+          refs,
+          pendingPanels,
+          raw,
+          op,
+          index: index,
+        );
+
+      case 'board.focus':
+        await cubit.setActiveBoard(board.id);
+        return {'ok': true, 'message': 'Board focused'};
+      case 'board.fit':
+        return _yamlFitBoard(cubit, board, raw, index: index);
+      case 'board.zoom':
+        return _yamlZoomBoard(cubit, board, raw, index: index);
+      case 'board.translate':
+        return _yamlTranslateBoard(cubit, board, raw, index: index);
+      case 'board.arrange':
+        return _yamlArrangeBoard(cubit, board, raw, index: index);
+      default:
+        return {'ok': false, 'error': 'Unknown op "$op"'};
+    }
+  }
+
+  Future<Map<String, dynamic>> _yamlCreatePanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final typeId = _string(raw['type'] ?? raw['typeId']);
+    if (typeId == null) return {'ok': false, 'error': 'Missing "type"'};
+
+    final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
+    if (plugin == null) {
+      return {'ok': false, 'error': 'Unknown panel type: $typeId'};
+    }
+
+    final title = _string(raw['title']) ?? plugin.displayName;
+    final x = _double(raw['x']) ?? 100.0;
+    final y = _double(raw['y']) ?? 100.0;
+    final width = _double(raw['width']) ?? plugin.defaultSize.width;
+    final height = _double(raw['height']) ?? plugin.defaultSize.height;
+    final state = _map(raw['state']);
+    final params = _map(raw['params']);
+    final ref = _string(raw['ref']);
+    final color = _color(raw['color']);
+    final hidden = _bool(raw['hidden']) ?? false;
+    final locked = _bool(raw['locked']) ?? false;
+    final pinned = _bool(raw['pinned']) ?? false;
+    final panelId = _string(raw['id'] ?? raw['panelId']) ?? _nextBulkId('p');
+    final zIndex = _int(raw['zIndex']) ?? board.panels.fold<int>(
+      0,
+      (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+    ) + 1;
+
+    final panel = BoardPanelInstance(
+      id: panelId,
+      type: typeId,
+      title: title.trim().isEmpty ? plugin.displayName : title.trim(),
+      bounds: BoardPanelBounds(x: x, y: y, width: width, height: height),
+      color: color,
+      params: {
+        ...?params,
+        if (ref != null && ref.isNotEmpty)
+          'yamlRef': ref,
+      },
+      state: {
+        ...plugin.initialState,
+        if (state != null) ...state,
+      },
+      zIndex: zIndex,
+      hidden: hidden,
+      locked: locked,
+      pinned: pinned,
+    );
+
+    await cubit.addPanel(panel, boardId: board.id);
+    pendingPanels[panel.id] = panel;
+    if (_bool(raw['focus']) == true) {
+      await cubit.focusPanel(panel.id, boardId: board.id);
+    }
+    if ((panel.type == 'board.note.markdown') &&
+        (panel.state['autoHeight'] == true)) {
+      final targetHeight = _estimateMarkdownNoteHeight(
+        panel.state['markdown'] as String? ?? '',
+        panel.bounds.width,
+      );
+      await cubit.resizePanel(
+        panel.id,
+        width: panel.bounds.width,
+        height: targetHeight,
+        boardId: board.id,
+      );
+    }
+    if (ref != null && ref.isNotEmpty) {
+      refs[ref] = panel.id;
+      pendingPanels[ref] = panel;
+    }
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlUpdatePanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) {
+      return {
+        'ok': false,
+        'error': 'Panel not found',
+        'rawPanel': raw['panel']?.toString(),
+        'rawPanelId': raw['panelId']?.toString(),
+        'rawPanelRef': raw['panelRef']?.toString(),
+        'rawRef': raw['ref']?.toString(),
+        'refs': refs,
+        'pending': pendingPanels.keys.toList(),
+      };
+    }
+
+    final updates = <String, dynamic>{};
+    if (raw.containsKey('title')) updates['title'] = _string(raw['title']) ?? panel.title;
+    if (raw.containsKey('hidden')) updates['hidden'] = _bool(raw['hidden']) ?? panel.hidden;
+    if (raw.containsKey('locked')) updates['locked'] = _bool(raw['locked']) ?? panel.locked;
+    if (raw.containsKey('pinned')) updates['pinned'] = _bool(raw['pinned']) ?? panel.pinned;
+    if (raw.containsKey('color')) {
+      final colorStr = _string(raw['color']);
+      updates['color'] = colorStr == 'clear' ? null : _parseColor(colorStr);
+    }
+    if (raw.containsKey('params')) {
+      updates['params'] = {
+        ...panel.params,
+        ...? _map(raw['params']),
+      };
+    }
+    if (raw.containsKey('state')) {
+      updates['state'] = {
+        ...panel.state,
+        ...? _map(raw['state']),
+      };
+    }
+    if (raw.containsKey('zIndex')) updates['zIndex'] = _int(raw['zIndex']) ?? panel.zIndex;
+    if (raw.containsKey('x') || raw.containsKey('y')) {
+      final x = _double(raw['x']) ?? panel.bounds.x;
+      final y = _double(raw['y']) ?? panel.bounds.y;
+      updates['x'] = x;
+      updates['y'] = y;
+    }
+    if (raw.containsKey('width') || raw.containsKey('height')) {
+      final w = _double(raw['width']) ?? panel.bounds.width;
+      final h = _double(raw['height']) ?? panel.bounds.height;
+      updates['width'] = w;
+      updates['height'] = h;
+    }
+
+    if (updates.isNotEmpty) {
+      await _applyYamlPanelUpdates(cubit, board, panel, updates);
+    }
+    if (_bool(raw['focus']) == true) {
+      await cubit.focusPanel(panel.id, boardId: board.id);
+    }
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<void> _applyYamlPanelUpdates(
+    BoardCubit cubit,
+    BoardDocument board,
+    BoardPanelInstance panel,
+    Map<String, dynamic> updates,
+  ) async {
+    if (updates.containsKey('title')) {
+      await cubit.updatePanelTitle(
+        panel.id,
+        updates['title'] as String,
+        boardId: board.id,
+      );
+    }
+    if (updates.containsKey('x') || updates.containsKey('y')) {
+      final x = (updates['x'] as num?)?.toDouble() ?? panel.bounds.x;
+      final y = (updates['y'] as num?)?.toDouble() ?? panel.bounds.y;
+      await cubit.movePanel(
+        panel.id,
+        Offset(x - panel.bounds.x, y - panel.bounds.y),
+        boardId: board.id,
+      );
+    }
+    if (updates.containsKey('width') || updates.containsKey('height')) {
+      await cubit.resizePanel(
+        panel.id,
+        width: (updates['width'] as num?)?.toDouble() ?? panel.bounds.width,
+        height: (updates['height'] as num?)?.toDouble() ?? panel.bounds.height,
+        boardId: board.id,
+      );
+    }
+    if (updates.containsKey('hidden')) {
+      await cubit.updatePanel(
+        panel.id,
+        (p) => p.copyWith(hidden: updates['hidden'] as bool),
+        boardId: board.id,
+      );
+    }
+    if (updates.containsKey('locked') ||
+        updates.containsKey('pinned') ||
+        updates.containsKey('params') ||
+        updates.containsKey('state') ||
+        updates.containsKey('zIndex') ||
+        updates.containsKey('color')) {
+      final color = updates['color'] as Color?;
+      await cubit.updatePanel(
+        panel.id,
+        (p) => p.copyWith(
+          color: updates.containsKey('color') && color == null ? null : color,
+          clearColor: updates.containsKey('color') && color == null,
+          params: updates['params'] as Map<String, dynamic>? ?? p.params,
+          state: updates['state'] as Map<String, dynamic>? ?? p.state,
+          zIndex: updates['zIndex'] as int? ?? p.zIndex,
+          locked: updates['locked'] as bool? ?? p.locked,
+          pinned: updates['pinned'] as bool? ?? p.pinned,
+        ),
+        boardId: board.id,
+      );
+    }
+
+    if (panel.type == 'board.note.markdown' &&
+        ((updates['state'] as Map<String, dynamic>?)?['autoHeight'] == true)) {
+      final markdown =
+          ((updates['state'] as Map<String, dynamic>?)?['markdown'] as String?) ??
+          panel.state['markdown'] as String? ??
+          '';
+      final targetHeight = _estimateMarkdownNoteHeight(markdown, panel.bounds.width);
+      await cubit.resizePanel(
+        panel.id,
+        width: panel.bounds.width,
+        height: targetHeight,
+        boardId: board.id,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _yamlMovePanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) {
+      return {
+        'ok': false,
+        'error': 'Panel not found',
+        'rawPanel': raw['panel']?.toString(),
+        'rawPanelId': raw['panelId']?.toString(),
+        'rawPanelRef': raw['panelRef']?.toString(),
+        'rawRef': raw['ref']?.toString(),
+        'refs': refs,
+        'pending': pendingPanels.keys.toList(),
+      };
+    }
+    final x = _double(raw['x']);
+    final y = _double(raw['y']);
+    if (x == null && y == null) {
+      return {'ok': false, 'error': 'Missing "x" and/or "y"'};
+    }
+    await cubit.movePanel(
+      panel.id,
+      Offset(
+        (x ?? panel.bounds.x) - panel.bounds.x,
+        (y ?? panel.bounds.y) - panel.bounds.y,
+      ),
+      boardId: board.id,
+    );
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlResizePanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    final width = _double(raw['width']);
+    final height = _double(raw['height']);
+    if (width == null && height == null) {
+      return {'ok': false, 'error': 'Missing "width" and/or "height"'};
+    }
+    await cubit.resizePanel(
+      panel.id,
+      width: width ?? panel.bounds.width,
+      height: height ?? panel.bounds.height,
+      boardId: board.id,
+    );
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlDeletePanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    await cubit.removePanel(panel.id, boardId: board.id);
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlFocusPanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    await cubit.focusPanel(panel.id, boardId: board.id);
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlColorPanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    final colorStr = _string(raw['color']);
+    await cubit.updatePanelColor(
+      panel.id,
+      color: colorStr == 'clear' ? null : _parseColor(colorStr),
+      boardId: board.id,
+    );
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlHideShowPanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required bool hidden,
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    await cubit.updatePanel(
+      panel.id,
+      (p) => p.copyWith(hidden: hidden),
+      boardId: board.id,
+    );
+    return {'ok': true, 'panelId': panel.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlPanelAction(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
+    if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    final action = _string(raw['action']);
+    if (action == null) return {'ok': false, 'error': 'Missing "action"'};
+
+    final body = <String, dynamic>{...raw}
+      ..remove('op')
+      ..remove('panel')
+      ..remove('panelId')
+      ..remove('panelRef')
+      ..remove('ref');
+    body['action'] = action;
+
+    final handler = _panelHandlers[panel.type];
+    if (handler == null) {
+      return {'ok': false, 'error': 'No CLI handler for panel type: ${panel.type}'};
+    }
+    if (!handler.supportedActions.contains(action)) {
+      return {
+        'ok': false,
+        'error': 'Unsupported action "$action" for ${panel.type}',
+      };
+    }
+
+    final result = await handler.handleAction(action, body, panel);
+    if (result.stateUpdate != null && result.ok) {
+      final mergedState = {...panel.state, ...result.stateUpdate!};
+      await cubit.updatePanel(
+        panel.id,
+        (p) => p.copyWith(state: mergedState),
+        boardId: board.id,
+      );
+      if (panel.type == 'board.note.markdown' &&
+          mergedState['autoHeight'] == true) {
+        final markdown = mergedState['markdown'] as String? ?? '';
+        final targetHeight = _estimateMarkdownNoteHeight(markdown, panel.bounds.width);
+        await cubit.resizePanel(
+          panel.id,
+          width: panel.bounds.width,
+          height: targetHeight,
+          boardId: board.id,
+        );
+      }
+    }
+    return {'ok': true, 'panelId': panel.id, ...result.toJson()};
+  }
+
+  Future<Map<String, dynamic>> _yamlCreateLink(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final from = _resolveYamlPanel(
+      cubit,
+      board,
+      refs,
+      pendingPanels,
+      {'panel': raw['from'] ?? raw['fromPanelId']},
+    );
+    final to = _resolveYamlPanel(
+      cubit,
+      board,
+      refs,
+      pendingPanels,
+      {'panel': raw['to'] ?? raw['toPanelId']},
+    );
+    if (from == null || to == null) {
+      return {'ok': false, 'error': 'Link endpoints not found'};
+    }
+    final style = _string(raw['style']) ?? 'arrow';
+    final geometry = _string(raw['geometry']) ?? 'bezier';
+    final link = BoardPanelLink(
+      id: _nextBulkId('link'),
+      fromPanelId: from.id,
+      toPanelId: to.id,
+      style: BoardLinkStyle.values.firstWhere(
+        (s) => s.name == style,
+        orElse: () => BoardLinkStyle.arrow,
+      ),
+      geometry: BoardLinkGeometry.values.firstWhere(
+        (g) => g.name == geometry,
+        orElse: () => BoardLinkGeometry.bezier,
+      ),
+      color: _color(raw['color']) ?? const Color(0xFF60A5FA),
+    );
+    await cubit.upsertLink(link, boardId: board.id);
+    final ref = _string(raw['ref']);
+    if (ref != null && ref.isNotEmpty) refs[ref] = link.id;
+    return {'ok': true, 'linkId': link.id};
+  }
+
+  Future<Map<String, dynamic>> _yamlDeleteLink(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final linkId = _string(raw['link'] ?? raw['linkId'] ?? raw['ref']) ??
+        refs[_string(raw['ref']) ?? ''];
+    if (linkId == null || linkId.isEmpty) {
+      return {'ok': false, 'error': 'Missing link identifier'};
+    }
+    await cubit.removeLink(linkId, boardId: board.id);
+    return {'ok': true, 'linkId': linkId};
+  }
+
+  Future<Map<String, dynamic>> _yamlUpdateLink(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw,
+    String op, {
+    required int index,
+  }) async {
+    final linkId = _string(raw['link'] ?? raw['linkId'] ?? raw['ref']) ??
+        refs[_string(raw['ref']) ?? ''];
+    if (linkId == null || linkId.isEmpty) {
+      return {'ok': false, 'error': 'Missing link identifier'};
+    }
+    final link = board.links.where((l) => l.id == linkId).firstOrNull;
+    if (link == null) return {'ok': false, 'error': 'Link not found: $linkId'};
+
+    final styleStr = _string(raw['style']);
+    final geometryStr = _string(raw['geometry']);
+    final colorStr = _string(raw['color']);
+
+    final style = styleStr == null
+        ? link.style
+        : BoardLinkStyle.values.firstWhere(
+            (s) => s.name == styleStr,
+            orElse: () => link.style,
+          );
+    final geometry = geometryStr == null
+        ? link.geometry
+        : BoardLinkGeometry.values.firstWhere(
+            (g) => g.name == geometryStr,
+            orElse: () => link.geometry,
+          );
+    final color = colorStr == null
+        ? link.color
+        : _parseColor(colorStr) ?? link.color;
+
+    await cubit.upsertLink(
+      link.copyWith(style: style, geometry: geometry, color: color),
+      boardId: board.id,
+    );
+    return {'ok': true, 'linkId': linkId};
+  }
+
+  Future<Map<String, dynamic>> _yamlFitBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final panels = board.panels.where((p) => !p.hidden).toList();
+    if (panels.isEmpty) return {'ok': false, 'error': 'No panels to fit'};
+
+    final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
+    final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
+    final maxX = panels.map((p) => p.bounds.x + p.bounds.width).reduce((a, b) => a > b ? a : b);
+    final maxY = panels.map((p) => p.bounds.y + p.bounds.height).reduce((a, b) => a > b ? a : b);
+
+    final contentW = maxX - minX;
+    final contentH = maxY - minY;
+    const padding = 80.0;
+
+    final vpW = _double(raw['viewportWidth']) ?? 1280.0;
+    final vpH = _double(raw['viewportHeight']) ?? 800.0;
+    final scaleX = (vpW - padding * 2) / contentW;
+    final scaleY = (vpH - padding * 2) / contentH;
+    final scale = (scaleX < scaleY ? scaleX : scaleY).clamp(0.1, 2.0);
+    final tx = (vpW - contentW * scale) / 2 - minX * scale;
+    final ty = (vpH - contentH * scale) / 2 - minY * scale;
+
+    final vp = board.viewport.copyWith(
+      scale: scale,
+      translation: Offset(tx, ty),
+    );
+    await cubit.updateViewport(vp, boardId: board.id);
+    return {
+      'ok': true,
+      'viewport': {'scale': vp.scale, 'x': vp.translation.dx, 'y': vp.translation.dy},
+      'bounds': {'minX': minX, 'minY': minY, 'maxX': maxX, 'maxY': maxY},
+    };
+  }
+
+  Future<Map<String, dynamic>> _yamlZoomBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final scale = _double(raw['scale']);
+    if (scale == null) return {'ok': false, 'error': 'Missing "scale"'};
+    await cubit.updateViewport(
+      board.viewport.copyWith(scale: scale.clamp(0.1, 4.0)),
+      boardId: board.id,
+    );
+    return {'ok': true, 'scale': scale};
+  }
+
+  Future<Map<String, dynamic>> _yamlTranslateBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final x = _double(raw['x']) ?? board.viewport.translation.dx;
+    final y = _double(raw['y']) ?? board.viewport.translation.dy;
+    await cubit.updateViewport(
+      board.viewport.copyWith(translation: Offset(x, y)),
+      boardId: board.id,
+    );
+    return {'ok': true, 'x': x, 'y': y};
+  }
+
+  Future<Map<String, dynamic>> _yamlArrangeBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
+    final response = await _arrangeBoard(cubit, board, {
+      'direction': _string(raw['direction']) ?? 'right',
+      'hSpacing': _double(raw['hSpacing']) ?? 80.0,
+      'vSpacing': _double(raw['vSpacing']) ?? 60.0,
+      if (raw.containsKey('rootPanelId')) 'rootPanelId': raw['rootPanelId'],
+    });
+    return jsonDecode(await response.readAsString()) as Map<String, dynamic>;
+  }
+
+  BoardPanelInstance? _resolveYamlPanel(
+    BoardCubit cubit,
+    BoardDocument board,
+    Map<String, String> refs,
+    Map<String, BoardPanelInstance> pendingPanels,
+    Map<String, dynamic> raw,
+  ) {
+    final spec = raw['panel'] ?? raw['panelId'] ?? raw['panelRef'] ?? raw['ref'];
+    final ref = _string(spec);
+    if (ref == null || ref.isEmpty) return null;
+    final liveBoard = cubit.state.boards.firstWhere(
+      (b) => b.id == board.id,
+      orElse: () => board,
+    );
+    final pending = pendingPanels[ref];
+    if (pending != null) {
+      return pending;
+    }
+    final byRef = refs[ref];
+    if (byRef != null) {
+      final pendingById = pendingPanels[byRef];
+      if (pendingById != null) {
+        return pendingById;
+      }
+      return _findPanel(liveBoard, byRef);
+    }
+    for (final panel in liveBoard.panels) {
+      if (panel.params['yamlRef'] == ref) {
+        return panel;
+      }
+    }
+    return _findPanel(liveBoard, ref);
+  }
+
+  dynamic _yamlToDart(dynamic value) {
+    if (value is YamlMap) {
+      return {
+        for (final entry in value.entries)
+          entry.key.toString(): _yamlToDart(entry.value),
+      };
+    }
+    if (value is YamlList) {
+      return value.map(_yamlToDart).toList();
+    }
+    return value;
+  }
+
+  Map<String, dynamic>? _yamlMap(dynamic value) {
+    final dart = _yamlToDart(value);
+    if (dart is Map) {
+      return Map<String, dynamic>.from(dart);
+    }
+    return null;
+  }
+
+  String? _string(dynamic value) => value?.toString();
+  double? _double(dynamic value) => value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');
+  int? _int(dynamic value) => value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
+  bool? _bool(dynamic value) => value is bool ? value : (value?.toString().toLowerCase() == 'true');
+  Map<String, dynamic>? _map(dynamic value) => value is Map ? Map<String, dynamic>.from(_yamlToDart(value) as Map) : null;
+  Color? _color(dynamic value) => value == null ? null : _parseColor(value.toString());
+  String _nextBulkId(String prefix) => '$prefix-${DateTime.now().microsecondsSinceEpoch}';
+
+  shelf.Response _yamlError(String message, {Map<String, dynamic>? details}) {
+    return shelf.Response(
+      400,
+      body: jsonEncode({
+        'ok': false,
+        'error': message,
+        if (details != null) ...details,
+      }),
+      headers: {'content-type': 'application/json; charset=utf-8'},
+    );
   }
 
   // ── Link implementations ───────────────────────────────────────────────

@@ -26,14 +26,17 @@ class KanbanCliHandler extends PanelCliHandler {
     final columns = _columns(panel);
     final cards = _cards(panel);
     return {
-      'columns': columns.map((c) {
-        final colCards = cards.where((card) =>
-          card['columnId'] == c['id']).toList();
-        return {
-          ...c,
-          'cards': colCards,
-        };
-      }).toList(),
+      'columns': [
+        for (var i = 0; i < columns.length; i++)
+          {
+            'index': i,
+            'title': columns[i],
+            'cards':
+                cards
+                    .where((card) => _cardColumnIndex(card, columns) == i)
+                    .toList(),
+          },
+      ],
     };
   }
 
@@ -45,73 +48,102 @@ class KanbanCliHandler extends PanelCliHandler {
   ) async {
     switch (action) {
       case 'columns':
-        return CliActionResult(data: {'columns': _columns(panel)});
+        final columns = _columns(panel);
+        return CliActionResult(
+          data: {
+            'columns': [
+              for (var i = 0; i < columns.length; i++)
+                {'index': i, 'title': columns[i]},
+            ],
+          },
+        );
       case 'cards':
         return CliActionResult(data: getContent(panel));
       case 'add-column':
         final name = args['name'] as String?;
-        if (name == null) {
+        if (name == null || name.trim().isEmpty) {
           return const CliActionResult(ok: false, message: 'Missing "name"');
         }
-        final columns = List<Map<String, dynamic>>.from(_columns(panel));
-        final id = 'col-${DateTime.now().millisecondsSinceEpoch}';
-        columns.add({'id': id, 'title': name});
+        final columns = _columns(panel)..add(name.trim());
         return CliActionResult(
           message: 'Column "$name" added',
           stateUpdate: {'columns': columns},
-          data: {'columnId': id},
+          data: {'columnIndex': columns.length - 1},
         );
       case 'rename-column':
-        final colId = args['columnId'] as String? ?? args['column'] as String?;
+        final col = args['columnId'] as String? ?? args['column'] as String?;
         final name = args['name'] as String?;
-        if (colId == null || name == null) {
-          return const CliActionResult(ok: false, message: 'Missing "columnId" and "name"');
+        if (col == null || name == null || name.trim().isEmpty) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "columnId" and "name"',
+          );
         }
-        final columns = List<Map<String, dynamic>>.from(_columns(panel));
-        final idx = _findColumnIndex(columns, colId);
+        final columns = _columns(panel);
+        final idx = _findColumnIndex(columns, col);
         if (idx < 0) {
-          return CliActionResult(ok: false, message: 'Column not found: $colId');
+          return CliActionResult(ok: false, message: 'Column not found: $col');
         }
-        columns[idx] = {...columns[idx], 'title': name};
+        columns[idx] = name.trim();
         return CliActionResult(
           message: 'Column renamed to "$name"',
           stateUpdate: {'columns': columns},
         );
       case 'remove-column':
-        final colId = args['columnId'] as String? ?? args['column'] as String?;
-        if (colId == null) {
-          return const CliActionResult(ok: false, message: 'Missing "columnId"');
+        final col = args['columnId'] as String? ?? args['column'] as String?;
+        if (col == null) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "columnId"',
+          );
         }
-        final columns = List<Map<String, dynamic>>.from(_columns(panel));
-        final resolvedId = _resolveColumnId(columns, colId);
-        if (resolvedId == null) {
-          return CliActionResult(ok: false, message: 'Column not found: $colId');
+        final columns = _columns(panel);
+        final idx = _findColumnIndex(columns, col);
+        if (idx < 0) {
+          return CliActionResult(ok: false, message: 'Column not found: $col');
         }
-        columns.removeWhere((c) => c['id'] == resolvedId);
-        final cards = List<Map<String, dynamic>>.from(_cards(panel));
-        cards.removeWhere((c) => c['columnId'] == resolvedId);
+        columns.removeAt(idx);
+        final cards =
+            _cards(panel)
+                .where(
+                  (card) =>
+                      _cardColumnIndex(card, columns, removedIndex: idx) != idx,
+                )
+                .map((card) {
+                  final old = _cardColumnIndex(
+                    card,
+                    columns,
+                    removedIndex: idx,
+                  );
+                  return {...card, 'columnIndex': old > idx ? old - 1 : old}
+                    ..remove('columnId');
+                })
+                .toList();
         return CliActionResult(
           message: 'Column removed',
           stateUpdate: {'columns': columns, 'cards': cards},
         );
       case 'add-card':
-        final colId = args['columnId'] as String? ?? args['column'] as String?;
+        final col = args['columnId'] as String? ?? args['column'] as String?;
         final title = args['title'] as String?;
-        if (colId == null || title == null) {
-          return const CliActionResult(ok: false, message: 'Missing "columnId" and "title"');
+        if (col == null || title == null || title.trim().isEmpty) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "columnId" and "title"',
+          );
         }
         final columns = _columns(panel);
-        final resolvedColId = _resolveColumnId(columns, colId);
-        if (resolvedColId == null) {
-          return CliActionResult(ok: false, message: 'Column not found: $colId');
+        final colIndex = _findColumnIndex(columns, col);
+        if (colIndex < 0) {
+          return CliActionResult(ok: false, message: 'Column not found: $col');
         }
-        final cards = List<Map<String, dynamic>>.from(_cards(panel));
+        final cards = _cards(panel);
         final cardId = 'card-${DateTime.now().millisecondsSinceEpoch}';
         cards.add({
           'id': cardId,
-          'columnId': resolvedColId,
-          'title': title,
-          if (args['description'] != null) 'description': args['description'],
+          'title': title.trim(),
+          'description': args['description'] as String? ?? '',
+          'columnIndex': colIndex,
           if (args['color'] != null) 'color': args['color'],
         });
         return CliActionResult(
@@ -123,19 +155,26 @@ class KanbanCliHandler extends PanelCliHandler {
         final cardId = args['cardId'] as String?;
         final toCol = args['to'] as String? ?? args['columnId'] as String?;
         if (cardId == null || toCol == null) {
-          return const CliActionResult(ok: false, message: 'Missing "cardId" and "to"');
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "cardId" and "to"',
+          );
         }
         final columns = _columns(panel);
-        final resolvedToCol = _resolveColumnId(columns, toCol);
-        if (resolvedToCol == null) {
-          return CliActionResult(ok: false, message: 'Target column not found: $toCol');
+        final toIndex = _findColumnIndex(columns, toCol);
+        if (toIndex < 0) {
+          return CliActionResult(
+            ok: false,
+            message: 'Target column not found: $toCol',
+          );
         }
-        final cards = List<Map<String, dynamic>>.from(_cards(panel));
-        final idx = cards.indexWhere((c) => c['id'] == cardId);
+        final cards = _cards(panel);
+        final idx = cards.indexWhere((card) => card['id'] == cardId);
         if (idx < 0) {
           return CliActionResult(ok: false, message: 'Card not found: $cardId');
         }
-        cards[idx] = {...cards[idx], 'columnId': resolvedToCol};
+        cards[idx] = {...cards[idx], 'columnIndex': toIndex}
+          ..remove('columnId');
         return CliActionResult(
           message: 'Card moved',
           stateUpdate: {'cards': cards},
@@ -145,8 +184,8 @@ class KanbanCliHandler extends PanelCliHandler {
         if (cardId == null) {
           return const CliActionResult(ok: false, message: 'Missing "cardId"');
         }
-        final cards = List<Map<String, dynamic>>.from(_cards(panel));
-        cards.removeWhere((c) => c['id'] == cardId);
+        final cards = _cards(panel)
+          ..removeWhere((card) => card['id'] == cardId);
         return CliActionResult(
           message: 'Card removed',
           stateUpdate: {'cards': cards},
@@ -156,14 +195,16 @@ class KanbanCliHandler extends PanelCliHandler {
         if (cardId == null) {
           return const CliActionResult(ok: false, message: 'Missing "cardId"');
         }
-        final cards = List<Map<String, dynamic>>.from(_cards(panel));
-        final idx = cards.indexWhere((c) => c['id'] == cardId);
+        final cards = _cards(panel);
+        final idx = cards.indexWhere((card) => card['id'] == cardId);
         if (idx < 0) {
           return CliActionResult(ok: false, message: 'Card not found: $cardId');
         }
         final updated = <String, dynamic>{...cards[idx]};
         if (args.containsKey('title')) updated['title'] = args['title'];
-        if (args.containsKey('description')) updated['description'] = args['description'];
+        if (args.containsKey('description')) {
+          updated['description'] = args['description'];
+        }
         if (args.containsKey('color')) updated['color'] = args['color'];
         cards[idx] = updated;
         return CliActionResult(
@@ -175,27 +216,55 @@ class KanbanCliHandler extends PanelCliHandler {
     }
   }
 
-  List<Map<String, dynamic>> _columns(BoardPanelInstance panel) =>
-      List<Map<String, dynamic>>.from(
-        (panel.state['columns'] as List<dynamic>?) ?? <Map<String, dynamic>>[],
-      );
+  List<String> _columns(BoardPanelInstance panel) => switch (panel
+      .state['columns']) {
+    final List<dynamic> entries =>
+      entries.map((entry) {
+        if (entry is Map<Object?, Object?>) {
+          return (entry['title'] ?? entry['name'] ?? entry['id']).toString();
+        }
+        return entry.toString();
+      }).toList(),
+    _ => ['Backlog', 'Todo', 'In Progress', 'Done'],
+  };
 
-  List<Map<String, dynamic>> _cards(BoardPanelInstance panel) =>
-      List<Map<String, dynamic>>.from(
-        (panel.state['cards'] as List<dynamic>?) ?? <Map<String, dynamic>>[],
-      );
+  List<Map<String, dynamic>> _cards(BoardPanelInstance panel) => switch (panel
+      .state['cards']) {
+    final List<dynamic> entries =>
+      entries
+          .whereType<Map<Object?, Object?>>()
+          .map(
+            (entry) => {
+              for (final item in entry.entries) item.key.toString(): item.value,
+            },
+          )
+          .toList(),
+    _ => <Map<String, dynamic>>[],
+  };
 
-  int _findColumnIndex(List<Map<String, dynamic>> columns, String idOrName) {
-    final byId = columns.indexWhere((c) => c['id'] == idOrName);
-    if (byId >= 0) return byId;
+  int _findColumnIndex(List<String> columns, String idOrName) {
+    final byIndex = int.tryParse(idOrName);
+    if (byIndex != null && byIndex >= 0 && byIndex < columns.length) {
+      return byIndex;
+    }
     return columns.indexWhere(
-      (c) => (c['title'] as String?)?.toLowerCase() == idOrName.toLowerCase(),
+      (column) => column.toLowerCase() == idOrName.toLowerCase(),
     );
   }
 
-  String? _resolveColumnId(List<Map<String, dynamic>> columns, String idOrName) {
-    final idx = _findColumnIndex(columns, idOrName);
-    if (idx < 0) return null;
-    return columns[idx]['id'] as String?;
+  int _cardColumnIndex(
+    Map<String, dynamic> card,
+    List<String> columns, {
+    int? removedIndex,
+  }) {
+    final rawIndex = card['columnIndex'];
+    if (rawIndex is int) return rawIndex.clamp(0, columns.length);
+    if (rawIndex is num) return rawIndex.toInt().clamp(0, columns.length);
+    final columnId = card['columnId']?.toString();
+    if (columnId != null) {
+      final idx = _findColumnIndex(columns, columnId);
+      if (idx >= 0) return idx;
+    }
+    return removedIndex ?? 0;
   }
 }

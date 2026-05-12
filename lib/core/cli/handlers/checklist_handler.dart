@@ -9,11 +9,18 @@ class ChecklistCliHandler extends PanelCliHandler {
   String get typeId => 'board.checklist';
 
   @override
-  List<String> get supportedActions => ['items', 'add', 'check', 'uncheck', 'remove', 'rename'];
+  List<String> get supportedActions => [
+    'items',
+    'add',
+    'check',
+    'uncheck',
+    'remove',
+    'rename',
+  ];
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
-    return {'items': panel.state['items'] ?? []};
+    return {'items': _items(panel)};
   }
 
   @override
@@ -30,10 +37,12 @@ class ChecklistCliHandler extends PanelCliHandler {
         if (text == null) {
           return const CliActionResult(ok: false, message: 'Missing "text"');
         }
-        final items = List<Map<String, dynamic>>.from(
-          (panel.state['items'] as List<dynamic>?) ?? [],
-        );
-        items.add({'text': text, 'checked': false});
+        final items = _items(panel);
+        items.add({
+          'id': 'item-${DateTime.now().millisecondsSinceEpoch}',
+          'text': text,
+          'done': false,
+        });
         return CliActionResult(
           message: 'Item added',
           stateUpdate: {'items': items},
@@ -43,15 +52,16 @@ class ChecklistCliHandler extends PanelCliHandler {
       case 'uncheck':
         return _setChecked(panel, args, false);
       case 'remove':
-        final index = args['index'] as int?;
+        final index = _indexArg(args);
         if (index == null) {
           return const CliActionResult(ok: false, message: 'Missing "index"');
         }
-        final items = List<Map<String, dynamic>>.from(
-          (panel.state['items'] as List<dynamic>?) ?? [],
-        );
+        final items = _items(panel);
         if (index < 0 || index >= items.length) {
-          return const CliActionResult(ok: false, message: 'Index out of range');
+          return const CliActionResult(
+            ok: false,
+            message: 'Index out of range',
+          );
         }
         items.removeAt(index);
         return CliActionResult(
@@ -59,16 +69,20 @@ class ChecklistCliHandler extends PanelCliHandler {
           stateUpdate: {'items': items},
         );
       case 'rename':
-        final index = args['index'] as int?;
+        final index = _indexArg(args);
         final text = args['text'] as String?;
         if (index == null || text == null) {
-          return const CliActionResult(ok: false, message: 'Missing "index" and "text"');
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "index" and "text"',
+          );
         }
-        final items = List<Map<String, dynamic>>.from(
-          (panel.state['items'] as List<dynamic>?) ?? [],
-        );
+        final items = _items(panel);
         if (index < 0 || index >= items.length) {
-          return const CliActionResult(ok: false, message: 'Index out of range');
+          return const CliActionResult(
+            ok: false,
+            message: 'Index out of range',
+          );
         }
         items[index] = {...items[index], 'text': text};
         return CliActionResult(
@@ -80,21 +94,56 @@ class ChecklistCliHandler extends PanelCliHandler {
     }
   }
 
-  CliActionResult _setChecked(BoardPanelInstance panel, Map<String, dynamic> args, bool checked) {
-    final index = args['index'] as int?;
+  CliActionResult _setChecked(
+    BoardPanelInstance panel,
+    Map<String, dynamic> args,
+    bool checked,
+  ) {
+    final items = _items(panel);
+    final index = _indexArg(args) ?? _indexById(items, args['id']?.toString());
     if (index == null) {
-      return const CliActionResult(ok: false, message: 'Missing "index"');
+      return const CliActionResult(
+        ok: false,
+        message: 'Missing "index" or "id"',
+      );
     }
-    final items = List<Map<String, dynamic>>.from(
-      (panel.state['items'] as List<dynamic>?) ?? [],
-    );
     if (index < 0 || index >= items.length) {
       return const CliActionResult(ok: false, message: 'Index out of range');
     }
-    items[index] = {...items[index], 'checked': checked};
+    items[index] = {...items[index], 'done': checked};
     return CliActionResult(
       message: checked ? 'Item checked' : 'Item unchecked',
       stateUpdate: {'items': items},
     );
+  }
+
+  List<Map<String, dynamic>> _items(BoardPanelInstance panel) {
+    final raw = panel.state['items'];
+    if (raw is! List) return [];
+    return [
+      for (var i = 0; i < raw.length; i++)
+        if (raw[i] is Map)
+          {
+            ...Map<String, dynamic>.from(raw[i] as Map),
+            'id': (raw[i] as Map)['id']?.toString() ?? 'item-$i',
+            'text': (raw[i] as Map)['text']?.toString() ?? '',
+            'done':
+                (raw[i] as Map)['done'] == true ||
+                (raw[i] as Map)['checked'] == true,
+          },
+    ];
+  }
+
+  int? _indexArg(Map<String, dynamic> args) {
+    final value = args['index'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  int? _indexById(List<Map<String, dynamic>> items, String? id) {
+    if (id == null || id.isEmpty) return null;
+    final index = items.indexWhere((item) => item['id'] == id);
+    return index < 0 ? null : index;
   }
 }

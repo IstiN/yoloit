@@ -56,6 +56,7 @@ BOARD COMMANDS
   board:zoom <id|name> <scale>    Set viewport zoom (e.g. 0.5)
   board:fit <id|name> [WxH]       Auto-fit viewport to show all panels
   board:arrange <id|name> [right|down] [hSpacing] [vSpacing]  Auto-layout panels as tree
+  board:apply <id|name> [file|-]  Apply YAML bulk operations from file or stdin
 
 APP COMMANDS
   reload                          Hot reload the running Flutter app
@@ -220,6 +221,22 @@ PYEOF
     bid=$(_encode "$1")
     _put "/boards/${bid}" '{"focus":true}' | python3 -m json.tool 2>/dev/null
     ;;
+  board:apply)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:apply <id|name> [file|-]" >&2; exit 1; }
+    bid=$(_encode "$1")
+    yaml_source="${2:--}"
+    _resolve_base
+    if [[ "$yaml_source" == "-" ]]; then
+      curl -s -X POST "${BASE}/boards/${bid}/apply" \
+        -H "Content-Type: application/yaml" \
+        --data-binary @- | python3 -m json.tool 2>/dev/null
+    else
+      [[ -f "$yaml_source" ]] || { echo "Error: YAML file not found: $yaml_source" >&2; exit 1; }
+      curl -s -X POST "${BASE}/boards/${bid}/apply" \
+        -H "Content-Type: application/yaml" \
+        --data-binary @"$yaml_source" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
   board:snapshot)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit board:snapshot <id|name>" >&2; exit 1; }
     bid=$(_encode "$1")
@@ -325,7 +342,7 @@ PYEOF
   do)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit do <board> <panel> <action> [json-body]" >&2; exit 1; }
     bid=$(_encode "$1"); pid=$(_encode "$2"); action=$3
-    body="${4:-{\}}"
+    body="${4:-{}}"
     # merge action into body JSON
     merged=$(python3 -c "
 import json,sys

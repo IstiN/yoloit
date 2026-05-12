@@ -52,6 +52,7 @@ dependencies:
   flutter_colorpicker: ^1.1.0
   flutter_code_editor: ^0.3.5
   flutter_markdown_plus: ^1.0.7
+  yaml: ^3.1.2
   # ── Collaboration / remote sync ──────────────────────────────────────────
   shelf: ^1.4.2
   shelf_web_socket: ^3.0.0

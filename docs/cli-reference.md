@@ -1,7 +1,8 @@
 # YoLoIT CLI Reference
 
-> Generated reference for all `yoloit` CLI commands. Designed for human use and LLM agent automation.
+> Canonical full reference for all `yoloit` CLI commands. Designed for human use.
 > The CLI communicates with the running YoLoIT app via HTTP on localhost (port auto-discovered from `~/.config/yoloit/cli.port`).
+> For ultra-short LLM/operator shortcuts, use [`cli-llm.md`](./cli-llm.md).
 
 ## Prerequisites
 - YoLoIT desktop app must be running
@@ -27,6 +28,7 @@
 | `board:translate <id\|name> <x> <y>` | Set viewport offset | `yoloit board:translate "Board" 100 200` |
 | `board:fit <id\|name> [WxH]` | Fit all panels in view | `yoloit board:fit "Board" 1440x900` |
 | `board:arrange <id\|name> [right\|down] [hGap] [vGap]` | Auto-layout panels as tree | `yoloit board:arrange "Board" right 80 60` |
+| `board:apply <id\|name> [file\|-]` | Apply YAML bulk operations from file or stdin | `yoloit board:apply "Board" flow.yaml` |
 | `board:snapshot <id\|name>` | Get board as YAML/text snapshot | `yoloit board:snapshot "Board"` |
 | `board:screenshot <id\|name> [file.png]` | Save PNG screenshot | `yoloit board:screenshot "Board" out.png` |
 | `board:svg <id\|name> [file.svg]` | Export SVG layout | `yoloit board:svg "Board" layout.svg` |
@@ -173,6 +175,48 @@
 |---|---|---|
 | `config` | — | Get terminal config |
 | `set-dir` | `path` | Set working directory |
+
+## YAML Bulk Apply
+
+`board:apply` accepts a YAML document from a file or stdin. The document can
+either be a list of operations or a map with an `operations:` key.
+
+```yaml
+operations:
+  - op: panel.create
+    id: temp-note
+    ref: temp-note
+    type: board.note.markdown
+    title: Temp note
+    x: 120
+    y: 80
+    width: 320
+    height: 180
+    state:
+      markdown: |
+        # Hello
+        - bulk
+  - op: panel.update
+    panel: temp-note
+    color: "#8B5CF6"
+    state:
+      autoHeight: true
+  - op: link.create
+    from: temp-note
+    to: "2. Идти в магазин"
+  - op: board.fit
+    viewportWidth: 1440
+    viewportHeight: 900
+```
+
+Supported `op` values:
+- `panel.create`, `panel.update`, `panel.move`, `panel.resize`, `panel.delete`,
+  `panel.focus`, `panel.color`, `panel.hide`, `panel.show`, `panel.action`
+- `link.create`, `link.delete`, `link.update` (`link.style`, `link.color`)
+- `board.focus`, `board.fit`, `board.zoom`, `board.translate`, `board.arrange`
+
+Use `id:` or `panelId:` on create operations when you want deterministic ids in
+the same YAML document. `ref:` also works for reusing generated panel/link ids.
 
 ## Color Reference
 Named colors supported in `panel:color` and `link:color`:
