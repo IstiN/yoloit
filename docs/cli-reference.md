@@ -64,10 +64,15 @@
 | `checklist:add <board> <panel> <item>` | Add checklist item | `yoloit checklist:add "Board" "Tasks" "Write tests"` |
 | `checklist:check <board> <panel> <id>` | Check item | `yoloit checklist:check "Board" "Tasks" item-123` |
 | `checklist:uncheck <board> <panel> <id>` | Uncheck item | `yoloit checklist:uncheck "Board" "Tasks" item-123` |
+| `kanban:columns <board> <panel>` | List columns | `yoloit kanban:columns "Board" "Kanban"` |
 | `kanban:add-column <board> <panel> <name>` | Add kanban column | `yoloit kanban:add-column "Board" "Kanban" "In Review"` |
+| `kanban:rename-column <board> <panel> <col> <name>` | Rename column | `yoloit kanban:rename-column "Board" "Kanban" "Todo" "Backlog"` |
+| `kanban:remove-column <board> <panel> <col>` | Remove column + its cards | `yoloit kanban:remove-column "Board" "Kanban" "Done"` |
+| `kanban:cards <board> <panel>` | List all columns+cards | `yoloit kanban:cards "Board" "Kanban"` |
 | `kanban:add-card <board> <panel> <col> <title>` | Add card | `yoloit kanban:add-card "Board" "Kanban" "Todo" "Fix bug"` |
-| `kanban:move-card <board> <panel> <cardId> <col>` | Move card | `yoloit kanban:move-card "Board" "Kanban" card-123 "Done"` |
-| `kanban:cards <board> <panel>` | List all cards | `yoloit kanban:cards "Board" "Kanban"` |
+| `kanban:update-card <board> <panel> <cardId> <title>` | Update card title | `yoloit kanban:update-card "Board" "Kanban" card-123 "New title"` |
+| `kanban:move-card <board> <panel> <cardId> <col>` | Move card to column | `yoloit kanban:move-card "Board" "Kanban" card-123 "Done"` |
+| `kanban:remove-card <board> <panel> <cardId>` | Remove card | `yoloit kanban:remove-card "Board" "Kanban" card-123` |
 | `play <board> <panel> <file\|url>` | Add & play media | `yoloit play "Board" "Music" ~/song.mp3` |
 | `web:open <board> <panel> <url>` | Open URL in browser panel | `yoloit web:open "Board" "Browser" https://example.com` |
 

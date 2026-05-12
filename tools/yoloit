@@ -86,10 +86,15 @@ SHORTHAND COMMANDS
   checklist:add <board> <panel> <item>    Add checklist item
   checklist:check <board> <panel> <id>    Check an item by ID
   checklist:uncheck <board> <panel> <id>  Uncheck an item
+  kanban:columns <board> <panel>               List kanban columns
   kanban:add-column <board> <panel> <name>     Add kanban column
+  kanban:rename-column <board> <panel> <col> <new-name>  Rename column
+  kanban:remove-column <board> <panel> <col>   Remove column (and its cards)
   kanban:add-card <board> <panel> <col> <title>  Add card to column
+  kanban:update-card <board> <panel> <cardId> <title>  Update card title
+  kanban:remove-card <board> <panel> <cardId>  Remove card
   kanban:move-card <board> <panel> <cardId> <col>  Move card to column
-  kanban:cards <board> <panel>            List all kanban cards
+  kanban:cards <board> <panel>                 List all columns+cards
   play <board> <panel> <file-or-url>      Add to playlist and play
   web:open <board> <panel> <url>          Open URL in webpage panel
   board:translate <board> <x> <y>         Set viewport translation offset
@@ -329,11 +334,28 @@ print(json.dumps(b))
     bid=$(_encode "$1"); pid=$(_encode "$2")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"id\":\"$3\"}" | python3 -m json.tool 2>/dev/null
     ;;
+  kanban:columns)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit kanban:columns <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"columns"}' | python3 -m json.tool 2>/dev/null
+    ;;
   kanban:add-column)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit kanban:add-column <board> <panel> <column-name>" >&2; exit 1; }
     bid=$(_encode "$1"); pid=$(_encode "$2")
     shift 2; name="$*"
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-column\",\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$name")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:rename-column)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:rename-column <board> <panel> <col-id|name> <new-name>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2"); col="$3"
+    shift 3; newname="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"rename-column\",\"column\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$col"),\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$newname")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:remove-column)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit kanban:remove-column <board> <panel> <col-id|name>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    shift 2; col="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-column\",\"column\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$col")}" | python3 -m json.tool 2>/dev/null
     ;;
   kanban:add-card)
     [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:add-card <board> <panel> <column> <title>" >&2; exit 1; }
@@ -345,6 +367,17 @@ print(json.dumps(b))
     [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:move-card <board> <panel> <cardId> <to-column>" >&2; exit 1; }
     bid=$(_encode "$1"); pid=$(_encode "$2")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"move-card\",\"cardId\":\"$3\",\"to\":\"$4\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:remove-card)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit kanban:remove-card <board> <panel> <cardId>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-card\",\"cardId\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:update-card)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:update-card <board> <panel> <cardId> <new-title>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2"); cardId="$3"
+    shift 3; title="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"update-card\",\"cardId\":\"${cardId}\",\"title\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$title")}" | python3 -m json.tool 2>/dev/null
     ;;
   kanban:cards)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit kanban:cards <board> <panel>" >&2; exit 1; }
