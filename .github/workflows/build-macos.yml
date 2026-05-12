@@ -300,6 +300,7 @@ jobs:
           ARCH_LABEL: ${{ steps.package.outputs.arch_label }}
           SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
+          export PATH="/opt/homebrew/bin:$PATH"
           SIGN_NOTE=""
           if [ "$SIGNED" = "false" ]; then
             SIGN_NOTE=" (unsigned build)"
