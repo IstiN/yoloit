@@ -72,8 +72,17 @@ jobs:
       # ── Environment ─────────────────────────────────────────────────────────
       - name: Setup Flutter environment
         run: |
-          echo "$HOME/.local/flutter/bin" >> $GITHUB_PATH
+          # Find Flutter in known locations
+          for candidate in "$HOME/development/flutter/bin" "$HOME/.local/flutter/bin" "/Users/Uladzimir_Klyshevich/development/flutter/bin"; do
+            if [ -x "$candidate/flutter" ]; then
+              echo "$candidate" >> $GITHUB_PATH
+              export PATH="$candidate:$PATH"
+              echo "Found Flutter at: $candidate"
+              break
+            fi
+          done
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
+          export PATH="/opt/homebrew/bin:$PATH"
           flutter --version
 
       # ── Dependencies ────────────────────────────────────────────────────────
