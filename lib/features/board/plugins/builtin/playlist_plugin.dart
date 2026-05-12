@@ -9,7 +9,36 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
-// ─── Plugin definition ────────────────────────────────────────────────────────
+// ─── Player registry ──────────────────────────────────────────────────────────
+
+/// Keeps [Player] instances alive across board switches so playback is
+/// not interrupted when the user navigates away from the board containing
+/// a playlist panel.
+///
+/// Players are keyed by panel ID and persist until [release] is called
+/// explicitly (e.g. when the panel is deleted).
+class PlaylistPlayerRegistry {
+  PlaylistPlayerRegistry._();
+  static final PlaylistPlayerRegistry instance = PlaylistPlayerRegistry._();
+
+  final Map<String, Player> _players = {};
+
+  /// Returns the existing player for [panelId] or creates a new one.
+  Player acquire(String panelId) {
+    return _players.putIfAbsent(panelId, Player.new);
+  }
+
+  /// Releases and disposes the player for [panelId].
+  /// Call this when the panel itself is deleted (not just hidden).
+  void release(String panelId) {
+    final p = _players.remove(panelId);
+    p?.dispose();
+  }
+
+  /// Whether a player exists for [panelId] and is currently playing.
+  bool isPlaying(String panelId) => _players[panelId]?.state.playing ?? false;
+}
+
 
 /// Board panel plugin: media playlist player (audio + video).
 ///
@@ -138,8 +167,20 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   @override
   void initState() {
     super.initState();
-    _initPlayer();
-    _openCurrentTrack(autoPlay: false); // restore paused on app start
+    // Use registry so the player survives board switches (widget dispose/remount).
+    _player = PlaylistPlayerRegistry.instance.acquire(widget.panel.id);
+    _subscribeToPlayer();
+    // Only open the track if nothing is currently playing (i.e. first mount).
+    if (!_player.state.playing) {
+      _openCurrentTrack(autoPlay: false);
+    } else {
+      // Re-sync UI state from the live player.
+      setState(() {
+        _position = _player.state.position;
+        _duration = _player.state.duration;
+        _isPlaying = _player.state.playing;
+      });
+    }
   }
 
   @override
@@ -161,8 +202,9 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     return tracks[idx]['path'] as String?;
   }
 
-  void _initPlayer() {
-    _player = Player();
+  void _subscribeToPlayer() {
+    for (final s in _subs) s.cancel();
+    _subs.clear();
     _subs.add(_player.stream.position.listen((p) {
       if (mounted) setState(() => _position = p);
     }));
@@ -213,8 +255,10 @@ class _PlaylistContentState extends State<_PlaylistContent> {
 
   @override
   void dispose() {
+    // Cancel stream subscriptions but do NOT dispose the player —
+    // PlaylistPlayerRegistry keeps it alive so music continues when the
+    // user switches to another board and this widget is removed from the tree.
     for (final s in _subs) s.cancel();
-    _player.dispose();
     super.dispose();
   }
 

@@ -9,6 +9,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 
 class BoardCubit extends Cubit<BoardState> {
@@ -419,6 +420,8 @@ class BoardCubit extends Cubit<BoardState> {
   }
 
   Future<void> removePanel(String panelId, {String? boardId}) async {
+    // Release any persistent resources tied to the panel (e.g. media player).
+    PlaylistPlayerRegistry.instance.release(panelId);
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
     await _updateBoard(targetId, (board) {
