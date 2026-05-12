@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/scheduler.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -216,6 +217,15 @@ class CliServer {
       await cubit.removeLink(sub[1], boardId: board.id);
       _scheduleRebuild();
       return _json({'ok': true, 'message': 'Link deleted'});
+    }
+    // PUT /api/boards/:id/links/:linkId → update link style/color
+    if (sub.length == 2 && sub[0] == 'links' && method == 'PUT') {
+      final body = await _body(request);
+      return _updateLink(cubit, board, sub[1], body);
+    }
+    // GET /api/boards/:id/panel-types → list available panel types
+    if (sub.length == 1 && sub[0] == 'panel-types' && method == 'GET') {
+      return _listPanelTypes();
     }
     // PUT /api/boards/:id/viewport → set scale/translation
     if (sub.length == 1 && sub[0] == 'viewport' && method == 'PUT') {
@@ -492,6 +502,20 @@ class CliServer {
       await cubit.focusPanel(panel.id, boardId: board.id);
       _scheduleRebuild();
     }
+    if (body.containsKey('color')) {
+      final colorStr = body['color'] as String?;
+      final parsed = colorStr == 'clear' ? null : _parseColor(colorStr);
+      await cubit.updatePanelColor(panel.id, color: parsed, boardId: board.id);
+      _scheduleRebuild();
+    }
+    if (body.containsKey('hidden')) {
+      await cubit.updatePanel(
+        panel.id,
+        (p) => p.copyWith(hidden: body['hidden'] as bool),
+        boardId: board.id,
+      );
+      _scheduleRebuild();
+    }
     return _json({'ok': true});
   }
 
@@ -715,6 +739,57 @@ class CliServer {
 
   // ── Link implementations ───────────────────────────────────────────────
 
+  shelf.Response _listPanelTypes() {
+    final plugins = BoardPluginRegistry.instance.all;
+    return _json({
+      'types': plugins.map((p) => {
+        'typeId': p.typeId,
+        'name': p.displayName,
+        'defaultSize': {
+          'w': p.defaultSize.width.toInt(),
+          'h': p.defaultSize.height.toInt(),
+        },
+      }).toList(),
+    });
+  }
+
+  Future<shelf.Response> _updateLink(
+    BoardCubit cubit,
+    BoardDocument board,
+    String linkId,
+    Map<String, dynamic> body,
+  ) async {
+    final link = board.links.where((l) => l.id == linkId).firstOrNull;
+    if (link == null) return _notFound('Link not found: $linkId');
+
+    final styleStr = body['style'] as String?;
+    final geoStr = body['geometry'] as String?;
+    final colorStr = body['color'] as String?;
+
+    final style =
+        styleStr != null
+            ? BoardLinkStyle.values.firstWhere(
+              (s) => s.name == styleStr,
+              orElse: () => link.style,
+            )
+            : link.style;
+    final geo =
+        geoStr != null
+            ? BoardLinkGeometry.values.firstWhere(
+              (g) => g.name == geoStr,
+              orElse: () => link.geometry,
+            )
+            : link.geometry;
+    final color =
+        colorStr != null ? (_parseColor(colorStr) ?? link.color) : link.color;
+
+    final updated = link.copyWith(style: style, geometry: geo, color: color);
+    await cubit.upsertLink(updated, boardId: board.id);
+    _scheduleRebuild();
+    return _json({'ok': true});
+  }
+
+
   shelf.Response _listLinks(BoardDocument board) {
     return _json({
       'links': board.links.map((l) => {
@@ -842,4 +917,36 @@ class CliServer {
     jsonEncode({'ok': false, 'error': msg}),
     headers: {'content-type': 'application/json; charset=utf-8'},
   );
+
+  /// Parse a color string to a [Color].
+  /// - `null` → returns null (clear/no color)
+  /// - `#RRGGBB` / `#AARRGGBB` hex strings
+  /// - Named colors: red, green, blue, yellow, purple, pink, orange, teal, gray, white
+  /// - Falls back to [Colors.blue] for unrecognised values
+  Color? _parseColor(String? s) {
+    if (s == null || s == 'clear') return null;
+    if (s.startsWith('#')) {
+      final hex = s.replaceFirst('#', '');
+      final value = int.tryParse(hex, radix: 16);
+      if (value != null) {
+        // If 6-digit hex, force full opacity
+        return Color(hex.length == 6 ? (value | 0xFF000000) : value);
+      }
+    }
+    const named = <String, int>{
+      'red': 0xFFFF4444,
+      'green': 0xFF44BB44,
+      'blue': 0xFF4488FF,
+      'yellow': 0xFFFFD644,
+      'purple': 0xFFA855F7,
+      'pink': 0xFFEC4899,
+      'orange': 0xFFF97316,
+      'teal': 0xFF14B8A6,
+      'gray': 0xFF6B7280,
+      'white': 0xFFF3F4F6,
+    };
+    final v = named[s.toLowerCase()];
+    if (v != null) return Color(v);
+    return Colors.blue;
+  }
 }

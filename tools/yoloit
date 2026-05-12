@@ -61,9 +61,13 @@ PANEL COMMANDS
   panels <board>                  List panels on a board
   panel <board> <panel>           Show panel details & content
   panel:create <board> <type> <title>  Create a panel
+  panel:types <board>             List available panel types
   panel:rename <board> <panel> <new>   Rename panel
   panel:move <board> <panel> <x> <y>   Move panel
   panel:resize <board> <panel> <w> <h> Resize panel
+  panel:color <board> <panel> <color|clear>  Set panel tint color (hex #RRGGBB or name)
+  panel:hide <board> <panel>           Hide panel
+  panel:show <board> <panel>           Show hidden panel
   panel:focus <board> <panel>          Focus panel (bring to front)
 
 PANEL ACTIONS (sent to panel handler)
@@ -73,6 +77,22 @@ LINK COMMANDS
   links <board>                   List links
   link:create <board> <from> <to> Link two panels
   link:delete <board> <link-id>   Remove a link by its ID
+  link:style <board> <linkId> <arrow|line> [bezier|straight|elbow]  Set link style
+  link:color <board> <linkId> <color>  Set link color
+
+SHORTHAND COMMANDS
+  note <board> <panel> <text>             Set markdown note content
+  note:append <board> <panel> <text>      Append text to note
+  checklist:add <board> <panel> <item>    Add checklist item
+  checklist:check <board> <panel> <id>    Check an item by ID
+  checklist:uncheck <board> <panel> <id>  Uncheck an item
+  kanban:add-column <board> <panel> <name>     Add kanban column
+  kanban:add-card <board> <panel> <col> <title>  Add card to column
+  kanban:move-card <board> <panel> <cardId> <col>  Move card to column
+  kanban:cards <board> <panel>            List all kanban cards
+  play <board> <panel> <file-or-url>      Add to playlist and play
+  web:open <board> <panel> <url>          Open URL in webpage panel
+  board:translate <board> <x> <y>         Set viewport translation offset
 
 EXAMPLES
   yoloit boards
@@ -245,6 +265,110 @@ print(json.dumps(b))
     [[ $# -lt 2 ]] && { echo "Usage: yoloit link:delete <board> <link-id>" >&2; exit 1; }
     bid=$(_encode "$1"); lid=$(_encode "$2")
     _delete "/boards/${bid}/links/${lid}" | python3 -m json.tool 2>/dev/null
+    ;;
+
+  # Panel color/visibility
+  panel:color)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit panel:color <board> <panel> <color|clear>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _put "/boards/${bid}/panels/${pid}" "{\"color\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:hide)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:hide <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _put "/boards/${bid}/panels/${pid}" '{"hidden":true}' | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:show)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:show <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _put "/boards/${bid}/panels/${pid}" '{"hidden":false}' | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:types)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit panel:types <board>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _get "/boards/${bid}/panel-types" | python3 -m json.tool 2>/dev/null
+    ;;
+  # Link management
+  link:style)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit link:style <board> <linkId> <arrow|line> [bezier|straight|elbow]" >&2; exit 1; }
+    bid=$(_encode "$1"); lid=$(_encode "$2")
+    geo="${4:-bezier}"
+    _put "/boards/${bid}/links/${lid}" "{\"style\":\"$3\",\"geometry\":\"${geo}\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  link:color)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit link:color <board> <linkId> <color>" >&2; exit 1; }
+    bid=$(_encode "$1"); lid=$(_encode "$2")
+    _put "/boards/${bid}/links/${lid}" "{\"color\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  # Shorthand panel-type commands
+  note)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit note <board> <panel> <text>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    shift 2; text="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  note:append)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit note:append <board> <panel> <text>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    shift 2; text="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"append\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  checklist:add)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:add <board> <panel> <item>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    shift 2; item="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$item")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  checklist:check)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:check <board> <panel> <item-id>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"check\",\"id\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  checklist:uncheck)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:uncheck <board> <panel> <item-id>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"id\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:add-column)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit kanban:add-column <board> <panel> <column-name>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    shift 2; name="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-column\",\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$name")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:add-card)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:add-card <board> <panel> <column> <title>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2"); col="$3"
+    shift 3; title="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-card\",\"column\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$col"),\"title\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$title")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:move-card)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:move-card <board> <panel> <cardId> <to-column>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"move-card\",\"cardId\":\"$3\",\"to\":\"$4\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  kanban:cards)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit kanban:cards <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"cards"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  play)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit play <board> <panel> <file-or-url>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    src="$3"
+    name=$(basename "$src")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add\",\"path\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$src"),\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$name")}" | python3 -m json.tool 2>/dev/null
+    sleep 0.1
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"play"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  web:open)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit web:open <board> <panel> <url>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"open\",\"url\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:translate)
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit board:translate <board> <x> <y>" >&2; exit 1; }
+    bid=$(_encode "$1")
+    _put "/boards/${bid}/viewport" "{\"x\":$2,\"y\":$3}" | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── help ──
