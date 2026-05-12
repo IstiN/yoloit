@@ -30,8 +30,8 @@ _curl() {
 }
 
 _get()    { _curl GET    "$1"; }
-_post()   { _curl POST   "$1" -d "${2:-{}}"; }
-_put()    { _curl PUT    "$1" -d "${2:-{}}"; }
+_post()   { _curl POST   "$1" -d "${2:-\{\}}"; }
+_put()    { _curl PUT    "$1" -d "${2:-\{\}}"; }
 _delete() { _curl DELETE "$1"; }
 
 # ── Usage ──────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ PANEL COMMANDS
   panel:rename <board> <panel> <new>   Rename panel
   panel:move <board> <panel> <x> <y>   Move panel
   panel:resize <board> <panel> <w> <h> Resize panel
-  panel:delete <board> <panel>         Delete panel
+  panel:focus <board> <panel>          Focus panel (bring to front)
 
 PANEL ACTIONS (sent to panel handler)
   do <board> <panel> <action> [json]   Execute a panel action
@@ -185,6 +185,11 @@ case "$cmd" in
     [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:delete <board> <panel>" >&2; exit 1; }
     bid=$(_encode "$1"); pid=$(_encode "$2")
     _delete "/boards/${bid}/panels/${pid}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:focus)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:focus <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _put "/boards/${bid}/panels/${pid}" '{"focus":true}' | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── panel actions ──
