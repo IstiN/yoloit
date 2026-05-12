@@ -215,8 +215,8 @@ print(json.dumps(b))
     ;;
   link:create)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit link:create <board> <from> <to>" >&2; exit 1; }
-    bid=$(_encode "$1"); from=$(_encode "$2"); to=$(_encode "$3")
-    _post "/boards/${bid}/links/${from}/${to}" | python3 -m json.tool 2>/dev/null
+    bid=$(_encode "$1"); from="$2"; to="$3"
+    _post "/boards/${bid}/links" "{\"from\":\"${from}\",\"to\":\"${to}\"}" | python3 -m json.tool 2>/dev/null
     ;;
   link:delete)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit link:delete <board> <from> <to>" >&2; exit 1; }
