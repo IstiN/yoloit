@@ -300,7 +300,13 @@ jobs:
           ARCH_LABEL: ${{ steps.package.outputs.arch_label }}
           SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
-          # Resolve gh CLI — may be symlink or in different locations
+          # Debug PATH and gh availability
+          echo "PATH=$PATH"
+          echo "which gh: $(which gh 2>&1 || true)"
+          echo "ls /opt/homebrew/bin/gh: $(ls -la /opt/homebrew/bin/gh 2>&1 || true)"
+          echo "type gh: $(type gh 2>&1 || true)"
+          
+          # Resolve gh CLI
           GH=""
           for p in /opt/homebrew/bin/gh /usr/local/bin/gh /usr/bin/gh; do
             if [ -x "$p" ]; then GH="$p"; break; fi
@@ -309,10 +315,15 @@ jobs:
             GH=$(which gh 2>/dev/null || true)
           fi
           if [ -z "$GH" ]; then
-            echo "❌ gh CLI not found"
+            echo "❌ gh CLI not found anywhere — trying brew install"
+            brew install gh 2>/dev/null || true
+            GH=$(which gh 2>/dev/null || true)
+          fi
+          if [ -z "$GH" ]; then
+            echo "❌ gh CLI still not found after install attempt"
             exit 1
           fi
-          echo "Using gh: $GH"
+          echo "Using gh: $GH ($($GH --version | head -1))"
 
           SIGN_NOTE=""
           if [ "$SIGNED" = "false" ]; then
