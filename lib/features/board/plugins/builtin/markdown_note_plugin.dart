@@ -98,7 +98,9 @@ class _AutoHeightNoteContent extends StatefulWidget {
 
 class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
   final _contentKey = GlobalKey();
-  static const double _padding = 16.0; // matches panel content padding
+  static const double _innerPadding = 16.0;
+  static const double _panelHeaderHeight = 44.0;
+  static const double _panelContentPadding = 12.0;
 
   @override
   void initState() {
@@ -109,7 +111,13 @@ class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
   @override
   void didUpdateWidget(_AutoHeightNoteContent old) {
     super.didUpdateWidget(old);
-    if (old.markdown != widget.markdown) _scheduleResize();
+    final oldAutoHeight = old.panel.state['autoHeight'] as bool? ?? false;
+    final newAutoHeight = widget.panel.state['autoHeight'] as bool? ?? false;
+    if (old.markdown != widget.markdown ||
+        oldAutoHeight != newAutoHeight ||
+        old.panel.bounds.width != widget.panel.bounds.width) {
+      _scheduleResize();
+    }
   }
 
   void _scheduleResize() {
@@ -118,8 +126,9 @@ class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
       final box = _contentKey.currentContext?.findRenderObject() as RenderBox?;
       if (box == null) return;
       final contentH = box.size.height;
-      final newH = contentH + _padding * 2;
+      final newH = contentH + _panelHeaderHeight + _panelContentPadding * 2;
       final currentH = widget.panel.bounds.height;
+      debugPrint('[NoteAutoHeight] ${widget.panel.title}: content=$contentH current=$currentH target=$newH');
       // Only resize if difference is more than 4px to avoid jitter.
       if ((newH - currentH).abs() > 4) {
         widget.renderContext.onResize?.call(widget.panel.bounds.width, newH);
@@ -132,9 +141,9 @@ class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.all(_padding),
+        key: _contentKey,
+        padding: const EdgeInsets.all(_innerPadding),
         child: MarkdownBody(
-          key: _contentKey,
           data: widget.markdown.isEmpty ? '*Empty note*' : widget.markdown,
         ),
       ),

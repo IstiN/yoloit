@@ -8,6 +8,12 @@
 - `tools/yoloit` script must be executable: `chmod +x tools/yoloit`
 - Add to PATH: `export PATH="$PATH:/path/to/yoloit/tools"`
 
+## App Commands
+| Command | Description | Example |
+|---|---|---|
+| `reload` | Hot reload the running Flutter app | `yoloit reload` |
+| `restart` | Hot restart the running Flutter app | `yoloit restart` |
+
 ## Board Commands
 | Command | Description | Example |
 |---|---|---|
@@ -61,6 +67,8 @@
 |---|---|---|
 | `note <board> <panel> <text>` | Set note content (markdown) | `yoloit note "Board" "Ideas" "# Title\n- item"` |
 | `note:append <board> <panel> <text>` | Append to note | `yoloit note:append "Board" "Ideas" "\n- new item"` |
+| `note:wrap <board> <panel>` | Enable auto-height for note | `yoloit note:wrap "Board" "Ideas"` |
+| `note:nowrap <board> <panel>` | Disable auto-height for note | `yoloit note:nowrap "Board" "Ideas"` |
 | `checklist:add <board> <panel> <item>` | Add checklist item | `yoloit checklist:add "Board" "Tasks" "Write tests"` |
 | `checklist:check <board> <panel> <id>` | Check item | `yoloit checklist:check "Board" "Tasks" item-123` |
 | `checklist:uncheck <board> <panel> <id>` | Uncheck item | `yoloit checklist:uncheck "Board" "Tasks" item-123` |
@@ -96,6 +104,8 @@
 | `get` | — | Get current content |
 | `set` | `text` | Replace content |
 | `append` | `text` | Append to content |
+| `wrap` | — | Enable auto-height wrapping |
+| `nowrap` | — | Disable auto-height wrapping |
 
 ### Checklist (`board.checklist`)
 | Action | Args | Description |

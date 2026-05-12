@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Colors;
+import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:yoloit/core/cli/board_screenshot_service.dart';
+import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -32,6 +35,10 @@ class CliServer {
   /// Port file written so the CLI client knows which port to connect to.
   static String get _portFilePath =>
       '${Platform.environment['HOME'] ?? '/tmp'}/.config/yoloit/cli.port';
+
+  /// VM service URI file so the CLI can trigger hot reload/restart.
+  static String get _vmServiceFilePath =>
+      '${Platform.environment['HOME'] ?? '/tmp'}/.config/yoloit/cli.vmservice';
 
   /// Whether the server is currently running.
   bool get isRunning => _server != null;
@@ -100,11 +107,30 @@ class CliServer {
       file.parent.createSync(recursive: true);
       file.writeAsStringSync('$port');
     } catch (_) {}
+    // Also write VM service URI for hot reload support
+    _writeVmServiceFile();
+  }
+
+  void _writeVmServiceFile() {
+    try {
+      developer.Service.getInfo().then((info) {
+        final uri = info.serverWebSocketUri;
+        if (uri != null) {
+          final file = File(_vmServiceFilePath);
+          file.parent.createSync(recursive: true);
+          file.writeAsStringSync(uri.toString());
+        }
+      });
+    } catch (_) {}
   }
 
   void _deletePortFile() {
     try {
       final file = File(_portFilePath);
+      if (file.existsSync()) file.deleteSync();
+    } catch (_) {}
+    try {
+      final file = File(_vmServiceFilePath);
       if (file.existsSync()) file.deleteSync();
     } catch (_) {}
   }
@@ -136,6 +162,13 @@ class CliServer {
     final cubit = _cubit;
     if (cubit == null) return _error('Board cubit not available');
 
+    // GET /api/vmservice → return VM service WebSocket URI for hot reload
+    if (path.length == 1 && path[0] == 'vmservice' && method == 'GET') {
+      _writeVmServiceFile(); // refresh
+      final f = File(_vmServiceFilePath);
+      final uri = f.existsSync() ? f.readAsStringSync().trim() : '';
+      return _json({'vmServiceWsUri': uri, 'ok': uri.isNotEmpty});
+    }
     // GET /api/boards
     if (path.length == 1 && path[0] == 'boards' && method == 'GET') {
       return _listBoards(cubit);
@@ -186,6 +219,14 @@ class CliServer {
     // GET /api/boards/:id/snapshot
     if (sub.length == 1 && sub[0] == 'snapshot' && method == 'GET') {
       return _boardSnapshot(board);
+    }
+    // GET /api/boards/:id/screenshot
+    if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
+      return _boardScreenshot(board);
+    }
+    // GET /api/boards/:id/svg
+    if (sub.length == 1 && sub[0] == 'svg' && method == 'GET') {
+      return _boardSvg(board);
     }
     // GET /api/boards/:id/panels
     if (sub.length == 1 && sub[0] == 'panels' && method == 'GET') {
@@ -367,6 +408,25 @@ class CliServer {
     );
   }
 
+  Future<shelf.Response> _boardScreenshot(BoardDocument board) async {
+    final png = await BoardScreenshotService.instance.capturePng(pixelRatio: 1.5);
+    if (png == null) {
+      return _error('Failed to capture board screenshot');
+    }
+    return shelf.Response.ok(
+      png,
+      headers: {'content-type': 'image/png'},
+    );
+  }
+
+  shelf.Response _boardSvg(BoardDocument board) {
+    final svg = BoardSvgExporter.export(board);
+    return shelf.Response.ok(
+      svg,
+      headers: {'content-type': 'image/svg+xml; charset=utf-8'},
+    );
+  }
+
   Future<shelf.Response> _updateBoard(
     BoardCubit cubit,
     BoardDocument board,
@@ -543,15 +603,45 @@ class CliServer {
 
     // Apply state update if provided
     if (result.stateUpdate != null && result.ok) {
+      final mergedState = {...panel.state, ...result.stateUpdate!};
       await cubit.updatePanel(
         panel.id,
-        (p) => p.copyWith(state: {...p.state, ...result.stateUpdate!}),
+        (p) => p.copyWith(state: mergedState),
         boardId: board.id,
       );
+      if (panel.type == 'board.note.markdown' && mergedState['autoHeight'] == true) {
+        final markdown = mergedState['markdown'] as String? ?? '';
+        final targetHeight = _estimateMarkdownNoteHeight(
+          markdown,
+          panel.bounds.width,
+        );
+        await cubit.resizePanel(
+          panel.id,
+          width: panel.bounds.width,
+          height: targetHeight,
+          boardId: board.id,
+        );
+      }
       _scheduleRebuild();
     }
 
     return _json(result.toJson());
+  }
+
+  double _estimateMarkdownNoteHeight(String markdown, double width) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: markdown.isEmpty ? '*Empty note*' : markdown,
+        style: const TextStyle(
+          fontSize: 14,
+          height: 1.25,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: (width - 32 - 24).clamp(100.0, 2000.0));
+
+    // text height + inner note padding (32) + panel chrome (header 44 + content padding 24)
+    return (painter.height + 100).clamp(140.0, 2000.0);
   }
 
   // ── Viewport implementations ───────────────────────────────────────────

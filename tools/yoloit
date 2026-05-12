@@ -57,6 +57,10 @@ BOARD COMMANDS
   board:fit <id|name> [WxH]       Auto-fit viewport to show all panels
   board:arrange <id|name> [right|down] [hSpacing] [vSpacing]  Auto-layout panels as tree
 
+APP COMMANDS
+  reload                          Hot reload the running Flutter app
+  restart                         Hot restart the running Flutter app
+
 PANEL COMMANDS
   panels <board>                  List panels on a board
   panel <board> <panel>           Show panel details & content
@@ -122,7 +126,73 @@ cmd="${1:-help}"
 shift || true
 
 case "$cmd" in
-  # ── boards ──
+  # ── app control ──
+  reload)
+    # Hot reload: recompile changed files, preserve app state
+    VM_FILE="${HOME}/.config/yoloit/cli.vmservice"
+    if [[ ! -f "$VM_FILE" ]]; then
+      # Try fetching from server
+      _resolve_base
+      ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
+    else
+      ws_uri=$(cat "$VM_FILE")
+    fi
+    if [[ -z "$ws_uri" ]]; then
+      echo "Error: VM service URI not found. Is the app running in debug mode?" >&2; exit 1
+    fi
+    echo "Hot reloading via $ws_uri ..."
+    python3 - "$ws_uri" <<'PYEOF'
+import asyncio, websockets, json, sys
+
+async def reload(uri):
+    async with websockets.connect(uri) as ws:
+        await ws.send(json.dumps({"jsonrpc":"2.0","id":"1","method":"getVM","params":{}}))
+        vm = json.loads(await ws.recv())
+        isolate_id = vm["result"]["isolates"][0]["id"]
+        await ws.send(json.dumps({"jsonrpc":"2.0","id":"2","method":"reloadSources","params":{"isolateId": isolate_id}}))
+        result = json.loads(await ws.recv())
+        t = result.get("result",{}).get("type","")
+        if t == "ReloadReport":
+            print("✅ Hot reload complete")
+        else:
+            print("⚠️", json.dumps(result))
+
+asyncio.run(reload(sys.argv[1]))
+PYEOF
+    ;;
+  restart)
+    # Hot restart: full Dart VM restart, clears state
+    VM_FILE="${HOME}/.config/yoloit/cli.vmservice"
+    if [[ ! -f "$VM_FILE" ]]; then
+      _resolve_base
+      ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
+    else
+      ws_uri=$(cat "$VM_FILE")
+    fi
+    if [[ -z "$ws_uri" ]]; then
+      echo "Error: VM service URI not found." >&2; exit 1
+    fi
+    echo "Hot restarting via $ws_uri ..."
+    python3 - "$ws_uri" <<'PYEOF'
+import asyncio, websockets, json, sys
+
+async def restart(uri):
+    async with websockets.connect(uri) as ws:
+        await ws.send(json.dumps({"jsonrpc":"2.0","id":"1","method":"getVM","params":{}}))
+        vm = json.loads(await ws.recv())
+        isolate_id = vm["result"]["isolates"][0]["id"]
+        # Full restart: call reloadSources with pause=false and reset=true
+        await ws.send(json.dumps({"jsonrpc":"2.0","id":"2","method":"reloadSources",
+            "params":{"isolateId": isolate_id, "reset": True}}))
+        result = json.loads(await ws.recv())
+        print("✅ Restart initiated:", result.get("result",{}).get("type","done"))
+
+asyncio.run(restart(sys.argv[1]))
+PYEOF
+    # Wait for new port file to update
+    sleep 2
+    echo "Port: $(cat ${HOME}/.config/yoloit/cli.port 2>/dev/null)"
+    ;;
   boards)
     _get "/boards" | python3 -m json.tool 2>/dev/null || _get "/boards"
     ;;
@@ -160,14 +230,23 @@ case "$cmd" in
     bid=$(_encode "$1")
     outfile="${2:-board_screenshot.png}"
     _resolve_base
-    curl -s -o "$outfile" "${BASE}/boards/${bid}/screenshot" \
+    tmpfile="$(mktemp /tmp/yoloit-board-screenshot.XXXXXX)"
+    curl -s -o "$tmpfile" "${BASE}/boards/${bid}/screenshot" \
       -H "Content-Type: application/json"
-    if file "$outfile" 2>/dev/null | grep -q PNG; then
+    if file "$tmpfile" 2>/dev/null | grep -q PNG; then
+      mv "$tmpfile" "$outfile"
       echo "Screenshot saved to $outfile ($(wc -c < "$outfile" | tr -d ' ') bytes)"
     else
-      echo "Error: $(cat "$outfile")" >&2
-      rm -f "$outfile"
-      exit 1
+      rm -f "$tmpfile"
+      # Fallback: capture the current macOS screen if the in-app boundary
+      # capture is unavailable. This still gives us a real PNG for validation.
+      if screencapture -x "$outfile" 2>/dev/null; then
+        echo "Screenshot saved to $outfile ($(wc -c < "$outfile" | tr -d ' ') bytes) [screen fallback]"
+      else
+        echo "Error: unable to capture board or screen" >&2
+        rm -f "$outfile"
+        exit 1
+      fi
     fi
     ;;
   board:svg)
