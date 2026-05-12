@@ -300,21 +300,34 @@ jobs:
           ARCH_LABEL: ${{ steps.package.outputs.arch_label }}
           SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
-          export PATH="/opt/homebrew/bin:$PATH"
+          # Resolve gh CLI — may be symlink or in different locations
+          GH=""
+          for p in /opt/homebrew/bin/gh /usr/local/bin/gh /usr/bin/gh; do
+            if [ -x "$p" ]; then GH="$p"; break; fi
+          done
+          if [ -z "$GH" ]; then
+            GH=$(which gh 2>/dev/null || true)
+          fi
+          if [ -z "$GH" ]; then
+            echo "❌ gh CLI not found"
+            exit 1
+          fi
+          echo "Using gh: $GH"
+
           SIGN_NOTE=""
           if [ "$SIGNED" = "false" ]; then
             SIGN_NOTE=" (unsigned build)"
           fi
 
-          if gh release view "$RELEASE_TAG" &>/dev/null; then
+          if "$GH" release view "$RELEASE_TAG" &>/dev/null; then
             echo "Release $RELEASE_TAG already exists — uploading macOS asset..."
-            gh release upload "$RELEASE_TAG" "$DMG_NAME" --clobber
+            "$GH" release upload "$RELEASE_TAG" "$DMG_NAME" --clobber
             echo "✅ Uploaded $DMG_NAME to existing release $RELEASE_TAG"
           else
             printf 'YoLoIT %s run #${{ github.run_number }}%s\n\nArchitecture: **%s**\n\n## Installation\n- **macOS**: Download the DMG, open it and drag YoLoIT.app to Applications.\n- **Linux**: Download tar.gz, extract and run the `bundle/yoloit` binary.\n- **Windows**: Download zip, extract and run `yoloit.exe`.\n' \
               "$RELEASE_TAG" "$SIGN_NOTE" "$ARCH_LABEL" > release-notes.md
 
-            gh release create "$RELEASE_TAG" \
+            "$GH" release create "$RELEASE_TAG" \
               --title "YoLoIT $RELEASE_TAG" \
               --notes-file release-notes.md \
               --latest \
