@@ -12,8 +12,10 @@ import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
+import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
+import 'package:yoloit/features/settings/ui/sync_section.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/ui/skills_panel.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
@@ -24,11 +26,13 @@ import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 const _kCategories = [
   'Appearance',
   'AI Agents',
+  'AI Models',
   'Environment',
   'Notifications',
   'Sessions',
   'Shortcuts',
   'Skills',
+  'Sync',
   'Setup Guide',
   'About',
 ];
@@ -119,7 +123,11 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const Spacer(),
           IconButton(
-            icon: Icon(Icons.close, size: 18, color: Theme.of(context).textTheme.bodySmall?.color),
+            icon: Icon(
+              Icons.close,
+              size: 18,
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
             onPressed: () => Navigator.of(context).pop(),
             tooltip: 'Close',
             padding: EdgeInsets.zero,
@@ -154,7 +162,10 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Text(
                 _kCategories[index],
                 style: TextStyle(
-                  color: isActive ? colors.primary : Theme.of(context).textTheme.bodyMedium?.color,
+                  color:
+                      isActive
+                          ? colors.primary
+                          : Theme.of(context).textTheme.bodyMedium?.color,
                   fontSize: 13,
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                 ),
@@ -168,7 +179,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildContent() {
     // Skills panel needs full height, not scrollable wrapper
-    if (_selectedCategory == 6) {
+    if (_selectedCategory == 7) {
       return const SkillsPanel();
     }
     return SingleChildScrollView(
@@ -197,12 +208,20 @@ class _SettingsPageState extends State<SettingsPage> {
         2 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const _SectionHeader(title: 'AI Models'),
+            const SizedBox(height: 12),
+            const AiModelsSection(),
+          ],
+        ),
+        3 => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             const _SectionHeader(title: 'Environment'),
             const SizedBox(height: 12),
             const GlobalEnvGroupsSection(),
           ],
         ),
-        3 => Column(
+        4 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Notifications'),
@@ -210,7 +229,7 @@ class _SettingsPageState extends State<SettingsPage> {
             const _NotificationsSection(),
           ],
         ),
-        4 => Column(
+        5 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Sessions'),
@@ -218,7 +237,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _SessionSettings(),
           ],
         ),
-        5 => Column(
+        6 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Keyboard Shortcuts'),
@@ -226,7 +245,15 @@ class _SettingsPageState extends State<SettingsPage> {
             _ShortcutsTable(),
           ],
         ),
-        7 => const SetupGuideEmbedded(),
+        8 => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Sync'),
+            const SizedBox(height: 12),
+            const SyncSection(),
+          ],
+        ),
+        9 => const SetupGuideEmbedded(),
         _ => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -335,7 +362,12 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
             'Star (★) an agent to make it open automatically for new workspaces.',
-            style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+            style: TextStyle(
+              color:
+                  Theme.of(context).textTheme.bodySmall?.color ??
+                  Theme.of(context).colorScheme.onSurface,
+              fontSize: 11,
+            ),
           ),
         ),
         Container(
@@ -504,7 +536,9 @@ class _AgentRowState extends State<_AgentRow> {
                 isDense: true,
                 hintText: 'Name',
                 hintStyle: TextStyle(
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
                   fontSize: 13,
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -537,7 +571,9 @@ class _AgentRowState extends State<_AgentRow> {
                 isDense: true,
                 hintText: 'launch command (empty = plain shell)',
                 hintStyle: TextStyle(
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                 ),
                 contentPadding: const EdgeInsets.symmetric(
@@ -567,7 +603,11 @@ class _AgentRowState extends State<_AgentRow> {
               child: Icon(
                 widget.isDefault ? Icons.star : Icons.star_border,
                 size: 18,
-                color: widget.isDefault ? Colors.amber : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                color:
+                    widget.isDefault
+                        ? Colors.amber
+                        : Theme.of(context).textTheme.bodySmall?.color ??
+                            Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -578,7 +618,9 @@ class _AgentRowState extends State<_AgentRow> {
               icon: Icon(
                 Icons.delete_outline,
                 size: 18,
-                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
               ),
               onPressed: widget.onDelete,
               tooltip: 'Delete agent',
@@ -653,12 +695,19 @@ class _BrightnessToggleState extends State<_BrightnessToggle> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 22, color: isActive ? colors.primary : colors.border),
+            Icon(
+              icon,
+              size: 22,
+              color: isActive ? colors.primary : colors.border,
+            ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: isActive ? colors.primary : Theme.of(context).textTheme.bodySmall?.color,
+                color:
+                    isActive
+                        ? colors.primary
+                        : Theme.of(context).textTheme.bodySmall?.color,
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -722,7 +771,13 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
                       preset.label,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: isActive ? colors.primary : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                        color:
+                            isActive
+                                ? colors.primary
+                                : Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color ??
+                                    Theme.of(context).colorScheme.onSurface,
                         fontSize: 11,
                         fontWeight:
                             isActive ? FontWeight.w600 : FontWeight.normal,
@@ -787,7 +842,9 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
                 child: Text(
                   entry.key.toUpperCase(),
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -826,7 +883,9 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
             icon: const Icon(Icons.restart_alt, size: 14),
             label: const Text('Reset all to defaults'),
             style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+              foregroundColor:
+                  Theme.of(context).textTheme.bodySmall?.color ??
+                  Theme.of(context).colorScheme.onSurface,
               textStyle: const TextStyle(fontSize: 12),
             ),
           ),
@@ -881,7 +940,8 @@ class _HotkeyRow extends StatelessWidget {
                 color:
                     definition.isOverridden
                         ? Theme.of(context).colorScheme.onSurface
-                        : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
+                        : Theme.of(context).textTheme.bodyMedium?.color ??
+                            Theme.of(context).colorScheme.onSurface,
                 fontSize: 13,
               ),
             ),
@@ -899,7 +959,9 @@ class _HotkeyRow extends StatelessWidget {
                 child: Icon(
                   Icons.restart_alt,
                   size: 14,
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -1096,7 +1158,11 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
                           ? Text(
                             'Press a key combination…',
                             style: TextStyle(
-                              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.color ??
+                                  Theme.of(context).colorScheme.onSurface,
                               fontSize: 14,
                             ),
                           )
@@ -1276,7 +1342,11 @@ class _AboutSectionState extends State<_AboutSection> {
                             Text(
                               'v${UpdateService.currentVersion}',
                               style: TextStyle(
-                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color ??
+                                    Theme.of(context).colorScheme.onSurface,
                                 fontSize: 11,
                               ),
                             ),
@@ -1316,7 +1386,9 @@ class _AboutSectionState extends State<_AboutSection> {
               Text(
                 'A Flutter desktop app for orchestrating AI CLI tools (GitHub Copilot, Claude Code) with embedded PTY terminals and git workspace management.',
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                   height: 1.6,
                 ),
@@ -1324,7 +1396,12 @@ class _AboutSectionState extends State<_AboutSection> {
               const SizedBox(height: 6),
               Text(
                 'Platform: macOS (primary) • Windows (coming soon)',
-                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -1359,7 +1436,9 @@ class _AboutSectionState extends State<_AboutSection> {
                     child: Text(
                       'Auto-check for updates',
                       style: TextStyle(
-                        color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
+                        color:
+                            Theme.of(context).textTheme.bodyMedium?.color ??
+                            Theme.of(context).colorScheme.onSurface,
                         fontSize: 12,
                       ),
                     ),
@@ -1377,7 +1456,12 @@ class _AboutSectionState extends State<_AboutSection> {
               const SizedBox(height: 4),
               Text(
                 'Checks GitHub releases once per day in release builds.',
-                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 10,
+                ),
               ),
 
               const SizedBox(height: 16),
@@ -1443,7 +1527,9 @@ class _AboutSectionState extends State<_AboutSection> {
                       Text(
                         _installStatus,
                         style: TextStyle(
-                          color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color:
+                              Theme.of(context).textTheme.bodyMedium?.color ??
+                              Theme.of(context).colorScheme.onSurface,
                           fontSize: 11,
                         ),
                       ),
@@ -1458,7 +1544,9 @@ class _AboutSectionState extends State<_AboutSection> {
                       Text(
                         'App will restart automatically after install.',
                         style: TextStyle(
-                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
                           fontSize: 10,
                         ),
                       ),
@@ -1529,7 +1617,9 @@ class _UpdateAvailableCard extends StatelessWidget {
                   ? '${info.releaseNotes.substring(0, 200)}...'
                   : info.releaseNotes,
               style: TextStyle(
-                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
                 fontSize: 10,
                 height: 1.5,
               ),
@@ -1554,7 +1644,12 @@ class _UpdateAvailableCard extends StatelessWidget {
                 onPressed: onSkip,
                 child: Text(
                   'Skip this version',
-                  style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
             ],
@@ -1677,7 +1772,9 @@ class _SessionSettingsState extends State<_SessionSettings> {
                     Icon(
                       _showLogs ? Icons.expand_less : Icons.expand_more,
                       size: 16,
-                      color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
                     ),
                     SizedBox(width: 8),
                     Text(
@@ -1724,7 +1821,9 @@ class _SessionSettingsState extends State<_SessionSettings> {
                     Icon(
                       _showAppLog ? Icons.expand_less : Icons.expand_more,
                       size: 16,
-                      color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1781,7 +1880,9 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 child: Text(
                   '~/.config/yoloit/app.log',
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -1815,7 +1916,9 @@ class _SessionSettingsState extends State<_SessionSettings> {
                   style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -1840,7 +1943,9 @@ class _SessionSettingsState extends State<_SessionSettings> {
               Text(
                 '${_logs.length} file(s)',
                 style: TextStyle(
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
                   fontSize: 12,
                 ),
               ),
@@ -1859,7 +1964,9 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 tooltip: 'Refresh',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
               ),
             ],
           ),
@@ -1876,7 +1983,12 @@ class _SessionSettingsState extends State<_SessionSettings> {
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
                 'No logs yet.',
-                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
               ),
             )
           else
@@ -1935,7 +2047,13 @@ class _ToggleRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+          Icon(
+            icon,
+            size: 18,
+            color:
+                Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1945,14 +2063,19 @@ class _ToggleRow extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color:
-                        enabled ? Theme.of(context).colorScheme.onSurface : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                        enabled
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
                     fontSize: 13,
                   ),
                 ),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                   ),
                 ),
@@ -1991,7 +2114,9 @@ class _LogRow extends StatelessWidget {
           Icon(
             Icons.insert_drive_file_outlined,
             size: 14,
-            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+            color:
+                Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -2010,7 +2135,12 @@ class _LogRow extends StatelessWidget {
           ),
           Text(
             log.sizeLabel,
-            style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+            style: TextStyle(
+              color:
+                  Theme.of(context).textTheme.bodySmall?.color ??
+                  Theme.of(context).colorScheme.onSurface,
+              fontSize: 11,
+            ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
@@ -2018,7 +2148,9 @@ class _LogRow extends StatelessWidget {
             child: Icon(
               Icons.close,
               size: 14,
-              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+              color:
+                  Theme.of(context).textTheme.bodySmall?.color ??
+                  Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -2070,7 +2202,9 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                 Text(
                   widget.log.sizeLabel,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 12,
                   ),
                 ),
@@ -2079,7 +2213,9 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                   icon: Icon(
                     Icons.close,
                     size: 18,
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                   ),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
@@ -2098,7 +2234,9 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                       child: SelectableText(
                         _content!,
                         style: TextStyle(
-                          color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color:
+                              Theme.of(context).textTheme.bodyMedium?.color ??
+                              Theme.of(context).colorScheme.onSurface,
                           fontSize: 12,
                           fontFamily: 'monospace',
                           height: 1.6,
@@ -2160,7 +2298,13 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Icon(Icons.folder_open, size: 16, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+          Icon(
+            Icons.folder_open,
+            size: 16,
+            color:
+                Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -2168,13 +2312,18 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
               children: [
                 Text(
                   'Workspace storage',
-                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 13),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _currentPath,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -2195,7 +2344,12 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
               onPressed: () => _resetPath(context),
               child: Text(
                 'Reset',
-                style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface),
+                style: TextStyle(
+                  fontSize: 12,
+                  color:
+                      Theme.of(context).textTheme.bodyMedium?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ),
         ],
@@ -2251,7 +2405,12 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
       children: [
         Text(
           'Sound alerts when AI agents change state.',
-          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+          style: TextStyle(
+            color:
+                Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface,
+            fontSize: 11,
+          ),
         ),
         const SizedBox(height: 16),
         _SettingsToggle(
@@ -2331,7 +2490,10 @@ class _SettingsToggle extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color:
-                        enabled ? Theme.of(context).colorScheme.onSurface : Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                        enabled
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -2340,7 +2502,9 @@ class _SettingsToggle extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 11,
                   ),
                 ),
