@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -54,6 +55,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   final TransformationController _transformController =
       TransformationController();
   final GlobalKey _viewportKey = GlobalKey();
+  final GlobalKey _screenshotBoundaryKey = GlobalKey();
   Size? _viewportSize;
   Size _canvasSize = _initialCanvasSize;
   Offset _canvasOrigin = const Offset(20000, 15000);
@@ -99,6 +101,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 220),
     );
     _transformController.addListener(_scheduleCanvasExpansionIfNeeded);
+    BoardScreenshotService.instance.registerBoundaryKey(_screenshotBoundaryKey);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<BoardCubit?>()?.load();
@@ -186,9 +189,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                         final focusedPanelId =
                             activeBoard.viewport.focusedPanelId;
 
-                        return Stack(
-                          key: _viewportKey,
-                          children: [
+                        return RepaintBoundary(
+                          key: _screenshotBoundaryKey,
+                          child: Stack(
+                            key: _viewportKey,
+                            children: [
                             Positioned.fill(
                               child: IgnorePointer(
                                 child: CustomPaint(
@@ -823,6 +828,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 ),
                               ),
                           ],
+                          ),
                         );
                       },
                     ),

@@ -51,6 +51,8 @@ BOARD COMMANDS
   board:delete <id|name>          Delete a board
   board:focus <id|name>           Switch to board
   board:snapshot <id|name>        Markdown snapshot of board layout
+  board:screenshot <id|name> [file.png]  Save PNG screenshot
+  board:svg <id|name> [file.svg]  Export SVG layout
 
 PANEL COMMANDS
   panels <board>                  List panels on a board
@@ -122,6 +124,30 @@ case "$cmd" in
     [[ $# -lt 1 ]] && { echo "Usage: yoloit board:snapshot <id|name>" >&2; exit 1; }
     bid=$(_encode "$1")
     _get "/boards/${bid}/snapshot"
+    ;;
+  board:screenshot)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:screenshot <id|name> [file.png]" >&2; exit 1; }
+    bid=$(_encode "$1")
+    outfile="${2:-board_screenshot.png}"
+    _resolve_base
+    curl -s -o "$outfile" "${BASE}/boards/${bid}/screenshot" \
+      -H "Content-Type: application/json"
+    if file "$outfile" 2>/dev/null | grep -q PNG; then
+      echo "Screenshot saved to $outfile ($(wc -c < "$outfile" | tr -d ' ') bytes)"
+    else
+      echo "Error: $(cat "$outfile")" >&2
+      rm -f "$outfile"
+      exit 1
+    fi
+    ;;
+  board:svg)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:svg <id|name> [file.svg]" >&2; exit 1; }
+    bid=$(_encode "$1")
+    outfile="${2:-board_layout.svg}"
+    _resolve_base
+    curl -s -o "$outfile" "${BASE}/boards/${bid}/svg" \
+      -H "Content-Type: application/json"
+    echo "SVG saved to $outfile ($(wc -c < "$outfile" | tr -d ' ') bytes)"
     ;;
 
   # ── panels ──

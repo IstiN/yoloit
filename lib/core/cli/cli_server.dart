@@ -49,27 +49,13 @@ class CliServer {
 
   // ── UI-thread helper ────────────────────────────────────────────────────
 
-  /// Runs a cubit mutation on the main UI thread and schedules a frame
-  /// so the widget tree rebuilds. Shelf handles requests in a microtask
-  /// that may not trigger WidgetsBinding frame scheduling.
-  Future<T> _runOnUi<T>(Future<T> Function() fn) async {
-    final completer = Completer<T>();
-    SchedulerBinding.instance.addPostFrameCallback((_) async {
-      try {
-        completer.complete(await fn());
-      } catch (e, st) {
-        completer.completeError(e, st);
-      }
-    });
-    SchedulerBinding.instance.scheduleFrame();
-    return completer.future;
-  }
-
-  /// Shorthand: run cubit mutation on UI thread, then schedule another
-  /// frame to ensure widgets rebuild.
-  Future<void> _mutate(Future<void> Function() fn) async {
-    await _runOnUi(fn);
-    SchedulerBinding.instance.scheduleFrame();
+  /// Schedule a UI frame so Flutter repaints after a cubit mutation.
+  /// Shelf runs on the same isolate, so cubit mutations work directly —
+  /// we just need to tell the engine a new frame is needed.
+  void _scheduleRebuild() {
+    try {
+      SchedulerBinding.instance.scheduleFrame();
+    } catch (_) {}
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -187,7 +173,8 @@ class CliServer {
     }
     // DELETE /api/boards/:id → delete board
     if (sub.isEmpty && method == 'DELETE') {
-      await _mutate(() => cubit.deleteBoard(board.id));
+      await cubit.deleteBoard(board.id);
+      _scheduleRebuild();
       return _json({'ok': true, 'message': 'Deleted board ${board.name}'});
     }
     // GET /api/boards/:id/snapshot
@@ -221,7 +208,8 @@ class CliServer {
     }
     // DELETE /api/boards/:id/links/:linkId
     if (sub.length == 2 && sub[0] == 'links' && method == 'DELETE') {
-      await _mutate(() => cubit.removeLink(sub[1], boardId: board.id));
+      await cubit.removeLink(sub[1], boardId: board.id);
+      _scheduleRebuild();
       return _json({'ok': true, 'message': 'Link deleted'});
     }
 
@@ -249,7 +237,8 @@ class CliServer {
     }
     // DELETE .../panels/:id
     if (sub.isEmpty && method == 'DELETE') {
-      await _mutate(() => cubit.removePanel(panel.id, boardId: board.id));
+      await cubit.removePanel(panel.id, boardId: board.id);
+      _scheduleRebuild();
       return _json({'ok': true, 'message': 'Panel deleted'});
     }
     // POST .../panels/:id/action  { action: "send", ... }
@@ -282,7 +271,8 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     final name = body['name'] as String? ?? 'New Board';
-    final board = await _runOnUi(() => cubit.createBoard(name: name));
+    final board = await cubit.createBoard(name: name);
+    _scheduleRebuild();
     if (board == null) return _error('Failed to create board');
     return _json({
       'ok': true,
@@ -353,10 +343,12 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     if (body.containsKey('name')) {
-      await _mutate(() => cubit.renameBoard(board.id, body['name'] as String));
+      await cubit.renameBoard(board.id, body['name'] as String);
+      _scheduleRebuild();
     }
     if (body['focus'] == true) {
-      await _mutate(() => cubit.setActiveBoard(board.id));
+      await cubit.setActiveBoard(board.id);
+      _scheduleRebuild();
     }
     return _json({'ok': true});
   }
@@ -395,7 +387,8 @@ class CliServer {
       bounds: BoardPanelBounds(x: x, y: y, width: w, height: h),
       state: state,
     );
-    await _mutate(() => cubit.addPanel(panel, boardId: board.id));
+    await cubit.addPanel(panel, boardId: board.id);
+    _scheduleRebuild();
     return _json({
       'ok': true,
       'panel': _panelSummary(panel),
@@ -420,27 +413,31 @@ class CliServer {
     Map<String, dynamic> body,
   ) async {
     if (body.containsKey('title')) {
-      await _mutate(() => cubit.updatePanelTitle(
+      await cubit.updatePanelTitle(
         panel.id,
         body['title'] as String,
         boardId: board.id,
-      ));
+      );
+      _scheduleRebuild();
     }
     if (body.containsKey('x') || body.containsKey('y')) {
       final dx = ((body['x'] as num?)?.toDouble() ?? panel.bounds.x) - panel.bounds.x;
       final dy = ((body['y'] as num?)?.toDouble() ?? panel.bounds.y) - panel.bounds.y;
-      await _mutate(() => cubit.movePanel(panel.id, Offset(dx, dy), boardId: board.id));
+      await cubit.movePanel(panel.id, Offset(dx, dy), boardId: board.id);
+      _scheduleRebuild();
     }
     if (body.containsKey('width') || body.containsKey('height')) {
-      await _mutate(() => cubit.resizePanel(
+      await cubit.resizePanel(
         panel.id,
         width: (body['width'] as num?)?.toDouble() ?? panel.bounds.width,
         height: (body['height'] as num?)?.toDouble() ?? panel.bounds.height,
         boardId: board.id,
-      ));
+      );
+      _scheduleRebuild();
     }
     if (body['focus'] == true) {
-      await _mutate(() => cubit.focusPanel(panel.id, boardId: board.id));
+      await cubit.focusPanel(panel.id, boardId: board.id);
+      _scheduleRebuild();
     }
     return _json({'ok': true});
   }
@@ -469,11 +466,12 @@ class CliServer {
 
     // Apply state update if provided
     if (result.stateUpdate != null && result.ok) {
-      await _mutate(() => cubit.updatePanel(
+      await cubit.updatePanel(
         panel.id,
         (p) => p.copyWith(state: {...p.state, ...result.stateUpdate!}),
         boardId: board.id,
-      ));
+      );
+      _scheduleRebuild();
     }
 
     return _json(result.toJson());
@@ -522,7 +520,8 @@ class CliServer {
       style: style,
       geometry: geo,
     );
-    await _mutate(() => cubit.upsertLink(link, boardId: board.id));
+    await cubit.upsertLink(link, boardId: board.id);
+    _scheduleRebuild();
     return _json({'ok': true, 'link': {'id': link.id}});
   }
 
