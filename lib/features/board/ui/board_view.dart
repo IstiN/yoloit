@@ -3592,6 +3592,9 @@ class _BoardToolsPanel extends StatelessWidget {
                               'board.files',
                               'board.file.preview',
                               'board.playlist',
+                              'board.filetree',
+                              'board.run_configs',
+                              'board.yolo_assistant',
                             ];
                             final pluginEntries =
                                 genericTypes.map((typeId) {
