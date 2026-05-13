@@ -407,6 +407,12 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
     try {
       final svg = await widget.renderer!.renderToSvg(widget.code);
       debugPrint('[Mermaid] _render() success, svg length=${svg.length}');
+      // Debug: save SVG to /tmp for inspection
+      try {
+        final tmpFile = '/tmp/mermaid_debug_${DateTime.now().millisecondsSinceEpoch}.svg';
+        await File(tmpFile).writeAsString(svg);
+        debugPrint('[Mermaid] SVG saved to $tmpFile');
+      } catch (_) {}
       if (mounted) setState(() { _svg = svg; _loading = false; });
     } catch (e) {
       debugPrint('[Mermaid] _render() ERROR: $e');
@@ -449,16 +455,18 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
         ),
       );
     }
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: widget.colors.border),
-      ),
-      child: SvgPicture.string(
-        _svg!,
-        fit: BoxFit.contain,
+    return RepaintBoundary(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: widget.colors.border),
+        ),
+        child: SvgPicture.string(
+          _svg!,
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }
