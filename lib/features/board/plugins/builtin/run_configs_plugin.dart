@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -133,49 +135,64 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
     final result = await showDialog<bool>(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('Add Configuration'),
-            content: SizedBox(
-              width: 360,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      hintText: 'e.g. Flutter Run (macOS)',
+          (ctx) => StatefulBuilder(
+            builder: (ctx, setDialogState) => AlertDialog(
+              title: const Text('Add Configuration'),
+              content: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        hintText: 'e.g. Flutter Run (macOS)',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: cmdCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Command',
-                      hintText: 'e.g. flutter run -d macos',
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: cmdCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Command',
+                        hintText: 'e.g. flutter run -d macos',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: dirCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Working Directory',
-                      hintText: '/path/to/project',
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: dirCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Working Directory',
+                        hintText: '/path/to/project',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.folder_open, size: 20),
+                          tooltip: 'Browse...',
+                          onPressed: () async {
+                            final picked = await FilePicker.getDirectoryPath(
+                              dialogTitle: 'Select working directory',
+                            );
+                            if (picked != null) {
+                              dirCtrl.text = picked;
+                              setDialogState(() {});
+                            }
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Add'),
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Add'),
-              ),
-            ],
           ),
     );
 
@@ -212,6 +229,10 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
             .where((c) => c['id'] == activeId)
             .cast<Map<String, dynamic>?>()
             .firstOrNull;
+    final colors = AppColorScheme.of(context);
+    final borderColor = colors.border;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final textSecondary = textColor.withValues(alpha: 0.5);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -220,9 +241,9 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
         SizedBox(
           width: 200,
           child: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                right: BorderSide(color: Color(0xFF1E293B), width: 1),
+                right: BorderSide(color: borderColor, width: 1),
               ),
             ),
             child: Column(
@@ -258,10 +279,10 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
                                   color: _accent.withValues(alpha: 0.35),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
+                                Text(
                                   'No configurations',
                                   style: TextStyle(
-                                    color: Color(0xFF64748B),
+                                    color: textSecondary,
                                     fontSize: 12,
                                   ),
                                 ),
@@ -324,9 +345,9 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
               Container(
                 height: 36,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: Color(0xFF1E293B), width: 1),
+                    bottom: BorderSide(color: borderColor, width: 1),
                   ),
                 ),
                 child: Row(
@@ -336,9 +357,10 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
                         activeConfig != null
                             ? activeConfig['name'] as String? ?? ''
                             : 'No configuration selected',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
+                          color: textColor,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -367,7 +389,7 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
                           minWidth: 28,
                           minHeight: 28,
                         ),
-                        color: const Color(0xFF94A3B8),
+                        color: textSecondary,
                       ),
                       IconButton(
                         icon: const Icon(Icons.close, size: 18),
@@ -379,7 +401,7 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
                           minWidth: 28,
                           minHeight: 28,
                         ),
-                        color: const Color(0xFF94A3B8),
+                        color: textSecondary,
                       ),
                     ],
                   ],
@@ -388,7 +410,7 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
               // Output area
               Expanded(
                 child: Container(
-                  color: const Color(0xFF0F172A),
+                  color: colors.terminalBackground,
                   padding: const EdgeInsets.all(10),
                   child: SingleChildScrollView(
                     child: SelectableText(
@@ -397,10 +419,10 @@ class _RunConfigsContentState extends State<_RunConfigsContent> {
                               ? 'Ready. Press ▶ to run.'
                               : 'Select a configuration to view output.')
                           : _output,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12,
-                        color: Color(0xFFCBD5E1),
+                        color: colors.terminalPrompt,
                         height: 1.5,
                       ),
                     ),
@@ -450,6 +472,13 @@ class _ConfigTileState extends State<_ConfigTile> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectColor = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.06);
+    final hoverColor = isDark
+        ? Colors.white.withValues(alpha: 0.03)
+        : Colors.black.withValues(alpha: 0.03);
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -459,9 +488,9 @@ class _ConfigTileState extends State<_ConfigTile> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           color:
               widget.selected
-                  ? Colors.white.withValues(alpha: 0.06)
+                  ? selectColor
                   : _hovered
-                  ? Colors.white.withValues(alpha: 0.03)
+                  ? hoverColor
                   : Colors.transparent,
           child: Row(
             children: [
