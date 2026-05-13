@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -61,6 +62,22 @@ bool _isVideoExt(String ext) {
 bool _isAudioExt(String ext) {
   return const {'mp3', 'aac', 'wav', 'ogg', 'flac', 'm4a', 'opus', 'wma'}
       .contains(ext.toLowerCase());
+}
+
+bool _isMarkdownExt(String ext) =>
+    const {'md', 'markdown'}.contains(ext.toLowerCase());
+
+bool _isTextExt(String ext) {
+  return const {
+    'txt', 'log', 'csv', 'tsv', 'ini', 'cfg', 'conf', 'env',
+    'dart', 'py', 'js', 'ts', 'jsx', 'tsx', 'java', 'kt', 'swift',
+    'go', 'rs', 'c', 'cpp', 'h', 'hpp', 'cs', 'rb', 'php', 'sh',
+    'bash', 'zsh', 'fish', 'ps1', 'bat', 'cmd',
+    'json', 'yaml', 'yml', 'xml', 'toml', 'html', 'css', 'scss',
+    'less', 'sql', 'graphql', 'proto', 'makefile', 'dockerfile',
+    'gitignore', 'editorconfig', 'properties', 'gradle', 'lock',
+    'mjs', 'cjs', 'vue', 'svelte', 'astro',
+  }.contains(ext.toLowerCase());
 }
 
 class _FilePreviewContent extends StatefulWidget {
@@ -158,8 +175,14 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     if (_isAudioExt(ext)) {
       return _AudioPreview(key: ValueKey(path), path: path);
     }
+    if (_isMarkdownExt(ext)) {
+      return _MarkdownPreview(key: ValueKey(path), path: path);
+    }
+    if (_isTextExt(ext) || _looksLikeTextFile(path)) {
+      return _CodePreview(key: ValueKey(path), path: path);
+    }
 
-    // Other file types
+    // Other file types (binary, etc.)
     final fileName = path.split(Platform.pathSeparator).last;
     return Center(
       child: Column(
@@ -199,6 +222,132 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
         ],
       ),
     );
+  }
+
+  /// Heuristic: files without extension or with unknown extension — try reading
+  /// first bytes to check if it's text.
+  bool _looksLikeTextFile(String path) {
+    try {
+      final file = File(path);
+      if (!file.existsSync()) return false;
+      final len = file.lengthSync();
+      if (len > 2 * 1024 * 1024) return false; // Skip files > 2MB
+      // Check for known no-extension text files
+      final name = path.split(Platform.pathSeparator).last.toLowerCase();
+      if (const {
+        'makefile', 'dockerfile', 'jenkinsfile', 'vagrantfile',
+        'procfile', 'gemfile', 'rakefile', 'license', 'readme',
+        'changelog', 'authors', 'contributors', 'todo',
+      }.contains(name)) return true;
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+}
+
+// ─── Markdown Preview ─────────────────────────────────────────────────────────
+
+class _MarkdownPreview extends StatelessWidget {
+  const _MarkdownPreview({super.key, required this.path});
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      return const Center(child: Text('File not found'));
+    }
+    try {
+      final content = file.readAsStringSync();
+      final colors = AppColorScheme.of(context);
+      return Markdown(
+        data: content,
+        selectable: true,
+        padding: const EdgeInsets.all(12),
+        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+          codeblockDecoration: BoxDecoration(
+            color: colors.terminalBackground,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          code: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurface,
+            backgroundColor: colors.terminalBackground,
+          ),
+        ),
+      );
+    } catch (e) {
+      return Center(child: Text('Error reading file: $e'));
+    }
+  }
+}
+
+// ─── Code / Text Preview ──────────────────────────────────────────────────────
+
+class _CodePreview extends StatelessWidget {
+  const _CodePreview({super.key, required this.path});
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      return const Center(child: Text('File not found'));
+    }
+    try {
+      final content = file.readAsStringSync();
+      final lines = content.split('\n');
+      final colors = AppColorScheme.of(context);
+      final textColor = Theme.of(context).colorScheme.onSurface;
+      final lineNumColor = textColor.withValues(alpha: 0.35);
+
+      return Container(
+        color: colors.terminalBackground,
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          itemCount: lines.length,
+          itemBuilder: (_, i) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '${i + 1}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: lineNumColor,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SelectableText(
+                      lines[i],
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: colors.terminalPrompt,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      return Center(child: Text('Error reading file: $e'));
+    }
   }
 }
 
