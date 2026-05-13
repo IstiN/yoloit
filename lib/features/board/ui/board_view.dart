@@ -2327,13 +2327,17 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                 size: 18,
                               )
                             else
-                              Icon(
-                                BoardPluginRegistry.instance
-                                        .pluginFor(panel.type)
-                                        ?.icon ??
-                                    Icons.dashboard_customize_outlined,
-                                size: 16,
-                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                              Builder(
+                                builder: (ctx) {
+                                  final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+                                  final svgIcon = plugin?.buildIconWidget(ctx, size: 16);
+                                  if (svgIcon != null) return svgIcon;
+                                  return Icon(
+                                    plugin?.icon ?? Icons.dashboard_customize_outlined,
+                                    size: 16,
+                                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                                  );
+                                },
                               ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -3604,23 +3608,30 @@ class _BoardToolsPanel extends StatelessWidget {
                                   return PopupMenuItem<String>(
                                     value: typeId,
                                     height: 36,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          plugin.icon,
-                                          size: 14,
-                                          color: plugin.accentColor
-                                              .withAlpha(200),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          plugin.displayName,
-                                           style: TextStyle(
-                                             fontSize: 12,
-                                             color: textColor,
-                                           ),
-                                        ),
-                                      ],
+                                    child: Builder(
+                                      builder: (ctx) {
+                                        final svgIcon = plugin.buildIconWidget(ctx, size: 14);
+                                        return Row(
+                                          children: [
+                                            if (svgIcon != null)
+                                              SizedBox(width: 14, height: 14, child: svgIcon)
+                                            else
+                                              Icon(
+                                                plugin.icon,
+                                                size: 14,
+                                                color: plugin.accentColor.withAlpha(200),
+                                              ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              plugin.displayName,
+                                               style: TextStyle(
+                                                 fontSize: 12,
+                                                 color: textColor,
+                                               ),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     ),
                                   );
                                 }).whereType<PopupMenuItem<String>>().toList();

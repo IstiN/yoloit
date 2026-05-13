@@ -59,6 +59,10 @@ abstract class BoardPanelPlugin {
   /// Icon used in the catalog and the panel header.
   IconData get icon;
 
+  /// Optional widget icon (e.g. SVG) to use instead of [icon] in headers.
+  /// When non-null, this takes precedence over [icon].
+  Widget? buildIconWidget(BuildContext context, {double size = 16}) => null;
+
   /// Accent color used to tint the panel header when no user color is set.
   /// Defaults to transparent (theme surface).
   Color get accentColor => Colors.transparent;

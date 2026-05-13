@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -238,10 +239,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.auto_awesome_outlined,
-              size: 48,
-              color: _kAccent.withAlpha(80),
+            SvgPicture.asset(
+              'assets/icon/yolo_assistant.svg',
+              width: 48,
+              height: 48,
             ),
             const SizedBox(height: 12),
             Text(

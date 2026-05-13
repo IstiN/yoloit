@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -17,6 +18,15 @@ class YoloAssistantPlugin extends BoardPanelPlugin {
 
   @override
   IconData get icon => Icons.auto_awesome;
+
+  @override
+  Widget? buildIconWidget(BuildContext context, {double size = 16}) {
+    return SvgPicture.asset(
+      'assets/icon/yolo_assistant.svg',
+      width: size,
+      height: size,
+    );
+  }
 
   @override
   Color get accentColor => const Color(0xFF8B5CF6);
