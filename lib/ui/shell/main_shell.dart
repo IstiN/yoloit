@@ -81,6 +81,12 @@ class _MainShellState extends State<MainShell> with WindowListener {
       _agentsVis = snap.agentsVis;
       _fileTreeVis = snap.fileTreeVis;
       _sessionSnapshot = snap;
+      // Restore last canvas mode (default: board so the last board opens automatically)
+      _canvasMode = switch (snap.canvasMode) {
+        'mindMap' => _CanvasMode.mindMap,
+        'board'   => _CanvasMode.board,
+        _         => _CanvasMode.panes,
+      };
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Initialize terminal services (no sessions yet — workspace listener will load them)
@@ -214,6 +220,12 @@ class _MainShellState extends State<MainShell> with WindowListener {
   void _toggleCanvasMode(_CanvasMode targetMode) {
     setState(() {
       _canvasMode = _canvasMode == targetMode ? _CanvasMode.panes : targetMode;
+    });
+    // Persist the new canvas mode so it's restored on next launch.
+    SessionPrefs.saveCanvasMode(switch (_canvasMode) {
+      _CanvasMode.mindMap => 'mindMap',
+      _CanvasMode.board   => 'board',
+      _CanvasMode.panes   => 'panes',
     });
   }
 

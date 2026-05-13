@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
 import 'package:file_picker/file_picker.dart';
@@ -379,7 +380,7 @@ class _MermaidDiagram extends StatefulWidget {
 }
 
 class _MermaidDiagramState extends State<_MermaidDiagram> {
-  String? _svg;
+  Uint8List? _png;
   String? _error;
   bool _loading = true;
 
@@ -405,15 +406,14 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
     debugPrint('[Mermaid] _render() start, code length=${widget.code.length}');
     setState(() { _loading = true; _error = null; });
     try {
+      // Get normalized SVG from the JS renderer (serialised via render queue).
       final svg = await widget.renderer!.renderToSvg(widget.code);
-      debugPrint('[Mermaid] _render() success, svg length=${svg.length}');
-      // Debug: save SVG to /tmp for inspection
-      try {
-        final tmpFile = '/tmp/mermaid_debug_${DateTime.now().millisecondsSinceEpoch}.svg';
-        await File(tmpFile).writeAsString(svg);
-        debugPrint('[Mermaid] SVG saved to $tmpFile');
-      } catch (_) {}
-      if (mounted) setState(() { _svg = svg; _loading = false; });
+      debugPrint('[Mermaid] _render() svg length=${svg.length}');
+      // Convert to PNG via rsvg-convert (on macOS) or flutter_svg fallback.
+      // Rendering at 1200px wide gives crisp output on any panel size ≤1200px.
+      final png = await MermaidRenderer.svgToPng(svg, width: 1200);
+      debugPrint('[Mermaid] _render() png bytes=${png.length}');
+      if (mounted) setState(() { _png = png; _loading = false; });
     } catch (e) {
       debugPrint('[Mermaid] _render() ERROR: $e');
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
@@ -463,9 +463,12 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: widget.colors.border),
         ),
-        child: SvgPicture.string(
-          _svg!,
+        // Use Image.memory so rsvg-convert output is shown pixel-perfectly.
+        // BoxFit.contain preserves aspect ratio; never upscales beyond natural size.
+        child: Image.memory(
+          _png!,
           fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
         ),
       ),
     );

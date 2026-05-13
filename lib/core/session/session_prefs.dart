@@ -31,6 +31,9 @@ class SessionPrefs {
   // First-launch / setup
   static const _kSetupCompleted = 'app.setupCompleted';
 
+  // Canvas mode (panes / mindMap / board)
+  static const _kCanvasMode = 'shell.canvasMode';
+
   // Updates
   static const _kAutoUpdateCheck   = 'updates.autoCheck';
   static const _kLastUpdateCheckMs = 'updates.lastCheckMs';
@@ -61,6 +64,7 @@ class SessionPrefs {
       fileTreeVis:  panelVisibilityFromPrefs(p.getString(_kFileTreeVis)),
       agentsVis:    panelVisibilityFromPrefs(p.getString(_kAgentsVis)),
       editorVis:    panelVisibilityFromPrefs(p.getString(_kEditorVis)),
+      canvasMode:   p.getString(_kCanvasMode) ?? 'board',
     );
   }
 
@@ -91,6 +95,9 @@ class SessionPrefs {
     };
     (await _p()).setString(key, v.toPrefsString());
   }
+
+  static Future<void> saveCanvasMode(String mode) async =>
+      (await _p()).setString(_kCanvasMode, mode);
 
   static Future<SharedPreferences> _p() => SharedPreferences.getInstance();
 
@@ -190,6 +197,7 @@ class SessionSnapshot {
     this.fileTreeVis  = PanelVisibility.open,
     this.agentsVis    = PanelVisibility.open,
     this.editorVis    = PanelVisibility.open,
+    this.canvasMode   = 'board',
   });
 
   final bool reviewVisible;
@@ -208,4 +216,6 @@ class SessionSnapshot {
   final PanelVisibility fileTreeVis;
   final PanelVisibility agentsVis;
   final PanelVisibility editorVis;
+  /// Last canvas mode: 'panes', 'mindMap', or 'board'.
+  final String canvasMode;
 }
