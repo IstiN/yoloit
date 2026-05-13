@@ -191,39 +191,41 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   }
 
   Widget _buildSkillsBar(AppColorScheme colors) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          ..._activeSkills.map(
-            (skill) => Padding(
-              padding: const EdgeInsets.only(right: 6, top: 6, bottom: 6),
-              child: InputChip(
-                label: Text(skill, style: const TextStyle(fontSize: 11)),
-                deleteIcon: const Icon(Icons.close, size: 14),
-                onDeleted: () => _removeSkill(skill),
-                backgroundColor: _kAccent.withAlpha(25),
-                selectedColor: _kAccent.withAlpha(50),
-                side: BorderSide(color: _kAccent.withAlpha(60)),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+    return SizedBox(
+      height: 44,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            ..._activeSkills.map(
+              (skill) => Padding(
+                padding: const EdgeInsets.only(right: 6, top: 8, bottom: 8),
+                child: InputChip(
+                  label: Text(skill, style: const TextStyle(fontSize: 11)),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () => _removeSkill(skill),
+                  backgroundColor: _kAccent.withAlpha(25),
+                  selectedColor: _kAccent.withAlpha(50),
+                  side: BorderSide(color: _kAccent.withAlpha(60)),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 8),
+              child: ActionChip(
+                avatar: const Icon(Icons.add, size: 14),
+                label: const Text('Add', style: TextStyle(fontSize: 11)),
+                onPressed: _showAddSkillSheet,
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 6),
-            child: ActionChip(
-              avatar: const Icon(Icons.add, size: 14),
-              label: const Text('Add', style: TextStyle(fontSize: 11)),
-              onPressed: _showAddSkillSheet,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
