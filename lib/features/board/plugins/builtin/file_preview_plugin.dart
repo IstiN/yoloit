@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
@@ -248,13 +250,37 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
 
 // ─── Markdown Preview ─────────────────────────────────────────────────────────
 
-class _MarkdownPreview extends StatelessWidget {
+// ─── Markdown Preview with Mermaid support ────────────────────────────────────
+
+class _MarkdownPreview extends StatefulWidget {
   const _MarkdownPreview({super.key, required this.path});
   final String path;
 
   @override
+  State<_MarkdownPreview> createState() => _MarkdownPreviewState();
+}
+
+class _MarkdownPreviewState extends State<_MarkdownPreview> {
+  final MermaidRenderer _renderer = MermaidRenderer();
+  bool _rendererReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _renderer.init().then((_) {
+      if (mounted) setState(() => _rendererReady = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _renderer.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final file = File(path);
+    final file = File(widget.path);
     if (!file.existsSync()) {
       return const Center(child: Text('File not found'));
     }
@@ -265,6 +291,13 @@ class _MarkdownPreview extends StatelessWidget {
         data: content,
         selectable: true,
         padding: const EdgeInsets.all(12),
+        builders: {
+          'pre': _MermaidBlockBuilder(
+            renderer: _rendererReady ? _renderer : null,
+            colors: colors,
+            context: context,
+          ),
+        },
         styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
           codeblockDecoration: BoxDecoration(
             color: colors.terminalBackground,
@@ -281,6 +314,142 @@ class _MarkdownPreview extends StatelessWidget {
     } catch (e) {
       return Center(child: Text('Error reading file: $e'));
     }
+  }
+}
+
+/// Custom markdown builder that intercepts ```mermaid code blocks and renders
+/// them with [MermaidRenderer]. All other code blocks fall back to default.
+class _MermaidBlockBuilder extends MarkdownElementBuilder {
+  _MermaidBlockBuilder({
+    required this.renderer,
+    required this.colors,
+    required this.context,
+  });
+
+  final MermaidRenderer? renderer;
+  final AppColorScheme colors;
+  final BuildContext context;
+
+  @override
+  bool isBlockElement() => true;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    // element is <pre>; look for a <code class="language-mermaid"> child
+    final children = element.children;
+    if (children == null || children.isEmpty) return null;
+
+    final codeEl = children.whereType<md.Element>().firstWhere(
+      (e) => e.tag == 'code',
+      orElse: () => md.Element('code', []),
+    );
+
+    final lang = (codeEl.attributes['class'] ?? '').replaceFirst('language-', '');
+    if (lang != 'mermaid') return null;
+
+    final code = codeEl.textContent.trim();
+    return _MermaidDiagram(code: code, renderer: renderer, colors: colors);
+  }
+}
+
+/// Widget that renders a single Mermaid diagram asynchronously.
+class _MermaidDiagram extends StatefulWidget {
+  const _MermaidDiagram({
+    required this.code,
+    required this.renderer,
+    required this.colors,
+  });
+
+  final String code;
+  final MermaidRenderer? renderer;
+  final AppColorScheme colors;
+
+  @override
+  State<_MermaidDiagram> createState() => _MermaidDiagramState();
+}
+
+class _MermaidDiagramState extends State<_MermaidDiagram> {
+  String? _svg;
+  String? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _render();
+  }
+
+  @override
+  void didUpdateWidget(_MermaidDiagram old) {
+    super.didUpdateWidget(old);
+    if (old.code != widget.code || old.renderer != widget.renderer) {
+      _render();
+    }
+  }
+
+  Future<void> _render() async {
+    if (widget.renderer == null) return; // still initializing
+    setState(() { _loading = true; _error = null; });
+    try {
+      final svg = await widget.renderer!.renderToSvg(widget.code);
+      if (mounted) setState(() { _svg = svg; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading || widget.renderer == null) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: widget.colors.terminalBackground,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 8),
+            Text('Rendering diagram…', style: TextStyle(fontSize: 12)),
+          ],
+        ),
+      );
+    }
+    if (_error != null) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          'Mermaid error: $_error',
+          style: const TextStyle(fontSize: 12, color: Colors.red),
+        ),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: widget.colors.border),
+      ),
+      child: SvgPicture.string(
+        _svg!,
+        fit: BoxFit.contain,
+      ),
+    );
   }
 }
 

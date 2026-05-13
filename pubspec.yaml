@@ -53,6 +53,9 @@ dependencies:
   flutter_code_editor: ^0.3.5
   flutter_markdown_plus: ^1.0.7
   yaml: ^3.1.2
+  flutter_js: ^0.8.7
+  dmtools_mermaid_renderer:
+    path: packages/mermaid_renderer_flutter
   # ── Collaboration / remote sync ──────────────────────────────────────────
   shelf: ^1.4.2
   shelf_web_socket: ^3.0.0

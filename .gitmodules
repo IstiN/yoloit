@@ -1,0 +1,3 @@
+[submodule "packages/mermaid_renderer_flutter"]
+	path = packages/mermaid_renderer_flutter
+	url = https://github.com/IstiN/mermaid_renderer_flutter.git
