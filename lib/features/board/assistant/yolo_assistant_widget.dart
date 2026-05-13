@@ -192,15 +192,16 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
   Widget _buildSkillsBar(AppColorScheme colors) {
     return SizedBox(
-      height: 44,
+      height: 52,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: ListView(
           scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
           children: [
             ..._activeSkills.map(
               (skill) => Padding(
-                padding: const EdgeInsets.only(right: 6, top: 8, bottom: 8),
+                padding: const EdgeInsets.only(right: 6, top: 10, bottom: 10),
                 child: InputChip(
                   label: Text(skill, style: const TextStyle(fontSize: 11)),
                   deleteIcon: const Icon(Icons.close, size: 14),
@@ -215,7 +216,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 8),
+              padding: const EdgeInsets.only(top: 10, bottom: 10),
               child: ActionChip(
                 avatar: const Icon(Icons.add, size: 14),
                 label: const Text('Add', style: TextStyle(fontSize: 11)),
