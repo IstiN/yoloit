@@ -292,6 +292,7 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
       final content = file.readAsStringSync();
       final colors = AppColorScheme.of(context);
       return Markdown(
+        key: ValueKey(_rendererReady), // force rebuild when renderer becomes ready
         data: content,
         selectable: true,
         padding: const EdgeInsets.all(12),
