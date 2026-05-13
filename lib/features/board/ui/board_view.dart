@@ -5546,11 +5546,11 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       },
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Vertical badge tab (left of panel)
+          // Vertical badge tab (left of panel) — always at bottom
           Padding(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: 16),
             child: GestureDetector(
               onTap: _toggleChat,
               child: MouseRegion(
@@ -5595,22 +5595,17 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
               ),
             ),
           ),
-          // Chat panel (slides from right)
+          // Chat panel (slides off to the right)
           AnimatedBuilder(
             animation: _chatController,
             builder: (context, child) {
-              return ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(14),
-                  topRight: Radius.circular(14),
-                  bottomRight: Radius.circular(14),
-                ),
-                child: SizedBox(
-                  width: 380 - _chatSlide.value,
-                  height: _chatSlide.value < 370 ? 480 : 0,
-                  child: _chatSlide.value < 370
-                      ? child
-                      : const SizedBox.shrink(),
+              final slideOffset = _chatSlide.value; // 380 → 0
+              final visible = slideOffset < 370;
+              return Transform.translate(
+                offset: Offset(slideOffset, 0),
+                child: Opacity(
+                  opacity: visible ? 1.0 : 0.0,
+                  child: child,
                 ),
               );
             },
