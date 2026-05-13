@@ -267,8 +267,12 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
   @override
   void initState() {
     super.initState();
+    debugPrint('[Mermaid] init() starting for ${widget.path}');
     _renderer.init().then((_) {
+      debugPrint('[Mermaid] init() complete, renderer ready');
       if (mounted) setState(() => _rendererReady = true);
+    }).catchError((e) {
+      debugPrint('[Mermaid] init() FAILED: $e');
     });
   }
 
@@ -393,12 +397,18 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
   }
 
   Future<void> _render() async {
-    if (widget.renderer == null) return; // still initializing
+    if (widget.renderer == null) {
+      debugPrint('[Mermaid] _render() skipped — renderer not ready yet');
+      return;
+    }
+    debugPrint('[Mermaid] _render() start, code length=${widget.code.length}');
     setState(() { _loading = true; _error = null; });
     try {
       final svg = await widget.renderer!.renderToSvg(widget.code);
+      debugPrint('[Mermaid] _render() success, svg length=${svg.length}');
       if (mounted) setState(() { _svg = svg; _loading = false; });
     } catch (e) {
+      debugPrint('[Mermaid] _render() ERROR: $e');
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
