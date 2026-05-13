@@ -190,9 +190,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                         final focusedPanelId =
                             activeBoard.viewport.focusedPanelId;
 
-                        return RepaintBoundary(
-                          key: _screenshotBoundaryKey,
-                          child: Stack(
+                        return Stack(
+                          children: [
+                          RepaintBoundary(
+                           key: _screenshotBoundaryKey,
+                           child: Stack(
                             key: _viewportKey,
                             children: [
                             Positioned.fill(
@@ -828,15 +830,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
-                            // ── YOLO badge (bottom-right) ──────────────────────
-                            Positioned(
-                              right: 0,
-                              bottom: 60,
-                              child: _YoloBadgeWithChat(),
-                            ),
-                          ],
+                            // ── YOLO badge removed from canvas stack ──────────────
+                           ],
+                           ),
+                          ), // RepaintBoundary
+                          // ── YOLO badge fixed overlay (bottom-right) ────────────
+                          Positioned(
+                            right: 0,
+                            bottom: 60,
+                            child: _YoloBadgeWithChat(),
                           ),
-                        );
+                          ], // outer Stack children
+                         ); // outer Stack
                       },
                     ),
                   ),
