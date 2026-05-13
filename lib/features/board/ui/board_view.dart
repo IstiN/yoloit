@@ -5606,11 +5606,35 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
             builder: (context, child) {
               // _chatSlide goes from 380 (closed) to 0 (open)
               final progress = 1.0 - (_chatSlide.value / 380);
-              return ClipRect(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: progress,
-                  child: child,
+              // Shadow lives outside ClipRect so it doesn't get clipped
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    topRight: Radius.circular(14),
+                    bottomRight: Radius.circular(14),
+                  ),
+                  boxShadow: progress > 0.05
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12 * progress),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08 * progress),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progress,
+                    child: child,
+                  ),
                 ),
               );
             },
@@ -5635,18 +5659,6 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           topRight: Radius.circular(14),
           bottomRight: Radius.circular(14),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: YoloAssistantWidget(
