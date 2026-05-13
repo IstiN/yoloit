@@ -5,7 +5,6 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:highlight/highlight_core.dart' show Mode;
 import 'package:highlight/languages/bash.dart';
@@ -31,6 +30,7 @@ import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/editor/utils/file_type_utils.dart';
+import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
 import 'package:yoloit/features/review/models/review_models.dart';
 
@@ -168,9 +168,8 @@ class _FileEditorPanelState extends State<FileEditorPanel>
   /// Dispose controllers for tabs that are no longer open.
   void _cleanupControllers(List<EditorTab> openTabs) {
     final openPaths = openTabs.map((t) => t.filePath).toSet();
-    final toRemove = _controllers.keys
-        .where((p) => !openPaths.contains(p))
-        .toList();
+    final toRemove =
+        _controllers.keys.where((p) => !openPaths.contains(p)).toList();
     for (final path in toRemove) {
       _controllers.remove(path)?.dispose();
       _loadedContent.remove(path);
@@ -236,99 +235,97 @@ class _FileEditorPanelState extends State<FileEditorPanel>
 
         final immersive = widget.immersive;
 
-        return GestureDetector(
-          onScaleStart: (d) => _scaleBase = _fontSizeNotifier.value,
-          onScaleUpdate: (d) {
-            // Update ValueNotifier directly — no setState, no full rebuild
-            final newSize = (_scaleBase * d.scale).clamp(8.0, 48.0);
-            _fontSizeNotifier.value = newSize;
-            SessionPrefs.saveEditorFontSize(newSize);
-          },
-          child: Column(
-            children: [
-              // Tab bar — hidden in immersive mode.
-              if (!immersive && !widget.hideTabBar) _TabBar(state: state),
-              Expanded(
-                child: Stack(
-                  children: [
-                    // Main content — full height, never resizes
-                    Positioned.fill(
-                      child: activeTab.isLoading
-                          ? const Center(child: CircularProgressIndicator())
-                          : activeTab.error != null
-                          ? _ErrorView(message: activeTab.error!)
-                          : activeTab.isDiff
-                          ? _DiffBody(tab: activeTab)
-                          : _isImage(activeTab.filePath)
-                          ? _ImagePreview(filePath: activeTab.filePath)
-                          : _previewPaths.contains(activeTab.filePath)
-                          ? (_isSvg(activeTab.filePath)
+        final body = Column(
+          children: [
+            if (!immersive && !widget.hideTabBar) _TabBar(state: state),
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child:
+                        activeTab.isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : activeTab.error != null
+                            ? _ErrorView(message: activeTab.error!)
+                            : activeTab.isDiff
+                            ? _DiffBody(tab: activeTab)
+                            : _isImage(activeTab.filePath)
+                            ? _ImagePreview(filePath: activeTab.filePath)
+                            : _previewPaths.contains(activeTab.filePath)
+                            ? (_isSvg(activeTab.filePath)
                                 ? _SvgPreview(filePath: activeTab.filePath)
                                 : _MarkdownPreview(
-                                    content: activeTab.content ?? '',
-                                  ))
-                          : _EditorBody(
+                                  content: activeTab.content ?? '',
+                                ))
+                            : _EditorBody(
                               key: ValueKey(activeTab.filePath),
                               tab: activeTab,
                               codeController: controller!,
                               fontSizeNotifier: _fontSizeNotifier,
                             ),
+                  ),
+                  if (!immersive)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: _AnimatedToggleBar(
+                        visible: toggleVisible,
+                        child: _MarkdownToggleBar(
+                          isPreview: _previewPaths.contains(activeTab.filePath),
+                          onToggle:
+                              () => setState(() {
+                                final path = activeTab.filePath;
+                                if (_previewPaths.contains(path)) {
+                                  _previewPaths.remove(path);
+                                } else {
+                                  _previewPaths.add(path);
+                                }
+                                SessionPrefs.savePreviewPaths(
+                                  _previewPaths.toList(),
+                                );
+                              }),
+                        ),
+                      ),
                     ),
-                    // Toggle bar: floats at top, fades in/out — hidden in immersive mode.
-                    if (!immersive)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: _AnimatedToggleBar(
-                          visible: toggleVisible,
-                          child: _MarkdownToggleBar(
-                            isPreview: _previewPaths.contains(
-                              activeTab.filePath,
-                            ),
-                            onToggle: () => setState(() {
-                              final path = activeTab.filePath;
-                              if (_previewPaths.contains(path)) {
-                                _previewPaths.remove(path);
-                              } else {
-                                _previewPaths.add(path);
-                              }
-                              SessionPrefs.savePreviewPaths(
-                                _previewPaths.toList(),
-                              );
-                            }),
-                          ),
-                        ),
+                  if (immersive && widget.onToggleImmersive != null)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: _ImmersiveButton(
+                        icon: Icons.close_fullscreen_rounded,
+                        tooltip: 'Exit focus mode',
+                        onTap: widget.onToggleImmersive!,
                       ),
-                    // Immersive-mode exit button (top-right corner).
-                    if (immersive && widget.onToggleImmersive != null)
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: _ImmersiveButton(
-                          icon: Icons.close_fullscreen_rounded,
-                          tooltip: 'Exit focus mode',
-                          onTap: widget.onToggleImmersive!,
-                        ),
+                    ),
+                  if (!immersive &&
+                      isVisualPreview &&
+                      widget.onToggleImmersive != null)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: _ImmersiveButton(
+                        icon: Icons.open_in_full_rounded,
+                        tooltip: 'Focus mode — hide chrome',
+                        onTap: widget.onToggleImmersive!,
                       ),
-                    // Enter-immersive button — shown when in a visual preview and not already immersive.
-                    if (!immersive &&
-                        isVisualPreview &&
-                        widget.onToggleImmersive != null)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: _ImmersiveButton(
-                          icon: Icons.open_in_full_rounded,
-                          tooltip: 'Focus mode — hide chrome',
-                          onTap: widget.onToggleImmersive!,
-                        ),
-                      ),
-                  ],
-                ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
+        );
+        if (isVisualPreview) {
+          return body;
+        }
+        return GestureDetector(
+          onScaleStart: (d) => _scaleBase = _fontSizeNotifier.value,
+          onScaleUpdate: (d) {
+            final newSize = (_scaleBase * d.scale).clamp(8.0, 48.0);
+            _fontSizeNotifier.value = newSize;
+            SessionPrefs.saveEditorFontSize(newSize);
+          },
+          child: body,
         );
       },
     );
@@ -564,22 +561,20 @@ class _ImmersiveButtonState extends State<_ImmersiveButton> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: _hovered
-                  ? colors.surfaceHighlight
-                  : colors.surface.withAlpha(0xCC),
+              color:
+                  _hovered
+                      ? colors.surfaceHighlight
+                      : colors.surface.withAlpha(0xCC),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: _hovered
-                    ? colors.primary
-                    : colors.primary.withAlpha(0x40),
+                color:
+                    _hovered ? colors.primary : colors.primary.withAlpha(0x40),
               ),
             ),
             child: Icon(
               widget.icon,
               size: 14,
-              color: _hovered
-                  ? colors.primary
-                  : colors.primary.withAlpha(0x90),
+              color: _hovered ? colors.primary : colors.primary.withAlpha(0x90),
             ),
           ),
         ),
@@ -596,57 +591,7 @@ class _MarkdownPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final bodyColor = Theme.of(context).textTheme.bodyMedium?.color;
-    final mutedColor = onSurface.withAlpha(120);
-    final sheet = MarkdownStyleSheet(
-      h1: TextStyle(color: onSurface, fontSize: 28, fontWeight: FontWeight.w700, height: 1.4),
-      h2: TextStyle(color: onSurface, fontSize: 22, fontWeight: FontWeight.w700, height: 1.4),
-      h3: TextStyle(color: onSurface, fontSize: 18, fontWeight: FontWeight.w600, height: 1.4),
-      h4: TextStyle(color: onSurface, fontSize: 16, fontWeight: FontWeight.w600),
-      p: TextStyle(color: bodyColor, fontSize: 14, height: 1.65),
-      strong: TextStyle(color: onSurface, fontWeight: FontWeight.w700),
-      em: TextStyle(color: bodyColor, fontStyle: FontStyle.italic),
-      code: TextStyle(color: colors.primary, backgroundColor: colors.primary.withAlpha(20), fontSize: 13, fontFamily: 'monospace'),
-      codeblockDecoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: mutedColor.withAlpha(40)),
-      ),
-      codeblockPadding: const EdgeInsets.all(14),
-      blockquoteDecoration: BoxDecoration(
-        border: Border(left: BorderSide(color: colors.primary, width: 3)),
-      ),
-      blockquotePadding: const EdgeInsets.only(left: 12),
-      blockquote: TextStyle(color: mutedColor, fontSize: 14, fontStyle: FontStyle.italic),
-      listBullet: TextStyle(color: mutedColor, fontSize: 14),
-      tableHead: TextStyle(color: onSurface, fontWeight: FontWeight.w600, fontSize: 13),
-      tableBody: TextStyle(color: bodyColor, fontSize: 13),
-      tableBorder: TableBorder.all(color: mutedColor.withAlpha(40)),
-      horizontalRuleDecoration: BoxDecoration(
-        border: Border(top: BorderSide(color: mutedColor.withAlpha(60))),
-      ),
-      a: TextStyle(color: colors.primary, decoration: TextDecoration.underline),
-    );
-    // Use SingleChildScrollView + shrinkWrap so Markdown does NOT create its
-    // own internal scroll. This keeps the coordinate system flat, which fixes
-    // text selection hitting the wrong position when content is scrolled.
-    return Container(
-      color: colors.background,
-      child: SelectionArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Markdown(
-            data: content,
-            selectable: false,
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            styleSheet: sheet,
-          ),
-        ),
-      ),
-    );
+    return MarkdownDocumentPreview(content: content);
   }
 }
 
@@ -684,7 +629,9 @@ class _ImagePreview extends StatelessWidget {
                 Text(
                   fileName,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(120),
                     fontSize: 12,
                   ),
                 ),
@@ -692,7 +639,9 @@ class _ImagePreview extends StatelessWidget {
                 Text(
                   ext.toUpperCase(),
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(120),
                     fontSize: 11,
                   ),
                 ),
@@ -706,12 +655,17 @@ class _ImagePreview extends StatelessWidget {
               child: Center(
                 child: Image.file(
                   File(filePath),
-                  errorBuilder: (_, __, ___) => Center(
-                    child: Text(
-                      'Cannot load image',
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withAlpha(120)),
-                    ),
-                  ),
+                  errorBuilder:
+                      (_, __, ___) => Center(
+                        child: Text(
+                          'Cannot load image',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(120),
+                          ),
+                        ),
+                      ),
                 ),
               ),
             ),
@@ -758,9 +712,7 @@ class _TabBar extends StatelessWidget {
       height: 36,
       decoration: BoxDecoration(
         color: colors.surface,
-        border: Border(
-          bottom: BorderSide(color: colors.border, width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: colors.border, width: 1)),
       ),
       child: Row(
         children: [
@@ -768,15 +720,16 @@ class _TabBar extends StatelessWidget {
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: state.tabs.length,
-              itemBuilder: (context, i) => _Tab(
-                tab: state.tabs[i],
-                isActive: i == state.activeIndex,
-                onTap: () => context.read<FileEditorCubit>().switchTab(i),
-                onClose: () => context.read<FileEditorCubit>().closeTab(i),
-                onCloseOthers: () =>
-                    context.read<FileEditorCubit>().closeOthers(i),
-                onPopOut: () => _popOutTab(context, state.tabs[i]),
-              ),
+              itemBuilder:
+                  (context, i) => _Tab(
+                    tab: state.tabs[i],
+                    isActive: i == state.activeIndex,
+                    onTap: () => context.read<FileEditorCubit>().switchTab(i),
+                    onClose: () => context.read<FileEditorCubit>().closeTab(i),
+                    onCloseOthers:
+                        () => context.read<FileEditorCubit>().closeOthers(i),
+                    onPopOut: () => _popOutTab(context, state.tabs[i]),
+                  ),
             ),
           ),
         ],
@@ -821,7 +774,11 @@ class _TabState extends State<_Tab> {
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
-          globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy),
+        globalPos.dx,
+        globalPos.dy,
+        globalPos.dx,
+        globalPos.dy,
+      ),
       color: colors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
@@ -830,19 +787,25 @@ class _TabState extends State<_Tab> {
       items: [
         PopupMenuItem(
           value: 'close',
-          child: Text('✕ Close',
-              style: TextStyle(fontSize: 12, color: onSurface)),
+          child: Text(
+            '✕ Close',
+            style: TextStyle(fontSize: 12, color: onSurface),
+          ),
         ),
         PopupMenuItem(
           value: 'close_others',
-          child: Text('✕ Close Others',
-              style: TextStyle(fontSize: 12, color: onSurface)),
+          child: Text(
+            '✕ Close Others',
+            style: TextStyle(fontSize: 12, color: onSurface),
+          ),
         ),
         if (widget.onPopOut != null)
           PopupMenuItem(
             value: 'pop_out',
-            child: Text('⬡ Open in Map panel',
-                style: TextStyle(fontSize: 12, color: onSurface)),
+            child: Text(
+              '⬡ Open in Map panel',
+              style: TextStyle(fontSize: 12, color: onSurface),
+            ),
           ),
       ],
     );
@@ -862,9 +825,10 @@ class _TabState extends State<_Tab> {
     final colors = context.appColors;
     final fileInfo =
         widget.tab.isDiff ? null : FileTypeUtils.forPath(widget.tab.filePath);
-    final displayName = widget.tab.isDiff
-        ? '${widget.tab.filePath.replaceFirst('diff:', '').split('/').last} (diff)'
-        : widget.tab.fileName;
+    final displayName =
+        widget.tab.isDiff
+            ? '${widget.tab.filePath.replaceFirst('diff:', '').split('/').last} (diff)'
+            : widget.tab.fileName;
 
     // Close button is placed OUTSIDE the tap-to-switch GestureDetector so
     // clicking × closes the tab instead of switching to it.
@@ -876,17 +840,19 @@ class _TabState extends State<_Tab> {
           GestureDetector(
             onTap: widget.onTap,
             child: Container(
-              constraints:
-                  const BoxConstraints(maxWidth: 170, minWidth: 60),
-              padding: const EdgeInsets.only(left: 10, right: 4, top: 0, bottom: 0),
+              constraints: const BoxConstraints(maxWidth: 170, minWidth: 60),
+              padding: const EdgeInsets.only(
+                left: 10,
+                right: 4,
+                top: 0,
+                bottom: 0,
+              ),
               decoration: BoxDecoration(
-                color:
-                    widget.isActive ? colors.background : Colors.transparent,
+                color: widget.isActive ? colors.background : Colors.transparent,
                 border: Border(
                   bottom: BorderSide(
-                    color: widget.isActive
-                        ? colors.primary
-                        : Colors.transparent,
+                    color:
+                        widget.isActive ? colors.primary : Colors.transparent,
                     width: 2,
                   ),
                 ),
@@ -897,22 +863,29 @@ class _TabState extends State<_Tab> {
                   Icon(
                     widget.tab.isDiff ? Icons.difference : fileInfo!.icon,
                     size: 12,
-                    color: widget.tab.isDiff
-                        ? Theme.of(context).colorScheme.onSurface.withAlpha(120)
-                        : fileInfo!.color,
+                    color:
+                        widget.tab.isDiff
+                            ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(120)
+                            : fileInfo!.color,
                   ),
                   const SizedBox(width: 5),
                   Flexible(
                     child: Text(
                       displayName,
                       style: TextStyle(
-                        color: widget.isActive
-                            ? colors.primaryLight
-                            : Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                        color:
+                            widget.isActive
+                                ? colors.primaryLight
+                                : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withAlpha(120),
                         fontSize: 12,
-                        fontWeight: widget.isActive
-                            ? FontWeight.w600
-                            : FontWeight.normal,
+                        fontWeight:
+                            widget.isActive
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -960,7 +933,10 @@ class _TabCloseButtonState extends State<_TabCloseButton> {
           child: Icon(
             Icons.close,
             size: 11,
-            color: _hovering ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withAlpha(180),
+            color:
+                _hovering
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).colorScheme.onSurface.withAlpha(180),
           ),
         ),
       ),
@@ -1247,8 +1223,9 @@ class _EditorBodyState extends State<_EditorBody> {
   void _findPrev() {
     if (_matchOffsets.isEmpty) return;
     setState(
-      () => _currentMatch =
-          (_currentMatch - 1 + _matchOffsets.length) % _matchOffsets.length,
+      () =>
+          _currentMatch =
+              (_currentMatch - 1 + _matchOffsets.length) % _matchOffsets.length,
     );
     _selectCurrentMatch();
   }
@@ -1416,11 +1393,12 @@ class _EditorBodyState extends State<_EditorBody> {
     final text = ctrl.text;
     final r = _lineRange(text, ctrl.selection.start);
     final line = text.substring(r.start, r.end);
-    final strip = line.startsWith('  ')
-        ? 2
-        : line.startsWith(' ')
-        ? 1
-        : 0;
+    final strip =
+        line.startsWith('  ')
+            ? 2
+            : line.startsWith(' ')
+            ? 1
+            : 0;
     if (strip == 0) return;
     ctrl.value = TextEditingValue(
       text:
@@ -1466,60 +1444,58 @@ class _EditorBodyState extends State<_EditorBody> {
         final mutedColor = onSurface.withAlpha(120);
         final borderColor = context.appColors.border;
         return Dialog(
-        backgroundColor: context.appColors.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Go to Line',
-                style: TextStyle(
-                  color: onSurface,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+          backgroundColor: context.appColors.surfaceElevated,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Go to Line',
+                  style: TextStyle(
+                    color: onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: inputCtrl,
-                autofocus: true,
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: onSurface,
-                  fontSize: 13,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: inputCtrl,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: onSurface, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: '1 – $lineCount',
+                    hintStyle: TextStyle(color: mutedColor),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: context.appColors.primary),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    isDense: true,
+                  ),
+                  onSubmitted: (v) {
+                    final n = int.tryParse(v);
+                    if (n != null && n >= 1 && n <= lineCount)
+                      _jumpToLine(ctrl, n);
+                    Navigator.of(dctx).pop();
+                  },
                 ),
-                decoration: InputDecoration(
-                  hintText: '1 – $lineCount',
-                  hintStyle: TextStyle(color: mutedColor),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: borderColor),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: context.appColors.primary),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  isDense: true,
-                ),
-                onSubmitted: (v) {
-                  final n = int.tryParse(v);
-                  if (n != null && n >= 1 && n <= lineCount)
-                    _jumpToLine(ctrl, n);
-                  Navigator.of(dctx).pop();
-                },
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      );},
+        );
+      },
     );
     inputCtrl.dispose();
   }
@@ -1563,8 +1539,8 @@ class _EditorBodyState extends State<_EditorBody> {
             _indentLine,
         const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true):
             _outdentLine,
-        const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () =>
-            _showGoToLine(context),
+        const SingleActivator(LogicalKeyboardKey.keyG, meta: true):
+            () => _showGoToLine(context),
         const SingleActivator(LogicalKeyboardKey.keyF, meta: true, shift: true):
             _formatDocument,
         const SingleActivator(LogicalKeyboardKey.keyO, meta: true, shift: true):
@@ -1604,8 +1580,8 @@ class _EditorBodyState extends State<_EditorBody> {
                   _updateMatches();
                   setState(() {});
                 },
-                onToggleReplace: () =>
-                    setState(() => _showReplace = !_showReplace),
+                onToggleReplace:
+                    () => setState(() => _showReplace = !_showReplace),
                 onQueryChanged: (q) {
                   setState(() {
                     _findQuery = q;
@@ -1652,7 +1628,10 @@ class _EditorBodyState extends State<_EditorBody> {
                                           width: 72,
                                           margin: 8,
                                           textStyle: TextStyle(
-                                            color: Theme.of(context).colorScheme.onSurface.withAlpha(100),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withAlpha(100),
                                             fontFamily: 'monospace',
                                           ),
                                           background: colors.surfaceElevated,
@@ -1689,8 +1668,8 @@ class _EditorBodyState extends State<_EditorBody> {
                     _SymbolOutline(
                       content: widget.codeController.text,
                       filePath: widget.tab.filePath,
-                      onJumpToLine: (line) =>
-                          _jumpToLine(widget.codeController, line),
+                      onJumpToLine:
+                          (line) => _jumpToLine(widget.codeController, line),
                     ),
                 ],
               ),
@@ -1766,14 +1745,15 @@ class _GitGutterPainter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder: (_, constraints) => CustomPaint(
-        size: Size(3, constraints.maxHeight),
-        painter: _GutterPaint(
-          markers: markers,
-          lineHeight: lineHeight,
-          scrollOffset: scrollOffset,
-        ),
-      ),
+      builder:
+          (_, constraints) => CustomPaint(
+            size: Size(3, constraints.maxHeight),
+            painter: _GutterPaint(
+              markers: markers,
+              lineHeight: lineHeight,
+              scrollOffset: scrollOffset,
+            ),
+          ),
     );
   }
 }
@@ -2398,65 +2378,67 @@ class _SymbolOutline extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: symbols.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No symbols',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: symbols.length,
-                    itemBuilder: (_, i) {
-                      final sym = symbols[i];
-                      return InkWell(
-                        onTap: () => onJumpToLine(sym.line),
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            left: sym.isClass ? 8 : 20,
-                            right: 8,
-                            top: 3,
-                            bottom: 3,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                sym.isClass
-                                    ? Icons.category_outlined
-                                    : Icons.functions,
-                                size: 11,
-                                color: sym.isClass
-                                    ? const Color(0xFFE5C07B)
-                                    : const Color(0xFF61AFEF),
-                              ),
-                              const SizedBox(width: 5),
-                              Expanded(
-                                child: Text(
-                                  sym.name,
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 11,
-                                    fontFamily: 'monospace',
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Text(
-                                '${sym.line}',
-                                style: const TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 9,
-                                ),
-                              ),
-                            ],
-                          ),
+            child:
+                symbols.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'No symbols',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    )
+                    : ListView.builder(
+                      itemCount: symbols.length,
+                      itemBuilder: (_, i) {
+                        final sym = symbols[i];
+                        return InkWell(
+                          onTap: () => onJumpToLine(sym.line),
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              left: sym.isClass ? 8 : 20,
+                              right: 8,
+                              top: 3,
+                              bottom: 3,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  sym.isClass
+                                      ? Icons.category_outlined
+                                      : Icons.functions,
+                                  size: 11,
+                                  color:
+                                      sym.isClass
+                                          ? const Color(0xFFE5C07B)
+                                          : const Color(0xFF61AFEF),
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    sym.name,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  '${sym.line}',
+                                  style: const TextStyle(
+                                    color: AppColors.textMuted,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),

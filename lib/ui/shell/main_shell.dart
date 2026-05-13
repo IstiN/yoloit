@@ -84,8 +84,8 @@ class _MainShellState extends State<MainShell> with WindowListener {
       // Restore last canvas mode (default: board so the last board opens automatically)
       _canvasMode = switch (snap.canvasMode) {
         'mindMap' => _CanvasMode.mindMap,
-        'board'   => _CanvasMode.board,
-        _         => _CanvasMode.panes,
+        'board' => _CanvasMode.board,
+        _ => _CanvasMode.panes,
       };
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -224,8 +224,8 @@ class _MainShellState extends State<MainShell> with WindowListener {
     // Persist the new canvas mode so it's restored on next launch.
     SessionPrefs.saveCanvasMode(switch (_canvasMode) {
       _CanvasMode.mindMap => 'mindMap',
-      _CanvasMode.board   => 'board',
-      _CanvasMode.panes   => 'panes',
+      _CanvasMode.board => 'board',
+      _CanvasMode.panes => 'panes',
     });
   }
 
@@ -445,7 +445,9 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
   Widget build(BuildContext context) {
     return BlocBuilder<FileEditorCubit, FileEditorState>(
       builder: (context, editorState) {
-        final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+        final mutedColor =
+            Theme.of(context).textTheme.bodySmall?.color ??
+            Theme.of(context).colorScheme.onSurface;
         final showWorkspace = widget.workspaceVis == PanelVisibility.open;
         final workspaceCollapsed =
             widget.workspaceVis == PanelVisibility.collapsed;
@@ -1059,14 +1061,20 @@ class _TitleBar extends StatelessWidget {
                           Icon(
                             Icons.search,
                             size: 15,
-                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                            color:
+                                Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
                           ),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
                               'Quick open…',
                               style: TextStyle(
-                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color ??
+                                    Theme.of(context).colorScheme.onSurface,
                                 fontSize: 14,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -1076,7 +1084,11 @@ class _TitleBar extends StatelessWidget {
                           Text(
                             isWindows ? 'Ctrl+O' : '⌘O',
                             style: TextStyle(
-                              color: (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface).withAlpha(120),
+                              color: (Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall?.color ??
+                                      Theme.of(context).colorScheme.onSurface)
+                                  .withAlpha(120),
                               fontSize: 12,
                             ),
                           ),
@@ -1183,7 +1195,11 @@ class _PanelToggleButton extends StatelessWidget {
             child: Icon(
               icon,
               size: 16,
-              color: active ? colors.primary : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+              color:
+                  active
+                      ? colors.primary
+                      : (Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface),
               semanticLabel: tooltip,
             ),
           ),
@@ -1281,12 +1297,14 @@ class _WinBtnState extends State<_WinBtn> {
 
   @override
   Widget build(BuildContext context) {
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
-    final secondaryColor = Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final secondaryColor =
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
     final hoverColor =
-        widget.isClose
-            ? const Color(0xFFE81123)
-            : mutedColor.withAlpha(40);
+        widget.isClose ? const Color(0xFFE81123) : mutedColor.withAlpha(40);
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
@@ -1301,10 +1319,7 @@ class _WinBtnState extends State<_WinBtn> {
             child: Icon(
               widget.icon,
               size: 14,
-              color:
-                  _hovered && widget.isClose
-                      ? Colors.white
-                      : secondaryColor,
+              color: _hovered && widget.isClose ? Colors.white : secondaryColor,
             ),
           ),
         ),
@@ -1443,7 +1458,8 @@ class _ResourcePanelState extends State<_ResourcePanel> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
     final host = _snap.host;
     final ramSharePercent =
         host.totalBytes > 0
@@ -1531,11 +1547,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                         ),
                         GestureDetector(
                           onTap: widget.onClose,
-                          child: Icon(
-                            Icons.close,
-                            size: 12,
-                            color: mutedColor,
-                          ),
+                          child: Icon(Icons.close, size: 12, color: mutedColor),
                         ),
                       ],
                     ),
@@ -1590,10 +1602,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                           children: [
                             Text(
                               '${formatBytes(host.usedBytes)} used / ${formatBytes(host.totalBytes)} total',
-                              style: TextStyle(
-                                color: onSurface,
-                                fontSize: 10,
-                              ),
+                              style: TextStyle(color: onSurface, fontSize: 10),
                             ),
                           ],
                         ),
@@ -1693,7 +1702,8 @@ class _StatCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1729,7 +1739,8 @@ class _SessionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 3, 14, 3),
       child: Row(
