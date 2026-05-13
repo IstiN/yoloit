@@ -16,7 +16,7 @@ class YoloAssistantPlugin extends BoardPanelPlugin {
   String get displayName => 'YoLo Assistant';
 
   @override
-  IconData get icon => Icons.smart_toy;
+  IconData get icon => Icons.auto_awesome;
 
   @override
   Color get accentColor => const Color(0xFF8B5CF6);

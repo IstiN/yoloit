@@ -239,7 +239,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.smart_toy_outlined,
+              Icons.auto_awesome_outlined,
               size: 48,
               color: _kAccent.withAlpha(80),
             ),
