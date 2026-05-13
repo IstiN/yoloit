@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -828,10 +829,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 ),
                               ),
                             // ── YOLO badge (bottom-right) ──────────────────────
-                            const Positioned(
-                              right: 16,
-                              bottom: 16,
-                              child: _YoloBadge(),
+                            Positioned(
+                              right: 0,
+                              bottom: 60,
+                              child: _YoloBadgeWithChat(),
                             ),
                           ],
                           ),
@@ -5457,100 +5458,333 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// YOLO badge — always visible bottom-right with entrance animation
+// YOLO badge + slide-out chat — always visible bottom-right as a bookmark tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _YoloBadge extends StatefulWidget {
-  const _YoloBadge();
+class _YoloBadgeWithChat extends StatefulWidget {
+  const _YoloBadgeWithChat();
 
   @override
-  State<_YoloBadge> createState() => _YoloBadgeState();
+  State<_YoloBadgeWithChat> createState() => _YoloBadgeWithChatState();
 }
 
-class _YoloBadgeState extends State<_YoloBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _slideAnimation;
-  late final Animation<double> _fadeAnimation;
+class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
+    with TickerProviderStateMixin {
+  late final AnimationController _entranceController;
+  late final Animation<double> _entranceSlide;
+  late final Animation<double> _entranceFade;
+
+  late final AnimationController _chatController;
+  late final Animation<double> _chatSlide;
+
+  bool _chatOpen = false;
+  final _chatInputController = TextEditingController();
+  final List<Map<String, String>> _messages = [];
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    // Entrance animation for badge
+    _entranceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
     );
-    _slideAnimation = Tween<double>(begin: 80, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    _entranceSlide = Tween<double>(begin: 60, end: 0).animate(
+      CurvedAnimation(parent: _entranceController, curve: Curves.easeOutCubic),
     );
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+    _entranceFade = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0, 0.6, curve: Curves.easeOut),
+        parent: _entranceController,
+        curve: const Interval(0, 0.7, curve: Curves.easeOut),
       ),
     );
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) _controller.forward();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) _entranceController.forward();
     });
+
+    // Chat panel slide animation
+    _chatController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _chatSlide = Tween<double>(begin: 380, end: 0).animate(
+      CurvedAnimation(parent: _chatController, curve: Curves.easeOutCubic),
+    );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _entranceController.dispose();
+    _chatController.dispose();
+    _chatInputController.dispose();
     super.dispose();
+  }
+
+  void _toggleChat() {
+    setState(() => _chatOpen = !_chatOpen);
+    if (_chatOpen) {
+      _chatController.forward();
+    } else {
+      _chatController.reverse();
+    }
+  }
+
+  void _sendMessage() {
+    final text = _chatInputController.text.trim();
+    if (text.isEmpty) return;
+    _chatInputController.clear();
+    setState(() {
+      _messages.add({'role': 'user', 'text': text});
+      _messages.add({
+        'role': 'assistant',
+        'text': 'Got it! (YoLo Assistant demo — real AI integration coming soon)',
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
+      animation: _entranceController,
       builder: (context, child) {
         return Transform.translate(
-          offset: Offset(_slideAnimation.value, 0),
-          child: Opacity(
-            opacity: _fadeAnimation.value,
-            child: child,
-          ),
+          offset: Offset(_entranceSlide.value, 0),
+          child: Opacity(opacity: _entranceFade.value, child: child),
         );
       },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () {
-            // TODO: open YoLo assistant
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 28),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Chat panel (slides from right)
+          AnimatedBuilder(
+            animation: _chatController,
+            builder: (context, child) {
+              return ClipRect(
+                child: SizedBox(
+                  width: 380 - _chatSlide.value,
+                  child: _chatSlide.value < 370
+                      ? child
+                      : const SizedBox.shrink(),
+                ),
+              );
+            },
+            child: SizedBox(
+              width: 380,
+              height: 480,
+              child: _buildChatPanel(),
+            ),
+          ),
+          // Badge tab
+          GestureDetector(
+            onTap: _toggleChat,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(-2, 2),
+                    ),
+                  ],
+                ),
+                child: RotatedBox(
+                  quarterTurns: 3,
+                  child: Text(
+                    _chatOpen ? '✕' : 'YOLO',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                      height: 1,
+                    ),
+                  ),
+                ),
               ),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.4),
-                  blurRadius: 12,
-                  offset: const Offset(-2, 2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatPanel() {
+    final colors = AppColorScheme.of(context);
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          bottomLeft: Radius.circular(12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 20,
+            offset: const Offset(-4, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: colors.border, width: 0.5),
+              ),
+            ),
+            child: Row(
+              children: [
+                SvgPicture.asset(
+                  'assets/icon/yolo_assistant.svg',
+                  width: 20,
+                  height: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'YoLo Assistant',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: Icon(Icons.close, size: 16, color: textColor),
+                  onPressed: _toggleChat,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                 ),
               ],
             ),
-            child: const RotatedBox(
-              quarterTurns: 3,
-              child: Text(
-                'YOLO',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 3,
-                  height: 1,
-                ),
+          ),
+          // Messages
+          Expanded(
+            child: _messages.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/icon/yolo_assistant.svg',
+                          width: 40,
+                          height: 40,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Ask me anything!',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: textColor.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(10),
+                    itemCount: _messages.length,
+                    itemBuilder: (_, i) {
+                      final msg = _messages[i];
+                      final isUser = msg['role'] == 'user';
+                      return Align(
+                        alignment: isUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          constraints: const BoxConstraints(maxWidth: 280),
+                          decoration: BoxDecoration(
+                            color: isUser
+                                ? const Color(0xFF8B5CF6).withValues(alpha: 0.15)
+                                : colors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            msg['text'] ?? '',
+                            style: TextStyle(fontSize: 13, color: textColor),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          // Input
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: colors.border, width: 0.5),
               ),
             ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _chatInputController,
+                    style: TextStyle(fontSize: 13, color: textColor),
+                    decoration: InputDecoration(
+                      hintText: 'Ask YoLo...',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: textColor.withValues(alpha: 0.4),
+                      ),
+                      filled: true,
+                      fillColor: colors.surface,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onSubmitted: (_) => _sendMessage(),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: _sendMessage,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF8B5CF6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_upward,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
