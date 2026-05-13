@@ -191,7 +191,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             activeBoard.viewport.focusedPanelId;
 
                         return Stack(
-                          clipBehavior: Clip.hardEdge,
+                          clipBehavior: Clip.none,
                           children: [
                           RepaintBoundary(
                            key: _screenshotBoundaryKey,
@@ -214,6 +214,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               constrained: false,
                               minScale: 0.2,
                               maxScale: 2.5,
+                              scaleEnabled: true,
                               boundaryMargin: const EdgeInsets.all(
                                 _canvasExpansionChunk,
                               ),
