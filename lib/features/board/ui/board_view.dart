@@ -827,6 +827,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
+                            // ── YOLO badge (bottom-right) ──────────────────────
+                            const Positioned(
+                              right: 16,
+                              bottom: 16,
+                              child: _YoloBadge(),
+                            ),
                           ],
                           ),
                         );
@@ -5447,5 +5453,105 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
     if (diff.inDays < 1) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// YOLO badge — always visible bottom-right with entrance animation
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _YoloBadge extends StatefulWidget {
+  const _YoloBadge();
+
+  @override
+  State<_YoloBadge> createState() => _YoloBadgeState();
+}
+
+class _YoloBadgeState extends State<_YoloBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _slideAnimation;
+  late final Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _slideAnimation = Tween<double>(begin: 80, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0, 0.6, curve: Curves.easeOut),
+      ),
+    );
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(_slideAnimation.value, 0),
+          child: Opacity(
+            opacity: _fadeAnimation.value,
+            child: child,
+          ),
+        );
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () {
+            // TODO: open YoLo assistant
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 28),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                  blurRadius: 12,
+                  offset: const Offset(-2, 2),
+                ),
+              ],
+            ),
+            child: const RotatedBox(
+              quarterTurns: 3,
+              child: Text(
+                'YOLO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 3,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
