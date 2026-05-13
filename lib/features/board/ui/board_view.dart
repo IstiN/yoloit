@@ -5552,7 +5552,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           child: Opacity(opacity: _entranceFade.value, child: child),
         );
       },
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -5560,9 +5560,11 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           AnimatedBuilder(
             animation: _chatController,
             builder: (context, child) {
-              return ClipRect(
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(14),
                 child: SizedBox(
                   width: 380 - _chatSlide.value,
+                  height: _chatSlide.value < 370 ? 480 : 0,
                   child: _chatSlide.value < 370
                       ? child
                       : const SizedBox.shrink(),
@@ -5575,42 +5577,47 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
               child: _buildChatPanel(),
             ),
           ),
-          // Badge tab
-          GestureDetector(
-            onTap: _toggleChat,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(-2, 2),
+          const SizedBox(height: 4),
+          // Badge tab (bottom-left of panel)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: GestureDetector(
+              onTap: _toggleChat,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                     ),
-                  ],
-                ),
-                child: RotatedBox(
-                  quarterTurns: 3,
-                  child: Text(
-                    _chatOpen ? '✕' : 'YOLO',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                      height: 1,
-                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_chatOpen)
+                        const Icon(Icons.close, size: 14, color: Colors.white)
+                      else
+                        const Text(
+                          'YOLO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -5627,15 +5634,12 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
     return Container(
       decoration: BoxDecoration(
         color: colors.surfaceElevated,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          bottomLeft: Radius.circular(12),
-        ),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 20,
-            offset: const Offset(-4, 0),
+            offset: const Offset(-4, 4),
           ),
         ],
       ),
