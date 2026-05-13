@@ -407,15 +407,25 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
     setState(() { _loading = true; _error = null; });
     try {
       // Get normalized SVG from the JS renderer (serialised via render queue).
+      debugPrint('[Mermaid] _render() calling renderToSvg()...');
       final svg = await widget.renderer!.renderToSvg(widget.code);
       debugPrint('[Mermaid] _render() svg length=${svg.length}');
+      
       // Convert to PNG via rsvg-convert (on macOS) or flutter_svg fallback.
       // Rendering at 1200px wide gives crisp output on any panel size ≤1200px.
+      debugPrint('[Mermaid] _render() calling svgToPng() with width=1200...');
       final png = await MermaidRenderer.svgToPng(svg, width: 1200);
-      debugPrint('[Mermaid] _render() png bytes=${png.length}');
-      if (mounted) setState(() { _png = png; _loading = false; });
-    } catch (e) {
+      debugPrint('[Mermaid] _render() svgToPng complete, png bytes=${png.length}');
+      
+      if (mounted) {
+        debugPrint('[Mermaid] _render() mounted=true, calling setState()');
+        setState(() { _png = png; _loading = false; });
+      } else {
+        debugPrint('[Mermaid] _render() mounted=false, not updating state');
+      }
+    } catch (e, st) {
       debugPrint('[Mermaid] _render() ERROR: $e');
+      debugPrintStack(label: '[Mermaid] stacktrace', stackTrace: st);
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
