@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -19,6 +18,7 @@ import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
@@ -5478,8 +5478,13 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
   late final Animation<double> _chatSlide;
 
   bool _chatOpen = false;
-  final _chatInputController = TextEditingController();
-  final List<Map<String, String>> _messages = [];
+  // In-memory panel instance for the embedded assistant widget
+  BoardPanelInstance _badgePanel = const BoardPanelInstance(
+    id: '__yolo_badge_assistant__',
+    type: 'board.yolo_assistant',
+    title: 'YoLo Assistant',
+    bounds: BoardPanelBounds(x: 0, y: 0, width: 380, height: 480),
+  );
 
   @override
   void initState() {
@@ -5516,7 +5521,6 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
   void dispose() {
     _entranceController.dispose();
     _chatController.dispose();
-    _chatInputController.dispose();
     super.dispose();
   }
 
@@ -5529,18 +5533,6 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
     }
   }
 
-  void _sendMessage() {
-    final text = _chatInputController.text.trim();
-    if (text.isEmpty) return;
-    _chatInputController.clear();
-    setState(() {
-      _messages.add({'role': 'user', 'text': text});
-      _messages.add({
-        'role': 'assistant',
-        'text': 'Got it! (YoLo Assistant demo — real AI integration coming soon)',
-      });
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -5630,7 +5622,6 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
 
   Widget _buildChatPanel() {
     final colors = AppColorScheme.of(context);
-    final textColor = Theme.of(context).colorScheme.onSurface;
     return Container(
       decoration: BoxDecoration(
         color: colors.surfaceElevated,
@@ -5643,152 +5634,14 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: colors.border, width: 0.5),
-              ),
-            ),
-            child: Row(
-              children: [
-                SvgPicture.asset(
-                  'assets/icon/yolo_assistant.svg',
-                  width: 20,
-                  height: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'YoLo Assistant',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: Icon(Icons.close, size: 16, color: textColor),
-                  onPressed: _toggleChat,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                ),
-              ],
-            ),
-          ),
-          // Messages
-          Expanded(
-            child: _messages.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SvgPicture.asset(
-                          'assets/icon/yolo_assistant.svg',
-                          width: 40,
-                          height: 40,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Ask me anything!',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: textColor.withValues(alpha: 0.5),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(10),
-                    itemCount: _messages.length,
-                    itemBuilder: (_, i) {
-                      final msg = _messages[i];
-                      final isUser = msg['role'] == 'user';
-                      return Align(
-                        alignment: isUser
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          constraints: const BoxConstraints(maxWidth: 280),
-                          decoration: BoxDecoration(
-                            color: isUser
-                                ? const Color(0xFF8B5CF6).withValues(alpha: 0.15)
-                                : colors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            msg['text'] ?? '',
-                            style: TextStyle(fontSize: 13, color: textColor),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-          // Input
-          Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: colors.border, width: 0.5),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _chatInputController,
-                    style: TextStyle(fontSize: 13, color: textColor),
-                    decoration: InputDecoration(
-                      hintText: 'Ask YoLo...',
-                      hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: textColor.withValues(alpha: 0.4),
-                      ),
-                      filled: true,
-                      fillColor: colors.surface,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: _sendMessage,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF8B5CF6),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.arrow_upward,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      clipBehavior: Clip.antiAlias,
+      child: YoloAssistantWidget(
+        panel: _badgePanel,
+        onUpdateState: (newState) {
+          setState(() {
+            _badgePanel = _badgePanel.copyWith(state: newState);
+          });
+        },
       ),
     );
   }
