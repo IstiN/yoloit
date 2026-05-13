@@ -5599,12 +5599,12 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           AnimatedBuilder(
             animation: _chatController,
             builder: (context, child) {
-              final slideOffset = _chatSlide.value; // 380 → 0
-              final visible = slideOffset < 370;
-              return Transform.translate(
-                offset: Offset(slideOffset, 0),
-                child: Opacity(
-                  opacity: visible ? 1.0 : 0.0,
+              // _chatSlide goes from 380 (closed) to 0 (open)
+              final progress = 1.0 - (_chatSlide.value / 380);
+              return ClipRect(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: progress,
                   child: child,
                 ),
               );
