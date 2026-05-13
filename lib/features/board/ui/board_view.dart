@@ -5546,46 +5546,51 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       },
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Vertical badge tab (left of panel)
-          GestureDetector(
-            onTap: _toggleChat,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(10),
-                    bottomLeft: Radius.circular(10),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(-2, 2),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: GestureDetector(
+              onTap: _toggleChat,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  width: 28,
+                  height: 56,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
                     ),
-                  ],
-                ),
-                child: RotatedBox(
-                  quarterTurns: 3,
-                  child: _chatOpen
-                      ? const Icon(Icons.close, size: 14, color: Colors.white)
-                      : const Text(
-                          'YOLO',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      bottomLeft: Radius.circular(10),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(-2, 2),
+                      ),
+                    ],
+                  ),
+                  child: RotatedBox(
+                    quarterTurns: 3,
+                    child: _chatOpen
+                        ? const Icon(Icons.close, size: 14, color: Colors.white)
+                        : const Text(
+                            'YOLO',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
               ),
             ),
