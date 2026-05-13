@@ -149,12 +149,11 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
   void _selectFile(String filePath, String fileName) {
     _updateState({'selectedFile': filePath});
-    if (_isPreviewable(fileName)) {
-      widget.renderContext.onCreateLinkedPanel?.call('board.file.preview', {
-        'path': filePath,
-        'title': fileName,
-      }, fileName);
-    }
+    // Open file preview as linked panel for any file
+    widget.renderContext.onCreateLinkedPanel?.call('board.file.preview', {
+      'path': filePath,
+      'title': fileName,
+    }, fileName);
   }
 
   void _refresh() {
