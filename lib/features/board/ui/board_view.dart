@@ -191,6 +191,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             activeBoard.viewport.focusedPanelId;
 
                         return Stack(
+                          clipBehavior: Clip.hardEdge,
                           children: [
                           RepaintBoundary(
                            key: _screenshotBoundaryKey,
@@ -5606,7 +5607,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
             builder: (context, child) {
               // _chatSlide goes from 380 (closed) to 0 (open)
               final progress = 1.0 - (_chatSlide.value / 380);
-              // Shadow lives outside ClipRect so it doesn't get clipped
+              // Shadow offset to the left so it doesn't bleed off right screen edge
               return DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.only(
@@ -5617,14 +5618,10 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
                   boxShadow: progress > 0.05
                       ? [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12 * progress),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08 * progress),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+                            color: Colors.black.withValues(alpha: 0.14 * progress),
+                            blurRadius: 20,
+                            spreadRadius: -4,
+                            offset: const Offset(-8, 8),
                           ),
                         ]
                       : [],
