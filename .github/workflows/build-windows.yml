@@ -27,6 +27,8 @@ jobs:
       # ── Checkout ─────────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       # ── Flutter ──────────────────────────────────────────────────────────────
       - name: Setup Flutter

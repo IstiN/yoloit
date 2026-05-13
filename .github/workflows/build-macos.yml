@@ -69,6 +69,11 @@ jobs:
             git -C "$GITHUB_WORKSPACE" log -1 --oneline
           fi
 
+          # Initialize and update git submodules (e.g. mermaid_renderer_flutter)
+          git -C "$GITHUB_WORKSPACE" submodule update --init --recursive
+          echo "Submodules initialized:"
+          git -C "$GITHUB_WORKSPACE" submodule status
+
       # ── Environment ─────────────────────────────────────────────────────────
       - name: Setup Flutter environment
         run: |
