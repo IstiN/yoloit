@@ -1,11 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_colors.dart';
+import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
-/// Model download status.
-enum ModelStatus { notDownloaded, downloading, ready }
-
-/// Settings section for selecting ASR, TTS, and LLM models.
 class AiModelsSection extends StatefulWidget {
   const AiModelsSection({super.key});
 
@@ -14,174 +13,127 @@ class AiModelsSection extends StatefulWidget {
 }
 
 class _AiModelsSectionState extends State<AiModelsSection> {
-  // ASR
-  String _asrModel = 'Whisper Large V3';
-  final ModelStatus _asrStatus = ModelStatus.notDownloaded;
-  static const _asrOptions = [
-    'Whisper Large V3',
-    'Whisper Medium',
-    'Whisper Small',
-    'Distil-Whisper',
-  ];
+  final _service = LocalAiModelsService.instance;
+  StreamSubscription<void>? _changesSub;
+  bool _busy = false;
 
-  // TTS
-  String _ttsModel = 'Kokoro';
-  final ModelStatus _ttsStatus = ModelStatus.notDownloaded;
-  static const _ttsOptions = ['Kokoro', 'Piper', 'eSpeak'];
-
-  // LLM
-  String _llmModel = 'Local (Llama 3.1 8B)';
-  final ModelStatus _llmStatus = ModelStatus.notDownloaded;
-  static const _llmOptions = [
-    'Local (Llama 3.1 8B)',
-    'Local (Mistral 7B)',
-    'Copilot',
-    'OpenAI GPT-4',
-    'Claude',
-  ];
-  final _apiKeyController = TextEditingController();
-  bool _apiKeyObscured = true;
-
-  bool get _isCloudLlm =>
-      _llmModel == 'Copilot' ||
-      _llmModel == 'OpenAI GPT-4' ||
-      _llmModel == 'Claude';
+  @override
+  void initState() {
+    super.initState();
+    _changesSub = _service.changes.listen((_) {
+      if (mounted) setState(() {});
+    });
+    unawaited(_service.initialize());
+  }
 
   @override
   void dispose() {
-    _apiKeyController.dispose();
+    _changesSub?.cancel();
     super.dispose();
   }
 
-  void _showComingSoon(String action) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$action coming soon')));
+  Future<void> _runAction(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Model action failed: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_service.isInitializing) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_service.initError != null) {
+      return _ErrorCard(message: _service.initError!);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ModelCard(
-          icon: Icons.mic,
-          title: 'ASR Model (Speech-to-Text)',
-          options: _asrOptions,
-          value: _asrModel,
-          status: _asrStatus,
-          onChanged: (v) => setState(() => _asrModel = v!),
-          onAction: () => _showComingSoon('Download'),
-          actionLabel: 'Download',
-        ),
-        const SizedBox(height: 16),
-        _ModelCard(
-          icon: Icons.record_voice_over,
-          title: 'TTS Model (Audio)',
-          options: _ttsOptions,
-          value: _ttsModel,
-          status: _ttsStatus,
-          onChanged: (v) => setState(() => _ttsModel = v!),
-          onAction: () => _showComingSoon('Download'),
-          actionLabel: 'Download',
-        ),
-        const SizedBox(height: 16),
-        _ModelCard(
           icon: Icons.psychology,
-          title: 'YoLo Assistant LLM',
-          options: _llmOptions,
-          value: _llmModel,
-          status: _llmStatus,
-          onChanged: (v) => setState(() => _llmModel = v!),
-          onAction:
-              () =>
-                  _showComingSoon(_isCloudLlm ? 'Test Connection' : 'Download'),
-          actionLabel: _isCloudLlm ? 'Test Connection' : 'Download',
-          extra: _isCloudLlm ? _buildApiKeyField() : null,
+          title: 'Local Chat Model (YoLo Chat)',
+          options: _service.chatModels,
+          selectedModelId: _service.selectedChatModelId,
+          onModelChanged:
+              (id) => _runAction(() => _service.setSelectedChatModel(id)),
+          stateForModel: _service.stateForModel,
+          onDownloadOrUpdate:
+              (id) => _runAction(() => _service.downloadOrUpdateModel(id)),
+          onDelete: (id) => _runAction(() => _service.deleteInstalledModel(id)),
+          onResume: (id) => _runAction(() => _service.resumeModelDownload(id)),
+          disabled: _busy,
+        ),
+        const SizedBox(height: 16),
+        _ModelCard(
+          icon: Icons.mic,
+          title: 'ASR Model (Microphone)',
+          options: _service.asrModels,
+          selectedModelId: _service.selectedAsrModelId,
+          onModelChanged:
+              (id) => _runAction(() => _service.setSelectedAsrModel(id)),
+          stateForModel: _service.stateForModel,
+          onDownloadOrUpdate:
+              (id) => _runAction(() => _service.downloadOrUpdateModel(id)),
+          onDelete: (id) => _runAction(() => _service.deleteInstalledModel(id)),
+          onResume: (id) => _runAction(() => _service.resumeModelDownload(id)),
+          disabled: _busy,
         ),
       ],
     );
   }
-
-  Widget _buildApiKeyField() {
-    final colors = context.appColors;
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: TextField(
-        controller: _apiKeyController,
-        obscureText: _apiKeyObscured,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurface,
-          fontSize: 12,
-          fontFamily: 'monospace',
-        ),
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: 'API Key',
-          hintStyle: TextStyle(
-            color:
-                Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface,
-            fontSize: 12,
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 8,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: colors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: colors.border),
-          ),
-          suffixIcon: IconButton(
-            icon: Icon(
-              _apiKeyObscured
-                  ? Icons.visibility_outlined
-                  : Icons.visibility_off_outlined,
-              size: 16,
-            ),
-            color:
-                Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface,
-            onPressed: () => setState(() => _apiKeyObscured = !_apiKeyObscured),
-          ),
-        ),
-      ),
-    );
-  }
 }
-
-// ─── Reusable model card ──────────────────────────────────────────────────────
 
 class _ModelCard extends StatelessWidget {
   const _ModelCard({
     required this.icon,
     required this.title,
     required this.options,
-    required this.value,
-    required this.status,
-    required this.onChanged,
-    required this.onAction,
-    required this.actionLabel,
-    this.extra,
+    required this.selectedModelId,
+    required this.onModelChanged,
+    required this.stateForModel,
+    required this.onDownloadOrUpdate,
+    required this.onDelete,
+    required this.onResume,
+    required this.disabled,
   });
 
   final IconData icon;
   final String title;
-  final List<String> options;
-  final String value;
-  final ModelStatus status;
-  final ValueChanged<String?> onChanged;
-  final VoidCallback onAction;
-  final String actionLabel;
-  final Widget? extra;
+  final List<LocalAiModelDefinition> options;
+  final String selectedModelId;
+  final ValueChanged<String> onModelChanged;
+  final LocalAiModelState Function(String modelId) stateForModel;
+  final ValueChanged<String> onDownloadOrUpdate;
+  final ValueChanged<String> onDelete;
+  final ValueChanged<String> onResume;
+  final bool disabled;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final selected = options.firstWhere(
+      (m) => m.id == selectedModelId,
+      orElse: () => options.first,
+    );
+    final state = stateForModel(selected.id);
+    final status = _statusFor(state.status);
+
     return Container(
       decoration: BoxDecoration(
         color: colors.surfaceElevated,
@@ -192,7 +144,6 @@ class _ModelCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             children: [
               Icon(icon, size: 16, color: colors.primary),
@@ -208,19 +159,26 @@ class _ModelCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // Dropdown + status + action
           Row(
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  initialValue: value,
+                  initialValue: selected.id,
                   items:
                       options
                           .map(
-                            (o) => DropdownMenuItem(value: o, child: Text(o)),
+                            (o) => DropdownMenuItem(
+                              value: o.id,
+                              child: Text(o.displayName),
+                            ),
                           )
                           .toList(),
-                  onChanged: onChanged,
+                  onChanged:
+                      disabled
+                          ? null
+                          : (v) {
+                            if (v != null) onModelChanged(v);
+                          },
                   dropdownColor: colors.surfaceElevated,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
@@ -244,40 +202,82 @@ class _ModelCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              _StatusChip(status: status),
-              const SizedBox(width: 10),
-              FilledButton(
-                onPressed: onAction,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  textStyle: const TextStyle(fontSize: 12),
-                ),
-                child: Text(actionLabel),
-              ),
+              _StatusChip(status: state.status),
             ],
           ),
-          if (extra != null) extra!,
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed:
+                      disabled || status.$3
+                          ? null
+                          : () {
+                            if (state.canResume) {
+                              onResume(selected.id);
+                            } else {
+                              onDownloadOrUpdate(selected.id);
+                            }
+                          },
+                  child: Text(status.$1),
+                ),
+              ),
+              if (status.$2) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: disabled ? null : () => onDelete(selected.id),
+                    child: const Text('Delete'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (state.error != null && state.error!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              state.error!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 11,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
-}
 
-// ─── Status chip ──────────────────────────────────────────────────────────────
+  /// (primaryLabel, showDelete, primaryDisabled)
+  (String, bool, bool) _statusFor(LocalAiModelStatus status) {
+    return switch (status) {
+      LocalAiModelStatus.notDownloaded => ('Download', false, false),
+      LocalAiModelStatus.downloading => ('Downloading…', false, true),
+      LocalAiModelStatus.ready => ('Update', true, false),
+      LocalAiModelStatus.failed => ('Resume', false, false),
+    };
+  }
+}
 
 class _StatusChip extends StatelessWidget {
   const _StatusChip({required this.status});
-  final ModelStatus status;
+
+  final LocalAiModelStatus status;
 
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
-      ModelStatus.notDownloaded => ('Not Downloaded', AppColors.textMuted),
-      ModelStatus.downloading => ('Downloading...', AppColors.neonBlue),
-      ModelStatus.ready => ('Ready', AppColors.neonGreen),
+      LocalAiModelStatus.notDownloaded => (
+        'Not Downloaded',
+        AppColors.textMuted,
+      ),
+      LocalAiModelStatus.downloading => ('Downloading...', AppColors.neonBlue),
+      LocalAiModelStatus.ready => ('Ready', AppColors.neonGreen),
+      LocalAiModelStatus.failed => (
+        'Failed',
+        Theme.of(context).colorScheme.error,
+      ),
     };
 
     return Container(
@@ -293,6 +293,33 @@ class _StatusChip extends StatelessWidget {
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Theme.of(context).colorScheme.error),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Text(
+        message,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.error,
+          fontSize: 12,
         ),
       ),
     );

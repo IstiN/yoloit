@@ -99,8 +99,7 @@ class ChatMessage extends Equatable {
           json['metadata'] is Map
               ? Map<String, dynamic>.from(json['metadata'] as Map)
               : null,
-      attachments:
-          (json['attachments'] as List?)?.cast<String>() ?? const [],
+      attachments: (json['attachments'] as List?)?.cast<String>() ?? const [],
     );
   }
 
@@ -677,7 +676,11 @@ const List<ChatModelInfo> kCursorModels = [
     displayName: 'GPT-5 Mini',
     costMultiplier: 0.2,
   ),
-  ChatModelInfo(id: 'gemini-3-flash', displayName: 'Gemini 3 Flash', costMultiplier: 0.1),
+  ChatModelInfo(
+    id: 'gemini-3-flash',
+    displayName: 'Gemini 3 Flash',
+    costMultiplier: 0.1,
+  ),
 
   // Standard
   ChatModelInfo(
@@ -697,15 +700,27 @@ const List<ChatModelInfo> kCursorModels = [
     displayName: 'Sonnet 4.5',
     costMultiplier: 1,
   ),
-  ChatModelInfo(id: 'claude-4-sonnet', displayName: 'Sonnet 4', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'claude-4-sonnet',
+    displayName: 'Sonnet 4',
+    costMultiplier: 1,
+  ),
   ChatModelInfo(id: 'kimi-k2.5', displayName: 'Kimi K2.5', costMultiplier: 0.5),
-  ChatModelInfo(id: 'gemini-3.1-pro', displayName: 'Gemini 3.1 Pro', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'gemini-3.1-pro',
+    displayName: 'Gemini 3.1 Pro',
+    costMultiplier: 1,
+  ),
   ChatModelInfo(
     id: 'gpt-5.3-codex',
     displayName: 'Codex 5.3',
     costMultiplier: 1,
   ),
-  ChatModelInfo(id: 'gpt-5.2-codex', displayName: 'Codex 5.2', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'gpt-5.2-codex',
+    displayName: 'Codex 5.2',
+    costMultiplier: 1,
+  ),
 
   // Premium
   ChatModelInfo(
@@ -752,4 +767,19 @@ const List<ChatModelInfo> kCursorModels = [
     costMultiplier: 6,
   ),
   ChatModelInfo(id: 'composer-2', displayName: 'Composer 2', costMultiplier: 1),
+];
+
+/// Local on-device chat models backed by flutter_local_models.
+const List<ChatModelInfo> kLocalModels = [
+  ChatModelInfo(
+    id: 'gemma4-e2b-it-4bit',
+    displayName: 'Gemma 4 E2B IT 4bit',
+    costMultiplier: 0,
+    isDefault: true,
+  ),
+  ChatModelInfo(
+    id: 'qwen3-8b-4bit',
+    displayName: 'Qwen3 8B 4bit',
+    costMultiplier: 0,
+  ),
 ];

@@ -1,3 +1,6 @@
 [submodule "packages/mermaid_renderer_flutter"]
 	path = packages/mermaid_renderer_flutter
 	url = https://github.com/IstiN/mermaid_renderer_flutter.git
+[submodule "third_party/flutter_local_models"]
+	path = third_party/flutter_local_models
+	url = https://github.com/IstiN/flutter_local_models.git

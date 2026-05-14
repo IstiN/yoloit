@@ -15,6 +15,7 @@ import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
+import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
@@ -104,6 +105,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   static ChatProvider _providerForId(String id) {
     return switch (id) {
       'cursor' => CursorAgentProvider(),
+      'local' => LocalLlmProvider(),
       _ => CopilotCliProvider(),
     };
   }
@@ -1881,10 +1883,14 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   static const _providers = [
     ('copilot', 'GitHub Copilot'),
     ('cursor', 'Cursor Agent'),
+    ('local', 'Local LLM'),
   ];
 
-  List<ChatModelInfo> get _modelsForProvider =>
-      _selectedProvider == 'cursor' ? kCursorModels : kCopilotModels;
+  List<ChatModelInfo> get _modelsForProvider => switch (_selectedProvider) {
+    'cursor' => kCursorModels,
+    'local' => kLocalModels,
+    _ => kCopilotModels,
+  };
 
   @override
   void initState() {
