@@ -55,6 +55,9 @@ yoloit
       list <board> <panel> — List run configurations and sessions
       input <board> <panel> <sessionId|id|name> <text> [--enter] — Send stdin to running run session
       output <board> <panel> [sessionId|id|name] — Show output of latest matching run session
+      detach <board> <panel> [sessionId|id|name] — Detach run console from session
+      attach <board> <panel> [sessionId|id|name] [--any] — Attach run console to running/any session
+      popout <board> <panel> [sessionId|id|name] — Create detached Run panel and attach session
     play <board> <panel> <file-or-url> — Add to playlist and play
     note:
       <board> <panel> <text> — Set markdown note content

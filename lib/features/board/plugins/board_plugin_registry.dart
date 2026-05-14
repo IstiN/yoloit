@@ -67,6 +67,7 @@ class BoardPluginRegistry {
     register(const FilesPlugin());
     register(const FilePreviewPlugin());
     register(const PlaylistPlugin());
+    register(const RunPlugin());
     register(const RunConfigsPlugin());
     register(const ChatPanelPlugin());
     register(const BoardTerminalPanelPlugin());

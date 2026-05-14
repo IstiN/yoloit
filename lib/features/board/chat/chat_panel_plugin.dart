@@ -27,10 +27,8 @@ class ChatPanelPlugin extends BoardPanelPlugin {
 
   @override
   Map<String, dynamic> get initialState => {
-    'config': const ChatSessionConfig(
-      sessionName: '',
-      workingDir: '',
-    ).toJson(),
+    'config': const ChatSessionConfig(sessionName: '', workingDir: '').toJson(),
+    'configured': false,
   };
 
   @override

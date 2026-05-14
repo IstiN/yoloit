@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -16,6 +17,7 @@ class CopilotCliProvider extends ChatProvider {
   CopilotCliProvider();
 
   final Map<String, Process> _processes = {};
+  String? _cachedYoloitBin;
 
   @override
   String get providerId => 'copilot';
@@ -41,6 +43,7 @@ class CopilotCliProvider extends ChatProvider {
     required ChatSessionConfig config,
     required bool isFirstMessage,
     List<String> attachments = const [],
+    ChatRuntimeContext? runtimeContext,
   }) {
     final controller = StreamController<ChatEvent>();
 
@@ -49,6 +52,7 @@ class CopilotCliProvider extends ChatProvider {
       config: config,
       isFirstMessage: isFirstMessage,
       attachments: attachments,
+      runtimeContext: runtimeContext,
       controller: controller,
     );
 
@@ -60,6 +64,7 @@ class CopilotCliProvider extends ChatProvider {
     required ChatSessionConfig config,
     required bool isFirstMessage,
     required List<String> attachments,
+    required ChatRuntimeContext? runtimeContext,
     required StreamController<ChatEvent> controller,
   }) async {
     // Kill any existing process for this session
@@ -107,24 +112,39 @@ class CopilotCliProvider extends ChatProvider {
     // Custom args
     args.addAll(config.customArgs);
 
+    final effectiveMessage =
+        isFirstMessage
+            ? await CliGuidanceService.instance.prependGuidance(
+              message,
+              runtimeContext: runtimeContext,
+            )
+            : message;
+    final workingDir = _resolveWorkingDir(config.workingDir);
+
     // Prompt
-    args.addAll(['-p', message]);
+    args.addAll(['-p', effectiveMessage]);
 
     debugPrint('[CopilotCli] Running: copilot ${args.join(' ')}');
-    debugPrint('[CopilotCli] cwd: ${config.workingDir}');
+    debugPrint('[CopilotCli] cwd: $workingDir');
 
     try {
       final extraEnv = await GlobalEnvGroupsService.instance
           .resolveSelectedGroups(config.envGroupIds);
       final baseEnv = {...Platform.environment, ...extraEnv};
-      final enrichedPath = PlatformShell.instance.enrichedPath(
+      final yoloitBin = _resolveYoloitBin();
+      final enrichedPath = _buildSessionPath(
         baseEnv['PATH'] ?? '',
+        yoloitBin: yoloitBin,
       );
       final process = await Process.start(
         'copilot',
         args,
-        workingDirectory: config.workingDir,
-        environment: {...baseEnv, 'PATH': enrichedPath},
+        workingDirectory: workingDir,
+        environment: {
+          ...baseEnv,
+          'PATH': enrichedPath,
+          if (yoloitBin != null) 'YOLOIT_BIN': yoloitBin,
+        },
       );
       _processes[config.sessionName] = process;
 
@@ -182,9 +202,7 @@ class CopilotCliProvider extends ChatProvider {
       if (exitCode != 0) {
         final errText = stderrBuf.toString().trim();
         controller.addError(
-          errText.isNotEmpty
-              ? errText
-              : 'Process exited with code $exitCode',
+          errText.isNotEmpty ? errText : 'Process exited with code $exitCode',
         );
       }
 
@@ -221,5 +239,58 @@ class CopilotCliProvider extends ChatProvider {
       process.kill(ProcessSignal.sigterm);
     }
     _processes.clear();
+  }
+
+  String _resolveWorkingDir(String configuredDir) {
+    final trimmed = configuredDir.trim();
+    if (trimmed.isNotEmpty && Directory(trimmed).existsSync()) return trimmed;
+    return Directory.current.path;
+  }
+
+  String _buildSessionPath(String existingPath, {required String? yoloitBin}) {
+    final shell = PlatformShell.instance;
+    final entries = <String>[
+      if (yoloitBin != null) File(yoloitBin).parent.path,
+      ...shell.splitPath(shell.enrichedPath(existingPath)),
+    ];
+    final deduped = <String>[];
+    for (final entry in entries) {
+      if (entry.isEmpty || deduped.contains(entry)) continue;
+      deduped.add(entry);
+    }
+    return shell.joinPath(deduped);
+  }
+
+  String? _resolveYoloitBin() {
+    final cached = _cachedYoloitBin;
+    if (cached != null && File(cached).existsSync()) return cached;
+
+    final roots = <Directory>[];
+    void addRoot(String path) {
+      if (path.isEmpty) return;
+      final dir = Directory(path).absolute;
+      if (roots.any((existing) => existing.path == dir.path)) return;
+      roots.add(dir);
+    }
+
+    addRoot(Directory.current.path);
+    addRoot(File(Platform.resolvedExecutable).parent.path);
+
+    for (final root in roots) {
+      var current = root;
+      for (var depth = 0; depth < 6; depth++) {
+        final candidate = File(
+          '${current.path}${Platform.pathSeparator}tools${Platform.pathSeparator}yoloit',
+        );
+        if (candidate.existsSync()) {
+          _cachedYoloitBin = candidate.path;
+          return candidate.path;
+        }
+        final parent = current.parent;
+        if (parent.path == current.path) break;
+        current = parent;
+      }
+    }
+    return null;
   }
 }

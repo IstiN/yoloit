@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
+import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -48,6 +49,7 @@ class CursorAgentProvider extends ChatProvider {
     required ChatSessionConfig config,
     required bool isFirstMessage,
     List<String> attachments = const [],
+    ChatRuntimeContext? runtimeContext,
   }) {
     final controller = StreamController<ChatEvent>();
     _runProcess(
@@ -55,6 +57,7 @@ class CursorAgentProvider extends ChatProvider {
       config: config,
       isFirstMessage: isFirstMessage,
       attachments: attachments,
+      runtimeContext: runtimeContext,
       controller: controller,
     );
     return controller.stream;
@@ -65,6 +68,7 @@ class CursorAgentProvider extends ChatProvider {
     required ChatSessionConfig config,
     required bool isFirstMessage,
     required List<String> attachments,
+    required ChatRuntimeContext? runtimeContext,
     required StreamController<ChatEvent> controller,
   }) async {
     await stop(config.sessionName);
@@ -105,7 +109,14 @@ class CursorAgentProvider extends ChatProvider {
     // Prompt as positional argument.
     // Cursor-agent has no --attachment flag — image paths are embedded in the
     // prompt text so the agent can read them via its shell/file tools.
-    final promptParts = [message, ...attachments];
+    final effectiveMessage =
+        isFirstMessage
+            ? await CliGuidanceService.instance.prependGuidance(
+              message,
+              runtimeContext: runtimeContext,
+            )
+            : message;
+    final promptParts = [effectiveMessage, ...attachments];
     args.add(promptParts.join(' '));
 
     debugPrint('[CursorAgent] Running: cursor-agent ${args.join(' ')}');
@@ -251,7 +262,8 @@ class CursorAgentProvider extends ChatProvider {
 
           if (isFirst) {
             final startId =
-                modelCallId ?? 'cursor-${DateTime.now().millisecondsSinceEpoch}';
+                modelCallId ??
+                'cursor-${DateTime.now().millisecondsSinceEpoch}';
             _currentStreamId = startId;
             // Emit messageStart + first delta together
             return [

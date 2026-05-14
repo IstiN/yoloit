@@ -65,7 +65,7 @@ graph TD
     Files --> files_actions["get|open"]
     FilePreview --> file_preview_actions["get|open"]
     Terminal --> term_actions["config|set-dir"]
-    Run --> run_actions["list|add|remove|run|stop|input|output|config<br>add args: name,command,[workingDir],[env],[isFlutterRun],[quickActions]"]
+    Run --> run_actions["list|add|remove|run|stop|detach|attach|input|output|config<br>add args: name,command,[group],[workingDir],[env],[isFlutterRun],[quickActions]"]
 ```
 
 ```mermaid
@@ -76,7 +76,7 @@ graph LR
         kanban_sh["kanban:{columns|cards} ‹b› ‹p›<br>kanban:{add|rename|remove}-column ‹b› ‹p› col<br>kanban:{add|update|move|remove}-card ‹b› ‹p› col|id"]
         play_sh["play ‹b› ‹p› file|url"]
         web_sh["web:open ‹b› ‹p› url"]
-        run_sh["run:list ‹b› ‹p›<br>run:input ‹b› ‹p› id|name text [--enter]<br>run:output ‹b› ‹p› [id|name]"]
+        run_sh["run:list ‹b› ‹p›<br>run:input ‹b› ‹p› id|name text [--enter]<br>run:output ‹b› ‹p› [id|name]<br>run:detach ‹b› ‹p› [id|name]<br>run:attach ‹b› ‹p› [id|name] [--any]"]
         link_sh["link:{style|color} ‹b› id val<br>Styles: arrow/line<br>Geom: bezier/straight/elbow"]
     end
 ```

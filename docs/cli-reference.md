@@ -9,6 +9,14 @@
 - `tools/yoloit` script must be executable: `chmod +x tools/yoloit`
 - Add to PATH: `export PATH="$PATH:/path/to/yoloit/tools"`
 
+## Help Commands
+| Command | Description | Example |
+|---|---|---|
+| `help --format short` | Compact grouped help with params + examples | `yoloit help --format short` |
+| `help --format detailed` | Verbose help (`description`, `parameters`, `format`, `example`) | `yoloit help --format detailed` |
+| `help --format mermaid` | Mermaid command tree | `yoloit help --format mermaid` |
+| `help --format tools` | JSON MCP-style tools schema | `yoloit help --format tools` |
+
 ## App Commands
 | Command | Description | Example |
 |---|---|---|
@@ -29,7 +37,8 @@
 | `board:fit <id\|name> [WxH]` | Fit all panels in view | `yoloit board:fit "Board" 1440x900` |
 | `board:arrange <id\|name> [right\|down] [hGap] [vGap]` | Auto-layout panels as tree | `yoloit board:arrange "Board" right 80 60` |
 | `board:apply <id\|name> [file\|-]` | Apply YAML bulk operations from file or stdin | `yoloit board:apply "Board" flow.yaml` |
-| `board:snapshot <id\|name>` | Get board as YAML/text snapshot | `yoloit board:snapshot "Board"` |
+| `board:snapshot <id\|name> [--format md\|mermaid]` | Get board snapshot as markdown or mermaid text | `yoloit board:snapshot "Board" --format mermaid` |
+| `board:diagram <id\|name> [--format mermaid\|md]` | Alias for snapshot focused on diagram output | `yoloit board:diagram "Board"` |
 | `board:screenshot <id\|name> [file.png]` | Save PNG screenshot | `yoloit board:screenshot "Board" out.png` |
 | `board:svg <id\|name> [file.svg]` | Export SVG layout | `yoloit board:svg "Board" layout.svg` |
 
@@ -65,6 +74,7 @@
 | `board.file.preview` | File Preview | 400×400 |
 | `board.terminal` | Terminal | 480×320 |
 | `board.filetree` | File Tree | 320×500 |
+| `board.run` | Run | 560×360 |
 | `board.run_configs` | Run Configs | 600×400 |
 | `board.yolo_assistant` | YoLo Assistant | 420×560 |
 
@@ -90,6 +100,9 @@
 | `run:list <board> <panel>` | List run configurations and sessions | `yoloit run:list "Board" "Run"` |
 | `run:input <board> <panel> <sessionId\|id\|name> <text> [--enter]` | Send stdin to a running run session | `yoloit run:input "Board" "Run" preset_flutter_run_macos r` |
 | `run:output <board> <panel> [sessionId\|id\|name]` | Get output of latest matching run session | `yoloit run:output "Board" "Run" preset_flutter_run_macos` |
+| `run:detach <board> <panel> [sessionId\|id\|name]` | Detach run console from active/matching session | `yoloit run:detach "Board" "Run"` |
+| `run:attach <board> <panel> [sessionId\|id\|name] [--any]` | Attach run console to running (or any) matching session | `yoloit run:attach "Board" "Run"` |
+| `run:popout <board> <panel> [sessionId\|id\|name]` | Create a detached `board.run` panel and attach a session there | `yoloit run:popout "Board" "Run"` |
 | `play <board> <panel> <file\|url>` | Add & play media | `yoloit play "Board" "Music" ~/song.mp3` |
 | `web:open <board> <panel> <url>` | Open URL in browser panel | `yoloit web:open "Board" "Browser" https://example.com` |
 
@@ -202,15 +215,17 @@
 ### Run Configs (`board.run_configs`)
 | Action | Args | Description |
 |---|---|---|
-| `list` | — | List all configurations |
-| `add` | `name`, `command`, `workingDir?`, `env?`, `isFlutterRun?`, `quickActions?` | Add configuration |
-| `update` | `id\|name`, `newName?`, `command?`, `workingDir?`, `env?`, `isFlutterRun?`, `quickActions?` | Update configuration |
-| `remove` | `id\|name` | Remove configuration |
-| `run` | `id\|name` | Start configuration |
-| `stop` | `sessionId?\|id?\|name?` | Stop the latest matching running session |
-| `input` | `text`, `appendNewline?`, `sessionId?\|id?\|name?` | Send stdin text to latest matching running session |
-| `output` | `sessionId?\|id?\|name?` | Get output of the latest matching run session |
-| `config` | `id\|name` | Get config details |
+| `list` | `group?` | List configurations in panel/current group |
+| `add` | `name`, `command`, `group?`, `workingDir?`, `env?`, `isFlutterRun?`, `quickActions?` | Add configuration |
+| `update` | `id\|name`, `group?`, `newName?`, `command?`, `workingDir?`, `env?`, `isFlutterRun?`, `quickActions?` | Update configuration |
+| `remove` | `id\|name`, `group?` | Remove configuration |
+| `run` | `id\|name`, `group?` | Start configuration |
+| `stop` | `sessionId?\|id?\|name?`, `group?` | Stop the latest matching running session |
+| `detach` | `sessionId?\|id?\|name?`, `group?` | Detach console from session (process keeps running) |
+| `attach` | `sessionId?\|id?\|name?`, `group?`, `runningOnly?` | Attach console to matching session |
+| `input` | `text`, `appendNewline?`, `sessionId?\|id?\|name?`, `group?` | Send stdin text to latest matching running session |
+| `output` | `sessionId?\|id?\|name?`, `group?` | Get output of the latest matching run session |
+| `config` | `id\|name`, `group?` | Get config details |
 
 `quickActions` format:
 ```json

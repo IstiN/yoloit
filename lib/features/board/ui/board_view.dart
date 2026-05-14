@@ -2546,6 +2546,38 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
           onUpdateState: onUpdateState ?? (_) {},
           onShowEditor: onEditNote ?? () {},
           onCreateLinkedPanel: onCreateLinkedPanel,
+          onFindPanelByGroup: (typeId, group) {
+            final board = context.read<BoardCubit>().state.activeBoard;
+            if (board == null) return null;
+            for (final p in board.panels) {
+              if (p.type != typeId) continue;
+              final panelGroup = p.state['group'];
+              if (panelGroup is String && panelGroup.trim() == group.trim()) {
+                return p.id;
+              }
+            }
+            return null;
+          },
+          onRevealSessionInPanel: (panelId, sessionId) async {
+            final cubit = context.read<BoardCubit>();
+            await cubit.updatePanel(panelId, (p) {
+              final hiddenRaw = p.state['hiddenSessionIds'];
+              final hidden =
+                  hiddenRaw is List
+                      ? hiddenRaw.whereType<String>().toSet()
+                      : <String>{};
+              hidden.remove(sessionId);
+              return p.copyWith(
+                state: {
+                  ...p.state,
+                  'activeSessionId': sessionId,
+                  'hiddenSessionIds': hidden.toList(),
+                },
+              );
+            });
+          },
+          onFocusPanelById: (panelId) =>
+              context.read<BoardCubit>().focusPanel(panelId),
           onResize: (w, h) => context.read<BoardCubit>().resizePanel(
                 panel.id,
                 width: w,

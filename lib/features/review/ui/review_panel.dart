@@ -179,7 +179,10 @@ class _CollapsibleRunPanelState extends State<_CollapsibleRunPanel> {
           crossFadeState: widget.collapsed
               ? CrossFadeState.showSecond
               : CrossFadeState.showFirst,
-          firstChild: SizedBox(height: _height, child: const RunPanel()),
+          firstChild: SizedBox(
+            height: _height,
+            child: const RunPanel(groupId: 'review'),
+          ),
           secondChild: const SizedBox.shrink(),
         ),
       ],

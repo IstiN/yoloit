@@ -11,6 +11,21 @@ enum ChatImageMode {
   base64,
 }
 
+/// Runtime context for the current chat send operation.
+class ChatRuntimeContext {
+  const ChatRuntimeContext({
+    this.boardId,
+    this.boardName,
+    this.panelId,
+    this.panelTitle,
+  });
+
+  final String? boardId;
+  final String? boardName;
+  final String? panelId;
+  final String? panelTitle;
+}
+
 /// Abstract interface for chat backends.
 ///
 /// Implementations wrap specific CLI tools or APIs. The board chat panel
@@ -41,6 +56,7 @@ abstract class ChatProvider {
     required ChatSessionConfig config,
     required bool isFirstMessage,
     List<String> attachments = const [],
+    ChatRuntimeContext? runtimeContext,
   });
 
   /// Stop any running process for [sessionName].

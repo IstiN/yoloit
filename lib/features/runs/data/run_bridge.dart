@@ -31,15 +31,23 @@ class RunBridge {
 
   String? get workspacePath => state.workspacePath;
 
-  RunConfig? findConfig([String? identifier]) {
+  RunConfig? findConfig([String? identifier, String? group]) {
     final configs = state.configs;
+    final groupKey = group?.trim();
     if (identifier == null || identifier.trim().isEmpty) {
       if (configs.length == 1) return configs.single;
       final active = state.activeSession?.config;
-      return active;
+      if (active == null) return null;
+      if (groupKey == null || groupKey.isEmpty || active.group == groupKey) {
+        return active;
+      }
+      return null;
     }
     final needle = identifier.trim().toLowerCase();
     for (final config in configs) {
+      if (groupKey != null && groupKey.isNotEmpty && config.group != groupKey) {
+        continue;
+      }
       if (config.id == identifier || config.name.toLowerCase() == needle) {
         return config;
       }
@@ -47,9 +55,19 @@ class RunBridge {
     return null;
   }
 
-  RunSession? findSession(String? identifier, {bool runningOnly = false}) {
+  RunSession? findSession(
+    String? identifier, {
+    bool runningOnly = false,
+    String? group,
+  }) {
+    final groupKey = group?.trim();
     final sessions = state.sessions.reversed.where((session) {
       if (runningOnly && session.status != RunStatus.running) return false;
+      if (groupKey != null &&
+          groupKey.isNotEmpty &&
+          session.config.group != groupKey) {
+        return false;
+      }
       if (identifier == null || identifier.trim().isEmpty) return true;
       final config = session.config;
       return session.id == identifier ||
@@ -62,6 +80,7 @@ class RunBridge {
   Future<RunConfig> addConfig({
     required String name,
     required String command,
+    String group = 'default',
     String? workingDir,
     Map<String, String> env = const {},
     bool isFlutterRun = false,
@@ -72,6 +91,7 @@ class RunBridge {
       id: 'cli_${DateTime.now().millisecondsSinceEpoch}',
       name: name,
       command: command,
+      group: group,
       workingDir: workingDir,
       env: env,
       isFlutterRun: isFlutterRun,
@@ -81,8 +101,8 @@ class RunBridge {
     return persisted;
   }
 
-  Future<RunSession> startConfig([String? identifier]) async {
-    final config = findConfig(identifier);
+  Future<RunSession> startConfig([String? identifier, String? group]) async {
+    final config = findConfig(identifier, group);
     if (config == null) {
       throw StateError('Run configuration not found');
     }
@@ -96,8 +116,8 @@ class RunBridge {
     throw StateError('Run session was not created');
   }
 
-  Future<RunSession> stopSession([String? identifier]) async {
-    final session = findSession(identifier, runningOnly: true);
+  Future<RunSession> stopSession([String? identifier, String? group]) async {
+    final session = findSession(identifier, runningOnly: true, group: group);
     if (session == null) {
       throw StateError('No running session found');
     }
@@ -105,12 +125,36 @@ class RunBridge {
     return session;
   }
 
+  Future<RunSession> detachSession([String? identifier, String? group]) async {
+    final session = findSession(identifier, group: group);
+    if (session == null) {
+      throw StateError('Run session not found');
+    }
+    _requireCubit.detachSession(session.id);
+    return session;
+  }
+
+  Future<RunSession> attachSession({
+    String? identifier,
+    String? group,
+    bool runningOnly = true,
+  }) async {
+    var session = findSession(identifier, runningOnly: runningOnly, group: group);
+    session ??= findSession(identifier, runningOnly: false, group: group);
+    if (session == null) {
+      throw StateError('Run session not found');
+    }
+    _requireCubit.attachSession(session.id);
+    return session;
+  }
+
   Future<RunSession> sendInput({
     String? identifier,
+    String? group,
     required String text,
     bool appendNewline = false,
   }) async {
-    final session = findSession(identifier, runningOnly: true);
+    final session = findSession(identifier, runningOnly: true, group: group);
     if (session == null) {
       throw StateError('No running session found');
     }
@@ -124,6 +168,7 @@ class RunBridge {
 
   Future<RunConfig> updateConfig({
     required String identifier,
+    String? group,
     String? name,
     String? command,
     String? workingDir,
@@ -131,7 +176,7 @@ class RunBridge {
     bool? isFlutterRun,
     List<RunQuickAction>? quickActions,
   }) async {
-    final existing = findConfig(identifier);
+    final existing = findConfig(identifier, group);
     if (existing == null) {
       throw StateError('Run configuration not found');
     }
@@ -161,6 +206,7 @@ class RunBridge {
     'id': config.id,
     'name': config.name,
     'command': config.command,
+    'group': config.group,
     'workingDir': config.workingDir,
     'env': config.env,
     'isFlutterRun': config.isFlutterRun,

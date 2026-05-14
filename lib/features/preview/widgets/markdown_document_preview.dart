@@ -65,6 +65,7 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
         child: MarkdownBody(
           key: ValueKey(_rendererReady),
           data: widget.content,
+          softLineBreak: true,
           builders: {
             'pre': _MermaidBlockBuilder(
               renderer: _rendererReady ? _renderer : null,

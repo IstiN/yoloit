@@ -36,89 +36,310 @@ _delete() { _curl DELETE "$1"; }
 
 # ── Usage ──────────────────────────────────────────────────────────────
 
+_render_help() {
+  local format="${1:-short}"
+  python3 - "$format" <<'PYEOF'
+import json
+import re
+import sys
+from collections import defaultdict
+
+fmt = (sys.argv[1] if len(sys.argv) > 1 else "short").strip().lower()
+
+commands = [
+  {
+    "group": "app",
+    "name": "reload",
+    "description": "Hot reload the running Flutter app",
+    "params": [],
+    "example": "yoloit reload",
+  },
+  {
+    "group": "app",
+    "name": "restart",
+    "description": "Hot restart the running Flutter app",
+    "params": [],
+    "example": "yoloit restart",
+  },
+  {
+    "group": "board",
+    "name": "boards",
+    "description": "List all boards",
+    "params": [],
+    "example": "yoloit boards",
+  },
+  {
+    "group": "board",
+    "name": "board",
+    "description": "Show board details",
+    "params": [["id|name", "Board identifier or board name", True]],
+    "example": "yoloit board \"My Board\"",
+  },
+  {
+    "group": "board",
+    "name": "board:create",
+    "description": "Create a new board",
+    "params": [["name", "New board name", True]],
+    "example": "yoloit board:create \"My Board\"",
+  },
+  {
+    "group": "board",
+    "name": "board:snapshot",
+    "description": "Text snapshot of board layout",
+    "params": [
+      ["id|name", "Board identifier or board name", True],
+      ["--format md|mermaid", "Output format (default: md)", False],
+    ],
+    "example": "yoloit board:snapshot \"My Board\" --format mermaid",
+  },
+  {
+    "group": "board",
+    "name": "board:diagram",
+    "description": "Alias for board snapshot focused on diagram output",
+    "params": [
+      ["id|name", "Board identifier or board name", True],
+      ["--format mermaid|md", "Output format (default: mermaid)", False],
+    ],
+    "example": "yoloit board:diagram \"My Board\" --format mermaid",
+  },
+  {
+    "group": "board",
+    "name": "board:screenshot",
+    "description": "Save PNG screenshot",
+    "params": [
+      ["id|name", "Board identifier or board name", True],
+      ["file.png", "Output PNG path", False],
+    ],
+    "example": "yoloit board:screenshot \"My Board\" out.png",
+  },
+  {
+    "group": "board",
+    "name": "board:svg",
+    "description": "Export SVG layout",
+    "params": [
+      ["id|name", "Board identifier or board name", True],
+      ["file.svg", "Output SVG path", False],
+    ],
+    "example": "yoloit board:svg \"My Board\" layout.svg",
+  },
+  {
+    "group": "board",
+    "name": "board:apply",
+    "description": "Apply YAML bulk operations from file or stdin",
+    "params": [
+      ["id|name", "Board identifier or board name", True],
+      ["file|-", "YAML file path or '-' for stdin", False],
+    ],
+    "example": "yoloit board:apply \"My Board\" flow.yaml",
+  },
+  {
+    "group": "panel",
+    "name": "panels",
+    "description": "List panels on board",
+    "params": [["board", "Board id or name", True]],
+    "example": "yoloit panels \"My Board\"",
+  },
+  {
+    "group": "panel",
+    "name": "panel",
+    "description": "Show panel details and content",
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True]],
+    "example": "yoloit panel \"My Board\" \"Run\"",
+  },
+  {
+    "group": "panel",
+    "name": "panel:help",
+    "description": "Show dynamic panel actions with parameter docs",
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True]],
+    "example": "yoloit panel:help \"My Board\" \"Run\"",
+  },
+  {
+    "group": "panel",
+    "name": "do",
+    "description": "Execute panel action",
+    "params": [
+      ["board", "Board id or name", True],
+      ["panel", "Panel id or title", True],
+      ["action", "Action name from panel:help", True],
+      ["json", "JSON body (optional)", False],
+    ],
+    "example": "yoloit do \"My Board\" \"Run\" list",
+  },
+  {
+    "group": "run",
+    "name": "run:list",
+    "description": "List run configurations and sessions",
+    "params": [["board", "Board id or name", True], ["panel", "Run panel id or title", True]],
+    "example": "yoloit run:list \"My Board\" \"Run\"",
+  },
+  {
+    "group": "run",
+    "name": "run:input",
+    "description": "Send stdin to running run session",
+    "params": [
+      ["board", "Board id or name", True],
+      ["panel", "Run panel id or title", True],
+      ["sessionId|id|name", "Session or config selector", True],
+      ["text", "Input text", True],
+      ["--enter", "Append newline", False],
+    ],
+    "example": "yoloit run:input \"My Board\" \"Run\" preset_flutter_run_macos r",
+  },
+  {
+    "group": "run",
+    "name": "run:attach",
+    "description": "Attach run console to matching session",
+    "params": [
+      ["board", "Board id or name", True],
+      ["panel", "Run panel id or title", True],
+      ["sessionId|id|name", "Session or config selector", False],
+      ["--any", "Allow stopped sessions", False],
+    ],
+    "example": "yoloit run:attach \"My Board\" \"Run\" --any",
+  },
+  {
+    "group": "run",
+    "name": "run:popout",
+    "description": "Open detached session in a new Run panel",
+    "params": [
+      ["board", "Board id or name", True],
+      ["panel", "Run panel id or title", True],
+      ["sessionId|id|name", "Session or config selector", False],
+    ],
+    "example": "yoloit run:popout \"My Board\" \"Run\"",
+  },
+  {
+    "group": "link",
+    "name": "links",
+    "description": "List links on board",
+    "params": [["board", "Board id or name", True]],
+    "example": "yoloit links \"My Board\"",
+  },
+  {
+    "group": "link",
+    "name": "link:create",
+    "description": "Create panel link",
+    "params": [["board", "Board id or name", True], ["from", "Source panel", True], ["to", "Target panel", True]],
+    "example": "yoloit link:create \"My Board\" \"A\" \"B\"",
+  },
+]
+
+by_group = defaultdict(list)
+for c in commands:
+    by_group[c["group"]].append(c)
+
+group_order = ["app", "board", "panel", "run", "link"]
+
+def params_inline(c):
+    if not c["params"]:
+        return "none"
+    return ", ".join([f'{p[0]}{"*" if p[2] else ""}' for p in c["params"]])
+
+def param_to_key(name):
+    raw = name.strip()
+    if raw.startswith("--"):
+        raw = raw.split()[0].lstrip("-")
+    key = raw.replace("|", "_or_")
+    key = re.sub(r"[^a-zA-Z0-9_]+", "_", key)
+    key = re.sub(r"_+", "_", key).strip("_").lower()
+    return key or "arg"
+
+if fmt == "short":
+    print("yoloit help (short)")
+    print("Use: yoloit help --format [short|detailed|mermaid|tools]")
+    for g in group_order:
+        if not by_group[g]:
+            continue
+        print(f"\n{g}:")
+        for c in by_group[g]:
+            print(f'  {c["name"]} — {c["description"]}')
+            if c["params"]:
+                print(f'    params: {params_inline(c)}')
+            print(f'    ex: {c["example"]}')
+elif fmt == "detailed":
+    print("yoloit help (detailed)\n")
+    for c in commands:
+        print(f'Command: {c["name"]}')
+        print(f'Description: {c["description"]}')
+        if c["params"]:
+            print("Parameters:")
+            for name, desc, req in c["params"]:
+                reqs = "required" if req else "optional"
+                print(f"  - {name} ({reqs}): {desc}")
+        fmt_parts = [c["name"]]
+        for name, _, req in c["params"]:
+            fmt_parts.append(f'<{name}>' if req else f'[{name}]')
+        print(f'CLI command format: yoloit {" ".join(fmt_parts)}')
+        print(f'Example: {c["example"]}\n')
+elif fmt == "mermaid":
+    print("graph TD")
+    print("  root[yoloit help]")
+    for g in group_order:
+        if not by_group[g]:
+            continue
+        gid = f"g_{g}"
+        print(f'  root --> {gid}["{g}"]')
+        for i, c in enumerate(by_group[g]):
+            cid = f"{gid}_{i}"
+            label = f'{c["name"]}<br/>{c["description"]}'
+            if c["params"]:
+                label += f'<br/>params: {params_inline(c)}'
+            label = label.replace('"', '\\"')
+            print(f'  {gid} --> {cid}["{label}"]')
+elif fmt == "tools":
+    tools = []
+    for c in commands:
+        props = {}
+        required = []
+        for name, desc, req in c["params"]:
+            key = param_to_key(name)
+            props[key] = {"type": "string", "description": desc}
+            if req:
+                required.append(key)
+        schema = {
+            "type": "object",
+            "properties": props,
+            "additionalProperties": False,
+        }
+        if required:
+            schema["required"] = required
+        tools.append(
+            {
+                "name": c["name"],
+                "description": c["description"],
+                "inputSchema": schema,
+            }
+        )
+    print(json.dumps({"tools": tools}, ensure_ascii=False, indent=2))
+else:
+    print(f"Unknown format: {fmt}", file=sys.stderr)
+    sys.exit(2)
+PYEOF
+}
+
+_parse_help_format() {
+  local format="short"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --format|-f)
+        format="${2:-short}"
+        shift 2
+        ;;
+      short|detailed|mermaid|tools)
+        format="$1"
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  echo "$format"
+}
+
 usage() {
-  cat <<'EOF'
-yoloit — terminal interface for YoLoIT boards
-
-USAGE
-  yoloit <command> [args...]
-
-BOARD COMMANDS
-  boards                          List all boards
-  board <id|name>                 Show board details
-  board:create <name>             Create a new board
-  board:rename <id|name> <new>    Rename a board
-  board:delete <id|name>          Delete a board
-  board:focus <id|name>           Switch to board
-  board:snapshot <id|name>        Markdown snapshot of board layout
-  board:screenshot <id|name> [file.png]  Save PNG screenshot
-  board:svg <id|name> [file.svg]  Export SVG layout
-  board:zoom <id|name> <scale>    Set viewport zoom (e.g. 0.5)
-  board:fit <id|name> [WxH]       Auto-fit viewport to show all panels
-  board:arrange <id|name> [right|down] [hSpacing] [vSpacing]  Auto-layout panels as tree
-  board:apply <id|name> [file|-]  Apply YAML bulk operations from file or stdin
-
-APP COMMANDS
-  reload                          Hot reload the running Flutter app
-  restart                         Hot restart the running Flutter app
-
-PANEL COMMANDS
-  panels <board>                  List panels on a board
-  panel <board> <panel>           Show panel details & content
-  panel:help <board> <panel>      Show supported actions with parameter help
-  panel:create <board> <type> <title>  Create a panel
-  panel:types <board>             List available panel types
-  panel:rename <board> <panel> <new>   Rename panel
-  panel:move <board> <panel> <x> <y>   Move panel
-  panel:resize <board> <panel> <w> <h> Resize panel
-  panel:color <board> <panel> <color|clear>  Set panel tint color (hex #RRGGBB or name)
-  panel:hide <board> <panel>           Hide panel
-  panel:show <board> <panel>           Show hidden panel
-  panel:focus <board> <panel>          Focus panel (bring to front)
-
-PANEL ACTIONS (sent to panel handler)
-  do <board> <panel> <action> [json]   Execute a panel action
-
-LINK COMMANDS
-  links <board>                   List links
-  link:create <board> <from> <to> Link two panels
-  link:delete <board> <link-id>   Remove a link by its ID
-  link:style <board> <linkId> <arrow|line> [bezier|straight|elbow]  Set link style
-  link:color <board> <linkId> <color>  Set link color
-
-SHORTHAND COMMANDS
-  run:list <board> <panel>                                          List run configs and sessions
-  run:input <board> <panel> <sessionId|id|name> <text> [--enter]  Send stdin to running run session
-  run:output <board> <panel> [sessionId|id|name]                  Show output of latest matching run session
-  note <board> <panel> <text>             Set markdown note content
-  note:append <board> <panel> <text>      Append text to note
-  note:wrap <board> <panel>               Enable auto-height (wraps to content)
-  note:nowrap <board> <panel>             Disable auto-height (fixed height)
-  checklist:add <board> <panel> <item>    Add checklist item
-  checklist:check <board> <panel> <id|text>    Check an item by ID or text
-  checklist:uncheck <board> <panel> <id|text>  Uncheck an item by ID or text
-  kanban:columns <board> <panel>               List kanban columns
-  kanban:add-column <board> <panel> <name>     Add kanban column
-  kanban:rename-column <board> <panel> <col> <new-name>  Rename column
-  kanban:remove-column <board> <panel> <col>   Remove column (and its cards)
-  kanban:add-card <board> <panel> <col> <title>  Add card to column
-  kanban:update-card <board> <panel> <cardId> <title>  Update card title
-  kanban:remove-card <board> <panel> <cardId>  Remove card
-  kanban:move-card <board> <panel> <cardId> <col>  Move card to column
-  kanban:cards <board> <panel>                 List all columns+cards
-  play <board> <panel> <file-or-url>      Add to playlist and play
-  web:open <board> <panel> <url>          Open URL in webpage panel
-  board:translate <board> <x> <y>         Set viewport translation offset
-
-EXAMPLES
-  yoloit boards
-  yoloit board:create "My Board"
-  yoloit panels "My Board"
-  yoloit panel:create "My Board" board.note.markdown "Notes"
-  yoloit do "My Board" "Notes" set '{"content":"# Hello"}'
-  yoloit do "My Board" "Chat" send '{"message":"Hi!"}'
-  yoloit board:snapshot "My Board"
-EOF
+  local format="${1:-short}"
+  _render_help "$format"
 }
 
 # ── Helpers ────────────────────────────────────────────────────────────
@@ -242,9 +463,28 @@ PYEOF
     fi
     ;;
   board:snapshot)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:snapshot <id|name>" >&2; exit 1; }
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:snapshot <id|name> [--format md|mermaid]" >&2; exit 1; }
     bid=$(_encode "$1")
-    _get "/boards/${bid}/snapshot"
+    format="md"
+    shift
+    if [[ "${1:-}" == "--format" ]]; then
+      format="${2:-md}"
+    elif [[ -n "${1:-}" ]]; then
+      format="$1"
+    fi
+    _get "/boards/${bid}/snapshot?format=${format}"
+    ;;
+  board:diagram)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit board:diagram <id|name> [--format mermaid|md]" >&2; exit 1; }
+    bid=$(_encode "$1")
+    format="mermaid"
+    shift
+    if [[ "${1:-}" == "--format" ]]; then
+      format="${2:-mermaid}"
+    elif [[ -n "${1:-}" ]]; then
+      format="$1"
+    fi
+    _get "/boards/${bid}/snapshot?format=${format}"
     ;;
   board:screenshot)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit board:screenshot <id|name> [file.png]" >&2; exit 1; }
@@ -453,6 +693,59 @@ print(json.dumps(b))
       _post "/boards/${bid}/panels/${pid}/action" '{"action":"output"}' | python3 -m json.tool 2>/dev/null
     fi
     ;;
+  run:detach)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit run:detach <board> <panel> [sessionId|id|name]" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    if [[ $# -ge 3 ]]; then
+      target="$3"
+      target_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"detach\",\"sessionId\":${target_json},\"id\":${target_json},\"name\":${target_json}}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/boards/${bid}/panels/${pid}/action" '{"action":"detach"}' | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  run:attach)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit run:attach <board> <panel> [sessionId|id|name] [--any]" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    shift 2
+    running_only=true
+    if [[ "${!#:-}" == "--any" ]]; then
+      running_only=false
+      set -- "${@:1:$(($# - 1))}"
+    fi
+    if [[ $# -ge 1 ]]; then
+      target="$1"
+      target_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"attach\",\"sessionId\":${target_json},\"id\":${target_json},\"name\":${target_json},\"runningOnly\":${running_only}}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"attach\",\"runningOnly\":${running_only}}" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  run:popout)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit run:popout <board> <panel> [sessionId|id|name]" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    target="${3:-}"
+
+    # Resolve source group from list action
+    list_json=$(_post "/boards/${bid}/panels/${pid}/action" '{"action":"list"}')
+    group=$(python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); data=d.get('data') or {}; print(data.get('group') or 'default')" <<<"$list_json")
+    group_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$group")
+
+    # Create a new detached Run panel in the same group
+    title_json=$(python3 -c "import json,sys; print(json.dumps('Run (Detached)'))")
+    create_body="{\"type\":\"board.run\",\"title\":${title_json},\"state\":{\"group\":${group_json}}}"
+    created_json=$(_post "/boards/${bid}/panels" "$create_body")
+    new_panel=$(python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print((d.get('panel') or {}).get('id',''))" <<<"$created_json")
+    [[ -z "$new_panel" ]] && { echo "Error: failed to create detached run panel" >&2; echo "$created_json"; exit 1; }
+    new_pid=$(_encode "$new_panel")
+
+    if [[ -n "$target" ]]; then
+      target_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")
+      _post "/boards/${bid}/panels/${new_pid}/action" "{\"action\":\"attach\",\"sessionId\":${target_json},\"id\":${target_json},\"name\":${target_json},\"runningOnly\":false}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/boards/${bid}/panels/${new_pid}/action" '{"action":"attach","runningOnly":true}' | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
 
   # ── links ──
   links)
@@ -619,7 +912,8 @@ print(json.dumps(b))
 
   # ── help ──
   help|--help|-h)
-    usage
+    fmt=$(_parse_help_format "$@")
+    usage "$fmt"
     ;;
   *)
     echo "Unknown command: $cmd" >&2

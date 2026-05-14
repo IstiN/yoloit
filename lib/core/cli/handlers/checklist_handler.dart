@@ -100,11 +100,14 @@ class ChecklistCliHandler extends PanelCliHandler {
     bool checked,
   ) {
     final items = _items(panel);
-    final index = _indexArg(args) ?? _indexById(items, args['id']?.toString());
+    final index =
+        _indexArg(args) ??
+        _indexById(items, args['id']?.toString()) ??
+        _indexByText(items, _textArg(args));
     if (index == null) {
       return const CliActionResult(
         ok: false,
-        message: 'Missing "index" or "id"',
+        message: 'Missing "index", "id", or "text"',
       );
     }
     if (index < 0 || index >= items.length) {
@@ -145,5 +148,25 @@ class ChecklistCliHandler extends PanelCliHandler {
     if (id == null || id.isEmpty) return null;
     final index = items.indexWhere((item) => item['id'] == id);
     return index < 0 ? null : index;
+  }
+
+  String? _textArg(Map<String, dynamic> args) {
+    final direct = args['text']?.toString().trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+    final aliases = ['item', 'name', 'title'];
+    for (final key in aliases) {
+      final value = args[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  int? _indexByText(List<Map<String, dynamic>> items, String? text) {
+    if (text == null || text.isEmpty) return null;
+    final needle = text.trim().toLowerCase();
+    final exact = items.indexWhere(
+      (item) => (item['text']?.toString().trim().toLowerCase() ?? '') == needle,
+    );
+    return exact < 0 ? null : exact;
   }
 }

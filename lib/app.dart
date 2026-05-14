@@ -31,6 +31,7 @@ import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_state.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_state.dart';
+import 'package:yoloit/features/runs/data/run_bridge.dart';
 import 'package:yoloit/features/runs/models/run_session.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
@@ -53,7 +54,13 @@ class App extends StatelessWidget {
         BlocProvider(create: (_) => TerminalCubit()),
         BlocProvider(create: (_) => ReviewCubit()),
         BlocProvider(create: (_) => FileEditorCubit()),
-        BlocProvider(create: (_) => RunCubit()),
+        BlocProvider(
+          create: (_) {
+            final cubit = RunCubit();
+            RunBridge.instance.attach(cubit);
+            return cubit;
+          },
+        ),
         BlocProvider(create: (_) => MindMapCubit()),
         BlocProvider(create: (_) => BoardCubit()),
         // CollaborationCubit must come after MindMapCubit so it can read it.
@@ -739,6 +746,9 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const FilesCliHandler());
     server.registerPanelHandler(const FilePreviewCliHandler());
     server.registerPanelHandler(const RunConfigsCliHandler());
+    server.registerPanelHandler(
+      const RunConfigsCliHandler(panelTypeId: 'board.run'),
+    );
     server.registerPanelHandler(const TerminalCliHandler());
     server.registerPanelHandler(const FileTreeCliHandler());
     server.registerPanelHandler(const AssistantCliHandler());

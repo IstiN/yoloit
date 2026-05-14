@@ -178,6 +178,17 @@ class RunCubit extends Cubit<RunState> {
     emit(state.copyWith(activeSessionId: sessionId));
   }
 
+  void attachSession(String sessionId) {
+    final exists = state.sessions.any((session) => session.id == sessionId);
+    if (!exists) return;
+    emit(state.copyWith(activeSessionId: sessionId));
+  }
+
+  void detachSession(String sessionId) {
+    if (state.activeSessionId != sessionId) return;
+    emit(state.copyWith(clearActiveSession: true));
+  }
+
   void removeSession(String sessionId) {
     RunService.instance.stop(sessionId);
     final sessions = state.sessions.where((s) => s.id != sessionId).toList();
@@ -204,6 +215,38 @@ class RunCubit extends Cubit<RunState> {
     await RunConfigStorage.instance.save(state.workspacePath ?? '', configs);
     emit(state.copyWith(configs: configs));
     return config;
+  }
+
+  Future<void> ensureGroupInitialized(String group) async {
+    final normalizedGroup = group.trim();
+    if (normalizedGroup.isEmpty) return;
+    if (state.configs.any((config) => config.group == normalizedGroup)) return;
+    final workspacePath = state.workspacePath;
+    if (workspacePath == null || workspacePath.trim().isEmpty) return;
+    if (!await _isFlutterProject(workspacePath)) return;
+
+    final suffix = _groupIdSuffix(normalizedGroup);
+    final presets = [
+      RunConfig.flutterRunMacos(
+        workspacePath,
+        group: normalizedGroup,
+      ).copyWith(id: 'preset_flutter_run_macos_$suffix'),
+      RunConfig.flutterTest(group: normalizedGroup).copyWith(
+        id: 'preset_flutter_test_$suffix',
+      ),
+      RunConfig.flutterBuildMacos(group: normalizedGroup).copyWith(
+        id: 'preset_flutter_build_macos_$suffix',
+      ),
+    ];
+
+    final configs = [...state.configs];
+    for (final preset in presets) {
+      if (_findEquivalentConfig(preset) != null) continue;
+      configs.add(preset);
+    }
+    if (configs.length == state.configs.length) return;
+    await RunConfigStorage.instance.save(workspacePath, configs);
+    emit(state.copyWith(configs: configs));
   }
 
   Future<void> updateConfig(RunConfig config) async {
@@ -280,7 +323,13 @@ class RunCubit extends Cubit<RunState> {
 
   String _configSignature(RunConfig config) {
     final normalizedDir = (config.workingDir ?? '').trim();
-    return '${config.name.trim().toLowerCase()}|${config.command.trim().toLowerCase()}|$normalizedDir';
+    final normalizedGroup = config.group.trim().toLowerCase();
+    return '${config.name.trim().toLowerCase()}|${config.command.trim().toLowerCase()}|$normalizedDir|$normalizedGroup';
+  }
+
+  String _groupIdSuffix(String group) {
+    final cleaned = group.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_');
+    return cleaned.isEmpty ? 'group' : cleaned;
   }
 
   bool _sameConfigs(List<RunConfig> a, List<RunConfig> b) {

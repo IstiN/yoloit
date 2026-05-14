@@ -44,6 +44,7 @@ do B P ⟨action⟩ [args...]→generic
 |board.file.preview|🖼️|400×400|
 |board.terminal|⌨️|480×320|
 |board.filetree|🌳|320×500|
+|board.run|▶️|560×360|
 |board.run_configs|▶️|600×400|
 |board.yolo_assistant|🤖|420×560|
 
@@ -53,7 +54,7 @@ do B P ⟨action⟩ [args...]→generic
    note:wrap|nowrap B P→auto-height ✓/✗
 
 ✅ checklist:add B P ⟨item⟩
-   checklist:check|uncheck B P ⟨id⟩
+   checklist:check|uncheck B P ⟨id|text⟩
 
 📊 kanban:columns|cards B P
    kanban:add-column B P ⟨name⟩
@@ -88,9 +89,10 @@ styles:`arrow|line`; geom:`bezier|straight|elbow`
 |🌐|`open⟨url⟩\|get`|
 |💻|`get\|set⟨code,[lang]⟩`|
 |📁|`get\|open⟨path⟩`|
+|🖼️|`get\|open⟨path⟩`|
 |⌨️|`config\|set-dir⟨path⟩`|
 |🌳|`list[path]\|set-root⟨path⟩\|expand⟨path⟩\|collapse⟨path⟩\|open⟨path⟩\|refresh`|
-|▶️|`list\|add⟨name,cmd,[dir]⟩\|remove⟨id⟩\|run⟨id⟩\|stop⟨id⟩\|output[id]\|config⟨id⟩`|
+|▶️|`list\|add⟨name,cmd,[group],[dir],[quickActions]⟩\|update⟨id|name,[group],[newName],[cmd],[quickActions]⟩\|remove⟨id,[group]⟩\|run⟨id,[group]⟩\|stop⟨id,[group]⟩\|detach[id]\|attach[id,[runningOnly]]\|input⟨text,[id],[appendNewline],[group]⟩\|output[id,[group]]\|config⟨id,[group]⟩`|
 |🤖|`send⟨text⟩\|messages\|clear\|skills\|add-skill⟨s⟩\|remove-skill⟨s⟩\|mode⟨text\|voice⟩\|voice-start\|voice-stop`|
 
 ## YAML Bulk `board:apply`

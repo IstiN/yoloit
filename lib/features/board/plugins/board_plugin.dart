@@ -11,6 +11,9 @@ class BoardPanelRenderContext {
     required this.onShowEditor,
     this.onCreateLinkedPanel,
     this.onResize,
+    this.onFindPanelByGroup,
+    this.onRevealSessionInPanel,
+    this.onFocusPanelById,
   });
 
   final bool isSelected;
@@ -30,6 +33,16 @@ class BoardPanelRenderContext {
     Map<String, dynamic> state,
     String title,
   )? onCreateLinkedPanel;
+
+  /// Finds an existing panel by [typeId] and run [group] (if available).
+  final String? Function(String typeId, String group)? onFindPanelByGroup;
+
+  /// Reveals a detached run [sessionId] in target [panelId].
+  final Future<void> Function(String panelId, String sessionId)?
+      onRevealSessionInPanel;
+
+  /// Focuses an existing panel by ID.
+  final Future<void> Function(String panelId)? onFocusPanelById;
 }
 
 /// Abstract base class for board panel plugins.

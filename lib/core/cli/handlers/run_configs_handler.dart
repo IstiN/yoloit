@@ -5,10 +5,12 @@ import 'package:yoloit/features/runs/models/run_config.dart';
 
 /// CLI handler for Run Configs panels (`board.run_configs`).
 class RunConfigsCliHandler extends PanelCliHandler {
-  const RunConfigsCliHandler();
+  const RunConfigsCliHandler({this.panelTypeId = 'board.run_configs'});
+
+  final String panelTypeId;
 
   @override
-  String get typeId => 'board.run_configs';
+  String get typeId => panelTypeId;
 
   @override
   List<String> get supportedActions => [
@@ -18,6 +20,8 @@ class RunConfigsCliHandler extends PanelCliHandler {
     'remove',
     'run',
     'stop',
+    'detach',
+    'attach',
     'input',
     'output',
     'config',
@@ -25,14 +29,25 @@ class RunConfigsCliHandler extends PanelCliHandler {
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
+    final group = _resolveGroup(panel: panel);
+    return _getContentForGroup(group);
+  }
+
+  Map<String, dynamic> _getContentForGroup(String group) {
     final bridge = RunBridge.instance;
+    final scopedConfigs =
+        bridge.state.configs.where((config) => config.group == group).toList();
+    final scopedSessions =
+        bridge.state.sessions
+            .where((session) => session.config.group == group)
+            .toList();
     return {
+      'group': group,
       'workspacePath': bridge.workspacePath,
-      'configurations':
-          bridge.state.configs.map(bridge.serializeConfig).toList(),
-      'sessions': bridge.state.sessions.map(bridge.serializeSession).toList(),
+      'configurations': scopedConfigs.map(bridge.serializeConfig).toList(),
+      'sessions': scopedSessions.map(bridge.serializeSession).toList(),
       'activeSessionId': bridge.state.activeSessionId,
-      'isRunning': bridge.state.sessions.any(
+      'isRunning': scopedSessions.any(
         (session) => session.status.name == 'running',
       ),
     };
@@ -44,9 +59,10 @@ class RunConfigsCliHandler extends PanelCliHandler {
     Map<String, dynamic> args,
     BoardPanelInstance panel,
   ) async {
+    final actionGroup = _resolveGroup(panel: panel, args: args);
     switch (action) {
       case 'list':
-        return CliActionResult(data: getContent(panel));
+        return CliActionResult(data: _getContentForGroup(actionGroup));
 
       case 'add':
         final name = args['name'] as String?;
@@ -63,6 +79,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
             (args['workingDir'] as String? ?? '').trim();
         final duplicate = RunBridge.instance.state.configs.firstWhere(
           (existing) =>
+              existing.group == actionGroup &&
               existing.name.trim().toLowerCase() == normalizedName &&
               existing.command.trim().toLowerCase() == normalizedCommand &&
               (existing.workingDir ?? '').trim() == normalizedWorkingDir,
@@ -77,6 +94,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
         final config = await RunBridge.instance.addConfig(
           name: name,
           command: command,
+          group: actionGroup,
           workingDir: args['workingDir'] as String?,
           env:
               args['env'] is Map
@@ -98,7 +116,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
 
       case 'remove':
         final identifier = args['id'] as String? ?? args['name'] as String?;
-        final config = RunBridge.instance.findConfig(identifier);
+        final config = RunBridge.instance.findConfig(identifier, actionGroup);
         if (config == null) {
           return const CliActionResult(ok: false, message: 'Missing "id"');
         }
@@ -113,6 +131,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
         try {
           final updated = await RunBridge.instance.updateConfig(
             identifier: identifier,
+            group: actionGroup,
             name: args['newName'] as String? ?? args['nameOverride'] as String?,
             command: args['command'] as String?,
             workingDir: args['workingDir'] as String?,
@@ -140,6 +159,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
         try {
           final session = await RunBridge.instance.startConfig(
             args['id'] as String? ?? args['name'] as String?,
+            actionGroup,
           );
           return CliActionResult(
             message: 'Running "${session.config.name}"',
@@ -155,6 +175,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
             args['sessionId'] as String? ??
                 args['id'] as String? ??
                 args['name'] as String?,
+            actionGroup,
           );
           return CliActionResult(
             message: 'Stopped "${session.config.name}"',
@@ -175,6 +196,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
                 args['sessionId'] as String? ??
                 args['id'] as String? ??
                 args['name'] as String?,
+            group: actionGroup,
             text: rawText,
             appendNewline: args['appendNewline'] as bool? ?? false,
           );
@@ -186,11 +208,46 @@ class RunConfigsCliHandler extends PanelCliHandler {
           return CliActionResult(ok: false, message: error.message);
         }
 
+      case 'detach':
+        try {
+          final session = await RunBridge.instance.detachSession(
+            args['sessionId'] as String? ??
+                args['id'] as String? ??
+                args['name'] as String?,
+            actionGroup,
+          );
+          return CliActionResult(
+            message: 'Detached "${session.config.name}"',
+            data: RunBridge.instance.serializeSession(session),
+          );
+        } on StateError catch (error) {
+          return CliActionResult(ok: false, message: error.message);
+        }
+
+      case 'attach':
+        try {
+          final session = await RunBridge.instance.attachSession(
+            identifier:
+                args['sessionId'] as String? ??
+                args['id'] as String? ??
+                args['name'] as String?,
+            group: actionGroup,
+            runningOnly: args['runningOnly'] as bool? ?? true,
+          );
+          return CliActionResult(
+            message: 'Attached "${session.config.name}"',
+            data: RunBridge.instance.serializeSession(session),
+          );
+        } on StateError catch (error) {
+          return CliActionResult(ok: false, message: error.message);
+        }
+
       case 'output':
         final session = RunBridge.instance.findSession(
           args['sessionId'] as String? ??
               args['id'] as String? ??
               args['name'] as String?,
+          group: actionGroup,
         );
         if (session == null) {
           return const CliActionResult(
@@ -205,6 +262,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
       case 'config':
         final config = RunBridge.instance.findConfig(
           args['id'] as String? ?? args['name'] as String?,
+          actionGroup,
         );
         if (config == null) {
           return const CliActionResult(
@@ -223,12 +281,16 @@ class RunConfigsCliHandler extends PanelCliHandler {
 
   @override
   Map<String, CliActionHelp> get actionHelp => {
-    'list': const CliActionHelp(description: 'List all run configurations'),
+    'list': const CliActionHelp(
+      description: 'List run configurations in current group',
+      params: {'group': 'Group scope override (optional)'},
+    ),
     'add': const CliActionHelp(
       description: 'Add a new run configuration',
       params: {
         'name': 'Configuration name (required)',
         'command': 'Shell command to execute (required)',
+        'group': 'Group scope override (optional)',
         'workingDir': 'Working directory (optional)',
         'env': 'Environment variables map (optional)',
         'isFlutterRun': 'Whether Flutter hot reload/restart controls apply',
@@ -243,6 +305,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
       params: {
         'id': 'Configuration ID',
         'name': 'Configuration name (alternative to id)',
+        'group': 'Group scope override (optional)',
       },
     ),
     'update': const CliActionHelp(
@@ -250,6 +313,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
       params: {
         'id': 'Configuration ID',
         'name': 'Configuration name (alternative to id)',
+        'group': 'Group scope override (optional)',
         'newName': 'New display name',
         'command': 'New command',
         'workingDir': 'Working directory override',
@@ -266,6 +330,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
       params: {
         'id': 'Configuration ID',
         'name': 'Configuration name (alternative to id)',
+        'group': 'Group scope override (optional)',
       },
     ),
     'stop': const CliActionHelp(
@@ -274,6 +339,26 @@ class RunConfigsCliHandler extends PanelCliHandler {
         'sessionId': 'Run session ID',
         'id': 'Configuration ID',
         'name': 'Configuration name',
+        'group': 'Group scope override (optional)',
+      },
+    ),
+    'detach': const CliActionHelp(
+      description: 'Detach from active run session (session keeps running)',
+      params: {
+        'sessionId': 'Run session ID',
+        'id': 'Configuration ID',
+        'name': 'Configuration name',
+        'group': 'Group scope override (optional)',
+      },
+    ),
+    'attach': const CliActionHelp(
+      description: 'Attach run console to a session in this group',
+      params: {
+        'sessionId': 'Run session ID',
+        'id': 'Configuration ID',
+        'name': 'Configuration name',
+        'group': 'Group scope override (optional)',
+        'runningOnly': 'Prefer running sessions (default: true)',
       },
     ),
     'input': const CliActionHelp(
@@ -284,6 +369,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
         'sessionId': 'Run session ID',
         'id': 'Configuration ID',
         'name': 'Configuration name',
+        'group': 'Group scope override (optional)',
       },
       example:
           '{"id":"preset_flutter_run_macos","text":"r","appendNewline":false}',
@@ -294,6 +380,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
         'sessionId': 'Run session ID',
         'id': 'Configuration ID',
         'name': 'Configuration name',
+        'group': 'Group scope override (optional)',
       },
     ),
     'config': const CliActionHelp(
@@ -301,7 +388,23 @@ class RunConfigsCliHandler extends PanelCliHandler {
       params: {
         'id': 'Configuration ID',
         'name': 'Configuration name (alternative to id)',
+        'group': 'Group scope override (optional)',
       },
     ),
   };
+
+  String _resolveGroup({
+    required BoardPanelInstance panel,
+    Map<String, dynamic>? args,
+  }) {
+    final argGroup = args?['group'];
+    if (argGroup is String && argGroup.trim().isNotEmpty) {
+      return argGroup.trim();
+    }
+    final panelGroup = panel.state['group'];
+    if (panelGroup is String && panelGroup.trim().isNotEmpty) {
+      return panelGroup.trim();
+    }
+    return panel.id;
+  }
 }

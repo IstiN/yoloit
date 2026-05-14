@@ -32,6 +32,7 @@ class CliServer {
 
   HttpServer? _server;
   BoardCubit? _cubit;
+  final Set<String> _warnedActionHelpTypes = <String>{};
 
   /// Port file written so the CLI client knows which port to connect to.
   static String get _portFilePath =>
@@ -79,9 +80,13 @@ class CliServer {
     _cubit = cubit;
 
     final handler = const shelf.Pipeline()
-        .addMiddleware(shelf.logRequests(logger: (msg, isError) {
-          if (isError) debugPrint('[CLI] ERROR: $msg');
-        }))
+        .addMiddleware(
+          shelf.logRequests(
+            logger: (msg, isError) {
+              if (isError) debugPrint('[CLI] ERROR: $msg');
+            },
+          ),
+        )
         .addHandler(_router);
 
     try {
@@ -219,7 +224,8 @@ class CliServer {
     }
     // GET /api/boards/:id/snapshot
     if (sub.length == 1 && sub[0] == 'snapshot' && method == 'GET') {
-      return _boardSnapshot(board);
+      final format = request.url.queryParameters['format'] ?? 'md';
+      return _boardSnapshot(board, format: format);
     }
     // POST /api/boards/:id/apply → apply YAML bulk operations
     if (sub.length == 1 && sub[0] == 'apply' && method == 'POST') {
@@ -332,13 +338,18 @@ class CliServer {
     final boards = cubit.state.boards;
     final active = cubit.state.activeBoardId;
     return _json({
-      'boards': boards.map((b) => {
-        'id': b.id,
-        'name': b.name,
-        'panelCount': b.panels.length,
-        'linkCount': b.links.length,
-        'active': b.id == active,
-      }).toList(),
+      'boards':
+          boards
+              .map(
+                (b) => {
+                  'id': b.id,
+                  'name': b.name,
+                  'panelCount': b.panels.length,
+                  'linkCount': b.links.length,
+                  'active': b.id == active,
+                },
+              )
+              .toList(),
     });
   }
 
@@ -372,7 +383,33 @@ class CliServer {
     });
   }
 
-  shelf.Response _boardSnapshot(BoardDocument board) {
+  shelf.Response _boardSnapshot(BoardDocument board, {String format = 'md'}) {
+    final normalized = format.trim().toLowerCase();
+    if (normalized == 'mermaid' || normalized == 'mmd') {
+      final lines = <String>['graph TD'];
+      final nodeByPanelId = <String, String>{};
+      for (var i = 0; i < board.panels.length; i++) {
+        final panel = board.panels[i];
+        final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+        final nodeId = 'p${i + 1}';
+        nodeByPanelId[panel.id] = nodeId;
+        final label = _escapeMermaidLabel(
+          '${panel.title}\\n${plugin?.displayName ?? panel.type}',
+        );
+        lines.add('  $nodeId["$label"]');
+      }
+      for (final link in board.links) {
+        final from = nodeByPanelId[link.fromPanelId];
+        final to = nodeByPanelId[link.toPanelId];
+        if (from == null || to == null) continue;
+        lines.add('  $from --> $to');
+      }
+      return shelf.Response.ok(
+        lines.join('\n'),
+        headers: {'content-type': 'text/plain; charset=utf-8'},
+      );
+    }
+
     final lines = <String>[];
     lines.add('# Board: ${board.name}');
     lines.add('');
@@ -396,14 +433,18 @@ class CliServer {
       lines.add('## Links (${board.links.length})');
       lines.add('');
       for (final link in board.links) {
-        final from = board.panels
-            .where((p) => p.id == link.fromPanelId)
-            .firstOrNull
-            ?.title ?? _short(link.fromPanelId);
-        final to = board.panels
-            .where((p) => p.id == link.toPanelId)
-            .firstOrNull
-            ?.title ?? _short(link.toPanelId);
+        final from =
+            board.panels
+                .where((p) => p.id == link.fromPanelId)
+                .firstOrNull
+                ?.title ??
+            _short(link.fromPanelId);
+        final to =
+            board.panels
+                .where((p) => p.id == link.toPanelId)
+                .firstOrNull
+                ?.title ??
+            _short(link.toPanelId);
         lines.add('- $from → $to (${link.style.name}, ${link.geometry.name})');
       }
     }
@@ -413,15 +454,21 @@ class CliServer {
     );
   }
 
+  String _escapeMermaidLabel(String input) {
+    return input
+        .replaceAll('\\', r'\\')
+        .replaceAll('"', r'\"')
+        .replaceAll('\n', r'\n');
+  }
+
   Future<shelf.Response> _boardScreenshot(BoardDocument board) async {
-    final png = await BoardScreenshotService.instance.capturePng(pixelRatio: 1.5);
+    final png = await BoardScreenshotService.instance.capturePng(
+      pixelRatio: 1.5,
+    );
     if (png == null) {
       return _error('Failed to capture board screenshot');
     }
-    return shelf.Response.ok(
-      png,
-      headers: {'content-type': 'image/png'},
-    );
+    return shelf.Response.ok(png, headers: {'content-type': 'image/png'});
   }
 
   shelf.Response _boardSvg(BoardDocument board) {
@@ -446,10 +493,14 @@ class CliServer {
       _scheduleRebuild();
     }
     // Viewport update: scale, x (translationX), y (translationY)
-    if (body.containsKey('scale') || body.containsKey('x') || body.containsKey('y')) {
+    if (body.containsKey('scale') ||
+        body.containsKey('x') ||
+        body.containsKey('y')) {
       final scale = (body['scale'] as num?)?.toDouble() ?? board.viewport.scale;
-      final tx = (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
-      final ty = (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
+      final tx =
+          (body['x'] as num?)?.toDouble() ?? board.viewport.translation.dx;
+      final ty =
+          (body['y'] as num?)?.toDouble() ?? board.viewport.translation.dy;
       final vp = board.viewport.copyWith(
         scale: scale.clamp(0.1, 4.0),
         translation: Offset(tx, ty),
@@ -461,10 +512,18 @@ class CliServer {
     if (body['fit'] == true) {
       final panels = board.panels.where((p) => !p.hidden).toList();
       if (panels.isNotEmpty) {
-        final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
-        final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
-        final maxX = panels.map((p) => p.bounds.x + p.bounds.width).reduce((a, b) => a > b ? a : b);
-        final maxY = panels.map((p) => p.bounds.y + p.bounds.height).reduce((a, b) => a > b ? a : b);
+        final minX = panels
+            .map((p) => p.bounds.x)
+            .reduce((a, b) => a < b ? a : b);
+        final minY = panels
+            .map((p) => p.bounds.y)
+            .reduce((a, b) => a < b ? a : b);
+        final maxX = panels
+            .map((p) => p.bounds.x + p.bounds.width)
+            .reduce((a, b) => a > b ? a : b);
+        final maxY = panels
+            .map((p) => p.bounds.y + p.bounds.height)
+            .reduce((a, b) => a > b ? a : b);
         const pad = 80.0;
         final vpW = (body['viewportWidth'] as num?)?.toDouble() ?? 1280.0;
         final vpH = (body['viewportHeight'] as num?)?.toDouble() ?? 800.0;
@@ -473,7 +532,10 @@ class CliServer {
         final s = (scaleX < scaleY ? scaleX : scaleY).clamp(0.1, 2.0);
         final tx = (vpW - (maxX - minX) * s) / 2 - minX * s;
         final ty = (vpH - (maxY - minY) * s) / 2 - minY * s;
-        final vp = board.viewport.copyWith(scale: s, translation: Offset(tx, ty));
+        final vp = board.viewport.copyWith(
+          scale: s,
+          translation: Offset(tx, ty),
+        );
         await cubit.updateViewport(vp, boardId: board.id);
         _scheduleRebuild();
       }
@@ -484,9 +546,7 @@ class CliServer {
   // ── Panel implementations ──────────────────────────────────────────────
 
   shelf.Response _listPanels(BoardDocument board) {
-    return _json({
-      'panels': board.panels.map(_panelSummary).toList(),
-    });
+    return _json({'panels': board.panels.map(_panelSummary).toList()});
   }
 
   Future<shelf.Response> _createPanel(
@@ -501,37 +561,129 @@ class CliServer {
     if (plugin == null) return _error('Unknown panel type: $typeId');
 
     final title = body['title'] as String? ?? plugin.displayName;
-    final x = (body['x'] as num?)?.toDouble() ?? 100;
-    final y = (body['y'] as num?)?.toDouble() ?? 100;
     final w = (body['width'] as num?)?.toDouble() ?? plugin.defaultSize.width;
     final h = (body['height'] as num?)?.toDouble() ?? plugin.defaultSize.height;
     final state = body['state'] as Map<String, dynamic>? ?? plugin.initialState;
+    final hasCustomPosition = body['x'] is num || body['y'] is num;
+    final bounds =
+        !hasCustomPosition
+            ? _nextAvailableBoundsFor(
+              board,
+              preferredWidth: w,
+              preferredHeight: h,
+            )
+            : BoardPanelBounds(
+              x: (body['x'] as num?)?.toDouble() ?? 100,
+              y: (body['y'] as num?)?.toDouble() ?? 100,
+              width: w,
+              height: h,
+            );
 
     final panelId = 'p-${DateTime.now().millisecondsSinceEpoch}';
     final panel = BoardPanelInstance(
       id: panelId,
       type: typeId,
       title: title,
-      bounds: BoardPanelBounds(x: x, y: y, width: w, height: h),
+      bounds: bounds,
       state: state,
+      zIndex:
+          board.panels.fold<int>(
+            0,
+            (value, p) => p.zIndex > value ? p.zIndex : value,
+          ) +
+          1,
     );
     await cubit.addPanel(panel, boardId: board.id);
     _scheduleRebuild();
-    return _json({
-      'ok': true,
-      'panel': _panelSummary(panel),
-    });
+    return _json({'ok': true, 'panel': _panelSummary(panel)});
+  }
+
+  BoardPanelBounds _nextAvailableBoundsFor(
+    BoardDocument board, {
+    required double preferredWidth,
+    required double preferredHeight,
+  }) {
+    const startX = 120.0;
+    const startY = 120.0;
+    const gap = 24.0;
+    const stepX = 56.0;
+    const stepY = 42.0;
+    const maxColumns = 8;
+
+    final occupiedRects =
+        board.panels
+            .where((panel) => !panel.hidden)
+            .map((panel) => panel.bounds.rect.inflate(gap))
+            .toList();
+
+    for (var row = 0; row < 40; row++) {
+      for (var column = 0; column < maxColumns; column++) {
+        final candidate = Rect.fromLTWH(
+          startX + (column * (preferredWidth + stepX)),
+          startY + (row * (preferredHeight + stepY)),
+          preferredWidth,
+          preferredHeight,
+        );
+        final overlaps = occupiedRects.any(candidate.overlaps);
+        if (!overlaps) {
+          return BoardPanelBounds(
+            x: candidate.left,
+            y: candidate.top,
+            width: preferredWidth,
+            height: preferredHeight,
+          );
+        }
+      }
+    }
+
+    return BoardPanelBounds(
+      x: startX,
+      y: startY + (occupiedRects.length * (preferredHeight + stepY) * 0.35),
+      width: preferredWidth,
+      height: preferredHeight,
+    );
   }
 
   shelf.Response _panelDetails(BoardPanelInstance panel) {
     final handler = _panelHandlers[panel.type];
+    if (handler != null) _warnIfActionHelpIncomplete(handler);
     final content = handler?.getContent(panel);
     return _json({
       ..._panelSummary(panel),
       'state': panel.state,
       if (content != null) 'content': content,
       if (handler != null) 'supportedActions': handler.supportedActions,
+      if (handler != null) 'actionHelp': _serializeActionHelp(handler),
     });
+  }
+
+  Map<String, dynamic> _serializeActionHelp(PanelCliHandler handler) {
+    final out = <String, dynamic>{};
+    handler.actionHelp.forEach((action, help) {
+      out[action] = {
+        'description': help.description,
+        if (help.params.isNotEmpty) 'params': help.params,
+        if (help.example != null && help.example!.trim().isNotEmpty)
+          'example': help.example,
+      };
+    });
+    return out;
+  }
+
+  void _warnIfActionHelpIncomplete(PanelCliHandler handler) {
+    if (_warnedActionHelpTypes.contains(handler.typeId)) return;
+    final missing =
+        handler.supportedActions
+            .where((action) => !handler.actionHelp.containsKey(action))
+            .toList();
+    if (missing.isEmpty) return;
+    _warnedActionHelpTypes.add(handler.typeId);
+    developer.log(
+      '[CliServer] ${handler.typeId}: missing actionHelp for ${missing.join(', ')}. '
+      'New CLI actions should include English description and params for self-help.',
+      name: 'yoloit.cli',
+      level: 900,
+    );
   }
 
   Future<shelf.Response> _updatePanel(
@@ -549,8 +701,10 @@ class CliServer {
       _scheduleRebuild();
     }
     if (body.containsKey('x') || body.containsKey('y')) {
-      final dx = ((body['x'] as num?)?.toDouble() ?? panel.bounds.x) - panel.bounds.x;
-      final dy = ((body['y'] as num?)?.toDouble() ?? panel.bounds.y) - panel.bounds.y;
+      final dx =
+          ((body['x'] as num?)?.toDouble() ?? panel.bounds.x) - panel.bounds.x;
+      final dy =
+          ((body['y'] as num?)?.toDouble() ?? panel.bounds.y) - panel.bounds.y;
       await cubit.movePanel(panel.id, Offset(dx, dy), boardId: board.id);
       _scheduleRebuild();
     }
@@ -600,7 +754,8 @@ class CliServer {
     if (!handler.supportedActions.contains(action)) {
       return _error(
         'Unsupported action "$action" for ${panel.type}. '
-        'Supported: ${handler.supportedActions.join(', ')}',
+        'Supported: ${handler.supportedActions.join(', ')}. '
+        'Use `yoloit panel:help "<board>" "<panel>"` for action details.',
       );
     }
 
@@ -614,7 +769,8 @@ class CliServer {
         (p) => p.copyWith(state: mergedState),
         boardId: board.id,
       );
-      if (panel.type == 'board.note.markdown' && mergedState['autoHeight'] == true) {
+      if (panel.type == 'board.note.markdown' &&
+          mergedState['autoHeight'] == true) {
         final markdown = mergedState['markdown'] as String? ?? '';
         final targetHeight = _estimateMarkdownNoteHeight(
           markdown,
@@ -637,10 +793,7 @@ class CliServer {
     final painter = TextPainter(
       text: TextSpan(
         text: markdown.isEmpty ? '*Empty note*' : markdown,
-        style: const TextStyle(
-          fontSize: 14,
-          height: 1.25,
-        ),
+        style: const TextStyle(fontSize: 14, height: 1.25),
       ),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: (width - 32 - 24).clamp(100.0, 2000.0));
@@ -665,7 +818,14 @@ class CliServer {
     );
     await cubit.updateViewport(vp, boardId: board.id);
     _scheduleRebuild();
-    return _json({'ok': true, 'viewport': {'scale': vp.scale, 'x': vp.translation.dx, 'y': vp.translation.dy}});
+    return _json({
+      'ok': true,
+      'viewport': {
+        'scale': vp.scale,
+        'x': vp.translation.dx,
+        'y': vp.translation.dy,
+      },
+    });
   }
 
   Future<shelf.Response> _fitViewport(
@@ -679,8 +839,12 @@ class CliServer {
     // Bounding box of all panels
     final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
     final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
-    final maxX = panels.map((p) => p.bounds.x + p.bounds.width).reduce((a, b) => a > b ? a : b);
-    final maxY = panels.map((p) => p.bounds.y + p.bounds.height).reduce((a, b) => a > b ? a : b);
+    final maxX = panels
+        .map((p) => p.bounds.x + p.bounds.width)
+        .reduce((a, b) => a > b ? a : b);
+    final maxY = panels
+        .map((p) => p.bounds.y + p.bounds.height)
+        .reduce((a, b) => a > b ? a : b);
 
     final contentW = maxX - minX;
     final contentH = maxY - minY;
@@ -708,7 +872,11 @@ class CliServer {
     _scheduleRebuild();
     return _json({
       'ok': true,
-      'viewport': {'scale': vp.scale, 'x': vp.translation.dx, 'y': vp.translation.dy},
+      'viewport': {
+        'scale': vp.scale,
+        'x': vp.translation.dx,
+        'y': vp.translation.dy,
+      },
       'bounds': {'minX': minX, 'minY': minY, 'maxX': maxX, 'maxY': maxY},
     });
   }
@@ -779,8 +947,12 @@ class CliServer {
     }
 
     // Find max panel size for spacing calculations
-    final maxW = panels.map((p) => p.bounds.width).reduce((a, b) => a > b ? a : b);
-    final maxH = panels.map((p) => p.bounds.height).reduce((a, b) => a > b ? a : b);
+    final maxW = panels
+        .map((p) => p.bounds.width)
+        .reduce((a, b) => a > b ? a : b);
+    final maxH = panels
+        .map((p) => p.bounds.height)
+        .reduce((a, b) => a > b ? a : b);
 
     // Assign x/y based on depth/index and direction
     const originX = 80.0;
@@ -804,7 +976,10 @@ class CliServer {
 
     // Also arrange unlinked panels below the tree
     if (unlinked.isNotEmpty) {
-      final treeMaxY = moves.values.isEmpty ? originY : moves.values.map((v) => v.$2).reduce((a, b) => a > b ? a : b);
+      final treeMaxY =
+          moves.values.isEmpty
+              ? originY
+              : moves.values.map((v) => v.$2).reduce((a, b) => a > b ? a : b);
       final startY = treeMaxY + maxH + vSpacing * 2;
       for (var i = 0; i < unlinked.length; i++) {
         final x = originX + i * (maxW + hSpacing);
@@ -886,11 +1061,15 @@ class CliServer {
             panels: [...currentBoard.panels, created],
           );
         }
-      } else if (opMap['op'] == 'panel.delete' || opMap['action'] == 'panel.delete') {
+      } else if (opMap['op'] == 'panel.delete' ||
+          opMap['action'] == 'panel.delete') {
         final panelId = _string(result['panelId']);
         if (panelId != null) {
           currentBoard = currentBoard.copyWith(
-            panels: currentBoard.panels.where((panel) => panel.id != panelId).toList(),
+            panels:
+                currentBoard.panels
+                    .where((panel) => panel.id != panelId)
+                    .toList(),
           );
         }
       }
@@ -925,9 +1104,9 @@ class CliServer {
     BoardDocument board,
     Map<String, String> refs,
     Map<String, BoardPanelInstance> pendingPanels,
-    Map<String, dynamic> raw,
-    {required int index}
-  ) async {
+    Map<String, dynamic> raw, {
+    required int index,
+  }) async {
     final op = _string(raw['op'] ?? raw['action']);
     if (op == null || op.isEmpty) {
       return {'ok': false, 'error': 'Missing "op" field'};
@@ -1094,10 +1273,13 @@ class CliServer {
     final locked = _bool(raw['locked']) ?? false;
     final pinned = _bool(raw['pinned']) ?? false;
     final panelId = _string(raw['id'] ?? raw['panelId']) ?? _nextBulkId('p');
-    final zIndex = _int(raw['zIndex']) ?? board.panels.fold<int>(
-      0,
-      (value, panel) => panel.zIndex > value ? panel.zIndex : value,
-    ) + 1;
+    final zIndex =
+        _int(raw['zIndex']) ??
+        board.panels.fold<int>(
+              0,
+              (value, panel) => panel.zIndex > value ? panel.zIndex : value,
+            ) +
+            1;
 
     final panel = BoardPanelInstance(
       id: panelId,
@@ -1105,15 +1287,8 @@ class CliServer {
       title: title.trim().isEmpty ? plugin.displayName : title.trim(),
       bounds: BoardPanelBounds(x: x, y: y, width: width, height: height),
       color: color,
-      params: {
-        ...?params,
-        if (ref != null && ref.isNotEmpty)
-          'yamlRef': ref,
-      },
-      state: {
-        ...plugin.initialState,
-        if (state != null) ...state,
-      },
+      params: {...?params, if (ref != null && ref.isNotEmpty) 'yamlRef': ref},
+      state: {...plugin.initialState, if (state != null) ...state},
       zIndex: zIndex,
       hidden: hidden,
       locked: locked,
@@ -1168,27 +1343,26 @@ class CliServer {
     }
 
     final updates = <String, dynamic>{};
-    if (raw.containsKey('title')) updates['title'] = _string(raw['title']) ?? panel.title;
-    if (raw.containsKey('hidden')) updates['hidden'] = _bool(raw['hidden']) ?? panel.hidden;
-    if (raw.containsKey('locked')) updates['locked'] = _bool(raw['locked']) ?? panel.locked;
-    if (raw.containsKey('pinned')) updates['pinned'] = _bool(raw['pinned']) ?? panel.pinned;
+    if (raw.containsKey('title'))
+      updates['title'] = _string(raw['title']) ?? panel.title;
+    if (raw.containsKey('hidden'))
+      updates['hidden'] = _bool(raw['hidden']) ?? panel.hidden;
+    if (raw.containsKey('locked'))
+      updates['locked'] = _bool(raw['locked']) ?? panel.locked;
+    if (raw.containsKey('pinned'))
+      updates['pinned'] = _bool(raw['pinned']) ?? panel.pinned;
     if (raw.containsKey('color')) {
       final colorStr = _string(raw['color']);
       updates['color'] = colorStr == 'clear' ? null : _parseColor(colorStr);
     }
     if (raw.containsKey('params')) {
-      updates['params'] = {
-        ...panel.params,
-        ...? _map(raw['params']),
-      };
+      updates['params'] = {...panel.params, ...?_map(raw['params'])};
     }
     if (raw.containsKey('state')) {
-      updates['state'] = {
-        ...panel.state,
-        ...? _map(raw['state']),
-      };
+      updates['state'] = {...panel.state, ...?_map(raw['state'])};
     }
-    if (raw.containsKey('zIndex')) updates['zIndex'] = _int(raw['zIndex']) ?? panel.zIndex;
+    if (raw.containsKey('zIndex'))
+      updates['zIndex'] = _int(raw['zIndex']) ?? panel.zIndex;
     if (raw.containsKey('x') || raw.containsKey('y')) {
       final x = _double(raw['x']) ?? panel.bounds.x;
       final y = _double(raw['y']) ?? panel.bounds.y;
@@ -1273,10 +1447,14 @@ class CliServer {
     if (panel.type == 'board.note.markdown' &&
         ((updates['state'] as Map<String, dynamic>?)?['autoHeight'] == true)) {
       final markdown =
-          ((updates['state'] as Map<String, dynamic>?)?['markdown'] as String?) ??
+          ((updates['state'] as Map<String, dynamic>?)?['markdown']
+              as String?) ??
           panel.state['markdown'] as String? ??
           '';
-      final targetHeight = _estimateMarkdownNoteHeight(markdown, panel.bounds.width);
+      final targetHeight = _estimateMarkdownNoteHeight(
+        markdown,
+        panel.bounds.width,
+      );
       await cubit.resizePanel(
         panel.id,
         width: panel.bounds.width,
@@ -1426,22 +1604,28 @@ class CliServer {
     final action = _string(raw['action']);
     if (action == null) return {'ok': false, 'error': 'Missing "action"'};
 
-    final body = <String, dynamic>{...raw}
-      ..remove('op')
-      ..remove('panel')
-      ..remove('panelId')
-      ..remove('panelRef')
-      ..remove('ref');
+    final body =
+        <String, dynamic>{...raw}
+          ..remove('op')
+          ..remove('panel')
+          ..remove('panelId')
+          ..remove('panelRef')
+          ..remove('ref');
     body['action'] = action;
 
     final handler = _panelHandlers[panel.type];
     if (handler == null) {
-      return {'ok': false, 'error': 'No CLI handler for panel type: ${panel.type}'};
+      return {
+        'ok': false,
+        'error': 'No CLI handler for panel type: ${panel.type}',
+      };
     }
     if (!handler.supportedActions.contains(action)) {
       return {
         'ok': false,
-        'error': 'Unsupported action "$action" for ${panel.type}',
+        'error':
+            'Unsupported action "$action" for ${panel.type}. '
+            'Supported: ${handler.supportedActions.join(', ')}',
       };
     }
 
@@ -1456,7 +1640,10 @@ class CliServer {
       if (panel.type == 'board.note.markdown' &&
           mergedState['autoHeight'] == true) {
         final markdown = mergedState['markdown'] as String? ?? '';
-        final targetHeight = _estimateMarkdownNoteHeight(markdown, panel.bounds.width);
+        final targetHeight = _estimateMarkdownNoteHeight(
+          markdown,
+          panel.bounds.width,
+        );
         await cubit.resizePanel(
           panel.id,
           width: panel.bounds.width,
@@ -1476,20 +1663,12 @@ class CliServer {
     Map<String, dynamic> raw, {
     required int index,
   }) async {
-    final from = _resolveYamlPanel(
-      cubit,
-      board,
-      refs,
-      pendingPanels,
-      {'panel': raw['from'] ?? raw['fromPanelId']},
-    );
-    final to = _resolveYamlPanel(
-      cubit,
-      board,
-      refs,
-      pendingPanels,
-      {'panel': raw['to'] ?? raw['toPanelId']},
-    );
+    final from = _resolveYamlPanel(cubit, board, refs, pendingPanels, {
+      'panel': raw['from'] ?? raw['fromPanelId'],
+    });
+    final to = _resolveYamlPanel(cubit, board, refs, pendingPanels, {
+      'panel': raw['to'] ?? raw['toPanelId'],
+    });
     if (from == null || to == null) {
       return {'ok': false, 'error': 'Link endpoints not found'};
     }
@@ -1523,7 +1702,8 @@ class CliServer {
     Map<String, dynamic> raw, {
     required int index,
   }) async {
-    final linkId = _string(raw['link'] ?? raw['linkId'] ?? raw['ref']) ??
+    final linkId =
+        _string(raw['link'] ?? raw['linkId'] ?? raw['ref']) ??
         refs[_string(raw['ref']) ?? ''];
     if (linkId == null || linkId.isEmpty) {
       return {'ok': false, 'error': 'Missing link identifier'};
@@ -1541,7 +1721,8 @@ class CliServer {
     String op, {
     required int index,
   }) async {
-    final linkId = _string(raw['link'] ?? raw['linkId'] ?? raw['ref']) ??
+    final linkId =
+        _string(raw['link'] ?? raw['linkId'] ?? raw['ref']) ??
         refs[_string(raw['ref']) ?? ''];
     if (linkId == null || linkId.isEmpty) {
       return {'ok': false, 'error': 'Missing link identifier'};
@@ -1553,21 +1734,22 @@ class CliServer {
     final geometryStr = _string(raw['geometry']);
     final colorStr = _string(raw['color']);
 
-    final style = styleStr == null
-        ? link.style
-        : BoardLinkStyle.values.firstWhere(
-            (s) => s.name == styleStr,
-            orElse: () => link.style,
-          );
-    final geometry = geometryStr == null
-        ? link.geometry
-        : BoardLinkGeometry.values.firstWhere(
-            (g) => g.name == geometryStr,
-            orElse: () => link.geometry,
-          );
-    final color = colorStr == null
-        ? link.color
-        : _parseColor(colorStr) ?? link.color;
+    final style =
+        styleStr == null
+            ? link.style
+            : BoardLinkStyle.values.firstWhere(
+              (s) => s.name == styleStr,
+              orElse: () => link.style,
+            );
+    final geometry =
+        geometryStr == null
+            ? link.geometry
+            : BoardLinkGeometry.values.firstWhere(
+              (g) => g.name == geometryStr,
+              orElse: () => link.geometry,
+            );
+    final color =
+        colorStr == null ? link.color : _parseColor(colorStr) ?? link.color;
 
     await cubit.upsertLink(
       link.copyWith(style: style, geometry: geometry, color: color),
@@ -1587,8 +1769,12 @@ class CliServer {
 
     final minX = panels.map((p) => p.bounds.x).reduce((a, b) => a < b ? a : b);
     final minY = panels.map((p) => p.bounds.y).reduce((a, b) => a < b ? a : b);
-    final maxX = panels.map((p) => p.bounds.x + p.bounds.width).reduce((a, b) => a > b ? a : b);
-    final maxY = panels.map((p) => p.bounds.y + p.bounds.height).reduce((a, b) => a > b ? a : b);
+    final maxX = panels
+        .map((p) => p.bounds.x + p.bounds.width)
+        .reduce((a, b) => a > b ? a : b);
+    final maxY = panels
+        .map((p) => p.bounds.y + p.bounds.height)
+        .reduce((a, b) => a > b ? a : b);
 
     final contentW = maxX - minX;
     final contentH = maxY - minY;
@@ -1609,7 +1795,11 @@ class CliServer {
     await cubit.updateViewport(vp, boardId: board.id);
     return {
       'ok': true,
-      'viewport': {'scale': vp.scale, 'x': vp.translation.dx, 'y': vp.translation.dy},
+      'viewport': {
+        'scale': vp.scale,
+        'x': vp.translation.dx,
+        'y': vp.translation.dy,
+      },
       'bounds': {'minX': minX, 'minY': minY, 'maxX': maxX, 'maxY': maxY},
     };
   }
@@ -1666,7 +1856,8 @@ class CliServer {
     Map<String, BoardPanelInstance> pendingPanels,
     Map<String, dynamic> raw,
   ) {
-    final spec = raw['panel'] ?? raw['panelId'] ?? raw['panelRef'] ?? raw['ref'];
+    final spec =
+        raw['panel'] ?? raw['panelId'] ?? raw['panelRef'] ?? raw['ref'];
     final ref = _string(spec);
     if (ref == null || ref.isEmpty) return null;
     final liveBoard = cubit.state.boards.firstWhere(
@@ -1715,12 +1906,22 @@ class CliServer {
   }
 
   String? _string(dynamic value) => value?.toString();
-  double? _double(dynamic value) => value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');
-  int? _int(dynamic value) => value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
-  bool? _bool(dynamic value) => value is bool ? value : (value?.toString().toLowerCase() == 'true');
-  Map<String, dynamic>? _map(dynamic value) => value is Map ? Map<String, dynamic>.from(_yamlToDart(value) as Map) : null;
-  Color? _color(dynamic value) => value == null ? null : _parseColor(value.toString());
-  String _nextBulkId(String prefix) => '$prefix-${DateTime.now().microsecondsSinceEpoch}';
+  double? _double(dynamic value) =>
+      value is num
+          ? value.toDouble()
+          : double.tryParse(value?.toString() ?? '');
+  int? _int(dynamic value) =>
+      value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
+  bool? _bool(dynamic value) =>
+      value is bool ? value : (value?.toString().toLowerCase() == 'true');
+  Map<String, dynamic>? _map(dynamic value) =>
+      value is Map
+          ? Map<String, dynamic>.from(_yamlToDart(value) as Map)
+          : null;
+  Color? _color(dynamic value) =>
+      value == null ? null : _parseColor(value.toString());
+  String _nextBulkId(String prefix) =>
+      '$prefix-${DateTime.now().microsecondsSinceEpoch}';
 
   shelf.Response _yamlError(String message, {Map<String, dynamic>? details}) {
     return shelf.Response(
@@ -1739,14 +1940,19 @@ class CliServer {
   shelf.Response _listPanelTypes() {
     final plugins = BoardPluginRegistry.instance.all;
     return _json({
-      'types': plugins.map((p) => {
-        'typeId': p.typeId,
-        'name': p.displayName,
-        'defaultSize': {
-          'w': p.defaultSize.width.toInt(),
-          'h': p.defaultSize.height.toInt(),
-        },
-      }).toList(),
+      'types':
+          plugins
+              .map(
+                (p) => {
+                  'typeId': p.typeId,
+                  'name': p.displayName,
+                  'defaultSize': {
+                    'w': p.defaultSize.width.toInt(),
+                    'h': p.defaultSize.height.toInt(),
+                  },
+                },
+              )
+              .toList(),
     });
   }
 
@@ -1786,16 +1992,20 @@ class CliServer {
     return _json({'ok': true});
   }
 
-
   shelf.Response _listLinks(BoardDocument board) {
     return _json({
-      'links': board.links.map((l) => {
-        'id': l.id,
-        'from': l.fromPanelId,
-        'to': l.toPanelId,
-        'style': l.style.name,
-        'geometry': l.geometry.name,
-      }).toList(),
+      'links':
+          board.links
+              .map(
+                (l) => {
+                  'id': l.id,
+                  'from': l.fromPanelId,
+                  'to': l.toPanelId,
+                  'style': l.style.name,
+                  'geometry': l.geometry.name,
+                },
+              )
+              .toList(),
     });
   }
 
@@ -1837,7 +2047,10 @@ class CliServer {
     );
     await cubit.upsertLink(link, boardId: board.id);
     _scheduleRebuild();
-    return _json({'ok': true, 'link': {'id': link.id}});
+    return _json({
+      'ok': true,
+      'link': {'id': link.id},
+    });
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────
@@ -1848,9 +2061,10 @@ class CliServer {
     final byId = boards.where((b) => b.id == idOrName).firstOrNull;
     if (byId != null) return byId;
     // Exact name match (case-insensitive)
-    final byName = boards
-        .where((b) => b.name.toLowerCase() == idOrName.toLowerCase())
-        .firstOrNull;
+    final byName =
+        boards
+            .where((b) => b.name.toLowerCase() == idOrName.toLowerCase())
+            .firstOrNull;
     if (byName != null) return byName;
     // Partial id match
     return boards.where((b) => b.id.startsWith(idOrName)).firstOrNull;
@@ -1860,9 +2074,10 @@ class CliServer {
     final panels = board.panels;
     final byId = panels.where((p) => p.id == idOrTitle).firstOrNull;
     if (byId != null) return byId;
-    final byTitle = panels
-        .where((p) => p.title.toLowerCase() == idOrTitle.toLowerCase())
-        .firstOrNull;
+    final byTitle =
+        panels
+            .where((p) => p.title.toLowerCase() == idOrTitle.toLowerCase())
+            .firstOrNull;
     if (byTitle != null) return byTitle;
     return panels.where((p) => p.id.startsWith(idOrTitle)).firstOrNull;
   }

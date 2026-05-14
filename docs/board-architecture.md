@@ -179,7 +179,7 @@ classDiagram
 
     class RunConfigsCliHandler {
         typeId = "board.run_configs"
-        actions: list, add, remove, run, stop, output, config
+        actions: list, add, remove, run, stop, input, output, config
     }
 
     class AssistantCliHandler {
@@ -413,5 +413,5 @@ lib/core/cli/
 | `board.file.preview` | File Preview | 🖼️ | 400×400 | get, open |
 | `board.terminal` | Terminal | ⌨️ | 520×360 | config, set-dir |
 | `board.filetree` | File Tree | 🌳 | 320×500 | list, set-root, expand, collapse, open, refresh |
-| `board.run_configs` | Run Configs | ▶️ | 600×400 | list, add, remove, run, stop, output, config |
+| `board.run_configs` | Run Configs | ▶️ | 600×400 | list, add, remove, run, stop, input, output, config |
 | `board.yolo_assistant` | YoLo Assistant | 🤖 | 420×560 | send, messages, clear, skills, add-skill, remove-skill, mode, voice-start, voice-stop |

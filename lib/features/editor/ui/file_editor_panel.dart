@@ -591,7 +591,10 @@ class _MarkdownPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MarkdownDocumentPreview(content: content);
+    return Padding(
+      padding: const EdgeInsets.only(top: 34),
+      child: MarkdownDocumentPreview(content: content),
+    );
   }
 }
 

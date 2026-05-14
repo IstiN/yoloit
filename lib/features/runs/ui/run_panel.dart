@@ -11,22 +11,93 @@ import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/runs/models/run_session.dart';
 import 'package:yoloit/features/runs/ui/run_config_dialog.dart';
 
+typedef RunPanelDetachToPanelCallback = Future<void> Function(RunSession session);
+typedef RunPanelSendToGroupCallback = Future<void> Function(
+  RunSession session,
+  String group,
+  bool createNewPanel,
+);
+typedef RunPanelSessionVisibilityChanged =
+    void Function(String sessionId, bool hidden);
+
 class RunPanel extends StatelessWidget {
-  const RunPanel({super.key});
+  const RunPanel({
+    super.key,
+    required this.groupId,
+    this.onGroupChanged,
+    this.showGroupControls = true,
+    this.showConfigList = true,
+    this.showSessionTabs = true,
+    this.initialAttachedSessionId,
+    this.onAttachedSessionChanged,
+    this.hiddenSessionIds = const [],
+    this.onSessionVisibilityChanged,
+    this.onDetachToPanel,
+    this.onSendToGroup,
+  });
+
+  final String groupId;
+  final ValueChanged<String>? onGroupChanged;
+  final bool showGroupControls;
+  final bool showConfigList;
+  final bool showSessionTabs;
+  final String? initialAttachedSessionId;
+  final ValueChanged<String?>? onAttachedSessionChanged;
+  final List<String> hiddenSessionIds;
+  final RunPanelSessionVisibilityChanged? onSessionVisibilityChanged;
+  final RunPanelDetachToPanelCallback? onDetachToPanel;
+  final RunPanelSendToGroupCallback? onSendToGroup;
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<RunCubit, RunState>(
       builder: (context, state) {
-        return _RunPanelView(state: state);
+        return _RunPanelView(
+          state: state,
+          groupId: groupId,
+          onGroupChanged: onGroupChanged,
+          showGroupControls: showGroupControls,
+          showConfigList: showConfigList,
+          showSessionTabs: showSessionTabs,
+          initialAttachedSessionId: initialAttachedSessionId,
+          onAttachedSessionChanged: onAttachedSessionChanged,
+          hiddenSessionIds: hiddenSessionIds,
+          onSessionVisibilityChanged: onSessionVisibilityChanged,
+          onDetachToPanel: onDetachToPanel,
+          onSendToGroup: onSendToGroup,
+        );
       },
     );
   }
 }
 
 class _RunPanelView extends StatefulWidget {
-  const _RunPanelView({required this.state});
+  const _RunPanelView({
+    required this.state,
+    required this.groupId,
+    this.onGroupChanged,
+    this.showGroupControls = true,
+    this.showConfigList = true,
+    this.showSessionTabs = true,
+    this.initialAttachedSessionId,
+    this.onAttachedSessionChanged,
+    this.hiddenSessionIds = const [],
+    this.onSessionVisibilityChanged,
+    this.onDetachToPanel,
+    this.onSendToGroup,
+  });
   final RunState state;
+  final String groupId;
+  final ValueChanged<String>? onGroupChanged;
+  final bool showGroupControls;
+  final bool showConfigList;
+  final bool showSessionTabs;
+  final String? initialAttachedSessionId;
+  final ValueChanged<String?>? onAttachedSessionChanged;
+  final List<String> hiddenSessionIds;
+  final RunPanelSessionVisibilityChanged? onSessionVisibilityChanged;
+  final RunPanelDetachToPanelCallback? onDetachToPanel;
+  final RunPanelSendToGroupCallback? onSendToGroup;
 
   @override
   State<_RunPanelView> createState() => _RunPanelViewState();
@@ -35,11 +106,15 @@ class _RunPanelView extends StatefulWidget {
 class _RunPanelViewState extends State<_RunPanelView> {
   final _scrollController = ScrollController();
   bool _workspaceLoadInFlight = false;
+  String? _attachedSessionId;
 
   @override
   void initState() {
     super.initState();
+    _attachedSessionId =
+        widget.initialAttachedSessionId ?? widget.state.activeSessionId;
     _ensureWorkspaceLoaded();
+    _ensureGroupLoaded();
   }
 
   @override
@@ -51,9 +126,20 @@ class _RunPanelViewState extends State<_RunPanelView> {
   @override
   void didUpdateWidget(_RunPanelView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialAttachedSessionId != widget.initialAttachedSessionId &&
+        widget.initialAttachedSessionId != null &&
+        widget.initialAttachedSessionId != _attachedSessionId) {
+      _attachedSessionId = widget.initialAttachedSessionId;
+    }
     _ensureWorkspaceLoaded();
-    final oldSession = oldWidget.state.activeSession;
-    final newSession = widget.state.activeSession;
+    if (oldWidget.groupId != widget.groupId) {
+      _ensureGroupLoaded();
+    }
+    final oldSession = _findSession(
+      oldWidget.state.sessions,
+      _attachedSessionId,
+    );
+    final newSession = _findSession(widget.state.sessions, _attachedSessionId);
     if (newSession != null &&
         newSession.output.length != (oldSession?.output.length ?? 0)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
@@ -84,26 +170,94 @@ class _RunPanelViewState extends State<_RunPanelView> {
     });
   }
 
+  void _ensureGroupLoaded() {
+    final group = widget.groupId.trim();
+    if (group.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<RunCubit>().ensureGroupInitialized(group);
+    });
+  }
+
+  RunSession? _findSession(List<RunSession> sessions, String? sessionId) {
+    if (sessionId == null) return null;
+    for (final session in sessions) {
+      if (session.id == sessionId) return session;
+    }
+    return null;
+  }
+
+  void _attachSession(String? sessionId) {
+    if (_attachedSessionId == sessionId) return;
+    setState(() {
+      _attachedSessionId = sessionId;
+    });
+    widget.onAttachedSessionChanged?.call(sessionId);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final state = widget.state;
+    final group = widget.groupId.trim();
+    final hidden = widget.hiddenSessionIds.toSet();
+    final configs =
+        state.configs.where((config) => config.group == group).toList();
+    final sessions =
+        state.sessions
+            .where(
+              (session) =>
+                  session.config.group == group && !hidden.contains(session.id),
+            )
+            .toList();
+    final activeSessionId =
+        sessions.any((s) => s.id == _attachedSessionId) ? _attachedSessionId : null;
+    if (activeSessionId == null && _attachedSessionId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _attachSession(null);
+      });
+    }
+    final scopedState = state.copyWith(
+      configs: configs,
+      sessions: sessions,
+      activeSessionId: activeSessionId,
+    );
 
     return Container(
       color: colors.terminalBackground,
       child: Row(
         children: [
-          // Left: configurations list (always visible)
-          _ConfigList(state: state),
-          Container(width: 1, color: colors.divider),
+          if (widget.showConfigList) ...[
+            // Left: configurations list
+            _ConfigList(
+              state: scopedState,
+              groupId: group,
+              onGroupChanged: widget.onGroupChanged,
+              showGroupControls: widget.showGroupControls,
+              onAttachSession: _attachSession,
+            ),
+            Container(width: 1, color: colors.divider),
+          ],
           // Right: session tabs + console output
           Expanded(
             child: Column(
               children: [
-                _ConsoleHeader(state: state),
+                _ConsoleHeader(
+                  state: scopedState,
+                  allSessions: state.sessions,
+                  allConfigs: state.configs,
+                  currentGroup: group,
+                  showSessionTabs: widget.showSessionTabs,
+                  onGroupChanged: widget.onGroupChanged,
+                  onAttachSession: _attachSession,
+                  onSessionVisibilityChanged: widget.onSessionVisibilityChanged,
+                  onDetachToPanel: widget.onDetachToPanel,
+                  onSendToGroup: widget.onSendToGroup,
+                ),
                 Expanded(
                   child: _Console(
-                    state: state,
+                    state: scopedState,
                     scrollController: _scrollController,
                   ),
                 ),
@@ -119,8 +273,28 @@ class _RunPanelViewState extends State<_RunPanelView> {
 // ── Console Header (tabs + action buttons, shown inside the right area) ──────
 
 class _ConsoleHeader extends StatelessWidget {
-  const _ConsoleHeader({required this.state});
+  const _ConsoleHeader({
+    required this.state,
+    required this.allSessions,
+    required this.allConfigs,
+    required this.currentGroup,
+    required this.showSessionTabs,
+    this.onGroupChanged,
+    required this.onAttachSession,
+    this.onSessionVisibilityChanged,
+    this.onDetachToPanel,
+    this.onSendToGroup,
+  });
   final RunState state;
+  final List<RunSession> allSessions;
+  final List<RunConfig> allConfigs;
+  final String currentGroup;
+  final bool showSessionTabs;
+  final ValueChanged<String>? onGroupChanged;
+  final ValueChanged<String?> onAttachSession;
+  final RunPanelSessionVisibilityChanged? onSessionVisibilityChanged;
+  final RunPanelDetachToPanelCallback? onDetachToPanel;
+  final RunPanelSendToGroupCallback? onSendToGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +302,12 @@ class _ConsoleHeader extends StatelessWidget {
     final cubit = context.read<RunCubit>();
     final activeSession = state.activeSession;
     final isRunning = activeSession?.status == RunStatus.running;
-    final quickActions = activeSession?.config.quickActions ?? const [];
+    final quickActions = _effectiveQuickActions(activeSession?.config);
+    final attachCandidate =
+        allSessions
+            .where((session) => session.status == RunStatus.running)
+            .lastOrNull ??
+        allSessions.lastOrNull;
 
     return Container(
       height: 36,
@@ -138,21 +317,40 @@ class _ConsoleHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Session tabs
+          // Session tabs (hidden in detached panel mode)
           Expanded(
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                ...state.sessions.map(
-                  (s) => _SessionTab(
-                    session: s,
-                    isActive: s.id == state.activeSessionId,
-                    onTap: () => cubit.setActiveSession(s.id),
-                    onClose: () => cubit.removeSession(s.id),
-                  ),
-                ),
-              ],
-            ),
+            child:
+                showSessionTabs
+                    ? ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        ...state.sessions.map(
+                          (s) => _SessionTab(
+                            session: s,
+                            isActive: s.id == state.activeSessionId,
+                            onTap: () => onAttachSession(s.id),
+                            onClose: () => cubit.removeSession(s.id),
+                          ),
+                        ),
+                      ],
+                    )
+                    : (activeSession == null
+                        ? const SizedBox.shrink()
+                        : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              activeSession.config.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                        )),
           ),
           // Action buttons
           if (activeSession != null) ...[
@@ -190,12 +388,170 @@ class _ConsoleHeader extends StatelessWidget {
               iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
               onTap: () => cubit.clearOutput(activeSession.id),
             ),
+            _HeaderButton(
+              tooltip: 'Detach session',
+              icon: Icons.link_off_rounded,
+              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+              onTap: () {
+                onSessionVisibilityChanged?.call(activeSession.id, true);
+                onAttachSession(null);
+              },
+            ),
+            if (onDetachToPanel != null)
+              _HeaderButton(
+                tooltip: 'Detach to new panel',
+                icon: Icons.open_in_new_rounded,
+                iconColor: AppColors.neonGreen,
+                onTap: () async {
+                  onSessionVisibilityChanged?.call(activeSession.id, true);
+                  await onDetachToPanel!(activeSession);
+                  onAttachSession(null);
+                },
+              ),
+            if (onSendToGroup != null)
+              _HeaderButton(
+                tooltip: 'Send to group',
+                icon: Icons.group_work_rounded,
+                iconColor: AppColors.neonGreen,
+                onTap: () async {
+                  final target = await _pickSendTarget(
+                    context,
+                    allSessions: allSessions,
+                    allConfigs: allConfigs,
+                    currentGroup: currentGroup,
+                  );
+                  if (target == null) return;
+                  onSessionVisibilityChanged?.call(activeSession.id, true);
+                  await onSendToGroup!(
+                    activeSession,
+                    target.group,
+                    target.createNewPanel,
+                  );
+                  onAttachSession(null);
+                },
+              ),
+            PopupMenuButton<String>(
+              tooltip: 'Run menu',
+              padding: EdgeInsets.zero,
+              color: colors.surfaceElevated,
+              onSelected: (value) async {
+                if (value == 'detach') {
+                  onSessionVisibilityChanged?.call(activeSession.id, true);
+                  onAttachSession(null);
+                } else if (value == 'popout') {
+                  if (onDetachToPanel != null) {
+                    onSessionVisibilityChanged?.call(activeSession.id, true);
+                    await onDetachToPanel!(activeSession);
+                    onAttachSession(null);
+                  }
+                } else if (value == 'send-group') {
+                  if (onSendToGroup != null) {
+                    final target = await _pickSendTarget(
+                      context,
+                      allSessions: allSessions,
+                      allConfigs: allConfigs,
+                      currentGroup: currentGroup,
+                    );
+                    if (target == null) return;
+                    onSessionVisibilityChanged?.call(activeSession.id, true);
+                    await onSendToGroup!(
+                      activeSession,
+                      target.group,
+                      target.createNewPanel,
+                    );
+                    onAttachSession(null);
+                  }
+                } else if (value == 'attach-latest') {
+                  if (attachCandidate != null) {
+                    onSessionVisibilityChanged?.call(attachCandidate.id, false);
+                    if (attachCandidate.config.group != currentGroup) {
+                      onGroupChanged?.call(attachCandidate.config.group);
+                    }
+                    onAttachSession(attachCandidate.id);
+                  }
+                } else if (value == 'attach') {
+                  final selected = await _pickAttachTarget(context, allSessions);
+                  if (selected != null) {
+                    onSessionVisibilityChanged?.call(selected.id, false);
+                    if (selected.config.group != currentGroup) {
+                      onGroupChanged?.call(selected.config.group);
+                    }
+                    onAttachSession(selected.id);
+                  }
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'attach',
+                  child: Text('Attach…'),
+                ),
+                const PopupMenuItem(
+                  value: 'detach',
+                  child: Text('Detach from console'),
+                ),
+                if (onDetachToPanel != null)
+                  const PopupMenuItem(
+                    value: 'popout',
+                    child: Text('Detach to new panel'),
+                  ),
+                if (onSendToGroup != null)
+                  const PopupMenuItem(
+                    value: 'send-group',
+                    child: Text('Send to group'),
+                  ),
+                if (attachCandidate != null)
+                  const PopupMenuItem(
+                    value: 'attach-latest',
+                    child: Text('Attach latest session'),
+                  ),
+              ],
+              child: Icon(
+                Icons.more_horiz_rounded,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(140),
+              ),
+            ),
           ],
+          if (activeSession == null && attachCandidate != null)
+            _HeaderButton(
+              tooltip: 'Attach session',
+              icon: Icons.link_rounded,
+              iconColor: AppColors.neonGreen,
+              onTap: () async {
+                final selected = await _pickAttachTarget(context, allSessions);
+                if (selected == null) return;
+                onSessionVisibilityChanged?.call(selected.id, false);
+                if (selected.config.group != currentGroup) {
+                  onGroupChanged?.call(selected.config.group);
+                }
+                onAttachSession(selected.id);
+              },
+            ),
           Container(width: 1, height: 20, color: colors.border),
           const SizedBox(width: 4),
         ],
       ),
     );
+  }
+
+  List<RunQuickAction> _effectiveQuickActions(RunConfig? config) {
+    if (config == null) return const [];
+    if (config.quickActions.isNotEmpty) return config.quickActions;
+    if (!config.isFlutterRun) return const [];
+    return const [
+      RunQuickAction(
+        id: 'flutter_hot_reload',
+        label: 'Hot Reload',
+        icon: 'local_fire_department',
+        command: 'r',
+      ),
+      RunQuickAction(
+        id: 'flutter_hot_restart',
+        label: 'Hot Restart',
+        icon: 'restart_alt',
+        command: 'R',
+      ),
+    ];
   }
 
   IconData _quickActionIcon(String raw) {
@@ -220,6 +576,218 @@ class _ConsoleHeader extends StatelessWidget {
         return Icons.bolt_rounded;
     }
   }
+
+  Future<RunSession?> _pickAttachTarget(
+    BuildContext context,
+    List<RunSession> sessions,
+  ) {
+    final grouped = <String, List<RunSession>>{};
+    for (final session in sessions.reversed) {
+      grouped.putIfAbsent(session.config.group, () => <RunSession>[]).add(session);
+    }
+    if (grouped.isEmpty) return Future.value(null);
+    return showDialog<RunSession>(
+      context: context,
+      builder: (dialogContext) {
+        final colors = context.appColors;
+        return AlertDialog(
+          title: const Text('Attach session'),
+          backgroundColor: colors.surfaceElevated,
+          content: SizedBox(
+            width: 420,
+            height: 360,
+            child: ListView(
+              children: grouped.entries.map((entry) {
+                final group = entry.key;
+                final groupSessions = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        group,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface.withAlpha(170),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ...groupSessions.map((session) {
+                        final isRunning = session.status == RunStatus.running;
+                        return InkWell(
+                          onTap: () => Navigator.of(dialogContext).pop(session),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 6,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.circle,
+                                  size: 8,
+                                  color:
+                                      isRunning
+                                          ? AppColors.neonGreen
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withAlpha(120),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    session.config.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  session.id.split('_').last,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withAlpha(120),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<_SendGroupTarget?> _pickSendTarget(
+    BuildContext context, {
+    required List<RunSession> allSessions,
+    required List<RunConfig> allConfigs,
+    required String currentGroup,
+  }) async {
+    final groups = <String>{};
+    for (final config in allConfigs) {
+      if (config.group.trim().isNotEmpty) groups.add(config.group.trim());
+    }
+    for (final session in allSessions) {
+      if (session.config.group.trim().isNotEmpty) {
+        groups.add(session.config.group.trim());
+      }
+    }
+    groups.remove(currentGroup);
+    final sorted = groups.toList()..sort();
+
+    return showDialog<_SendGroupTarget>(
+      context: context,
+      builder: (dialogContext) {
+        final colors = context.appColors;
+        return AlertDialog(
+          title: const Text('Send to group'),
+          backgroundColor: colors.surfaceElevated,
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ...sorted.map(
+                  (group) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.folder_open_rounded, size: 18),
+                    title: Text(group),
+                    subtitle: const Text('Return to existing group panel'),
+                    onTap: () {
+                      Navigator.of(dialogContext).pop(
+                        _SendGroupTarget(group: group, createNewPanel: false),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(height: 10),
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.create_new_folder_rounded, size: 18),
+                  title: const Text('Create new group panel'),
+                  subtitle: const Text('Choose group name'),
+                  onTap: () async {
+                    final group = await _askGroupName(dialogContext);
+                    if (group == null || group.trim().isEmpty) return;
+                    if (!context.mounted) return;
+                    Navigator.of(dialogContext).pop(
+                      _SendGroupTarget(
+                        group: group.trim(),
+                        createNewPanel: true,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<String?> _askGroupName(BuildContext context) {
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('New group'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Group name'),
+            onSubmitted: (_) {
+              Navigator.of(dialogContext).pop(controller.text.trim());
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(controller.text.trim());
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SendGroupTarget {
+  const _SendGroupTarget({required this.group, required this.createNewPanel});
+  final String group;
+  final bool createNewPanel;
 }
 
 class _SessionTab extends StatelessWidget {
@@ -352,13 +920,27 @@ class _HeaderButton extends StatelessWidget {
 // ── Config List ──────────────────────────────────────────────────────────────
 
 class _ConfigList extends StatelessWidget {
-  const _ConfigList({required this.state});
+  const _ConfigList({
+    required this.state,
+    required this.groupId,
+    this.onGroupChanged,
+    this.showGroupControls = true,
+    this.onAttachSession,
+  });
   final RunState state;
+  final String groupId;
+  final ValueChanged<String>? onGroupChanged;
+  final bool showGroupControls;
+  final ValueChanged<String>? onAttachSession;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final cubit = context.read<RunCubit>();
+    final groupLabel =
+        groupId.length > 14
+            ? '${groupId.substring(0, 6)}…${groupId.substring(groupId.length - 4)}'
+            : groupId;
     final sessionsByConfig = <String, List<RunSession>>{};
     for (final session in state.sessions.reversed) {
       sessionsByConfig
@@ -374,14 +956,59 @@ class _ConfigList extends StatelessWidget {
             height: 28,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             alignment: Alignment.centerLeft,
-            child: Text(
-              'CONFIGURATIONS',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'CONFIGURATIONS',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: TextStyle(
+                      color:
+                          Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                if (showGroupControls) ...[
+                  Tooltip(
+                    message: 'Group',
+                    child: Text(
+                      groupLabel,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 9,
+                        color:
+                            Theme.of(context).textTheme.bodySmall?.color ??
+                            Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
+                if (showGroupControls && onGroupChanged != null) ...[
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () async {
+                      final next = await _askGroupName(
+                        context,
+                        initialValue: groupId,
+                      );
+                      if (next == null || next.trim().isEmpty) return;
+                      onGroupChanged!(next.trim());
+                    },
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: 12,
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           Expanded(
@@ -414,12 +1041,16 @@ class _ConfigList extends StatelessWidget {
                         if (c.isFlutterRun) {
                           cubit.sendHotReload(runningSession.id);
                         }
-                        cubit.setActiveSession(runningSession.id);
+                        onAttachSession?.call(runningSession.id);
                       } else if (stoppedSession != null) {
                         cubit.restartSession(stoppedSession.id);
-                        cubit.setActiveSession(stoppedSession.id);
+                        onAttachSession?.call(stoppedSession.id);
                       } else {
-                        cubit.startRun(c);
+                        cubit.startRun(c).then((started) {
+                          if (started != null) {
+                            onAttachSession?.call(started.id);
+                          }
+                        });
                       }
                     },
                     onEdit: () async {
@@ -427,7 +1058,9 @@ class _ConfigList extends StatelessWidget {
                         context,
                         initial: c,
                       );
-                      if (updated != null) cubit.updateConfig(updated);
+                      if (updated != null) {
+                        cubit.updateConfig(updated.copyWith(group: groupId));
+                      }
                     },
                     onDelete: () => cubit.removeConfig(c.id),
                   );
@@ -441,7 +1074,9 @@ class _ConfigList extends StatelessWidget {
                     onTap: () async {
                       final config = await RunConfigDialog.show(context);
                       if (config == null) return;
-                      final added = await cubit.addConfig(config);
+                      final added = await cubit.addConfig(
+                        config.copyWith(group: groupId),
+                      );
                       if (!context.mounted) return;
                       if (added.id != config.id) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -503,7 +1138,9 @@ class _ConfigList extends StatelessWidget {
                           config: config,
                           sessions: sessions,
                           activeSessionId: state.activeSessionId,
-                          onTapSession: cubit.setActiveSession,
+                          onTapSession: (sessionId) {
+                            onAttachSession?.call(sessionId);
+                          },
                           onDeleteSession: cubit.removeSession,
                         );
                       }),
@@ -513,6 +1150,44 @@ class _ConfigList extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Future<String?> _askGroupName(
+    BuildContext context, {
+    required String initialValue,
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        final controller = TextEditingController(text: initialValue);
+        return AlertDialog(
+          title: const Text('Run group'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Group',
+              hintText: 'e.g. backend, ui, test',
+            ),
+            onSubmitted: (_) {
+              Navigator.of(dialogContext).pop(controller.text.trim());
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(controller.text.trim());
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
