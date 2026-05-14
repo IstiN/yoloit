@@ -38,6 +38,7 @@
 |---|---|---|
 | `panels <board>` | List all panels | `yoloit panels "Board"` |
 | `panel <board> <panel>` | Show panel details & content | `yoloit panel "Board" "My Note"` |
+| `panel:help <board> <panel>` | Show actions with args/help for panel type | `yoloit panel:help "Board" "Run"` |
 | `panel:create <board> <type> <title>` | Create panel | `yoloit panel:create "Board" board.note.markdown "Ideas"` |
 | `panel:types <board>` | List available panel types | `yoloit panel:types "Board"` |
 | `panel:rename <board> <panel> <name>` | Rename panel | `yoloit panel:rename "Board" "Old" "New"` |
@@ -75,8 +76,8 @@
 | `note:wrap <board> <panel>` | Enable auto-height for note | `yoloit note:wrap "Board" "Ideas"` |
 | `note:nowrap <board> <panel>` | Disable auto-height for note | `yoloit note:nowrap "Board" "Ideas"` |
 | `checklist:add <board> <panel> <item>` | Add checklist item | `yoloit checklist:add "Board" "Tasks" "Write tests"` |
-| `checklist:check <board> <panel> <id>` | Check item | `yoloit checklist:check "Board" "Tasks" item-123` |
-| `checklist:uncheck <board> <panel> <id>` | Uncheck item | `yoloit checklist:uncheck "Board" "Tasks" item-123` |
+| `checklist:check <board> <panel> <id\|text>` | Check item by id or text | `yoloit checklist:check "Board" "Tasks" "Write tests"` |
+| `checklist:uncheck <board> <panel> <id\|text>` | Uncheck item by id or text | `yoloit checklist:uncheck "Board" "Tasks" item-123` |
 | `kanban:columns <board> <panel>` | List columns | `yoloit kanban:columns "Board" "Kanban"` |
 | `kanban:add-column <board> <panel> <name>` | Add kanban column | `yoloit kanban:add-column "Board" "Kanban" "In Review"` |
 | `kanban:rename-column <board> <panel> <col> <name>` | Rename column | `yoloit kanban:rename-column "Board" "Kanban" "Todo" "Backlog"` |
@@ -86,6 +87,9 @@
 | `kanban:update-card <board> <panel> <cardId> <title>` | Update card title | `yoloit kanban:update-card "Board" "Kanban" card-123 "New title"` |
 | `kanban:move-card <board> <panel> <cardId> <col>` | Move card to column | `yoloit kanban:move-card "Board" "Kanban" card-123 "Done"` |
 | `kanban:remove-card <board> <panel> <cardId>` | Remove card | `yoloit kanban:remove-card "Board" "Kanban" card-123` |
+| `run:list <board> <panel>` | List run configurations and sessions | `yoloit run:list "Board" "Run"` |
+| `run:input <board> <panel> <sessionId\|id\|name> <text> [--enter]` | Send stdin to a running run session | `yoloit run:input "Board" "Run" preset_flutter_run_macos r` |
+| `run:output <board> <panel> [sessionId\|id\|name]` | Get output of latest matching run session | `yoloit run:output "Board" "Run" preset_flutter_run_macos` |
 | `play <board> <panel> <file\|url>` | Add & play media | `yoloit play "Board" "Music" ~/song.mp3` |
 | `web:open <board> <panel> <url>` | Open URL in browser panel | `yoloit web:open "Board" "Browser" https://example.com` |
 
@@ -117,8 +121,8 @@
 |---|---|---|
 | `items` | — | List all items |
 | `add` | `text` | Add item |
-| `check` | `id` | Check item |
-| `uncheck` | `id` | Uncheck item |
+| `check` | `index` \| `id` \| `text` | Check item |
+| `uncheck` | `index` \| `id` \| `text` | Uncheck item |
 | `remove` | `id` | Delete item |
 | `rename` | `id`, `text` | Rename item |
 
@@ -138,9 +142,9 @@
 ### Chat (`board.chat`)
 | Action | Args | Description |
 |---|---|---|
-| `send` | `message`, `provider?` | Send a message |
+| `send` | `message\|text`, `attachments?`, `config?`, `provider?`, `model?`, `sessionName?`, `workingDir?` | Send a message (optionally updating chat config first) |
 | `messages` | — | Get chat history |
-| `config` | `provider`, `model?` | Set AI provider |
+| `config` | `config?`, `provider?`, `model?`, `sessionName?`, `workingDir?` | Get or update AI/session config |
 | `clear` | — | Clear chat history |
 
 ### Playlist (`board.playlist`)
@@ -173,6 +177,12 @@
 | `get` | — | Get current path |
 | `open` | `path` | Open directory |
 
+### File Preview (`board.file.preview`)
+| Action | Args | Description |
+|---|---|---|
+| `get` | — | Get current preview file path |
+| `open` | `path` | Open file in preview panel |
+
 ### Terminal (`board.terminal`)
 | Action | Args | Description |
 |---|---|---|
@@ -193,12 +203,28 @@
 | Action | Args | Description |
 |---|---|---|
 | `list` | — | List all configurations |
-| `add` | `name`, `command`, `workingDir?` | Add configuration |
-| `remove` | `id` | Remove configuration |
-| `run` | `id` | Start configuration |
-| `stop` | `id` | Stop running configuration |
-| `output` | `id?` | Get output of active/given config |
-| `config` | `id` | Get config details |
+| `add` | `name`, `command`, `workingDir?`, `env?`, `isFlutterRun?`, `quickActions?` | Add configuration |
+| `update` | `id\|name`, `newName?`, `command?`, `workingDir?`, `env?`, `isFlutterRun?`, `quickActions?` | Update configuration |
+| `remove` | `id\|name` | Remove configuration |
+| `run` | `id\|name` | Start configuration |
+| `stop` | `sessionId?\|id?\|name?` | Stop the latest matching running session |
+| `input` | `text`, `appendNewline?`, `sessionId?\|id?\|name?` | Send stdin text to latest matching running session |
+| `output` | `sessionId?\|id?\|name?` | Get output of the latest matching run session |
+| `config` | `id\|name` | Get config details |
+
+`quickActions` format:
+```json
+[
+  {
+    "label": "Hot Reload",
+    "icon": "local_fire_department",
+    "command": "r",
+    "appendNewline": false
+  }
+]
+```
+
+Supported icon names: `bolt`, `local_fire_department`, `restart_alt`, `play_arrow`, `pause`, `stop`.
 
 ### YoLo Assistant (`board.yolo_assistant`)
 | Action | Args | Description |

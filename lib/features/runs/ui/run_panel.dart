@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -32,6 +34,13 @@ class _RunPanelView extends StatefulWidget {
 
 class _RunPanelViewState extends State<_RunPanelView> {
   final _scrollController = ScrollController();
+  bool _workspaceLoadInFlight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureWorkspaceLoaded();
+  }
 
   @override
   void dispose() {
@@ -42,6 +51,7 @@ class _RunPanelViewState extends State<_RunPanelView> {
   @override
   void didUpdateWidget(_RunPanelView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _ensureWorkspaceLoaded();
     final oldSession = oldWidget.state.activeSession;
     final newSession = widget.state.activeSession;
     if (newSession != null &&
@@ -58,6 +68,20 @@ class _RunPanelViewState extends State<_RunPanelView> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  void _ensureWorkspaceLoaded() {
+    if (_workspaceLoadInFlight || widget.state.workspacePath != null) return;
+    _workspaceLoadInFlight = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context
+          .read<RunCubit>()
+          .loadForWorkspace(Directory.current.path)
+          .whenComplete(() {
+            _workspaceLoadInFlight = false;
+          });
+    });
   }
 
   @override
@@ -104,7 +128,7 @@ class _ConsoleHeader extends StatelessWidget {
     final cubit = context.read<RunCubit>();
     final activeSession = state.activeSession;
     final isRunning = activeSession?.status == RunStatus.running;
-    final isFlutter = activeSession?.config.isFlutterRun ?? false;
+    final quickActions = activeSession?.config.quickActions ?? const [];
 
     return Container(
       height: 36,
@@ -119,34 +143,33 @@ class _ConsoleHeader extends StatelessWidget {
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                ...state.sessions.map((s) => _SessionTab(
-                      session: s,
-                      isActive: s.id == state.activeSessionId,
-                      onTap: () => cubit.setActiveSession(s.id),
-                      onClose: () => cubit.removeSession(s.id),
-                    )),
+                ...state.sessions.map(
+                  (s) => _SessionTab(
+                    session: s,
+                    isActive: s.id == state.activeSessionId,
+                    onTap: () => cubit.setActiveSession(s.id),
+                    onClose: () => cubit.removeSession(s.id),
+                  ),
+                ),
               ],
             ),
           ),
           // Action buttons
           if (activeSession != null) ...[
-            if (isRunning && isFlutter) ...[
-              _HeaderButton(
-                tooltip: 'Hot Reload (r)',
-                label: '🔥',
-                onTap: () => cubit.sendHotReload(activeSession.id),
-              ),
-              _HeaderButton(
-                tooltip: 'Hot Restart (R)',
-                label: 'R',
-                onTap: () => cubit.sendHotRestart(activeSession.id),
-                textStyle: const TextStyle(
-                  color: AppColors.neonGreen,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
+            if (isRunning)
+              ...quickActions.map(
+                (action) => _HeaderButton(
+                  tooltip:
+                      action.appendNewline
+                          ? '${action.label} (sends Enter)'
+                          : action.label,
+                  icon: _quickActionIcon(action.icon),
+                  label: action.label.isNotEmpty ? action.label[0] : 'A',
+                  iconColor: AppColors.neonGreen,
+                  onTap:
+                      () => cubit.triggerQuickAction(activeSession.id, action),
                 ),
               ),
-            ],
             if (isRunning)
               _HeaderButton(
                 tooltip: 'Stop',
@@ -157,9 +180,9 @@ class _ConsoleHeader extends StatelessWidget {
             else
               _HeaderButton(
                 tooltip: 'Re-run',
-                icon: Icons.play_arrow_rounded,
+                icon: Icons.refresh_rounded,
                 iconColor: AppColors.neonGreen,
-                onTap: () => cubit.startRun(activeSession.config),
+                onTap: () => cubit.restartSession(activeSession.id),
               ),
             _HeaderButton(
               tooltip: 'Clear output',
@@ -173,6 +196,29 @@ class _ConsoleHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  IconData _quickActionIcon(String raw) {
+    switch (raw.trim().toLowerCase()) {
+      case 'local_fire_department':
+      case 'fire':
+      case 'hot_reload':
+        return Icons.local_fire_department_rounded;
+      case 'restart_alt':
+      case 'restart':
+      case 'hot_restart':
+        return Icons.restart_alt_rounded;
+      case 'play':
+      case 'play_arrow':
+        return Icons.play_arrow_rounded;
+      case 'pause':
+        return Icons.pause_rounded;
+      case 'stop':
+        return Icons.stop_rounded;
+      case 'bolt':
+      default:
+        return Icons.bolt_rounded;
+    }
   }
 }
 
@@ -193,8 +239,11 @@ class _SessionTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final isRunning = session.status == RunStatus.running;
-    final dotColor = session.config.color ??
-        (isRunning ? AppColors.neonGreen : Theme.of(context).colorScheme.onSurface.withAlpha(120));
+    final dotColor =
+        session.config.color ??
+        (isRunning
+            ? AppColors.neonGreen
+            : Theme.of(context).colorScheme.onSurface.withAlpha(120));
 
     return GestureDetector(
       onTap: onTap,
@@ -215,20 +264,17 @@ class _SessionTab extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isRunning)
-              SizedBox(
-                width: 8,
-                height: 8,
-                child: _PulsingDot(color: dotColor),
-              )
+              SizedBox(width: 8, height: 8, child: _PulsingDot(color: dotColor))
             else
               Container(
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: session.status == RunStatus.failed
-                      ? AppColors.neonRed
-                      : dotColor,
+                  color:
+                      session.status == RunStatus.failed
+                          ? AppColors.neonRed
+                          : dotColor,
                 ),
               ),
             const SizedBox(width: 6),
@@ -236,12 +282,12 @@ class _SessionTab extends StatelessWidget {
               child: Text(
                 session.config.name,
                 style: TextStyle(
-                  color: isActive
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context).textTheme.bodyMedium?.color,
+                  color:
+                      isActive
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Theme.of(context).textTheme.bodyMedium?.color,
                   fontSize: 11,
-                  fontWeight:
-                      isActive ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -268,7 +314,6 @@ class _HeaderButton extends StatelessWidget {
     this.icon,
     this.iconColor,
     this.label,
-    this.textStyle,
     required this.onTap,
   });
 
@@ -276,7 +321,6 @@ class _HeaderButton extends StatelessWidget {
   final IconData? icon;
   final Color? iconColor;
   final String? label;
-  final TextStyle? textStyle;
   final VoidCallback onTap;
 
   @override
@@ -289,14 +333,16 @@ class _HeaderButton extends StatelessWidget {
           width: 28,
           height: 28,
           alignment: Alignment.center,
-          child: icon != null
-              ? Icon(icon, size: 14, color: iconColor)
-              : Text(
-                  label ?? '',
-                  style: textStyle ??
-                      TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
-                ),
+          child:
+              icon != null
+                  ? Icon(icon, size: 14, color: iconColor)
+                  : Text(
+                    label ?? '',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
+                  ),
         ),
       ),
     );
@@ -313,6 +359,12 @@ class _ConfigList extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final cubit = context.read<RunCubit>();
+    final sessionsByConfig = <String, List<RunSession>>{};
+    for (final session in state.sessions.reversed) {
+      sessionsByConfig
+          .putIfAbsent(session.config.id, () => <RunSession>[])
+          .add(session);
+    }
 
     return SizedBox(
       width: 180,
@@ -337,11 +389,22 @@ class _ConfigList extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 4),
               children: [
                 ...state.configs.map((c) {
-                  final runningSession = state.sessions
-                      .where((s) =>
-                          s.config.id == c.id &&
-                          s.status == RunStatus.running)
-                      .firstOrNull;
+                  final runningSession =
+                      state.sessions
+                          .where(
+                            (s) =>
+                                s.config.id == c.id &&
+                                s.status == RunStatus.running,
+                          )
+                          .firstOrNull;
+                  final stoppedSession =
+                      state.sessions
+                          .where(
+                            (s) =>
+                                s.config.id == c.id &&
+                                s.status != RunStatus.running,
+                          )
+                          .lastOrNull;
                   return _ConfigItem(
                     config: c,
                     isRunning: runningSession != null,
@@ -352,26 +415,44 @@ class _ConfigList extends StatelessWidget {
                           cubit.sendHotReload(runningSession.id);
                         }
                         cubit.setActiveSession(runningSession.id);
+                      } else if (stoppedSession != null) {
+                        cubit.restartSession(stoppedSession.id);
+                        cubit.setActiveSession(stoppedSession.id);
                       } else {
                         cubit.startRun(c);
                       }
                     },
                     onEdit: () async {
-                      final updated =
-                          await RunConfigDialog.show(context, initial: c);
+                      final updated = await RunConfigDialog.show(
+                        context,
+                        initial: c,
+                      );
                       if (updated != null) cubit.updateConfig(updated);
                     },
                     onDelete: () => cubit.removeConfig(c.id),
                   );
                 }),
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   child: InkWell(
                     onTap: () async {
-                      final config =
-                          await RunConfigDialog.show(context);
-                      if (config != null) cubit.addConfig(config);
+                      final config = await RunConfigDialog.show(context);
+                      if (config == null) return;
+                      final added = await cubit.addConfig(config);
+                      if (!context.mounted) return;
+                      if (added.id != config.id) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Configuration already exists: ${added.name}',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
                     },
                     borderRadius: BorderRadius.circular(4),
                     child: Container(
@@ -386,7 +467,9 @@ class _ConfigList extends StatelessWidget {
                               'Add Configuration',
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  color: colors.primary, fontSize: 11),
+                                color: colors.primary,
+                                fontSize: 11,
+                              ),
                             ),
                           ),
                         ],
@@ -394,12 +477,166 @@ class _ConfigList extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (state.sessions.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'RUN SESSIONS',
+                      style: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withAlpha(120),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  ...state.configs
+                      .where((c) => sessionsByConfig[c.id] != null)
+                      .map((config) {
+                        final sessions = sessionsByConfig[config.id]!;
+                        return _SessionGroup(
+                          config: config,
+                          sessions: sessions,
+                          activeSessionId: state.activeSessionId,
+                          onTapSession: cubit.setActiveSession,
+                          onDeleteSession: cubit.removeSession,
+                        );
+                      }),
+                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+class _SessionGroup extends StatelessWidget {
+  const _SessionGroup({
+    required this.config,
+    required this.sessions,
+    required this.activeSessionId,
+    required this.onTapSession,
+    required this.onDeleteSession,
+  });
+
+  final RunConfig config;
+  final List<RunSession> sessions;
+  final String? activeSessionId;
+  final ValueChanged<String> onTapSession;
+  final ValueChanged<String> onDeleteSession;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final runningCount =
+        sessions.where((s) => s.status == RunStatus.running).length;
+    final titleColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface.withAlpha(150);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
+        decoration: BoxDecoration(
+          color: colors.surfaceHighlight.withAlpha(70),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: colors.border.withAlpha(100)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${config.name} (${sessions.length})',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: runningCount > 0 ? AppColors.neonGreen : titleColor,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            ...sessions.take(4).map((session) {
+              final isActive = session.id == activeSessionId;
+              final isRunning = session.status == RunStatus.running;
+              final markerColor =
+                  isRunning
+                      ? AppColors.neonGreen
+                      : session.status == RunStatus.failed
+                      ? AppColors.neonRed
+                      : Theme.of(context).colorScheme.onSurface.withAlpha(110);
+              final startedAt = session.startedAt;
+              final trailingTime =
+                  startedAt == null ? '' : _formatMiniTime(startedAt);
+              return InkWell(
+                onTap: () => onTapSession(session.id),
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  height: 20,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration:
+                      isActive
+                          ? BoxDecoration(
+                            color: colors.tabActiveBg,
+                            borderRadius: BorderRadius.circular(4),
+                          )
+                          : null,
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, size: 7, color: markerColor),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          session.id.split('_').last,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (trailingTime.isNotEmpty)
+                        Text(
+                          trailingTime,
+                          style: TextStyle(
+                            fontSize: 8,
+                            color:
+                                Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => onDeleteSession(session.id),
+                        child: Icon(
+                          Icons.close,
+                          size: 9,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(120),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatMiniTime(DateTime dt) {
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
   }
 }
 
@@ -429,7 +666,9 @@ class _ConfigItemState extends State<_ConfigItem> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final dotColor =
-        widget.config.color ?? Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface;
+        widget.config.color ??
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -488,9 +727,10 @@ class _ConfigItemState extends State<_ConfigItem> {
                 icon: Icons.more_vert,
                 color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
                 tooltip: 'Options',
-                onTap: (_hovering || widget.isRunning)
-                    ? () => _showMenu(context)
-                    : null,
+                onTap:
+                    (_hovering || widget.isRunning)
+                        ? () => _showMenu(context)
+                        : null,
               ),
             ),
           ],
@@ -516,15 +756,21 @@ class _ConfigItemState extends State<_ConfigItem> {
         PopupMenuItem(
           value: 'edit',
           height: 32,
-          child: Text('Edit',
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+          child: Text(
+            'Edit',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 12,
+            ),
+          ),
         ),
         const PopupMenuItem(
           value: 'delete',
           height: 32,
-          child: Text('Delete',
-              style: TextStyle(color: AppColors.neonRed, fontSize: 12)),
+          child: Text(
+            'Delete',
+            style: TextStyle(color: AppColors.neonRed, fontSize: 12),
+          ),
         ),
       ],
     ).then((value) {
@@ -600,6 +846,7 @@ class _ConsoleState extends State<_Console> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final cubit = context.read<RunCubit>();
     final session = widget.state.activeSession;
 
     if (session == null) {
@@ -610,6 +857,7 @@ class _ConsoleState extends State<_Console> {
     }
 
     final output = session.output;
+    final isRunning = session.status == RunStatus.running;
 
     return KeyboardListener(
       focusNode: _focusNode,
@@ -639,7 +887,9 @@ class _ConsoleState extends State<_Console> {
                         child: Text(
                           '> ${session.config.command}',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(120),
                             fontSize: 11,
                             fontFamily: 'monospace',
                           ),
@@ -651,7 +901,11 @@ class _ConsoleState extends State<_Console> {
                         Text(
                           _formatTime(session.startedAt!),
                           style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withAlpha(120), fontSize: 10),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(120),
+                            fontSize: 10,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -660,8 +914,33 @@ class _ConsoleState extends State<_Console> {
                         message: 'Copy all (⌘A)',
                         child: InkWell(
                           onTap: _copyAll,
-                          child: Icon(Icons.copy_outlined,
-                              size: 12, color: Theme.of(context).colorScheme.onSurface.withAlpha(120)),
+                          child: Icon(
+                            Icons.copy_outlined,
+                            size: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(120),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: isRunning ? 'Already running' : 'Re-run',
+                        child: InkWell(
+                          onTap:
+                              isRunning
+                                  ? null
+                                  : () => cubit.restartSession(session.id),
+                          child: Icon(
+                            Icons.replay_rounded,
+                            size: 12,
+                            color:
+                                isRunning
+                                    ? Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withAlpha(80)
+                                    : AppColors.neonGreen,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -670,18 +949,23 @@ class _ConsoleState extends State<_Console> {
                 ),
               ),
               Expanded(
-                child: output.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No output yet…',
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withAlpha(120), fontSize: 12),
+                child:
+                    output.isEmpty
+                        ? Center(
+                          child: Text(
+                            'No output yet…',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withAlpha(120),
+                              fontSize: 12,
+                            ),
+                          ),
+                        )
+                        : _FullLogView(
+                          output: output,
+                          scrollController: widget.scrollController,
                         ),
-                      )
-                    : _FullLogView(
-                        output: output,
-                        scrollController: widget.scrollController,
-                      ),
               ),
             ],
           ),
@@ -701,10 +985,7 @@ class _ConsoleState extends State<_Console> {
 /// Renders all output lines as a single selectable block.
 /// Ctrl+A / ⌘A selects everything; ⌘C copies the selection.
 class _FullLogView extends StatelessWidget {
-  const _FullLogView({
-    required this.output,
-    required this.scrollController,
-  });
+  const _FullLogView({required this.output, required this.scrollController});
 
   final List<RunOutputLine> output;
   final ScrollController scrollController;
@@ -745,10 +1026,11 @@ class _FullLogView extends StatelessWidget {
             children: spans,
           ),
           // Let the OS handle Ctrl+A / ⌘A for select-all within this widget.
-          contextMenuBuilder: (context, editableTextState) =>
-              AdaptiveTextSelectionToolbar.editableText(
-            editableTextState: editableTextState,
-          ),
+          contextMenuBuilder:
+              (context, editableTextState) =>
+                  AdaptiveTextSelectionToolbar.editableText(
+                    editableTextState: editableTextState,
+                  ),
         ),
       ),
     );
@@ -756,10 +1038,7 @@ class _FullLogView extends StatelessWidget {
 }
 
 class _EmptyConsole extends StatelessWidget {
-  const _EmptyConsole({
-    required this.hasWorkspace,
-    required this.configs,
-  });
+  const _EmptyConsole({required this.hasWorkspace, required this.configs});
 
   final bool hasWorkspace;
   final List<RunConfig> configs;
@@ -776,49 +1055,55 @@ class _EmptyConsole extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colors.primary.withAlpha(20),
-                shape: BoxShape.circle,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colors.primary.withAlpha(20),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.play_circle_outline,
+                  size: 32,
+                  color: colors.primary,
+                ),
               ),
-              child: Icon(Icons.play_circle_outline,
-                  size: 32, color: colors.primary),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Run Configurations',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 16),
+              Text(
+                'Run Configurations',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              hasWorkspace
-                  ? 'Select a configuration from the left panel to run it'
-                  : 'Open a workspace to get started',
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withAlpha(120), fontSize: 12),
-            ),
-            if (hasWorkspace && configs.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 8,
-                children: configs
-                    .take(3)
-                    .map(
-                      (c) => _RunQuickButton(
-                        config: c,
-                        onTap: () => cubit.startRun(c),
-                      ),
-                    )
-                    .toList(),
+              const SizedBox(height: 8),
+              Text(
+                hasWorkspace
+                    ? 'Select a configuration from the left panel to run it'
+                    : 'Open a workspace to get started',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                  fontSize: 12,
+                ),
               ),
+              if (hasWorkspace && configs.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 8,
+                  children:
+                      configs
+                          .take(3)
+                          .map(
+                            (c) => _RunQuickButton(
+                              config: c,
+                              onTap: () => cubit.startRun(c),
+                            ),
+                          )
+                          .toList(),
+                ),
+              ],
             ],
-          ],
           ),
         ),
       ),
@@ -839,8 +1124,7 @@ class _RunQuickButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: colors.surfaceElevated,
           borderRadius: BorderRadius.circular(4),
@@ -851,9 +1135,13 @@ class _RunQuickButton extends StatelessWidget {
           children: [
             Icon(Icons.play_arrow_rounded, size: 12, color: dotColor),
             const SizedBox(width: 4),
-            Text(config.name,
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+            Text(
+              config.name,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
+              ),
+            ),
           ],
         ),
       ),
@@ -883,9 +1171,10 @@ class _PulsingDotState extends State<_PulsingDot>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _anim = Tween<double>(
+      begin: 0.4,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -898,12 +1187,13 @@ class _PulsingDotState extends State<_PulsingDot>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: widget.color.withAlpha((_anim.value * 255).round()),
-        ),
-      ),
+      builder:
+          (_, __) => Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: widget.color.withAlpha((_anim.value * 255).round()),
+            ),
+          ),
     );
   }
 }

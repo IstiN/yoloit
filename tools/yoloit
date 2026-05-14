@@ -65,6 +65,7 @@ APP COMMANDS
 PANEL COMMANDS
   panels <board>                  List panels on a board
   panel <board> <panel>           Show panel details & content
+  panel:help <board> <panel>      Show supported actions with parameter help
   panel:create <board> <type> <title>  Create a panel
   panel:types <board>             List available panel types
   panel:rename <board> <panel> <new>   Rename panel
@@ -86,13 +87,16 @@ LINK COMMANDS
   link:color <board> <linkId> <color>  Set link color
 
 SHORTHAND COMMANDS
+  run:list <board> <panel>                                          List run configs and sessions
+  run:input <board> <panel> <sessionId|id|name> <text> [--enter]  Send stdin to running run session
+  run:output <board> <panel> [sessionId|id|name]                  Show output of latest matching run session
   note <board> <panel> <text>             Set markdown note content
   note:append <board> <panel> <text>      Append text to note
   note:wrap <board> <panel>               Enable auto-height (wraps to content)
   note:nowrap <board> <panel>             Disable auto-height (fixed height)
   checklist:add <board> <panel> <item>    Add checklist item
-  checklist:check <board> <panel> <id>    Check an item by ID
-  checklist:uncheck <board> <panel> <id>  Uncheck an item
+  checklist:check <board> <panel> <id|text>    Check an item by ID or text
+  checklist:uncheck <board> <panel> <id|text>  Uncheck an item by ID or text
   kanban:columns <board> <panel>               List kanban columns
   kanban:add-column <board> <panel> <name>     Add kanban column
   kanban:rename-column <board> <panel> <col> <new-name>  Rename column
@@ -307,10 +311,76 @@ PYEOF
     bid=$(_encode "$1"); pid=$(_encode "$2")
     _get "/boards/${bid}/panels/${pid}" | python3 -m json.tool 2>/dev/null
     ;;
+  panel:help)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:help <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _get "/boards/${bid}/panels/${pid}" | python3 -c 'import json,sys; panel=json.load(sys.stdin); out={"panelType":panel.get("type"),"supportedActions":panel.get("supportedActions",[]),"actionHelp":panel.get("actionHelp",{})}; print(json.dumps(out, ensure_ascii=False, indent=2))'
+    ;;
   panel:create)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit panel:create <board> <type> <title>" >&2; exit 1; }
     bid=$(_encode "$1")
-    _post "/boards/${bid}/panels" "{\"type\":\"$2\",\"title\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    types_json=$(_get "/boards/${bid}/panel-types")
+    board_json=$(_get "/boards/${bid}")
+    payload=$(python3 - "$2" "$3" "$types_json" "$board_json" <<'PY'
+import json, sys
+
+type_id, title, types_raw, board_raw = sys.argv[1:5]
+types = json.loads(types_raw).get("types", [])
+board = json.loads(board_raw)
+
+default_w, default_h = 360.0, 240.0
+for t in types:
+    if t.get("type") == type_id:
+        size = t.get("defaultSize") or {}
+        default_w = float(size.get("width", default_w))
+        default_h = float(size.get("height", default_h))
+        break
+
+start_x, start_y = 120.0, 120.0
+gap, step_x, step_y, max_cols = 24.0, 56.0, 42.0, 8
+occupied = []
+for p in board.get("panels", []):
+    if p.get("hidden"):
+        continue
+    b = p.get("bounds") or {}
+    x = float(b.get("x", 0.0))
+    y = float(b.get("y", 0.0))
+    w = float(b.get("width", 0.0))
+    h = float(b.get("height", 0.0))
+    occupied.append((x - gap, y - gap, x + w + gap, y + h + gap))
+
+def overlaps(rect):
+    x1, y1, x2, y2 = rect
+    for ox1, oy1, ox2, oy2 in occupied:
+        if x1 < ox2 and x2 > ox1 and y1 < oy2 and y2 > oy1:
+            return True
+    return False
+
+placed_x, placed_y = start_x, start_y + (len(occupied) * (default_h + step_y) * 0.35)
+found = False
+for row in range(40):
+    for col in range(max_cols):
+        x = start_x + (col * (default_w + step_x))
+        y = start_y + (row * (default_h + step_y))
+        rect = (x, y, x + default_w, y + default_h)
+        if not overlaps(rect):
+            placed_x, placed_y = x, y
+            found = True
+            break
+    if found:
+        break
+
+print(json.dumps({
+    "type": type_id,
+    "title": title,
+    "x": placed_x,
+    "y": placed_y,
+    "width": default_w,
+    "height": default_h,
+}))
+PY
+)
+    _post "/boards/${bid}/panels" "$payload" | python3 -m json.tool 2>/dev/null
     ;;
   panel:rename)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit panel:rename <board> <panel> <new>" >&2; exit 1; }
@@ -342,7 +412,7 @@ PYEOF
   do)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit do <board> <panel> <action> [json-body]" >&2; exit 1; }
     bid=$(_encode "$1"); pid=$(_encode "$2"); action=$3
-    body="${4:-{}}"
+    body="${4:-\{\}}"
     # merge action into body JSON
     merged=$(python3 -c "
 import json,sys
@@ -351,6 +421,37 @@ b['action'] = sys.argv[2]
 print(json.dumps(b))
 " "$body" "$action")
     _post "/boards/${bid}/panels/${pid}/action" "$merged" | python3 -m json.tool 2>/dev/null
+    ;;
+  run:list)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit run:list <board> <panel>" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"list"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  run:input)
+    [[ $# -lt 4 ]] && { echo "Usage: yoloit run:input <board> <panel> <sessionId|id|name> <text> [--enter]" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2"); target="$3"
+    shift 3
+    append_newline=false
+    if [[ "${!#}" == "--enter" ]]; then
+      append_newline=true
+      set -- "${@:1:$(($# - 1))}"
+    fi
+    text="$*"
+    [[ -z "$text" ]] && { echo "Usage: yoloit run:input <board> <panel> <sessionId|id|name> <text> [--enter]" >&2; exit 1; }
+    target_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")
+    text_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"input\",\"sessionId\":${target_json},\"id\":${target_json},\"name\":${target_json},\"text\":${text_json},\"appendNewline\":${append_newline}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  run:output)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit run:output <board> <panel> [sessionId|id|name]" >&2; exit 1; }
+    bid=$(_encode "$1"); pid=$(_encode "$2")
+    if [[ $# -ge 3 ]]; then
+      target="$3"
+      target_json=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"output\",\"sessionId\":${target_json},\"id\":${target_json},\"name\":${target_json}}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/boards/${bid}/panels/${pid}/action" '{"action":"output"}' | python3 -m json.tool 2>/dev/null
+    fi
     ;;
 
   # ── links ──
@@ -435,14 +536,16 @@ print(json.dumps(b))
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$item")}" | python3 -m json.tool 2>/dev/null
     ;;
   checklist:check)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:check <board> <panel> <item-id>" >&2; exit 1; }
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:check <board> <panel> <item-id|item-text>" >&2; exit 1; }
     bid=$(_encode "$1"); pid=$(_encode "$2")
-    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"check\",\"id\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    shift 2; target="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"check\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
     ;;
   checklist:uncheck)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:uncheck <board> <panel> <item-id>" >&2; exit 1; }
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:uncheck <board> <panel> <item-id|item-text>" >&2; exit 1; }
     bid=$(_encode "$1"); pid=$(_encode "$2")
-    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"id\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+    shift 2; target="$*"
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
     ;;
   kanban:columns)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit kanban:columns <board> <panel>" >&2; exit 1; }

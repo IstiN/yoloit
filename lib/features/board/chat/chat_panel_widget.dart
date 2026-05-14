@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,7 +18,9 @@ import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
+import 'package:yoloit/ui/widgets/ui_components.dart';
 
 /// The chat UI rendered inside a board panel.
 ///
@@ -62,6 +65,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   final List<ChatMessage> _messages = [];
   final Map<String, ChatToolCall> _activeToolCalls = {};
+  final Set<String> _ignoredToolCallIds = <String>{};
+  Set<String> _ignoredToolCalls = const {'report_intent'};
   bool _isProcessing = false;
   bool _isFirstMessage = true;
   ChatTokenUsage? _lastUsage;
@@ -79,6 +84,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   void initState() {
     super.initState();
     _initConfig();
+    ToolCallSettingsService.instance.load().then((_) {
+      if (!mounted) return;
+      _handleIgnoredToolsChanged();
+    });
+    ToolCallSettingsService.instance.ignoredToolsListenable.addListener(
+      _handleIgnoredToolsChanged,
+    );
     _provider = _providerForId(_config.provider);
     _glowCtrl = AnimationController(
       vsync: this,
@@ -86,6 +98,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
     // Register processing notifier for board-level glow
     ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
+    _consumeCliPendingMessage();
   }
 
   static ChatProvider _providerForId(String id) {
@@ -108,9 +121,44 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         Map<String, dynamic>.from(oldRaw),
       );
       if (nextConfig != previousConfig && nextConfig != _config) {
-        setState(() => _config = nextConfig);
+        setState(() {
+          if (nextConfig.provider != _config.provider) {
+            _provider.dispose();
+            _provider = _providerForId(nextConfig.provider);
+          }
+          _config = nextConfig;
+        });
       }
     }
+
+    _consumeCliPendingMessage(
+      previousPendingMessage:
+          oldWidget.panel.state['_cliPendingMessage'] as String?,
+    );
+  }
+
+  void _consumeCliPendingMessage({String? previousPendingMessage}) {
+    final pendingMessage = widget.panel.state['_cliPendingMessage'] as String?;
+    if (pendingMessage == null || pendingMessage.isEmpty) return;
+    if (previousPendingMessage != null &&
+        pendingMessage == previousPendingMessage) {
+      return;
+    }
+    final attachments =
+        (widget.panel.state['_cliPendingAttachments'] as List?)
+            ?.cast<String>() ??
+        const <String>[];
+    final clearedState =
+        {...widget.panel.state}
+          ..remove('_cliPendingMessage')
+          ..remove('_cliPendingAttachments');
+    widget.onUpdateState(clearedState);
+    unawaited(
+      _sendMessage(
+        overrideText: pendingMessage,
+        overrideAttachments: attachments,
+      ),
+    );
   }
 
   void _initConfig() {
@@ -118,10 +166,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     if (raw is Map) {
       _config = ChatSessionConfig.fromJson(Map<String, dynamic>.from(raw));
     } else {
-      _config = ChatSessionConfig(
-        sessionName: 'chat-${widget.panel.id}',
-        workingDir: '',
-      );
+      _config = ChatSessionConfig(sessionName: '', workingDir: '');
     }
     // Restore saved messages
     final savedMessages = widget.panel.state['messages'];
@@ -186,6 +231,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   @override
   void dispose() {
     _eventSub?.cancel();
+    ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
+      _handleIgnoredToolsChanged,
+    );
     _provider.dispose();
     _inputController.dispose();
     _scrollController.dispose();
@@ -206,6 +254,126 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         );
       }
     });
+  }
+
+  void _handleIgnoredToolsChanged() {
+    final next = ToolCallSettingsService.instance.ignoredTools;
+    if (!mounted || setEquals(next, _ignoredToolCalls)) return;
+    setState(() => _ignoredToolCalls = next);
+  }
+
+  bool _isIgnoredToolCall(String name) =>
+      _ignoredToolCalls.contains(name.trim().toLowerCase());
+
+  String _resolveToolName(String? toolName, {String? content}) {
+    final raw = toolName?.trim() ?? '';
+    final normalized = raw.toLowerCase();
+    if (normalized.isNotEmpty && normalized != 'unknown') return raw;
+    final text = content?.trim().toLowerCase() ?? '';
+    if (text == 'intent logged') return 'report_intent';
+    return raw.isEmpty ? 'unknown' : raw;
+  }
+
+  static final RegExp _changedFilePathRe = RegExp(r'(/\S+)');
+  static const Set<String> _fileMutationToolNames = {
+    'create',
+    'edit',
+    'apply_patch',
+    'write_file',
+    'delete_file',
+    'move_file',
+    'rename',
+  };
+
+  List<String> _extractChangedFiles({
+    required String toolName,
+    required String resultContent,
+    Map<String, dynamic> arguments = const {},
+  }) {
+    final loweredName = toolName.trim().toLowerCase();
+    final loweredContent = resultContent.toLowerCase();
+    final likelyMutation =
+        _fileMutationToolNames.contains(loweredName) ||
+        loweredContent.contains('created file ') ||
+        loweredContent.contains('updated with changes') ||
+        loweredContent.contains('updated file') ||
+        loweredContent.contains('deleted file');
+    if (!likelyMutation) return const [];
+
+    final found = <String>{};
+    for (final match in _changedFilePathRe.allMatches(resultContent)) {
+      final cleaned = _normalizePathToken(match.group(1) ?? '');
+      if (cleaned.isNotEmpty) found.add(cleaned);
+    }
+
+    void collectFromDynamic(dynamic value, {String? key}) {
+      if (value is String) {
+        final candidate = _normalizePathToken(value);
+        if (!candidate.startsWith('/')) return;
+        if (key != null) {
+          const pathKeys = {
+            'path',
+            'file',
+            'filepath',
+            'target',
+            'destination',
+            'newpath',
+            'oldpath',
+            'from',
+            'to',
+          };
+          if (!pathKeys.contains(key.toLowerCase())) return;
+        }
+        found.add(candidate);
+        return;
+      }
+      if (value is Map) {
+        for (final entry in value.entries) {
+          if (entry.key is! String) continue;
+          collectFromDynamic(entry.value, key: entry.key as String);
+        }
+        return;
+      }
+      if (value is List) {
+        for (final item in value) {
+          collectFromDynamic(item);
+        }
+      }
+    }
+
+    collectFromDynamic(arguments);
+    return found.toList()..sort();
+  }
+
+  String _normalizePathToken(String raw) {
+    var value = raw.trim();
+    if (value.isEmpty || !value.startsWith('/')) return '';
+    value = value.replaceAll(RegExp("^[`\"']+|[`\"']+\$"), '');
+    value = value.replaceAll(RegExp(r'[),.;:!?]+$'), '');
+    return value;
+  }
+
+  List<String> _collectChangedFilesForStrip() {
+    final dedup = <String>{};
+    final ordered = <String>[];
+    for (final message in _messages.reversed) {
+      if (message.role != ChatRole.tool) continue;
+      final files =
+          (message.metadata?['changedFiles'] as List?)?.cast<String>() ??
+          _extractChangedFiles(
+            toolName: _resolveToolName(
+              message.toolName,
+              content: message.content,
+            ),
+            resultContent: message.content,
+          );
+      if (files.isEmpty) continue;
+      for (final path in files) {
+        if (dedup.add(path)) ordered.add(path);
+      }
+      if (ordered.length >= 16) break;
+    }
+    return ordered;
   }
 
   void _handleLinkTap(String? href) {
@@ -243,6 +411,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
   }
 
+  void _openInPreviewPanel(String path) {
+    if (path.isEmpty) return;
+    final createPanel = widget.onCreateLinkedPanel;
+    if (createPanel != null) {
+      final title = path.split('/').last;
+      createPanel('board.file.preview', {'path': path, 'title': title}, title);
+      return;
+    }
+    _handleOpenFile(path);
+  }
+
   void _setProcessing(bool value) {
     _isProcessing = value;
     processingNotifier.value = value;
@@ -258,8 +437,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   bool _isSending = false;
 
-  Future<void> _sendMessage() async {
-    final text = _inputController.text.trim();
+  BoardDocument? _currentBoardForPanel() {
+    final state = context.read<BoardCubit>().state;
+    for (final board in state.boards) {
+      final hasPanel = board.panels.any((p) => p.id == widget.panel.id);
+      if (hasPanel) return board;
+    }
+    return state.activeBoard;
+  }
+
+  Future<void> _sendMessage({
+    String? overrideText,
+    List<String> overrideAttachments = const [],
+  }) async {
+    final text = overrideText?.trim() ?? _inputController.text.trim();
     if (text.isEmpty) return;
     if (_isSending) return; // prevent re-entrance
 
@@ -271,7 +462,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
 
     _isSending = true;
-    _inputController.clear();
+    if (overrideText == null) {
+      _inputController.clear();
+    }
 
     // If currently processing, finalize any partial response first
     if (_isProcessing) {
@@ -283,6 +476,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _streamingContent = '';
         _streamingMessageId = null;
         _activeToolCalls.clear();
+        _ignoredToolCallIds.clear();
       });
     }
 
@@ -295,7 +489,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       caseSensitive: false,
     );
     final tokens = text.split(RegExp(r'\s+'));
-    final attachments = tokens.where((t) => filePathRe.hasMatch(t)).toList();
+    final attachments = <String>[
+      ...overrideAttachments,
+      ...tokens.where((t) => filePathRe.hasMatch(t)),
+    ];
     final promptText =
         tokens.where((t) => !filePathRe.hasMatch(t)).join(' ').trim();
 
@@ -314,6 +511,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _streamingContent = '';
       _streamingMessageId = null;
       _activeToolCalls.clear();
+      _ignoredToolCallIds.clear();
     });
 
     _scrollToBottom();
@@ -322,12 +520,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // pass only image files as attachments; others get path embedded in prompt.
     final imageAttachments =
         attachments.where((t) => imageExtRe.hasMatch(t)).toList();
+    final board = _currentBoardForPanel();
 
     final stream = _provider.sendMessage(
       message: promptText.isNotEmpty ? promptText : text,
       config: _config,
       isFirstMessage: _isFirstMessage,
       attachments: imageAttachments,
+      runtimeContext: ChatRuntimeContext(
+        boardId: board?.id,
+        boardName: board?.name,
+        panelId: widget.panel.id,
+        panelTitle: widget.panel.title,
+      ),
     );
 
     _isFirstMessage = false;
@@ -359,6 +564,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
             _finalizeStreamingMessage();
           }
+          _markAllActiveToolCallsCompleted();
         });
         _persistMessages();
         _scrollToBottom();
@@ -444,7 +650,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
       case ChatEventType.toolStart:
         final toolCallId = event.toolCallId ?? '';
-        final toolName = event.toolName ?? 'unknown';
+        final toolName = _resolveToolName(event.toolName);
+        if (_isIgnoredToolCall(toolName)) {
+          if (toolCallId.isNotEmpty) {
+            _ignoredToolCallIds.add(toolCallId);
+          }
+          break;
+        }
         setState(() {
           _activeToolCalls[toolCallId] = ChatToolCall(
             toolCallId: toolCallId,
@@ -457,9 +669,34 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         break;
 
       case ChatEventType.toolComplete:
-        final toolCallId = event.data['toolCallId'] as String? ?? '';
+        var toolCallId = event.data['toolCallId'] as String? ?? '';
+        if (toolCallId.isEmpty && _activeToolCalls.length == 1) {
+          toolCallId = _activeToolCalls.keys.first;
+        }
+        if (toolCallId.isNotEmpty && _ignoredToolCallIds.remove(toolCallId)) {
+          break;
+        }
         final success = event.data['success'] as bool? ?? true;
         final resultContent = event.toolResultContent ?? '';
+        final toolArguments =
+            _activeToolCalls[toolCallId]?.arguments ??
+            event.toolArguments ??
+            {};
+        final toolName = _resolveToolName(
+          _activeToolCalls[toolCallId]?.toolName ?? event.toolName,
+          content: resultContent,
+        );
+        final changedFiles = _extractChangedFiles(
+          toolName: toolName,
+          resultContent: resultContent,
+          arguments: toolArguments,
+        );
+        if (_isIgnoredToolCall(toolName)) {
+          setState(() {
+            _activeToolCalls.remove(toolCallId);
+          });
+          break;
+        }
         setState(() {
           _activeToolCalls[toolCallId] = (_activeToolCalls[toolCallId] ??
                   ChatToolCall(
@@ -470,10 +707,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               .copyWith(
                 isRunning: false,
                 success: success,
-                result:
-                    resultContent.length > 500
-                        ? '${resultContent.substring(0, 500)}…'
-                        : resultContent,
+                result: resultContent,
               );
 
           // Add tool result as a message for the chat log
@@ -481,13 +715,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ChatMessage(
               id: 'tool-$toolCallId',
               role: ChatRole.tool,
-              content:
-                  resultContent.length > 500
-                      ? '${resultContent.substring(0, 500)}…'
-                      : resultContent,
-              toolName: _activeToolCalls[toolCallId]?.toolName ?? 'unknown',
+              content: resultContent,
+              toolName: toolName,
               toolCallId: toolCallId,
               timestamp: event.timestamp ?? DateTime.now(),
+              metadata: {
+                'success': success,
+                if (changedFiles.isNotEmpty) 'changedFiles': changedFiles,
+              },
             ),
           );
         });
@@ -553,6 +788,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
   }
 
+  void _markAllActiveToolCallsCompleted() {
+    if (_activeToolCalls.isEmpty) return;
+    final updated = <String, ChatToolCall>{};
+    _activeToolCalls.forEach((id, call) {
+      updated[id] = call.isRunning ? call.copyWith(isRunning: false) : call;
+    });
+    _activeToolCalls
+      ..clear()
+      ..addAll(updated);
+    _ignoredToolCallIds.clear();
+  }
+
   void _finalizeStreamingMessage() {
     if (_streamingContent.isEmpty) return;
     _messages.add(
@@ -571,7 +818,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   @override
   Widget build(BuildContext context) {
-    if (_config.workingDir.isEmpty) {
+    final configured = widget.panel.state['configured'] == true;
+    if (!configured && _messages.isEmpty) {
       return _buildSetupView();
     }
     return _buildChatView();
@@ -604,6 +852,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         widget.onUpdateState({
           ...widget.panel.state,
           'config': config.toJson(),
+          'configured': true,
         });
       },
     );
@@ -735,6 +984,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ),
           const SizedBox(width: 4),
           GestureDetector(
+            onTap: _copySessionToClipboard,
+            child: Tooltip(
+              message: 'Copy session',
+              child: Icon(Icons.copy_all_outlined, size: 13, color: muted),
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
             onTap: () => _showSessionHistoryDialog(context),
             child: Icon(Icons.history, size: 13, color: muted),
           ),
@@ -789,7 +1046,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Widget _buildMessageList() {
-    final hasRunningTools = _activeToolCalls.values.any((t) => t.isRunning);
+    final hasRunningTools = _activeToolCalls.values.any(
+      (t) => t.isRunning && !_isIgnoredToolCall(t.toolName),
+    );
     final showStreaming = _streamingContent.isNotEmpty;
     // Show thinking indicator when processing but no streaming content and no running tools
     final showThinking = _isProcessing && !showStreaming && !hasRunningTools;
@@ -804,7 +1063,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           (showThinking ? 1 : 0),
       itemBuilder: (context, index) {
         final runningTools =
-            _activeToolCalls.values.where((t) => t.isRunning).toList();
+            _activeToolCalls.values
+                .where((t) => t.isRunning && !_isIgnoredToolCall(t.toolName))
+                .toList();
 
         if (index < _messages.length) {
           return _buildMessageBubble(_messages[index]);
@@ -856,19 +1117,37 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           onOpenFile: _handleOpenFile,
         );
       case ChatRole.assistant:
+        final visibleToolCalls =
+            message.toolCalls
+                .map(
+                  (tc) => tc.copyWith(
+                    toolName: _resolveToolName(tc.toolName, content: tc.result),
+                  ),
+                )
+                .where((tc) => !_isIgnoredToolCall(tc.toolName))
+                .toList();
         return _AssistantBubble(
           content: message.content,
-          toolCalls: message.toolCalls,
+          toolCalls: visibleToolCalls,
           tokenUsage: message.tokenUsage,
           onLinkTap: _handleLinkTap,
           onOpenFile: _handleOpenFile,
         );
       case ChatRole.tool:
+        final resolvedToolName = _resolveToolName(
+          message.toolName,
+          content: message.content,
+        );
+        if (_isIgnoredToolCall(resolvedToolName)) {
+          return const SizedBox.shrink();
+        }
+        final persistedSuccess = message.metadata?['success'] as bool?;
         return _ToolResultCard(
-          toolName: message.toolName ?? 'tool',
+          toolName: resolvedToolName,
           toolCallId: message.toolCallId ?? '',
           content: message.content,
-          success: _activeToolCalls[message.toolCallId]?.success,
+          success:
+              _activeToolCalls[message.toolCallId]?.success ?? persistedSuccess,
         );
       case ChatRole.system:
         final meta = message.metadata;
@@ -1000,6 +1279,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final hintColor =
         Theme.of(context).textTheme.bodySmall?.color ??
         Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+    final changedFiles = _collectChangedFilesForStrip();
     return Container(
       margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
       padding: const EdgeInsets.fromLTRB(10, 8, 22, 12),
@@ -1010,128 +1290,145 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           bottomRight: Radius.circular(14),
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Model selector (bottom-left)
-          Builder(
-            builder:
-                (btnContext) => GestureDetector(
-                  onTap: () => _showModelPicker(btnContext),
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    margin: const EdgeInsets.only(bottom: 2),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(14),
+          if (changedFiles.isNotEmpty) ...[
+            _ChangedFilesStrip(
+              files: changedFiles,
+              onOpenFile: _openInPreviewPanel,
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Model selector (bottom-left)
+              Builder(
+                builder:
+                    (btnContext) => GestureDetector(
+                      onTap: () => _showModelPicker(btnContext),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        margin: const EdgeInsets.only(bottom: 2),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceElevated,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(
+                          Icons.auto_awesome,
+                          size: 14,
+                          color: colors.terminalPrompt,
+                        ),
+                      ),
                     ),
-                    child: Icon(
-                      Icons.auto_awesome,
-                      size: 14,
-                      color: colors.terminalPrompt,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Focus(
+                  onKeyEvent: (node, event) {
+                    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                    // Enter (without Shift) → send
+                    if (event.logicalKey == LogicalKeyboardKey.enter &&
+                        !HardwareKeyboard.instance.isShiftPressed) {
+                      _sendMessage();
+                      return KeyEventResult.handled;
+                    }
+                    // Cmd+V (macOS) or Ctrl+V → smart paste — intercept fully
+                    final isCmd = HardwareKeyboard.instance.isMetaPressed;
+                    final isCtrl = HardwareKeyboard.instance.isControlPressed;
+                    if (event.logicalKey == LogicalKeyboardKey.keyV &&
+                        (isCmd || isCtrl)) {
+                      _handleSmartPaste();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: TextField(
+                    controller: _inputController,
+                    focusNode: _inputFocusNode,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textColor,
+                      height: 1.4,
                     ),
+                    decoration: InputDecoration(
+                      hintText: _isProcessing ? 'Agent working…' : 'Message…',
+                      hintStyle: TextStyle(fontSize: 13, color: hintColor),
+                      filled: true,
+                      fillColor: colors.surfaceElevated,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: colors.terminalPrompt,
+                          width: 0.8,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      isDense: true,
+                    ),
+                    maxLines: 4,
+                    minLines: 1,
                   ),
                 ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Focus(
-              onKeyEvent: (node, event) {
-                if (event is! KeyDownEvent) return KeyEventResult.ignored;
-                // Enter (without Shift) → send
-                if (event.logicalKey == LogicalKeyboardKey.enter &&
-                    !HardwareKeyboard.instance.isShiftPressed) {
-                  _sendMessage();
-                  return KeyEventResult.handled;
-                }
-                // Cmd+V (macOS) or Ctrl+V → smart paste — intercept fully
-                final isCmd = HardwareKeyboard.instance.isMetaPressed;
-                final isCtrl = HardwareKeyboard.instance.isControlPressed;
-                if (event.logicalKey == LogicalKeyboardKey.keyV &&
-                    (isCmd || isCtrl)) {
-                  _handleSmartPaste();
-                  return KeyEventResult.handled;
-                }
-                return KeyEventResult.ignored;
-              },
-              child: TextField(
-                controller: _inputController,
-                focusNode: _inputFocusNode,
-                style: TextStyle(fontSize: 13, color: textColor, height: 1.4),
-                decoration: InputDecoration(
-                  hintText: _isProcessing ? 'Agent working…' : 'Message…',
-                  hintStyle: TextStyle(fontSize: 13, color: hintColor),
-                  filled: true,
-                  fillColor: colors.surfaceElevated,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: colors.terminalPrompt,
-                      width: 0.8,
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Voice input coming soon'),
+                      duration: Duration(seconds: 2),
                     ),
+                  );
+                },
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  margin: const EdgeInsets.only(bottom: 2),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
+                  child: Icon(
+                    Icons.mic_none,
+                    size: 15,
+                    color: colors.terminalPrompt,
                   ),
-                  isDense: true,
                 ),
-                maxLines: 4,
-                minLines: 1,
               ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Voice input coming soon'),
-                  duration: Duration(seconds: 2),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: _sendMessage,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  margin: const EdgeInsets.only(bottom: 2),
+                  decoration: BoxDecoration(
+                    color: colors.terminalPrompt,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.arrow_upward,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    size: 16,
+                  ),
                 ),
-              );
-            },
-            child: Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(bottom: 2),
-              decoration: BoxDecoration(
-                color: colors.surfaceElevated,
-                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                Icons.mic_none,
-                size: 15,
-                color: colors.terminalPrompt,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: _sendMessage,
-            child: Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(bottom: 2),
-              decoration: BoxDecoration(
-                color: colors.terminalPrompt,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                Icons.arrow_upward,
-                color: Theme.of(context).colorScheme.onPrimary,
-                size: 16,
-              ),
-            ),
+            ],
           ),
         ],
       ),
@@ -1167,6 +1464,55 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final parts = path.split('/');
     if (parts.length <= 3) return path;
     return '…/${parts.sublist(parts.length - 2).join('/')}';
+  }
+
+  Future<void> _copySessionToClipboard() async {
+    final transcript = _buildSessionTranscript();
+    await Clipboard.setData(ClipboardData(text: transcript));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Session copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  String _buildSessionTranscript() {
+    final b =
+        StringBuffer()
+          ..writeln(
+            'Session: ${_config.sessionName.isEmpty ? 'unnamed' : _config.sessionName}',
+          )
+          ..writeln('Provider: ${_config.provider}')
+          ..writeln('Model: ${_config.model}')
+          ..writeln('Working dir: ${_config.workingDir}')
+          ..writeln('Messages: ${_messages.length}')
+          ..writeln('');
+
+    for (final message in _messages) {
+      final ts = message.timestamp?.toIso8601String() ?? '-';
+      final role = message.role.name.toUpperCase();
+      final toolName = message.toolName;
+      final title =
+          toolName != null && toolName.isNotEmpty
+              ? '[$ts] $role ($toolName)'
+              : '[$ts] $role';
+      b.writeln(title);
+      if (message.attachments.isNotEmpty) {
+        b.writeln('Attachments: ${message.attachments.join(', ')}');
+      }
+      b.writeln(message.content.trimRight());
+      b.writeln('');
+    }
+
+    if (_streamingContent.isNotEmpty) {
+      b.writeln('[streaming] ASSISTANT');
+      b.writeln(_streamingContent.trimRight());
+      b.writeln('');
+    }
+
+    return b.toString().trimRight();
   }
 
   void _showModelPicker(BuildContext context) {
@@ -1822,6 +2168,93 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
 // Message bubbles
 // ─────────────────────────────────────────────────────────────────────────────
 
+class _ChangedFilesStrip extends StatelessWidget {
+  const _ChangedFilesStrip({required this.files, required this.onOpenFile});
+
+  final List<String> files;
+  final void Function(String path) onOpenFile;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final labelColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface.withOpacity(0.7);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.file_present_rounded, size: 13, color: colors.primary),
+            const SizedBox(width: 5),
+            Text(
+              'Files changed',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: labelColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children:
+                files.map((path) {
+                  final fileName = path.split('/').last;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Tooltip(
+                      message: path,
+                      waitDuration: const Duration(milliseconds: 350),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => onOpenFile(path),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceElevated,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: colors.border.withOpacity(0.6),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.description_outlined,
+                                size: 12,
+                                color: colors.primary,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                fileName,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _UserBubble extends StatefulWidget {
   const _UserBubble({
     required this.content,
@@ -2414,22 +2847,82 @@ class _ToolResultCard extends StatefulWidget {
 class _ToolResultCardState extends State<_ToolResultCard> {
   bool _expanded = false;
 
+  void _copyResult() {
+    Clipboard.setData(ClipboardData(text: widget.content));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Tool result copied'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _openFullView() {
+    showDialog<void>(
+      context: context,
+      builder:
+          (ctx) => Dialog(
+            insetPadding: const EdgeInsets.all(24),
+            child: SizedBox(
+              width: 900,
+              height: 640,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${widget.toolName} • Full view',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.copy_all_outlined, size: 18),
+                          tooltip: 'Copy',
+                          onPressed: _copyResult,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(12),
+                      child: SelectableText(
+                        widget.content,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final statusIcon =
-        widget.success == null
-            ? Icons.hourglass_top
-            : widget.success!
-            ? Icons.check_circle_outline
-            : Icons.error_outline;
-    final statusColor =
-        widget.success == null
-            ? Theme.of(context).textTheme.bodyMedium?.color ??
-                Theme.of(context).colorScheme.onSurface
-            : widget.success!
-            ? const Color(0xFF34D399)
-            : const Color(0xFFF87171);
+    final status = _ToolExecutionStatus.from(
+      success: widget.success,
+      content: widget.content,
+    );
+    final previewText = _toolResultPreview(widget.content);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -2438,23 +2931,43 @@ class _ToolResultCardState extends State<_ToolResultCard> {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: colors.surfaceHighlight,
+            color: Color.lerp(colors.surfaceHighlight, status.tint, 0.14),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
+            border: Border.all(
+              color:
+                  Color.lerp(colors.border, status.tint, 0.35) ?? colors.border,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(statusIcon, size: 14, color: statusColor),
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: status.tint.withAlpha(28),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(status.icon, size: 14, color: status.tint),
+                  ),
                   const SizedBox(width: 6),
-                  Icon(
-                    Icons.build_outlined,
-                    size: 12,
-                    color:
-                        Theme.of(context).textTheme.bodyMedium?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: colors.surface.withAlpha(180),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: colors.border.withAlpha(120)),
+                    ),
+                    child: Icon(
+                      Icons.build_outlined,
+                      size: 12,
+                      color:
+                          Theme.of(context).textTheme.bodyMedium?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -2467,6 +2980,37 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  _ToolStatusBadge(status: status),
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: 'Copy',
+                    child: InkWell(
+                      onTap: _copyResult,
+                      child: Icon(
+                        Icons.copy_all_outlined,
+                        size: 14,
+                        color:
+                            Theme.of(context).textTheme.bodySmall?.color ??
+                            Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: 'Full view',
+                    child: InkWell(
+                      onTap: _openFullView,
+                      child: Icon(
+                        Icons.open_in_full_rounded,
+                        size: 14,
+                        color:
+                            Theme.of(context).textTheme.bodySmall?.color ??
+                            Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
                     size: 16,
@@ -2476,6 +3020,22 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                   ),
                 ],
               ),
+              if (previewText != null && !_expanded)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 28, right: 4),
+                  child: Text(
+                    previewText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.35,
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
               if (_expanded && widget.content.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
@@ -2483,8 +3043,9 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: colors.surface,
+                      color: Color.lerp(colors.surface, status.tint, 0.05),
                       borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: colors.border.withAlpha(110)),
                     ),
                     child: SelectableText(
                       widget.content,
@@ -2504,6 +3065,104 @@ class _ToolResultCardState extends State<_ToolResultCard> {
       ),
     );
   }
+}
+
+class _ToolStatusBadge extends StatelessWidget {
+  const _ToolStatusBadge({required this.status});
+
+  final _ToolExecutionStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeonBadge(
+      label: status.label,
+      color: status.tint,
+      showPulse: status.isRunning,
+    );
+  }
+}
+
+class _ToolExecutionStatus {
+  const _ToolExecutionStatus({
+    required this.icon,
+    required this.label,
+    required this.tint,
+    this.isRunning = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color tint;
+  final bool isRunning;
+
+  static _ToolExecutionStatus from({
+    required bool? success,
+    required String content,
+  }) {
+    final exitCode = _extractExitCode(content);
+    if (success == null) {
+      if (exitCode != null) {
+        return _ToolExecutionStatus(
+          icon:
+              exitCode == 0 ? Icons.check_circle_rounded : Icons.error_rounded,
+          label: exitCode == 0 ? 'Done $exitCode' : 'Failed $exitCode',
+          tint:
+              exitCode == 0 ? const Color(0xFF34D399) : const Color(0xFFF87171),
+        );
+      }
+      if (content.trim().isNotEmpty) {
+        return const _ToolExecutionStatus(
+          icon: Icons.check_circle_rounded,
+          label: 'Done',
+          tint: Color(0xFF34D399),
+        );
+      }
+      return const _ToolExecutionStatus(
+        icon: Icons.pending_outlined,
+        label: 'Running',
+        tint: Color(0xFFFBBF24),
+        isRunning: true,
+      );
+    }
+    if (success) {
+      return _ToolExecutionStatus(
+        icon: Icons.check_circle_rounded,
+        label: exitCode == null ? 'Done' : 'Done $exitCode',
+        tint: const Color(0xFF34D399),
+      );
+    }
+    return _ToolExecutionStatus(
+      icon: Icons.error_rounded,
+      label: exitCode == null ? 'Failed' : 'Failed $exitCode',
+      tint: const Color(0xFFF87171),
+    );
+  }
+}
+
+int? _extractExitCode(String content) {
+  final match = RegExp(
+    r'(?:exited with exit code|exit code)\s+(\d+)',
+    caseSensitive: false,
+  ).firstMatch(content);
+  return match == null ? null : int.tryParse(match.group(1)!);
+}
+
+String? _toolResultPreview(String content) {
+  final cleaned =
+      content
+          .replaceAll(RegExp(r'<[^>]+>'), ' ')
+          .split('\n')
+          .map((line) => line.trim())
+          .where((line) => line.isNotEmpty)
+          .where(
+            (line) => !line.toLowerCase().contains('exited with exit code'),
+          )
+          .toList();
+  if (cleaned.isEmpty) {
+    final exitCode = _extractExitCode(content);
+    return exitCode == null ? null : 'Exited with code $exitCode';
+  }
+  return cleaned.first;
 }
 
 class _SystemBubble extends StatelessWidget {

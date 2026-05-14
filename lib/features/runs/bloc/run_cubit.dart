@@ -15,29 +15,35 @@ class RunCubit extends Cubit<RunState> {
 
   Future<void> loadForWorkspace(String workspacePath) async {
     final configs = await RunConfigStorage.instance.load(workspacePath);
-    var savedSessions = await RunSessionStorage.instance.load(workspacePath);
+    final savedSessions = await RunSessionStorage.instance.load(workspacePath);
 
-    final effectiveConfigs = configs.isEmpty && await _isFlutterProject(workspacePath)
-        ? [
-            RunConfig.flutterRunMacos(workspacePath),
-            RunConfig.flutterTest(),
-            RunConfig.flutterBuildMacos(),
-          ]
-        : configs;
+    final seededConfigs =
+        configs.isEmpty && await _isFlutterProject(workspacePath)
+            ? [
+              RunConfig.flutterRunMacos(workspacePath),
+              RunConfig.flutterTest(),
+              RunConfig.flutterBuildMacos(),
+            ]
+            : configs;
+    final effectiveConfigs = _dedupeConfigs(seededConfigs);
 
-    if (effectiveConfigs != configs) {
+    if (!_sameConfigs(effectiveConfigs, configs)) {
       await RunConfigStorage.instance.save(workspacePath, effectiveConfigs);
     }
 
-    emit(state.copyWith(
-      configs: effectiveConfigs,
-      workspacePath: workspacePath,
-      sessions: savedSessions,
-      activeSessionId: savedSessions.lastOrNull?.id,
-    ));
+    emit(
+      state.copyWith(
+        configs: effectiveConfigs,
+        workspacePath: workspacePath,
+        sessions: savedSessions,
+        activeSessionId: savedSessions.lastOrNull?.id,
+      ),
+    );
 
     // Reconnect to any sessions that were running when the app last closed
-    for (final session in savedSessions.where((s) => s.status == RunStatus.running)) {
+    for (final session in savedSessions.where(
+      (s) => s.status == RunStatus.running,
+    )) {
       final alive = await RunService.instance.reconnect(
         sessionId: session.id,
         configId: session.config.id,
@@ -46,7 +52,10 @@ class RunCubit extends Cubit<RunState> {
       );
       if (!alive) {
         // tmux session gone — mark as stopped
-        _updateSession(session.id, (s) => s.copyWith(status: RunStatus.stopped));
+        _updateSession(
+          session.id,
+          (s) => s.copyWith(status: RunStatus.stopped),
+        );
       }
     }
   }
@@ -58,9 +67,9 @@ class RunCubit extends Cubit<RunState> {
     return content.contains('flutter:');
   }
 
-  Future<void> startRun(RunConfig config) async {
+  Future<RunSession?> startRun(RunConfig config) async {
     final workspacePath = state.workspacePath;
-    if (workspacePath == null) return;
+    if (workspacePath == null) return null;
 
     final sessionId = '${config.id}_${DateTime.now().millisecondsSinceEpoch}';
     final session = RunSession(
@@ -71,10 +80,12 @@ class RunCubit extends Cubit<RunState> {
       startedAt: DateTime.now(),
     );
 
-    emit(state.copyWith(
-      sessions: [...state.sessions, session],
-      activeSessionId: sessionId,
-    ));
+    emit(
+      state.copyWith(
+        sessions: [...state.sessions, session],
+        activeSessionId: sessionId,
+      ),
+    );
 
     // Persist immediately so status=running is saved before any app restart
     _persistSessions();
@@ -90,6 +101,46 @@ class RunCubit extends Cubit<RunState> {
       onOutput: (line, isError) => _appendOutput(sessionId, line, isError),
       onExit: (code) => _onExit(sessionId, code),
     );
+    return session;
+  }
+
+  Future<RunSession?> restartSession(String sessionId) async {
+    RunSession? existing;
+    for (final session in state.sessions) {
+      if (session.id == sessionId) {
+        existing = session;
+        break;
+      }
+    }
+    if (existing == null) return null;
+
+    RunService.instance.stop(sessionId);
+
+    final workspacePath = state.workspacePath ?? existing.workspacePath;
+    final restarted = existing.copyWith(
+      status: RunStatus.running,
+      output: const [],
+      clearExitCode: true,
+      startedAt: DateTime.now(),
+      workspacePath: workspacePath,
+    );
+
+    final sessions =
+        state.sessions.map((s) => s.id == sessionId ? restarted : s).toList();
+    emit(state.copyWith(sessions: sessions, activeSessionId: sessionId));
+    _persistSessions();
+
+    final effectiveDir = restarted.config.workingDir ?? workspacePath;
+    await RunService.instance.start(
+      sessionId: restarted.id,
+      configId: restarted.config.id,
+      command: restarted.config.command,
+      workingDir: effectiveDir,
+      env: restarted.config.env,
+      onOutput: (line, isError) => _appendOutput(restarted.id, line, isError),
+      onExit: (code) => _onExit(restarted.id, code),
+    );
+    return restarted;
   }
 
   void stopRun(String sessionId) {
@@ -106,6 +157,18 @@ class RunCubit extends Cubit<RunState> {
     RunService.instance.sendStdin(sessionId, 'R');
   }
 
+  void sendInput(String sessionId, String text) {
+    if (text.isEmpty) return;
+    RunService.instance.sendStdin(sessionId, text);
+  }
+
+  void triggerQuickAction(String sessionId, RunQuickAction action) {
+    if (action.command.trim().isEmpty) return;
+    final payload =
+        action.appendNewline ? '${action.command}\n' : action.command;
+    RunService.instance.sendStdin(sessionId, payload);
+  }
+
   void clearOutput(String sessionId) {
     _updateSession(sessionId, (s) => s.copyWith(output: []));
     _persistSessions();
@@ -117,23 +180,30 @@ class RunCubit extends Cubit<RunState> {
 
   void removeSession(String sessionId) {
     RunService.instance.stop(sessionId);
-    final sessions =
-        state.sessions.where((s) => s.id != sessionId).toList();
-    final activeId = state.activeSessionId == sessionId
-        ? sessions.lastOrNull?.id
-        : state.activeSessionId;
-    emit(state.copyWith(
-      sessions: sessions,
-      activeSessionId: activeId,
-      clearActiveSession: activeId == null,
-    ));
+    final sessions = state.sessions.where((s) => s.id != sessionId).toList();
+    final activeId =
+        state.activeSessionId == sessionId
+            ? sessions.lastOrNull?.id
+            : state.activeSessionId;
+    emit(
+      state.copyWith(
+        sessions: sessions,
+        activeSessionId: activeId,
+        clearActiveSession: activeId == null,
+      ),
+    );
     _persistSessions();
   }
 
-  Future<void> addConfig(RunConfig config) async {
+  Future<RunConfig> addConfig(RunConfig config) async {
+    final existing = _findEquivalentConfig(config);
+    if (existing != null) {
+      return existing;
+    }
     final configs = [...state.configs, config];
     await RunConfigStorage.instance.save(state.workspacePath ?? '', configs);
     emit(state.copyWith(configs: configs));
+    return config;
   }
 
   Future<void> updateConfig(RunConfig config) async {
@@ -153,20 +223,19 @@ class RunCubit extends Cubit<RunState> {
     _updateSession(sessionId, (s) {
       final lines = [
         ...s.output,
-        RunOutputLine(
-            text: line, isError: isError, timestamp: DateTime.now()),
+        RunOutputLine(text: line, isError: isError, timestamp: DateTime.now()),
       ];
       return s.copyWith(
-        output: lines.length > _maxOutputLines
-            ? lines.sublist(lines.length - _maxOutputLines)
-            : lines,
+        output:
+            lines.length > _maxOutputLines
+                ? lines.sublist(lines.length - _maxOutputLines)
+                : lines,
       );
     });
   }
 
   void _onExit(String sessionId, int code) {
-    _appendOutput(
-        sessionId, '\n[Process exited with code $code]', code != 0);
+    _appendOutput(sessionId, '\n[Process exited with code $code]', code != 0);
     _updateSession(
       sessionId,
       (s) => s.copyWith(
@@ -178,10 +247,11 @@ class RunCubit extends Cubit<RunState> {
   }
 
   void _updateSession(
-      String sessionId, RunSession Function(RunSession) updater) {
-    final sessions = state.sessions
-        .map((s) => s.id == sessionId ? updater(s) : s)
-        .toList();
+    String sessionId,
+    RunSession Function(RunSession) updater,
+  ) {
+    final sessions =
+        state.sessions.map((s) => s.id == sessionId ? updater(s) : s).toList();
     emit(state.copyWith(sessions: sessions));
   }
 
@@ -189,5 +259,36 @@ class RunCubit extends Cubit<RunState> {
     final path = state.workspacePath;
     if (path == null) return;
     RunSessionStorage.instance.save(path, state.sessions);
+  }
+
+  RunConfig? _findEquivalentConfig(RunConfig candidate) {
+    final key = _configSignature(candidate);
+    for (final config in state.configs) {
+      if (_configSignature(config) == key) return config;
+    }
+    return null;
+  }
+
+  List<RunConfig> _dedupeConfigs(List<RunConfig> configs) {
+    final bySignature = <String, RunConfig>{};
+    for (final config in configs) {
+      final key = _configSignature(config);
+      bySignature.putIfAbsent(key, () => config);
+    }
+    return bySignature.values.toList();
+  }
+
+  String _configSignature(RunConfig config) {
+    final normalizedDir = (config.workingDir ?? '').trim();
+    return '${config.name.trim().toLowerCase()}|${config.command.trim().toLowerCase()}|$normalizedDir';
+  }
+
+  bool _sameConfigs(List<RunConfig> a, List<RunConfig> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }
