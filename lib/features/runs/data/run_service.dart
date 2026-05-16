@@ -82,9 +82,22 @@ class RunService {
     // Inline workingDir and log directly into the bash string so they are
     // available even when the tmux server does not inherit the client's env.
     final enrichedPath = _enrichedPath();
-    final bash = "export PATH=\"$enrichedPath\"; "
-        "${prefix}cd \"$workingDir\" && $command 2>&1 | tee \"$log\"; "
-        "echo \"__YOLOIT_EXIT_\$?\" >> \"$log\"";
+    final isFlutterRun = command.contains('flutter run') && !Platform.isWindows;
+
+    final String bash;
+    if (isFlutterRun) {
+      // Run flutter directly inside the tmux PTY — no piping, so
+      // io.stdout.hasTerminal stays true and hot reload/restart work.
+      // tmux pipe-pane (set up below) mirrors all output to the log file.
+      // kill-session will SIGHUP flutter directly so the app window closes.
+      bash = "export PATH=\"$enrichedPath\"; "
+          "${prefix}cd \"$workingDir\" && $command; "
+          "echo \"__YOLOIT_EXIT_\$?\" >> \"$log\"";
+    } else {
+      bash = "export PATH=\"$enrichedPath\"; "
+          "${prefix}cd \"$workingDir\" && $command 2>&1 | tee \"$log\"; "
+          "echo \"__YOLOIT_EXIT_\$?\" >> \"$log\"";
+    }
 
     final result = await Process.run(
       tmux,
@@ -100,6 +113,11 @@ class RunService {
       onOutput("Failed to start tmux session: ${result.stderr}", true);
       onExit(1);
       return;
+    }
+
+    if (isFlutterRun) {
+      // Mirror tmux pane output to log file so _tailLog can read it.
+      await Process.run(tmux, ["pipe-pane", "-t", name, "cat >> \"$log\""]);
     }
 
     await _tailLog(

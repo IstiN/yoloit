@@ -26,15 +26,8 @@ void main() {
     expect(plugin.defaultSize, const Size(600, 400));
   });
 
-  test('initialState has expected keys', () {
+  test('initialState is empty (state managed by RunBridge)', () {
     final state = plugin.initialState;
-    expect(state.containsKey('configurations'), isTrue);
-    expect(state.containsKey('activeConfigId'), isTrue);
-    expect(state.containsKey('output'), isTrue);
-    expect(state.containsKey('isRunning'), isTrue);
-    expect(state['configurations'], <Map<String, dynamic>>[]);
-    expect(state['activeConfigId'], '');
-    expect(state['output'], '');
-    expect(state['isRunning'], false);
+    expect(state, isEmpty);
   });
 }

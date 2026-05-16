@@ -38,6 +38,7 @@ class ChatProviderIcon extends StatelessWidget {
         ),
       ),
       'local' => Icon(Icons.memory_rounded, size: size, color: color),
+      'opencode' => Icon(Icons.code_rounded, size: size, color: color),
       _ => Icon(Icons.auto_awesome, size: size, color: color),
     };
   }

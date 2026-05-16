@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yaml/yaml.dart';
@@ -16,6 +17,7 @@ import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
 /// API on `localhost`. A companion CLI script (`tools/yoloit`) communicates
@@ -175,6 +177,22 @@ class CliServer {
       final uri = f.existsSync() ? f.readAsStringSync().trim() : '';
       return _json({'vmServiceWsUri': uri, 'ok': uri.isNotEmpty});
     }
+
+    // /api/local-models/...
+    if (path.isNotEmpty && path[0] == 'local-models') {
+      return _handleLocalModels(method, path.sublist(1), request);
+    }
+
+    // POST /api/lm/generate  { messages: [...], systemPrompt?: "...", maxTokens?: 512 }
+    if (path.length == 2 && path[0] == 'lm' && path[1] == 'generate' && method == 'POST') {
+      return _handleLmGenerate(request);
+    }
+
+    // /api/yolochat/...
+    if (path.isNotEmpty && path[0] == 'yolochat') {
+      return _handleYoloChat(method, path.sublist(1), request, cubit);
+    }
+
     // GET /api/boards
     if (path.length == 1 && path[0] == 'boards' && method == 'GET') {
       return _listBoards(cubit);
@@ -199,6 +217,284 @@ class CliServer {
   }
 
   // ── Board routes ────────────────────────────────────────────────────────
+
+  Future<shelf.Response> _handleLocalModels(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+  ) async {
+    final service = LocalAiModelsService.instance;
+    await service.initialize();
+
+    if (sub.isEmpty && method == 'GET') {
+      return _json(service.snapshot());
+    }
+    if (sub.length == 1 && sub[0] == 'download' && method == 'POST') {
+      final body = await _body(request);
+      final modelId = body['id'] as String?;
+      if (modelId == null || modelId.trim().isEmpty) {
+        return _error('Missing "id" field');
+      }
+      await service.downloadOrUpdateModel(modelId);
+      return _json({'ok': true, 'action': 'download', 'id': modelId});
+    }
+    if (sub.length == 1 && sub[0] == 'resume' && method == 'POST') {
+      final body = await _body(request);
+      final modelId = body['id'] as String?;
+      if (modelId == null || modelId.trim().isEmpty) {
+        return _error('Missing "id" field');
+      }
+      await service.resumeModelDownload(modelId);
+      return _json({'ok': true, 'action': 'resume', 'id': modelId});
+    }
+    if (sub.length == 1 && sub[0] == 'stop' && method == 'POST') {
+      final body = await _body(request);
+      final modelId = body['id'] as String?;
+      if (modelId == null || modelId.trim().isEmpty) {
+        return _error('Missing "id" field');
+      }
+      await service.pauseModelDownload(modelId);
+      return _json({
+        'ok': true,
+        'action': 'pause',
+        'id': modelId,
+        'alias': 'stop',
+      });
+    }
+    if (sub.length == 1 && sub[0] == 'pause' && method == 'POST') {
+      final body = await _body(request);
+      final modelId = body['id'] as String?;
+      if (modelId == null || modelId.trim().isEmpty) {
+        return _error('Missing "id" field');
+      }
+      await service.pauseModelDownload(modelId);
+      return _json({'ok': true, 'action': 'pause', 'id': modelId});
+    }
+    if (sub.length == 1 && sub[0] == 'cancel' && method == 'POST') {
+      final body = await _body(request);
+      final modelId = body['id'] as String?;
+      if (modelId == null || modelId.trim().isEmpty) {
+        return _error('Missing "id" field');
+      }
+      await service.cancelModelDownload(modelId);
+      return _json({'ok': true, 'action': 'cancel', 'id': modelId});
+    }
+    if (sub.length == 1 && sub[0] == 'delete' && method == 'POST') {
+      final body = await _body(request);
+      final modelId = body['id'] as String?;
+      if (modelId == null || modelId.trim().isEmpty) {
+        return _error('Missing "id" field');
+      }
+      await service.deleteInstalledModel(modelId);
+      return _json({'ok': true, 'action': 'delete', 'id': modelId});
+    }
+    if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
+      final body = await _body(request);
+      final kind = body['kind'] as String?;
+      final modelId = body['id'] as String?;
+      if (kind == null || modelId == null) {
+        return _error('Missing "kind" or "id" field');
+      }
+      if (kind == 'chat') {
+        await service.setSelectedChatModel(modelId);
+      } else if (kind == 'asr') {
+        await service.setSelectedAsrModel(modelId);
+      } else {
+        return _error('Unsupported kind "$kind". Expected "chat" or "asr".');
+      }
+      return _json({
+        'ok': true,
+        'action': 'select',
+        'kind': kind,
+        'id': modelId,
+      });
+    }
+
+    return _notFound('Unknown local-models route');
+  }
+
+  Future<shelf.Response> _handleLmGenerate(shelf.Request request) async {
+    final body = await _body(request);
+    final service = LocalAiModelsService.instance;
+    final modelId = body['modelId'] as String? ?? service.selectedChatModelId;
+    final systemPrompt = body['systemPrompt'] as String? ?? '';
+    final rawMessages = body['messages'] as List<dynamic>? ?? [];
+    final maxTokens = (body['maxTokens'] as num?)?.toInt() ?? 512;
+    final temperature = (body['temperature'] as num?)?.toDouble() ?? 0.2;
+    // enableThinking: explicit bool from body, or auto-false for Qwen3 models
+    final bool? enableThinking = body.containsKey('enableThinking')
+        ? (body['enableThinking'] as bool?)
+        : (modelId.toLowerCase().contains('qwen3') ? false : null);
+
+    await service.initialize();
+    await service.ensureRuntimeReady();
+    final installedInfo = service.installedModelById(modelId);
+    if (installedInfo == null) {
+      return _error('Model "$modelId" is not installed');
+    }
+
+    final messages = <Map<String, String>>[];
+    if (systemPrompt.isNotEmpty) {
+      messages.add({'role': 'system', 'content': systemPrompt});
+    }
+    for (final m in rawMessages) {
+      if (m is Map) {
+        messages.add({
+          'role': m['role'] as String? ?? 'user',
+          'content': m['content'] as String? ?? '',
+        });
+      }
+    }
+    if (messages.isEmpty || messages.last['role'] != 'user') {
+      return _error('At least one user message is required');
+    }
+
+    try {
+      final engine = flm.NativeLmEngine();
+      final installed = flm.InstalledModel(
+        manifest: installedInfo.manifest,
+        directory: installedInfo.directory,
+        sourceLabel: installedInfo.sourceLabel,
+        installedAt: installedInfo.installedAt,
+        sizeBytes: installedInfo.sizeBytes,
+        metadataUpdatedAt: installedInfo.metadataUpdatedAt,
+      );
+      final t0 = DateTime.now();
+      int firstTokenMs = -1;
+      final buffer = StringBuffer();
+      int tokenCount = 0;
+
+      final full = await engine.completeStreaming(
+        flm.LmCompletionRequest(
+          modelPath: installed.directory.path,
+          manifest: installed.manifest,
+          messages: messages,
+          maxTokens: maxTokens,
+          temperature: temperature,
+          enableThinking: enableThinking,
+          tools: [],
+        ),
+        (chunk) {
+          if (firstTokenMs < 0) {
+            firstTokenMs = DateTime.now().difference(t0).inMilliseconds;
+          }
+          buffer.write(chunk);
+          tokenCount++;
+        },
+      );
+
+      final totalMs = DateTime.now().difference(t0).inMilliseconds;
+      final genMs = totalMs - (firstTokenMs < 0 ? 0 : firstTokenMs);
+      final response = full.trim().isNotEmpty ? full.trim() : buffer.toString().trim();
+      final hasThink = response.contains('<think>');
+
+      return _json({
+        'ok': true,
+        'modelId': modelId,
+        'response': response,
+        'hasThinkBlock': hasThink,
+        'timings': {
+          'ttftMs': firstTokenMs,
+          'generationMs': genMs,
+          'totalMs': totalMs,
+          'tokens': tokenCount,
+          'tps': genMs > 0 ? (tokenCount * 1000.0 / genMs).roundToDouble() : 0,
+        },
+      });
+    } catch (e) {
+      return _error('LM generate error: $e');
+    }
+  }
+
+  Future<shelf.Response> _handleYoloChat(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+    BoardCubit cubit,
+  ) async {
+    if (sub.length == 1 && sub[0] == 'panels' && method == 'GET') {
+      final out = <Map<String, dynamic>>[];
+      for (final board in cubit.state.boards) {
+        for (final panel in board.panels.where((p) => p.type == 'board.chat')) {
+          out.add({
+            'boardId': board.id,
+            'boardName': board.name,
+            'panelId': panel.id,
+            'panelTitle': panel.title,
+          });
+        }
+      }
+      return _json({'ok': true, 'items': out});
+    }
+
+    if (sub.length == 1 && sub[0] == 'send' && method == 'POST') {
+      final body = await _body(request);
+      final text = body['text'] as String? ?? body['message'] as String?;
+      if (text == null || text.trim().isEmpty) {
+        return _error('Missing "text" field');
+      }
+      final target = _resolveYoloChatTarget(
+        cubit,
+        boardHint: body['board'] as String? ?? body['boardId'] as String?,
+        panelHint: body['panel'] as String? ?? body['panelId'] as String?,
+      );
+      if (target == null) {
+        return _error('No board.chat panel found (or target not found)');
+      }
+      final actionBody = <String, dynamic>{
+        ...body,
+        'action': 'send',
+        'text': text,
+      };
+      return _panelAction(cubit, target.board, target.panel, actionBody);
+    }
+
+    if (sub.length == 1 && sub[0] == 'messages' && method == 'GET') {
+      final boardHint = request.url.queryParameters['board'];
+      final panelHint = request.url.queryParameters['panel'];
+      final limitRaw = request.url.queryParameters['limit'];
+      final target = _resolveYoloChatTarget(
+        cubit,
+        boardHint: boardHint,
+        panelHint: panelHint,
+      );
+      if (target == null) {
+        return _error('No board.chat panel found (or target not found)');
+      }
+      final body = <String, dynamic>{'action': 'messages'};
+      final limit = int.tryParse(limitRaw ?? '');
+      if (limit != null && limit > 0) {
+        body['limit'] = limit;
+      }
+      return _panelAction(cubit, target.board, target.panel, body);
+    }
+
+    return _notFound('Unknown yolochat route');
+  }
+
+  ({BoardDocument board, BoardPanelInstance panel})? _resolveYoloChatTarget(
+    BoardCubit cubit, {
+    String? boardHint,
+    String? panelHint,
+  }) {
+    BoardDocument? board;
+    if (boardHint != null && boardHint.trim().isNotEmpty) {
+      board = _findBoard(cubit, boardHint);
+    } else {
+      board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
+    }
+    if (board == null) return null;
+
+    BoardPanelInstance? panel;
+    if (panelHint != null && panelHint.trim().isNotEmpty) {
+      panel = _findPanel(board, panelHint);
+      if (panel?.type != 'board.chat') return null;
+    } else {
+      panel = board.panels.where((p) => p.type == 'board.chat').firstOrNull;
+    }
+    if (panel == null) return null;
+    return (board: board, panel: panel);
+  }
 
   Future<shelf.Response> _handleBoard(
     String method,

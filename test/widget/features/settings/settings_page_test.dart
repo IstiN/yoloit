@@ -78,14 +78,12 @@ void main() {
         MaterialApp(
           theme: AppThemePreset.neonPurple.theme,
           home: const Scaffold(
-            body: SizedBox(width: 700, height: 600, child: SettingsPage()),
+            body: SizedBox(width: 700, height: 600, child: SettingsPage(initialCategory: 'About')),
           ),
         ),
       );
       await tester.pump();
-      // Navigate to About tab (last category)
-      await tester.tap(find.text('About'));
-      await tester.pump();
+      // About is pre-selected, no need to tap
       expect(find.textContaining('YoLoIT'), findsWidgets);
       // Drain any pending async work from _AboutSectionState.initState
       await tester.pump(Duration.zero);

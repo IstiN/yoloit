@@ -15,7 +15,7 @@ void main() {
   });
 
   test('icon is smart_toy', () {
-    expect(plugin.icon, Icons.smart_toy);
+    expect(plugin.icon, Icons.auto_awesome);
   });
 
   test('accentColor is set', () {

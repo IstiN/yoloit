@@ -85,7 +85,7 @@ void main() {
       final items = r.stateUpdate!['items'] as List;
       expect(items.length, 1);
       expect(items[0]['text'], 'Buy milk');
-      expect(items[0]['checked'], false);
+      expect(items[0]['done'], false);
     });
 
     test('check item', () async {
@@ -93,7 +93,7 @@ void main() {
         'items': [{'text': 'A', 'checked': false}]
       });
       final r = await h.handleAction('check', {'index': 0}, p);
-      expect((r.stateUpdate!['items'] as List)[0]['checked'], true);
+      expect((r.stateUpdate!['items'] as List)[0]['done'], true);
     });
 
     test('uncheck item', () async {
@@ -101,7 +101,7 @@ void main() {
         'items': [{'text': 'A', 'checked': true}]
       });
       final r = await h.handleAction('uncheck', {'index': 0}, p);
-      expect((r.stateUpdate!['items'] as List)[0]['checked'], false);
+      expect((r.stateUpdate!['items'] as List)[0]['done'], false);
     });
 
     test('remove item', () async {

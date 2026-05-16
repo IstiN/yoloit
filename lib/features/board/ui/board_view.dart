@@ -5517,6 +5517,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
   late final Animation<double> _chatSlide;
 
   bool _chatOpen = false;
+  Timer? _entranceDelayTimer;
   // In-memory panel instance for the embedded assistant widget
   BoardPanelInstance _badgePanel = const BoardPanelInstance(
     id: '__yolo_badge_assistant__',
@@ -5542,7 +5543,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
         curve: const Interval(0, 0.7, curve: Curves.easeOut),
       ),
     );
-    Future.delayed(const Duration(milliseconds: 300), () {
+    _entranceDelayTimer = Timer(const Duration(milliseconds: 300), () {
       if (mounted) _entranceController.forward();
     });
 
@@ -5558,6 +5559,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
 
   @override
   void dispose() {
+    _entranceDelayTimer?.cancel();
     _entranceController.dispose();
     _chatController.dispose();
     super.dispose();

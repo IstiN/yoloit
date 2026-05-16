@@ -52,7 +52,7 @@ void main() {
         'rename-column', {'column': 'Todo', 'name': 'Backlog'}, _panel(state: _withColumns()));
     expect(r.ok, isTrue);
     final cols = r.stateUpdate!['columns'] as List;
-    expect(cols.any((c) => c['title'] == 'Backlog'), isTrue);
+    expect(cols.contains('Backlog'), isTrue);
   });
 
   test('remove-column by title', () async {
@@ -75,7 +75,8 @@ void main() {
     expect(r.ok, isTrue);
     final cards = r.stateUpdate!['cards'] as List;
     final moved = cards.firstWhere((c) => c['id'] == 'card-1');
-    expect(moved['columnId'], 'col-2');
+    // Handler converts column ids to column index (Done is at index 1)
+    expect(moved['columnIndex'], 1);
   });
 
   test('remove-card by cardId', () async {

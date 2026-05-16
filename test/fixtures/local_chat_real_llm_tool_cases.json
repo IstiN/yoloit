@@ -1,0 +1,859 @@
+{
+  "version": 2,
+  "runtimeContext": {
+    "boardId": "board-main",
+    "boardName": "Main Board",
+    "panelId": "panel-chat",
+    "panelTitle": "YoLo Chat"
+  },
+  "cases": [
+    {
+      "id": "app-help-detailed",
+      "category": "app",
+      "message": "Show detailed YoLoIT CLI help.",
+      "expectedTool": "help",
+      "expectedArguments": {
+        "format": "detailed"
+      }
+    },
+    {
+      "id": "app-reload",
+      "category": "app",
+      "message": "Hot reload the running YoLoIT app.",
+      "expectedTool": "reload",
+      "expectedArguments": {}
+    },
+    {
+      "id": "app-restart",
+      "category": "app",
+      "message": "Hot restart the app now.",
+      "expectedTool": "restart",
+      "expectedArguments": {}
+    },
+    {
+      "id": "board-list",
+      "category": "board",
+      "message": "List all boards in YoLoIT.",
+      "expectedTool": "boards",
+      "expectedArguments": {}
+    },
+    {
+      "id": "board-show-current",
+      "category": "board",
+      "message": "Show details for the current board.",
+      "expectedTool": "board",
+      "expectedArguments": {
+        "id_or_name": "board-main"
+      }
+    },
+    {
+      "id": "board-create-launch",
+      "category": "board",
+      "message": "Create a new board named Launch Plan.",
+      "expectedTool": "board:create",
+      "expectedArguments": {
+        "name": "Launch Plan"
+      }
+    },
+    {
+      "id": "board-create-retro",
+      "category": "board",
+      "message": "Make a board called Retrospective Notes.",
+      "expectedTool": "board:create",
+      "expectedArguments": {
+        "name": "Retrospective Notes"
+      }
+    },
+    {
+      "id": "board-create-roadmap",
+      "category": "board",
+      "message": "Add a fresh board with the name Product Roadmap.",
+      "expectedTool": "board:create",
+      "expectedArguments": {
+        "name": "Product Roadmap"
+      }
+    },
+    {
+      "id": "board-rename-main",
+      "category": "board",
+      "message": "Rename the current board to Planning Hub.",
+      "expectedTool": "board:rename",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "new_name": "Planning Hub"
+      }
+    },
+    {
+      "id": "board-focus-roadmap",
+      "category": "board",
+      "message": "Focus the board named Product Roadmap.",
+      "expectedTool": "board:focus",
+      "expectedArguments": {
+        "id_or_name": "Product Roadmap"
+      }
+    },
+    {
+      "id": "board-zoom",
+      "category": "board",
+      "message": "Set the current board zoom to 1.25.",
+      "expectedTool": "board:zoom",
+      "expectedArguments": {
+        "board": "board-main",
+        "scale": 1.25
+      }
+    },
+    {
+      "id": "board-fit",
+      "category": "board",
+      "message": "Fit this board to a 1440x900 viewport.",
+      "expectedTool": "board:fit",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "size": "1440x900"
+      }
+    },
+    {
+      "id": "board-arrange-right",
+      "category": "board",
+      "message": "Arrange the panels on this board to the right with horizontal spacing 40 and vertical spacing 30.",
+      "expectedTool": "board:arrange",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "direction": "right",
+        "h_spacing": 40,
+        "v_spacing": 30
+      }
+    },
+    {
+      "id": "board-translate",
+      "category": "board",
+      "message": "Move the current board viewport to x 120 and y -80.",
+      "expectedTool": "board:translate",
+      "expectedArguments": {
+        "board": "board-main",
+        "x": 120,
+        "y": -80
+      }
+    },
+    {
+      "id": "board-snapshot-md",
+      "category": "board",
+      "message": "Create a markdown text snapshot for the current board.",
+      "expectedTool": "board:snapshot",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "format": "md"
+      }
+    },
+    {
+      "id": "board-diagram-mermaid",
+      "category": "board",
+      "message": "Generate a Mermaid diagram for this board.",
+      "expectedTool": "board:diagram",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "format": "mermaid"
+      }
+    },
+    {
+      "id": "board-screenshot",
+      "category": "board",
+      "message": "Save a PNG screenshot of the current board to /tmp/yoloit-board.png.",
+      "expectedTool": "board:screenshot",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "file_png": "/tmp/yoloit-board.png"
+      }
+    },
+    {
+      "id": "board-svg",
+      "category": "board",
+      "message": "Export this board as SVG to /tmp/yoloit-board.svg.",
+      "expectedTool": "board:svg",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "file_svg": "/tmp/yoloit-board.svg"
+      }
+    },
+    {
+      "id": "board-apply-yaml",
+      "category": "board",
+      "message": "Apply the YAML bulk operation file /tmp/board-update.yaml to the current board.",
+      "expectedTool": "board:apply",
+      "expectedArguments": {
+        "id_or_name": "board-main",
+        "file": "/tmp/board-update.yaml"
+      }
+    },
+    {
+      "id": "board-delete-confirmed",
+      "category": "board",
+      "message": "Delete board Scratch Board; I confirm this destructive action.",
+      "expectedTool": "board:delete",
+      "expectedArguments": {
+        "id_or_name": "Scratch Board",
+        "confirm": true
+      }
+    },
+    {
+      "id": "panel-list",
+      "category": "panel",
+      "message": "List panels on the current board.",
+      "expectedTool": "panels",
+      "expectedArguments": {
+        "board": "board-main"
+      }
+    },
+    {
+      "id": "panel-show-current",
+      "category": "panel",
+      "message": "Show details and content for the current panel.",
+      "expectedTool": "panel",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "panel-help-current",
+      "category": "panel",
+      "message": "Show available actions for the current panel.",
+      "expectedTool": "panel:help",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "panel-create-note",
+      "category": "panel",
+      "message": "On the current board, create a markdown note panel titled Architecture Notes.",
+      "expectedTool": "panel:create",
+      "expectedArguments": {
+        "board": "board-main",
+        "type": "board.note.markdown",
+        "title": "Architecture Notes"
+      }
+    },
+    {
+      "id": "panel-create-kanban",
+      "category": "panel",
+      "message": "Create a kanban panel named Release Kanban on this board.",
+      "expectedTool": "panel:create",
+      "expectedArguments": {
+        "board": "board-main",
+        "type": "board.kanban",
+        "title": "Release Kanban"
+      }
+    },
+    {
+      "id": "panel-create-run",
+      "category": "panel",
+      "message": "Create a Run panel titled Dev Server for this board.",
+      "expectedTool": "panel:create",
+      "expectedArguments": {
+        "board": "board-main",
+        "type": "board.run",
+        "title": "Dev Server"
+      }
+    },
+    {
+      "id": "panel-rename",
+      "category": "panel",
+      "message": "Rename the current panel to Daily Notes.",
+      "expectedTool": "panel:rename",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "new_title": "Daily Notes"
+      }
+    },
+    {
+      "id": "panel-move",
+      "category": "panel",
+      "message": "Move the current panel to x 300 and y 180.",
+      "expectedTool": "panel:move",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "x": 300,
+        "y": 180
+      }
+    },
+    {
+      "id": "panel-resize",
+      "category": "panel",
+      "message": "Resize the current panel to width 640 and height 420.",
+      "expectedTool": "panel:resize",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "width": 640,
+        "height": 420
+      }
+    },
+    {
+      "id": "panel-focus-builds",
+      "category": "panel",
+      "message": "Focus the panel named Builds on this board.",
+      "expectedTool": "panel:focus",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "Builds"
+      }
+    },
+    {
+      "id": "panel-color",
+      "category": "panel",
+      "message": "Set the current panel color to #ffcc00.",
+      "expectedTool": "panel:color",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "color": "#ffcc00"
+      }
+    },
+    {
+      "id": "panel-hide",
+      "category": "panel",
+      "message": "Hide the current panel.",
+      "expectedTool": "panel:hide",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "panel-show",
+      "category": "panel",
+      "message": "Show the panel named Archived Notes.",
+      "expectedTool": "panel:show",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "Archived Notes"
+      }
+    },
+    {
+      "id": "panel-types",
+      "category": "panel",
+      "message": "List available panel types for this board.",
+      "expectedTool": "panel:types",
+      "expectedArguments": {
+        "board": "board-main"
+      }
+    },
+    {
+      "id": "panel-do-refresh",
+      "category": "panel",
+      "message": "Execute the refresh action on the current panel with JSON body {}.",
+      "expectedTool": "do",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "action": "refresh",
+        "json": "{}"
+      }
+    },
+    {
+      "id": "panel-delete-confirmed",
+      "category": "panel",
+      "message": "Delete panel Scratch Panel on this board; I confirm this destructive action.",
+      "expectedTool": "panel:delete",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "Scratch Panel",
+        "confirm": true
+      }
+    },
+    {
+      "id": "link-list",
+      "category": "link",
+      "message": "List links on the current board.",
+      "expectedTool": "links",
+      "expectedArguments": {
+        "board": "board-main"
+      }
+    },
+    {
+      "id": "link-create",
+      "category": "link",
+      "message": "Create a link from panel Plan to panel Build on this board.",
+      "expectedTool": "link:create",
+      "expectedArguments": {
+        "board": "board-main",
+        "from": "Plan",
+        "to": "Build"
+      }
+    },
+    {
+      "id": "link-style",
+      "category": "link",
+      "message": "Set link link-42 style to arrow with elbow geometry.",
+      "expectedTool": "link:style",
+      "expectedArguments": {
+        "board": "board-main",
+        "link_id": "link-42",
+        "style": "arrow",
+        "geometry": "elbow"
+      }
+    },
+    {
+      "id": "link-color",
+      "category": "link",
+      "message": "Set link link-42 color to #33aaff.",
+      "expectedTool": "link:color",
+      "expectedArguments": {
+        "board": "board-main",
+        "link_id": "link-42",
+        "color": "#33aaff"
+      }
+    },
+    {
+      "id": "link-delete-confirmed",
+      "category": "link",
+      "message": "Delete link link-42 from this board; I confirm this destructive action.",
+      "expectedTool": "link:delete",
+      "expectedArguments": {
+        "board": "board-main",
+        "link_id": "link-42",
+        "confirm": true
+      }
+    },
+    {
+      "id": "note-set",
+      "category": "note",
+      "message": "Replace the current note content with '# Launch Notes'.",
+      "expectedTool": "note",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "text": "# Launch Notes"
+      }
+    },
+    {
+      "id": "note-append-task",
+      "category": "note",
+      "message": "Append '- verify microphone permissions' to the current note panel.",
+      "expectedTool": "note:append",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "text": "- verify microphone permissions"
+      }
+    },
+    {
+      "id": "note-append-heading",
+      "category": "note",
+      "message": "Append '## Test Plan' to the current note.",
+      "expectedTool": "note:append",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "text": "## Test Plan"
+      }
+    },
+    {
+      "id": "note-append-summary",
+      "category": "note",
+      "message": "Add this line to the note: Local LLM should call tools.",
+      "expectedTool": "note:append",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "text": "Local LLM should call tools."
+      }
+    },
+    {
+      "id": "note-wrap",
+      "category": "note",
+      "message": "Enable auto-height wrapping for the current note panel.",
+      "expectedTool": "note:wrap",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "note-nowrap",
+      "category": "note",
+      "message": "Disable auto-height wrapping for the current note panel.",
+      "expectedTool": "note:nowrap",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "checklist-add",
+      "category": "checklist",
+      "message": "Add checklist item Verify microphone prompt to the current checklist panel.",
+      "expectedTool": "checklist:add",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "item": "Verify microphone prompt"
+      }
+    },
+    {
+      "id": "checklist-check",
+      "category": "checklist",
+      "message": "Check the checklist item Verify microphone prompt.",
+      "expectedTool": "checklist:check",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "item": "Verify microphone prompt"
+      }
+    },
+    {
+      "id": "checklist-uncheck",
+      "category": "checklist",
+      "message": "Uncheck the checklist item Verify microphone prompt.",
+      "expectedTool": "checklist:uncheck",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "item": "Verify microphone prompt"
+      }
+    },
+    {
+      "id": "kanban-columns",
+      "category": "kanban",
+      "message": "List columns in the current kanban panel.",
+      "expectedTool": "kanban:columns",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "kanban-add-column",
+      "category": "kanban",
+      "message": "Add a kanban column named Blocked.",
+      "expectedTool": "kanban:add-column",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "name": "Blocked"
+      }
+    },
+    {
+      "id": "kanban-rename-column",
+      "category": "kanban",
+      "message": "Rename kanban column Todo to Backlog.",
+      "expectedTool": "kanban:rename-column",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "column": "Todo",
+        "name": "Backlog"
+      }
+    },
+    {
+      "id": "kanban-add-card-mic",
+      "category": "kanban",
+      "message": "Add a card titled Fix microphone TCC to the Todo column in the current kanban.",
+      "expectedTool": "kanban:add-card",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "column": "Todo",
+        "title": "Fix microphone TCC"
+      }
+    },
+    {
+      "id": "kanban-add-card-tests",
+      "category": "kanban",
+      "message": "Create a kanban card in Doing named Real LLM tool tests.",
+      "expectedTool": "kanban:add-card",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "column": "Doing",
+        "title": "Real LLM tool tests"
+      }
+    },
+    {
+      "id": "kanban-add-card-docs",
+      "category": "kanban",
+      "message": "Put a card called Document permissions into the Done column.",
+      "expectedTool": "kanban:add-card",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "column": "Done",
+        "title": "Document permissions"
+      }
+    },
+    {
+      "id": "kanban-move-card",
+      "category": "kanban",
+      "message": "Move kanban card card-7 to the Done column.",
+      "expectedTool": "kanban:move-card",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "card_id": "card-7",
+        "to_column": "Done"
+      }
+    },
+    {
+      "id": "kanban-update-card",
+      "category": "kanban",
+      "message": "Rename kanban card card-7 to Verify permissions.",
+      "expectedTool": "kanban:update-card",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "card_id": "card-7",
+        "title": "Verify permissions"
+      }
+    },
+    {
+      "id": "kanban-cards",
+      "category": "kanban",
+      "message": "List kanban cards in this panel.",
+      "expectedTool": "kanban:cards",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "kanban-remove-card-confirmed",
+      "category": "kanban",
+      "message": "Remove kanban card card-7; I confirm this destructive action.",
+      "expectedTool": "kanban:remove-card",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "card_id": "card-7",
+        "confirm": true
+      }
+    },
+    {
+      "id": "kanban-remove-column-confirmed",
+      "category": "kanban",
+      "message": "Remove kanban column Blocked; I confirm this destructive action.",
+      "expectedTool": "kanban:remove-column",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "column": "Blocked",
+        "confirm": true
+      }
+    },
+    {
+      "id": "run-list-current",
+      "category": "run",
+      "message": "Show run configs for the current run panel.",
+      "expectedTool": "run:list",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "run-list-dev-server",
+      "category": "run",
+      "message": "List run sessions in the Dev Server panel on this board.",
+      "expectedTool": "run:list",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "Dev Server"
+      }
+    },
+    {
+      "id": "run-list-builds",
+      "category": "run",
+      "message": "Get the run configuration list from panel Builds.",
+      "expectedTool": "run:list",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "Builds"
+      }
+    },
+    {
+      "id": "run-input-enter",
+      "category": "run",
+      "message": "Send 'r' plus Enter to run session flutter-app in the current run panel.",
+      "expectedTool": "run:input",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "session": "flutter-app",
+        "text": "r",
+        "enter": true
+      }
+    },
+    {
+      "id": "run-output",
+      "category": "run",
+      "message": "Read output from run session flutter-app in the current panel.",
+      "expectedTool": "run:output",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "session": "flutter-app"
+      }
+    },
+    {
+      "id": "run-detach",
+      "category": "run",
+      "message": "Detach run session flutter-app from the current panel.",
+      "expectedTool": "run:detach",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "session": "flutter-app"
+      }
+    },
+    {
+      "id": "run-attach",
+      "category": "run",
+      "message": "Attach the current run panel to session flutter-app, allowing stopped sessions.",
+      "expectedTool": "run:attach",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "session": "flutter-app",
+        "any": true
+      }
+    },
+    {
+      "id": "run-popout",
+      "category": "run",
+      "message": "Pop out run session flutter-app into a new Run panel.",
+      "expectedTool": "run:popout",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "session": "flutter-app"
+      }
+    },
+    {
+      "id": "models-list",
+      "category": "models",
+      "message": "List local AI model download and selection states.",
+      "expectedTool": "models:list",
+      "expectedArguments": {}
+    },
+    {
+      "id": "models-download",
+      "category": "models",
+      "message": "Download local model qwen3-8b-4bit.",
+      "expectedTool": "models:download",
+      "expectedArguments": {
+        "model_id": "qwen3-8b-4bit"
+      }
+    },
+    {
+      "id": "models-resume",
+      "category": "models",
+      "message": "Resume downloading model qwen3-8b-4bit.",
+      "expectedTool": "models:resume",
+      "expectedArguments": {
+        "model_id": "qwen3-8b-4bit"
+      }
+    },
+    {
+      "id": "models-pause",
+      "category": "models",
+      "message": "Pause model download qwen3-8b-4bit.",
+      "expectedTool": "models:pause",
+      "expectedArguments": {
+        "model_id": "qwen3-8b-4bit"
+      }
+    },
+    {
+      "id": "models-stop",
+      "category": "models",
+      "message": "Stop model download qwen3-8b-4bit.",
+      "expectedTool": "models:stop",
+      "expectedArguments": {
+        "model_id": "qwen3-8b-4bit"
+      }
+    },
+    {
+      "id": "models-select-chat",
+      "category": "models",
+      "message": "Select gemma4-e2b-it-4bit as the local chat model.",
+      "expectedTool": "models:select",
+      "expectedArguments": {
+        "kind": "chat",
+        "model_id": "gemma4-e2b-it-4bit"
+      }
+    },
+    {
+      "id": "models-cancel-confirmed",
+      "category": "models",
+      "message": "Cancel model download qwen3-8b-4bit; I confirm discarding partial files.",
+      "expectedTool": "models:cancel",
+      "expectedArguments": {
+        "model_id": "qwen3-8b-4bit",
+        "confirm": true
+      }
+    },
+    {
+      "id": "models-delete-confirmed",
+      "category": "models",
+      "message": "Delete installed local model qwen3-8b-4bit; I confirm this destructive action.",
+      "expectedTool": "models:delete",
+      "expectedArguments": {
+        "model_id": "qwen3-8b-4bit",
+        "confirm": true
+      }
+    },
+    {
+      "id": "yolochat-panels",
+      "category": "yolochat",
+      "message": "List all YoLo chat panels.",
+      "expectedTool": "yolochat:panels",
+      "expectedArguments": {}
+    },
+    {
+      "id": "yolochat-send",
+      "category": "yolochat",
+      "message": "Send 'status update please' to the current YoLo chat panel.",
+      "expectedTool": "yolochat:send",
+      "expectedArguments": {
+        "text": "status update please",
+        "board": "board-main",
+        "panel": "panel-chat"
+      }
+    },
+    {
+      "id": "yolochat-messages",
+      "category": "yolochat",
+      "message": "Read the last 5 messages from the current YoLo chat panel.",
+      "expectedTool": "yolochat:messages",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "limit": 5
+      }
+    },
+    {
+      "id": "playlist-play",
+      "category": "media",
+      "message": "Play media file /tmp/demo.mp4 in the current playlist panel.",
+      "expectedTool": "play",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "file_or_url": "/tmp/demo.mp4"
+      }
+    },
+    {
+      "id": "web-open",
+      "category": "web",
+      "message": "Open https://example.com in the current web panel.",
+      "expectedTool": "web:open",
+      "expectedArguments": {
+        "board": "board-main",
+        "panel": "panel-chat",
+        "url": "https://example.com"
+      }
+    }
+  ]
+}

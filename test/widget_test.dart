@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
@@ -20,6 +21,7 @@ Widget _testApp() => MultiBlocProvider(
         BlocProvider(create: (_) => ReviewCubit()),
         BlocProvider(create: (_) => FileEditorCubit()),
         BlocProvider(create: (_) => RunCubit()),
+        BlocProvider(create: (_) => BoardCubit()),
       ],
       child: MaterialApp(
         theme: AppThemePreset.neonPurple.theme,
@@ -39,6 +41,10 @@ void main() {
   });
 
   testWidgets('App smoke test — three-panel shell renders', (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
     await tester.pumpWidget(_testApp());
     await tester.pump();
 

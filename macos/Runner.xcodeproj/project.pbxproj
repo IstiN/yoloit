@@ -34,6 +34,7 @@
 		B20807362F8CC01900237752 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B20807352F8CC01900237752 /* AppIcon.icon */; };
 		B20807372F8CC01900237752 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = B20807352F8CC01900237752 /* AppIcon.icon */; };
 		E7EDD6094D7A79C9F56C5DA2 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 780C56C3525CA6C8E929B17A /* Pods_RunnerTests.framework */; };
+		F1B1003A33823900A9FFBC10 /* FlmMLXRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = F1B1002A33823900A9FFBC10 /* FlmMLXRuntime */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -112,6 +113,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F1B1003A33823900A9FFBC10 /* FlmMLXRuntime in Frameworks */,
 				1FA83D8B3C0647EF3847445A /* Pods_Runner.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -243,6 +245,9 @@
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		33CC10EC2044A3C60003C045 /* Runner */ = {
+			packageProductDependencies = (
+				F1B1002A33823900A9FFBC10 /* FlmMLXRuntime */,
+			);
 			isa = PBXNativeTarget;
 			buildConfigurationList = 33CC10FB2044A3C60003C045 /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
@@ -268,6 +273,9 @@
 
 /* Begin PBXProject section */
 		33CC10E52044A3C60003C045 /* Project object */ = {
+			packageReferences = (
+				F1B1001A33823900A9FFBC10 /* XCLocalSwiftPackageReference "FlmMLXRuntime" */,
+			);
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
@@ -574,7 +582,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -656,7 +664,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -706,7 +714,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -815,6 +823,19 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+/* Begin XCLocalSwiftPackageReference section */
+		F1B1001A33823900A9FFBC10 /* XCLocalSwiftPackageReference "FlmMLXRuntime" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../third_party/flutter_local_models/packages/local_models_flutter/macos/FlmMLXRuntime;
+		};
+/* End XCLocalSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+		F1B1002A33823900A9FFBC10 /* FlmMLXRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F1B1001A33823900A9FFBC10 /* XCLocalSwiftPackageReference "FlmMLXRuntime" */;
+			productName = FlmMLXRuntime;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 33CC10E52044A3C60003C045 /* Project object */;
 }

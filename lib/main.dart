@@ -1,18 +1,21 @@
-import 'dart:io' show Platform, File;
+import 'dart:io' show Platform, File, exit;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:yoloit/app.dart';
+import 'package:yoloit/core/cli/real_llm_tool_test_runner.dart';
 import 'package:yoloit/core/config/app_config.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (RealLlmToolTestRunner.isRequested(args)) {
+    exit(await RealLlmToolTestRunner.run(args));
+  }
   // On macOS, media_kit's default `DynamicLibrary.open('Mpv.framework/Mpv')`
   // collides with media_kit_video's linked `@rpath/Mpv.framework/Versions/A/Mpv`
   // because dyld treats them as different lookup keys → loads Mpv twice →

@@ -8,6 +8,9 @@ class AppDelegate: FlutterAppDelegate {
     // every webview created in the app (including those from webview_flutter).
     WKWebViewFullscreen.install()
     super.applicationDidFinishLaunching(notification)
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+    NSRunningApplication.current.activate(options: [.activateAllWindows])
   }
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

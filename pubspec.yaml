@@ -68,6 +68,7 @@ dependencies:
   media_kit: ^1.1.11
   media_kit_video: ^1.2.4
   media_kit_libs_video: ^1.0.5
+  record: ^6.1.2
   local_models_sdk:
     path: third_party/flutter_local_models/packages/local_models_sdk
   local_models_flutter:
@@ -98,6 +99,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icon/
+    - assets/prompts/
 
   fonts:
     - family: JetBrainsMono

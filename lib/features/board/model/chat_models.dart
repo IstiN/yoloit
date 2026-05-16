@@ -484,6 +484,7 @@ class ChatSessionConfig extends Equatable {
     this.maxAutopilotContinues = 99,
     this.customArgs = const [],
     this.envGroupIds = const [],
+    this.disabledLocalToolNames = const [],
   });
 
   final String sessionName;
@@ -513,6 +514,9 @@ class ChatSessionConfig extends Equatable {
   /// Global env groups selected for this session. Last selected group wins.
   final List<String> envGroupIds;
 
+  /// Local YoLoIT tool function names disabled for this chat session.
+  final List<String> disabledLocalToolNames;
+
   Map<String, dynamic> toJson() => {
     'sessionName': sessionName,
     'workingDir': workingDir,
@@ -524,6 +528,8 @@ class ChatSessionConfig extends Equatable {
     'maxAutopilotContinues': maxAutopilotContinues,
     if (customArgs.isNotEmpty) 'customArgs': customArgs,
     if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
+    if (disabledLocalToolNames.isNotEmpty)
+      'disabledLocalToolNames': disabledLocalToolNames,
   };
 
   factory ChatSessionConfig.fromJson(Map<String, dynamic> json) {
@@ -538,6 +544,8 @@ class ChatSessionConfig extends Equatable {
       maxAutopilotContinues: json['maxAutopilotContinues'] as int? ?? 99,
       customArgs: (json['customArgs'] as List?)?.cast<String>() ?? const [],
       envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
+      disabledLocalToolNames:
+          (json['disabledLocalToolNames'] as List?)?.cast<String>() ?? const [],
     );
   }
 
@@ -552,6 +560,7 @@ class ChatSessionConfig extends Equatable {
     int? maxAutopilotContinues,
     List<String>? customArgs,
     List<String>? envGroupIds,
+    List<String>? disabledLocalToolNames,
   }) {
     return ChatSessionConfig(
       sessionName: sessionName ?? this.sessionName,
@@ -566,6 +575,8 @@ class ChatSessionConfig extends Equatable {
           maxAutopilotContinues ?? this.maxAutopilotContinues,
       customArgs: customArgs ?? this.customArgs,
       envGroupIds: envGroupIds ?? this.envGroupIds,
+      disabledLocalToolNames:
+          disabledLocalToolNames ?? this.disabledLocalToolNames,
     );
   }
 
@@ -581,6 +592,7 @@ class ChatSessionConfig extends Equatable {
     maxAutopilotContinues,
     customArgs,
     envGroupIds,
+    disabledLocalToolNames,
   ];
 }
 
@@ -778,8 +790,97 @@ const List<ChatModelInfo> kLocalModels = [
     isDefault: true,
   ),
   ChatModelInfo(
+    id: 'qwen3-4b-instruct-4bit',
+    displayName: 'Qwen3 4B Instruct 4bit (latest)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'qwen3-4b-instruct-2507-4bit',
+    displayName: 'Qwen3 4B Instruct 4bit',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
     id: 'qwen3-8b-4bit',
     displayName: 'Qwen3 8B 4bit',
     costMultiplier: 0,
+  ),
+];
+
+
+/// OpenCode models (providerID/modelID format).
+const List<ChatModelInfo> kOpencodeModels = [
+  // Anthropic
+  ChatModelInfo(
+    id: 'anthropic/claude-sonnet-4-5',
+    displayName: 'Claude Sonnet 4.5',
+    costMultiplier: 1,
+    isDefault: true,
+  ),
+  ChatModelInfo(
+    id: 'anthropic/claude-opus-4-7',
+    displayName: 'Claude Opus 4.7',
+    costMultiplier: 15,
+  ),
+  ChatModelInfo(
+    id: 'anthropic/claude-haiku-4-5',
+    displayName: 'Claude Haiku 4.5',
+    costMultiplier: 0.33,
+  ),
+  ChatModelInfo(
+    id: 'anthropic/claude-sonnet-4',
+    displayName: 'Claude Sonnet 4',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(
+    id: 'anthropic/claude-opus-4-5',
+    displayName: 'Claude Opus 4.5',
+    costMultiplier: 3,
+  ),
+
+  // OpenAI
+  ChatModelInfo(id: 'openai/gpt-4o', displayName: 'GPT-4o', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'openai/gpt-4.1',
+    displayName: 'GPT-4.1',
+    costMultiplier: 0.8,
+  ),
+  ChatModelInfo(
+    id: 'openai/gpt-4o-mini',
+    displayName: 'GPT-4o Mini',
+    costMultiplier: 0.2,
+  ),
+  ChatModelInfo(
+    id: 'openai/o3-mini',
+    displayName: 'O3 Mini',
+    costMultiplier: 0.4,
+  ),
+  ChatModelInfo(
+    id: 'openai/o4-mini',
+    displayName: 'O4 Mini',
+    costMultiplier: 0.6,
+  ),
+
+  // Google
+  ChatModelInfo(
+    id: 'google/gemini-2.5-pro',
+    displayName: 'Gemini 2.5 Pro',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(
+    id: 'google/gemini-2.5-flash',
+    displayName: 'Gemini 2.5 Flash',
+    costMultiplier: 0.1,
+  ),
+
+  // xAI Grok
+  ChatModelInfo(
+    id: 'xai/grok-4',
+    displayName: 'Grok 4',
+    costMultiplier: 2,
+  ),
+  ChatModelInfo(
+    id: 'xai/grok-code-fast-1',
+    displayName: 'Grok Code Fast',
+    costMultiplier: 0.5,
   ),
 ];

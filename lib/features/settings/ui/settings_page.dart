@@ -40,9 +40,11 @@ const _kCategories = [
 
 /// Settings overlay shown as a modal dialog with sidebar navigation.
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.initialCategory});
 
-  static Future<void> show(BuildContext context) {
+  final String? initialCategory;
+
+  static Future<void> show(BuildContext context, {String? initialCategory}) {
     final wsCubit = context.read<WorkspaceCubit>();
     return showDialog<void>(
       context: context,
@@ -52,13 +54,13 @@ class SettingsPage extends StatefulWidget {
             create: (_) => SkillsCubit(),
             child: BlocProvider.value(
               value: wsCubit,
-              child: const Dialog(
+              child: Dialog(
                 backgroundColor: Colors.transparent,
                 insetPadding: EdgeInsets.symmetric(
                   horizontal: 60,
                   vertical: 40,
                 ),
-                child: SettingsPage(),
+                child: SettingsPage(initialCategory: initialCategory),
               ),
             ),
           ),
@@ -71,6 +73,19 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   int _selectedCategory = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialCategory;
+    if (initial == null || initial.isEmpty) {
+      return;
+    }
+    final index = _kCategories.indexOf(initial);
+    if (index >= 0) {
+      _selectedCategory = index;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

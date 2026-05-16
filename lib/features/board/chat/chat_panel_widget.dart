@@ -7,19 +7,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:record/record.dart';
+import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
-import 'package:yoloit/features/board/chat/chat_provider.dart';
-import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
-import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
+import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
+import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
+import 'package:yoloit/features/board/chat/opencode_provider.dart';
+import 'package:yoloit/features/board/chat/provider_icon.dart';
+import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
+import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 import 'package:yoloit/ui/widgets/ui_components.dart';
 
@@ -80,6 +86,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   // Streaming assistant message accumulator
   String _streamingContent = '';
   String? _streamingMessageId;
+  final AudioRecorder _micRecorder = AudioRecorder();
+  bool _isRecordingMic = false;
+  bool _isTranscribingMic = false;
 
   @override
   void initState() {
@@ -106,6 +115,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     return switch (id) {
       'cursor' => CursorAgentProvider(),
       'local' => LocalLlmProvider(),
+      'opencode' => OpencodeProvider(),
       _ => CopilotCliProvider(),
     };
   }
@@ -241,6 +251,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _scrollController.dispose();
     _inputFocusNode.dispose();
     _glowCtrl.dispose();
+    unawaited(_micRecorder.dispose());
     ChatPanelWidget.processingNotifiers.remove(widget.panel.id);
     processingNotifier.dispose();
     super.dispose();
@@ -909,6 +920,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ),
           ),
           ChatProviderIcon(provider: _config.provider, size: 14, color: muted),
+          if (_config.provider == 'local') ...[
+            const SizedBox(width: 6),
+            Tooltip(
+              message:
+                  'Local tools: ${_enabledLocalToolCount()}/${YoloitCliToolCatalog.tools.length} enabled',
+              child: Icon(Icons.construction, size: 12, color: muted),
+            ),
+          ],
           const SizedBox(width: 8),
           // Autopilot toggle
           GestureDetector(
@@ -1020,6 +1039,175 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _config = _config.copyWith(reasoningEffort: () => levels[nextIdx]);
     });
     _persistMessages();
+  }
+
+  Set<String> _disabledLocalTools() =>
+      _config.disabledLocalToolNames.map((name) => name.trim()).toSet();
+
+  int _enabledLocalToolCount() =>
+      YoloitCliToolCatalog.tools.length - _disabledLocalTools().length;
+
+  Future<void> _showLocalToolsDialog() async {
+    final colors = context.appColors;
+    final muted =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+    var disabled = _disabledLocalTools();
+    final tools = [...YoloitCliToolCatalog.tools]..sort((a, b) {
+      final byGroup = a.group.compareTo(b.group);
+      return byGroup == 0 ? a.command.compareTo(b.command) : byGroup;
+    });
+
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => StatefulBuilder(
+            builder: (context, setDialogState) {
+              void persist(Set<String> next) {
+                disabled = {...next};
+                final sorted = disabled.toList()..sort();
+                setState(() {
+                  _config = _config.copyWith(disabledLocalToolNames: sorted);
+                });
+                _persistMessages();
+              }
+
+              Widget buildToolTile(YoloitCliTool tool) {
+                final enabled = !disabled.contains(tool.functionName);
+                return CheckboxListTile(
+                  dense: true,
+                  value: enabled,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (value) {
+                    final next = {...disabled};
+                    if (value == true) {
+                      next.remove(tool.functionName);
+                    } else {
+                      next.add(tool.functionName);
+                    }
+                    setDialogState(() => persist(next));
+                  },
+                  title: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'yoloit ${tool.command}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (tool.destructive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.error.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'destructive',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  subtitle: Text(
+                    '${tool.functionName}\n${tool.description}',
+                    style: TextStyle(fontSize: 11, color: muted),
+                  ),
+                );
+              }
+
+              final grouped = <String, List<YoloitCliTool>>{};
+              for (final tool in tools) {
+                grouped.putIfAbsent(tool.group, () => []).add(tool);
+              }
+              return AlertDialog(
+                title: Row(
+                  children: [
+                    const Icon(Icons.settings_input_component_outlined),
+                    const SizedBox(width: 8),
+                    const Expanded(child: Text('YoLo Chat tools')),
+                    Text(
+                      '${_enabledLocalToolCount()}/${tools.length}',
+                      style: TextStyle(fontSize: 12, color: muted),
+                    ),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 720,
+                  height: 560,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Checked tools are exposed to the local LLM. Unchecked tools are removed from the tool schema and blocked if the model still tries to call them.',
+                        style: TextStyle(fontSize: 12, color: muted),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: ListView(
+                          children: [
+                            for (final entry in grouped.entries) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 10,
+                                  bottom: 4,
+                                ),
+                                child: Text(
+                                  entry.key.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: colors.primary,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ),
+                              ...entry.value.map(buildToolTile),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      setDialogState(() => persist(<String>{}));
+                    },
+                    child: const Text('Enable all'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      final next = {
+                        for (final tool in tools)
+                          if (tool.destructive) tool.functionName,
+                      };
+                      setDialogState(() => persist(next));
+                    },
+                    child: const Text('Disable destructive'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Done'),
+                  ),
+                ],
+              );
+            },
+          ),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -1328,13 +1516,42 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     ),
               ),
               const SizedBox(width: 8),
+              if (_config.provider == 'local') ...[
+                GestureDetector(
+                  onTap: _showLocalToolsDialog,
+                  child: Tooltip(
+                    message:
+                        'Choose local YoLoIT tools (${_enabledLocalToolCount()} enabled)',
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      margin: const EdgeInsets.only(bottom: 2),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        Icons.settings_input_component_outlined,
+                        size: 14,
+                        color:
+                            _config.disabledLocalToolNames.isEmpty
+                                ? colors.terminalPrompt
+                                : Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: Focus(
                   onKeyEvent: (node, event) {
                     if (event is! KeyDownEvent) return KeyEventResult.ignored;
                     // Enter (without Shift) → send
-                    if (event.logicalKey == LogicalKeyboardKey.enter &&
-                        !HardwareKeyboard.instance.isShiftPressed) {
+                    final isEnter =
+                        event.logicalKey == LogicalKeyboardKey.enter ||
+                        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+                    if (isEnter && !HardwareKeyboard.instance.isShiftPressed) {
                       _sendMessage();
                       return KeyEventResult.handled;
                     }
@@ -1389,14 +1606,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               ),
               const SizedBox(width: 6),
               GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Voice input coming soon'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
+                onTap: _isTranscribingMic ? null : _handleMicInput,
                 child: Container(
                   width: 28,
                   height: 28,
@@ -1406,9 +1616,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
-                    Icons.mic_none,
+                    _isRecordingMic
+                        ? Icons.mic_rounded
+                        : (_isTranscribingMic
+                            ? Icons.hourglass_top_rounded
+                            : Icons.mic_none),
                     size: 15,
-                    color: colors.terminalPrompt,
+                    color:
+                        _isRecordingMic
+                            ? Theme.of(context).colorScheme.error
+                            : colors.terminalPrompt,
                   ),
                 ),
               ),
@@ -1460,6 +1677,111 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _inputController.selection = TextSelection.collapsed(
       offset: before.length + text.length,
     );
+  }
+
+  Future<void> _handleMicInput() async {
+    await LocalAiModelsService.instance.initialize();
+    if (!LocalAiModelsService.instance.hasSelectedAsrInstalled) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Install ASR model first. Opening Settings → AI Models…',
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      await SettingsPage.show(context, initialCategory: 'AI Models');
+      return;
+    }
+
+    if (_isRecordingMic) {
+      await _stopRecordingAndTranscribe();
+      return;
+    }
+
+    final nativeGranted =
+        await MicrophonePermissionService.instance.ensureGranted();
+    if (!nativeGranted) {
+      if (!mounted) return;
+      await _showMicrophonePermissionHint();
+      return;
+    }
+
+    final granted = await _micRecorder.hasPermission();
+    if (!granted) {
+      if (!mounted) return;
+      await _showMicrophonePermissionHint();
+      return;
+    }
+
+    final outputPath =
+        '${Directory.systemTemp.path}/yoloit_asr_${DateTime.now().millisecondsSinceEpoch}.wav';
+    try {
+      await _micRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: outputPath,
+      );
+    } on Exception catch (e) {
+      if (!mounted) return;
+      final stillNoPermission = !await _micRecorder.hasPermission();
+      if (!mounted) return;
+      if (stillNoPermission) {
+        await _showMicrophonePermissionHint();
+        return;
+      }
+      await _showCopyableErrorDialog(
+        title: 'Microphone error',
+        message: 'Failed to start microphone:\n$e',
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isRecordingMic = true);
+  }
+
+  Future<void> _stopRecordingAndTranscribe() async {
+    final path = await _micRecorder.stop();
+    if (!mounted) return;
+    setState(() {
+      _isRecordingMic = false;
+      _isTranscribingMic = true;
+    });
+
+    try {
+      if (path == null || path.isEmpty) return;
+      final transcript = await LocalAiModelsService.instance
+          .transcribeWithSelectedAsr(path);
+      if (!mounted) return;
+      final text = transcript.trim();
+      if (text.isNotEmpty) {
+        _insertTextAtCursor(text);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      await _showCopyableErrorDialog(
+        title: 'ASR error',
+        message: 'ASR failed:\n$e',
+      );
+    } finally {
+      if (path != null && path.isNotEmpty) {
+        final f = File(path);
+        if (f.existsSync()) {
+          try {
+            await f.delete();
+          } on FileSystemException {
+            // ignore cleanup failure for temp recording
+          }
+        }
+      }
+      if (mounted) {
+        setState(() => _isTranscribingMic = false);
+      }
+    }
   }
 
   String _shortPath(String path) {
@@ -1515,6 +1837,128 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
 
     return b.toString().trimRight();
+  }
+
+  Future<void> _showCopyableErrorDialog({
+    required String title,
+    required String message,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: Text(title),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(child: SelectableText(message)),
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: message));
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Copied error text'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_outlined, size: 18),
+                label: const Text('Copy'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _showMicrophonePermissionHint() async {
+    if (!mounted) return;
+    final appName = await MicrophonePermissionService.instance.displayName();
+    final bundleId =
+        await MicrophonePermissionService.instance.bundleIdentifier();
+    final resetCommand = 'tccutil reset Microphone $bundleId';
+    final status = await MicrophonePermissionService.instance.status();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Microphone access required'),
+            content: SizedBox(
+              width: 560,
+              child: SelectableText(
+                'YoLoIT needs microphone access to record audio for local ASR.\n\n'
+                'App shown to macOS: $appName\n'
+                'Bundle id: $bundleId\n'
+                'macOS status: $status\n\n'
+                'If the system prompt does not appear, macOS has already saved a decision for this exact debug bundle. '
+                'Open Privacy & Security → Microphone and enable $appName. If it is missing from the list, reset the saved decision and press Request again:\n\n'
+                '$resetCommand',
+              ),
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () async {
+                  final granted =
+                      await MicrophonePermissionService.instance
+                          .ensureGranted();
+                  if (!mounted) return;
+                  if (granted) {
+                    Navigator.of(dialogContext).pop();
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Microphone is still not allowed by macOS'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.mic_outlined, size: 18),
+                label: const Text('Request again'),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: resetCommand));
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Copied reset command'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_outlined, size: 18),
+                label: const Text('Copy reset command'),
+              ),
+              TextButton.icon(
+                onPressed:
+                    () => unawaited(() async {
+                      final opened =
+                          await MicrophonePermissionService.instance
+                              .openSettings();
+                      if (!opened) {
+                        await PlatformLauncher.instance.openUrl(
+                          'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+                        );
+                      }
+                    }()),
+                icon: const Icon(Icons.settings_outlined, size: 18),
+                label: const Text('Open Settings'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+    );
   }
 
   void _showModelPicker(BuildContext context) {
@@ -1883,12 +2327,14 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   static const _providers = [
     ('copilot', 'GitHub Copilot'),
     ('cursor', 'Cursor Agent'),
+    ('opencode', 'OpenCode'),
     ('local', 'Local LLM'),
   ];
 
   List<ChatModelInfo> get _modelsForProvider => switch (_selectedProvider) {
     'cursor' => kCursorModels,
     'local' => kLocalModels,
+    'opencode' => kOpencodeModels,
     _ => kCopilotModels,
   };
 
