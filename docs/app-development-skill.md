@@ -509,50 +509,63 @@ mainAxisSize: 'max' | 'min'
 
 ---
 
-## CLI Workflow for App Development
+## CLI Reference for App Development
 
 ```bash
-# 1. Scaffold a new app
+# ── Creating ──────────────────────────────────────────────────────────────────
+
+# Create a new app (scaffold in ~/.config/yoloit/apps/<name>/)
 yoloit app:create my-app
+yoloit app:create my-app --template network   # with HTTP fetch example
+yoloit app:create my-app --template yoloit    # with storage + theme example
 
-# 2. Edit the generated files
-#    ~/.config/yoloit/apps/my-app/widget.js
-#    ~/.config/yoloit/apps/my-app/manifest.json
+# ── Running ───────────────────────────────────────────────────────────────────
 
-# 3. Open it on the board
+# Open app as a panel on the board
 yoloit app:run my-app
 
-# 4. After editing widget.js, hot-reload without restarting
+# Hot-reload JS after editing widget.js (no Flutter restart needed)
 yoloit app:reload my-app
 
-# 5. Trigger an event manually for testing
-yoloit app:execute my-app btn_click
+# ── Debugging ─────────────────────────────────────────────────────────────────
 
-# 6. Inspect the current render tree (JSON)
+# Inspect the current JSON render tree
 yoloit app:snapshot my-app
 
-# 7. List all installed apps
+# Fire an event manually (simulate button tap, etc.)
+yoloit app:execute my-app btn_click
+yoloit app:execute my-app city_submit '{"value":"London"}'
+
+# ── Managing ──────────────────────────────────────────────────────────────────
+
+# List all discovered apps and which are active
 yoloit app:list
 
-# 8. Install from a path or URL
-yoloit app:install ~/projects/my-app
-yoloit app:install https://example.com/my-app.js
+# Install from EXTERNAL sources (NOT needed for apps you created with app:create)
+yoloit app:install ~/projects/external-app     # from path outside apps folder
+yoloit app:install https://example.com/app.js  # from URL
+yoloit app:install ~/downloads/my-app.zip      # from ZIP archive
 
-# 9. Remove an app
+# Remove an app
 yoloit app:remove my-app
 ```
+
+**Important**: `app:install` is only needed for apps from OUTSIDE `~/.config/yoloit/apps/`.  
+Apps created with `app:create` or manually placed in `~/.config/yoloit/apps/` are **automatically discovered** — just `app:run` them directly.
 
 ---
 
 ## Tips for AI Agents
 
-1. **Always use `yoloit.theme` colors** — never hardcode hex values. Users switch between light and dark mode.
-2. **Wrap everything in IIFE** — `(function(){ ... })()` — functions inside are NOT global.
+1. **Always use `yoloit.theme` colors** — never hardcode hex. Users switch dark/light mode.
+2. **Wrap everything in an IIFE** — `(function(){ ... })()` — functions inside are NOT global.
 3. **`yoloit.onEvent` is mandatory** — register it even if you handle few events; the engine uses `yoloit._handler`.
-4. **Storage is async** — `yoloit.storage.get()` returns a Promise. Always `.then()` before using the value.
-5. **`yoloit.render()` replaces everything** — it's not additive; always render the complete UI tree.
-6. **Hot reload** — after editing `widget.js`, run `yoloit app:reload <id>`. No need to restart the Flutter app.
-7. **Network requires manifest** — set `"network": true` in `manifest.json` or `fetchJson` will fail silently.
-8. **Timer cleanup** — if you use `setInterval`, save the ID and `clearInterval` when needed to avoid memory leaks.
-9. **`app:snapshot`** — use this to debug the render tree when the UI looks wrong.
-10. **`app:execute`** — use this to fire events from tests or the CLI to validate app logic.
+4. **Storage is async** — `yoloit.storage.get()` returns a Promise. Always use `.then()` before using the value.
+5. **`yoloit.render()` replaces everything** — not additive; always render the complete UI tree.
+6. **After editing `widget.js` → `yoloit app:reload <id>`** — no Flutter restart needed.
+7. **Network requires manifest flag** — set `"network": true` or `fetchJson` silently fails.
+8. **Timer cleanup** — save `setInterval` IDs and `clearInterval` when done.
+9. **Use `app:snapshot`** — inspect the render tree when UI looks wrong.
+10. **Use `app:execute`** — fire events from CLI to test app logic without clicking.
+11. **Never call `app:install` on `~/.config/yoloit/apps/` paths** — it's already installed.
+12. **`app:run` is idempotent** — safe to call even if the panel already exists.
