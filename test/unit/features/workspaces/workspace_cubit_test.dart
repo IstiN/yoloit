@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,20 +10,29 @@ import 'package:yoloit/features/workspaces/models/workspace.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('WorkspaceCubit', () {
-    setUp(() {
-      SharedPreferences.setMockInitialValues({});
-    });
+  late Directory tempDir;
 
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    tempDir = await Directory.systemTemp.createTemp('workspace_cubit_test_');
+  });
+
+  tearDown(() async {
+    await tempDir.delete(recursive: true);
+  });
+
+  String tempFile(String name) => '${tempDir.path}/$name.json';
+
+  group('WorkspaceCubit', () {
     test('initial state is WorkspaceInitial', () {
-      final cubit = WorkspaceCubit();
+      final cubit = WorkspaceCubit(testWorkspacesFilePath: tempFile('ws'));
       expect(cubit.state, const WorkspaceInitial());
       cubit.close();
     });
 
     blocTest<WorkspaceCubit, WorkspaceState>(
       'load() with empty prefs emits WorkspaceLoading then WorkspaceLoaded with empty list',
-      build: () => WorkspaceCubit(),
+      build: () => WorkspaceCubit(testWorkspacesFilePath: tempFile('ws')),
       act: (cubit) => cubit.load(),
       expect: () => [
         const WorkspaceLoading(),
@@ -32,13 +43,11 @@ void main() {
     blocTest<WorkspaceCubit, WorkspaceState>(
       'load() restores persisted workspaces',
       setUp: () async {
-        SharedPreferences.setMockInitialValues({
-          'workspaces': [
-            '{"id":"ws_1","name":"project","path":"/tmp/project","gitBranch":null,"addedLines":0,"removedLines":0}'
-          ],
-        });
+        File(tempFile('ws_restore')).writeAsStringSync(
+          '[{"id":"ws_1","name":"project","paths":["/tmp/project"],"gitBranch":null,"addedLines":0,"removedLines":0}]',
+        );
       },
-      build: () => WorkspaceCubit(),
+      build: () => WorkspaceCubit(testWorkspacesFilePath: tempFile('ws_restore')),
       act: (cubit) => cubit.load(),
       expect: () => [
         const WorkspaceLoading(),
@@ -52,7 +61,7 @@ void main() {
 
     blocTest<WorkspaceCubit, WorkspaceState>(
       'removeWorkspace removes correct workspace',
-      build: () => WorkspaceCubit(),
+      build: () => WorkspaceCubit(testWorkspacesFilePath: tempFile('ws_remove')),
       seed: () => const WorkspaceLoaded(
         workspaces: [
           Workspace(id: 'ws_1', name: 'alpha', paths: ['/a']),
@@ -71,7 +80,7 @@ void main() {
 
     blocTest<WorkspaceCubit, WorkspaceState>(
       'setActive updates activeWorkspaceId',
-      build: () => WorkspaceCubit(),
+      build: () => WorkspaceCubit(testWorkspacesFilePath: tempFile('ws_active')),
       seed: () => const WorkspaceLoaded(
         workspaces: [
           Workspace(id: 'ws_1', name: 'alpha', paths: ['/a']),
@@ -86,7 +95,7 @@ void main() {
 
     blocTest<WorkspaceCubit, WorkspaceState>(
       'removeWorkspace clears activeWorkspaceId when active is removed',
-      build: () => WorkspaceCubit(),
+      build: () => WorkspaceCubit(testWorkspacesFilePath: tempFile('ws_clear')),
       seed: () => const WorkspaceLoaded(
         workspaces: [
           Workspace(id: 'ws_1', name: 'alpha', paths: ['/a']),

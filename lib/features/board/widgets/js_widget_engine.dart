@@ -100,21 +100,28 @@ class JsWidgetEngine {
   // ── Private ──────────────────────────────────────────────────────────────
 
   void _setupBridges(JavascriptRuntime rt) {
+    // flutter_js bridges are invoked from JS via: sendMessage(channelName, jsonString)
+    // The Dart callback receives args = jsonDecode(jsonString) — already decoded.
+
     // yoloit.render(jsonTree)
     rt.setupBridge('__yoloit_render', (args) {
       if (_disposed) return;
       try {
-        final tree = jsonDecode(args as String? ?? '{}') as Map<String, dynamic>;
+        final tree = (args is Map)
+            ? Map<String, dynamic>.from(args)
+            : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
         onRender(tree);
       } catch (e) {
-        debugPrint('[JsWidgetEngine] render bridge error: $e');
+        debugPrint('[JsWidgetEngine] render bridge error: $e args=$args (${args.runtimeType})');
       }
     });
 
     // yoloit.fetchJson(url, opts) — goes through Dart, no CORS
     rt.setupBridge('__yoloit_fetch', (args) {
       if (_disposed) return;
-      final req = jsonDecode(args as String? ?? '{}') as Map<String, dynamic>;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
       final url = req['url'] as String;
       final method = (req['method'] as String? ?? 'GET').toUpperCase();
@@ -144,7 +151,9 @@ class JsWidgetEngine {
     // yoloit.storage.get(key)
     rt.setupBridge('__yoloit_storage_get', (args) {
       if (_disposed) return;
-      final req = jsonDecode(args as String? ?? '{}') as Map<String, dynamic>;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
       final key = req['key'] as String;
       _resolveCallback(rt, id, _storage[key]);
@@ -153,7 +162,9 @@ class JsWidgetEngine {
     // yoloit.storage.set(key, value)
     rt.setupBridge('__yoloit_storage_set', (args) {
       if (_disposed) return;
-      final req = jsonDecode(args as String? ?? '{}') as Map<String, dynamic>;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       _storage[req['key'] as String] = req['value'];
       onStorageUpdate(Map<String, dynamic>.from(_storage));
     });
@@ -161,18 +172,20 @@ class JsWidgetEngine {
     // yoloit.panel.setTitle(title)
     rt.setupBridge('__yoloit_set_title', (title) {
       if (_disposed) return;
-      onSetTitle((title as String?) ?? '');
+      onSetTitle(title?.toString() ?? '');
     });
 
     // console.log
     rt.setupBridge('__yoloit_log', (msg) {
-      debugPrint('[JsWidget] $msg');
+      debugPrint('[JsWidget] ${msg?.toString() ?? ''}');
     });
 
     // setInterval — Dart-backed
     rt.setupBridge('__yoloit_set_interval', (args) {
       if (_disposed) return;
-      final req = jsonDecode(args as String? ?? '{}') as Map<String, dynamic>;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
       final ms = (req['ms'] as num?)?.toInt() ?? 1000;
       _intervals[id]?.cancel();
@@ -187,8 +200,9 @@ class JsWidgetEngine {
 
     // clearInterval
     rt.setupBridge('__yoloit_clear_interval', (id) {
-      _intervals[id as String]?.cancel();
-      _intervals.remove(id);
+      final idStr = id?.toString() ?? '';
+      _intervals[idStr]?.cancel();
+      _intervals.remove(idStr);
     });
   }
 
@@ -204,30 +218,32 @@ class JsWidgetEngine {
 
   // ── Bootstrap JS injected before widget code ────────────────────────────
 
+  // NOTE: flutter_js bridges are called from JS via the native `sendMessage(channelName, jsonString)`
+  // function that flutter_js injects globally. Do NOT call channel names as functions directly.
   static const _bootstrap = r'''
 var __cbs = {};
 var __iv_cbs = {};
 var __nid = function(){return Math.random().toString(36).slice(2)+Date.now().toString(36);};
 
 var console = {
-  log:   function(){__yoloit_log(Array.prototype.slice.call(arguments).join(' '));},
-  warn:  function(){__yoloit_log('[W] '+Array.prototype.slice.call(arguments).join(' '));},
-  error: function(){__yoloit_log('[E] '+Array.prototype.slice.call(arguments).join(' '));}
+  log:   function(){sendMessage('__yoloit_log',JSON.stringify(Array.prototype.slice.call(arguments).join(' ')));},
+  warn:  function(){sendMessage('__yoloit_log',JSON.stringify('[W] '+Array.prototype.slice.call(arguments).join(' ')));},
+  error: function(){sendMessage('__yoloit_log',JSON.stringify('[E] '+Array.prototype.slice.call(arguments).join(' ')));}
 };
 
-var setTimeout = function(fn,ms){ var id=__nid(); __iv_cbs[id]=function(){fn();clearInterval(id);}; __yoloit_set_interval(JSON.stringify({id:id,ms:ms||0})); return id; };
-var clearTimeout = function(id){ __yoloit_clear_interval(String(id)); };
-var setInterval = function(fn,ms){ var id=__nid(); __iv_cbs[id]=fn; __yoloit_set_interval(JSON.stringify({id:id,ms:ms||1000})); return id; };
-var clearInterval = function(id){ __yoloit_clear_interval(String(id)); delete __iv_cbs[String(id)]; };
+var setTimeout = function(fn,ms){ var id=__nid(); __iv_cbs[id]=function(){fn();clearInterval(id);}; sendMessage('__yoloit_set_interval',JSON.stringify({id:id,ms:ms||0})); return id; };
+var clearTimeout = function(id){ sendMessage('__yoloit_clear_interval',JSON.stringify(String(id))); };
+var setInterval = function(fn,ms){ var id=__nid(); __iv_cbs[id]=fn; sendMessage('__yoloit_set_interval',JSON.stringify({id:id,ms:ms||1000})); return id; };
+var clearInterval = function(id){ sendMessage('__yoloit_clear_interval',JSON.stringify(String(id))); delete __iv_cbs[String(id)]; };
 
 var yoloit = {
-  render: function(tree){ __yoloit_render(JSON.stringify(tree)); },
+  render: function(tree){ sendMessage('__yoloit_render', JSON.stringify(tree)); },
 
   fetchJson: function(url,opts){
     return new Promise(function(resolve,reject){
       var id=__nid();
       __cbs[id]=function(r){if(r&&r.__error)reject(new Error(r.__error));else resolve(r);};
-      __yoloit_fetch(JSON.stringify({id:id,url:url,method:(opts&&opts.method)||'GET',headers:(opts&&opts.headers)||{}}));
+      sendMessage('__yoloit_fetch', JSON.stringify({id:id,url:url,method:(opts&&opts.method)||'GET',headers:(opts&&opts.headers)||{}}));
     });
   },
 
@@ -239,17 +255,17 @@ var yoloit = {
       return new Promise(function(resolve){
         var id=__nid();
         __cbs[id]=function(v){self._c[key]=v;resolve(v);};
-        __yoloit_storage_get(JSON.stringify({id:id,key:key}));
+        sendMessage('__yoloit_storage_get', JSON.stringify({id:id,key:key}));
       });
     },
     set:function(key,val){
       this._c[key]=val;
-      __yoloit_storage_set(JSON.stringify({key:key,value:val}));
+      sendMessage('__yoloit_storage_set', JSON.stringify({key:key,value:val}));
       return Promise.resolve();
     }
   },
 
-  panel:{setTitle:function(t){__yoloit_set_title(t);}},
+  panel:{setTitle:function(t){sendMessage('__yoloit_set_title', JSON.stringify(t));}},
 
   showError:function(msg){
     yoloit.render({type:'center',child:{type:'padding',padding:[16,16,16,16],child:{

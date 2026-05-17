@@ -14,7 +14,12 @@ import 'package:yoloit/features/workspaces/data/workspace_dir_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
 
 class WorkspaceCubit extends Cubit<WorkspaceState> {
-  WorkspaceCubit() : super(const WorkspaceInitial());
+  /// [testWorkspacesFilePath] is for testing only — overrides the shared file path
+  /// so tests can use a temporary, isolated file instead of the real user data.
+  WorkspaceCubit({this.testWorkspacesFilePath}) : super(const WorkspaceInitial());
+
+  /// If set, overrides the shared file path (for tests only).
+  final String? testWorkspacesFilePath;
 
   static const _storageKey = 'workspaces';
   // Production bundle ID — used for cross-build migration only.
@@ -33,9 +38,18 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
     return File(path);
   }
 
-  static Future<List<Workspace>> _loadShared() async {
+  Future<File> get _file async {
+    if (testWorkspacesFilePath != null) {
+      final dir = Directory(p.dirname(testWorkspacesFilePath!));
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      return File(testWorkspacesFilePath!);
+    }
+    return _sharedFile;
+  }
+
+  Future<List<Workspace>> _loadShared() async {
     try {
-      final f = await _sharedFile;
+      final f = await _file;
       if (!f.existsSync()) return [];
       final raw = jsonDecode(f.readAsStringSync());
       if (raw is List) {
@@ -79,8 +93,8 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
     }
   }
 
-  static Future<void> _saveShared(List<Workspace> workspaces) async {
-    final f = await _sharedFile;
+  Future<void> _saveShared(List<Workspace> workspaces) async {
+    final f = await _file;
     f.writeAsStringSync(
       jsonEncode(workspaces.map((w) => w.toJson()).toList()),
     );
