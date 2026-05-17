@@ -50,7 +50,9 @@ class JsWidgetEngine {
       // Always use QuickJsRuntime2 — JavascriptCoreRuntime has a static
       // _sendMessageDartFunc field that gets overwritten by each new instance,
       // breaking multi-widget setups on macOS/iOS.
-      final runtime = QuickJsRuntime2();
+      // NOTE: flutter_js pub cache is patched (jscore_runtime.dart) to use an
+      // instance map keyed by context pointer instead of the static field.
+      final runtime = getJavascriptRuntime();
       runtime.enableHandlePromises();
       _runtime = runtime;
       debugPrint('[JsWidgetEngine] starting ${runtime.runtimeType}');
