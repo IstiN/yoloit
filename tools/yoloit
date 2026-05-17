@@ -2100,15 +2100,7 @@ PY
     echo "$result" | python3 -m json.tool 2>/dev/null
     ;;
   app:dev-skill|app:skill|app:docs)
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    SKILL_FILE="$SCRIPT_DIR/../docs/app-development-skill.md"
-    if [[ -f "$SKILL_FILE" ]]; then
-      cat "$SKILL_FILE"
-    else
-      echo "❌ Skill file not found at: $SKILL_FILE" >&2
-      echo "   Make sure you are running from the yoloit repo." >&2
-      exit 1
-    fi
+    _get "/apps/dev-skill"
     ;;
   app:install)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit app:install <url|path>" >&2; exit 1; }

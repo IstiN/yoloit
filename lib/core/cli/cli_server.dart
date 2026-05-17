@@ -2576,6 +2576,16 @@ class CliServer {
       });
     }
 
+    // GET /api/apps/dev-skill — return the app development skill doc
+    if (sub.length == 1 && sub[0] == 'dev-skill' && method == 'GET') {
+      try {
+        final content = await rootBundle.loadString('docs/app-development-skill.md');
+        return shelf.Response.ok(content, headers: {'content-type': 'text/plain; charset=utf-8'});
+      } catch (e) {
+        return _error('Skill doc not found: $e');
+      }
+    }
+
     // POST /api/apps/install-zip { zipPath: "..." }
     if (sub.length == 1 && sub[0] == 'install-zip' && method == 'POST') {
       final body = await _body(request);
