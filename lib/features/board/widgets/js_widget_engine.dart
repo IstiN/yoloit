@@ -49,8 +49,13 @@ class JsWidgetEngine {
     try {
       final runtime = getJavascriptRuntime();
       _runtime = runtime;
+      debugPrint('[JsWidgetEngine] starting ${runtime.runtimeType}');
       _setupBridges(runtime);
-      runtime.evaluate(_bootstrap);
+
+      final bootstrapResult = runtime.evaluate(_bootstrap);
+      if (bootstrapResult.isError) {
+        debugPrint('[JsWidgetEngine] bootstrap error: ${bootstrapResult.stringResult}');
+      }
 
       final code = '''
 (function() {
@@ -61,8 +66,13 @@ class JsWidgetEngine {
   }
 })();
 ''';
-      runtime.evaluate(code);
+      debugPrint('[JsWidgetEngine] evaluating widget code...');
+      final result = runtime.evaluate(code);
+      if (result.isError) {
+        debugPrint('[JsWidgetEngine] widget eval error: ${result.stringResult}');
+      }
       runtime.executePendingJob();
+      debugPrint('[JsWidgetEngine] widget code done, uiTree set: ${_disposed}');
     } catch (e) {
       debugPrint('[JsWidgetEngine] startup error: $e');
       rethrow;
@@ -107,9 +117,11 @@ class JsWidgetEngine {
     rt.setupBridge('__yoloit_render', (args) {
       if (_disposed) return;
       try {
+        debugPrint('[JsWidgetEngine] render bridge called, args type: ${args.runtimeType}');
         final tree = (args is Map)
             ? Map<String, dynamic>.from(args)
             : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+        debugPrint('[JsWidgetEngine] render tree type: ${tree['type']}');
         onRender(tree);
       } catch (e) {
         debugPrint('[JsWidgetEngine] render bridge error: $e args=$args (${args.runtimeType})');

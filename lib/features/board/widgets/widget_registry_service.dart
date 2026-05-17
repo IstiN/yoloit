@@ -106,13 +106,12 @@ class WidgetRegistryService {
       destDir.createSync(recursive: true);
     }
 
-    // Copy each bundled example widget if not already present.
+    // Always overwrite bundled example widgets so updates ship with the app.
     const examples = ['weather', 'crypto', 'stocks', 'calculator'];
     for (final name in examples) {
       final dest = Directory(
         '${destDir.path}${Platform.pathSeparator}$name',
       );
-      if (dest.existsSync()) continue; // already installed
       dest.createSync(recursive: true);
       for (final filename in ['manifest.json', 'widget.js']) {
         try {
