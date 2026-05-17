@@ -122,10 +122,16 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
         WidgetAppRegistry.instance.updateTree(_widgetId, tree);
       },
       onSetTitle: (title) {
-        widget.renderContext.onUpdateState({'_title': title});
+        widget.renderContext.onUpdateState({
+          ...widget.panel.state,
+          '_title': title,
+        });
       },
       onStorageUpdate: (newStorage) {
-        widget.renderContext.onUpdateState({'_storage': newStorage});
+        widget.renderContext.onUpdateState({
+          ...widget.panel.state,
+          '_storage': newStorage,
+        });
       },
       initialStorage: storage,
     );
@@ -259,7 +265,10 @@ class _PickerViewState extends State<_PickerView> {
         final m = widgets[i];
         return InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => widget.renderContext.onUpdateState({'widgetId': m.id}),
+          onTap: () => widget.renderContext.onUpdateState({
+            ...widget.panel.state,
+            'widgetId': m.id,
+          }),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(

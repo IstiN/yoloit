@@ -47,7 +47,11 @@ class JsWidgetEngine {
     _disposed = false;
 
     try {
-      final runtime = getJavascriptRuntime();
+      // Always use QuickJsRuntime2 — JavascriptCoreRuntime has a static
+      // _sendMessageDartFunc field that gets overwritten by each new instance,
+      // breaking multi-widget setups on macOS/iOS.
+      final runtime = QuickJsRuntime2();
+      runtime.enableHandlePromises();
       _runtime = runtime;
       debugPrint('[JsWidgetEngine] starting ${runtime.runtimeType}');
       _setupBridges(runtime);
