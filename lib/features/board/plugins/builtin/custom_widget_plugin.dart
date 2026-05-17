@@ -86,7 +86,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
   Future<void> _load() async {
     if (_widgetId.isEmpty) {
-      setState(() { _loading = false; _error = 'No widget selected'; });
+      setState(() { _loading = false; _error = null; _controller = null; });
       return;
     }
     setState(() { _loading = true; _error = null; });
