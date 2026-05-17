@@ -788,7 +788,7 @@ def param_to_key(name):
 
 if fmt == "short":
     print("yoloit help (short)")
-    print("Use: yoloit help --format [short|detailed|mermaid|tools|registry]")
+    print("Use: yoloit help --format [short|detailed|mermaid|mermaid_short|tools|registry]")
     print("Board and panel are optional in note/checklist/kanban commands — uses active board/panel.")
     for g in group_order:
         if not by_group[g]:
@@ -836,6 +836,22 @@ elif fmt == "mermaid":
                 label += f'<br/>params: {params_inline(c)}'
             label = label.replace('"', '\\"')
             print(f'  {gid} --> {cid}["{label}"]')
+elif fmt == "mermaid_short":
+    print("graph LR")
+    print("  root[yoloit]")
+    for g in group_order:
+        if not by_group[g]:
+            continue
+        gid = f"g_{g}"
+        print(f'  root --> {gid}(("{g}"))')
+        for i, c in enumerate(by_group[g]):
+            cid = f"{gid}_{i}"
+            aliases = c.get("aliases", [])
+            name_str = c["name"]
+            if aliases:
+                name_str += f' · {" · ".join(aliases)}'
+            name_str = name_str.replace('"', '\\"')
+            print(f'  {gid} --> {cid}["{name_str}"]')
 elif fmt == "tools":
     tools = []
     for c in commands:
@@ -886,7 +902,7 @@ _parse_help_format() {
         format="${2:-short}"
         shift 2
         ;;
-      short|detailed|mermaid|tools|registry)
+      short|detailed|mermaid|mermaid_short|tools|registry)
         format="$1"
         shift
         ;;
