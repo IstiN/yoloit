@@ -269,7 +269,7 @@ class _PickerViewState extends State<_PickerView> {
               final createPanel = widget.renderContext.onCreateLinkedPanel;
               if (createPanel != null) {
                 // Open widget as a new panel on the board
-                createPanel(CustomWidgetPlugin.kTypeId, {'widgetId': m.id}, m.title);
+                createPanel(CustomWidgetPlugin.kTypeId, {'widgetId': m.id}, m.name);
               } else {
                 // Fallback: replace current panel's content
                 widget.renderContext.onUpdateState({
