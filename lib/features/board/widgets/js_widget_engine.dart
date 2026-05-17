@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_js/flutter_js.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Headless JS widget engine.
 ///
@@ -15,8 +16,10 @@ import 'package:flutter_js/flutter_js.dart';
 /// ```js
 /// yoloit.render(tree)           // update the Flutter UI
 /// yoloit.fetchJson(url, opts)   // HTTP fetch via Dart (no CORS)
-/// yoloit.storage.get(key)       // persistent per-panel storage
+/// yoloit.storage.get(key)       // persistent per-panel storage (plain JSON)
 /// yoloit.storage.set(key, val)
+/// yoloit.secrets.get(key)       // per-widget secure storage (encrypted)
+/// yoloit.secrets.set(key, val)
 /// yoloit.panel.setTitle(title)
 /// yoloit.showError(msg)
 /// setInterval(fn, ms)           // Dart-backed timer
@@ -25,12 +28,15 @@ import 'package:flutter_js/flutter_js.dart';
 /// ```
 class JsWidgetEngine {
   JsWidgetEngine({
+    required this.widgetId,
     required this.onRender,
     required this.onSetTitle,
     required this.onStorageUpdate,
     required Map<String, dynamic> initialStorage,
   }) : _storage = Map<String, dynamic>.from(initialStorage);
 
+  /// Widget ID used to namespace secure storage keys.
+  final String widgetId;
   final void Function(Map<String, dynamic> tree) onRender;
   final void Function(String title) onSetTitle;
   final void Function(Map<String, dynamic> storage) onStorageUpdate;
@@ -39,6 +45,8 @@ class JsWidgetEngine {
   JavascriptRuntime? _runtime;
   bool _disposed = false;
   final Map<String, Timer> _intervals = {};
+
+  static const _secureStorage = FlutterSecureStorage();
 
   // ── Public API ──────────────────────────────────────────────────────────
 
@@ -221,6 +229,47 @@ class JsWidgetEngine {
       _intervals[idStr]?.cancel();
       _intervals.remove(idStr);
     });
+
+    // yoloit.secrets.get(key) — encrypted secure storage, per-widget namespace
+    rt.setupBridge('__yoloit_secrets_get', (args) {
+      if (_disposed) return;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final id = req['id'] as String;
+      final key = '_widget_${widgetId}_${req['key'] as String}';
+      Future(() async {
+        try {
+          final val = await _secureStorage.read(key: key);
+          if (!_disposed) _resolveCallback(rt, id, val);
+        } catch (e) {
+          if (!_disposed) _resolveCallback(rt, id, null);
+        }
+      });
+    });
+
+    // yoloit.secrets.set(key, value)
+    rt.setupBridge('__yoloit_secrets_set', (args) {
+      if (_disposed) return;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final id = req['id'] as String;
+      final key = '_widget_${widgetId}_${req['key'] as String}';
+      final value = req['value'];
+      Future(() async {
+        try {
+          if (value == null) {
+            await _secureStorage.delete(key: key);
+          } else {
+            await _secureStorage.write(key: key, value: value.toString());
+          }
+          if (!_disposed) _resolveCallback(rt, id, true);
+        } catch (e) {
+          if (!_disposed) _resolveCallback(rt, id, false);
+        }
+      });
+    });
   }
 
   void _resolveCallback(JavascriptRuntime rt, String id, dynamic value) {
@@ -288,6 +337,31 @@ var yoloit = {
   //   yoloit.onEvent(function handleEvent(actionId, payload) { ... });
   _handler: null,
   onEvent: function(fn){ yoloit._handler = fn; },
+
+  // Encrypted secure storage — sandboxed per widget ID
+  secrets:{
+    get:function(key){
+      return new Promise(function(resolve){
+        var id=__nid();
+        __cbs[id]=function(v){resolve(v);};
+        sendMessage('__yoloit_secrets_get', JSON.stringify({id:id,key:key}));
+      });
+    },
+    set:function(key,val){
+      return new Promise(function(resolve){
+        var id=__nid();
+        __cbs[id]=function(ok){resolve(ok);};
+        sendMessage('__yoloit_secrets_set', JSON.stringify({id:id,key:key,value:val}));
+      });
+    },
+    delete:function(key){
+      return new Promise(function(resolve){
+        var id=__nid();
+        __cbs[id]=function(ok){resolve(ok);};
+        sendMessage('__yoloit_secrets_set', JSON.stringify({id:id,key:key,value:null}));
+      });
+    }
+  },
 
   showError:function(msg){
     yoloit.render({type:'center',child:{type:'padding',padding:[16,16,16,16],child:{

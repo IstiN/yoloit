@@ -70,6 +70,10 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   @override
   void initState() {
     super.initState();
+    // Register reload callback immediately so CLI can trigger reload even before first load completes
+    if (_widgetId.isNotEmpty) {
+      WidgetAppRegistry.instance.registerReload(_widgetId, _load);
+    }
     _load();
   }
 
@@ -77,7 +81,12 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   void didUpdateWidget(_CustomWidgetContent old) {
     super.didUpdateWidget(old);
     final oldId = old.panel.state['widgetId'] as String? ?? '';
-    if (_widgetId != oldId) _load();
+    if (_widgetId != oldId) {
+      if (_widgetId.isNotEmpty) {
+        WidgetAppRegistry.instance.registerReload(_widgetId, _load);
+      }
+      _load();
+    }
   }
 
   @override
@@ -117,6 +126,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     );
 
     final engine = JsWidgetEngine(
+      widgetId: _widgetId,
       onRender: (tree) {
         if (mounted) setState(() => _uiTree = tree);
         WidgetAppRegistry.instance.updateTree(_widgetId, tree);
@@ -144,6 +154,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       await engine.run(js);
       _engine = engine;
       WidgetAppRegistry.instance.register(_widgetId, engine, null);
+      WidgetAppRegistry.instance.registerReload(_widgetId, _load);
       if (mounted) setState(() { _manifest = manifest; _loading = false; });
     } catch (e) {
       engine.dispose();

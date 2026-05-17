@@ -764,6 +764,14 @@ commands = [
   },
   {
     "group": "app",
+    "name": "app:reload",
+    "description": "Hot-reload a running widget (re-reads JS from disk, no full app restart needed)",
+    "params": [["id", "Widget app id", True]],
+    "example": "yoloit app:reload weather",
+    "aliases": ["widget:reload", "app:refresh"],
+  },
+  {
+    "group": "app",
     "name": "app:snapshot",
     "description": "Get the current JSON render tree of a running widget app",
     "params": [["id", "Widget app id", True]],
@@ -2060,6 +2068,17 @@ PY
     [[ $# -lt 2 ]] && { echo "Usage: yoloit app:execute <id> <action> [payload_json]" >&2; exit 1; }
     app_id="$1"; action_id="$2"; payload="${3:-{}}"
     _post "/apps/$(_encode "$app_id")/execute" "{\"action\":\"${action_id}\",\"payload\":${payload}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:reload|widget:reload|app:refresh)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:reload <id>" >&2; exit 1; }
+    result=$(_post "/apps/$(_encode "$1")/reload" '{}')
+    ok=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('ok') else 'no')" 2>/dev/null)
+    if [[ "$ok" == "yes" ]]; then
+      echo "✅ Widget '$1' reloaded"
+    else
+      msg=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message','unknown error'))" 2>/dev/null)
+      echo "❌ Reload failed: $msg" >&2; exit 1
+    fi
     ;;
   app:snapshot)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit app:snapshot <id>" >&2; exit 1; }

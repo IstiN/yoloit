@@ -2606,6 +2606,15 @@ class CliServer {
         return _json({'ok': true, 'widgetId': id, 'action': actionId});
       }
 
+      // POST /api/apps/:id/reload — hot-reload widget JS without restarting the app
+      if (action == 'reload' && method == 'POST') {
+        final ok = await appRegistry.triggerReload(id);
+        if (!ok) {
+          return _json({'ok': false, 'message': 'Widget "$id" is not currently running'});
+        }
+        return _json({'ok': true, 'widgetId': id, 'message': 'Widget reloaded'});
+      }
+
       // POST /api/apps/:id/screenshot
       if (action == 'screenshot' && method == 'POST') {
         // TODO: implement full screenshot once BoardScreenshotService.capturePanel(panelId) is wired to widgetId lookup

@@ -67,7 +67,8 @@ class JsonWidgetRenderer {
       'aspectRatio'               => _aspectRatio(m),
       'opacity'                   => Opacity(opacity: _double(m['opacity'], 1.0), child: _child(m)),
       'clipRRect'                 => _clipRRect(m),
-      'overflowBox'               => _build(m['child']),  // fallback
+      'textField'                 => _textFieldNode(m),
+
       _                           => const SizedBox.shrink(),
     };
   }
@@ -597,6 +598,103 @@ class JsonWidgetRenderer {
   double? _doubleOrNull(dynamic v) =>
       v == null ? null : (v as num).toDouble();
 
+  Widget _textFieldNode(Map<String, dynamic> m) => _TextFieldNode(
+    initialValue: m['value'] as String? ?? '',
+    hint: m['hint'] as String? ?? '',
+    onSubmit: m['onSubmit'] as String?,
+    onChange: m['onChange'] as String?,
+    style: _textStyle(m['style'] as Map?),
+    obscure: m['obscure'] == true,
+    onEvent: onEvent,
+  );
+
   int _int(dynamic v, int def) =>
       v == null ? def : (v as num).toInt();
+}
+
+// ── TextField node ────────────────────────────────────────────────────────────
+
+class _TextFieldNode extends StatefulWidget {
+  const _TextFieldNode({
+    required this.initialValue,
+    required this.hint,
+    required this.onSubmit,
+    required this.onChange,
+    required this.style,
+    required this.obscure,
+    required this.onEvent,
+  });
+
+  final String initialValue;
+  final String hint;
+  final String? onSubmit;
+  final String? onChange;
+  final TextStyle? style;
+  final bool obscure;
+  final void Function(String actionId, Map<String, dynamic> payload) onEvent;
+
+  @override
+  State<_TextFieldNode> createState() => _TextFieldNodeState();
+}
+
+class _TextFieldNodeState extends State<_TextFieldNode> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void didUpdateWidget(_TextFieldNode old) {
+    super.didUpdateWidget(old);
+    // Only update controller if value changes externally and field is not focused
+    if (widget.initialValue != old.initialValue && !_ctrl.selection.isValid) {
+      _ctrl.text = widget.initialValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _ctrl,
+      obscureText: widget.obscure,
+      style: widget.style ?? const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        filled: true,
+        fillColor: const Color(0xFF1e293b),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF334155)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF334155)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF3b82f6)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        isDense: true,
+      ),
+      onSubmitted: (val) {
+        final action = widget.onSubmit;
+        if (action != null) widget.onEvent(action, {'value': val});
+      },
+      onChanged: (val) {
+        final action = widget.onChange;
+        if (action != null) widget.onEvent(action, {'value': val});
+      },
+    );
+  }
 }

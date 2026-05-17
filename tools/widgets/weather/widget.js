@@ -1,7 +1,9 @@
 // Weather widget — native Flutter UI via JSON tree
 // Uses wttr.in free API (fetched through Dart, no CORS)
+// Supports city text input with storage persistence + secrets demo
 (function() {
   var city = 'London';
+  var _inputCity = city;  // tracks live textField value
 
   function iconForDesc(desc) {
     var d = desc.toLowerCase();
@@ -55,15 +57,17 @@
               _stat('👁️','Vis.',cur.visibility+' km'),
             ]
           }},
-          // Change city
-          {type:'padding',padding:[12,0,12,12],child:{type:'row',children:[
-            {type:'expanded',child:{type:'container',
-              decoration:{color:'#1e293b',borderRadius:8,borderColor:'#334155',borderWidth:1},
-              padding:[8,8,8,8],
-              child:{type:'text',data:'📍 '+city,style:{color:'#94a3b8',fontSize:12}},
+          // City input row
+          {type:'padding',padding:[12,0,12,12],child:{type:'row',crossAxisAlignment:'center',children:[
+            {type:'expanded',child:{
+              type:'textField',
+              value: city,
+              hint: 'Enter city…',
+              onSubmit: 'submit_city',
+              onChange: 'city_input_change',
             }},
             {type:'sizedBox',width:8},
-            {type:'textButton',text:'Change',onTap:'change_city'},
+            {type:'textButton',text:'Go',onTap:'submit_city_btn'},
           ]}},
           {type:'padding',padding:[0,0,12,8],child:{
             type:'text',
@@ -87,11 +91,13 @@
   }
 
   async function handleEvent(actionId, payload) {
-    if (actionId === 'change_city') {
-      // cycle through preset cities for demo
-      var cities = ['London','New York','Tokyo','Berlin','Sydney','Moscow','Dubai'];
-      var idx = cities.indexOf(city);
-      city = cities[(idx + 1) % cities.length];
+    if (actionId === 'city_input_change') {
+      _inputCity = payload.value;
+    } else if (actionId === 'submit_city' || actionId === 'submit_city_btn') {
+      var newCity = (payload && payload.value) ? payload.value.trim() : _inputCity.trim();
+      if (!newCity) return;
+      city = newCity;
+      _inputCity = city;
       await yoloit.storage.set('city', city);
       await load();
     }
@@ -99,7 +105,7 @@
 
   yoloit.onEvent(handleEvent);
   yoloit.storage.get('city').then(function(saved) {
-    if (saved) city = saved;
+    if (saved) { city = saved; _inputCity = saved; }
     load();
     setInterval(load, 10 * 60 * 1000);
   });
