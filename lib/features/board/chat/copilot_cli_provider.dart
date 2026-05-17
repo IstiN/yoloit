@@ -265,6 +265,16 @@ class CopilotCliProvider extends ChatProvider {
     final cached = _cachedYoloitBin;
     if (cached != null && File(cached).existsSync()) return cached;
 
+    // Check the installed location first — written by CliServer on startup.
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isNotEmpty) {
+      final installed = File('$home/.config/yoloit/yoloit');
+      if (installed.existsSync()) {
+        _cachedYoloitBin = installed.path;
+        return installed.path;
+      }
+    }
+
     final roots = <Directory>[];
     void addRoot(String path) {
       if (path.isEmpty) return;

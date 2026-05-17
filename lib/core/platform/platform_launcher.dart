@@ -67,14 +67,65 @@ class MacosPlatformLauncher extends PlatformLauncher {
 
   @override
   Future<void> openTerminal(String workdir) async {
-    await _run('osascript', [
-      '-e',
-      'tell application "Terminal" to do script "cd \\"$workdir\\""',
-    ]);
+    final yoloitBin = _resolveYoloitBin(workdir);
+    // ignore: avoid_print
+    print(
+      '[PlatformLauncher] openTerminal: workdir=$workdir, '
+      'cwd=${Directory.current.path}, '
+      'resolvedExe=${Platform.resolvedExecutable}, '
+      'yoloitBin=$yoloitBin',
+    );
+    if (yoloitBin != null) {
+      final yoloitDir = File(yoloitBin).parent.path;
+      await _run('osascript', [
+        '-e',
+        'tell application "Terminal" to do script "export PATH=\\"$yoloitDir:\$PATH\\"; cd \\"$workdir\\""',
+      ]);
+    } else {
+      await _run('osascript', [
+        '-e',
+        'tell application "Terminal" to do script "cd \\"$workdir\\""',
+      ]);
+    }
     await _run('osascript', [
       '-e',
       'tell application "Terminal" to activate',
     ]);
+  }
+
+  String? _resolveYoloitBin([String? alsoSearchFrom]) {
+    // Check the installed location first — written by CliServer on startup.
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isNotEmpty) {
+      final installed = File('$home/.config/yoloit/yoloit');
+      if (installed.existsSync()) return installed.path;
+    }
+
+    final roots = <Directory>[];
+    void addRoot(String path) {
+      if (path.isEmpty) return;
+      final dir = Directory(path).absolute;
+      if (roots.any((existing) => existing.path == dir.path)) return;
+      roots.add(dir);
+    }
+
+    addRoot(Directory.current.path);
+    addRoot(File(Platform.resolvedExecutable).parent.path);
+    if (alsoSearchFrom != null) addRoot(alsoSearchFrom);
+
+    for (final root in roots) {
+      var current = root;
+      for (var depth = 0; depth < 8; depth++) {
+        final candidate = File(
+          '${current.path}${Platform.pathSeparator}tools${Platform.pathSeparator}yoloit',
+        );
+        if (candidate.existsSync()) return candidate.path;
+        final parent = current.parent;
+        if (parent.path == current.path) break;
+        current = parent;
+      }
+    }
+    return null;
   }
 }
 

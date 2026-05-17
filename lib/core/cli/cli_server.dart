@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -117,6 +118,29 @@ class CliServer {
     } catch (_) {}
     // Also write VM service URI for hot reload support
     _writeVmServiceFile();
+    // Install the CLI script to a known location so terminals can use it.
+    unawaited(_installCliScript());
+  }
+
+  /// Extracts the bundled `tools/yoloit` asset to `~/.config/yoloit/yoloit`
+  /// and makes it executable. This ensures the script is available in PATH
+  /// both when running in debug mode and when running as an installed app.
+  Future<void> _installCliScript() async {
+    try {
+      final home = Platform.environment['HOME'] ?? '';
+      if (home.isEmpty) return;
+      final binFile = File('$home/.config/yoloit/yoloit');
+      final data = await rootBundle.load('tools/yoloit');
+      binFile.parent.createSync(recursive: true);
+      await binFile.writeAsBytes(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        flush: true,
+      );
+      await Process.run('chmod', ['+x', binFile.path]);
+      debugPrint('[CliServer] CLI script installed at ${binFile.path}');
+    } catch (e) {
+      debugPrint('[CliServer] Failed to install CLI script: $e');
+    }
   }
 
   void _writeVmServiceFile() {

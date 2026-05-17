@@ -248,6 +248,13 @@ Prefer YoLoIT CLI for long-running processes:
   }
 
   String? _resolveYoloitBin() {
+    // Check the installed location first — written by CliServer on startup.
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isNotEmpty) {
+      final installed = File('$home/.config/yoloit/yoloit');
+      if (installed.existsSync()) return installed.path;
+    }
+
     final roots = <Directory>[];
     void addRoot(String path) {
       if (path.isEmpty) return;
