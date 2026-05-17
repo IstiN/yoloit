@@ -91,11 +91,10 @@ class JsWidgetEngine {
     if (rt == null || _disposed) return;
     try {
       final p = jsonEncode(payload ?? {});
+      // Support both yoloit.onEvent(fn) registration and global handleEvent
       rt.evaluate(
-        'if(typeof handleEvent==="function"){'
-        'try{handleEvent(${jsonEncode(actionId)},$p);}'
-        'catch(e){yoloit.showError(e.message||String(e));}'
-        '}',
+        'var __h=yoloit._handler||(typeof handleEvent==="function"?handleEvent:null);'
+        'if(__h){try{__h(${jsonEncode(actionId)},$p);}catch(e){yoloit.showError(e.message||String(e));}}'
       );
       rt.executePendingJob();
     } catch (e) {
@@ -284,6 +283,11 @@ var yoloit = {
   },
 
   panel:{setTitle:function(t){sendMessage('__yoloit_set_title', JSON.stringify(t));}},
+
+  // Event handler registration — called from IIFE widgets:
+  //   yoloit.onEvent(function handleEvent(actionId, payload) { ... });
+  _handler: null,
+  onEvent: function(fn){ yoloit._handler = fn; },
 
   showError:function(msg){
     yoloit.render({type:'center',child:{type:'padding',padding:[16,16,16,16],child:{

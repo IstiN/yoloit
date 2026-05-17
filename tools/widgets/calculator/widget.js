@@ -97,6 +97,7 @@
     if (actionId.startsWith('btn_')) press(actionId.slice(4));
   }
 
+  yoloit.onEvent(handleEvent);
   yoloit.panel.setTitle('Calculator');
   render();
 })();

@@ -88,6 +88,7 @@
     if (actionId === 'refresh') load();
   }
 
+  yoloit.onEvent(handleEvent);
   yoloit.panel.setTitle('Crypto Prices');
   load();
   setInterval(load, 60 * 1000);

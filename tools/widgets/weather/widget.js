@@ -97,6 +97,7 @@
     }
   }
 
+  yoloit.onEvent(handleEvent);
   yoloit.storage.get('city').then(function(saved) {
     if (saved) city = saved;
     load();

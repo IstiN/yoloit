@@ -265,10 +265,19 @@ class _PickerViewState extends State<_PickerView> {
         final m = widgets[i];
         return InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => widget.renderContext.onUpdateState({
-            ...widget.panel.state,
-            'widgetId': m.id,
-          }),
+          onTap: () {
+              final createPanel = widget.renderContext.onCreateLinkedPanel;
+              if (createPanel != null) {
+                // Open widget as a new panel on the board
+                createPanel(CustomWidgetPlugin.kTypeId, {'widgetId': m.id}, m.title);
+              } else {
+                // Fallback: replace current panel's content
+                widget.renderContext.onUpdateState({
+                  ...widget.panel.state,
+                  'widgetId': m.id,
+                });
+              }
+            },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
