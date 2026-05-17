@@ -1,0 +1,9 @@
+{
+  "id": "calculator",
+  "name": "Calculator",
+  "description": "Simple scientific calculator",
+  "version": "1.0.0",
+  "icon": "🧮",
+  "allowedCommands": [],
+  "network": false
+}

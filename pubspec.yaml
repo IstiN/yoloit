@@ -101,6 +101,14 @@ flutter:
     - assets/icon/
     - assets/prompts/
     - tools/yoloit
+    - tools/widgets/weather/manifest.json
+    - tools/widgets/weather/widget.js
+    - tools/widgets/crypto/manifest.json
+    - tools/widgets/crypto/widget.js
+    - tools/widgets/stocks/manifest.json
+    - tools/widgets/stocks/widget.js
+    - tools/widgets/calculator/manifest.json
+    - tools/widgets/calculator/widget.js
 
   fonts:
     - family: JetBrainsMono

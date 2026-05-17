@@ -1,0 +1,9 @@
+{
+  "id": "weather",
+  "name": "Weather",
+  "description": "Current weather for any city using wttr.in",
+  "version": "1.0.0",
+  "icon": "🌤️",
+  "allowedCommands": [],
+  "network": true
+}

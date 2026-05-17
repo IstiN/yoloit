@@ -1,0 +1,9 @@
+{
+  "id": "crypto",
+  "name": "Crypto Prices",
+  "description": "Live BTC, ETH, SOL prices via CoinGecko",
+  "version": "1.0.0",
+  "icon": "₿",
+  "allowedCommands": [],
+  "network": true
+}

@@ -1,0 +1,9 @@
+{
+  "id": "stocks",
+  "name": "Stock Prices",
+  "description": "Real-time stock quotes",
+  "version": "1.0.0",
+  "icon": "📈",
+  "allowedCommands": [],
+  "network": true
+}

@@ -18,6 +18,7 @@ import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
@@ -217,6 +218,19 @@ class CliServer {
       return _handleYoloChat(method, path.sublist(1), request, cubit);
     }
 
+    // GET /api/active-board → active board details (or first board)
+    if (path.length == 1 && path[0] == 'active-board' && method == 'GET') {
+      final board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
+      if (board == null) return _json({'board': null});
+      return _json({
+        'board': {
+          'id': board.id,
+          'name': board.name,
+          'panelCount': board.panels.length,
+        },
+      });
+    }
+
     // GET /api/boards
     if (path.length == 1 && path[0] == 'boards' && method == 'GET') {
       return _listBoards(cubit);
@@ -235,6 +249,11 @@ class CliServer {
 
       final sub = path.sublist(2);
       return _handleBoard(method, sub, board, cubit, request);
+    }
+
+    // /api/widgets
+    if (path.isNotEmpty && path[0] == 'widgets') {
+      return _handleWidgets(method, path.sublist(1), request);
     }
 
     return _notFound('Unknown route');
@@ -2480,5 +2499,51 @@ class CliServer {
     final v = named[s.toLowerCase()];
     if (v != null) return Color(v);
     return Colors.blue;
+  }
+
+  // ── Widget routes ──────────────────────────────────────────────────────────
+
+  Future<shelf.Response> _handleWidgets(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+  ) async {
+    final registry = WidgetRegistryService.instance;
+
+    // GET /api/widgets — list all installed widgets
+    if (sub.isEmpty && method == 'GET') {
+      final widgets = await registry.loadAll();
+      return _json({
+        'widgets': widgets.map((m) => m.toJson()).toList(),
+      });
+    }
+
+    // POST /api/widgets/install  { path: "..." }
+    if (sub.length == 1 && sub[0] == 'install' && method == 'POST') {
+      final body = await _body(request);
+      final srcPath = body['path'] as String?;
+      if (srcPath == null || srcPath.trim().isEmpty) {
+        return _error('Missing "path" field');
+      }
+      final manifest = await registry.install(srcPath.trim());
+      if (manifest == null) return _error('Failed to install widget from: $srcPath');
+      return _json({'ok': true, 'widget': manifest.toJson()});
+    }
+
+    // DELETE /api/widgets/:id
+    if (sub.length == 1 && method == 'DELETE') {
+      final id = sub[0];
+      final removed = await registry.remove(id);
+      return _json({'ok': removed, 'id': id});
+    }
+
+    // GET /api/widgets/:id — single widget details
+    if (sub.length == 1 && method == 'GET') {
+      final manifest = await registry.find(sub[0]);
+      if (manifest == null) return _notFound('Widget not found: ${sub[0]}');
+      return _json({'widget': manifest.toJson()});
+    }
+
+    return _notFound('Unknown widget route');
   }
 }

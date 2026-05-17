@@ -696,6 +696,47 @@ commands = [
     "params": [["duration", "Duration in seconds (default 300)", False], ["--label", "Timer label text", False], ["--start", "Start timer immediately", False]],
     "example": "yoloit timer:create 600 --label \"Pomodoro\" --start",
   },
+  # ── Widget commands ────────────────────────────────────────────────────────
+  {
+    "group": "widget",
+    "name": "widget:list",
+    "description": "List installed custom widgets",
+    "params": [],
+    "example": "yoloit widget:list",
+    "aliases": ["wg:ls"],
+  },
+  {
+    "group": "widget",
+    "name": "widget:install",
+    "description": "Install a widget from a local directory or .js file",
+    "params": [["path", "Path to widget directory or .js file", True]],
+    "example": "yoloit widget:install ~/widgets/my-widget",
+    "aliases": ["wg:i"],
+  },
+  {
+    "group": "widget",
+    "name": "widget:remove",
+    "description": "Remove an installed widget by id",
+    "params": [["id", "Widget id", True]],
+    "example": "yoloit widget:remove weather",
+    "aliases": ["wg:rm"],
+  },
+  {
+    "group": "widget",
+    "name": "widget:open",
+    "description": "Open a widget in a new panel on a board",
+    "params": [["id", "Widget id", True], ["[board]", "Board name (optional)", False], ["[panel-title]", "Panel title (optional)", False]],
+    "example": "yoloit widget:open crypto",
+    "aliases": ["wg:o"],
+  },
+  {
+    "group": "widget",
+    "name": "widget:create",
+    "description": "Scaffold a new custom widget in the widgets directory",
+    "params": [["name", "Widget id/name", True], ["--template", "Template: basic|network|yoloit (default: basic)", False]],
+    "example": "yoloit widget:create my-widget --template network",
+    "aliases": ["wg:new"],
+  },
 ]
 
 # ── Registry: namespace prefixes (one definition per namespace) ───────
@@ -718,6 +759,7 @@ NAMESPACE_PREFIXES = {
     "kanban":    "k",
     "playlist":  "pl",
     "webpage":   "w",
+    "widget":    "wg",
 }
 
 # Only these namespaces get automatically generated short aliases.
@@ -1928,6 +1970,107 @@ PY
     [[ $# -lt 3 ]] && { echo "Usage: yoloit board:translate <board> <x> <y>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"
     _put "/boards/${bid}/viewport" "{\"x\":$2,\"y\":$3}" | python3 -m json.tool 2>/dev/null
+    ;;
+
+  # ── widget commands ────────────────────────────────────────────────────────
+  widget:list|wg:ls)
+    _get "/widgets" | python3 -m json.tool 2>/dev/null
+    ;;
+  widget:install|wg:i)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:install <path>" >&2; exit 1; }
+    _post "/widgets/install" "{\"path\":\"$1\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  widget:remove|wg:rm)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:remove <id>" >&2; exit 1; }
+    _delete "/widgets/$(_encode "$1")" | python3 -m json.tool 2>/dev/null
+    ;;
+  widget:open|wg:o)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:open <id> [board] [panel-title]" >&2; exit 1; }
+    widget_id="$1"; shift
+    board_arg="${1:-}"; panel_arg="${2:-${widget_id} Widget}"
+    bid=$(_require_board "$board_arg")
+    panel_json=$(_smart_panel "$bid" "$panel_arg" "board.widget.custom")
+    panel_id=$(echo "$panel_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('panel',d).get('id','') if isinstance(d.get('panel',d),dict) else '')" 2>/dev/null)
+    _post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  widget:create|wg:new)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:create <name> [--template basic|network|yoloit]" >&2; exit 1; }
+    widget_name="$1"; shift
+    template="basic"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --template) template="$2"; shift 2 ;; *) shift ;; esac
+    done
+    widget_dir="${HOME}/.config/yoloit/widgets/${widget_name}"
+    mkdir -p "$widget_dir"
+    cat > "${widget_dir}/manifest.json" <<EOF
+{
+  "id": "${widget_name}",
+  "name": "$(python3 -c "import sys; print(' '.join(w.capitalize() for w in '${widget_name}'.replace('-',' ').replace('_',' ').split()))")",
+  "description": "Custom widget",
+  "version": "1.0.0",
+  "icon": "🔧",
+  "allowedCommands": [],
+  "network": true
+}
+EOF
+    case "$template" in
+      network)
+        cat > "${widget_dir}/widget.js" <<'JSEOF'
+// Network widget template
+(function() {
+  const app = document.getElementById('app');
+  async function load() {
+    app.innerHTML = '<div style="padding:16px;color:#94a3b8">Loading…</div>';
+    try {
+      const data = await yoloit.fetchJson('https://httpbin.org/json');
+      app.innerHTML = '<pre style="padding:12px;color:#e2e8f0;font-size:11px;overflow:auto">'
+        + JSON.stringify(data, null, 2) + '</pre>';
+    } catch(e) {
+      yoloit.showError(e.message);
+    }
+  }
+  load();
+  setInterval(load, 30000);
+})();
+JSEOF
+        ;;
+      yoloit)
+        cat > "${widget_dir}/widget.js" <<'JSEOF'
+// Yoloit CLI widget template
+(function() {
+  const app = document.getElementById('app');
+  async function load() {
+    app.innerHTML = '<div style="padding:16px;color:#94a3b8">Loading boards…</div>';
+    try {
+      const data = await yoloit.cli('boards');
+      app.innerHTML = '<pre style="padding:12px;color:#e2e8f0;font-size:11px;overflow:auto">'
+        + JSON.stringify(data, null, 2) + '</pre>';
+    } catch(e) {
+      yoloit.showError(e.message);
+    }
+  }
+  load();
+})();
+JSEOF
+        ;;
+      *)
+        cat > "${widget_dir}/widget.js" <<'JSEOF'
+// Basic widget template
+(function() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="padding:24px;text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">🔧</div>
+      <div style="font-size:16px;font-weight:600;color:#e2e8f0;margin-bottom:8px">My Widget</div>
+      <div style="font-size:13px;color:#94a3b8">Edit widget.js to customize</div>
+    </div>`;
+})();
+JSEOF
+        ;;
+    esac
+    echo "✅ Widget '${widget_name}' created at ${widget_dir}"
+    echo "   Edit: ${widget_dir}/widget.js"
+    echo "   Open: yoloit widget:open ${widget_name}"
     ;;
 
   # ── help ──

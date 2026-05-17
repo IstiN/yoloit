@@ -18,6 +18,7 @@ import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
 import 'package:yoloit/core/cli/handlers/assistant_handler.dart';
 import 'package:yoloit/core/cli/handlers/timer_handler.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
+import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -754,6 +755,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const FileTreeCliHandler());
     server.registerPanelHandler(const AssistantCliHandler());
     server.registerPanelHandler(const TimerCliHandler());
+    server.registerPanelHandler(const CustomWidgetCliHandler());
     server.start(cubit);
   }
 

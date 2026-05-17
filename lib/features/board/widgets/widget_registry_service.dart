@@ -1,0 +1,146 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:yoloit/features/board/widgets/widget_manifest.dart';
+
+/// Discovers and manages custom JS widgets installed in
+/// `~/.config/yoloit/widgets/`.
+///
+/// On first run the service copies the bundled example widgets from Flutter
+/// assets (`tools/widgets/`) into the user's widget directory.
+class WidgetRegistryService {
+  WidgetRegistryService._();
+  static final instance = WidgetRegistryService._();
+
+  List<WidgetManifest>? _cache;
+
+  String get widgetsDir {
+    final home = Platform.environment['HOME'] ?? '';
+    return '$home/.config/yoloit/widgets';
+  }
+
+  /// Returns all installed widgets, scanning the widgets directory.
+  /// Results are cached until [invalidate] is called.
+  Future<List<WidgetManifest>> loadAll() async {
+    if (_cache != null) return _cache!;
+    await _ensureExamplesInstalled();
+    _cache = await _scan();
+    return _cache!;
+  }
+
+  /// Find a widget by id.
+  Future<WidgetManifest?> find(String id) async {
+    final all = await loadAll();
+    for (final m in all) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  /// Clears the in-memory cache so the next [loadAll] re-scans.
+  void invalidate() => _cache = null;
+
+  /// Install a widget from a local directory or .js file path.
+  /// Returns the installed manifest on success.
+  Future<WidgetManifest?> install(String sourcePath) async {
+    final source = FileSystemEntity.typeSync(sourcePath);
+    final destDir = Directory(widgetsDir);
+    if (!destDir.existsSync()) destDir.createSync(recursive: true);
+
+    if (source == FileSystemEntityType.directory) {
+      final dir = Directory(sourcePath);
+      final name = dir.path.split(Platform.pathSeparator).last;
+      final dest = Directory('${destDir.path}${Platform.pathSeparator}$name');
+      if (dest.existsSync()) dest.deleteSync(recursive: true);
+      await _copyDir(dir, dest);
+      invalidate();
+      return WidgetManifest.fromDirectory(dest);
+    } else if (source == FileSystemEntityType.file &&
+        sourcePath.endsWith('.js')) {
+      final file = File(sourcePath);
+      final name = file.path.split(Platform.pathSeparator).last;
+      final dest = File('${destDir.path}${Platform.pathSeparator}$name');
+      await file.copy(dest.path);
+      invalidate();
+      return WidgetManifest.fromJsFile(dest);
+    }
+    return null;
+  }
+
+  /// Remove a widget by id.
+  Future<bool> remove(String id) async {
+    final manifest = await find(id);
+    if (manifest == null) return false;
+    if (manifest.isSingleFile) {
+      await File(manifest.widgetPath).delete();
+    } else {
+      await Directory(manifest.widgetPath).delete(recursive: true);
+    }
+    invalidate();
+    return true;
+  }
+
+  // ── Internals ─────────────────────────────────────────────────────────────
+
+  Future<List<WidgetManifest>> _scan() async {
+    final dir = Directory(widgetsDir);
+    if (!await dir.exists()) return [];
+
+    final results = <WidgetManifest>[];
+    await for (final entity in dir.list()) {
+      if (entity is Directory) {
+        final m = await WidgetManifest.fromDirectory(entity);
+        if (m != null) results.add(m);
+      } else if (entity is File && entity.path.endsWith('.js')) {
+        results.add(WidgetManifest.fromJsFile(entity));
+      }
+    }
+    results.sort((a, b) => a.name.compareTo(b.name));
+    return results;
+  }
+
+  /// Copy bundled example widgets from Flutter assets on first run.
+  Future<void> _ensureExamplesInstalled() async {
+    final destDir = Directory(widgetsDir);
+    if (!destDir.existsSync()) {
+      destDir.createSync(recursive: true);
+    }
+
+    // Copy each bundled example widget if not already present.
+    const examples = ['weather', 'crypto', 'stocks', 'calculator'];
+    for (final name in examples) {
+      final dest = Directory(
+        '${destDir.path}${Platform.pathSeparator}$name',
+      );
+      if (dest.existsSync()) continue; // already installed
+      dest.createSync(recursive: true);
+      for (final filename in ['manifest.json', 'widget.js']) {
+        try {
+          final assetKey = 'tools/widgets/$name/$filename';
+          final data = await rootBundle.load(assetKey);
+          final bytes = data.buffer.asUint8List();
+          await File(
+            '${dest.path}${Platform.pathSeparator}$filename',
+          ).writeAsBytes(bytes);
+        } catch (_) {
+          // Asset not bundled — skip silently.
+        }
+      }
+    }
+  }
+
+  Future<void> _copyDir(Directory src, Directory dest) async {
+    dest.createSync(recursive: true);
+    await for (final entity in src.list()) {
+      final name = entity.path.split(Platform.pathSeparator).last;
+      if (entity is Directory) {
+        await _copyDir(
+          entity,
+          Directory('${dest.path}${Platform.pathSeparator}$name'),
+        );
+      } else if (entity is File) {
+        await entity.copy('${dest.path}${Platform.pathSeparator}$name');
+      }
+    }
+  }
+}
