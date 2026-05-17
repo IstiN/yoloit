@@ -6,6 +6,9 @@ class WidgetAppRegistry {
   static final instance = WidgetAppRegistry._();
   WidgetAppRegistry._();
 
+  /// Creates an isolated instance for unit testing.
+  factory WidgetAppRegistry.testInstance() => WidgetAppRegistry._();
+
   final Map<String, _WidgetAppEntry> _entries = {};
 
   void register(String widgetId, JsWidgetEngine engine, Map<String, dynamic>? tree) {

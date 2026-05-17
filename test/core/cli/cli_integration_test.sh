@@ -298,7 +298,103 @@ fi
 
 echo ""
 
-# ── 5. Cleanup ────────────────────────────────────────────────────────
+# ── 5. Widget App Commands ─────────────────────────────────────────────
+
+echo "── Widget App Commands ──"
+
+# GET /api/apps — list widgets
+APPS_JSON=$(_get "/apps")
+_assert_json_field "$APPS_JSON" "ok" "True" "GET /api/apps returns ok=true" || true
+# apps key should be a list (may be empty if no widgets installed yet)
+HAS_APPS=$(echo "$APPS_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print('yes' if isinstance(d.get('apps'), list) else 'no')" 2>/dev/null || echo "no")
+if [[ "$HAS_APPS" == "yes" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ GET /api/apps returns apps list"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ GET /api/apps: apps key not a list\n"
+  echo "  ❌ GET /api/apps: apps key not a list"
+fi
+
+# GET /api/apps — activeIds key present
+HAS_ACTIVE=$(echo "$APPS_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print('yes' if 'activeIds' in d else 'no')" 2>/dev/null || echo "no")
+if [[ "$HAS_ACTIVE" == "yes" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ GET /api/apps includes activeIds"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ GET /api/apps: missing activeIds key\n"
+  echo "  ❌ GET /api/apps: missing activeIds key"
+fi
+
+# POST /api/apps/nonexistent/reload — should return ok=false (not crash)
+RELOAD_JSON=$(_post "/apps/$(_encode "__no_such_widget__")/reload" '{}' || echo '{"ok":false,"message":"curl_error"}')
+RELOAD_OK=$(echo "$RELOAD_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('ok','__MISSING__'))" 2>/dev/null || echo "__ERROR__")
+if [[ "$RELOAD_OK" == "False" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ POST /api/apps/nonexistent/reload returns ok=false"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ reload nonexistent: expected ok=false, got '$RELOAD_OK'\n"
+  echo "  ❌ reload nonexistent: expected ok=false, got '$RELOAD_OK'"
+fi
+
+# GET /api/apps/nonexistent/snapshot — should return ok=false
+SNAP_JSON=$(_get "/apps/$(_encode "__no_such_widget__")/snapshot" || echo '{"ok":false}')
+SNAP_OK=$(echo "$SNAP_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('ok','__MISSING__'))" 2>/dev/null || echo "__ERROR__")
+if [[ "$SNAP_OK" == "False" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ GET /api/apps/nonexistent/snapshot returns ok=false"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ snapshot nonexistent: expected ok=false, got '$SNAP_OK'\n"
+  echo "  ❌ snapshot nonexistent: expected ok=false, got '$SNAP_OK'"
+fi
+
+# POST /api/apps/nonexistent/execute — should return ok=false
+EXEC_JSON=$(_post "/apps/$(_encode "__no_such_widget__")/execute" '{"action":"test"}' || echo '{"ok":false}')
+EXEC_OK=$(echo "$EXEC_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('ok','__MISSING__'))" 2>/dev/null || echo "__ERROR__")
+if [[ "$EXEC_OK" == "False" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ POST /api/apps/nonexistent/execute returns ok=false"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ execute nonexistent: expected ok=false, got '$EXEC_OK'\n"
+  echo "  ❌ execute nonexistent: expected ok=false, got '$EXEC_OK'"
+fi
+
+# POST /api/apps/nonexistent/execute — missing action field
+EXEC2_JSON=$(_post "/apps/$(_encode "__no_such_widget__")/execute" '{}' || echo '{"ok":false}')
+EXEC2_OK=$(echo "$EXEC2_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('ok','__MISSING__'))" 2>/dev/null || echo "__ERROR__")
+if [[ "$EXEC2_OK" == "False" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ POST /api/apps/execute without action returns ok=false"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ execute without action: expected ok=false, got '$EXEC2_OK'\n"
+  echo "  ❌ execute without action: expected ok=false, got '$EXEC2_OK'"
+fi
+
+# If a widget is currently running, test reload on it
+ACTIVE_ID=$(echo "$APPS_JSON" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+ids=d.get('activeIds',[])
+print(ids[0] if ids else '')
+" 2>/dev/null || echo "")
+
+if [[ -n "$ACTIVE_ID" ]]; then
+  echo "  ℹ️  Active widget found: $ACTIVE_ID — testing live reload"
+
+  # Snapshot should return a tree
+  SNAP2=$(_get "/apps/$(_encode "$ACTIVE_ID")/snapshot")
+  _assert_json_field "$SNAP2" "ok" "True" "GET /api/apps/$ACTIVE_ID/snapshot returns ok"
+
+  TREE=$(echo "$SNAP2" | python3 -c "import json,sys; d=json.load(sys.stdin); print('yes' if d.get('tree') else 'no')" 2>/dev/null || echo "no")
+  if [[ "$TREE" == "yes" ]]; then
+    PASS=$((PASS+1)); echo "  ✅ snapshot includes render tree"
+  else
+    FAIL=$((FAIL+1)); ERRORS+="  ❌ snapshot missing tree for active widget\n"; echo "  ❌ snapshot missing tree"
+  fi
+
+  # Reload should succeed
+  RELOAD2=$(_post "/apps/$(_encode "$ACTIVE_ID")/reload" '{}')
+  _assert_json_field "$RELOAD2" "ok" "True" "POST /api/apps/$ACTIVE_ID/reload returns ok"
+else
+  echo "  ⚠️  No active widget — skipping live reload/snapshot tests (open a widget first)"
+fi
+
+echo ""
+
+# ── 6. Cleanup ────────────────────────────────────────────────────────
 
 echo "── Cleanup ──"
 
