@@ -35,96 +35,51 @@ class MicrophonePermissionPlugin: NSObject, FlutterPlugin {
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "status":
-      result(currentMicrophoneStatusString())
-    case "bundleIdentifier":
-      result(Bundle.main.bundleIdentifier ?? "unknown")
-    case "displayName":
-      let displayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
-      let bundleName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
-      result(displayName ?? bundleName ?? ProcessInfo.processInfo.processName)
+      result(microphoneStatusString())
+    case "request":
+      requestMicrophonePermission(result: result)
     case "openSettings":
       if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
         result(NSWorkspace.shared.open(url))
       } else {
         result(false)
       }
-    case "request":
-      requestMicrophonePermission(result: result)
+    case "bundleIdentifier":
+      result(Bundle.main.bundleIdentifier)
+    case "displayName":
+      let name = Bundle.main.localizedInfoDictionary?["CFBundleDisplayName"] as? String
+        ?? Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
+        ?? "YoLoIT"
+      result(name)
     default:
       result(FlutterMethodNotImplemented)
     }
   }
 
-  private func currentMicrophoneStatusString() -> String {
-    if #available(macOS 14.0, *) {
-      return statusString(AVAudioApplication.shared.recordPermission)
+  private func microphoneStatusString() -> String {
+    let s = AVCaptureDevice.authorizationStatus(for: .audio)
+    switch s {
+    case .authorized: return "authorized"
+    case .denied: return "denied"
+    case .restricted: return "restricted"
+    case .notDetermined: return "notDetermined"
+    @unknown default: return "unknown"
     }
-    return statusString(AVCaptureDevice.authorizationStatus(for: .audio))
   }
 
   private func requestMicrophonePermission(result: @escaping FlutterResult) {
-    if #available(macOS 14.0, *) {
-      switch AVAudioApplication.shared.recordPermission {
-      case .granted:
-        result(true)
-      case .undetermined:
-        Task {
-          let granted = await AVAudioApplication.requestRecordPermission()
-          DispatchQueue.main.async {
-            result(granted)
-          }
-        }
-      case .denied:
-        result(false)
-      @unknown default:
-        result(false)
-      }
-      return
-    }
-
-    let status = AVCaptureDevice.authorizationStatus(for: .audio)
-    switch status {
+    let s = AVCaptureDevice.authorizationStatus(for: .audio)
+    switch s {
     case .authorized:
       result(true)
     case .notDetermined:
       AVCaptureDevice.requestAccess(for: .audio) { granted in
-        DispatchQueue.main.async {
-          result(granted)
-        }
+        DispatchQueue.main.async { result(granted) }
       }
     case .denied, .restricted:
       result(false)
     @unknown default:
       result(false)
-    }
-  }
-
-  @available(macOS 14.0, *)
-  private func statusString(_ status: AVAudioApplication.recordPermission) -> String {
-    switch status {
-    case .granted:
-      return "authorized"
-    case .denied:
-      return "denied"
-    case .undetermined:
-      return "notDetermined"
-    @unknown default:
-      return "unknown"
-    }
-  }
-
-  private func statusString(_ status: AVAuthorizationStatus) -> String {
-    switch status {
-    case .authorized:
-      return "authorized"
-    case .denied:
-      return "denied"
-    case .restricted:
-      return "restricted"
-    case .notDetermined:
-      return "notDetermined"
-    @unknown default:
-      return "unknown"
     }
   }
 }

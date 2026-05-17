@@ -65,6 +65,13 @@ abstract class ChatProvider {
   /// Whether a session is currently running.
   bool isRunning(String sessionName);
 
+  /// Set the external session ID for resume (used by providers that need
+  /// to track session IDs across widget rebuilds). No-op by default.
+  void setSessionId(String sessionName, String sessionId) {}
+
+  /// Get the external session ID for resume. Returns null if not set.
+  String? getSessionId(String sessionName) => null;
+
   /// Dispose all resources.
   void dispose();
 }

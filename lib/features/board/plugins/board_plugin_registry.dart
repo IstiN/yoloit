@@ -11,6 +11,7 @@ import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart'
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/run_configs_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/timer_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 
@@ -73,6 +74,7 @@ class BoardPluginRegistry {
     register(const BoardTerminalPanelPlugin());
     register(const FileTreePlugin());
     register(const YoloAssistantPlugin());
+    register(const TimerPlugin());
   }
 }
 

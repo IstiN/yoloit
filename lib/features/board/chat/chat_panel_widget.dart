@@ -29,6 +29,23 @@ import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 import 'package:yoloit/ui/widgets/ui_components.dart';
 
+/// Slash command definition for the chat input bar.
+class _SlashCommand {
+  const _SlashCommand({
+    required this.id,
+    required this.displayName,
+    required this.description,
+    required this.triggers,
+  });
+
+  final String id;
+  final String displayName;
+  final String description;
+  final List<String> triggers;
+
+  bool matches(String text) => triggers.any(text.startsWith);
+}
+
 /// The chat UI rendered inside a board panel.
 ///
 /// Manages its own [ChatProvider] instance, message list, and streaming state.
@@ -67,6 +84,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   final _inputFocusNode = FocusNode();
   late AnimationController _glowCtrl;
 
+  final _modelScrollCtrl = ScrollController();
+  String _modelQuery = '';
+  int _modelSelectedIndex = 0;
+
   late ChatProvider _provider;
   late ChatSessionConfig _config;
 
@@ -79,6 +100,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   ChatTokenUsage? _lastUsage;
   int _totalOutputTokens = 0;
   StreamSubscription<ChatEvent>? _eventSub;
+
+  /// Persisted opencode session ID (survives widget rebuilds).
+  String? _opencodeSessionId;
 
   /// Notifier for panel border animation.
   final ValueNotifier<bool> processingNotifier = ValueNotifier(false);
@@ -102,6 +126,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _handleIgnoredToolsChanged,
     );
     _provider = _providerForId(_config.provider);
+    // Restore sessionID for opencode
+    if (_config.provider == 'opencode' && _opencodeSessionId != null) {
+      _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
+    }
     _glowCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -137,6 +165,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           if (nextConfig.provider != _config.provider) {
             _provider.dispose();
             _provider = _providerForId(nextConfig.provider);
+            // Restore sessionID for new provider
+            if (nextConfig.provider == 'opencode' &&
+                _opencodeSessionId != null) {
+              _provider.setSessionId(
+                nextConfig.sessionName,
+                _opencodeSessionId!,
+              );
+            }
           }
           _config = nextConfig;
         });
@@ -207,6 +243,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         Map<String, dynamic>.from(savedUsage),
       );
     }
+    // Restore opencode session ID
+    if (_config.provider == 'opencode') {
+      final savedSessionId = widget.panel.state['opencodeSessionId'];
+      if (savedSessionId is String && savedSessionId.isNotEmpty) {
+        _opencodeSessionId = savedSessionId;
+      }
+    }
   }
 
   static const _maxSavedMessages = 100;
@@ -250,6 +293,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
+    _modelScrollCtrl.dispose();
     _glowCtrl.dispose();
     unawaited(_micRecorder.dispose());
     ChatPanelWidget.processingNotifiers.remove(widget.panel.id);
@@ -571,6 +615,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       },
       onDone: () {
         _isSending = false;
+        // Persist opencode session ID after first message completes
+        if (_config.provider == 'opencode') {
+          final sid = _provider.getSessionId(_config.sessionName);
+          if (sid != null && sid != _opencodeSessionId) {
+            _opencodeSessionId = sid;
+            widget.onUpdateState({
+              ...widget.panel.state,
+              'opencodeSessionId': sid,
+            });
+          }
+        }
         setState(() {
           _setProcessing(false);
           // Finalize any streaming message
@@ -1491,6 +1546,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ),
             const SizedBox(height: 8),
           ],
+          if (_isPlainSlash) ...[
+            _buildSlashChips(colors),
+            const SizedBox(height: 8),
+          ],
+          if (_isModelSlash) ...[
+            _buildModelSuggestions(colors),
+            const SizedBox(height: 8),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1546,19 +1609,96 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               Expanded(
                 child: Focus(
                   onKeyEvent: (node, event) {
-                    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                    if (event is! KeyDownEvent) {
+                      return KeyEventResult.ignored;
+                    }
+
+                    if (_isModelSlash) {
+                      final isUp = event.logicalKey ==
+                          LogicalKeyboardKey.arrowUp;
+                      final isDown = event.logicalKey ==
+                          LogicalKeyboardKey.arrowDown;
+                      final isEnter =
+                          event.logicalKey ==
+                                  LogicalKeyboardKey.enter ||
+                              event.logicalKey ==
+                                  LogicalKeyboardKey.numpadEnter;
+                      final isEscape =
+                          event.logicalKey ==
+                              LogicalKeyboardKey.escape;
+                      final isTab = event.logicalKey ==
+                          LogicalKeyboardKey.tab;
+
+                      if (isTab && _filteredModels.isNotEmpty) {
+                        // Tab: select highlighted model
+                        _selectModelFromSlash(
+                          _filteredModels[_modelSelectedIndex].id,
+                        );
+                        return KeyEventResult.handled;
+                      }
+
+                      if (isUp || isDown) {
+                        final delta = isDown ? 1 : -1;
+                        final next = (_modelSelectedIndex + delta)
+                            .clamp(0, _filteredModels.length - 1);
+                        if (next == _modelSelectedIndex) {
+                          return KeyEventResult.handled;
+                        }
+                        setState(() {
+                          _modelSelectedIndex = next;
+                        });
+                        WidgetsBinding.instance.addPostFrameCallback(
+                          (_) => _scrollToModelSelection(),
+                        );
+                        return KeyEventResult.handled;
+                      }
+
+                      if (isEnter &&
+                          !HardwareKeyboard.instance.isShiftPressed &&
+                          _filteredModels.isNotEmpty) {
+                        _selectModelFromSlash(
+                          _filteredModels[_modelSelectedIndex].id,
+                        );
+                        return KeyEventResult.handled;
+                      }
+
+                      if (isEscape) {
+                        _hideModelSlash();
+                        return KeyEventResult.handled;
+                      }
+                    }
+
+                    if (_isPlainSlash) {
+                      final isTab = event.logicalKey ==
+                          LogicalKeyboardKey.tab;
+                      if (isTab) {
+                        _autoCompleteSlash();
+                        return KeyEventResult.handled;
+                      }
+                      if (event.logicalKey == LogicalKeyboardKey.escape) {
+                        _hideModelSlash();
+                        return KeyEventResult.handled;
+                      }
+                    }
+
                     // Enter (without Shift) → send
                     final isEnter =
-                        event.logicalKey == LogicalKeyboardKey.enter ||
-                        event.logicalKey == LogicalKeyboardKey.numpadEnter;
-                    if (isEnter && !HardwareKeyboard.instance.isShiftPressed) {
+                        event.logicalKey ==
+                                LogicalKeyboardKey.enter ||
+                            event.logicalKey ==
+                                LogicalKeyboardKey.numpadEnter;
+                    if (isEnter &&
+                        !HardwareKeyboard.instance.isShiftPressed) {
                       _sendMessage();
                       return KeyEventResult.handled;
                     }
-                    // Cmd+V (macOS) or Ctrl+V → smart paste — intercept fully
-                    final isCmd = HardwareKeyboard.instance.isMetaPressed;
-                    final isCtrl = HardwareKeyboard.instance.isControlPressed;
-                    if (event.logicalKey == LogicalKeyboardKey.keyV &&
+                    // Cmd+V (macOS) or Ctrl+V → smart paste
+                    final isCmd =
+                        HardwareKeyboard.instance.isMetaPressed;
+                    final isCtrl =
+                        HardwareKeyboard.instance.isControlPressed;
+                    if (event.logicalKey ==
+                            LogicalKeyboardKey.keyV &&
                         (isCmd || isCtrl)) {
                       _handleSmartPaste();
                       return KeyEventResult.handled;
@@ -1568,14 +1708,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   child: TextField(
                     controller: _inputController,
                     focusNode: _inputFocusNode,
+                    onChanged: _onInputChanged,
                     style: TextStyle(
                       fontSize: 13,
                       color: textColor,
                       height: 1.4,
                     ),
                     decoration: InputDecoration(
-                      hintText: _isProcessing ? 'Agent working…' : 'Message…',
-                      hintStyle: TextStyle(fontSize: 13, color: hintColor),
+                      hintText: _isProcessing
+                          ? 'Agent working…'
+                          : 'Message…',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: hintColor,
+                      ),
                       filled: true,
                       fillColor: colors.surfaceElevated,
                       border: OutlineInputBorder(
@@ -2036,6 +2182,283 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     });
   }
 
+  List<ChatModelInfo> get _filteredModels {
+    final models = _provider.availableModels;
+    if (_modelQuery.isEmpty) return models;
+    final q = _modelQuery.toLowerCase();
+    return models.where((m) =>
+      m.displayName.toLowerCase().contains(q) ||
+      m.id.toLowerCase().contains(q)
+    ).toList();
+  }
+
+  static const _slashCommands = [
+    _SlashCommand(
+      id: 'model',
+      displayName: 'model',
+      description: 'Switch AI model',
+      triggers: ['/model', '.model'],
+    ),
+  ];
+
+  _SlashCommand? _findMatchingCommand(String text) {
+    for (final c in _slashCommands) {
+      if (c.matches(text)) return c;
+    }
+    return null;
+  }
+
+  void _onInputChanged(String value) {
+    final cmd = _findMatchingCommand(value);
+    final needsScroll = value.startsWith('/') || value.startsWith('.');
+    setState(() {
+      if (cmd != null) {
+        final trigger = cmd.triggers.firstWhere(value.startsWith);
+        _modelQuery = value.length > trigger.length
+            ? value.substring(trigger.length).trimLeft()
+            : '';
+        _modelSelectedIndex = 0;
+        _isModelSlash = cmd.id == 'model';
+      } else {
+        _modelQuery = '';
+        _isModelSlash = false;
+      }
+    });
+    if (needsScroll) _ensureSuggestionsVisible();
+  }
+
+  bool _isModelSlash = false;
+
+  bool get _isPlainSlash {
+    final t = _inputController.text;
+    return (t.startsWith('/') || t.startsWith('.')) && !_isModelSlash;
+  }
+
+  double _suggestionHeight(int count) {
+    if (count == 0) return 40;
+    return (count * 32.0 + 8).clamp(0, 280);
+  }
+
+  void _ensureSuggestionsVisible() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _scrollToModelSelection() {
+    if (!_modelScrollCtrl.hasClients) return;
+    final target = 4.0 + _modelSelectedIndex * 32.0;
+    final viewport = _modelScrollCtrl.position.viewportDimension;
+    final currentScroll = _modelScrollCtrl.offset;
+    if (target < currentScroll || target + 32 > currentScroll + viewport) {
+      _modelScrollCtrl.animateTo(
+        target,
+        duration: const Duration(milliseconds: 80),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  List<_SlashCommand> get _filteredSlashCommands {
+    final text = _inputController.text;
+    if (text.length <= 1) return _slashCommands;
+    final query = text.substring(1).toLowerCase();
+    return _slashCommands.where((cmd) {
+      return cmd.displayName.toLowerCase().startsWith(query) ||
+          cmd.triggers.any((t) => t.substring(1).toLowerCase().startsWith(query));
+    }).toList();
+  }
+
+  void _autoCompleteSlash() {
+    final filtered = _filteredSlashCommands;
+    if (filtered.isEmpty) return;
+    final cmd = filtered.first;
+    setState(() {
+      _inputController.text = '${cmd.triggers.first} ';
+      _inputController.selection = TextSelection.collapsed(
+        offset: _inputController.text.length,
+      );
+      if (cmd.id == 'model') {
+        _isModelSlash = true;
+        _modelQuery = '';
+        _modelSelectedIndex = 0;
+      }
+    });
+  }
+
+  void _hideModelSlash() {
+    setState(() {
+      _isModelSlash = false;
+      _modelQuery = '';
+    });
+  }
+
+  void _clearModelSlash() {
+    _inputController.clear();
+  }
+
+  Widget _buildSlashChips(AppColorScheme colors) {
+    final commands = _filteredSlashCommands;
+    if (commands.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: commands.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, i) {
+          final cmd = commands[i];
+          final isActive = i == 0;
+          return GestureDetector(
+            onTap: () {
+              _inputController.text = '${cmd.triggers.first} ';
+              _inputController.selection = TextSelection.collapsed(
+                offset: _inputController.text.length,
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? colors.terminalPrompt.withValues(alpha: 0.2)
+                    : colors.surfaceElevated,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isActive
+                      ? colors.terminalPrompt.withValues(alpha: 0.5)
+                      : colors.border,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    cmd.displayName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    cmd.description,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _selectModelFromSlash(String modelId) {
+    if (modelId != _config.model) {
+      setState(() {
+        _config = _config.copyWith(model: modelId);
+      });
+      _persistMessages();
+    }
+    _hideModelSlash();
+    _inputController.clear();
+    _inputFocusNode.requestFocus();
+  }
+
+  Widget _buildModelSuggestions(AppColorScheme colors) {
+    final models = _filteredModels;
+    if (models.isNotEmpty && _modelSelectedIndex >= models.length) {
+      _modelSelectedIndex = models.length - 1;
+    }
+
+    return Container(
+      height: _suggestionHeight(models.length),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border),
+      ),
+      child: ListView(
+        controller: _modelScrollCtrl,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        children: [
+          if (models.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'No models found',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            )
+          else
+            ...models.asMap().entries.map((entry) {
+              final i = entry.key;
+              final m = entry.value;
+              final isActive = m.id == _config.model;
+              final isHighlighted = i == _modelSelectedIndex;
+              return InkWell(
+                onTap: () => _selectModelFromSlash(m.id),
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  color: isHighlighted
+                      ? colors.surfaceHighlight
+                      : Colors.transparent,
+                  child: Row(
+                    children: [
+                      if (isActive)
+                        const Icon(Icons.check, size: 14, color: Color(0xFF34D399))
+                      else
+                        const SizedBox(width: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          m.displayName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isActive
+                                ? const Color(0xFF34D399)
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${m.costMultiplier}x',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: m.costMultiplier == 0
+                              ? const Color(0xFF34D399)
+                              : m.costMultiplier > 3
+                              ? const Color(0xFFF87171)
+                              : Theme.of(context).textTheme.bodySmall?.color ??
+                                  Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   void _showSessionHistoryDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -2045,6 +2468,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             onRestore: (entry, messages) {
               setState(() {
                 _config = _config.copyWith(
+                  provider: entry.provider,
                   sessionName: entry.sessionName,
                   workingDir: entry.workingDir,
                   model: entry.model,

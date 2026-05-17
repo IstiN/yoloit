@@ -807,14 +807,41 @@ const List<ChatModelInfo> kLocalModels = [
 ];
 
 
-/// OpenCode models (providerID/modelID format).
+/// OpenCode models (providerID/modelID format, from `opencode models`).
 const List<ChatModelInfo> kOpencodeModels = [
-  // Anthropic
+  // ── OpenCode built-in free models ─────────────────────────────────────
+  ChatModelInfo(
+    id: 'opencode/qwen3.6-plus-free',
+    displayName: 'Qwen 3.6 Plus (Free)',
+    costMultiplier: 0,
+    isDefault: true,
+  ),
+  ChatModelInfo(
+    id: 'opencode/big-pickle',
+    displayName: 'Big Pickle (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'opencode/deepseek-v4-flash-free',
+    displayName: 'DeepSeek V4 Flash (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'opencode/nemotron-3-super-free',
+    displayName: 'Nemotron 3 Super (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'opencode/minimax-m2.5-free',
+    displayName: 'MiniMax M2.5 (Free)',
+    costMultiplier: 0,
+  ),
+
+  // ── Anthropic ─────────────────────────────────────────────────────────
   ChatModelInfo(
     id: 'anthropic/claude-sonnet-4-5',
     displayName: 'Claude Sonnet 4.5',
     costMultiplier: 1,
-    isDefault: true,
   ),
   ChatModelInfo(
     id: 'anthropic/claude-opus-4-7',
@@ -837,7 +864,7 @@ const List<ChatModelInfo> kOpencodeModels = [
     costMultiplier: 3,
   ),
 
-  // OpenAI
+  // ── OpenAI ────────────────────────────────────────────────────────────
   ChatModelInfo(id: 'openai/gpt-4o', displayName: 'GPT-4o', costMultiplier: 1),
   ChatModelInfo(
     id: 'openai/gpt-4.1',
@@ -860,7 +887,7 @@ const List<ChatModelInfo> kOpencodeModels = [
     costMultiplier: 0.6,
   ),
 
-  // Google
+  // ── Google ────────────────────────────────────────────────────────────
   ChatModelInfo(
     id: 'google/gemini-2.5-pro',
     displayName: 'Gemini 2.5 Pro',
@@ -872,7 +899,7 @@ const List<ChatModelInfo> kOpencodeModels = [
     costMultiplier: 0.1,
   ),
 
-  // xAI Grok
+  // ── xAI Grok ─────────────────────────────────────────────────────────
   ChatModelInfo(
     id: 'xai/grok-4',
     displayName: 'Grok 4',
@@ -882,5 +909,69 @@ const List<ChatModelInfo> kOpencodeModels = [
     id: 'xai/grok-code-fast-1',
     displayName: 'Grok Code Fast',
     costMultiplier: 0.5,
+  ),
+
+  // ── OpenRouter free models ────────────────────────────────────────────
+  ChatModelInfo(
+    id: 'openrouter/deepseek/deepseek-chat-v3-0324:free',
+    displayName: 'OR DeepSeek V3 (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/deepseek/deepseek-r1:free',
+    displayName: 'OR DeepSeek R1 (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
+    displayName: 'OR Nemotron Ultra (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/meta-llama/llama-4-maverick:free',
+    displayName: 'OR Llama 4 Maverick (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/google/gemma-3-27b-it:free',
+    displayName: 'OR Gemma 3 27B (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/moonshotai/kimi-k2-instruct-0905:free',
+    displayName: 'OR Kimi K2 (Free)',
+    costMultiplier: 0,
+  ),
+
+  // ── OpenRouter paid models ────────────────────────────────────────────
+  ChatModelInfo(
+    id: 'openrouter/qwen/qwen-plus',
+    displayName: 'OR Qwen Plus',
+    costMultiplier: 0.5,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/qwen/qwen-2.5-72b-instruct',
+    displayName: 'OR Qwen 2.5 72B',
+    costMultiplier: 0.3,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/meta-llama/llama-3.3-70b-instruct',
+    displayName: 'OR Llama 3.3 70B',
+    costMultiplier: 0.3,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/deepseek/deepseek-r1-distill-qwen-32b:free',
+    displayName: 'OR DeepSeek R1 Distill (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/mistralai/mistral-small-3.1-24b-instruct:free',
+    displayName: 'OR Mistral Small 3.1 (Free)',
+    costMultiplier: 0,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/microsoft/phi-4-multimodal-instruct',
+    displayName: 'OR Phi-4 Multimodal',
+    costMultiplier: 0.2,
   ),
 ];
