@@ -3646,6 +3646,7 @@ class _BoardToolsPanel extends StatelessWidget {
                               'board.run_configs',
                               'board.yolo_assistant',
                               'board.timer',
+                              'board.widget.custom',
                             ];
                             final pluginEntries =
                                 genericTypes.map((typeId) {
