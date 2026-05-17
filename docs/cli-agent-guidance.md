@@ -38,24 +38,34 @@ yoloit app:dev-skill
 ```
 Read the output carefully. It contains the complete JS API, all UI node types, examples, and critical rules. Do not write any app code before reading it.
 
-**STEP 1 — Develop in the current session working directory, NOT inside the YoLoIT app folder.**
-- Write the app code (widget.js, manifest.json) in the current project directory first.
-- Then create the app scaffold: `yoloit app:create <name>`
-- Copy/write your code into `~/.config/yoloit/apps/<name>/widget.js`
+**STEP 1 — Develop in the current session working directory.**
+Write `widget.js` and `manifest.json` directly in the current project directory (NOT inside `~/.config/yoloit/apps/`). The app runs from wherever it lives on disk.
 
-**STEP 2 — The minimal workflow:**
+**STEP 2 — Local dev workflow (no install needed):**
 ```bash
-yoloit app:create <name>       # scaffold the app
-# write widget.js into ~/.config/yoloit/apps/<name>/widget.js
-yoloit app:run <name>          # open as panel on the board
-yoloit app:reload <name>       # after each edit — hot reload
+# Create files in current directory
+mkdir my-app && cd my-app
+# write manifest.json and widget.js here
+
+# Open directly from local path (. or ./my-app or absolute path)
+yoloit app:run .
+
+# After editing widget.js — hot reload from same local path
+yoloit app:reload .
+
+# Inspect render tree
+yoloit app:snapshot .
+
+# Fire an event manually to test logic
+yoloit app:execute . btn_click
 ```
 
+All commands accept a local path (`.`, `./my-app`, `/abs/path`) OR an installed app id. Local paths are resolved to absolute and used directly — no copy, no install.
+
 **Critical rules (violations cause failures):**
-- NEVER call `app:install` for apps you created with `app:create` — they are already discovered automatically.
-- `app:install` is ONLY for external sources (URLs, zip files, paths outside `~/.config/yoloit/apps/`).
 - ALWAYS wrap widget.js code in an IIFE: `(function(){ ... })();`
 - ALWAYS call `yoloit.onEvent(handler)` — required even if you handle few events.
 - NEVER hardcode colors — use `yoloit.theme.bg`, `yoloit.theme.text`, etc.
-- After editing widget.js → `yoloit app:reload <name>` (no Flutter restart needed).
+- After editing widget.js → `yoloit app:reload .` (no Flutter restart needed).
+- `app:install` is only needed for distributing/publishing apps to other users.
 

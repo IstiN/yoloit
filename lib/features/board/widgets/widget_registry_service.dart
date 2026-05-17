@@ -32,8 +32,22 @@ class WidgetRegistryService {
     return _cache!;
   }
 
-  /// Find a widget by id.
+  /// Find a widget by id or by absolute/relative path.
+  /// If [id] is an absolute path to a directory containing widget.js,
+  /// it is loaded directly without installing — ideal for local development.
   Future<WidgetManifest?> find(String id) async {
+    // Treat absolute paths as direct local-dev mounts (no install needed).
+    if (id.startsWith('/') || id.startsWith('~')) {
+      final resolved = id.startsWith('~')
+          ? id.replaceFirst('~', Platform.environment['HOME'] ?? '')
+          : id;
+      final dir = Directory(resolved);
+      if (await dir.exists()) {
+        final m = await WidgetManifest.fromDirectory(dir);
+        if (m != null) return m;
+      }
+      return null;
+    }
     final all = await loadAll();
     for (final m in all) {
       if (m.id == id) return m;

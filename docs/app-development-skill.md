@@ -6,41 +6,60 @@
 
 ## ⚡ Quick Start (Minimal Workflow for AI Agents)
 
-**Creating and running an app takes exactly 3 steps:**
+### Option A — Local dev (Recommended for AI agents)
+Develop in your current working directory. No copy, no install. The app loads directly from disk.
 
 ```bash
-# Step 1: Create app scaffold (creates folder + files)
-yoloit app:create my-app
+# Step 1: Create files in current directory
+mkdir my-app && cd my-app
 
-# Step 2: Write your code into the generated file
-# Edit: ~/.config/yoloit/apps/my-app/widget.js
+# Step 2: Write manifest.json
+cat > manifest.json << 'EOF'
+{"id":"my-app","name":"My App","description":"...","version":"1.0.0","icon":"🔧","network":false}
+EOF
 
-# Step 3: Open it as a panel on the board
-yoloit app:run my-app
+# Step 3: Write widget.js (see API below)
+# ... edit widget.js ...
+
+# Step 4: Open from local path — no install needed!
+yoloit app:run .
+
+# Step 5: After each edit, hot-reload
+yoloit app:reload .
+
+# Step 6: Inspect render tree to debug
+yoloit app:snapshot .
+
+# Step 7: Fire events manually to test logic
+yoloit app:execute . btn_click
 ```
 
-**After editing code, hot-reload:**
+All app commands accept `.` (current dir), `./subdir`, or any absolute path — in addition to installed app IDs.
+
+### Option B — Scaffold into apps folder (for permanent apps)
 ```bash
-yoloit app:reload my-app
+yoloit app:create my-app     # creates ~/.config/yoloit/apps/my-app/
+# edit ~/.config/yoloit/apps/my-app/widget.js
+yoloit app:run my-app        # open by id
+yoloit app:reload my-app     # hot-reload by id
 ```
 
 ### ⚠️ Critical Rules for AI Agents
 
-1. **NEVER call `app:install` for apps you just created** — apps in `~/.config/yoloit/apps/` are already discovered automatically. Just call `app:run <id>`.
-2. **`app:install` is only for external sources** (URLs, zip files, or paths OUTSIDE the apps folder).
-3. **After writing/editing `widget.js`, always call `app:reload <id>`** so the panel picks up changes.
-4. **Panel type for custom apps is `board.widget.custom`** — `app:run` handles this automatically.
+1. **Develop in the session's working directory** — write `widget.js` here, use `yoloit app:run .`
+2. **After editing `widget.js` → always call `app:reload .`** so the panel picks up changes.
+3. **`app:install` is only for distribution** — publishing apps for other users (zip/URL). Never needed for local dev.
 
-### Complete AI Agent Workflow
+### Complete AI Agent Dev Workflow
 
 ```
-1. yoloit app:create <name>          → scaffold files in ~/.config/yoloit/apps/<name>/
-2. Write/edit widget.js              → implement the app logic
-3. yoloit app:run <name>             → open as a panel on the board
+1. mkdir my-app && cd my-app    create local app folder
+2. write widget.js              implement the app
+3. yoloit app:run .             open as panel on the board
 4. [edit widget.js again]
-5. yoloit app:reload <name>          → hot-reload into the running panel
-6. yoloit app:snapshot <name>        → debug: inspect current render tree
-7. yoloit app:execute <name> <event> → debug: fire an event manually
+5. yoloit app:reload .          hot-reload into running panel
+6. yoloit app:snapshot .        debug: inspect render tree
+7. yoloit app:execute . <evt>   debug: fire event manually
 ```
 
 ---

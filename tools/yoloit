@@ -724,8 +724,8 @@ commands = [
   {
     "group": "app",
     "name": "app:run",
-    "description": "Open an app in a new panel on a board",
-    "params": [["id", "App id", True], ["[board]", "Board name (optional)", False], ["[panel-title]", "Panel title (optional)", False]],
+    "description": "Open an app in a new panel on a board. Accepts app id or local path (e.g. ./my-app) for dev workflow.",
+    "params": [["id_or_path", "App id or local directory path", True], ["[board]", "Board name (optional)", False], ["[panel-title]", "Panel title (optional)", False]],
     "example": "yoloit app:run calculator",
     "aliases": ["app:open", "widget:open", "wg:o"],
   },
@@ -2042,33 +2042,56 @@ PY
     _delete "/widgets/$(_encode "$1")" | python3 -m json.tool 2>/dev/null
     ;;
   app:run|app:open|widget:open|wg:o)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:run <id> [board] [panel-title]" >&2; exit 1; }
-    widget_id="$1"; shift
-    board_arg="${1:-}"; panel_arg="${2:-${widget_id}}"
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:run <id|path> [board] [panel-title]" >&2; exit 1; }
+    # Resolve local paths to absolute (supports ./my-app, ../foo, /abs/path)
+    raw_id="$1"; shift
+    if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) ]]; then
+      widget_id="$(cd "$raw_id" 2>/dev/null && pwd)" || { echo "❌ Path not found: $raw_id" >&2; exit 1; }
+    else
+      widget_id="$raw_id"
+    fi
+    board_arg="${1:-}"; panel_arg="${2:-$(basename "$widget_id")}"
     bid=$(_require_board "$board_arg")
     panel_json=$(_smart_panel "$bid" "$panel_arg" "board.widget.custom")
     panel_id=$(echo "$panel_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('panel',d).get('id','') if isinstance(d.get('panel',d),dict) else '')" 2>/dev/null)
     _post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}" | python3 -m json.tool 2>/dev/null
     ;;
   app:execute)
-    [[ $# -lt 2 ]] && { echo "Usage: yoloit app:execute <id> <action> [payload_json]" >&2; exit 1; }
-    app_id="$1"; action_id="$2"; payload="${3:-{}}"
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit app:execute <id|path> <action> [payload_json]" >&2; exit 1; }
+    raw_id="$1"; action_id="$2"; payload="${3:-{}}"
+    if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) ]]; then
+      app_id="$(cd "$raw_id" 2>/dev/null && pwd)"
+    else
+      app_id="$raw_id"
+    fi
     _post "/apps/$(_encode "$app_id")/execute" "{\"action\":\"${action_id}\",\"payload\":${payload}}" | python3 -m json.tool 2>/dev/null
     ;;
   app:reload|widget:reload|app:refresh)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:reload <id>" >&2; exit 1; }
-    result=$(_post "/apps/$(_encode "$1")/reload" '{}')
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:reload <id|path>" >&2; exit 1; }
+    raw_id="$1"
+    if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) ]]; then
+      app_id="$(cd "$raw_id" 2>/dev/null && pwd)"
+    else
+      app_id="$raw_id"
+    fi
+    result=$(_post "/apps/$(_encode "$app_id")/reload" '{}')
     ok=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('ok') else 'no')" 2>/dev/null)
     if [[ "$ok" == "yes" ]]; then
-      echo "✅ App '$1' reloaded"
+      echo "✅ App reloaded"
     else
       msg=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message','unknown error'))" 2>/dev/null)
       echo "❌ Reload failed: $msg" >&2; exit 1
     fi
     ;;
   app:snapshot)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:snapshot <id>" >&2; exit 1; }
-    _get "/apps/$(_encode "$1")/snapshot" | python3 -m json.tool 2>/dev/null
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:snapshot <id|path>" >&2; exit 1; }
+    raw_id="$1"
+    if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) ]]; then
+      app_id="$(cd "$raw_id" 2>/dev/null && pwd)"
+    else
+      app_id="$raw_id"
+    fi
+    _get "/apps/$(_encode "$app_id")/snapshot" | python3 -m json.tool 2>/dev/null
     ;;
   app:screenshot)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit app:screenshot <id> [output.png]" >&2; exit 1; }
