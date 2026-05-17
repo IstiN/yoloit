@@ -494,6 +494,23 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   bool _isSending = false;
 
+  Future<void> _stopStreaming() async {
+    if (!_isSending) return;
+    _eventSub?.cancel();
+    _eventSub = null;
+    await _provider.stop(_config.sessionName);
+    if (mounted) {
+      setState(() {
+        _finalizeStreamingMessage();
+        _streamingContent = '';
+        _streamingMessageId = null;
+        _activeToolCalls.clear();
+        _ignoredToolCallIds.clear();
+        _isSending = false;
+      });
+    }
+  }
+
   BoardDocument? _currentBoardForPanel() {
     final state = context.read<BoardCubit>().state;
     for (final board in state.boards) {
@@ -518,7 +535,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       return;
     }
 
-    _isSending = true;
+    setState(() => _isSending = true);
     if (overrideText == null) {
       _inputController.clear();
     }
@@ -598,8 +615,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _eventSub = stream.listen(
       _handleEvent,
       onError: (Object error) {
-        _isSending = false;
         setState(() {
+          _isSending = false;
           _setProcessing(false);
           _messages.add(
             ChatMessage(
@@ -614,7 +631,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _scrollToBottom();
       },
       onDone: () {
-        _isSending = false;
         // Persist opencode session ID after first message completes
         if (_config.provider == 'opencode') {
           final sid = _provider.getSessionId(_config.sessionName);
@@ -627,6 +643,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           }
         }
         setState(() {
+          _isSending = false;
           _setProcessing(false);
           // Finalize any streaming message
           if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
@@ -1777,17 +1794,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               ),
               const SizedBox(width: 6),
               GestureDetector(
-                onTap: _sendMessage,
+                onTap: _isSending ? _stopStreaming : _sendMessage,
                 child: Container(
                   width: 28,
                   height: 28,
                   margin: const EdgeInsets.only(bottom: 2),
                   decoration: BoxDecoration(
-                    color: colors.terminalPrompt,
+                    color: _isSending
+                        ? Theme.of(context).colorScheme.error
+                        : colors.terminalPrompt,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
-                    Icons.arrow_upward,
+                    _isSending ? Icons.stop_rounded : Icons.arrow_upward,
                     color: Theme.of(context).colorScheme.onPrimary,
                     size: 16,
                   ),
