@@ -769,6 +769,14 @@ commands = [
     "example": "yoloit app:screenshot calculator /tmp/calc.png",
     "aliases": [],
   },
+  {
+    "group": "app",
+    "name": "app:dev-skill",
+    "description": "Print the full YoLoIT app development guide (JS API, node types, examples). Useful for AI agents writing apps.",
+    "params": [],
+    "example": "yoloit app:dev-skill",
+    "aliases": ["app:skill", "app:docs"],
+  },
 ]
 
 # ── Registry: namespace prefixes (one definition per namespace) ───────
@@ -2064,6 +2072,17 @@ PY
     app_id="$1"; out="${2:-/tmp/${app_id}.png}"
     result=$(_post "/apps/$(_encode "$app_id")/screenshot" "{\"outputPath\":\"${out}\"}")
     echo "$result" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:dev-skill|app:skill|app:docs)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SKILL_FILE="$SCRIPT_DIR/../docs/app-development-skill.md"
+    if [[ -f "$SKILL_FILE" ]]; then
+      cat "$SKILL_FILE"
+    else
+      echo "❌ Skill file not found at: $SKILL_FILE" >&2
+      echo "   Make sure you are running from the yoloit repo." >&2
+      exit 1
+    fi
     ;;
   app:install)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit app:install <url|path>" >&2; exit 1; }
