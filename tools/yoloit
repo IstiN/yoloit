@@ -2030,6 +2030,9 @@ PY
         curl -fsSL "$source_arg" -o "${tmp_dir}/widget.zip" && unzip -q "${tmp_dir}/widget.zip" -d "${tmp_dir}/extracted" && tmp_dir="${tmp_dir}/extracted/$(ls ${tmp_dir}/extracted | head -1)"
       fi
       _post "/widgets/install" "{\"path\":\"${tmp_dir}\"}" | python3 -m json.tool 2>/dev/null
+    elif [[ "$source_arg" == *.zip ]]; then
+      abs_zip="$(cd "$(dirname "$source_arg")" && pwd)/$(basename "$source_arg")"
+      _post "/apps/install-zip" "{\"zipPath\":\"${abs_zip}\"}" | python3 -m json.tool 2>/dev/null
     else
       _post "/widgets/install" "{\"path\":\"${source_arg}\"}" | python3 -m json.tool 2>/dev/null
     fi
@@ -2097,6 +2100,9 @@ PY
         curl -fsSL "$source_arg" -o "${tmp_dir}/widget.zip" && unzip -q "${tmp_dir}/widget.zip" -d "${tmp_dir}/extracted" && tmp_dir="${tmp_dir}/extracted/$(ls ${tmp_dir}/extracted | head -1)"
       fi
       _post "/widgets/install" "{\"path\":\"${tmp_dir}\"}" | python3 -m json.tool 2>/dev/null
+    elif [[ "$source_arg" == *.zip ]]; then
+      abs_zip="$(cd "$(dirname "$source_arg")" && pwd)/$(basename "$source_arg")"
+      _post "/apps/install-zip" "{\"zipPath\":\"${abs_zip}\"}" | python3 -m json.tool 2>/dev/null
     else
       _post "/widgets/install" "{\"path\":\"${source_arg}\"}" | python3 -m json.tool 2>/dev/null
     fi

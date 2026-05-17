@@ -34,6 +34,7 @@ class JsWidgetEngine {
     required this.onStorageUpdate,
     required Map<String, dynamic> initialStorage,
     Map<String, dynamic> initialTheme = const {},
+    this.appDir,
   }) : _storage = Map<String, dynamic>.from(initialStorage),
        _initialTheme = Map<String, dynamic>.from(initialTheme);
 
@@ -42,6 +43,9 @@ class JsWidgetEngine {
   final void Function(Map<String, dynamic> tree) onRender;
   final void Function(String title) onSetTitle;
   final void Function(Map<String, dynamic> storage) onStorageUpdate;
+
+  /// Absolute path to the app's folder — used by loadAsset bridge.
+  final String? appDir;
 
   Map<String, dynamic> _storage;
   final Map<String, dynamic> _initialTheme;
@@ -292,6 +296,35 @@ class JsWidgetEngine {
         }
       });
     });
+
+    // yoloit.loadAsset(path) — read a file from the app's folder
+    rt.setupBridge('__yoloit_load_asset', (args) {
+      if (_disposed) return;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final id = req['id'] as String;
+      final assetPath = req['path'] as String? ?? '';
+      Future(() async {
+        try {
+          final dir = appDir;
+          if (dir == null || dir.isEmpty) {
+            if (!_disposed) _resolveCallback(rt, id, null);
+            return;
+          }
+          final file = File('$dir${Platform.pathSeparator}${assetPath.replaceAll('/', Platform.pathSeparator)}');
+          if (await file.exists()) {
+            final content = await file.readAsString();
+            if (!_disposed) _resolveCallback(rt, id, content);
+          } else {
+            if (!_disposed) _resolveCallback(rt, id, null);
+          }
+        } catch (e) {
+          debugPrint('[JsWidgetEngine] loadAsset error: $e');
+          if (!_disposed) _resolveCallback(rt, id, null);
+        }
+      });
+    });
   }
 
   void _resolveCallback(JavascriptRuntime rt, String id, dynamic value) {
@@ -398,6 +431,14 @@ var yoloit = {
         {type:'text',data:String(msg),style:{color:'#ef4444',fontSize:13,textAlign:'center'}}
       ]
     }}});
+  },
+
+  loadAsset: function(path) {
+    return new Promise(function(resolve) {
+      var id = __nid();
+      __cbs[id] = function(v) { resolve(v); };
+      sendMessage('__yoloit_load_asset', JSON.stringify({id: id, path: path}));
+    });
   }
 };
 ''';

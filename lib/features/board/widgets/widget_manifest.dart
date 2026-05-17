@@ -17,6 +17,7 @@ class WidgetManifest {
     required this.networkEnabled,
     required this.widgetPath,
     required this.isSingleFile,
+    this.files,
   });
 
   /// Unique identifier (directory name or file stem).
@@ -45,15 +46,80 @@ class WidgetManifest {
   /// True when the widget is a single .js file without a directory.
   final bool isSingleFile;
 
+  /// Explicit ordered list of JS files to concatenate (relative to widgetPath).
+  /// When null or empty, falls back to reading widget.js.
+  final List<String>? files;
+
   /// Absolute path to the main widget.js entry point.
   String get mainJsPath =>
       isSingleFile ? widgetPath : '$widgetPath${Platform.pathSeparator}widget.js';
 
+  /// App directory (parent directory of the entry point for single-file apps).
+  String get appDir =>
+      isSingleFile ? File(widgetPath).parent.path : widgetPath;
+
   /// Reads and returns the JS source code.
+  ///
+  /// If [files] is set, reads each file in order and concatenates them.
+  /// Otherwise falls back to reading widget.js.
+  /// After assembling, runs the [_preprocessIncludes] pass which inlines
+  /// `yoloit.include('path')` calls with the referenced file contents.
   Future<String?> readJs() async {
-    final file = File(mainJsPath);
-    if (!await file.exists()) return null;
-    return file.readAsString();
+    String js;
+
+    if (files != null && files!.isNotEmpty) {
+      final parts = <String>[];
+      for (final filename in files!) {
+        final path = '$widgetPath${Platform.pathSeparator}${filename.replaceAll('/', Platform.pathSeparator)}';
+        final file = File(path);
+        if (await file.exists()) {
+          parts.add(await file.readAsString());
+        } else {
+          parts.add('/* yoloit.include: file not found: $filename */');
+        }
+      }
+      js = parts.join('\n');
+    } else {
+      final file = File(mainJsPath);
+      if (!await file.exists()) return null;
+      js = await file.readAsString();
+    }
+
+    return _preprocessIncludes(js, widgetPath, 0);
+  }
+
+  /// Recursively inlines `yoloit.include('path')` calls (up to [_maxIncludeDepth]).
+  static const int _maxIncludeDepth = 5;
+  static final RegExp _includeRegex = RegExp(
+    r'''yoloit\.include\(\s*['"]([^'"]+)['"]\s*\)''',
+  );
+
+  static Future<String> _preprocessIncludes(
+    String source,
+    String baseDir,
+    int depth,
+  ) async {
+    if (depth >= _maxIncludeDepth) return source;
+    if (!_includeRegex.hasMatch(source)) return source;
+
+    final buffer = StringBuffer();
+    int last = 0;
+    for (final match in _includeRegex.allMatches(source)) {
+      buffer.write(source.substring(last, match.start));
+      final relPath = match.group(1)!;
+      final absPath = '$baseDir${Platform.pathSeparator}${relPath.replaceAll('/', Platform.pathSeparator)}';
+      final file = File(absPath);
+      if (await file.exists()) {
+        final included = await file.readAsString();
+        final subDir = File(absPath).parent.path;
+        buffer.write(await _preprocessIncludes(included, subDir, depth + 1));
+      } else {
+        buffer.write('/* yoloit.include: file not found: $relPath */');
+      }
+      last = match.end;
+    }
+    buffer.write(source.substring(last));
+    return buffer.toString();
   }
 
   /// Creates a manifest from a directory (reads manifest.json if present).
@@ -69,6 +135,7 @@ class WidgetManifest {
     if (await manifestFile.exists()) {
       try {
         final raw = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+        final filesList = raw['files'] as List?;
         return WidgetManifest(
           id: (raw['id'] as String? ?? id).trim(),
           name: (raw['name'] as String? ?? id),
@@ -79,6 +146,7 @@ class WidgetManifest {
           networkEnabled: raw['network'] as bool? ?? true,
           widgetPath: dir.path,
           isSingleFile: false,
+          files: filesList != null ? List<String>.from(filesList) : null,
         );
       } catch (_) {}
     }
@@ -126,6 +194,7 @@ class WidgetManifest {
     'network': networkEnabled,
     'widgetPath': widgetPath,
     'isSingleFile': isSingleFile,
+    if (files != null) 'files': files,
   };
 
   static String _titleCase(String s) =>

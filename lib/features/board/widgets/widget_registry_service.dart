@@ -55,6 +55,11 @@ class WidgetRegistryService {
       final dir = Directory(sourcePath);
       final name = dir.path.split(Platform.pathSeparator).last;
       final dest = Directory('${destDir.path}${Platform.pathSeparator}$name');
+      // If source is already inside appsDir (same path), skip copy — already installed.
+      if (dest.path == dir.path || dest.path == dir.path.trimRight()) {
+        invalidate();
+        return WidgetManifest.fromDirectory(dest);
+      }
       if (dest.existsSync()) dest.deleteSync(recursive: true);
       await _copyDir(dir, dest);
       invalidate();
@@ -64,7 +69,7 @@ class WidgetRegistryService {
       final file = File(sourcePath);
       final name = file.path.split(Platform.pathSeparator).last;
       final dest = File('${destDir.path}${Platform.pathSeparator}$name');
-      await file.copy(dest.path);
+      if (dest.path != file.path) await file.copy(dest.path);
       invalidate();
       return WidgetManifest.fromJsFile(dest);
     }

@@ -2576,6 +2576,75 @@ class CliServer {
       });
     }
 
+    // POST /api/apps/install-zip { zipPath: "..." }
+    if (sub.length == 1 && sub[0] == 'install-zip' && method == 'POST') {
+      final body = await _body(request);
+      final zipPath = body['zipPath'] as String?;
+      if (zipPath == null || zipPath.trim().isEmpty) {
+        return _error('Missing "zipPath" field');
+      }
+      final zipFile = File(zipPath.trim());
+      if (!await zipFile.exists()) {
+        return _error('ZIP file not found: $zipPath');
+      }
+      try {
+        final zipName = zipFile.path.split(Platform.pathSeparator).last;
+        final appNameFromZip = zipName.endsWith('.zip')
+            ? zipName.substring(0, zipName.length - 4)
+            : zipName;
+        final appsDir = Directory(
+          '${Platform.environment['HOME']}/.config/yoloit/apps',
+        );
+        await appsDir.create(recursive: true);
+        final extractDir = Directory(
+          '${appsDir.path}${Platform.pathSeparator}__zip_extract_${DateTime.now().millisecondsSinceEpoch}',
+        );
+        await extractDir.create();
+        final unzipResult = await Process.run(
+          'unzip',
+          ['-q', zipFile.path, '-d', extractDir.path],
+        );
+        if (unzipResult.exitCode != 0) {
+          await extractDir.delete(recursive: true);
+          return _error('Failed to extract ZIP: ${unzipResult.stderr}');
+        }
+        // Find the directory containing widget.js or manifest.json
+        Directory? appSource;
+        await for (final entity in extractDir.list(recursive: true)) {
+          if (entity is File) {
+            final name = entity.path.split(Platform.pathSeparator).last;
+            if (name == 'widget.js' || name == 'manifest.json') {
+              appSource = entity.parent;
+              break;
+            }
+          }
+        }
+        appSource ??= extractDir;
+        // Determine app name from manifest or zip filename
+        String appName = appNameFromZip;
+        final manifestFile = File(
+          '${appSource.path}${Platform.pathSeparator}manifest.json',
+        );
+        if (await manifestFile.exists()) {
+          try {
+            final raw = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+            appName = (raw['id'] as String?)?.trim() ?? appNameFromZip;
+          } catch (_) {}
+        }
+        final destDir = Directory(
+          '${appsDir.path}${Platform.pathSeparator}$appName',
+        );
+        if (await destDir.exists()) await destDir.delete(recursive: true);
+        await Process.run('cp', ['-r', appSource.path, destDir.path]);
+        await extractDir.delete(recursive: true);
+        final manifest = await registry.find(appName);
+        await registry.loadAll(); // refresh registry cache
+        return _json({'ok': true, 'appName': appName, 'widget': manifest?.toJson()});
+      } catch (e) {
+        return _error('ZIP install failed: $e');
+      }
+    }
+
     // /api/apps/:id/...
     if (sub.length >= 2) {
       final id = sub[0];

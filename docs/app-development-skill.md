@@ -1,6 +1,47 @@
 # YoLoIT App Development Skill
 
-> **For AI agents**: This document is the authoritative guide for creating YoLoIT apps. Read it fully before writing any app code. Use `yoloit app:dev-skill` to print this from the CLI.
+> **For AI agents**: This is the authoritative guide for creating YoLoIT apps. Use `yoloit app:dev-skill` to print this. Read the **Quick Start** first — it shows the minimal workflow.
+
+---
+
+## ⚡ Quick Start (Minimal Workflow for AI Agents)
+
+**Creating and running an app takes exactly 3 steps:**
+
+```bash
+# Step 1: Create app scaffold (creates folder + files)
+yoloit app:create my-app
+
+# Step 2: Write your code into the generated file
+# Edit: ~/.config/yoloit/apps/my-app/widget.js
+
+# Step 3: Open it as a panel on the board
+yoloit app:run my-app
+```
+
+**After editing code, hot-reload:**
+```bash
+yoloit app:reload my-app
+```
+
+### ⚠️ Critical Rules for AI Agents
+
+1. **NEVER call `app:install` for apps you just created** — apps in `~/.config/yoloit/apps/` are already discovered automatically. Just call `app:run <id>`.
+2. **`app:install` is only for external sources** (URLs, zip files, or paths OUTSIDE the apps folder).
+3. **After writing/editing `widget.js`, always call `app:reload <id>`** so the panel picks up changes.
+4. **Panel type for custom apps is `board.widget.custom`** — `app:run` handles this automatically.
+
+### Complete AI Agent Workflow
+
+```
+1. yoloit app:create <name>          → scaffold files in ~/.config/yoloit/apps/<name>/
+2. Write/edit widget.js              → implement the app logic
+3. yoloit app:run <name>             → open as a panel on the board
+4. [edit widget.js again]
+5. yoloit app:reload <name>          → hot-reload into the running panel
+6. yoloit app:snapshot <name>        → debug: inspect current render tree
+7. yoloit app:execute <name> <event> → debug: fire an event manually
+```
 
 ---
 
@@ -48,6 +89,41 @@ Apps run in a sandboxed JavaScript engine (JavaScriptCore on macOS/iOS). They co
 | `icon` | ✅ | Emoji used in the app picker |
 | `network` | ❌ | `true` to allow HTTP requests (default: false) |
 | `allowedCommands` | ❌ | Reserved for future CLI command permissions |
+| `files` | ❌ | Ordered list of JS files to concatenate before evaluation (multi-file apps) |
+
+---
+
+## Multi-File Apps
+
+Large apps can be split into multiple JS files. Use the `files` array in `manifest.json` to specify the load order:
+
+```json
+{
+  "id": "my-app",
+  "name": "My App",
+  "version": "1.0.0",
+  "icon": "🚀",
+  "files": ["lib/utils.js", "lib/api.js", "widget.js"]
+}
+```
+
+All files are concatenated in order and evaluated as a single script. Single-file apps (no `files` field) continue to work unchanged.
+
+### `yoloit.include('path')` — Static Inlining
+
+You can also inline files inside any JS file using `yoloit.include('relative/path')`. This is a **preprocessor** directive — it is replaced with the file's contents before the JS engine sees the code:
+
+```javascript
+// lib/utils.js
+yoloit.include('lib/helpers.js');   // inlined before eval
+
+function formatDate(ts) { /* ... */ }
+```
+
+- Paths are relative to the app's folder
+- Supports subdirectories: `yoloit.include('lib/api/client.js')`
+- Maximum recursion depth: 5 levels
+- If the file is not found, replaced with a comment (no crash)
 
 ---
 
@@ -206,6 +282,26 @@ Display an error overlay in the panel.
 ```javascript
 yoloit.showError('Failed to load data');
 ```
+
+---
+
+### `yoloit.loadAsset(path)` → Promise\<string|null\>
+Reads a file from the app's folder and returns its text content as a string. Returns `null` if the file is not found.
+
+```javascript
+yoloit.loadAsset('logo.svg').then(function(svgText) {
+  if (svgText) {
+    // use svgText
+  }
+});
+
+// Supports subdirectories
+yoloit.loadAsset('assets/config.json').then(function(json) {
+  var config = JSON.parse(json);
+});
+```
+
+This is useful for loading SVGs, JSON config files, templates, or any static asset bundled with the app.
 
 ---
 

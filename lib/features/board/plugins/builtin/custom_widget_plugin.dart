@@ -155,6 +155,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
     final engine = JsWidgetEngine(
       widgetId: _widgetId,
+      appDir: manifest.appDir,
       onRender: (tree) {
         if (mounted) setState(() => _uiTree = tree);
         WidgetAppRegistry.instance.updateTree(_widgetId, tree);
