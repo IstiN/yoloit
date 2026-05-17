@@ -44,6 +44,9 @@ class SessionPrefs {
   static const _kApprovalSoundEnabled  = 'notifications.approvalSound';
   static const _kCompletionSoundEnabled = 'notifications.completionSound';
 
+  // Chat context injection
+  static const _kInjectCliHelp = 'chat.injectCliHelpOnFirstMessage';
+
   // ── Load ─────────────────────────────────────────────────────────────────
   static Future<SessionSnapshot> load() async {
     final p = await SharedPreferences.getInstance();
@@ -143,6 +146,14 @@ class SessionPrefs {
       (await _p()).getBool(_kCompletionSoundEnabled) ?? true;
   static Future<void> saveCompletionSoundEnabled(bool v) async =>
       (await _p()).setBool(_kCompletionSoundEnabled, v);
+
+  // ── Chat context injection ────────────────────────────────────────────────
+
+  static Future<bool> isInjectCliHelpEnabled() async =>
+      (await _p()).getBool(_kInjectCliHelp) ?? true;
+
+  static Future<void> saveInjectCliHelpEnabled(bool v) async =>
+      (await _p()).setBool(_kInjectCliHelp, v);
 
   // ── Editor tabs (per workspace) ───────────────────────────────────────────
 

@@ -8,6 +8,7 @@ import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
@@ -223,6 +224,10 @@ class _SettingsPageState extends State<SettingsPage> {
             const _SectionHeader(title: 'Ignored Tool Calls'),
             const SizedBox(height: 12),
             const _IgnoredToolCallsSection(),
+            const SizedBox(height: 20),
+            const _SectionHeader(title: 'Chat Context'),
+            const SizedBox(height: 12),
+            const _ChatContextSection(),
           ],
         ),
         2 => Column(
@@ -544,6 +549,50 @@ class _IgnoredToolCallsSectionState extends State<_IgnoredToolCallsSection> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Chat Context Settings ────────────────────────────────────────────────────
+
+class _ChatContextSection extends StatefulWidget {
+  const _ChatContextSection();
+
+  @override
+  State<_ChatContextSection> createState() => _ChatContextSectionState();
+}
+
+class _ChatContextSectionState extends State<_ChatContextSection> {
+  bool _injectCliHelp = true;
+
+  @override
+  void initState() {
+    super.initState();
+    SessionPrefs.isInjectCliHelpEnabled().then((v) {
+      if (mounted) setState(() => _injectCliHelp = v);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border),
+      ),
+      child: _ToggleRow(
+        icon: Icons.integration_instructions_outlined,
+        title: 'Inject CLI help on first message',
+        subtitle:
+            'Prepends yoloit command reference to the first Copilot message',
+        value: _injectCliHelp,
+        onChanged: (v) async {
+          await SessionPrefs.saveInjectCliHelpEnabled(v);
+          CliGuidanceService.instance.clearCache();
+          if (mounted) setState(() => _injectCliHelp = v);
+        },
       ),
     );
   }

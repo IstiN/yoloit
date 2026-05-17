@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 
 class CliGuidanceService {
@@ -12,6 +13,10 @@ class CliGuidanceService {
   ];
 
   String? _cachedGuidanceMarkdown;
+
+  /// Call this when the inject-CLI-help setting changes so the next chat
+  /// session picks up the new value.
+  void clearCache() => _cachedGuidanceMarkdown = null;
 
   Future<String> prependGuidance(
     String message, {
@@ -46,7 +51,16 @@ Prefer this board by default when running `yoloit` commands unless the user expl
   }
 
   Future<String> _loadGuidanceMarkdown() async {
+    final inject = await SessionPrefs.isInjectCliHelpEnabled();
     final cached = _cachedGuidanceMarkdown;
+    if (!inject) {
+      // Return minimal guidance without CLI help tree
+      return '''
+You are running inside YoLoIT chat.
+Prefer YoLoIT CLI commands over ad-hoc shell mutations.
+Use `yoloit help` to see available commands.
+''';
+    }
     if (cached != null && cached.isNotEmpty) return cached;
     final helpTree = await _loadYoloitHelpTree();
     if (helpTree != null && helpTree.isNotEmpty) {
