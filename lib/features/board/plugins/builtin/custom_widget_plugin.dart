@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
@@ -70,6 +72,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   @override
   void initState() {
     super.initState();
+    ThemeManager.instance.addListener(_onThemeChanged);
     // Register reload callback immediately so CLI can trigger reload even before first load completes
     if (_widgetId.isNotEmpty) {
       WidgetAppRegistry.instance.registerReload(_widgetId, _load);
@@ -91,9 +94,34 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
   @override
   void dispose() {
+    ThemeManager.instance.removeListener(_onThemeChanged);
     if (_widgetId.isNotEmpty) WidgetAppRegistry.instance.unregister(_widgetId);
     _engine?.dispose();
     super.dispose();
+  }
+
+  void _onThemeChanged() => _engine?.updateTheme(_themeColors());
+
+  Map<String, dynamic> _themeColors() {
+    final tm = ThemeManager.instance;
+    final scheme = tm.theme.extension<AppColorScheme>();
+    final isDark = tm.isDark;
+    return {
+      'isDark': isDark,
+      'bg': _hexColor(scheme?.background ?? (isDark ? const Color(0xFF0f172a) : Colors.white)),
+      'surface': _hexColor(scheme?.surface ?? (isDark ? const Color(0xFF1e293b) : const Color(0xFFF8FAFC))),
+      'border': _hexColor(scheme?.border ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+      'accent': _hexColor(scheme?.primary ?? const Color(0xFF818cf8)),
+      'text': _hexColor(isDark ? const Color(0xFFf1f5f9) : const Color(0xFF1A1A2E)),
+      'muted': _hexColor(isDark ? const Color(0xFF64748b) : const Color(0xFF94A3B8)),
+    };
+  }
+
+  String _hexColor(Color c) {
+    final r = (c.r * 255).round();
+    final g = (c.g * 255).round();
+    final b = (c.b * 255).round();
+    return '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}';
   }
 
   Future<void> _load() async {
@@ -144,6 +172,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
         });
       },
       initialStorage: storage,
+      initialTheme: _themeColors(),
     );
 
     _renderer = JsonWidgetRenderer(

@@ -68,6 +68,7 @@ class JsonWidgetRenderer {
       'opacity'                   => Opacity(opacity: _double(m['opacity'], 1.0), child: _child(m)),
       'clipRRect'                 => _clipRRect(m),
       'textField'                 => _textFieldNode(m),
+      'chart'                     => _chartNode(m),
 
       _                           => const SizedBox.shrink(),
     };
@@ -608,6 +609,27 @@ class JsonWidgetRenderer {
     onEvent: onEvent,
   );
 
+  Widget _chartNode(Map<String, dynamic> m) {
+    final rawPoints = m['points'] as List?;
+    if (rawPoints == null || rawPoints.isEmpty) return const SizedBox.shrink();
+    final points = rawPoints.map((v) => (v as num).toDouble()).toList();
+    final color = _color(m['color'] as String? ?? '#4ade80') ?? Colors.greenAccent;
+    final height = _double(m['height'], 60.0);
+    final fill = m['fill'] == true;
+    final onTap = m['onTap'] as String?;
+    Widget chart = SizedBox(
+      height: height,
+      child: CustomPaint(
+        painter: _SparklinePainter(points: points, color: color, fill: fill),
+        size: Size.infinite,
+      ),
+    );
+    if (onTap != null) {
+      chart = GestureDetector(onTap: () => onEvent(onTap, {}), child: chart);
+    }
+    return chart;
+  }
+
   int _int(dynamic v, int def) =>
       v == null ? def : (v as num).toInt();
 }
@@ -697,4 +719,60 @@ class _TextFieldNodeState extends State<_TextFieldNode> {
       },
     );
   }
+}
+
+// ── Sparkline chart painter ───────────────────────────────────────────────────
+
+class _SparklinePainter extends CustomPainter {
+  const _SparklinePainter({required this.points, required this.color, required this.fill});
+  final List<double> points;
+  final Color color;
+  final bool fill;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final min = points.reduce((a, b) => a < b ? a : b);
+    final max = points.reduce((a, b) => a > b ? a : b);
+    final range = (max - min).abs();
+    final effectiveRange = range < 0.0001 ? 1.0 : range;
+
+    final xStep = size.width / (points.length - 1);
+
+    double toY(double v) => size.height - ((v - min) / effectiveRange) * size.height * 0.85 - size.height * 0.05;
+
+    final path = Path();
+    path.moveTo(0, toY(points[0]));
+    for (int i = 1; i < points.length; i++) {
+      final x = i * xStep;
+      final prev = points[i - 1];
+      final curr = points[i];
+      final cpx = (i - 0.5) * xStep;
+      path.cubicTo(cpx, toY(prev), cpx, toY(curr), x, toY(curr));
+    }
+
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, linePaint);
+
+    if (fill) {
+      final fillPath = Path()..addPath(path, Offset.zero);
+      fillPath.lineTo(size.width, size.height);
+      fillPath.lineTo(0, size.height);
+      fillPath.close();
+      canvas.drawPath(
+        fillPath,
+        Paint()
+          ..color = color.withAlpha(40)
+          ..style = PaintingStyle.fill,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SparklinePainter old) =>
+      old.points != points || old.color != color || old.fill != fill;
 }

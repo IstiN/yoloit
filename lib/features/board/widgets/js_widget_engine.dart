@@ -33,7 +33,9 @@ class JsWidgetEngine {
     required this.onSetTitle,
     required this.onStorageUpdate,
     required Map<String, dynamic> initialStorage,
-  }) : _storage = Map<String, dynamic>.from(initialStorage);
+    Map<String, dynamic> initialTheme = const {},
+  }) : _storage = Map<String, dynamic>.from(initialStorage),
+       _initialTheme = Map<String, dynamic>.from(initialTheme);
 
   /// Widget ID used to namespace secure storage keys.
   final String widgetId;
@@ -42,6 +44,7 @@ class JsWidgetEngine {
   final void Function(Map<String, dynamic> storage) onStorageUpdate;
 
   Map<String, dynamic> _storage;
+  final Map<String, dynamic> _initialTheme;
   JavascriptRuntime? _runtime;
   bool _disposed = false;
   final Map<String, Timer> _intervals = {};
@@ -49,6 +52,21 @@ class JsWidgetEngine {
   static const _secureStorage = FlutterSecureStorage();
 
   // ── Public API ──────────────────────────────────────────────────────────
+
+  /// Push updated theme colors into the running JS widget.
+  void updateTheme(Map<String, dynamic> colors) {
+    final rt = _runtime;
+    if (rt == null || _disposed) return;
+    try {
+      rt.evaluate(
+        'yoloit.theme=${jsonEncode(colors)};'
+        'if(yoloit._onThemeChange){try{yoloit._onThemeChange(yoloit.theme);}catch(e){}}',
+      );
+      rt.executePendingJob();
+    } catch (e) {
+      debugPrint('[JsWidgetEngine] updateTheme error: $e');
+    }
+  }
 
   Future<void> run(String widgetJs) async {
     await dispose();
@@ -70,6 +88,7 @@ class JsWidgetEngine {
       if (bootstrapResult.isError) {
         debugPrint('[JsWidgetEngine] bootstrap error: ${bootstrapResult.stringResult}');
       }
+      updateTheme(_initialTheme);
 
       final code = '''
 (function() {
@@ -185,6 +204,9 @@ class JsWidgetEngine {
     });
 
     // yoloit.storage.set(key, value)
+    // Flow: JS → sendMessage → Dart _storage[key]=value → onStorageUpdate(shallow copy)
+    // → plugin onUpdateState({..., '_storage': newStorage}) → cubit _persist() → SharedPreferences.
+    // jsonEncode handles List<dynamic> correctly, so array storage is safe across hot restarts.
     rt.setupBridge('__yoloit_storage_set', (args) {
       if (_disposed) return;
       final req = (args is Map)
@@ -337,6 +359,11 @@ var yoloit = {
   //   yoloit.onEvent(function handleEvent(actionId, payload) { ... });
   _handler: null,
   onEvent: function(fn){ yoloit._handler = fn; },
+
+  // Theme — updated by Dart when the user switches themes
+  theme: {isDark:true,bg:'#0f172a',surface:'#1e293b',border:'#334155',accent:'#818cf8',text:'#f1f5f9',muted:'#64748b'},
+  _onThemeChange: null,
+  onThemeChange: function(fn){ yoloit._onThemeChange = fn; },
 
   // Encrypted secure storage — sandboxed per widget ID
   secrets:{
