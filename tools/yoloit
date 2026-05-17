@@ -523,121 +523,151 @@ commands = [
   {
     "group": "note",
     "name": "note",
-    "description": "Set note text (auto-creates or reuses note panel)",
-    "params": [["text", "Markdown text", True]],
+    "description": "Set note text — board and panel optional (uses active board/first note panel)",
+    "params": [["text", "Markdown text (1 arg: current board)", True], ["[panel]", "Panel title", False], ["[board]", "Board name (3 args)", False]],
     "example": "yoloit note \"# Plan\"",
+    "aliases": ["note"],
+  },
+  {
+    "group": "note",
+    "name": "note:add",
+    "description": "Append text to note — board and panel optional (alias: n:a)",
+    "params": [["text", "Text to append", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
+    "example": "yoloit note:add \"Купить кофе\"",
+    "aliases": ["n:a"],
+  },
+  {
+    "group": "note",
+    "name": "note:create",
+    "description": "Create a new note panel (alias: n:c)",
+    "params": [["title", "Note title", True], ["[content]", "Markdown content", False], ["[board]", "Board name (first arg when 3+)", False]],
+    "example": "yoloit note:create \"Sprint Plan\" \"# Goals\\n- Ship\"",
+    "aliases": ["n:c"],
   },
   {
     "group": "note",
     "name": "note:append",
-    "description": "Append markdown note text",
-    "params": [["board", "Board id or name", True], ["panel", "Note panel id or title", True], ["text", "Markdown text", True]],
+    "description": "Append markdown text (explicit board+panel)",
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True], ["text", "Markdown text", True]],
     "example": "yoloit note:append \"My Board\" \"Notes\" \"- item\"",
   },
   {
     "group": "note",
     "name": "note:wrap",
     "description": "Enable note auto-height wrapping",
-    "params": [["board", "Board id or name", True], ["panel", "Note panel id or title", True]],
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True]],
     "example": "yoloit note:wrap \"My Board\" \"Notes\"",
   },
   {
     "group": "note",
     "name": "note:nowrap",
     "description": "Disable note auto-height wrapping",
-    "params": [["board", "Board id or name", True], ["panel", "Note panel id or title", True]],
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True]],
     "example": "yoloit note:nowrap \"My Board\" \"Notes\"",
-  },
-  {
-    "group": "note",
-    "name": "note:create",
-    "description": "Create a new note panel with title and optional content",
-    "params": [["title", "Note title", True], ["content", "Markdown content", False]],
-    "example": "yoloit note:create \"Sprint Plan\" \"# Goals\\n- Ship\\n- Party\"",
   },
   {
     "group": "checklist",
     "name": "checklist:add",
-    "description": "Add checklist item",
-    "params": [["board", "Board id or name", True], ["panel", "Checklist panel id or title", True], ["item", "Item text", True]],
-    "example": "yoloit checklist:add \"My Board\" \"Tasks\" \"Ship build\"",
+    "description": "Add checklist item — board and panel optional (alias: cl:a)",
+    "params": [["item", "Item text (1 arg: current board/panel)", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
+    "example": "yoloit checklist:add \"Купить кофе\"",
+    "aliases": ["cl:a"],
+  },
+  {
+    "group": "checklist",
+    "name": "checklist:new",
+    "description": "Create a new checklist panel (alias: cl:n)",
+    "params": [["title", "Panel title", True], ["[board]", "Board name", False]],
+    "example": "yoloit checklist:new \"Shopping\"",
+    "aliases": ["cl:n"],
   },
   {
     "group": "checklist",
     "name": "checklist:check",
-    "description": "Check checklist item",
-    "params": [["board", "Board id or name", True], ["panel", "Checklist panel id or title", True], ["item-id|item-text", "Item id or text", True]],
-    "example": "yoloit checklist:check \"My Board\" \"Tasks\" \"Ship build\"",
+    "description": "Check checklist item — board and panel optional (alias: cl:ch)",
+    "params": [["item", "Item text/id (1 arg: current board/panel)", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
+    "example": "yoloit checklist:check \"Купить кофе\"",
+    "aliases": ["cl:ch"],
   },
   {
     "group": "checklist",
     "name": "checklist:uncheck",
-    "description": "Uncheck checklist item",
-    "params": [["board", "Board id or name", True], ["panel", "Checklist panel id or title", True], ["item-id|item-text", "Item id or text", True]],
-    "example": "yoloit checklist:uncheck \"My Board\" \"Tasks\" \"Ship build\"",
+    "description": "Uncheck checklist item — board and panel optional (alias: cl:u)",
+    "params": [["item", "Item text/id", True], ["[panel]", "Panel title", False], ["[board]", "Board name", False]],
+    "example": "yoloit checklist:uncheck \"Купить кофе\"",
+    "aliases": ["cl:u"],
   },
   {
     "group": "kanban",
     "name": "kanban:columns",
-    "description": "List kanban columns",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True]],
-    "example": "yoloit kanban:columns \"My Board\" \"Kanban\"",
+    "description": "List kanban columns — board and panel optional (alias: k:col)",
+    "params": [["[panel]", "Panel title", False], ["[board]", "Board name", False]],
+    "example": "yoloit kanban:columns",
+    "aliases": ["k:col"],
   },
   {
     "group": "kanban",
     "name": "kanban:add-column",
-    "description": "Add kanban column",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True], ["column-name", "Column name", True]],
-    "example": "yoloit kanban:add-column \"My Board\" \"Kanban\" \"Review\"",
+    "description": "Add kanban column — board and panel optional (alias: k:c)",
+    "params": [["column-name", "Column name (1 arg: current board/panel)", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
+    "example": "yoloit kanban:add-column \"Review\"",
+    "aliases": ["k:c"],
   },
   {
     "group": "kanban",
     "name": "kanban:rename-column",
-    "description": "Rename kanban column",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True], ["col-id|name", "Column id or name", True], ["new-name", "New column name", True]],
-    "example": "yoloit kanban:rename-column \"My Board\" \"Kanban\" \"Todo\" \"Backlog\"",
+    "description": "Rename kanban column — board and panel optional (alias: k:rc)",
+    "params": [["col-name", "Column name", True], ["new-name", "New name", True], ["[panel]", "Panel title (3 args)", False], ["[board]", "Board name (4 args)", False]],
+    "example": "yoloit kanban:rename-column \"Todo\" \"Backlog\"",
+    "aliases": ["k:rc"],
   },
   {
     "group": "kanban",
     "name": "kanban:remove-column",
-    "description": "Remove kanban column",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True], ["col-id|name", "Column id or name", True]],
-    "example": "yoloit kanban:remove-column \"My Board\" \"Kanban\" \"Old\"",
+    "description": "Remove kanban column — board and panel optional (alias: k:dc)",
+    "params": [["col-name", "Column name (1 arg: current board/panel)", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
+    "example": "yoloit kanban:remove-column \"Old\"",
+    "aliases": ["k:dc"],
   },
   {
     "group": "kanban",
     "name": "kanban:add-card",
-    "description": "Add kanban card",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True], ["column", "Column id or name", True], ["title", "Card title", True]],
-    "example": "yoloit kanban:add-card \"My Board\" \"Kanban\" \"Todo\" \"Fix mic\"",
+    "description": "Add kanban card — board and panel optional (alias: k:a, kanban:card)",
+    "params": [["column", "Column name", True], ["title", "Card title", True], ["[panel]", "Panel title (3 args)", False], ["[board]", "Board name (4 args)", False]],
+    "example": "yoloit kanban:card \"Todo\" \"Fix mic\"",
+    "aliases": ["k:a", "kanban:card"],
   },
   {
     "group": "kanban",
     "name": "kanban:move-card",
-    "description": "Move kanban card",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True], ["cardId", "Card id", True], ["to-column", "Destination column", True]],
-    "example": "yoloit kanban:move-card \"My Board\" \"Kanban\" card_1 Done",
+    "description": "Move kanban card — board and panel optional (alias: k:mv)",
+    "params": [["cardId", "Card id", True], ["to-column", "Destination column", True], ["[panel]", "Panel title (3 args)", False], ["[board]", "Board name (4 args)", False]],
+    "example": "yoloit kanban:move-card card_1 Done",
+    "aliases": ["k:mv"],
   },
   {
     "group": "kanban",
     "name": "kanban:remove-card",
-    "description": "Remove kanban card",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True], ["cardId", "Card id", True]],
-    "example": "yoloit kanban:remove-card \"My Board\" \"Kanban\" card_1",
+    "description": "Remove kanban card — board and panel optional (alias: k:rm)",
+    "params": [["cardId", "Card id", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
+    "example": "yoloit kanban:remove-card card_1",
+    "aliases": ["k:rm"],
   },
   {
     "group": "kanban",
     "name": "kanban:update-card",
-    "description": "Update kanban card title",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True], ["cardId", "Card id", True], ["new-title", "New title", True]],
-    "example": "yoloit kanban:update-card \"My Board\" \"Kanban\" card_1 \"New title\"",
+    "description": "Update kanban card title — board and panel optional (alias: k:up)",
+    "params": [["cardId", "Card id", True], ["new-title", "New title", True], ["[panel]", "Panel title (3 args)", False], ["[board]", "Board name (4 args)", False]],
+    "example": "yoloit kanban:update-card card_1 \"New title\"",
+    "aliases": ["k:up"],
   },
   {
     "group": "kanban",
     "name": "kanban:cards",
-    "description": "List kanban cards",
-    "params": [["board", "Board id or name", True], ["panel", "Kanban panel id or title", True]],
-    "example": "yoloit kanban:cards \"My Board\" \"Kanban\"",
+    "description": "List kanban cards — board and panel optional (alias: k:ls)",
+    "params": [["[panel]", "Panel title", False], ["[board]", "Board name", False]],
+    "example": "yoloit kanban:cards",
+    "aliases": ["k:ls"],
   },
   {
     "group": "playlist",
@@ -685,19 +715,25 @@ def param_to_key(name):
 if fmt == "short":
     print("yoloit help (short)")
     print("Use: yoloit help --format [short|detailed|mermaid|tools]")
+    print("Board and panel are optional in note/checklist/kanban commands — uses active board/panel.")
     for g in group_order:
         if not by_group[g]:
             continue
         print(f"\n{g}:")
         for c in by_group[g]:
-            print(f'  {c["name"]} — {c["description"]}')
+            aliases = c.get("aliases", [])
+            alias_str = f'  [aliases: {", ".join(aliases)}]' if aliases else ""
+            print(f'  {c["name"]} — {c["description"]}{alias_str}')
             if c["params"]:
                 print(f'    params: {params_inline(c)}')
             print(f'    ex: {c["example"]}')
 elif fmt == "detailed":
     print("yoloit help (detailed)\n")
     for c in commands:
+        aliases = c.get("aliases", [])
         print(f'Command: {c["name"]}')
+        if aliases:
+            print(f'Aliases: {", ".join(aliases)}')
         print(f'Description: {c["description"]}')
         if c["params"]:
             print("Parameters:")
@@ -792,6 +828,69 @@ _auto_panel() {
   local created
   created=$(_post "/boards/${bid}/panels" "$body")
   python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print((d.get('panel') or {}).get('id',''))" <<<"$created"
+}
+
+# ── Smart board/panel resolution ──────────────────────────────────────
+
+# Returns active board raw name/id: explicit arg → state.json → API active board
+_require_board() {
+  local explicit="${1:-}"
+  if [[ -n "$explicit" ]]; then echo "$explicit"; return; fi
+  local from_state
+  from_state=$(_board "")
+  if [[ -n "$from_state" ]]; then echo "$from_state"; return; fi
+  _resolve_base 2>/dev/null || true
+  if [[ -n "$BASE" ]]; then
+    local name
+    name=$(python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read() or '{}')
+b = d.get('board') or {}
+print(b.get('name') or b.get('id') or '')
+" <<<"$(_get "/active-board" 2>/dev/null)" 2>/dev/null || echo "")
+    [[ -n "$name" ]] && { echo "$name"; return; }
+  fi
+  echo "Error: no board specified and no active board found. Use 'yoloit board:use <name>'." >&2
+  exit 1
+}
+
+# Find existing panel of given type (optionally matching title hint), or create one.
+# Usage: _smart_panel <encoded-bid> <type> [title-hint]
+# Returns panel id (raw, not encoded)
+_smart_panel() {
+  local bid=$1 type=$2 hint="${3:-}"
+  local panels_json existing=""
+  panels_json=$(_get "/boards/${bid}/panels" 2>/dev/null)
+  # Match by title hint first
+  if [[ -n "$hint" ]]; then
+    existing=$(python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read() or '{}')
+hint = sys.argv[1].lower(); typ = sys.argv[2]
+for p in d.get('panels') or []:
+    if not p.get('hidden') and (p.get('title','').lower() == hint or p.get('id','').lower() == hint):
+        print(p.get('id','')); break
+" "$hint" "$type" <<<"$panels_json" 2>/dev/null)
+  fi
+  # Fallback: first visible panel of matching type
+  if [[ -z "$existing" ]]; then
+    existing=$(python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read() or '{}')
+typ = sys.argv[1]
+for p in d.get('panels') or []:
+    if not p.get('hidden') and p.get('type','') == typ:
+        print(p.get('id','')); break
+" "$type" <<<"$panels_json" 2>/dev/null)
+  fi
+  if [[ -n "$existing" ]]; then
+    echo "$existing"
+  else
+    # Create a new panel with sensible title
+    local display="${hint:-${type##*.}}"
+    display=$(python3 -c "import sys; print(sys.argv[1].capitalize())" "$display")
+    _auto_panel "$bid" "$type" "$display"
+  fi
 }
 
 # ── Command dispatch ──────────────────────────────────────────────────
@@ -904,11 +1003,11 @@ PYEOF
     ;;
   board:current)
     local cur
-    cur=$(_board "")
+    cur=$(_require_board "")
     if [[ -n "$cur" ]]; then
       echo "$cur"
     else
-      echo "No current board set" >&2
+      echo "No current board found" >&2
       exit 1
     fi
     ;;
@@ -1449,144 +1548,263 @@ PY
     _put "/boards/${bid}/links/${lid}" "{\"color\":\"$3\"}" | python3 -m json.tool 2>/dev/null
     ;;
   # Shorthand panel-type commands
+  # Smart arg parsing: [board] [panel] <text>
+  # Board and panel are optional — resolved from active board / panel type
   note)
-    local bid_raw pid text
-    bid_raw=$(_board "")
-    if [[ $# -eq 1 ]]; then
-      text="$1"
-    elif [[ $# -eq 2 ]]; then
-      bid_raw="$1"; text="$2"
-    elif [[ $# -ge 3 ]]; then
-      bid_raw="$1"; pid="$2"; shift 2; text="$*"
-    fi
-    [[ -z "$bid_raw" ]] && { echo "Usage: yoloit note <text> | <board> <panel> <text>" >&2; exit 1; }
-    [[ -z "$text" ]] && { echo "Usage: yoloit note <text> | <board> <panel> <text>" >&2; exit 1; }
+    local bid_raw="" pid="" text="" panel_hint=""
+    case $# in
+      0) echo "Usage: yoloit note [board] [panel] <text>" >&2; exit 1 ;;
+      1) text="$1" ;;
+      2) panel_hint="$1"; text="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; text="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
-    if [[ -z "$pid" ]]; then
-      local panels_json existing
-      panels_json=$(_get "/boards/${bid}/panels" 2>/dev/null)
-      existing=$(python3 -c "
-import json,sys
-d=json.loads(sys.stdin.read() or '{}')
-panels=d.get('panels') or []
-for p in panels:
-    if p.get('type')=='board.note.markdown' and not p.get('hidden'):
-        print(p.get('id',''))
-        break
-" <<<"$panels_json" 2>/dev/null)
-      if [[ -n "$existing" ]]; then
-        pid="$existing"
-        echo "Using existing note panel: $pid"
-      else
-        pid=$(_auto_panel "$bid" "board.note.markdown" "Note")
-        [[ -z "$pid" ]] && { echo "Error: failed to create note panel" >&2; exit 1; }
-      fi
-    fi
+    pid=$(_smart_panel "$bid" "board.note.markdown" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve note panel" >&2; exit 1; }
     pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"set\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
     ;;
-  note:create)
-    local bid_raw title content
-    bid_raw=$(_board "")
-    if [[ $# -eq 1 ]]; then
-      title="$1"
-    elif [[ $# -eq 2 ]]; then
-      title="$1"; content="$2"
-    elif [[ $# -ge 3 ]]; then
-      bid_raw="$1"; title="$2"; shift 2; content="$*"
-    fi
-    [[ -z "$bid_raw" || -z "$title" ]] && { echo "Usage: yoloit note:create [board] <title> [content]" >&2; exit 1; }
+  note:add|n:a)
+    # Append text to note — smart board/panel resolution
+    # Usage: yoloit note:add "text"
+    #        yoloit note:add "Panel" "text"
+    #        yoloit note:add "Board" "Panel" "text"
+    local bid_raw="" panel_hint="" text=""
+    case $# in
+      0) echo "Usage: yoloit note:add [board] [panel] <text>" >&2; exit 1 ;;
+      1) text="$1" ;;
+      2) panel_hint="$1"; text="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; text="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.note.markdown" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve note panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"append\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  note:create|n:c)
+    # Create a new note panel
+    # Usage: yoloit note:create "Title" ["content"]
+    #        yoloit note:create "Board" "Title" ["content"]
+    local bid_raw="" title="" content=""
+    case $# in
+      0) echo "Usage: yoloit note:create [board] <title> [content]" >&2; exit 1 ;;
+      1) title="$1" ;;
+      2) title="$1"; content="$2" ;;
+      *) bid_raw="$1"; title="$2"; shift 2; content="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     local state
-    state=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1] if len(sys.argv)>1 and sys.argv[1] else ''}))" "$content" 2>/dev/null)
-    local pid
+    state=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1] if len(sys.argv)>1 else ''}))" "${content:-}" 2>/dev/null)
     pid=$(_auto_panel "$bid" "board.note.markdown" "$title" "$state")
     echo "Note panel created: $pid"
     ;;
   note:append)
+    # Explicit board+panel required (legacy compat)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit note:append <board> <panel> <text>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     shift 2; text="$*"
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"append\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
     ;;
   note:wrap)
-    # Enable auto-height: panel resizes to fit content
     [[ $# -lt 2 ]] && { echo "Usage: yoloit note:wrap <board> <panel>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"wrap"}' | python3 -m json.tool 2>/dev/null
     ;;
   note:nowrap)
-    # Disable auto-height: panel keeps fixed height
     [[ $# -lt 2 ]] && { echo "Usage: yoloit note:nowrap <board> <panel>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"nowrap"}' | python3 -m json.tool 2>/dev/null
     ;;
-  checklist:add)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:add <board> <panel> <item>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    shift 2; item="$*"
+  checklist:add|cl:a)
+    # Smart: yoloit checklist:add "item"
+    #        yoloit checklist:add "Panel" "item"
+    #        yoloit checklist:add "Board" "Panel" "item"
+    local bid_raw="" panel_hint="" item=""
+    case $# in
+      0) echo "Usage: yoloit checklist:add [board] [panel] <item>" >&2; exit 1 ;;
+      1) item="$1" ;;
+      2) panel_hint="$1"; item="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; item="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.checklist" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve checklist panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$item")}" | python3 -m json.tool 2>/dev/null
     ;;
-  checklist:check)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:check <board> <panel> <item-id|item-text>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    shift 2; target="$*"
+  checklist:new|cl:n)
+    # Create a new checklist panel
+    # Usage: yoloit checklist:new "Title"
+    #        yoloit checklist:new "Board" "Title"
+    local bid_raw="" title=""
+    case $# in
+      0) echo "Usage: yoloit checklist:new [board] <title>" >&2; exit 1 ;;
+      1) title="$1" ;;
+      *) bid_raw="$1"; title="$2" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_auto_panel "$bid" "board.checklist" "$title")
+    echo "Checklist panel created: $pid"
+    ;;
+  checklist:check|cl:ch)
+    # Smart: yoloit checklist:check "item"
+    #        yoloit checklist:check "Panel" "item"
+    #        yoloit checklist:check "Board" "Panel" "item"
+    local bid_raw="" panel_hint="" target=""
+    case $# in
+      0) echo "Usage: yoloit checklist:check [board] [panel] <item>" >&2; exit 1 ;;
+      1) target="$1" ;;
+      2) panel_hint="$1"; target="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; target="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.checklist" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve checklist panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"check\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
     ;;
-  checklist:uncheck)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit checklist:uncheck <board> <panel> <item-id|item-text>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    shift 2; target="$*"
+  checklist:uncheck|cl:u)
+    local bid_raw="" panel_hint="" target=""
+    case $# in
+      0) echo "Usage: yoloit checklist:uncheck [board] [panel] <item>" >&2; exit 1 ;;
+      1) target="$1" ;;
+      2) panel_hint="$1"; target="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; target="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.checklist" "$panel_hint")
+    [[ -z "$pid" ]] && { echo "Error: failed to resolve checklist panel" >&2; exit 1; }
+    pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"uncheck\",\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target"),\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$target")}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:columns)
-    [[ $# -lt 2 ]] && { echo "Usage: yoloit kanban:columns <board> <panel>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+  kanban:columns|k:col)
+    local bid_raw="" panel_hint=""
+    case $# in
+      0|1) panel_hint="${1:-}" ;;
+      *) bid_raw="$1"; panel_hint="$2" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"columns"}' | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:add-column)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit kanban:add-column <board> <panel> <column-name>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    shift 2; name="$*"
+  kanban:add-column|k:c)
+    # yoloit kanban:add-column "column-name"
+    # yoloit kanban:add-column "Panel" "column-name"
+    # yoloit kanban:add-column "Board" "Panel" "column-name"
+    local bid_raw="" panel_hint="" name=""
+    case $# in
+      0) echo "Usage: yoloit kanban:add-column [board] [panel] <column>" >&2; exit 1 ;;
+      1) name="$1" ;;
+      2) panel_hint="$1"; name="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; name="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-column\",\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$name")}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:rename-column)
-    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:rename-column <board> <panel> <col-id|name> <new-name>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2"); col="$3"
-    shift 3; newname="$*"
+  kanban:rename-column|k:rc)
+    # yoloit kanban:rename-column "old" "new"
+    # yoloit kanban:rename-column "Panel" "old" "new"
+    # yoloit kanban:rename-column "Board" "Panel" "old" "new"
+    local bid_raw="" panel_hint="" col="" newname=""
+    case $# in
+      0|1) echo "Usage: yoloit kanban:rename-column [board] [panel] <col> <new-name>" >&2; exit 1 ;;
+      2) col="$1"; newname="$2" ;;
+      3) panel_hint="$1"; col="$2"; newname="$3" ;;
+      *) bid_raw="$1"; panel_hint="$2"; col="$3"; shift 3; newname="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"rename-column\",\"column\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$col"),\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$newname")}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:remove-column)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit kanban:remove-column <board> <panel> <col-id|name>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    shift 2; col="$*"
+  kanban:remove-column|k:dc)
+    local bid_raw="" panel_hint="" col=""
+    case $# in
+      0) echo "Usage: yoloit kanban:remove-column [board] [panel] <col>" >&2; exit 1 ;;
+      1) col="$1" ;;
+      2) panel_hint="$1"; col="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; shift 2; col="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-column\",\"column\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$col")}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:add-card)
-    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:add-card <board> <panel> <column> <title>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2"); col="$3"
-    shift 3; title="$*"
+  kanban:add-card|kanban:card|k:a)
+    # yoloit kanban:card "column" "title"
+    # yoloit kanban:card "Panel" "column" "title"
+    # yoloit kanban:card "Board" "Panel" "column" "title"
+    local bid_raw="" panel_hint="" col="" title=""
+    case $# in
+      0|1) echo "Usage: yoloit kanban:card [board] [panel] <column> <title>" >&2; exit 1 ;;
+      2) col="$1"; title="$2" ;;
+      3) panel_hint="$1"; col="$2"; title="$3" ;;
+      *) bid_raw="$1"; panel_hint="$2"; col="$3"; shift 3; title="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-card\",\"column\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$col"),\"title\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$title")}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:move-card)
-    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:move-card <board> <panel> <cardId> <to-column>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"move-card\",\"cardId\":\"$3\",\"to\":\"$4\"}" | python3 -m json.tool 2>/dev/null
+  kanban:move-card|k:mv)
+    local bid_raw="" panel_hint="" cardId="" to=""
+    case $# in
+      0|1|2) echo "Usage: yoloit kanban:move-card [board] [panel] <cardId> <to-column>" >&2; exit 1 ;;
+      2) cardId="$1"; to="$2" ;;
+      3) panel_hint="$1"; cardId="$2"; to="$3" ;;
+      *) bid_raw="$1"; panel_hint="$2"; cardId="$3"; to="$4" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"move-card\",\"cardId\":\"${cardId}\",\"to\":\"${to}\"}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:remove-card)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit kanban:remove-card <board> <panel> <cardId>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-card\",\"cardId\":\"$3\"}" | python3 -m json.tool 2>/dev/null
+  kanban:remove-card|k:rm)
+    local bid_raw="" panel_hint="" cardId=""
+    case $# in
+      0) echo "Usage: yoloit kanban:remove-card [board] [panel] <cardId>" >&2; exit 1 ;;
+      1) cardId="$1" ;;
+      2) panel_hint="$1"; cardId="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; cardId="$3" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-card\",\"cardId\":\"${cardId}\"}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:update-card)
-    [[ $# -lt 4 ]] && { echo "Usage: yoloit kanban:update-card <board> <panel> <cardId> <new-title>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2"); cardId="$3"
-    shift 3; title="$*"
+  kanban:update-card|k:up)
+    local bid_raw="" panel_hint="" cardId="" title=""
+    case $# in
+      0|1) echo "Usage: yoloit kanban:update-card [board] [panel] <cardId> <new-title>" >&2; exit 1 ;;
+      2) cardId="$1"; title="$2" ;;
+      3) panel_hint="$1"; cardId="$2"; title="$3" ;;
+      *) bid_raw="$1"; panel_hint="$2"; cardId="$3"; shift 3; title="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"update-card\",\"cardId\":\"${cardId}\",\"title\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$title")}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:cards)
-    [[ $# -lt 2 ]] && { echo "Usage: yoloit kanban:cards <board> <panel>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+  kanban:cards|k:ls)
+    local bid_raw="" panel_hint=""
+    case $# in
+      0|1) panel_hint="${1:-}" ;;
+      *) bid_raw="$1"; panel_hint="$2" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"cards"}' | python3 -m json.tool 2>/dev/null
     ;;
   play)
