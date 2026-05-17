@@ -1,70 +1,91 @@
-// Crypto widget — BTC, ETH, SOL prices via CoinGecko free API (no key)
-(function () {
-  const COINS = [
-    { id: 'bitcoin',   symbol: 'BTC', icon: '₿',  color: '#f59e0b' },
-    { id: 'ethereum',  symbol: 'ETH', icon: 'Ξ',  color: '#818cf8' },
-    { id: 'solana',    symbol: 'SOL', icon: '◎',  color: '#34d399' },
-    { id: 'binancecoin', symbol: 'BNB', icon: 'B', color: '#fbbf24' },
-    { id: 'ripple',    symbol: 'XRP', icon: '✕',  color: '#60a5fa' },
+// Crypto widget — CoinGecko free API (fetched via Dart, no CORS)
+(function() {
+  var COINS = [
+    {id:'bitcoin',   sym:'BTC', icon:'₿',  color:'#f59e0b'},
+    {id:'ethereum',  sym:'ETH', icon:'Ξ',  color:'#818cf8'},
+    {id:'solana',    sym:'SOL', icon:'◎',  color:'#34d399'},
+    {id:'binancecoin',sym:'BNB',icon:'B',  color:'#fbbf24'},
+    {id:'ripple',    sym:'XRP', icon:'✕',  color:'#60a5fa'},
   ];
 
-  const app = document.getElementById('app');
-  let prevPrices = {};
-
-  function arrow(change) {
-    if (change > 0) return '<span style="color:#4ade80">▲</span>';
-    if (change < 0) return '<span style="color:#f87171">▼</span>';
-    return '<span style="color:#94a3b8">—</span>';
-  }
-
-  function fmt(n) {
-    if (n >= 1000) return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  function fmtPrice(n) {
+    if (n >= 1000) return '$' + Math.round(n).toLocaleString('en-US');
     if (n >= 1)    return '$' + n.toFixed(2);
     return '$' + n.toFixed(4);
   }
 
   async function load() {
-    const ids = COINS.map(c => c.id).join(',');
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
+    yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
-      const data = await yoloit.fetchJson(url);
-      let html = `<div style="padding:12px">
-        <div style="font-size:11px;color:#475569;margin-bottom:10px;text-align:right">
-          🕐 ${new Date().toLocaleTimeString()}
-        </div>`;
-      for (const coin of COINS) {
-        const info = data[coin.id];
-        if (!info) continue;
-        const price = info.usd;
-        const change = info.usd_24h_change;
-        const changeColor = change >= 0 ? '#4ade80' : '#f87171';
-        html += `
-          <div style="display:flex;align-items:center;justify-content:space-between;
-                      padding:10px 12px;margin-bottom:6px;border-radius:8px;
-                      background:#1e293b;border:1px solid #1e3a5f">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:20px;color:${coin.color};font-weight:700">${coin.icon}</span>
-              <div>
-                <div style="font-size:13px;font-weight:600;color:#e2e8f0">${coin.symbol}</div>
-                <div style="font-size:10px;color:#64748b">${coin.id}</div>
-              </div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-size:14px;font-weight:700;color:#f1f5f9">${fmt(price)}</div>
-              <div style="font-size:11px;color:${changeColor}">
-                ${arrow(change)} ${Math.abs(change).toFixed(2)}% (24h)
-              </div>
-            </div>
-          </div>`;
-        prevPrices[coin.id] = price;
-      }
-      html += `<div style="text-align:center;font-size:10px;color:#334155;margin-top:8px">
-        via CoinGecko · auto-refresh 60s</div></div>`;
-      app.innerHTML = html;
-    } catch (e) {
-      app.innerHTML = `<div style="padding:16px;color:#f87171;font-size:13px">
-        ⚠️ ${e.message}<br><span style="color:#64748b;font-size:11px">Check your network</span></div>`;
+      var ids = COINS.map(function(c){return c.id;}).join(',');
+      var url = 'https://api.coingecko.com/api/v3/simple/price?ids='+ids+'&vs_currencies=usd&include_24hr_change=true';
+      var data = await yoloit.fetchJson(url);
+
+      var now = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      var rows = COINS.map(function(coin) {
+        var info = data[coin.id];
+        if (!info) return {type:'sizedBox',height:0};
+        var price = info.usd;
+        var chg = info.usd_24h_change || 0;
+        var chgColor = chg >= 0 ? '#4ade80' : '#f87171';
+        var arrow = chg >= 0 ? '▲' : '▼';
+        return {
+          type:'container',
+          margin:[0,0,0,6],
+          decoration:{color:'#1e293b',borderRadius:8,borderColor:'#1e3a5f',borderWidth:1},
+          padding:[12,10,12,10],
+          child:{type:'row',crossAxisAlignment:'center',children:[
+            // Icon
+            {type:'container',
+             decoration:{color:'#0f172a',borderRadius:20},
+             padding:[8,8,8,8],
+             child:{type:'text',data:coin.icon,style:{fontSize:18,color:coin.color}}},
+            {type:'sizedBox',width:10},
+            // Name
+            {type:'expanded',child:{type:'column',crossAxisAlignment:'start',children:[
+              {type:'text',data:coin.sym,style:{color:'#e2e8f0',fontWeight:'w700',fontSize:14}},
+              {type:'text',data:coin.id,style:{color:'#475569',fontSize:10}},
+            ]}},
+            // Price & change
+            {type:'column',crossAxisAlignment:'end',mainAxisSize:'min',children:[
+              {type:'text',data:fmtPrice(price),
+               style:{color:'#f1f5f9',fontWeight:'w700',fontSize:14}},
+              {type:'row',mainAxisSize:'min',children:[
+                {type:'text',data:arrow+' ',style:{color:chgColor,fontSize:11}},
+                {type:'text',data:Math.abs(chg).toFixed(2)+'%',
+                 style:{color:chgColor,fontSize:11}},
+              ]},
+            ]},
+          ]},
+        };
+      });
+
+      yoloit.render({
+        type:'column',
+        crossAxisAlignment:'stretch',
+        children:[
+          {type:'padding',padding:[12,12,12,8],child:{type:'column',
+            crossAxisAlignment:'stretch',
+            children: rows,
+          }},
+          {type:'padding',padding:[0,0,12,8],child:{
+            type:'row',mainAxisAlignment:'spaceBetween',children:[
+              {type:'padding',padding:[12,0,0,0],child:{
+                type:'text',data:'via CoinGecko · '+now,
+                style:{color:'#334155',fontSize:10},
+              }},
+              {type:'textButton',text:'Refresh',onTap:'refresh'},
+            ],
+          }},
+        ]
+      });
+    } catch(e) {
+      yoloit.showError('Could not load prices:\n'+e.message);
     }
+  }
+
+  function handleEvent(actionId, payload) {
+    if (actionId === 'refresh') load();
   }
 
   yoloit.panel.setTitle('Crypto Prices');

@@ -1,117 +1,102 @@
-// Calculator widget — pure JS, no network required
-(function () {
-  const app = document.getElementById('app');
+// Calculator widget — pure JS with native Flutter UI
+(function() {
+  var expr = '';
+  var justCalc = false;
 
-  app.innerHTML = `
-    <div style="padding:12px;max-width:280px;margin:0 auto">
-      <div id="display"
-        style="background:#0f172a;border:1px solid #334155;border-radius:8px;
-               padding:12px 16px;margin-bottom:10px;text-align:right;min-height:60px">
-        <div id="expr" style="font-size:11px;color:#64748b;min-height:16px;margin-bottom:4px"></div>
-        <div id="result" style="font-size:28px;font-weight:700;color:#e2e8f0">0</div>
-      </div>
-      <div id="keys" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px"></div>
-    </div>`;
+  function render() {
+    var btnRows = [
+      ['C','±','%','÷'],
+      ['7','8','9','×'],
+      ['4','5','6','−'],
+      ['1','2','3','+'],
+      ['0','.','⌫','='],
+    ];
 
-  const keys = [
-    ['C', '±', '%', '÷'],
-    ['7', '8', '9', '×'],
-    ['4', '5', '6', '−'],
-    ['1', '2', '3', '+'],
-    ['0', '.', '⌫', '='],
-  ];
+    var opBg = '#b45309'; var opFg = '#ffffff';
+    var numBg = '#1e293b'; var numFg = '#e2e8f0';
+    var specBg= '#334155';
+    var eqBg  = '#2563eb';
 
-  const ops = { '÷': '/', '×': '*', '−': '-', '+': '+' };
-  let expr = '';
-  let resultEl = document.getElementById('result');
-  let exprEl = document.getElementById('expr');
-  let justCalc = false;
+    var rows = btnRows.map(function(row) {
+      return {type:'row',children:row.map(function(k) {
+        var bg = (['÷','×','−','+'].indexOf(k)>=0) ? opBg :
+                 (k==='=' ? eqBg :
+                 (['C','±','%','⌫'].indexOf(k)>=0) ? specBg : numBg);
+        var fg = '#ffffff';
+        return {
+          type:'expanded',
+          child:{type:'padding',padding:[3,3,3,3],child:{
+            type:'inkWell',onTap:'btn_'+k,borderRadius:8,
+            child:{type:'container',
+              decoration:{color:bg,borderRadius:8},
+              padding:[0,14,0,14],
+              child:{type:'text',data:k,style:{
+                color:fg,fontSize:18,fontWeight:'w600',textAlign:'center',
+              }},
+            },
+          }},
+        };
+      })};
+    });
 
-  const keyColors = {
-    'C': '#ef4444', '±': '#475569', '%': '#475569', '÷': '#f59e0b',
-    '×': '#f59e0b', '−': '#f59e0b', '+': '#f59e0b', '=': '#3b82f6',
-    '⌫': '#475569',
-  };
+    // Display
+    var display = {type:'container',
+      decoration:{color:'#0f172a',borderRadius:12},
+      padding:[16,12,16,12],
+      margin:[0,0,0,8],
+      child:{type:'column',crossAxisAlignment:'end',children:[
+        {type:'text',data:expr||'',style:{color:'#475569',fontSize:13},
+         maxLines:1,overflow:'ellipsis'},
+        {type:'sizedBox',height:4},
+        {type:'text',data:_preview()||'0',
+         style:{color:'#f1f5f9',fontSize:32,fontWeight:'w700'},
+         maxLines:1,overflow:'ellipsis'},
+      ]},
+    };
 
-  const grid = document.getElementById('keys');
-  for (const row of keys) {
-    for (const k of row) {
-      const btn = document.createElement('button');
-      btn.textContent = k;
-      const bg = keyColors[k] || '#1e293b';
-      btn.style.cssText = `
-        background:${bg};border:1px solid #334155;border-radius:8px;
-        color:#e2e8f0;font-size:16px;font-weight:600;padding:14px 0;
-        cursor:pointer;transition:opacity .1s;
-        ${k === '0' ? '' : ''}
-      `;
-      btn.onmousedown = () => { btn.style.opacity = '0.7'; };
-      btn.onmouseup = () => { btn.style.opacity = '1'; };
-      btn.onclick = () => press(k);
-      grid.appendChild(btn);
-    }
+    yoloit.render({
+      type:'padding',padding:[12,12,12,12],
+      child:{type:'column',crossAxisAlignment:'stretch',children:[display].concat(rows)},
+    });
+  }
+
+  function _preview() {
+    if (!expr) return '0';
+    try {
+      var safe = expr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-');
+      var v = Function('"use strict";return('+safe+')')();
+      if (!isFinite(v)) return 'Error';
+      return +v.toFixed(10)+'';
+    } catch(e){ return ''; }
   }
 
   function press(k) {
-    if (k === 'C') {
-      expr = '';
-      resultEl.textContent = '0';
-      exprEl.textContent = '';
-      justCalc = false;
-      return;
+    if (k==='C'){expr='';justCalc=false;render();return;}
+    if (k==='⌫'){expr=expr.slice(0,-1);render();return;}
+    if (k==='='){
+      try{
+        var safe=expr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-');
+        var v=Function('"use strict";return('+safe+')')();
+        expr=''+Number(v.toFixed(10));
+        justCalc=true;
+      }catch(e){expr='';justCalc=true;}
+      render();return;
     }
-    if (k === '⌫') {
-      expr = expr.slice(0, -1);
-      exprEl.textContent = expr;
-      if (!expr) resultEl.textContent = '0';
-      return;
+    if (k==='±'){expr=expr.startsWith('-')?expr.slice(1):expr?'-'+expr:expr;render();return;}
+    if (k==='%'){
+      try{var v=Function('"use strict";return('+expr.replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-')+')')();expr=''+Number((v/100).toFixed(10));}catch(e){}
+      render();return;
     }
-    if (k === '=') {
-      try {
-        const evaled = Function('"use strict"; return (' + expr.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-') + ')')();
-        exprEl.textContent = expr + ' =';
-        resultEl.textContent = Number(evaled.toFixed(10)).toString();
-        expr = evaled.toString();
-        justCalc = true;
-      } catch {
-        resultEl.textContent = 'Error';
-        expr = '';
-        justCalc = true;
-      }
-      return;
-    }
-    if (k === '±') {
-      if (expr.startsWith('-')) expr = expr.slice(1);
-      else if (expr) expr = '-' + expr;
-      exprEl.textContent = expr;
-      return;
-    }
-    if (k === '%') {
-      try {
-        const v = Function('"use strict"; return (' + expr.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-') + ')')();
-        expr = (v / 100).toString();
-        resultEl.textContent = expr;
-        exprEl.textContent = '';
-      } catch {}
-      return;
-    }
-    const opMap = { '÷': '/', '×': '*', '−': '-' };
-    if (justCalc && /[\d.]/.test(k)) { expr = ''; justCalc = false; }
-    expr += opMap[k] || k;
-    exprEl.textContent = expr;
-    // Live eval preview
-    try {
-      const preview = Function('"use strict"; return (' + expr.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-') + ')')();
-      if (isFinite(preview)) resultEl.textContent = Number(preview.toFixed(10)).toString();
-    } catch {}
+    var opMap={'÷':'/','×':'*'};
+    if (justCalc && /[\d.]/.test(k)){expr='';justCalc=false;}
+    expr += opMap[k]||k;
+    render();
   }
 
-  // Keyboard support
-  document.addEventListener('keydown', function(e) {
-    const map = {
-      '0':'0','1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
-      '.':'.', '+':'+', '-':'−', '*':'×', '/':'÷', 'Enter':'=', 'Backspace':'⌫', 'Escape':'C',
-    };
-    if (map[e.key]) { press(map[e.key]); e.preventDefault(); }
-  });
+  function handleEvent(actionId, payload) {
+    if (actionId.startsWith('btn_')) press(actionId.slice(4));
+  }
+
+  yoloit.panel.setTitle('Calculator');
+  render();
 })();

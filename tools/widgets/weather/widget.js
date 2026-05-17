@@ -1,95 +1,105 @@
-// Weather widget — uses wttr.in free JSON API (no key required)
-(function () {
-  const app = document.getElementById('app');
+// Weather widget — native Flutter UI via JSON tree
+// Uses wttr.in free API (fetched through Dart, no CORS)
+(function() {
+  var city = 'London';
 
-  async function loadWeather(city) {
-    app.innerHTML = '<div style="padding:16px;color:#94a3b8">Loading…</div>';
+  function iconForDesc(desc) {
+    var d = desc.toLowerCase();
+    if (d.indexOf('sun') >= 0 || d.indexOf('clear') >= 0) return '☀️';
+    if (d.indexOf('part') >= 0) return '⛅';
+    if (d.indexOf('cloud') >= 0 || d.indexOf('overcast') >= 0) return '☁️';
+    if (d.indexOf('rain') >= 0 || d.indexOf('drizzle') >= 0) return '🌧️';
+    if (d.indexOf('snow') >= 0 || d.indexOf('blizzard') >= 0) return '❄️';
+    if (d.indexOf('thunder') >= 0) return '⛈️';
+    if (d.indexOf('fog') >= 0 || d.indexOf('mist') >= 0) return '🌫️';
+    return '🌡️';
+  }
+
+  async function load() {
+    yoloit.render({type:'center',child:{type:'circularProgressIndicator',size:24}});
     try {
-      const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1`;
-      const data = await yoloit.fetchJson(url);
-      const cur = data.current_condition[0];
-      const area = data.nearest_area[0];
-      const areaName = area.areaName[0].value;
-      const country = area.country[0].value;
-      const tempC = cur.temp_C;
-      const tempF = cur.temp_F;
-      const desc = cur.weatherDesc[0].value;
-      const humidity = cur.humidity;
-      const windKph = cur.windspeedKmph;
-      const feelsC = cur.FeelsLikeC;
+      var url = 'https://wttr.in/' + encodeURIComponent(city) + '?format=j1';
+      var data = await yoloit.fetchJson(url);
+      var cur = data.current_condition[0];
+      var area = data.nearest_area[0];
+      var areaName = area.areaName[0].value;
+      var country = area.country[0].value;
+      var icon = iconForDesc(cur.weatherDesc[0].value);
 
-      // Weather icon mapping
-      const iconMap = {
-        'Clear': '☀️', 'Sunny': '☀️', 'Partly cloudy': '⛅',
-        'Cloudy': '☁️', 'Overcast': '☁️', 'Mist': '🌫️',
-        'Rain': '🌧️', 'Light rain': '🌦️', 'Heavy rain': '🌧️',
-        'Snow': '❄️', 'Thunder': '⛈️', 'Blizzard': '🌨️',
-        'Fog': '🌫️', 'Drizzle': '🌦️',
-      };
-      const icon = Object.keys(iconMap).find(k => desc.toLowerCase().includes(k.toLowerCase()))
-        ? iconMap[Object.keys(iconMap).find(k => desc.toLowerCase().includes(k.toLowerCase()))]
-        : '🌡️';
-
-      app.innerHTML = `
-        <div style="padding:20px;text-align:center">
-          <div style="font-size:56px;margin-bottom:4px">${icon}</div>
-          <div style="font-size:13px;color:#94a3b8;margin-bottom:8px">${areaName}, ${country}</div>
-          <div style="font-size:42px;font-weight:700;color:#e2e8f0">${tempC}°C</div>
-          <div style="font-size:13px;color:#94a3b8">${tempF}°F · Feels like ${feelsC}°C</div>
-          <div style="font-size:14px;color:#cbd5e1;margin:10px 0">${desc}</div>
-          <div style="display:flex;justify-content:center;gap:24px;margin-top:12px;font-size:12px;color:#64748b">
-            <div>💧 ${humidity}%</div>
-            <div>💨 ${windKph} km/h</div>
-          </div>
-        </div>
-        <div style="text-align:center;margin-top:12px">
-          <form onsubmit="event.preventDefault();changeCity(this.city.value)">
-            <input name="city" value="${city}"
-              style="background:#1e293b;border:1px solid #334155;border-radius:6px;
-                     color:#e2e8f0;padding:6px 10px;font-size:12px;width:140px;outline:none">
-            <button type="submit"
-              style="background:#3b82f6;border:none;border-radius:6px;color:#fff;
-                     padding:6px 10px;font-size:12px;cursor:pointer;margin-left:6px">Go</button>
-          </form>
-        </div>
-        <div style="text-align:center;margin-top:8px;font-size:10px;color:#334155">
-          via wttr.in · updated ${new Date().toLocaleTimeString()}
-        </div>
-      `;
-    } catch (e) {
-      app.innerHTML = `
-        <div style="padding:20px;text-align:center">
-          <div style="font-size:32px">⚠️</div>
-          <div style="color:#f87171;font-size:13px;margin:8px 0">Could not load weather</div>
-          <div style="color:#64748b;font-size:11px">${e.message}</div>
-          <div style="margin-top:12px">
-            <form onsubmit="event.preventDefault();changeCity(this.city.value)">
-              <input name="city" placeholder="Enter city…"
-                style="background:#1e293b;border:1px solid #334155;border-radius:6px;
-                       color:#e2e8f0;padding:6px 10px;font-size:12px;width:140px;outline:none">
-              <button type="submit"
-                style="background:#3b82f6;border:none;border-radius:6px;color:#fff;
-                       padding:6px 10px;font-size:12px;cursor:pointer;margin-left:6px">Go</button>
-            </form>
-          </div>
-        </div>
-      `;
+      yoloit.panel.setTitle('Weather — ' + areaName);
+      yoloit.render({
+        type: 'column',
+        crossAxisAlignment: 'stretch',
+        children: [
+          // Header
+          {type:'container', decoration:{color:'#0f172a', borderRadius:0},
+           padding:[16,20,16,16],
+           child:{type:'column',crossAxisAlignment:'center',children:[
+            {type:'text',data:icon,style:{fontSize:52}},
+            {type:'sizedBox',height:4},
+            {type:'text',data:areaName+', '+country,
+             style:{color:'#94a3b8',fontSize:12,textAlign:'center'}},
+            {type:'sizedBox',height:6},
+            {type:'text',data:cur.temp_C+'°C',
+             style:{fontSize:40,fontWeight:'w700',color:'#f1f5f9',textAlign:'center'}},
+            {type:'text',data:cur.weatherDesc[0].value,
+             style:{color:'#cbd5e1',fontSize:13,textAlign:'center'}},
+          ]}},
+          // Stats row
+          {type:'padding',padding:[12,12,12,8],child:{type:'row',
+            mainAxisAlignment:'spaceAround',
+            children:[
+              _stat('💧','Humidity',cur.humidity+'%'),
+              _stat('💨','Wind',cur.windspeedKmph+' km/h'),
+              _stat('🌡️','Feels',cur.FeelsLikeC+'°C'),
+              _stat('👁️','Vis.',cur.visibility+' km'),
+            ]
+          }},
+          // Change city
+          {type:'padding',padding:[12,0,12,12],child:{type:'row',children:[
+            {type:'expanded',child:{type:'container',
+              decoration:{color:'#1e293b',borderRadius:8,borderColor:'#334155',borderWidth:1},
+              padding:[8,8,8,8],
+              child:{type:'text',data:'📍 '+city,style:{color:'#94a3b8',fontSize:12}},
+            }},
+            {type:'sizedBox',width:8},
+            {type:'textButton',text:'Change',onTap:'change_city'},
+          ]}},
+          {type:'padding',padding:[0,0,12,8],child:{
+            type:'text',
+            data:'via wttr.in',
+            style:{color:'#334155',fontSize:10,textAlign:'right'},
+          }},
+        ]
+      });
+    } catch(e) {
+      yoloit.showError('Could not load weather:\n'+e.message);
     }
   }
 
-  window.changeCity = function(city) {
-    if (!city.trim()) return;
-    yoloit.storage.set('city', city.trim());
-    loadWeather(city.trim());
-  };
+  function _stat(icon, label, value) {
+    return {type:'column',crossAxisAlignment:'center',mainAxisSize:'min',children:[
+      {type:'text',data:icon,style:{fontSize:18}},
+      {type:'sizedBox',height:2},
+      {type:'text',data:value,style:{color:'#e2e8f0',fontSize:13,fontWeight:'w600'}},
+      {type:'text',data:label,style:{color:'#64748b',fontSize:10}},
+    ]};
+  }
 
-  // Init — load saved city or default
+  async function handleEvent(actionId, payload) {
+    if (actionId === 'change_city') {
+      // cycle through preset cities for demo
+      var cities = ['London','New York','Tokyo','Berlin','Sydney','Moscow','Dubai'];
+      var idx = cities.indexOf(city);
+      city = cities[(idx + 1) % cities.length];
+      await yoloit.storage.set('city', city);
+      await load();
+    }
+  }
+
   yoloit.storage.get('city').then(function(saved) {
-    loadWeather(saved || 'London');
+    if (saved) city = saved;
+    load();
+    setInterval(load, 10 * 60 * 1000);
   });
-
-  // Auto-refresh every 10 minutes
-  setInterval(function() {
-    yoloit.storage.get('city').then(function(c) { loadWeather(c || 'London'); });
-  }, 10 * 60 * 1000);
 })();
