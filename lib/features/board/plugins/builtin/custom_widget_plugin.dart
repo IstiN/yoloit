@@ -4,6 +4,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
+import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 
@@ -81,6 +82,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
   @override
   void dispose() {
+    if (_widgetId.isNotEmpty) WidgetAppRegistry.instance.unregister(_widgetId);
     _engine?.dispose();
     super.dispose();
   }
@@ -117,6 +119,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     final engine = JsWidgetEngine(
       onRender: (tree) {
         if (mounted) setState(() => _uiTree = tree);
+        WidgetAppRegistry.instance.updateTree(_widgetId, tree);
       },
       onSetTitle: (title) {
         widget.renderContext.onUpdateState({'_title': title});
@@ -134,6 +137,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     try {
       await engine.run(js);
       _engine = engine;
+      WidgetAppRegistry.instance.register(_widgetId, engine, null);
       if (mounted) setState(() { _manifest = manifest; _loading = false; });
     } catch (e) {
       engine.dispose();
@@ -305,7 +309,7 @@ class CustomWidgetCliHandler extends PanelCliHandler {
   String get typeId => CustomWidgetPlugin.kTypeId;
 
   @override
-  List<String> get supportedActions => const ['setState', 'info'];
+  List<String> get supportedActions => const ['setState', 'info', 'execute', 'snapshot'];
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) => {
@@ -327,6 +331,24 @@ class CustomWidgetCliHandler extends PanelCliHandler {
         final wid = panel.state['widgetId'] as String? ?? '';
         final manifest = wid.isNotEmpty ? await WidgetRegistryService.instance.find(wid) : null;
         return CliActionResult(ok: true, data: {'widgetId': wid, 'manifest': manifest?.toJson()});
+      case 'execute':
+        final widgetId = panel.state['widgetId'] as String? ?? '';
+        final actionId = args['actionId'] as String?;
+        if (actionId == null) return const CliActionResult(ok: false, message: 'Missing "actionId" field');
+        final payload = args['payload'] as Map<String, dynamic>?;
+        final engine = WidgetAppRegistry.instance.engine(widgetId);
+        if (engine == null) {
+          return CliActionResult(ok: false, message: 'Widget "$widgetId" is not currently running');
+        }
+        engine.callEvent(actionId, payload);
+        return CliActionResult(ok: true, message: 'Event "$actionId" sent to widget "$widgetId"');
+      case 'snapshot':
+        final widgetId = panel.state['widgetId'] as String? ?? '';
+        final tree = WidgetAppRegistry.instance.tree(widgetId);
+        if (tree == null) {
+          return CliActionResult(ok: false, message: 'No render tree available for widget "$widgetId"');
+        }
+        return CliActionResult(ok: true, data: {'widgetId': widgetId, 'tree': tree});
     }
     return CliActionResult(ok: false, message: 'Unknown action: $action');
   }

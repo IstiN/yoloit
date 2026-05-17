@@ -18,6 +18,7 @@ import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
@@ -254,6 +255,11 @@ class CliServer {
     // /api/widgets
     if (path.isNotEmpty && path[0] == 'widgets') {
       return _handleWidgets(method, path.sublist(1), request);
+    }
+
+    // /api/apps
+    if (path.isNotEmpty && path[0] == 'apps') {
+      return _handleApps(method, path.sublist(1), request);
     }
 
     return _notFound('Unknown route');
@@ -2545,5 +2551,71 @@ class CliServer {
     }
 
     return _notFound('Unknown widget route');
+  }
+
+  // ── App routes ─────────────────────────────────────────────────────────────
+
+  Future<shelf.Response> _handleApps(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+  ) async {
+    final registry = WidgetRegistryService.instance;
+    final appRegistry = WidgetAppRegistry.instance;
+
+    // GET /api/apps — list all installed widgets + which are currently active
+    if (sub.isEmpty && method == 'GET') {
+      final widgets = await registry.loadAll();
+      final activeIds = appRegistry.activeIds();
+      return _json({
+        'apps': widgets.map((m) => {
+          ...m.toJson(),
+          'active': activeIds.contains(m.id),
+        }).toList(),
+        'activeIds': activeIds,
+      });
+    }
+
+    // /api/apps/:id/...
+    if (sub.length >= 2) {
+      final id = sub[0];
+      final action = sub[1];
+
+      // GET /api/apps/:id/snapshot — return current UI tree JSON
+      if (action == 'snapshot' && method == 'GET') {
+        final tree = appRegistry.tree(id);
+        if (tree == null) {
+          return _json({'ok': false, 'message': 'No render tree available for widget "$id". Is it running?'});
+        }
+        return _json({'ok': true, 'widgetId': id, 'tree': tree});
+      }
+
+      // POST /api/apps/:id/execute — call JS event
+      if (action == 'execute' && method == 'POST') {
+        final body = await _body(request);
+        final actionId = body['action'] as String?;
+        if (actionId == null || actionId.isEmpty) {
+          return _error('Missing "action" field');
+        }
+        final engine = appRegistry.engine(id);
+        if (engine == null) {
+          return _json({'ok': false, 'message': 'Widget "$id" is not currently running'});
+        }
+        final payload = body['payload'] as Map<String, dynamic>?;
+        engine.callEvent(actionId, payload);
+        return _json({'ok': true, 'widgetId': id, 'action': actionId});
+      }
+
+      // POST /api/apps/:id/screenshot
+      if (action == 'screenshot' && method == 'POST') {
+        // TODO: implement full screenshot once BoardScreenshotService.capturePanel(panelId) is wired to widgetId lookup
+        return _json({
+          'ok': false,
+          'message': 'Widget screenshot requires the panel to be visible on screen. Use app:snapshot for the render tree.',
+        });
+      }
+    }
+
+    return _notFound('Unknown app route');
   }
 }

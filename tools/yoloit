@@ -737,6 +737,55 @@ commands = [
     "example": "yoloit widget:create my-widget --template network",
     "aliases": ["wg:new"],
   },
+  # ── App commands ────────────────────────────────────────────────────────────
+  {
+    "group": "app",
+    "name": "app:list",
+    "description": "List installed widget apps and which are currently running",
+    "params": [],
+    "example": "yoloit app:list",
+    "aliases": ["myapps"],
+  },
+  {
+    "group": "app",
+    "name": "app:run",
+    "description": "Open a widget app in a panel (creates panel if needed)",
+    "params": [["id", "Widget app id", True], ["[board]", "Board name (optional)", False]],
+    "example": "yoloit app:run calculator",
+    "aliases": ["app:open"],
+  },
+  {
+    "group": "app",
+    "name": "app:execute",
+    "description": "Execute a JS event/function in a running widget app",
+    "params": [["id", "Widget app id", True], ["action", "Action id (e.g. btn_5, refresh)", True], ["[payload]", "JSON payload string (optional)", False]],
+    "example": "yoloit app:execute calculator btn_5",
+    "aliases": [],
+  },
+  {
+    "group": "app",
+    "name": "app:snapshot",
+    "description": "Get the current JSON render tree of a running widget app",
+    "params": [["id", "Widget app id", True]],
+    "example": "yoloit app:snapshot calculator",
+    "aliases": [],
+  },
+  {
+    "group": "app",
+    "name": "app:screenshot",
+    "description": "Save a screenshot of a running widget panel to a PNG file",
+    "params": [["id", "Widget app id", True], ["[output]", "Output PNG path (default: /tmp/<id>.png)", False]],
+    "example": "yoloit app:screenshot calculator /tmp/calc.png",
+    "aliases": [],
+  },
+  {
+    "group": "app",
+    "name": "app:install",
+    "description": "Install a widget app from a URL (zip/js) or local path",
+    "params": [["source", "URL or local path to widget directory/js file", True]],
+    "example": "yoloit app:install https://example.com/mywidget.zip",
+    "aliases": [],
+  },
 ]
 
 # ── Registry: namespace prefixes (one definition per namespace) ───────
@@ -1993,6 +2042,53 @@ PY
     panel_id=$(echo "$panel_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('panel',d).get('id','') if isinstance(d.get('panel',d),dict) else '')" 2>/dev/null)
     _post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}" | python3 -m json.tool 2>/dev/null
     ;;
+
+  # ── app commands ──────────────────────────────────────────────────────────────
+  myapps|app:list)
+    _get "/apps" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:run|app:open)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:run <id> [board]" >&2; exit 1; }
+    widget_id="$1"; shift
+    board_arg="${1:-}"
+    bid=$(_require_board "$board_arg")
+    panel_json=$(_smart_panel "$bid" "${widget_id} App" "board.widget.custom")
+    panel_id=$(echo "$panel_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('panel',d).get('id','') if isinstance(d.get('panel',d),dict) else '')" 2>/dev/null)
+    _post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:execute)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit app:execute <id> <action> [payload_json]" >&2; exit 1; }
+    app_id="$1"; action_id="$2"; payload="${3:-{}}"
+    _post "/apps/$(_encode "$app_id")/execute" "{\"action\":\"${action_id}\",\"payload\":${payload}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:snapshot)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:snapshot <id>" >&2; exit 1; }
+    _get "/apps/$(_encode "$1")/snapshot" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:screenshot)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:screenshot <id> [output.png]" >&2; exit 1; }
+    app_id="$1"; out="${2:-/tmp/${app_id}.png}"
+    result=$(_post "/apps/$(_encode "$app_id")/screenshot" "{\"outputPath\":\"${out}\"}")
+    echo "$result" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:install)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:install <url|path>" >&2; exit 1; }
+    source_arg="$1"
+    if [[ "$source_arg" == http* ]]; then
+      tmp_dir=$(mktemp -d)
+      if [[ "$source_arg" == *.js ]]; then
+        curl -fsSL "$source_arg" -o "${tmp_dir}/widget.js"
+        app_name=$(basename "$source_arg" .js)
+        echo "{\"id\":\"${app_name}\",\"name\":\"${app_name}\",\"description\":\"Installed from URL\",\"version\":\"1.0.0\",\"icon\":\"🔧\",\"network\":true,\"allowedCommands\":[]}" > "${tmp_dir}/manifest.json"
+      else
+        curl -fsSL "$source_arg" -o "${tmp_dir}/widget.zip" && unzip -q "${tmp_dir}/widget.zip" -d "${tmp_dir}/extracted" && tmp_dir="${tmp_dir}/extracted/$(ls ${tmp_dir}/extracted | head -1)"
+      fi
+      _post "/widgets/install" "{\"path\":\"${tmp_dir}\"}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/widgets/install" "{\"path\":\"${source_arg}\"}" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+
   widget:create|wg:new)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:create <name> [--template basic|network|yoloit]" >&2; exit 1; }
     widget_name="$1"; shift
@@ -2016,19 +2112,38 @@ EOF
     case "$template" in
       network)
         cat > "${widget_dir}/widget.js" <<'JSEOF'
-// Network widget template
+// Network widget template — native Flutter rendering
 (function() {
-  const app = document.getElementById('app');
+  yoloit.panel.setTitle('Network Widget');
+
+  function showLoading() {
+    yoloit.render({type: 'center', child: {
+      type: 'column', mainAxisSize: 'min', children: [
+        {type: 'circularProgressIndicator', size: 24, strokeWidth: 2},
+        {type: 'sizedBox', height: 12},
+        {type: 'text', data: 'Loading\u2026', style: {color: '#94a3b8', fontSize: 13}},
+      ],
+    }});
+  }
+
+  function showData(data) {
+    var text = JSON.stringify(data, null, 2);
+    yoloit.render({
+      type: 'padding', padding: [12, 12, 12, 12],
+      child: {type: 'text', data: text, style: {color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace'}},
+    });
+  }
+
   async function load() {
-    app.innerHTML = '<div style="padding:16px;color:#94a3b8">Loading…</div>';
+    showLoading();
     try {
-      const data = await yoloit.fetchJson('https://httpbin.org/json');
-      app.innerHTML = '<pre style="padding:12px;color:#e2e8f0;font-size:11px;overflow:auto">'
-        + JSON.stringify(data, null, 2) + '</pre>';
+      var data = await yoloit.fetchJson('https://httpbin.org/json');
+      showData(data);
     } catch(e) {
       yoloit.showError(e.message);
     }
   }
+
   load();
   setInterval(load, 30000);
 })();
@@ -2036,34 +2151,59 @@ JSEOF
         ;;
       yoloit)
         cat > "${widget_dir}/widget.js" <<'JSEOF'
-// Yoloit CLI widget template
+// Yoloit boards widget template — native Flutter rendering
 (function() {
-  const app = document.getElementById('app');
+  yoloit.panel.setTitle('Boards');
+
   async function load() {
-    app.innerHTML = '<div style="padding:16px;color:#94a3b8">Loading boards…</div>';
+    yoloit.render({type: 'center', child: {type: 'circularProgressIndicator', size: 24}});
     try {
-      const data = await yoloit.cli('boards');
-      app.innerHTML = '<pre style="padding:12px;color:#e2e8f0;font-size:11px;overflow:auto">'
-        + JSON.stringify(data, null, 2) + '</pre>';
+      var data = await yoloit.fetchJson('http://localhost:PORT/api/boards');
+      var boards = data.boards || [];
+      yoloit.render({
+        type: 'column', crossAxisAlignment: 'stretch',
+        children: boards.length === 0
+          ? [{type: 'center', child: {type: 'text', data: 'No boards', style: {color: '#64748b'}}}]
+          : boards.map(function(b) {
+              return {
+                type: 'container',
+                margin: [8, 4, 8, 4],
+                decoration: {color: '#1e293b', borderRadius: 8},
+                padding: [12, 10, 12, 10],
+                child: {type: 'text', data: b.name || b.id, style: {color: '#f1f5f9', fontSize: 14}},
+              };
+            }),
+      });
     } catch(e) {
       yoloit.showError(e.message);
     }
   }
+
   load();
 })();
 JSEOF
         ;;
       *)
         cat > "${widget_dir}/widget.js" <<'JSEOF'
-// Basic widget template
+// Basic widget template — native Flutter rendering
 (function() {
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <div style="padding:24px;text-align:center">
-      <div style="font-size:40px;margin-bottom:12px">🔧</div>
-      <div style="font-size:16px;font-weight:600;color:#e2e8f0;margin-bottom:8px">My Widget</div>
-      <div style="font-size:13px;color:#94a3b8">Edit widget.js to customize</div>
-    </div>`;
+  yoloit.panel.setTitle('My Widget');
+  yoloit.render({
+    type: 'center',
+    child: {
+      type: 'padding', padding: [24, 24, 24, 24],
+      child: {
+        type: 'column', mainAxisAlignment: 'center', mainAxisSize: 'min',
+        children: [
+          {type: 'text', data: '\ud83d\udd27', style: {fontSize: 40}},
+          {type: 'sizedBox', height: 12},
+          {type: 'text', data: 'My Widget', style: {color: '#e2e8f0', fontSize: 16, fontWeight: 'w600'}},
+          {type: 'sizedBox', height: 8},
+          {type: 'text', data: 'Edit widget.js to customize', style: {color: '#94a3b8', fontSize: 13}},
+        ],
+      },
+    },
+  });
 })();
 JSEOF
         ;;
