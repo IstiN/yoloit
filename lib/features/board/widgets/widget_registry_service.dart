@@ -3,21 +3,25 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 
-/// Discovers and manages custom JS widgets installed in
-/// `~/.config/yoloit/widgets/`.
+/// Discovers and manages custom JS apps installed in
+/// `~/.config/yoloit/apps/`.
 ///
-/// On first run the service copies the bundled example widgets from Flutter
-/// assets (`tools/widgets/`) into the user's widget directory.
+/// On first run the service copies the bundled example apps from Flutter
+/// assets (`tools/widgets/`) into the user's app directory.
 class WidgetRegistryService {
   WidgetRegistryService._();
   static final instance = WidgetRegistryService._();
 
   List<WidgetManifest>? _cache;
 
-  String get widgetsDir {
+  String get appsDir {
     final home = Platform.environment['HOME'] ?? '';
-    return '$home/.config/yoloit/widgets';
+    return '$home/.config/yoloit/apps';
   }
+
+  /// Backward-compat alias.
+  /// Backward-compat alias.
+  String get widgetsDir => appsDir;
 
   /// Returns all installed widgets, scanning the widgets directory.
   /// Results are cached until [invalidate] is called.
@@ -44,7 +48,7 @@ class WidgetRegistryService {
   /// Returns the installed manifest on success.
   Future<WidgetManifest?> install(String sourcePath) async {
     final source = FileSystemEntity.typeSync(sourcePath);
-    final destDir = Directory(widgetsDir);
+    final destDir = Directory(appsDir);
     if (!destDir.existsSync()) destDir.createSync(recursive: true);
 
     if (source == FileSystemEntityType.directory) {
@@ -83,7 +87,7 @@ class WidgetRegistryService {
   // ── Internals ─────────────────────────────────────────────────────────────
 
   Future<List<WidgetManifest>> _scan() async {
-    final dir = Directory(widgetsDir);
+    final dir = Directory(appsDir);
     if (!await dir.exists()) return [];
 
     final results = <WidgetManifest>[];
@@ -101,7 +105,7 @@ class WidgetRegistryService {
 
   /// Copy bundled example widgets from Flutter assets on first run.
   Future<void> _ensureExamplesInstalled() async {
-    final destDir = Directory(widgetsDir);
+    final destDir = Directory(appsDir);
     if (!destDir.existsSync()) {
       destDir.createSync(recursive: true);
     }

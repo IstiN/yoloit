@@ -696,102 +696,77 @@ commands = [
     "params": [["duration", "Duration in seconds (default 300)", False], ["--label", "Timer label text", False], ["--start", "Start timer immediately", False]],
     "example": "yoloit timer:create 600 --label \"Pomodoro\" --start",
   },
-  # ── Widget commands ────────────────────────────────────────────────────────
-  {
-    "group": "widget",
-    "name": "widget:list",
-    "description": "List installed custom widgets",
-    "params": [],
-    "example": "yoloit widget:list",
-    "aliases": ["wg:ls"],
-  },
-  {
-    "group": "widget",
-    "name": "widget:install",
-    "description": "Install a widget from a local directory or .js file",
-    "params": [["path", "Path to widget directory or .js file", True]],
-    "example": "yoloit widget:install ~/widgets/my-widget",
-    "aliases": ["wg:i"],
-  },
-  {
-    "group": "widget",
-    "name": "widget:remove",
-    "description": "Remove an installed widget by id",
-    "params": [["id", "Widget id", True]],
-    "example": "yoloit widget:remove weather",
-    "aliases": ["wg:rm"],
-  },
-  {
-    "group": "widget",
-    "name": "widget:open",
-    "description": "Open a widget in a new panel on a board",
-    "params": [["id", "Widget id", True], ["[board]", "Board name (optional)", False], ["[panel-title]", "Panel title (optional)", False]],
-    "example": "yoloit widget:open crypto",
-    "aliases": ["wg:o"],
-  },
-  {
-    "group": "widget",
-    "name": "widget:create",
-    "description": "Scaffold a new custom widget in the widgets directory",
-    "params": [["name", "Widget id/name", True], ["--template", "Template: basic|network|yoloit (default: basic)", False]],
-    "example": "yoloit widget:create my-widget --template network",
-    "aliases": ["wg:new"],
-  },
   # ── App commands ────────────────────────────────────────────────────────────
   {
     "group": "app",
     "name": "app:list",
-    "description": "List installed widget apps and which are currently running",
+    "description": "List installed apps and which are currently running",
     "params": [],
     "example": "yoloit app:list",
-    "aliases": ["myapps"],
+    "aliases": ["myapps", "widget:list", "wg:ls"],
+  },
+  {
+    "group": "app",
+    "name": "app:install",
+    "description": "Install an app from a local path or URL",
+    "params": [["source", "Path to app directory or .js file, or URL", True]],
+    "example": "yoloit app:install ~/myapp",
+    "aliases": ["widget:install", "wg:i"],
+  },
+  {
+    "group": "app",
+    "name": "app:remove",
+    "description": "Remove an installed app by id",
+    "params": [["id", "App id", True]],
+    "example": "yoloit app:remove weather",
+    "aliases": ["widget:remove", "wg:rm"],
   },
   {
     "group": "app",
     "name": "app:run",
-    "description": "Open a widget app in a panel (creates panel if needed)",
-    "params": [["id", "Widget app id", True], ["[board]", "Board name (optional)", False]],
+    "description": "Open an app in a new panel on a board",
+    "params": [["id", "App id", True], ["[board]", "Board name (optional)", False], ["[panel-title]", "Panel title (optional)", False]],
     "example": "yoloit app:run calculator",
-    "aliases": ["app:open"],
+    "aliases": ["app:open", "widget:open", "wg:o"],
+  },
+  {
+    "group": "app",
+    "name": "app:create",
+    "description": "Scaffold a new app in the apps directory",
+    "params": [["name", "App id/name", True], ["--template", "Template: basic|network|yoloit (default: basic)", False]],
+    "example": "yoloit app:create my-app --template network",
+    "aliases": ["widget:create", "wg:new"],
   },
   {
     "group": "app",
     "name": "app:execute",
-    "description": "Execute a JS event/function in a running widget app",
-    "params": [["id", "Widget app id", True], ["action", "Action id (e.g. btn_5, refresh)", True], ["[payload]", "JSON payload string (optional)", False]],
+    "description": "Execute a JS event/function in a running app",
+    "params": [["id", "App id", True], ["action", "Action id (e.g. btn_5, refresh)", True], ["[payload]", "JSON payload string (optional)", False]],
     "example": "yoloit app:execute calculator btn_5",
     "aliases": [],
   },
   {
     "group": "app",
     "name": "app:reload",
-    "description": "Hot-reload a running widget (re-reads JS from disk, no full app restart needed)",
-    "params": [["id", "Widget app id", True]],
+    "description": "Hot-reload a running app (re-reads JS from disk, no full restart needed)",
+    "params": [["id", "App id", True]],
     "example": "yoloit app:reload weather",
-    "aliases": ["widget:reload", "app:refresh"],
+    "aliases": ["app:refresh", "widget:reload"],
   },
   {
     "group": "app",
     "name": "app:snapshot",
-    "description": "Get the current JSON render tree of a running widget app",
-    "params": [["id", "Widget app id", True]],
+    "description": "Get the current JSON render tree of a running app",
+    "params": [["id", "App id", True]],
     "example": "yoloit app:snapshot calculator",
     "aliases": [],
   },
   {
     "group": "app",
     "name": "app:screenshot",
-    "description": "Save a screenshot of a running widget panel to a PNG file",
-    "params": [["id", "Widget app id", True], ["[output]", "Output PNG path (default: /tmp/<id>.png)", False]],
+    "description": "Save a screenshot of a running app panel to a PNG file",
+    "params": [["id", "App id", True], ["[output]", "Output PNG path (default: /tmp/<id>.png)", False]],
     "example": "yoloit app:screenshot calculator /tmp/calc.png",
-    "aliases": [],
-  },
-  {
-    "group": "app",
-    "name": "app:install",
-    "description": "Install a widget app from a URL (zip/js) or local path",
-    "params": [["source", "URL or local path to widget directory/js file", True]],
-    "example": "yoloit app:install https://example.com/mywidget.zip",
     "aliases": [],
   },
 ]
@@ -2030,37 +2005,37 @@ PY
     ;;
 
   # ── widget commands ────────────────────────────────────────────────────────
-  widget:list|wg:ls)
-    _get "/widgets" | python3 -m json.tool 2>/dev/null
-    ;;
-  widget:install|wg:i)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:install <path>" >&2; exit 1; }
-    _post "/widgets/install" "{\"path\":\"$1\"}" | python3 -m json.tool 2>/dev/null
-    ;;
-  widget:remove|wg:rm)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:remove <id>" >&2; exit 1; }
-    _delete "/widgets/$(_encode "$1")" | python3 -m json.tool 2>/dev/null
-    ;;
-  widget:open|wg:o)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:open <id> [board] [panel-title]" >&2; exit 1; }
-    widget_id="$1"; shift
-    board_arg="${1:-}"; panel_arg="${2:-${widget_id} Widget}"
-    bid=$(_require_board "$board_arg")
-    panel_json=$(_smart_panel "$bid" "$panel_arg" "board.widget.custom")
-    panel_id=$(echo "$panel_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('panel',d).get('id','') if isinstance(d.get('panel',d),dict) else '')" 2>/dev/null)
-    _post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}" | python3 -m json.tool 2>/dev/null
-    ;;
-
   # ── app commands ──────────────────────────────────────────────────────────────
-  myapps|app:list)
+  myapps|app:list|widget:list|wg:ls)
     _get "/apps" | python3 -m json.tool 2>/dev/null
     ;;
-  app:run|app:open)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:run <id> [board]" >&2; exit 1; }
+  app:install|widget:install|wg:i)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:install <path|url>" >&2; exit 1; }
+    source_arg="$1"
+    if [[ "$source_arg" == http* ]]; then
+      tmp_dir=$(mktemp -d)
+      if [[ "$source_arg" == *.js ]]; then
+        curl -fsSL "$source_arg" -o "${tmp_dir}/widget.js"
+        app_name=$(basename "$source_arg" .js)
+        echo "{\"id\":\"${app_name}\",\"name\":\"${app_name}\",\"description\":\"Installed from URL\",\"version\":\"1.0.0\",\"icon\":\"🔧\",\"network\":true,\"allowedCommands\":[]}" > "${tmp_dir}/manifest.json"
+      else
+        curl -fsSL "$source_arg" -o "${tmp_dir}/widget.zip" && unzip -q "${tmp_dir}/widget.zip" -d "${tmp_dir}/extracted" && tmp_dir="${tmp_dir}/extracted/$(ls ${tmp_dir}/extracted | head -1)"
+      fi
+      _post "/widgets/install" "{\"path\":\"${tmp_dir}\"}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/widgets/install" "{\"path\":\"${source_arg}\"}" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  app:remove|widget:remove|wg:rm)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:remove <id>" >&2; exit 1; }
+    _delete "/widgets/$(_encode "$1")" | python3 -m json.tool 2>/dev/null
+    ;;
+  app:run|app:open|widget:open|wg:o)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:run <id> [board] [panel-title]" >&2; exit 1; }
     widget_id="$1"; shift
-    board_arg="${1:-}"
+    board_arg="${1:-}"; panel_arg="${2:-${widget_id}}"
     bid=$(_require_board "$board_arg")
-    panel_json=$(_smart_panel "$bid" "${widget_id} App" "board.widget.custom")
+    panel_json=$(_smart_panel "$bid" "$panel_arg" "board.widget.custom")
     panel_id=$(echo "$panel_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('panel',d).get('id','') if isinstance(d.get('panel',d),dict) else '')" 2>/dev/null)
     _post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}" | python3 -m json.tool 2>/dev/null
     ;;
@@ -2074,7 +2049,7 @@ PY
     result=$(_post "/apps/$(_encode "$1")/reload" '{}')
     ok=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print('yes' if d.get('ok') else 'no')" 2>/dev/null)
     if [[ "$ok" == "yes" ]]; then
-      echo "✅ Widget '$1' reloaded"
+      echo "✅ App '$1' reloaded"
     else
       msg=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message','unknown error'))" 2>/dev/null)
       echo "❌ Reload failed: $msg" >&2; exit 1
@@ -2108,20 +2083,20 @@ PY
     fi
     ;;
 
-  widget:create|wg:new)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit widget:create <name> [--template basic|network|yoloit]" >&2; exit 1; }
+  app:create|widget:create|wg:new)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:create <name> [--template basic|network|yoloit]" >&2; exit 1; }
     widget_name="$1"; shift
     template="basic"
     while [[ $# -gt 0 ]]; do
       case "$1" in --template) template="$2"; shift 2 ;; *) shift ;; esac
     done
-    widget_dir="${HOME}/.config/yoloit/widgets/${widget_name}"
+    widget_dir="${HOME}/.config/yoloit/apps/${widget_name}"
     mkdir -p "$widget_dir"
     cat > "${widget_dir}/manifest.json" <<EOF
 {
   "id": "${widget_name}",
   "name": "$(python3 -c "import sys; print(' '.join(w.capitalize() for w in '${widget_name}'.replace('-',' ').replace('_',' ').split()))")",
-  "description": "Custom widget",
+  "description": "Custom app",
   "version": "1.0.0",
   "icon": "🔧",
   "allowedCommands": [],
@@ -2227,9 +2202,9 @@ JSEOF
 JSEOF
         ;;
     esac
-    echo "✅ Widget '${widget_name}' created at ${widget_dir}"
+    echo "✅ App '${widget_name}' created at ${widget_dir}"
     echo "   Edit: ${widget_dir}/widget.js"
-    echo "   Open: yoloit widget:open ${widget_name}"
+    echo "   Open: yoloit app:run ${widget_name}"
     ;;
 
   # ── help ──
