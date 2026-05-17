@@ -547,6 +547,7 @@ commands = [
   {
     "group": "note",
     "name": "note:append",
+    "alias_override": "n:ap",
     "description": "Append markdown text (explicit board+panel)",
     "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True], ["text", "Markdown text", True]],
     "example": "yoloit note:append \"My Board\" \"Notes\" \"- item\"",
@@ -600,6 +601,7 @@ commands = [
   {
     "group": "kanban",
     "name": "kanban:columns",
+    "alias_override": "k:col",
     "description": "List kanban columns — board and panel optional (alias: k:col)",
     "params": [["[panel]", "Panel title", False], ["[board]", "Board name", False]],
     "example": "yoloit kanban:columns",
@@ -624,6 +626,7 @@ commands = [
   {
     "group": "kanban",
     "name": "kanban:remove-column",
+    "alias_override": "k:dc",
     "description": "Remove kanban column — board and panel optional (alias: k:dc)",
     "params": [["col-name", "Column name (1 arg: current board/panel)", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
     "example": "yoloit kanban:remove-column \"Old\"",
@@ -632,6 +635,7 @@ commands = [
   {
     "group": "kanban",
     "name": "kanban:add-card",
+    "alias_override": "k:a",
     "description": "Add kanban card — board and panel optional (alias: k:a, kanban:card)",
     "params": [["column", "Column name", True], ["title", "Card title", True], ["[panel]", "Panel title (3 args)", False], ["[board]", "Board name (4 args)", False]],
     "example": "yoloit kanban:card \"Todo\" \"Fix mic\"",
@@ -648,6 +652,7 @@ commands = [
   {
     "group": "kanban",
     "name": "kanban:remove-card",
+    "alias_override": "k:rm",
     "description": "Remove kanban card — board and panel optional (alias: k:rm)",
     "params": [["cardId", "Card id", True], ["[panel]", "Panel title (2 args)", False], ["[board]", "Board name (3 args)", False]],
     "example": "yoloit kanban:remove-card card_1",
@@ -664,6 +669,7 @@ commands = [
   {
     "group": "kanban",
     "name": "kanban:cards",
+    "alias_override": "k:ls",
     "description": "List kanban cards — board and panel optional (alias: k:ls)",
     "params": [["[panel]", "Panel title", False], ["[board]", "Board name", False]],
     "example": "yoloit kanban:cards",
@@ -692,6 +698,74 @@ commands = [
   },
 ]
 
+# ── Registry: namespace prefixes (one definition per namespace) ───────
+# Algorithm: namespace_prefix:first_letters_of_each_action_word
+# Example: "checklist:add-item" → "cl:ai"
+# Override per command via "alias_override" field.
+# Only namespaces listed in ALIAS_ENABLED_NAMESPACES get auto-generated short aliases.
+# Other namespaces can still have manual "aliases" in their command definition.
+NAMESPACE_PREFIXES = {
+    "app":       "app",
+    "board":     "b",
+    "panel":     "p",
+    "run":       "r",
+    "timer":     "t",
+    "models":    "m",
+    "yolochat":  "yc",
+    "link":      "lk",
+    "note":      "n",
+    "checklist": "cl",
+    "kanban":    "k",
+    "playlist":  "pl",
+    "webpage":   "w",
+}
+
+# Only these namespaces get automatically generated short aliases.
+# Add a namespace here when you want the algorithm to kick in.
+ALIAS_ENABLED_NAMESPACES = {"note", "checklist", "kanban"}
+
+def auto_alias(cmd):
+    """Auto-generate short alias from command name using namespace prefix + action initials.
+    Only applies to ALIAS_ENABLED_NAMESPACES or commands with alias_override."""
+    name = cmd["name"]
+    if "alias_override" in cmd:
+        return cmd["alias_override"]
+    if ":" not in name:
+        return None
+    ns, action = name.split(":", 1)
+    if ns not in ALIAS_ENABLED_NAMESPACES:
+        return None
+    prefix = NAMESPACE_PREFIXES.get(ns)
+    if not prefix:
+        return None
+    # First letter of each "-"-separated word in the action part
+    abbrev = "".join(w[0] for w in action.split("-") if w)
+    alias = f"{prefix}:{abbrev}"
+    return alias if alias != name else None
+
+def resolve_aliases(commands):
+    """Build alias list for each command; detect and report collisions."""
+    alias_map = {}   # alias → canonical name
+    for c in commands:
+        aliases = list(c.get("aliases", []))  # keep any manual aliases
+        auto = auto_alias(c)
+        if auto and auto not in aliases and auto != c["name"]:
+            aliases.append(auto)
+        # Collision detection
+        clean = []
+        for a in aliases:
+            if a in alias_map and alias_map[a] != c["name"]:
+                import sys as _sys
+                print(f"⚠️  Alias collision: '{a}' claimed by '{alias_map[a]}' and '{c['name']}'", file=_sys.stderr)
+            else:
+                alias_map[a] = c["name"]
+                clean.append(a)
+        c = dict(c)
+        c["aliases"] = clean
+        yield c
+
+commands = list(resolve_aliases(commands))
+
 by_group = defaultdict(list)
 for c in commands:
     by_group[c["group"]].append(c)
@@ -714,7 +788,7 @@ def param_to_key(name):
 
 if fmt == "short":
     print("yoloit help (short)")
-    print("Use: yoloit help --format [short|detailed|mermaid|tools]")
+    print("Use: yoloit help --format [short|detailed|mermaid|tools|registry]")
     print("Board and panel are optional in note/checklist/kanban commands — uses active board/panel.")
     for g in group_order:
         if not by_group[g]:
@@ -755,7 +829,9 @@ elif fmt == "mermaid":
         print(f'  root --> {gid}["{g}"]')
         for i, c in enumerate(by_group[g]):
             cid = f"{gid}_{i}"
-            label = f'{c["name"]}<br/>{c["description"]}'
+            aliases = c.get("aliases", [])
+            alias_str = f'<br/>aliases: {", ".join(aliases)}' if aliases else ""
+            label = f'{c["name"]}{alias_str}<br/>{c["description"]}'
             if c["params"]:
                 label += f'<br/>params: {params_inline(c)}'
             label = label.replace('"', '\\"')
@@ -780,11 +856,22 @@ elif fmt == "tools":
         tools.append(
             {
                 "name": c["name"],
+                "aliases": c.get("aliases", []),
                 "description": c["description"],
                 "inputSchema": schema,
             }
         )
     print(json.dumps({"tools": tools}, ensure_ascii=False, indent=2))
+elif fmt == "registry":
+    # Machine-readable: all commands + auto-aliases, used by 'validate'
+    out = []
+    for c in commands:
+        out.append({
+            "name": c["name"],
+            "group": c["group"],
+            "aliases": c.get("aliases", []),
+        })
+    print(json.dumps(out, ensure_ascii=False, indent=2))
 else:
     print(f"Unknown format: {fmt}", file=sys.stderr)
     sys.exit(2)
@@ -799,7 +886,7 @@ _parse_help_format() {
         format="${2:-short}"
         shift 2
         ;;
-      short|detailed|mermaid|tools)
+      short|detailed|mermaid|tools|registry)
         format="$1"
         shift
         ;;
@@ -1602,19 +1689,19 @@ PY
     pid=$(_auto_panel "$bid" "board.note.markdown" "$title" "$state")
     echo "Note panel created: $pid"
     ;;
-  note:append)
+  note:append|n:ap)
     # Explicit board+panel required (legacy compat)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit note:append <board> <panel> <text>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     shift 2; text="$*"
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"append\",\"text\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$text")}" | python3 -m json.tool 2>/dev/null
     ;;
-  note:wrap)
+  note:wrap|n:w)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit note:wrap <board> <panel>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"wrap"}' | python3 -m json.tool 2>/dev/null
     ;;
-  note:nowrap)
+  note:nowrap|n:n)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit note:nowrap <board> <panel>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"nowrap"}' | python3 -m json.tool 2>/dev/null
@@ -1652,7 +1739,7 @@ PY
     pid=$(_auto_panel "$bid" "board.checklist" "$title")
     echo "Checklist panel created: $pid"
     ;;
-  checklist:check|cl:ch)
+  checklist:check|cl:ch|cl:c)
     # Smart: yoloit checklist:check "item"
     #        yoloit checklist:check "Panel" "item"
     #        yoloit checklist:check "Board" "Panel" "item"
@@ -1696,7 +1783,7 @@ PY
     pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"columns"}' | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:add-column|k:c)
+  kanban:add-column|k:c|k:ac)
     # yoloit kanban:add-column "column-name"
     # yoloit kanban:add-column "Panel" "column-name"
     # yoloit kanban:add-column "Board" "Panel" "column-name"
@@ -1757,7 +1844,7 @@ PY
     pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add-card\",\"column\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$col"),\"title\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$title")}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:move-card|k:mv)
+  kanban:move-card|k:mv|k:mc)
     local bid_raw="" panel_hint="" cardId="" to=""
     case $# in
       0|1|2) echo "Usage: yoloit kanban:move-card [board] [panel] <cardId> <to-column>" >&2; exit 1 ;;
@@ -1783,7 +1870,7 @@ PY
     pid=$(_smart_panel "$bid" "board.kanban" "$panel_hint"); pid=$(_encode "$pid")
     _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"remove-card\",\"cardId\":\"${cardId}\"}" | python3 -m json.tool 2>/dev/null
     ;;
-  kanban:update-card|k:up)
+  kanban:update-card|k:up|k:uc)
     local bid_raw="" panel_hint="" cardId="" title=""
     case $# in
       0|1) echo "Usage: yoloit kanban:update-card [board] [panel] <cardId> <new-title>" >&2; exit 1 ;;
@@ -1831,6 +1918,106 @@ PY
   help|--help|-h)
     fmt=$(_parse_help_format "$@")
     usage "$fmt"
+    ;;
+  validate)
+    # Validate that the command registry matches bash case handlers.
+    # Run: yoloit validate
+    # Used in pre-commit hook as a "compilation check".
+    python3 - "$0" <<'PYEOF'
+import subprocess, re, sys, json, os
+
+script_path = sys.argv[1] if len(sys.argv) > 1 else os.path.realpath(__file__)
+
+# Get all registered commands + aliases via registry format
+result = subprocess.run([script_path, 'help', '--format', 'registry'],
+                        capture_output=True, text=True)
+if result.returncode != 0:
+    print("❌ Could not load registry:", result.stderr, file=sys.stderr)
+    sys.exit(1)
+
+registry = json.loads(result.stdout)
+
+# All names expected to have a bash handler
+expected = set()
+for entry in registry:
+    expected.add(entry["name"])
+    for a in entry.get("aliases", []):
+        expected.add(a)
+
+# Commands handled implicitly (not needing their own case branch)
+implicit = {
+    "help", "--help", "-h",
+    "validate",
+    "boards", "panels", "links",  # simple pass-through
+    "*",  # catch-all
+}
+
+# Parse bash case patterns from the script source
+with open(script_path) as f:
+    source = f.read()
+
+bash_cmds = set()
+in_case = False
+case_depth = 0
+for line in source.split("\n"):
+    stripped = line.strip()
+    # Detect the top-level command dispatch case
+    if not in_case and stripped == 'case "$cmd" in':
+        in_case = True
+        case_depth = 1
+        continue
+    if in_case:
+        # Track nested case...esac blocks
+        if re.match(r'^case\b', stripped):
+            case_depth += 1
+        elif stripped == "esac":
+            case_depth -= 1
+            if case_depth == 0:
+                break  # Done with top-level case
+            continue
+        # Only match patterns at depth 1 (top-level dispatch)
+        if case_depth == 1:
+            m = re.match(r'^([\w:.\-|]+)\)$', stripped)
+            if m:
+                for pat in m.group(1).split("|"):
+                    bash_cmds.add(pat.strip())
+
+missing_bash = expected - bash_cmds - implicit
+missing_registry = bash_cmds - expected - implicit
+
+errors = 0
+warnings = 0
+
+if missing_bash:
+    print("❌ In registry but no bash case handler:")
+    for cmd in sorted(missing_bash):
+        print(f"   add to bash case: {cmd})")
+    errors += len(missing_bash)
+
+if missing_registry:
+    print("⚠️  Bash case handler but not in registry (consider adding to commands[]):")
+    for cmd in sorted(missing_registry):
+        print(f"   {cmd}")
+    warnings += len(missing_registry)
+
+# Alias collision check
+alias_map = {}
+for entry in registry:
+    for a in entry.get("aliases", []):
+        if a in alias_map:
+            print(f"❌ Alias collision: '{a}' used by both '{alias_map[a]}' and '{entry['name']}'")
+            errors += 1
+        else:
+            alias_map[a] = entry["name"]
+
+if errors == 0 and warnings == 0:
+    total = len(expected)
+    print(f"✅ CLI registry is consistent ({total} commands/aliases, 0 errors)")
+elif errors == 0:
+    print(f"✅ No errors ({warnings} warnings — bash handlers not in registry are OK)")
+else:
+    sys.exit(1)
+PYEOF
     ;;
   *)
     echo "Unknown command: $cmd" >&2
