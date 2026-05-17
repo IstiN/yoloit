@@ -72,6 +72,8 @@ class MacosPlatformShell extends PlatformShell {
   @override
   String enrichedPath(String existing) {
     final extras = <String>[
+      if (_home.isNotEmpty) '$_home/.config/yoloit',
+      if (_home.isNotEmpty) '$_home/.opencode/bin',
       if (_home.isNotEmpty) '$_home/.local/bin',
       if (_home.isNotEmpty) '$_home/development/flutter/bin',
       if (_home.isNotEmpty) '$_home/flutter/bin',
@@ -104,6 +106,7 @@ class LinuxPlatformShell extends PlatformShell {
   @override
   String enrichedPath(String existing) {
     final extras = <String>[
+      if (_home.isNotEmpty) '$_home/.config/yoloit',
       if (_home.isNotEmpty) '$_home/.local/bin',
       '/usr/local/bin',
       '/snap/bin',
