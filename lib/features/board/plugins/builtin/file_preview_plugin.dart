@@ -279,32 +279,34 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
   }
 
   Widget _buildPreview(String path, String ext) {
-    // _refreshKey is incremented when BoardEventBus notifies us the file changed,
-    // which causes all stateless sub-widgets to rebuild and re-read the file.
-    final refreshKey = ValueKey('$path:$_refreshKey');
+    // For binary/media types, _refreshKey forces full recreation on file change.
+    // Text/markdown previews are stateful and subscribe to BoardEventBus
+    // themselves, so they reload content while preserving scroll position.
+    final mediaKey = ValueKey('$path:$_refreshKey');
     if (_isSvgExt(ext)) {
       return Padding(
         padding: const EdgeInsets.all(8),
-        child: SvgPicture.file(File(path), key: refreshKey, fit: BoxFit.contain),
+        child: SvgPicture.file(File(path), key: mediaKey, fit: BoxFit.contain),
       );
     }
     if (_isImageExt(ext)) {
       return Padding(
         padding: const EdgeInsets.all(8),
-        child: Image.file(File(path), key: refreshKey, fit: BoxFit.contain),
+        child: Image.file(File(path), key: mediaKey, fit: BoxFit.contain),
       );
     }
     if (_isVideoExt(ext)) {
-      return _VideoPreview(key: refreshKey, path: path);
+      return _VideoPreview(key: mediaKey, path: path);
     }
     if (_isAudioExt(ext)) {
-      return _AudioPreview(key: refreshKey, path: path);
+      return _AudioPreview(key: mediaKey, path: path);
     }
     if (_isMarkdownExt(ext)) {
-      return _MarkdownPreview(key: refreshKey, path: path);
+      // No key change — stateful widget handles its own reload + scroll preservation.
+      return _MarkdownPreview(key: ValueKey(path), path: path);
     }
     if (_isTextExt(ext) || _looksLikeTextFile(path)) {
-      return _CodePreview(key: refreshKey, path: path);
+      return _CodePreview(key: ValueKey(path), path: path);
     }
 
     // Other file types (binary, etc.)
@@ -398,22 +400,60 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
 
 // ─── Markdown Preview with Mermaid support ────────────────────────────────────
 
-class _MarkdownPreview extends StatelessWidget {
+class _MarkdownPreview extends StatefulWidget {
   const _MarkdownPreview({super.key, required this.path});
   final String path;
 
   @override
+  State<_MarkdownPreview> createState() => _MarkdownPreviewState();
+}
+
+class _MarkdownPreviewState extends State<_MarkdownPreview> {
+  late String _content;
+  StreamSubscription<BoardFileModifiedEvent>? _fileSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _content = _readFile();
+    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(_onFileModified);
+  }
+
+  @override
+  void didUpdateWidget(_MarkdownPreview old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) {
+      _content = _readFile();
+    }
+  }
+
+  @override
+  void dispose() {
+    _fileSub?.cancel();
+    super.dispose();
+  }
+
+  String _readFile() {
+    try {
+      final file = File(widget.path);
+      return file.existsSync() ? file.readAsStringSync() : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  void _onFileModified(BoardFileModifiedEvent event) {
+    if (!mounted || event.path != widget.path) return;
+    // Re-read file but let MarkdownDocumentPreview preserve its own scroll.
+    setState(() => _content = _readFile());
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final file = File(path);
-    if (!file.existsSync()) {
+    if (_content.isEmpty) {
       return const Center(child: Text('File not found'));
     }
-    try {
-      final content = file.readAsStringSync();
-      return MarkdownDocumentPreview(content: content);
-    } catch (e) {
-      return Center(child: Text('Error reading file: $e'));
-    }
+    return MarkdownDocumentPreview(content: _content);
   }
 }
 
@@ -1229,68 +1269,115 @@ class _MermaidExpandedDialogState extends State<_MermaidExpandedDialog> {
 
 // ─── Code / Text Preview ──────────────────────────────────────────────────────
 
-class _CodePreview extends StatelessWidget {
+class _CodePreview extends StatefulWidget {
   const _CodePreview({super.key, required this.path});
   final String path;
 
   @override
+  State<_CodePreview> createState() => _CodePreviewState();
+}
+
+class _CodePreviewState extends State<_CodePreview> {
+  late List<String> _lines;
+  final _scrollCtrl = ScrollController();
+  StreamSubscription<BoardFileModifiedEvent>? _fileSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _lines = _readLines();
+    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(_onFileModified);
+  }
+
+  @override
+  void didUpdateWidget(_CodePreview old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) {
+      _lines = _readLines();
+    }
+  }
+
+  @override
+  void dispose() {
+    _fileSub?.cancel();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  List<String> _readLines() {
+    try {
+      final file = File(widget.path);
+      if (!file.existsSync()) return [];
+      return file.readAsStringSync().split('\n');
+    } catch (_) {
+      return [];
+    }
+  }
+
+  void _onFileModified(BoardFileModifiedEvent event) {
+    if (!mounted || event.path != widget.path) return;
+    // Capture scroll offset before rebuild so we can restore it after.
+    final offset = _scrollCtrl.hasClients ? _scrollCtrl.offset : 0.0;
+    setState(() => _lines = _readLines());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollCtrl.hasClients) return;
+      final max = _scrollCtrl.position.maxScrollExtent;
+      _scrollCtrl.jumpTo(offset.clamp(0.0, max));
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final file = File(path);
-    if (!file.existsSync()) {
+    if (_lines.isEmpty) {
       return const Center(child: Text('File not found'));
     }
-    try {
-      final content = file.readAsStringSync();
-      final lines = content.split('\n');
-      final colors = AppColorScheme.of(context);
-      final textColor = Theme.of(context).colorScheme.onSurface;
-      final lineNumColor = textColor.withValues(alpha: 0.35);
+    final colors = AppColorScheme.of(context);
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final lineNumColor = textColor.withValues(alpha: 0.35);
 
-      return Container(
-        color: colors.terminalBackground,
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          itemCount: lines.length,
-          itemBuilder: (_, i) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 44,
-                    child: Text(
-                      '${i + 1}',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        color: lineNumColor,
-                        height: 1.5,
-                      ),
+    return Container(
+      color: colors.terminalBackground,
+      child: ListView.builder(
+        controller: _scrollCtrl,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: _lines.length,
+        itemBuilder: (_, i) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 44,
+                  child: Text(
+                    '${i + 1}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: lineNumColor,
+                      height: 1.5,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SelectableText(
-                      lines[i],
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        color: colors.terminalPrompt,
-                        height: 1.5,
-                      ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SelectableText(
+                    _lines[i],
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: colors.terminalPrompt,
+                      height: 1.5,
                     ),
                   ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
-    } catch (e) {
-      return Center(child: Text('Error reading file: $e'));
-    }
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
