@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 /// Converts a JSON widget tree (produced by JS widgets) into Flutter widgets.
@@ -714,31 +716,35 @@ class JsonWidgetRenderer {
 
   Widget _gestureDetector(Map<String, dynamic> m) {
     final child = _child(m) ?? const SizedBox.shrink();
+    // Use scheduleMicrotask to defer onEvent calls outside Flutter's gesture/mouse
+    // tracking pipeline — prevents !_debugDuringDeviceUpdate assertion.
+    void fire(String event, Map<String, dynamic> payload) =>
+        scheduleMicrotask(() => onEvent(event, payload));
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: m['onTap'] != null
-          ? () => onEvent(m['onTap'] as String, {})
+          ? () => fire(m['onTap'] as String, {})
           : null,
       onTapDown: m['onTapDown'] != null
-          ? (d) => onEvent(m['onTapDown'] as String, {
+          ? (d) => fire(m['onTapDown'] as String, {
               'x': d.localPosition.dx,
               'y': d.localPosition.dy,
             })
           : null,
       onTapUp: m['onTapUp'] != null
-          ? (d) => onEvent(m['onTapUp'] as String, {
+          ? (d) => fire(m['onTapUp'] as String, {
               'x': d.localPosition.dx,
               'y': d.localPosition.dy,
             })
           : null,
       onPanStart: m['onPanStart'] != null
-          ? (d) => onEvent(m['onPanStart'] as String, {
+          ? (d) => fire(m['onPanStart'] as String, {
               'x': d.localPosition.dx,
               'y': d.localPosition.dy,
             })
           : null,
       onPanUpdate: m['onPanUpdate'] != null
-          ? (d) => onEvent(m['onPanUpdate'] as String, {
+          ? (d) => fire(m['onPanUpdate'] as String, {
               'x': d.localPosition.dx,
               'y': d.localPosition.dy,
               'dx': d.delta.dx,
@@ -746,7 +752,7 @@ class JsonWidgetRenderer {
             })
           : null,
       onPanEnd: m['onPanEnd'] != null
-          ? (d) => onEvent(m['onPanEnd'] as String, {
+          ? (d) => fire(m['onPanEnd'] as String, {
               'velocityX': d.velocity.pixelsPerSecond.dx,
               'velocityY': d.velocity.pixelsPerSecond.dy,
             })
