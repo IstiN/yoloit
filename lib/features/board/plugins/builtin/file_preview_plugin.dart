@@ -16,6 +16,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
@@ -176,6 +177,29 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
 
   String get _path => widget.panel.state['path'] as String? ?? '';
 
+  StreamSubscription<BoardFileModifiedEvent>? _fileSub;
+  int _refreshKey = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(_onFileModified);
+  }
+
+  @override
+  void dispose() {
+    _fileSub?.cancel();
+    super.dispose();
+  }
+
+  void _onFileModified(BoardFileModifiedEvent event) {
+    if (!mounted) return;
+    final p = _path;
+    if (p.isNotEmpty && p == event.path) {
+      setState(() => _refreshKey++);
+    }
+  }
+
   Future<void> _pickFile() async {
     final result = await FilePicker.pickFiles(allowMultiple: false);
     if (result == null || result.files.isEmpty) return;
@@ -255,29 +279,32 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
   }
 
   Widget _buildPreview(String path, String ext) {
+    // _refreshKey is incremented when BoardEventBus notifies us the file changed,
+    // which causes all stateless sub-widgets to rebuild and re-read the file.
+    final refreshKey = ValueKey('$path:$_refreshKey');
     if (_isSvgExt(ext)) {
       return Padding(
         padding: const EdgeInsets.all(8),
-        child: SvgPicture.file(File(path), fit: BoxFit.contain),
+        child: SvgPicture.file(File(path), key: refreshKey, fit: BoxFit.contain),
       );
     }
     if (_isImageExt(ext)) {
       return Padding(
         padding: const EdgeInsets.all(8),
-        child: Image.file(File(path), fit: BoxFit.contain),
+        child: Image.file(File(path), key: refreshKey, fit: BoxFit.contain),
       );
     }
     if (_isVideoExt(ext)) {
-      return _VideoPreview(key: ValueKey(path), path: path);
+      return _VideoPreview(key: refreshKey, path: path);
     }
     if (_isAudioExt(ext)) {
-      return _AudioPreview(key: ValueKey(path), path: path);
+      return _AudioPreview(key: refreshKey, path: path);
     }
     if (_isMarkdownExt(ext)) {
-      return _MarkdownPreview(key: ValueKey(path), path: path);
+      return _MarkdownPreview(key: refreshKey, path: path);
     }
     if (_isTextExt(ext) || _looksLikeTextFile(path)) {
-      return _CodePreview(key: ValueKey(path), path: path);
+      return _CodePreview(key: refreshKey, path: path);
     }
 
     // Other file types (binary, etc.)

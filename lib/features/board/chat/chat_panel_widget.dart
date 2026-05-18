@@ -20,6 +20,7 @@ import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
+import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
@@ -854,6 +855,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             _activeToolCalls.remove(toolCallId);
           });
           break;
+        }
+        // Notify any open file preview panels to refresh their content.
+        for (final path in changedFiles) {
+          BoardEventBus.instance.fileModified(path);
         }
         setState(() {
           _activeToolCalls[toolCallId] = (_activeToolCalls[toolCallId] ??
