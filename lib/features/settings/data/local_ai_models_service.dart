@@ -550,24 +550,18 @@ class LocalAiModelsService {
   }
 
   Future<Directory> _resolveRegistryDirectory() async {
-    // First try to find registry in the standard locations (dev environment).
-    try {
-      return await LocalModelRegistryLocator.resolveAsync(
-        currentDirectory: PlatformDirs.instance.configDir,
-      );
-    } catch (_) {
-      // Not found — extract bundled registry assets to configDir.
-      await _ensureRegistryExtracted();
-      return LocalModelRegistryLocator.resolveAsync(
-        currentDirectory: PlatformDirs.instance.configDir,
-      );
-    }
+    // Always sync bundled registry assets to configDir so the registry
+    // is up to date with the installed app version.
+    await _syncRegistryAssets();
+    return LocalModelRegistryLocator.resolveAsync(
+      currentDirectory: PlatformDirs.instance.configDir,
+    );
   }
 
   static const _registryAssetPrefix =
       'third_party/flutter_local_models/registry/models/';
 
-  Future<void> _ensureRegistryExtracted() async {
+  Future<void> _syncRegistryAssets() async {
     final destDir = Directory(
       p.join(
         PlatformDirs.instance.configDir,
@@ -584,13 +578,12 @@ class LocalAiModelsService {
       (k) => k.startsWith(_registryAssetPrefix),
     );
 
+    // Always overwrite to ensure bundled assets are up to date.
     for (final assetKey in assets) {
       final fileName = p.basename(assetKey);
       final destFile = File(p.join(destDir.path, fileName));
-      if (!destFile.existsSync()) {
-        final data = await rootBundle.load(assetKey);
-        await destFile.writeAsBytes(data.buffer.asUint8List());
-      }
+      final data = await rootBundle.load(assetKey);
+      await destFile.writeAsBytes(data.buffer.asUint8List());
     }
   }
 
