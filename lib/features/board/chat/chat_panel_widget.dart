@@ -295,6 +295,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
     );
+    // Safety net: if the board is switched before the first opencode event
+    // arrives (so _handleEvent never had a chance to run), persist the session
+    // ID now so the next mount can resume the session correctly.
+    if (_config.provider == 'opencode' && _opencodeSessionId == null) {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null) {
+        _opencodeSessionId = sid;
+        widget.onUpdateState({
+          ...widget.panel.state,
+          'opencodeSessionId': sid,
+        });
+      }
+    }
     // Use detach() instead of dispose() so that any in-flight CLI process
     // (copilot / opencode / cursor) is NOT killed when the user switches
     // boards.  The OS process runs to completion and persists its session
@@ -744,6 +757,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   void _handleEvent(ChatEvent event) {
+    // Persist the opencode session ID as soon as the provider captures it
+    // (which happens on the first event). Doing it here — rather than only in
+    // onDone — means the ID survives a board switch that happens mid-message.
+    if (_config.provider == 'opencode' && _opencodeSessionId == null) {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null) {
+        _opencodeSessionId = sid;
+        widget.onUpdateState({
+          ...widget.panel.state,
+          'opencodeSessionId': sid,
+        });
+      }
+    }
+
     switch (event.type) {
       case ChatEventType.assistantMessageStart:
         setState(() {

@@ -130,7 +130,7 @@ class WidgetRegistryService {
     }
 
     // Always overwrite bundled example widgets so updates ship with the app.
-    const examples = ['weather', 'crypto', 'stocks', 'calculator'];
+    const examples = ['weather', 'crypto', 'stocks', 'calculator', 'yolo-hello', 'animation-showcase'];
     for (final name in examples) {
       final dest = Directory(
         '${destDir.path}${Platform.pathSeparator}$name',

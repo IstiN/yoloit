@@ -109,6 +109,10 @@ flutter:
     - tools/widgets/stocks/widget.js
     - tools/widgets/calculator/manifest.json
     - tools/widgets/calculator/widget.js
+    - tools/widgets/yolo-hello/manifest.json
+    - tools/widgets/yolo-hello/widget.js
+    - tools/widgets/animation-showcase/manifest.json
+    - tools/widgets/animation-showcase/widget.js
     - docs/app-development-skill.md
     - third_party/flutter_local_models/registry/models/
 
