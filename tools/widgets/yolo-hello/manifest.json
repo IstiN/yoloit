@@ -1,0 +1,9 @@
+{
+  "id": "yolo-hello",
+  "name": "Hello Animated",
+  "description": "Interactive demo: animations, gestures, requestAnimationFrame",
+  "version": "1.0.0",
+  "icon": "🎨",
+  "allowedCommands": [],
+  "network": false
+}

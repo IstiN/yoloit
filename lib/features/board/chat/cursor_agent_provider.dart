@@ -461,4 +461,14 @@ class CursorAgentProvider extends ChatProvider {
     }
     _processes.clear();
   }
+
+  /// Drop process references without killing them.
+  ///
+  /// Called when the board is switched away. In-flight cursor processes
+  /// continue running and persist their session state; the user can resume
+  /// from the next message when they switch back.
+  @override
+  void detach() {
+    _processes.clear();
+  }
 }

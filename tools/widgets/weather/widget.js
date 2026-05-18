@@ -1,9 +1,10 @@
 // Weather widget — native Flutter UI via JSON tree
 // Uses wttr.in free API (fetched through Dart, no CORS)
-// Supports city text input with storage persistence + secrets demo
+// Features animated transitions between city changes
 (function() {
   var city = 'London';
-  var _inputCity = city;  // tracks live textField value
+  var _inputCity = city;
+  var _visible = false; // for fade-in animation
 
   function iconForDesc(desc) {
     var d = desc.toLowerCase();
@@ -29,12 +30,22 @@
       var icon = iconForDesc(cur.weatherDesc[0].value);
 
       yoloit.panel.setTitle('Weather — ' + areaName);
+
+      // Fade out then in on city change
+      _visible = true;
+
       yoloit.render({
+        type: 'animatedOpacity',
+        opacity: _visible ? 1.0 : 0.0,
+        duration: 400,
+        curve: 'easeInOut',
+        child: {
         type: 'column',
         crossAxisAlignment: 'stretch',
         children: [
-          // Header
-          {type:'container', decoration:{color:'#0f172a', borderRadius:0},
+          // Header with animated temperature
+          {type:'animatedContainer', duration:500, curve:'easeOut',
+           decoration:{color:'#0f172a', borderRadius:0},
            padding:[16,20,16,16],
            child:{type:'column',crossAxisAlignment:'center',children:[
             {type:'text',data:icon,style:{fontSize:52}},
@@ -75,7 +86,7 @@
             style:{color:'#334155',fontSize:10,textAlign:'right'},
           }},
         ]
-      });
+      }});
     } catch(e) {
       yoloit.showError('Could not load weather:\n'+e.message);
     }

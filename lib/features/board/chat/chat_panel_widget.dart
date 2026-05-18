@@ -295,7 +295,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
     );
-    _provider.dispose();
+    // Use detach() instead of dispose() so that any in-flight CLI process
+    // (copilot / opencode / cursor) is NOT killed when the user switches
+    // boards.  The OS process runs to completion and persists its session
+    // state; the next message will resume it correctly.
+    _provider.detach();
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();

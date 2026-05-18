@@ -34,7 +34,9 @@
         return {
           type:'inkWell', onTap:'show_chart_'+coin.id,
           child:{
-            type:'container',
+            type:'animatedContainer',
+            duration: 300,
+            curve: 'easeOut',
             margin:[0,0,0,6],
             decoration:{color:'#1e293b',borderRadius:8,borderColor:'#1e3a5f',borderWidth:1},
             padding:[12,10,12,10],
