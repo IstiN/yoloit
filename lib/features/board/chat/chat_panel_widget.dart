@@ -3553,11 +3553,8 @@ class _UserBubbleState extends State<_UserBubble> {
                         ),
                       ),
                     ),
-                  AnimatedOpacity(
-                    opacity: _isHovered ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 100),
-                    child: _BubbleMenu(textToCopy: resolved.text, light: true),
-                  ),
+                  if (_isHovered)
+                    _BubbleMenu(textToCopy: resolved.text, light: true),
                 ],
               ),
             ),
