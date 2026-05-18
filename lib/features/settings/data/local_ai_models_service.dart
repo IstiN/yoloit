@@ -573,10 +573,10 @@ class LocalAiModelsService {
     );
     await destDir.create(recursive: true);
 
-    final manifest = await rootBundle.loadString('AssetManifest.json');
-    final assets = (jsonDecode(manifest) as Map<String, dynamic>).keys.where(
-      (k) => k.startsWith(_registryAssetPrefix),
-    );
+    final assetManifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+    final assets = assetManifest
+        .listAssets()
+        .where((k) => k.startsWith(_registryAssetPrefix));
 
     // Always overwrite to ensure bundled assets are up to date.
     for (final assetKey in assets) {
