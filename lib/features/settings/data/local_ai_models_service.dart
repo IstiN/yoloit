@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
 import 'package:path/path.dart' as p;

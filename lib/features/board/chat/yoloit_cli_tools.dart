@@ -997,6 +997,21 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     params: <YoloitCliToolParam>[_boardParam('id_or_name')],
   ),
   YoloitCliTool(
+    command: 'board:use',
+    alias: 'buse',
+    description: 'Set current board for subsequent commands',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name', required: true, shortKey: 'b'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'board:current',
+    alias: 'bcur',
+    description: 'Show current board',
+    group: 'board',
+  ),
+  YoloitCliTool(
     command: 'board:apply',
     alias: 'bap',
     description: 'Apply YAML bulk operations',
@@ -1639,6 +1654,28 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
   YoloitCliTool(
+    command: 'note:add',
+    alias: 'nadd',
+    description: 'Append text to note — board and panel optional',
+    group: 'note',
+    params: <YoloitCliToolParam>[
+      _p('text', 'Text to append', required: true, shortKey: 'tx'),
+      _panelParam(),
+      _boardParam(),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'note:create',
+    alias: 'ncrt',
+    description: 'Create a new note panel',
+    group: 'note',
+    params: <YoloitCliToolParam>[
+      _p('title', 'Note title', required: true, shortKey: 'ti'),
+      _p('content', 'Markdown content', shortKey: 'c'),
+      _boardParam(),
+    ],
+  ),
+  YoloitCliTool(
     command: 'checklist:add',
     alias: 'chad',
     description: 'Add checklist item',
@@ -1687,6 +1724,16 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         aliases: const ['id', 'text'],
         shortKey: 'it',
       ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'checklist:new',
+    alias: 'cln',
+    description: 'Create a new checklist panel',
+    group: 'checklist',
+    params: <YoloitCliToolParam>[
+      _p('title', 'Panel title', required: true, shortKey: 'ti'),
+      _boardParam(),
     ],
   ),
   YoloitCliTool(
@@ -1850,5 +1897,117 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _panelParam(),
       _p('url', 'URL to open', required: true, shortKey: 'u'),
     ],
+  ),
+  YoloitCliTool(
+    command: 'timer:create',
+    alias: 'tmr',
+    description: 'Create and optionally start a timer',
+    group: 'timer',
+    params: <YoloitCliToolParam>[
+      _p('duration', 'Duration in seconds (default 300)', shortKey: 'd'),
+      _p('label', 'Timer label text', shortKey: 'l'),
+      _p('start', 'Start timer immediately', shortKey: 's'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:list',
+    alias: 'myapps',
+    description: 'List installed apps and which are currently running',
+    group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'app:install',
+    alias: 'wgi',
+    description: 'Install an app from a local path or URL',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('source', 'Path to app directory or .js file, or URL', required: true, shortKey: 's'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:remove',
+    alias: 'wgrm',
+    description: 'Remove an installed app by id',
+    group: 'app',
+    destructive: true,
+    params: <YoloitCliToolParam>[
+      _p('id', 'App id', required: true, shortKey: 'i'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:run',
+    alias: 'wgo',
+    description: 'Open an app in a new panel on a board',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('id_or_path', 'App id or local directory path', required: true, shortKey: 'i'),
+      _boardParam(),
+      _p('panel_title', 'Panel title (optional)', shortKey: 'pt'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:create',
+    alias: 'wgnew',
+    description: 'Scaffold a new app in the apps directory',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('name', 'App id/name', required: true, shortKey: 'n'),
+      _p('template', 'Template: basic|network|yoloit (default: basic)', shortKey: 't'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:execute',
+    alias: 'apexec',
+    description: 'Execute a JS event/function in a running app',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('id', 'App id', required: true, shortKey: 'i'),
+      _p('action', 'Action id (e.g. btn_5, refresh)', required: true, shortKey: 'a'),
+      _p('payload', 'JSON payload string (optional)', shortKey: 'p'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:reload',
+    alias: 'apref',
+    description: 'Hot-reload a running app (re-reads JS from disk)',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('id', 'App id', required: true, shortKey: 'i'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:logs',
+    alias: 'aplog',
+    description: 'Show console.log output from a running app',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('id', 'App id or local directory path', required: true, shortKey: 'i'),
+      _p('f', 'Follow/stream logs continuously', shortKey: 'f'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:snapshot',
+    alias: 'apsnap',
+    description: 'Get the current JSON render tree of a running app',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('id', 'App id', required: true, shortKey: 'i'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:screenshot',
+    alias: 'apss',
+    description: 'Save a screenshot of a running app panel to a PNG file',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('id', 'App id', required: true, shortKey: 'i'),
+      _p('output', 'Output PNG path (default: /tmp/<id>.png)', shortKey: 'o'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'app:dev-skill',
+    alias: 'apdocs',
+    description: 'Print the full YoLoIT app development guide',
+    group: 'app',
   ),
 ];
