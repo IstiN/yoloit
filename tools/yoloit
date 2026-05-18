@@ -785,6 +785,22 @@ commands = [
     "example": "yoloit app:dev-skill",
     "aliases": ["app:skill", "app:docs"],
   },
+  {
+    "group": "app",
+    "name": "app:demo",
+    "description": "List built-in demo apps with their local paths and descriptions.",
+    "params": [],
+    "example": "yoloit app:demo",
+    "aliases": [],
+  },
+  {
+    "group": "app",
+    "name": "app:demo-view",
+    "description": "Show the full source (manifest.json + widget.js) of a built-in demo app. Use to learn patterns before writing a new app.",
+    "params": [["id", "Demo app id (from app:demo list)", True]],
+    "example": "yoloit app:demo-view calculator",
+    "aliases": [],
+  },
 ]
 
 # ── Registry: namespace prefixes (one definition per namespace) ───────
@@ -2168,6 +2184,14 @@ else:
     ;;
   app:dev-skill|app:skill|app:docs)
     _get "/apps/dev-skill"
+    ;;
+  app:demo)
+    _get "/apps/demo"
+    ;;
+  app:demo-view)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:demo-view <id>" >&2; exit 1; }
+    app_id="$1"
+    _get "/apps/demo/$(_encode "$app_id")"
     ;;
   app:create|widget:create|wg:new)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit app:create <name> [--template basic|network|yoloit]" >&2; exit 1; }

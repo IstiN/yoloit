@@ -2586,6 +2586,69 @@ class CliServer {
       }
     }
 
+    // GET /api/apps/demo — list installed demo apps with their file paths
+    if (sub.length == 1 && sub[0] == 'demo' && method == 'GET') {
+      final appsDir = Directory(
+        '${Platform.environment['HOME']}/.config/yoloit/apps',
+      );
+      if (!await appsDir.exists()) {
+        return _json({'demos': []});
+      }
+      final demos = <Map<String, Object?>>[];
+      await for (final entry in appsDir.list()) {
+        if (entry is! Directory) continue;
+        final manifestFile = File('${entry.path}/manifest.json');
+        if (!await manifestFile.exists()) continue;
+        try {
+          final raw = await manifestFile.readAsString();
+          final manifest = jsonDecode(raw) as Map<String, dynamic>;
+          demos.add({
+            'id': manifest['id'] ?? entry.path.split(Platform.pathSeparator).last,
+            'name': manifest['name'] ?? '',
+            'description': manifest['description'] ?? '',
+            'icon': manifest['icon'] ?? '',
+            'network': manifest['network'] ?? false,
+            'path': entry.path,
+            'files': {
+              'manifest': '${entry.path}/manifest.json',
+              'widget': '${entry.path}/widget.js',
+            },
+          });
+        } catch (_) {}
+      }
+      demos.sort((a, b) => (a['id'] as String).compareTo(b['id'] as String));
+      return _json({'demos': demos});
+    }
+
+    // GET /api/apps/demo/:id — show manifest + widget.js content of a demo app
+    if (sub.length == 2 && sub[0] == 'demo' && method == 'GET') {
+      final id = sub[1];
+      final appsDir = '${Platform.environment['HOME']}/.config/yoloit/apps';
+      final appDir = Directory('$appsDir/$id');
+      if (!await appDir.exists()) {
+        return _error('Demo app "$id" not found. Run app:demo to list available apps.');
+      }
+      final manifestFile = File('${appDir.path}/manifest.json');
+      final widgetFile = File('${appDir.path}/widget.js');
+      final manifestContent = await manifestFile.exists()
+          ? await manifestFile.readAsString()
+          : null;
+      final widgetContent = await widgetFile.exists()
+          ? await widgetFile.readAsString()
+          : null;
+      Map<String, dynamic> manifest = {};
+      try {
+        if (manifestContent != null) manifest = jsonDecode(manifestContent) as Map<String, dynamic>;
+      } catch (_) {}
+      return _json({
+        'id': id,
+        'path': appDir.path,
+        'manifest': manifest,
+        'manifestRaw': manifestContent,
+        'widgetJs': widgetContent,
+      });
+    }
+
     // POST /api/apps/install-zip { zipPath: "..." }
     if (sub.length == 1 && sub[0] == 'install-zip' && method == 'POST') {
       final body = await _body(request);

@@ -2007,7 +2007,22 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'app:dev-skill',
     alias: 'apdocs',
-    description: 'Print the full YoLoIT app development guide',
+    description: 'Print the full YoLoIT app development guide (JS API, node types, examples). Useful for AI agents writing apps.',
     group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'app:demo',
+    alias: 'apdemo',
+    description: 'List built-in demo apps with their local paths. Use app:demo-view <id> to read a full example.',
+    group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'app:demo-view',
+    alias: 'apdemov',
+    description: 'Show the full source (manifest.json + widget.js) of a built-in demo app. Great for learning patterns before writing a new app.',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('id', 'Demo app id (from app:demo list)', required: true, shortKey: 'i'),
+    ],
   ),
 ];

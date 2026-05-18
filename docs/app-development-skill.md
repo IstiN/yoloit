@@ -14,11 +14,13 @@ Develop in your current working directory. No copy, no install. The app loads di
 mkdir my-app && cd my-app
 
 # Step 2: Write manifest.json
-cat > manifest.json << 'EOF'
-{"id":"my-app","name":"My App","description":"...","version":"1.0.0","icon":"🔧","network":false}
-EOF
+# ⚠️  NEVER use heredoc (cat << 'EOF') — it hangs in AI agent bash sessions.
+# Use printf or python3 to write files:
+printf '{"id":"my-app","name":"My App","description":"...","version":"1.0.0","icon":"🔧","network":false}\n' > manifest.json
+# or:
+python3 -c "open('manifest.json','w').write('{\"id\":\"my-app\",\"name\":\"My App\",\"description\":\"...\",\"version\":\"1.0.0\",\"icon\":\"🔧\",\"network\":false}')"
 
-# Step 3: Write widget.js (see API below)
+# Step 3: Write widget.js (see API below — use printf or python3, NOT heredoc)
 # ... edit widget.js ...
 
 # Step 4: Open from local path — board and panel are auto-selected/created
@@ -56,11 +58,13 @@ yoloit app:run <id>          # run by manifest id
 
 ### ⚠️ Critical Rules for AI Agents
 
-1. **NEVER use `app:install` for local dev** — use `app:run .` directly. `app:install` copies to apps folder (use only for distributing finished apps).
-2. **After editing `widget.js` → always call `app:reload .`** — hot-reloads without restart.
-3. **Board and panel are always optional** — `app:run .` picks active board automatically.
-4. **Check `app:logs .`** to see `console.log` output — essential for debugging.
-5. **If `app:run .` fails** — check `yoloit boards` to verify YoLoIT is running.
+1. **NEVER use heredoc (`cat << 'EOF'`)** — it hangs in AI agent bash sessions. Use `printf` or `python3 -c "open('file','w').write(...)"` to write files.
+2. **NEVER use `app:install` for local dev** — use `app:run .` directly. `app:install` copies to apps folder (use only for distributing finished apps).
+3. **After editing `widget.js` → always call `app:reload .`** — hot-reloads without restart.
+4. **Board and panel are always optional** — `app:run .` picks active board automatically.
+5. **Check `app:logs .`** to see `console.log` output — essential for debugging.
+6. **If `app:run .` fails** — check `yoloit boards` to verify YoLoIT is running.
+7. **Read demo apps first** — run `app:demo` to list examples, then `app:demo-view <id>` to study patterns.
 
 ### Complete AI Agent Dev Workflow
 
@@ -84,6 +88,7 @@ yoloit app:run <id>          # run by manifest id
 | UI not updating after reload | JS syntax error | Check `app:logs .` for error message |
 | `yoloit.render()` not showing | Missing IIFE wrapper | Wrap all code in `(function(){ ... })()` |
 | Button not working | Missing `yoloit.onEvent` | Always register `yoloit.onEvent(function(id){ ... })` |
+| bash hangs when writing files | Using heredoc `cat << 'EOF'` | Use `printf '...' > file` or `python3 -c "open(...).write(...)"` |
 
 ---
 
@@ -693,6 +698,35 @@ Apps created with `app:create` or manually placed in `~/.config/yoloit/apps/` ar
 
 ---
 
+## Built-in Demo Apps
+
+Real-world examples you can study and run. Use these as starting points for your own apps.
+
+```bash
+# List all demo apps with their local paths
+yoloit app:demo
+
+# Read the full source of a demo app (manifest.json + widget.js)
+yoloit app:demo-view calculator
+yoloit app:demo-view weather
+yoloit app:demo-view crypto
+yoloit app:demo-view stocks
+
+# Run a demo app on the board
+yoloit app:run calculator
+```
+
+| ID | Name | Description | Network |
+|----|------|-------------|---------|
+| `calculator` | Calculator | Scientific calculator — pure JS, no network | ❌ |
+| `weather` | Weather | Current weather via wttr.in API, city input with storage | ✅ |
+| `crypto` | Crypto Prices | Live BTC/ETH/SOL via CoinGecko, auto-refresh | ✅ |
+| `stocks` | Stock Prices | Real-time stock quotes, textField + fetch | ✅ |
+
+**Tip**: Before building a new app, always run `app:demo-view <similar-app>` to study the pattern — especially for network fetch, storage, and theming.
+
+---
+
 ## Tips for AI Agents
 
 1. **Always use `yoloit.theme` colors** — never hardcode hex. Users switch dark/light mode.
@@ -708,3 +742,5 @@ Apps created with `app:create` or manually placed in `~/.config/yoloit/apps/` ar
 11. **Use `app:execute . <evt>`** — fire events from CLI to test app logic without clicking.
 12. **`app:run .` is idempotent** — safe to call even if the panel already exists.
 13. **NEVER call `app:install .`** during development — use `app:run .` directly from your working directory.
+14. **NEVER use heredoc** (`cat << 'EOF'`) — hangs in AI bash sessions. Use `printf '...' > file` or `python3 -c "open('f','w').write('...')"`.
+15. **Study demo apps first** — `app:demo` lists them, `app:demo-view <id>` shows full source.
