@@ -486,6 +486,7 @@ class _QuickSizeButton extends StatelessWidget {
   final void Function(double w, double h) onResize;
 
   static const _sizes = [
+    (icon: Icons.crop_free_outlined, label: 'Compact', w: 360.0, h: 420.0),
     (icon: Icons.smartphone_outlined, label: 'Mobile', w: 390.0, h: 844.0),
     (icon: Icons.tablet_outlined, label: 'Tablet', w: 768.0, h: 1024.0),
     (icon: Icons.desktop_windows_outlined, label: 'Desktop', w: 1280.0, h: 800.0),
