@@ -176,6 +176,12 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       initialTheme: _themeColors(),
     );
 
+    // Inject env vars from panel state
+    final envGroup = widget.panel.state['_envGroup'] as Map?;
+    if (envGroup != null) {
+      engine.envVars = envGroup.cast<String, String>();
+    }
+
     _renderer = JsonWidgetRenderer(
       onEvent: (actionId, payload) => engine.callEvent(actionId, payload),
     );
@@ -208,9 +214,28 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       // Engine running but no render yet
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-    return SingleChildScrollView(
-      padding: EdgeInsets.zero,
-      child: _renderer!.build(tree, context),
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: EdgeInsets.zero,
+          child: _renderer!.build(tree, context),
+        ),
+        // Gear icon for env variable configuration
+        Positioned(
+          right: 4,
+          top: 4,
+          child: _EnvGearButton(
+            panel: widget.panel,
+            onUpdate: (envGroup) {
+              widget.renderContext.onUpdateState({
+                ...widget.panel.state,
+                '_envGroup': envGroup,
+              });
+              _engine?.envVars = envGroup?.cast<String, String>() ?? {};
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -410,5 +435,104 @@ class CustomWidgetCliHandler extends PanelCliHandler {
         return CliActionResult(ok: true, data: {'widgetId': widgetId, 'tree': tree});
     }
     return CliActionResult(ok: false, message: 'Unknown action: $action');
+  }
+}
+
+// ─── Env variable gear button ─────────────────────────────────────────────────
+
+class _EnvGearButton extends StatelessWidget {
+  const _EnvGearButton({required this.panel, required this.onUpdate});
+  final BoardPanelInstance panel;
+  final void Function(Map<String, dynamic>?) onUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasEnv = (panel.state['_envGroup'] as Map?)?.isNotEmpty == true;
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        iconSize: 14,
+        tooltip: 'Environment variables',
+        icon: Icon(
+          Icons.settings_outlined,
+          color: hasEnv
+              ? const Color(0xFF4ade80)
+              : Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(120),
+        ),
+        onPressed: () => _showEnvDialog(context),
+      ),
+    );
+  }
+
+  void _showEnvDialog(BuildContext context) {
+    final current = Map<String, String>.from(
+      (panel.state['_envGroup'] as Map?)?.cast<String, String>() ?? {},
+    );
+    final controller = TextEditingController(
+      text: current.entries.map((e) => '${e.key}=${e.value}').join('\n'),
+    );
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Environment Variables', style: TextStyle(fontSize: 14)),
+        content: SizedBox(
+          width: 320,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'One per line: KEY=VALUE\nInjected into yoloit.exec() calls.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                maxLines: 8,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                decoration: const InputDecoration(
+                  hintText: 'API_KEY=xxx\nDEBUG=true',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding: EdgeInsets.all(8),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              onUpdate(null);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Clear'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final lines = controller.text
+                  .split('\n')
+                  .map((l) => l.trim())
+                  .where((l) => l.isNotEmpty && l.contains('='));
+              final env = <String, dynamic>{};
+              for (final line in lines) {
+                final idx = line.indexOf('=');
+                env[line.substring(0, idx)] = line.substring(idx + 1);
+              }
+              onUpdate(env.isEmpty ? null : env);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 }

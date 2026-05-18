@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_js/flutter_js.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -16,14 +17,20 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// ```js
 /// yoloit.render(tree)           // update the Flutter UI
 /// yoloit.fetchJson(url, opts)   // HTTP fetch via Dart (no CORS)
+/// yoloit.exec(cmd)              // run yoloit CLI command, returns {stdout, stderr, exitCode}
 /// yoloit.storage.get(key)       // persistent per-panel storage (plain JSON)
 /// yoloit.storage.set(key, val)
 /// yoloit.secrets.get(key)       // per-widget secure storage (encrypted)
 /// yoloit.secrets.set(key, val)
 /// yoloit.panel.setTitle(title)
 /// yoloit.showError(msg)
+/// yoloit.loadAsset(path)
 /// setInterval(fn, ms)           // Dart-backed timer
 /// clearInterval(id)
+/// setTimeout(fn, ms)
+/// clearTimeout(id)
+/// requestAnimationFrame(fn)     // vsync-driven (~60fps), fn receives elapsed ms
+/// cancelAnimationFrame(id)
 /// console.log(...)
 /// ```
 class JsWidgetEngine {
@@ -54,6 +61,11 @@ class JsWidgetEngine {
   final Map<String, Timer> _intervals = {};
   final List<Map<String, dynamic>> _consoleLogs = [];
   static const int _maxLogs = 200;
+  Ticker? _rafTicker;
+  final Map<String, bool> _rafCallbacks = {};
+
+  /// Environment variables injected into exec calls.
+  Map<String, String> envVars = {};
 
   static const _secureStorage = FlutterSecureStorage();
 
@@ -153,6 +165,9 @@ class JsWidgetEngine {
       t.cancel();
     }
     _intervals.clear();
+    _rafTicker?.dispose();
+    _rafTicker = null;
+    _rafCallbacks.clear();
     _runtime?.dispose();
     _runtime = null;
   }
@@ -345,6 +360,60 @@ class JsWidgetEngine {
         }
       });
     });
+
+    // yoloit.exec(cmd) — run a yoloit CLI command, returns stdout
+    rt.setupBridge('__yoloit_exec', (args) {
+      if (_disposed) return;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final id = req['id'] as String;
+      final cmd = req['cmd'] as String? ?? '';
+      // Security: only allow yoloit commands
+      if (!cmd.startsWith('yoloit ') && cmd != 'yoloit') {
+        _resolveCallback(rt, id, {'__error': 'Only yoloit commands are allowed'});
+        return;
+      }
+      Future(() async {
+        try {
+          final yoloitBin = '${Platform.environment['HOME']}/.config/yoloit/yoloit';
+          final cmdArgs = cmd.substring('yoloit'.length).trim().split(RegExp(r'\s+'));
+          final env = Map<String, String>.from(Platform.environment)..addAll(envVars);
+          final result = await Process.run(
+            yoloitBin,
+            cmdArgs.where((s) => s.isNotEmpty).toList(),
+            environment: env,
+          ).timeout(const Duration(seconds: 30));
+          if (_disposed) return;
+          _resolveCallback(rt, id, {
+            'stdout': result.stdout.toString(),
+            'stderr': result.stderr.toString(),
+            'exitCode': result.exitCode,
+          });
+        } catch (e) {
+          if (!_disposed) _resolveCallback(rt, id, {'__error': e.toString()});
+        }
+      });
+    });
+
+    // requestAnimationFrame — vsync-driven frame callback
+    rt.setupBridge('__yoloit_raf', (args) {
+      if (_disposed) return;
+      final req = (args is Map)
+          ? Map<String, dynamic>.from(args)
+          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final id = req['id'] as String;
+      _rafCallbacks[id] = true;
+      _ensureRafTicker(rt);
+    });
+
+    // cancelAnimationFrame
+    rt.setupBridge('__yoloit_caf', (id) {
+      _rafCallbacks.remove(id?.toString() ?? '');
+      if (_rafCallbacks.isEmpty) {
+        _rafTicker?.stop();
+      }
+    });
   }
 
   void _resolveCallback(JavascriptRuntime rt, String id, dynamic value) {
@@ -357,6 +426,32 @@ class JsWidgetEngine {
     }
   }
 
+  void _ensureRafTicker(JavascriptRuntime rt) {
+    if (_rafTicker != null) {
+      if (!_rafTicker!.isTicking) _rafTicker!.start();
+      return;
+    }
+    _rafTicker = Ticker((elapsed) {
+      if (_disposed || _rafCallbacks.isEmpty) {
+        _rafTicker?.stop();
+        return;
+      }
+      final ms = elapsed.inMilliseconds;
+      // Copy keys to avoid concurrent modification
+      final ids = List<String>.from(_rafCallbacks.keys);
+      _rafCallbacks.clear();
+      try {
+        for (final id in ids) {
+          rt.evaluate('if(__raf_cbs["$id"]){__raf_cbs["$id"]($ms);delete __raf_cbs["$id"];}');
+        }
+        rt.executePendingJob();
+      } catch (e) {
+        debugPrint('[JsWidgetEngine] RAF tick error: $e');
+      }
+    });
+    _rafTicker!.start();
+  }
+
   // ── Bootstrap JS injected before widget code ────────────────────────────
 
   // NOTE: flutter_js bridges are called from JS via the native `sendMessage(channelName, jsonString)`
@@ -364,6 +459,7 @@ class JsWidgetEngine {
   static const _bootstrap = r'''
 var __cbs = {};
 var __iv_cbs = {};
+var __raf_cbs = {};
 var __nid = function(){return Math.random().toString(36).slice(2)+Date.now().toString(36);};
 
 var console = {
@@ -377,6 +473,9 @@ var clearTimeout = function(id){ sendMessage('__yoloit_clear_interval',JSON.stri
 var setInterval = function(fn,ms){ var id=__nid(); __iv_cbs[id]=fn; sendMessage('__yoloit_set_interval',JSON.stringify({id:id,ms:ms||1000})); return id; };
 var clearInterval = function(id){ sendMessage('__yoloit_clear_interval',JSON.stringify(String(id))); delete __iv_cbs[String(id)]; };
 
+var requestAnimationFrame = function(fn){ var id=__nid(); __raf_cbs[id]=fn; sendMessage('__yoloit_raf',JSON.stringify({id:id})); return id; };
+var cancelAnimationFrame = function(id){ delete __raf_cbs[String(id)]; sendMessage('__yoloit_caf',JSON.stringify(String(id))); };
+
 var yoloit = {
   render: function(tree){ sendMessage('__yoloit_render', JSON.stringify(tree)); },
 
@@ -385,6 +484,14 @@ var yoloit = {
       var id=__nid();
       __cbs[id]=function(r){if(r&&r.__error)reject(new Error(r.__error));else resolve(r);};
       sendMessage('__yoloit_fetch', JSON.stringify({id:id,url:url,method:(opts&&opts.method)||'GET',headers:(opts&&opts.headers)||{}}));
+    });
+  },
+
+  exec: function(cmd){
+    return new Promise(function(resolve,reject){
+      var id=__nid();
+      __cbs[id]=function(r){if(r&&r.__error)reject(new Error(r.__error));else resolve(r);};
+      sendMessage('__yoloit_exec', JSON.stringify({id:id,cmd:cmd}));
     });
   },
 

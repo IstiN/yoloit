@@ -88,4 +88,16 @@ abstract class ChatProvider {
 
   /// Dispose all resources.
   void dispose();
+
+  /// Detach from running processes without killing them.
+  ///
+  /// Called when the chat widget is temporarily removed from the tree (e.g.
+  /// the user switches to a different board). Unlike [dispose], this must NOT
+  /// send SIGTERM — in-flight CLI sessions should keep running so the user can
+  /// resume them when they switch back. The Dart [Process] references are
+  /// dropped so they can be GC-ed, but the OS processes continue until they
+  /// exit naturally.
+  ///
+  /// Override in providers that manage OS processes. The default is a no-op.
+  void detach() {}
 }

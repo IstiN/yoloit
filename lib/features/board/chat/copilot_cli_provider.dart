@@ -258,6 +258,16 @@ class CopilotCliProvider extends ChatProvider {
     _processes.clear();
   }
 
+  /// Drop process references without killing them.
+  ///
+  /// Called when the board is switched away. In-flight copilot processes
+  /// continue running and persist their session state; the user can resume
+  /// from the next message when they switch back.
+  @override
+  void detach() {
+    _processes.clear();
+  }
+
   String _resolveWorkingDir(String configuredDir) {
     final trimmed = configuredDir.trim();
     if (trimmed.isNotEmpty && Directory(trimmed).existsSync()) return trimmed;

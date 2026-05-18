@@ -70,6 +70,14 @@ class JsonWidgetRenderer {
       'textField'                 => _textFieldNode(m),
       'chart'                     => _chartNode(m),
 
+      // Animated widgets (implicit animations)
+      'animatedContainer'         => _animatedContainer(m),
+      'animatedOpacity'           => _animatedOpacity(m),
+      'animatedPositioned'        => _animatedPositioned(m),
+
+      // Gesture input
+      'gestureDetector'           => _gestureDetector(m),
+
       _                           => const SizedBox.shrink(),
     };
   }
@@ -632,6 +640,120 @@ class JsonWidgetRenderer {
 
   int _int(dynamic v, int def) =>
       v == null ? def : (v as num).toInt();
+
+  // ── Animated widgets ──────────────────────────────────────────────────────
+
+  Widget _animatedContainer(Map<String, dynamic> m) {
+    final deco = m['decoration'] as Map?;
+    return AnimatedContainer(
+      duration: Duration(milliseconds: _int(m['duration'], 300)),
+      curve: _curve(m['curve'] as String?),
+      width: _doubleOrNull(m['width']),
+      height: _doubleOrNull(m['height']),
+      padding: _edgeInsetsOrNull(m['padding']),
+      margin: _edgeInsetsOrNull(m['margin']),
+      alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
+      decoration: deco != null
+          ? _boxDecoration(deco.cast<String, dynamic>())
+          : (m['color'] != null ? BoxDecoration(color: _color(m['color'] as String?)) : null),
+      transform: _matrix4(m['transform']),
+      child: _child(m),
+    );
+  }
+
+  Widget _animatedOpacity(Map<String, dynamic> m) => AnimatedOpacity(
+    duration: Duration(milliseconds: _int(m['duration'], 300)),
+    curve: _curve(m['curve'] as String?),
+    opacity: _double(m['opacity'], 1.0),
+    child: _child(m) ?? const SizedBox.shrink(),
+  );
+
+  Widget _animatedPositioned(Map<String, dynamic> m) => AnimatedPositioned(
+    duration: Duration(milliseconds: _int(m['duration'], 300)),
+    curve: _curve(m['curve'] as String?),
+    left: _doubleOrNull(m['left']),
+    top: _doubleOrNull(m['top']),
+    right: _doubleOrNull(m['right']),
+    bottom: _doubleOrNull(m['bottom']),
+    width: _doubleOrNull(m['width']),
+    height: _doubleOrNull(m['height']),
+    child: _child(m) ?? const SizedBox.shrink(),
+  );
+
+  Curve _curve(String? v) => switch (v) {
+    'linear'       => Curves.linear,
+    'easeIn'       => Curves.easeIn,
+    'easeOut'      => Curves.easeOut,
+    'easeInOut'    => Curves.easeInOut,
+    'bounce'       => Curves.bounceOut,
+    'bounceIn'     => Curves.bounceIn,
+    'elastic'      => Curves.elasticOut,
+    'elasticIn'    => Curves.elasticIn,
+    'decelerate'   => Curves.decelerate,
+    'fastOutSlowIn'=> Curves.fastOutSlowIn,
+    _              => Curves.easeInOut,
+  };
+
+  Matrix4? _matrix4(dynamic v) {
+    if (v == null) return null;
+    if (v is Map) {
+      final m = v.cast<String, dynamic>();
+      final tx = _double(m['translateX'], 0);
+      final ty = _double(m['translateY'], 0);
+      final scale = _double(m['scale'], 1);
+      final rotate = _double(m['rotate'], 0); // radians
+      return Matrix4.identity()
+        ..translateByDouble(tx, ty, 0, 1)
+        ..scaleByDouble(scale, scale, 1, 1)
+        ..rotateZ(rotate);
+    }
+    return null;
+  }
+
+  // ── Gesture Detector ──────────────────────────────────────────────────────
+
+  Widget _gestureDetector(Map<String, dynamic> m) {
+    final child = _child(m) ?? const SizedBox.shrink();
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: m['onTap'] != null
+          ? () => onEvent(m['onTap'] as String, {})
+          : null,
+      onTapDown: m['onTapDown'] != null
+          ? (d) => onEvent(m['onTapDown'] as String, {
+              'x': d.localPosition.dx,
+              'y': d.localPosition.dy,
+            })
+          : null,
+      onTapUp: m['onTapUp'] != null
+          ? (d) => onEvent(m['onTapUp'] as String, {
+              'x': d.localPosition.dx,
+              'y': d.localPosition.dy,
+            })
+          : null,
+      onPanStart: m['onPanStart'] != null
+          ? (d) => onEvent(m['onPanStart'] as String, {
+              'x': d.localPosition.dx,
+              'y': d.localPosition.dy,
+            })
+          : null,
+      onPanUpdate: m['onPanUpdate'] != null
+          ? (d) => onEvent(m['onPanUpdate'] as String, {
+              'x': d.localPosition.dx,
+              'y': d.localPosition.dy,
+              'dx': d.delta.dx,
+              'dy': d.delta.dy,
+            })
+          : null,
+      onPanEnd: m['onPanEnd'] != null
+          ? (d) => onEvent(m['onPanEnd'] as String, {
+              'velocityX': d.velocity.pixelsPerSecond.dx,
+              'velocityY': d.velocity.pixelsPerSecond.dy,
+            })
+          : null,
+      child: child,
+    );
+  }
 }
 
 // ── TextField node ────────────────────────────────────────────────────────────
