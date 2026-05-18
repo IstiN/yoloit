@@ -94,6 +94,21 @@ class LocalAiModelsService {
       displayName: 'Qwen3 ASR 0.6B 4bit',
       kind: LocalAiModelKind.asr,
     ),
+    LocalAiModelDefinition(
+      id: 'whisper-tiny-asr-4bit',
+      displayName: 'Whisper Tiny (fastest, ~26 MB)',
+      kind: LocalAiModelKind.asr,
+    ),
+    LocalAiModelDefinition(
+      id: 'whisper-base-asr-4bit',
+      displayName: 'Whisper Base (~47 MB)',
+      kind: LocalAiModelKind.asr,
+    ),
+    LocalAiModelDefinition(
+      id: 'whisper-small-asr-4bit',
+      displayName: 'Whisper Small (best quality, ~144 MB)',
+      kind: LocalAiModelKind.asr,
+    ),
   ];
 
   final _changes = StreamController<void>.broadcast();
