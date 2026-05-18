@@ -1034,9 +1034,13 @@ _auto_panel() {
   local body="{\"type\":\"${type}\",\"title\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$title")"
   [[ -n "$state" ]] && body+=",\"state\":${state}"
   body+="}"
-  local created
+  local created pid_result
   created=$(_post "/boards/${bid}/panels" "$body")
-  python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print((d.get('panel') or {}).get('id',''))" <<<"$created"
+  pid_result=$(python3 -c "import json,sys; d=json.loads(sys.stdin.read() or '{}'); print((d.get('panel') or {}).get('id',''))" <<<"$created")
+  if [[ -z "$pid_result" ]]; then
+    echo "Warning: _auto_panel failed to create panel. API response: $created" >&2
+  fi
+  echo "$pid_result"
 }
 
 # ── Smart board/panel resolution ──────────────────────────────────────
