@@ -112,6 +112,7 @@ abstract class BoardPanelPlugin {
   List<Widget> buildHeaderActions(
     BuildContext context,
     BoardPanelInstance panel,
-    ValueChanged<Map<String, dynamic>> onUpdateState,
-  ) => const [];
+    ValueChanged<Map<String, dynamic>> onUpdateState, {
+    void Function(double w, double h)? onResize,
+  }) => const [];
 }

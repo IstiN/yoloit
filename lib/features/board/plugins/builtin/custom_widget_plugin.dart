@@ -9,6 +9,8 @@ import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
+import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 
 class CustomWidgetPlugin extends BoardPanelPlugin {
   const CustomWidgetPlugin();
@@ -49,15 +51,20 @@ class CustomWidgetPlugin extends BoardPanelPlugin {
   List<Widget> buildHeaderActions(
     BuildContext context,
     BoardPanelInstance panel,
-    ValueChanged<Map<String, dynamic>> onUpdateState,
-  ) {
+    ValueChanged<Map<String, dynamic>> onUpdateState, {
+    void Function(double w, double h)? onResize,
+  }) {
     return [
+      // Quick size presets: Mobile / Tablet / Desktop
+      if (onResize != null) _QuickSizeButton(onResize: onResize),
+      // Env variable gear
       _EnvGearButton(
         panel: panel,
-        onUpdate: (envGroup) {
+        onUpdate: (selectedGroups, customVars) {
           onUpdateState({
             ...panel.state,
-            '_envGroup': envGroup,
+            '_selectedEnvGroups': selectedGroups,
+            '_customEnvVars': customVars,
           });
         },
       ),
@@ -110,11 +117,13 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       _load();
       return;
     }
-    // Sync env vars when _envGroup changes (e.g. updated from header gear button)
-    final oldEnv = old.panel.state['_envGroup'] as Map?;
-    final newEnv = widget.panel.state['_envGroup'] as Map?;
-    if (oldEnv != newEnv) {
-      _engine?.envVars = newEnv?.cast<String, String>() ?? {};
+    // Sync env vars when env state changes (e.g. updated from header gear button)
+    final oldGroups = old.panel.state['_selectedEnvGroups'];
+    final newGroups = widget.panel.state['_selectedEnvGroups'];
+    final oldCustom = old.panel.state['_customEnvVars'];
+    final newCustom = widget.panel.state['_customEnvVars'];
+    if (oldGroups != newGroups || oldCustom != newCustom) {
+      _applyEnvVarsAsync(widget.panel.state);
     }
   }
 
@@ -148,6 +157,36 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     final g = (c.g * 255).round();
     final b = (c.b * 255).round();
     return '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}';
+  }
+
+  /// Apply env vars synchronously from panel state (for initial load).
+  /// Merges selected global env groups + custom vars.
+  /// Falls back to legacy _envGroup flat map.
+  void _applyEnvVars(JsWidgetEngine engine, Map<String, dynamic> state) {
+    // Legacy format backward compat
+    final legacy = state['_envGroup'] as Map?;
+    final custom = (state['_customEnvVars'] as Map?)?.cast<String, String>() ?? {};
+    if (legacy != null && state['_selectedEnvGroups'] == null) {
+      engine.envVars = {...legacy.cast<String, String>(), ...custom};
+      return;
+    }
+    // New format: just apply custom vars synchronously; groups resolved async
+    engine.envVars = custom;
+    _applyEnvVarsAsync(state, engine: engine);
+  }
+
+  /// Resolve global env groups asynchronously and merge into engine.envVars.
+  Future<void> _applyEnvVarsAsync(Map<String, dynamic> state, {JsWidgetEngine? engine}) async {
+    final eng = engine ?? _engine;
+    if (eng == null) return;
+    final selectedGroups = (state['_selectedEnvGroups'] as List?)
+        ?.whereType<String>().toList() ?? [];
+    final custom = (state['_customEnvVars'] as Map?)?.cast<String, String>() ?? {};
+    final groupVars = selectedGroups.isEmpty
+        ? <String, String>{}
+        : await GlobalEnvGroupsService.instance.resolveSelectedGroups(selectedGroups);
+    if (!mounted) return;
+    eng.envVars = {...groupVars, ...custom};
   }
 
   Future<void> _load() async {
@@ -202,11 +241,9 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       initialTheme: _themeColors(),
     );
 
-    // Inject env vars from panel state
-    final envGroup = widget.panel.state['_envGroup'] as Map?;
-    if (envGroup != null) {
-      engine.envVars = envGroup.cast<String, String>();
-    }
+    // Inject env vars from panel state (new format: _selectedEnvGroups + _customEnvVars)
+    // Backward compat: fall back to _envGroup (old flat map format)
+    _applyEnvVars(engine, widget.panel.state);
 
     _renderer = JsonWidgetRenderer(
       onEvent: (actionId, payload) => engine.callEvent(actionId, payload),
@@ -442,16 +479,70 @@ class CustomWidgetCliHandler extends PanelCliHandler {
   }
 }
 
+// ─── Quick size preset button ─────────────────────────────────────────────────
+
+class _QuickSizeButton extends StatelessWidget {
+  const _QuickSizeButton({required this.onResize});
+  final void Function(double w, double h) onResize;
+
+  static const _sizes = [
+    (icon: Icons.smartphone_outlined, label: 'Mobile', w: 390.0, h: 844.0),
+    (icon: Icons.tablet_outlined, label: 'Tablet', w: 768.0, h: 1024.0),
+    (icon: Icons.desktop_windows_outlined, label: 'Desktop', w: 1280.0, h: 800.0),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: PopupMenuButton<({double w, double h})>(
+        tooltip: 'Quick size',
+        padding: EdgeInsets.zero,
+        iconSize: 14,
+        icon: Icon(
+          Icons.aspect_ratio_outlined,
+          size: 14,
+          color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(150),
+        ),
+        onSelected: (s) => onResize(s.w, s.h),
+        itemBuilder: (_) => _sizes
+            .map((s) => PopupMenuItem(
+                  value: (w: s.w, h: s.h),
+                  height: 36,
+                  child: Row(children: [
+                    Icon(s.icon, size: 14),
+                    const SizedBox(width: 8),
+                    Text('${s.label} (${s.w.toInt()}×${s.h.toInt()})',
+                        style: const TextStyle(fontSize: 12)),
+                  ]),
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
 // ─── Env variable gear button ─────────────────────────────────────────────────
 
 class _EnvGearButton extends StatelessWidget {
   const _EnvGearButton({required this.panel, required this.onUpdate});
   final BoardPanelInstance panel;
-  final void Function(Map<String, dynamic>?) onUpdate;
+  /// Called with (selectedGroupIds, customVars)
+  final void Function(List<String> selectedGroups, Map<String, dynamic> customVars) onUpdate;
+
+  bool get _hasEnv {
+    final groups = panel.state['_selectedEnvGroups'] as List?;
+    final custom = panel.state['_customEnvVars'] as Map?;
+    // Legacy support
+    final legacy = panel.state['_envGroup'] as Map?;
+    return (groups?.isNotEmpty == true) ||
+        (custom?.isNotEmpty == true) ||
+        (legacy?.isNotEmpty == true);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hasEnv = (panel.state['_envGroup'] as Map?)?.isNotEmpty == true;
     return SizedBox(
       width: 24,
       height: 24,
@@ -461,7 +552,7 @@ class _EnvGearButton extends StatelessWidget {
         tooltip: 'Environment variables',
         icon: Icon(
           Icons.settings_outlined,
-          color: hasEnv
+          color: _hasEnv
               ? const Color(0xFF4ade80)
               : Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(120),
         ),
@@ -471,72 +562,193 @@ class _EnvGearButton extends StatelessWidget {
   }
 
   void _showEnvDialog(BuildContext context) {
-    final current = Map<String, String>.from(
-      (panel.state['_envGroup'] as Map?)?.cast<String, String>() ?? {},
-    );
-    final controller = TextEditingController(
-      text: current.entries.map((e) => '${e.key}=${e.value}').join('\n'),
-    );
-
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Environment Variables', style: TextStyle(fontSize: 14)),
-        content: SizedBox(
-          width: 320,
+      builder: (ctx) => _EnvDialog(panel: panel, onUpdate: onUpdate),
+    );
+  }
+}
+
+// ─── Env dialog (stateful — loads groups async) ───────────────────────────────
+
+class _EnvDialog extends StatefulWidget {
+  const _EnvDialog({required this.panel, required this.onUpdate});
+  final BoardPanelInstance panel;
+  final void Function(List<String>, Map<String, dynamic>) onUpdate;
+
+  @override
+  State<_EnvDialog> createState() => _EnvDialogState();
+}
+
+class _EnvDialogState extends State<_EnvDialog> {
+  late List<String> _selectedGroups;
+  late List<MapEntry<String, String>> _customRows;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load from new format, or migrate from legacy _envGroup
+    final raw = widget.panel.state['_selectedEnvGroups'];
+    _selectedGroups = (raw as List?)?.whereType<String>().toList() ?? [];
+
+    final customRaw = widget.panel.state['_customEnvVars'] as Map?;
+    if (customRaw != null) {
+      _customRows = customRaw.entries
+          .map((e) => MapEntry(e.key.toString(), e.value.toString()))
+          .toList();
+    } else {
+      // Migrate legacy _envGroup
+      final legacy = widget.panel.state['_envGroup'] as Map?;
+      _customRows = legacy?.entries
+              .map((e) => MapEntry(e.key.toString(), e.value.toString()))
+              .toList() ??
+          [];
+    }
+  }
+
+  void _addRow() => setState(() => _customRows.add(const MapEntry('', '')));
+
+  void _removeRow(int i) => setState(() => _customRows.removeAt(i));
+
+  void _updateKey(int i, String v) {
+    setState(() {
+      _customRows[i] = MapEntry(v, _customRows[i].value);
+    });
+  }
+
+  void _updateVal(int i, String v) {
+    setState(() {
+      _customRows[i] = MapEntry(_customRows[i].key, v);
+    });
+  }
+
+  void _save() {
+    final customVars = <String, dynamic>{
+      for (final e in _customRows)
+        if (e.key.trim().isNotEmpty) e.key.trim(): e.value,
+    };
+    widget.onUpdate(_selectedGroups, customVars);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return AlertDialog(
+      title: const Text('Environment Variables', style: TextStyle(fontSize: 14)),
+      content: SizedBox(
+        width: 380,
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'One per line: KEY=VALUE\nInjected into yoloit.exec() calls.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-              ),
+              // ── Env group presets ──
+              Text('Env Group Presets',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: onSurface)),
+              const SizedBox(height: 4),
+              Text('Select global groups from Settings → Environment',
+                  style: TextStyle(fontSize: 11, color: muted)),
               const SizedBox(height: 8),
-              TextField(
-                controller: controller,
-                maxLines: 8,
-                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                decoration: const InputDecoration(
-                  hintText: 'API_KEY=xxx\nDEBUG=true',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.all(8),
-                ),
+              EnvGroupSelectionField(
+                selectedGroupIds: _selectedGroups,
+                onChanged: (ids) => setState(() => _selectedGroups = ids),
+                label: '',
               ),
+              const SizedBox(height: 16),
+              // ── Custom vars ──
+              Row(
+                children: [
+                  Text('Custom Variables',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: onSurface)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _addRow,
+                    icon: const Icon(Icons.add, size: 14),
+                    label: const Text('Add', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text('Overrides group values. Injected into yoloit.exec().',
+                  style: TextStyle(fontSize: 11, color: muted)),
+              const SizedBox(height: 8),
+              ..._customRows.asMap().entries.map((entry) {
+                final i = entry.key;
+                final e = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(children: [
+                    Expanded(
+                      child: TextField(
+                        controller: TextEditingController(text: e.key)
+                          ..selection = TextSelection.collapsed(offset: e.key.length),
+                        onChanged: (v) => _updateKey(i, v),
+                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                        decoration: const InputDecoration(
+                          hintText: 'KEY',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('=', style: TextStyle(fontSize: 12)),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: TextEditingController(text: e.value)
+                          ..selection = TextSelection.collapsed(offset: e.value.length),
+                        onChanged: (v) => _updateVal(i, v),
+                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                        decoration: const InputDecoration(
+                          hintText: 'value',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => _removeRow(i),
+                      icon: const Icon(Icons.close, size: 14),
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(),
+                    ),
+                  ]),
+                );
+              }),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              onUpdate(null);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Clear'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final lines = controller.text
-                  .split('\n')
-                  .map((l) => l.trim())
-                  .where((l) => l.isNotEmpty && l.contains('='));
-              final env = <String, dynamic>{};
-              for (final line in lines) {
-                final idx = line.indexOf('=');
-                env[line.substring(0, idx)] = line.substring(idx + 1);
-              }
-              onUpdate(env.isEmpty ? null : env);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _selectedGroups = [];
+              _customRows = [];
+            });
+          },
+          child: const Text('Clear All'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _save,
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_js/flutter_js.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:yoloit/features/settings/data/widget_permissions_service.dart';
 
 /// Headless JS widget engine.
 ///
@@ -101,6 +102,9 @@ class JsWidgetEngine {
     await dispose();
     _disposed = false;
     _consoleLogs.clear();
+
+    // Ensure permissions are loaded before checking them in bridges
+    await WidgetPermissionsService.instance.load();
 
     try {
       // Always use QuickJsRuntime2 — JavascriptCoreRuntime has a static
@@ -200,6 +204,10 @@ class JsWidgetEngine {
           ? Map<String, dynamic>.from(args)
           : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
+      if (!WidgetPermissionsService.instance.isAllowed('fetch')) {
+        _resolveCallback(rt, id, {'__error': 'fetchJson is disabled in Settings → Apps & Widgets'});
+        return;
+      }
       final url = req['url'] as String;
       final method = (req['method'] as String? ?? 'GET').toUpperCase();
       final headers = (req['headers'] as Map?)?.cast<String, String>() ?? {};
@@ -232,6 +240,10 @@ class JsWidgetEngine {
           ? Map<String, dynamic>.from(args)
           : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
+      if (!WidgetPermissionsService.instance.isAllowed('storage')) {
+        _resolveCallback(rt, id, {'__error': 'storage is disabled in Settings → Apps & Widgets'});
+        return;
+      }
       final key = req['key'] as String;
       _resolveCallback(rt, id, _storage[key]);
     });
@@ -242,6 +254,7 @@ class JsWidgetEngine {
     // jsonEncode handles List<dynamic> correctly, so array storage is safe across hot restarts.
     rt.setupBridge('__yoloit_storage_set', (args) {
       if (_disposed) return;
+      if (!WidgetPermissionsService.instance.isAllowed('storage')) return;
       final req = (args is Map)
           ? Map<String, dynamic>.from(args)
           : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
@@ -298,6 +311,10 @@ class JsWidgetEngine {
           ? Map<String, dynamic>.from(args)
           : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
+      if (!WidgetPermissionsService.instance.isAllowed('secrets')) {
+        _resolveCallback(rt, id, {'__error': 'secrets is disabled in Settings → Apps & Widgets'});
+        return;
+      }
       final key = '_widget_${widgetId}_${req['key'] as String}';
       Future(() async {
         try {
@@ -316,6 +333,10 @@ class JsWidgetEngine {
           ? Map<String, dynamic>.from(args)
           : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
+      if (!WidgetPermissionsService.instance.isAllowed('secrets')) {
+        _resolveCallback(rt, id, false);
+        return;
+      }
       final key = '_widget_${widgetId}_${req['key'] as String}';
       final value = req['value'];
       Future(() async {
@@ -369,6 +390,11 @@ class JsWidgetEngine {
           : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
       final id = req['id'] as String;
       final cmd = req['cmd'] as String? ?? '';
+      // Permission check
+      if (!WidgetPermissionsService.instance.isAllowed('exec')) {
+        _resolveCallback(rt, id, {'__error': 'exec is disabled in Settings → Apps & Widgets'});
+        return;
+      }
       // Security: only allow yoloit commands
       if (!cmd.startsWith('yoloit ') && cmd != 'yoloit') {
         _resolveCallback(rt, id, {'__error': 'Only yoloit commands are allowed'});

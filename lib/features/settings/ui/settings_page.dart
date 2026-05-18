@@ -18,6 +18,7 @@ import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/settings/ui/sync_section.dart';
+import 'package:yoloit/features/settings/ui/widget_permissions_section.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/ui/skills_panel.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
@@ -36,6 +37,7 @@ const _kCategories = [
   'Skills',
   'Sync',
   'Setup Guide',
+  'Apps & Widgets',
   'About',
 ];
 
@@ -279,6 +281,14 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
         9 => const SetupGuideEmbedded(),
+        10 => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'Widget API Permissions'),
+            const SizedBox(height: 12),
+            const WidgetPermissionsSection(),
+          ],
+        ),
         _ => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -2408,7 +2408,10 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                             ...() {
                               final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
                               if (plugin == null || onUpdateState == null) return <Widget>[];
-                              return plugin.buildHeaderActions(context, panel, onUpdateState!);
+                              return plugin.buildHeaderActions(
+                                context, panel, onUpdateState!,
+                                onResize: (w, h) => context.read<BoardCubit>().resizePanel(panel.id, width: w, height: h),
+                              );
                             }(),
                             SizedBox(
                               width: 28,
