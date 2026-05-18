@@ -277,7 +277,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       // Engine running but no render yet
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-    return _renderer!.build(tree, context);
+    return ClipRect(child: _renderer!.build(tree, context));
   }
 }
 
