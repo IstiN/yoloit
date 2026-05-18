@@ -1,0 +1,9 @@
+{
+  "columns": ["Todo", "In Progress", "Done"],
+  "cards": [
+    {"id": "card-1", "columnIndex": 0, "title": "Fix login bug", "description": "Users can't log in with Google"},
+    {"id": "card-2", "columnIndex": 0, "title": "Update API docs"},
+    {"id": "card-3", "columnIndex": 1, "title": "Redesign dashboard", "description": "New Figma mockups ready"},
+    {"id": "card-4", "columnIndex": 2, "title": "Setup CI/CD"}
+  ]
+}

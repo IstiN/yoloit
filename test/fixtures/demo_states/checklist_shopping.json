@@ -1,0 +1,8 @@
+{
+  "items": [
+    {"id": "item-1", "text": "Milk", "done": false},
+    {"id": "item-2", "text": "Bread", "done": true},
+    {"id": "item-3", "text": "Eggs", "done": false},
+    {"id": "item-4", "text": "Coffee", "done": false}
+  ]
+}

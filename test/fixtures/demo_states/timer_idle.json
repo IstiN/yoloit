@@ -1,0 +1,8 @@
+{
+  "duration": 1500,
+  "remaining": 1500,
+  "isRunning": false,
+  "isPaused": false,
+  "completed": false,
+  "label": "Pomodoro"
+}

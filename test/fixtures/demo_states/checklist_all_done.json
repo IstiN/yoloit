@@ -1,0 +1,6 @@
+{
+  "items": [
+    {"id": "item-1", "text": "Task A", "done": true},
+    {"id": "item-2", "text": "Task B", "done": true}
+  ]
+}
