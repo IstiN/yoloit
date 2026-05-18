@@ -953,6 +953,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       case ChatEventType.subagentStarted:
         final agentId = event.agentId ?? event.toolCallId ?? '';
         if (agentId.isEmpty) break;
+        // Deduplicate: ignore if we already have this agent (event can fire >1×)
+        if (_subAgents.containsKey(agentId)) break;
         final agentName = event.agentName ?? 'Agent';
         final agentDesc = event.agentDescription ?? '';
         final state = _SubAgentRunState(
@@ -1042,7 +1044,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final markdown = _buildAgentMarkdown(agentId);
     final panelId = await createPanel(
       'board.note.markdown',
-      {'markdown': markdown},
+      {'markdown': markdown, 'autoScroll': true},
       title,
     );
     if (panelId != null) {

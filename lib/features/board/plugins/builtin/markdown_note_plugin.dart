@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -27,7 +28,11 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
   Size get defaultSize => const Size(360, 220);
 
   @override
-  Map<String, dynamic> get initialState => {'markdown': '', 'autoHeight': false};
+  Map<String, dynamic> get initialState => {
+    'markdown': '',
+    'autoHeight': false,
+    'autoScroll': false,
+  };
 
   @override
   bool get hasEditor => true;
@@ -40,6 +45,7 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
   ) {
     final markdown = panel.state['markdown'] as String? ?? '';
     final autoHeight = panel.state['autoHeight'] as bool? ?? false;
+    final autoScroll = panel.state['autoScroll'] as bool? ?? false;
 
     if (autoHeight) {
       return _AutoHeightNoteContent(
@@ -49,12 +55,9 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
       );
     }
 
-    return ClipRect(
-      child: SingleChildScrollView(
-        child: MarkdownBody(
-          data: markdown.isEmpty ? '*Empty note*' : markdown,
-        ),
-      ),
+    return _ScrollableNoteContent(
+      markdown: markdown,
+      autoScroll: autoScroll,
     );
   }
 
@@ -71,6 +74,139 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
     if (result == null) return false;
     onSave(result);
     return true;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scrollable content with optional auto-scroll and copy button
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Renders the markdown body in a scrollable view.
+/// When [autoScroll] is true (e.g. for live agent log panels), the scroll
+/// position is animated to the bottom whenever the content changes.
+/// A copy button appears on hover in the top-right corner.
+class _ScrollableNoteContent extends StatefulWidget {
+  const _ScrollableNoteContent({
+    required this.markdown,
+    this.autoScroll = false,
+  });
+
+  final String markdown;
+  final bool autoScroll;
+
+  @override
+  State<_ScrollableNoteContent> createState() => _ScrollableNoteContentState();
+}
+
+class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
+  final _scrollCtrl = ScrollController();
+  bool _isHovered = false;
+  bool _copied = false;
+
+  @override
+  void didUpdateWidget(_ScrollableNoteContent old) {
+    super.didUpdateWidget(old);
+    if (widget.autoScroll && old.markdown != widget.markdown) {
+      _scheduleScrollToBottom();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _scheduleScrollToBottom() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollCtrl.hasClients) return;
+      _scrollCtrl.animateTo(
+        _scrollCtrl.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _copyContent() async {
+    await Clipboard.setData(ClipboardData(text: widget.markdown));
+    if (!mounted) return;
+    setState(() => _copied = true);
+    await Future<void>.delayed(const Duration(seconds: 1));
+    if (mounted) setState(() => _copied = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Stack(
+        children: [
+          ClipRect(
+            child: SingleChildScrollView(
+              controller: _scrollCtrl,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: MarkdownBody(
+                  data: widget.markdown.isEmpty ? '*Empty note*' : widget.markdown,
+                ),
+              ),
+            ),
+          ),
+          // Copy button — shown on hover
+          AnimatedOpacity(
+            opacity: _isHovered ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 120),
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Tooltip(
+                  message: _copied ? 'Copied!' : 'Copy content',
+                  child: InkWell(
+                    onTap: _isHovered ? _copyContent : null,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Theme.of(context).dividerColor,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _copied ? Icons.check : Icons.copy_outlined,
+                            size: 12,
+                            color: _copied
+                                ? Colors.green
+                                : Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _copied ? 'Copied' : 'Copy',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _copied
+                                  ? Colors.green
+                                  : Theme.of(context).textTheme.bodySmall?.color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
