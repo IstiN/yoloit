@@ -115,115 +115,12 @@ Prefer YoLoIT CLI for long-running processes:
     final yoloitBin = _resolveYoloitBin();
     final result =
         yoloitBin != null
-            ? await runHelp(yoloitBin, const ['--help'])
-            : await runHelp('yoloit', const ['--help']);
+            ? await runHelp(yoloitBin, const ['help', '--format', 'short'])
+            : await runHelp('yoloit', const ['help', '--format', 'short']);
     if (result == null || result.exitCode != 0) return null;
     final stdout = result.stdout.toString().trim();
     if (stdout.isEmpty) return null;
-    return _compactHelpAsTree(stdout);
-  }
-
-  String _compactHelpAsTree(String helpText) {
-    final lines = helpText.split('\n');
-    final out = StringBuffer('yoloit');
-    String? section;
-    final sectionCommands = <String, List<_HelpItem>>{};
-    final seen = <String>{};
-
-    for (final rawLine in lines) {
-      final line = rawLine.trimRight();
-      if (line.isEmpty) continue;
-      final upper = line.toUpperCase();
-      final isSectionTitle =
-          line == upper &&
-          RegExp(r'^[A-Z ]+$').hasMatch(line) &&
-          !line.startsWith('USAGE');
-      if (isSectionTitle) {
-        final title = line.toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-        section = title;
-        sectionCommands.putIfAbsent(section, () => <_HelpItem>[]);
-        seen.clear();
-        continue;
-      }
-      if (section == null || section == 'examples') continue;
-      if (!rawLine.startsWith('  ')) continue;
-      final trimmed = rawLine.trimLeft();
-      final parts = trimmed.split(RegExp(r'\s{2,}'));
-      final command = parts.first.trim();
-      if (command.isEmpty || command == 'yoloit <command> [args...]') continue;
-      if (!seen.add(command)) continue;
-      final desc = _compactDescription(
-        parts.length > 1 ? parts.sublist(1).join(' ').trim() : null,
-      );
-      sectionCommands[section]!.add(
-        _HelpItem(command: command, description: desc),
-      );
-    }
-
-    for (final entry in sectionCommands.entries) {
-      final title = entry.key;
-      final commands = entry.value;
-      if (commands.isEmpty) continue;
-
-      out.writeln();
-      out.writeln('  $title:');
-
-      final plain = <_HelpItem>[];
-      final grouped = <String, List<_HelpItem>>{};
-      final groupOrder = <String>[];
-
-      for (final item in commands) {
-        final command = item.command;
-        final head = command.split(' ').first;
-        final colon = head.indexOf(':');
-        if (colon <= 0) {
-          plain.add(item);
-          continue;
-        }
-        final prefix = head.substring(0, colon);
-        final suffixHead = head.substring(colon + 1);
-        final args =
-            command.length > head.length ? command.substring(head.length) : '';
-        grouped.putIfAbsent(prefix, () {
-          groupOrder.add(prefix);
-          return <_HelpItem>[];
-        });
-        grouped[prefix]!.add(
-          _HelpItem(command: '$suffixHead$args', description: item.description),
-        );
-      }
-
-      for (final p in plain) {
-        out.writeln(_formatHelpLine('    ', p.command, p.description));
-      }
-      for (final group in groupOrder) {
-        out.writeln('    $group:');
-        for (final suffix in grouped[group]!) {
-          out.writeln(
-            _formatHelpLine('      ', suffix.command, suffix.description),
-          );
-        }
-      }
-    }
-    return out.toString().trim();
-  }
-
-  String _formatHelpLine(String indent, String command, String? description) {
-    if (description == null || description.isEmpty) return '$indent$command';
-    return '$indent$command — $description';
-  }
-
-  String? _compactDescription(String? description) {
-    if (description == null) return null;
-    var value = description.trim();
-    if (value.isEmpty) return null;
-    value = value.replaceAll(RegExp(r'\s+'), ' ');
-    value = value.replaceAll(
-      RegExp(r'\(e\.g\.[^)]+\)', caseSensitive: false),
-      '',
-    );
-    value = value.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return value.isEmpty ? null : value;
+    return stdout;
   }
 
   List<File> _resolveGuidanceDocFiles() {
@@ -296,9 +193,3 @@ Prefer YoLoIT CLI for long-running processes:
   }
 }
 
-class _HelpItem {
-  const _HelpItem({required this.command, this.description});
-
-  final String command;
-  final String? description;
-}
