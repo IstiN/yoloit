@@ -374,6 +374,59 @@ var timer = setInterval(function() {
 clearInterval(timer);
 ```
 
+### `requestAnimationFrame(fn)` / `cancelAnimationFrame(id)`
+Vsync-driven frame callback (~60fps). The callback receives elapsed time in milliseconds. Use for smooth animations and game loops.
+
+```javascript
+function gameLoop(elapsed) {
+  updatePhysics(elapsed);
+  renderFrame();
+  requestAnimationFrame(gameLoop); // schedule next frame
+}
+requestAnimationFrame(gameLoop);
+```
+
+### `yoloit.exec(cmd)` → Promise
+Run a yoloit CLI command from the widget. Returns `{stdout, stderr, exitCode}`. **Security: only `yoloit` commands are allowed.**
+
+```javascript
+var result = await yoloit.exec('yoloit note:add "Hello from widget"');
+console.log(result.stdout); // command output
+console.log(result.exitCode); // 0 = success
+```
+
+Environment variables can be configured via the ⚙️ gear icon in the widget panel header — they are injected into all `exec()` calls.
+
+### GestureDetector Events
+
+The `gestureDetector` node fires events with coordinates:
+
+| Event | Payload |
+|-------|---------|
+| `onTap` | `{}` |
+| `onTapDown` | `{x, y}` — local position |
+| `onTapUp` | `{x, y}` |
+| `onPanStart` | `{x, y}` |
+| `onPanUpdate` | `{x, y, dx, dy}` — position + delta |
+| `onPanEnd` | `{velocityX, velocityY}` |
+
+```javascript
+yoloit.render({
+  type: 'gestureDetector',
+  onTapDown: 'tap',
+  onPanUpdate: 'drag',
+  child: {type: 'container', width: 300, height: 200}
+});
+
+yoloit.onEvent(function(action, payload) {
+  if (action === 'drag') {
+    playerX = payload.x;
+    playerY = payload.y;
+    render();
+  }
+});
+```
+
 ---
 
 ## UI Node Types (Widget Tree)
@@ -418,6 +471,19 @@ All nodes are plain JSON objects with a `type` field.
 |------|-----------|-------------|
 | `button` | `label`, `onPressed`, `icon`, `color`, `textColor` | Elevated button |
 | `textField` | `hint`, `value`, `onSubmit`, `onChange`, `obscure` | Text input field |
+| `gestureDetector` | `child`, `onTap`, `onTapDown`, `onTapUp`, `onPanStart`, `onPanUpdate`, `onPanEnd` | Touch/gesture input with local coordinates |
+
+### Animated (Implicit Animations)
+
+| Type | Key props | Description |
+|------|-----------|-------------|
+| `animatedContainer` | same as `container` + `duration` (ms), `curve`, `transform` | Animates size/color/decoration changes |
+| `animatedOpacity` | `child`, `opacity`, `duration`, `curve` | Smooth fade in/out |
+| `animatedPositioned` | `child`, `left`, `top`, `right`, `bottom`, `width`, `height`, `duration`, `curve` | Animates position inside a `stack` |
+
+**Curves**: `linear`, `easeIn`, `easeOut`, `easeInOut`, `bounce`, `bounceIn`, `elastic`, `elasticIn`, `decelerate`, `fastOutSlowIn`
+
+**Transform** (on `animatedContainer`): `{translateX, translateY, scale, rotate}` — rotate in radians.
 
 ### Data Viz
 
@@ -711,6 +777,7 @@ yoloit app:demo-view calculator
 yoloit app:demo-view weather
 yoloit app:demo-view crypto
 yoloit app:demo-view stocks
+yoloit app:demo-view animation-showcase
 
 # Run a demo app on the board
 yoloit app:run calculator
@@ -718,10 +785,12 @@ yoloit app:run calculator
 
 | ID | Name | Description | Network |
 |----|------|-------------|---------|
-| `calculator` | Calculator | Scientific calculator — pure JS, no network | ❌ |
-| `weather` | Weather | Current weather via wttr.in API, city input with storage | ✅ |
-| `crypto` | Crypto Prices | Live BTC/ETH/SOL via CoinGecko, auto-refresh | ✅ |
+| `calculator` | Calculator | Scientific calculator — animated button press | ❌ |
+| `weather` | Weather | Current weather via wttr.in API, animated transitions | ✅ |
+| `crypto` | Crypto Prices | Live BTC/ETH/SOL via CoinGecko, animated rows | ✅ |
 | `stocks` | Stock Prices | Real-time stock quotes, textField + fetch | ✅ |
+| `yolo-hello` | Hello Animated | Interactive demo: bounce, gradient, gestures, RAF | ❌ |
+| `animation-showcase` | Animation Showcase | 7 animation demos with menu: fade, morph, bounce, cards, drag, pulse, colors | ❌ |
 
 **Tip**: Before building a new app, always run `app:demo-view <similar-app>` to study the pattern — especially for network fetch, storage, and theming.
 

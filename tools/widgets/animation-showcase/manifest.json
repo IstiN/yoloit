@@ -1,0 +1,9 @@
+{
+  "id": "animation-showcase",
+  "name": "Animation Showcase",
+  "description": "Interactive demos of all animation & gesture capabilities",
+  "version": "1.0.0",
+  "icon": "🎬",
+  "allowedCommands": [],
+  "network": false
+}
