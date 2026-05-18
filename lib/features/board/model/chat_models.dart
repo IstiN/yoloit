@@ -318,6 +318,12 @@ enum ChatEventType {
   toolComplete, // tool.execution_complete
   askUser, // ask_user.question
   result, // result (session complete)
+  // Sub-agent events (from events.jsonl watcher)
+  subagentStarted, // subagent.started
+  subagentCompleted, // subagent.completed
+  subagentToolStart, // tool.execution_start with parentToolCallId (inside sub-agent)
+  subagentToolComplete, // tool.execution_complete with parentToolCallId (inside sub-agent)
+  subagentMessage, // assistant.message emitted by a sub-agent
   unknown,
 }
 
@@ -437,6 +443,22 @@ class ChatEvent extends Equatable {
 
   /// For tool.execution_complete — success flag.
   bool? get toolSuccess => data['success'] as bool?;
+
+  /// For sub-agent events — the agent ID (= toolCallId of the `task` call).
+  String? get agentId => data['agentId'] as String?;
+
+  /// For sub-agent tool events — the parent tool call ID.
+  String? get parentToolCallId => data['parentToolCallId'] as String?;
+
+  /// For subagent.started / subagent.completed — the agent display name.
+  String? get agentName =>
+      (data['agentDisplayName'] as String?)?.trim().isNotEmpty == true
+          ? (data['agentDisplayName'] as String?)?.trim()
+          : (data['agentName'] as String?)?.trim();
+
+  /// For subagent.started — the agent description.
+  String? get agentDescription =>
+      (data['agentDescription'] as String?)?.trim();
 
   /// For result — output tokens.
   int? get outputTokens => (data['outputTokens'] as num?)?.toInt();

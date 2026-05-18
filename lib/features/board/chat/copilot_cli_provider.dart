@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/sub_agent_event_watcher.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 
@@ -148,6 +149,20 @@ class CopilotCliProvider extends ChatProvider {
       );
       _processes[config.sessionName] = process;
 
+      // Merge sub-agent events (from events.jsonl) into the main stream.
+      // SubAgentEventWatcher discovers the session folder via the process PID
+      // and tails events.jsonl in real-time.
+      // Other providers (OpenCode, Cursor) should implement their own watcher
+      // and merge into their controller the same way — the ChatPanelWidget
+      // only depends on the subagent* ChatEventType values.
+      final subAgentWatcher = SubAgentEventWatcher(pid: process.pid);
+      final subAgentSub = subAgentWatcher.events.listen(
+        (event) {
+          if (!controller.isClosed) controller.add(event);
+        },
+        onError: (_) {},
+      );
+
       // Buffer for incomplete JSON lines
       final buffer = StringBuffer();
 
@@ -210,6 +225,8 @@ class CopilotCliProvider extends ChatProvider {
       if (_processes[config.sessionName] == process) {
         _processes.remove(config.sessionName);
       }
+      await subAgentSub.cancel();
+      await subAgentWatcher.dispose();
       await controller.close();
     } catch (e, st) {
       debugPrint('[CopilotCli] Failed to start process: $e');

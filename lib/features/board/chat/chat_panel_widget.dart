@@ -101,6 +101,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   int _totalOutputTokens = 0;
   StreamSubscription<ChatEvent>? _eventSub;
 
+  // Sub-agent terminal tracking: keyed by agentId (= task toolCallId)
+  final Map<String, _SubAgentRunState> _subAgents = {};
+
   /// Persisted opencode session ID (survives widget rebuilds).
   String? _opencodeSessionId;
 
@@ -880,17 +883,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           );
         });
         _scrollToBottom();
-
-        // Auto-create a board panel for sub-agent (task) results
-        if (_isSubAgentToolCall(toolName) && resultContent.isNotEmpty) {
-          unawaited(
-            _sendToolResultToPanel(
-              toolName: toolName,
-              arguments: toolArguments,
-              content: resultContent,
-            ),
-          );
-        }
         break;
 
       case ChatEventType.result:
@@ -948,6 +940,79 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       case ChatEventType.assistantTurnStart:
       case ChatEventType.assistantTurnEnd:
       case ChatEventType.unknown:
+        break;
+
+      // ── Sub-agent terminal events ────────────────────────────────────────
+      case ChatEventType.subagentStarted:
+        final agentId = event.agentId ?? event.toolCallId ?? '';
+        if (agentId.isEmpty) break;
+        setState(() {
+          _subAgents[agentId] = _SubAgentRunState(
+            agentId: agentId,
+            agentName: event.agentName ?? 'Agent',
+            agentDescription: event.agentDescription ?? '',
+          );
+        });
+        break;
+
+      case ChatEventType.subagentToolStart:
+        final agentId = event.agentId ?? '';
+        final state = _subAgents[agentId];
+        if (state == null) break;
+        setState(() {
+          state.events.add(_SubAgentEvent(
+            type: 'tool_start',
+            toolName: event.toolName ?? '',
+            timestamp: event.timestamp ?? DateTime.now(),
+          ));
+        });
+        break;
+
+      case ChatEventType.subagentToolComplete:
+        final agentId = event.agentId ?? '';
+        final state = _subAgents[agentId];
+        if (state == null) break;
+        final toolName = event.toolName ??
+            event.data['toolName'] as String? ??
+            '';
+        final success = event.data['success'] as bool? ?? true;
+        final resultContent = event.toolResultContent ?? '';
+        setState(() {
+          state.events.add(_SubAgentEvent(
+            type: success ? 'tool_complete' : 'tool_error',
+            toolName: toolName,
+            content: resultContent.length > 120
+                ? '${resultContent.substring(0, 120)}…'
+                : resultContent,
+            timestamp: event.timestamp ?? DateTime.now(),
+          ));
+        });
+        break;
+
+      case ChatEventType.subagentMessage:
+        final agentId = event.agentId ?? '';
+        final state = _subAgents[agentId];
+        if (state == null) break;
+        final content = event.messageContent ?? '';
+        if (content.isEmpty) break;
+        setState(() {
+          state.events.add(_SubAgentEvent(
+            type: 'message',
+            content: content.length > 200
+                ? '${content.substring(0, 200)}…'
+                : content,
+            timestamp: event.timestamp ?? DateTime.now(),
+          ));
+        });
+        break;
+
+      case ChatEventType.subagentCompleted:
+        final agentId = event.agentId ?? event.toolCallId ?? '';
+        final state = _subAgents[agentId];
+        if (state == null) break;
+        setState(() {
+          state.isRunning = false;
+        });
         break;
     }
   }
@@ -1531,65 +1596,254 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                         (tool.arguments['name'] as String?)?.trim();
                     final color =
                         isAgent ? const Color(0xFF818CF8) : const Color(0xFFFBBF24);
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: color.withAlpha(22),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: color.withAlpha(60)),
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: color,
-                            ),
+                    final subAgent = isAgent
+                        ? _subAgents[tool.toolCallId]
+                        : null;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 4),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: color.withAlpha(22),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: color.withAlpha(60)),
                           ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            isAgent
-                                ? Icons.smart_toy_outlined
-                                : Icons.build_outlined,
-                            size: 14,
-                            color: color,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  isAgent ? 'Running sub-agent…' : tool.toolName,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: color,
-                                    fontWeight: FontWeight.w500,
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: color,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                isAgent
+                                    ? Icons.smart_toy_outlined
+                                    : Icons.build_outlined,
+                                size: 14,
+                                color: color,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      isAgent
+                                          ? (subAgent != null
+                                              ? 'Agent: ${subAgent.agentName}'
+                                              : 'Running sub-agent…')
+                                          : tool.toolName,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: color,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    if (isAgent && agentDesc != null)
+                                      Text(
+                                        agentDesc,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: color.withAlpha(180),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              // Expand/collapse toggle for sub-agents
+                              if (subAgent != null)
+                                GestureDetector(
+                                  onTap: () => setState(
+                                    () => subAgent.isExpanded =
+                                        !subAgent.isExpanded,
+                                  ),
+                                  child: Icon(
+                                    subAgent.isExpanded
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    size: 16,
+                                    color: color.withAlpha(180),
                                   ),
                                 ),
-                                if (isAgent && agentDesc != null)
-                                  Text(
-                                    agentDesc,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: color.withAlpha(180),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                              ],
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        // Inline terminal output for sub-agents
+                        if (subAgent != null && subAgent.isExpanded)
+                          _buildSubAgentTerminal(subAgent),
+                      ],
                     );
                   },
                 )
                 .toList(),
+      ),
+    );
+  }
+
+  Widget _buildSubAgentTerminal(_SubAgentRunState agent) {
+    const termBg = Color(0xFF0D1117);
+    const termBorder = Color(0xFF30363D);
+    const colorTool = Color(0xFF58A6FF);
+    const colorOk = Color(0xFF3FB950);
+    const colorErr = Color(0xFFF85149);
+    const colorMsg = Color(0xFFE6EDF3);
+    const colorTime = Color(0xFF6E7681);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6, left: 4),
+      decoration: BoxDecoration(
+        color: termBg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: termBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Terminal title bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: termBorder)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.terminal, size: 12, color: colorTime),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    agent.agentDescription.isNotEmpty
+                        ? agent.agentDescription
+                        : agent.agentName,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: colorTime,
+                      fontFamily: 'monospace',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (agent.isRunning)
+                  const SizedBox(
+                    width: 10,
+                    height: 10,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.2,
+                      color: colorOk,
+                    ),
+                  )
+                else
+                  const Icon(Icons.check_circle_outline,
+                      size: 12, color: colorOk),
+              ],
+            ),
+          ),
+          // Event lines
+          if (agent.events.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(10),
+              child: Text(
+                'Waiting for agent…',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colorTime,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                shrinkWrap: true,
+                itemCount: agent.events.length,
+                itemBuilder: (ctx, i) {
+                  final ev = agent.events[i];
+                  final timeStr =
+                      '${ev.timestamp.hour.toString().padLeft(2, '0')}:'
+                      '${ev.timestamp.minute.toString().padLeft(2, '0')}:'
+                      '${ev.timestamp.second.toString().padLeft(2, '0')}';
+                  Color evColor;
+                  String prefix;
+                  String label;
+                  switch (ev.type) {
+                    case 'tool_start':
+                      evColor = colorTool;
+                      prefix = '▶';
+                      label = ev.toolName ?? '';
+                    case 'tool_complete':
+                      evColor = colorOk;
+                      prefix = '✓';
+                      label = ev.toolName ?? '';
+                    case 'tool_error':
+                      evColor = colorErr;
+                      prefix = '✗';
+                      label = ev.toolName ?? '';
+                    default: // 'message'
+                      evColor = colorMsg;
+                      prefix = '»';
+                      label = ev.content ?? '';
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 1.5),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          timeStr,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: colorTime,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          prefix,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: evColor,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: evColor,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                        if (ev.type == 'tool_complete' &&
+                            ev.content != null &&
+                            ev.content!.isNotEmpty)
+                          Tooltip(
+                            message: ev.content!,
+                            child: const Icon(Icons.info_outline,
+                                size: 11, color: colorTime),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -4364,4 +4618,36 @@ class _TypingIndicatorState extends State<_TypingIndicator>
       },
     );
   }
+}
+
+// ── Sub-agent state data classes ─────────────────────────────────────────────
+
+class _SubAgentEvent {
+  _SubAgentEvent({
+    required this.type,
+    required this.timestamp,
+    this.toolName,
+    this.content,
+  });
+
+  /// One of: 'tool_start', 'tool_complete', 'tool_error', 'message'
+  final String type;
+  final DateTime timestamp;
+  final String? toolName;
+  final String? content;
+}
+
+class _SubAgentRunState {
+  _SubAgentRunState({
+    required this.agentId,
+    required this.agentName,
+    required this.agentDescription,
+  });
+
+  final String agentId;
+  final String agentName;
+  final String agentDescription;
+  final List<_SubAgentEvent> events = [];
+  bool isRunning = true;
+  bool isExpanded = true;
 }

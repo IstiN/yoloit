@@ -30,6 +30,20 @@ class ChatRuntimeContext {
 ///
 /// Implementations wrap specific CLI tools or APIs. The board chat panel
 /// only depends on this interface, making it easy to swap providers.
+///
+/// ## Sub-agent event support
+///
+/// Providers that support sub-agent visualization (showing nested agent
+/// activity as inline terminal output) should merge `subagent*` [ChatEvent]s
+/// into the stream returned by [sendMessage]. The [ChatPanelWidget] only
+/// reacts to [ChatEventType] values and does not care about the source.
+///
+/// Copilot implementation: [SubAgentEventWatcher] tails
+/// `~/.copilot/session-state/<session>/events.jsonl` by matching the
+/// spawned process PID to its `inuse.<pid>.lock` file.
+///
+/// OpenCode / Cursor: implement a similar watcher that reads the
+/// provider's own event log and emits the same `subagent*` event types.
 abstract class ChatProvider {
   /// Unique provider identifier (e.g. 'copilot', 'cursor', 'local').
   String get providerId;
