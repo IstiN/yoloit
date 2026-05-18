@@ -498,7 +498,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     if (!_isSending) return;
     _eventSub?.cancel();
     _eventSub = null;
-    await _provider.stop(_config.sessionName);
+    // Update UI immediately so the stop button and loading disappear at once.
     if (mounted) {
       setState(() {
         _finalizeStreamingMessage();
@@ -507,8 +507,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _activeToolCalls.clear();
         _ignoredToolCallIds.clear();
         _isSending = false;
+        _setProcessing(false);
       });
     }
+    // Kill the underlying process in the background.
+    unawaited(_provider.stop(_config.sessionName));
   }
 
   BoardDocument? _currentBoardForPanel() {
