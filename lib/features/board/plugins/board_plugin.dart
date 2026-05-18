@@ -106,4 +106,12 @@ abstract class BoardPanelPlugin {
 
   /// Whether this plugin provides a custom editor accessible from the panel header.
   bool get hasEditor => false;
+
+  /// Optional widgets to inject into the panel header row (before the close button).
+  /// Use for plugin-specific header actions (e.g. env variable gear icon).
+  List<Widget> buildHeaderActions(
+    BuildContext context,
+    BoardPanelInstance panel,
+    ValueChanged<Map<String, dynamic>> onUpdateState,
+  ) => const [];
 }

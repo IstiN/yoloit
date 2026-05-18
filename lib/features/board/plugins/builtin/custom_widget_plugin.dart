@@ -44,6 +44,25 @@ class CustomWidgetPlugin extends BoardPanelPlugin {
   ) {
     return _CustomWidgetContent(panel: panel, renderContext: renderContext);
   }
+
+  @override
+  List<Widget> buildHeaderActions(
+    BuildContext context,
+    BoardPanelInstance panel,
+    ValueChanged<Map<String, dynamic>> onUpdateState,
+  ) {
+    return [
+      _EnvGearButton(
+        panel: panel,
+        onUpdate: (envGroup) {
+          onUpdateState({
+            ...panel.state,
+            '_envGroup': envGroup,
+          });
+        },
+      ),
+    ];
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +108,13 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
         WidgetAppRegistry.instance.registerReload(_widgetId, _load);
       }
       _load();
+      return;
+    }
+    // Sync env vars when _envGroup changes (e.g. updated from header gear button)
+    final oldEnv = old.panel.state['_envGroup'] as Map?;
+    final newEnv = widget.panel.state['_envGroup'] as Map?;
+    if (oldEnv != newEnv) {
+      _engine?.envVars = newEnv?.cast<String, String>() ?? {};
     }
   }
 
@@ -214,29 +240,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       // Engine running but no render yet
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
-    return Stack(
-      children: [
-        SingleChildScrollView(
-          padding: EdgeInsets.zero,
-          child: _renderer!.build(tree, context),
-        ),
-        // Gear icon for env variable configuration
-        Positioned(
-          right: 4,
-          top: 4,
-          child: _EnvGearButton(
-            panel: widget.panel,
-            onUpdate: (envGroup) {
-              widget.renderContext.onUpdateState({
-                ...widget.panel.state,
-                '_envGroup': envGroup,
-              });
-              _engine?.envVars = envGroup?.cast<String, String>() ?? {};
-            },
-          ),
-        ),
-      ],
-    );
+    return _renderer!.build(tree, context);
   }
 }
 

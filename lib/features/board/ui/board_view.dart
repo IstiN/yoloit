@@ -2404,6 +2404,12 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                 onEditColor: onEditColor,
                                 onUpdateState: onUpdateState,
                               ),
+                            // Plugin-specific header actions (e.g. env gear for widget panels)
+                            ...() {
+                              final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+                              if (plugin == null || onUpdateState == null) return <Widget>[];
+                              return plugin.buildHeaderActions(context, panel, onUpdateState!);
+                            }(),
                             SizedBox(
                               width: 28,
                               height: 28,
