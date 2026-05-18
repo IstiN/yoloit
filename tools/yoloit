@@ -2026,7 +2026,7 @@ PY
     _get "/apps" | python3 -m json.tool 2>/dev/null
     ;;
   app:install|widget:install|wg:i)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:install <path|url>" >&2; exit 1; }
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:install <path|url|.>" >&2; exit 1; }
     source_arg="$1"
     if [[ "$source_arg" == http* ]]; then
       tmp_dir=$(mktemp -d)
@@ -2042,7 +2042,18 @@ PY
       abs_zip="$(cd "$(dirname "$source_arg")" && pwd)/$(basename "$source_arg")"
       _post "/apps/install-zip" "{\"zipPath\":\"${abs_zip}\"}" | python3 -m json.tool 2>/dev/null
     else
-      _post "/widgets/install" "{\"path\":\"${source_arg}\"}" | python3 -m json.tool 2>/dev/null
+      # Resolve relative/local paths (., ./foo, ../bar) to absolute
+      if [[ "$source_arg" == ./* || "$source_arg" == ../* || "$source_arg" == "." ]]; then
+        source_arg="$(cd "$source_arg" 2>/dev/null && pwd)" || { echo "❌ Path not found: $1" >&2; exit 1; }
+      fi
+      result=$(_post "/widgets/install" "{\"path\":\"${source_arg}\"}")
+      app_id=$(echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('appName') or d.get('widget',{}).get('id',''))" 2>/dev/null)
+      if [[ -n "$app_id" ]]; then
+        echo "✅ App '$app_id' installed"
+        echo "   Run: yoloit app:run $app_id"
+      else
+        echo "$result" | python3 -m json.tool 2>/dev/null || echo "$result" >&2
+      fi
     fi
     ;;
   app:remove|widget:remove|wg:rm)
@@ -2050,7 +2061,7 @@ PY
     _delete "/widgets/$(_encode "$1")" | python3 -m json.tool 2>/dev/null
     ;;
   app:run|app:open|widget:open|wg:o)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:run <id|path> [board] [panel-title]" >&2; exit 1; }
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:run <id|path|.>" >&2; exit 1; }
     # Resolve local paths to absolute (supports ./my-app, ../foo, /abs/path)
     raw_id="$1"; shift
     if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) ]]; then
@@ -2158,27 +2169,6 @@ else:
   app:dev-skill|app:skill|app:docs)
     _get "/apps/dev-skill"
     ;;
-  app:install)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:install <url|path>" >&2; exit 1; }
-    source_arg="$1"
-    if [[ "$source_arg" == http* ]]; then
-      tmp_dir=$(mktemp -d)
-      if [[ "$source_arg" == *.js ]]; then
-        curl -fsSL "$source_arg" -o "${tmp_dir}/widget.js"
-        app_name=$(basename "$source_arg" .js)
-        echo "{\"id\":\"${app_name}\",\"name\":\"${app_name}\",\"description\":\"Installed from URL\",\"version\":\"1.0.0\",\"icon\":\"🔧\",\"network\":true,\"allowedCommands\":[]}" > "${tmp_dir}/manifest.json"
-      else
-        curl -fsSL "$source_arg" -o "${tmp_dir}/widget.zip" && unzip -q "${tmp_dir}/widget.zip" -d "${tmp_dir}/extracted" && tmp_dir="${tmp_dir}/extracted/$(ls ${tmp_dir}/extracted | head -1)"
-      fi
-      _post "/widgets/install" "{\"path\":\"${tmp_dir}\"}" | python3 -m json.tool 2>/dev/null
-    elif [[ "$source_arg" == *.zip ]]; then
-      abs_zip="$(cd "$(dirname "$source_arg")" && pwd)/$(basename "$source_arg")"
-      _post "/apps/install-zip" "{\"zipPath\":\"${abs_zip}\"}" | python3 -m json.tool 2>/dev/null
-    else
-      _post "/widgets/install" "{\"path\":\"${source_arg}\"}" | python3 -m json.tool 2>/dev/null
-    fi
-    ;;
-
   app:create|widget:create|wg:new)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit app:create <name> [--template basic|network|yoloit]" >&2; exit 1; }
     widget_name="$1"; shift

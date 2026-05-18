@@ -10,7 +10,7 @@
 Develop in your current working directory. No copy, no install. The app loads directly from disk.
 
 ```bash
-# Step 1: Create files in current directory
+# Step 1: Create app folder in working directory
 mkdir my-app && cd my-app
 
 # Step 2: Write manifest.json
@@ -21,20 +21,23 @@ EOF
 # Step 3: Write widget.js (see API below)
 # ... edit widget.js ...
 
-# Step 4: Open from local path — no install needed!
+# Step 4: Open from local path — board and panel are auto-selected/created
 yoloit app:run .
 
-# Step 5: After each edit, hot-reload
+# Step 5: After each edit, hot-reload (no restart needed)
 yoloit app:reload .
 
-# Step 6: Inspect render tree to debug
+# Step 6: See console.log output
+yoloit app:logs .
+
+# Step 7: Inspect render tree to debug UI
 yoloit app:snapshot .
 
-# Step 7: Fire events manually to test logic
+# Step 8: Fire events manually to test logic
 yoloit app:execute . btn_click
 ```
 
-All app commands accept `.` (current dir), `./subdir`, or any absolute path — in addition to installed app IDs.
+**All app commands accept `.` (current dir), `./subdir`, or any absolute path — board and panel are always optional (auto-resolved).**
 
 ### Option B — Scaffold into apps folder (for permanent apps)
 ```bash
@@ -44,23 +47,43 @@ yoloit app:run my-app        # open by id
 yoloit app:reload my-app     # hot-reload by id
 ```
 
+### Option C — Install from path (copy into apps folder)
+```bash
+yoloit app:install .         # installs current dir as permanent app
+yoloit app:install ./my-app  # installs ./my-app folder
+yoloit app:run <id>          # run by manifest id
+```
+
 ### ⚠️ Critical Rules for AI Agents
 
-1. **Develop in the session's working directory** — write `widget.js` here, use `yoloit app:run .`
-2. **After editing `widget.js` → always call `app:reload .`** so the panel picks up changes.
-3. **`app:install` is only for distribution** — publishing apps for other users (zip/URL). Never needed for local dev.
+1. **NEVER use `app:install` for local dev** — use `app:run .` directly. `app:install` copies to apps folder (use only for distributing finished apps).
+2. **After editing `widget.js` → always call `app:reload .`** — hot-reloads without restart.
+3. **Board and panel are always optional** — `app:run .` picks active board automatically.
+4. **Check `app:logs .`** to see `console.log` output — essential for debugging.
+5. **If `app:run .` fails** — check `yoloit boards` to verify YoLoIT is running.
 
 ### Complete AI Agent Dev Workflow
 
 ```
 1. mkdir my-app && cd my-app    create local app folder
-2. write widget.js              implement the app
-3. yoloit app:run .             open as panel on the board
-4. [edit widget.js again]
-5. yoloit app:reload .          hot-reload into running panel
-6. yoloit app:snapshot .        debug: inspect render tree
-7. yoloit app:execute . <evt>   debug: fire event manually
+2. write manifest.json + widget.js
+3. yoloit app:run .             open panel (board auto-selected)
+4. yoloit app:logs .            check console.log output
+5. [edit widget.js]
+6. yoloit app:reload .          hot-reload changes
+7. yoloit app:snapshot .        inspect UI render tree
+8. yoloit app:execute . <evt>   fire event manually for testing
 ```
+
+### 🔧 Troubleshooting
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `app:run .` fails silently | YoLoIT not running | Start YoLoIT app |
+| `app:logs .` empty | No console.log called yet | Add `console.log('test')` to widget.js |
+| UI not updating after reload | JS syntax error | Check `app:logs .` for error message |
+| `yoloit.render()` not showing | Missing IIFE wrapper | Wrap all code in `(function(){ ... })()` |
+| Button not working | Missing `yoloit.onEvent` | Always register `yoloit.onEvent(function(id){ ... })` |
 
 ---
 
@@ -677,10 +700,11 @@ Apps created with `app:create` or manually placed in `~/.config/yoloit/apps/` ar
 3. **`yoloit.onEvent` is mandatory** — register it even if you handle few events; the engine uses `yoloit._handler`.
 4. **Storage is async** — `yoloit.storage.get()` returns a Promise. Always use `.then()` before using the value.
 5. **`yoloit.render()` replaces everything** — not additive; always render the complete UI tree.
-6. **After editing `widget.js` → `yoloit app:reload <id>`** — no Flutter restart needed.
+6. **After editing `widget.js` → `yoloit app:reload .`** — no Flutter restart needed.
 7. **Network requires manifest flag** — set `"network": true` or `fetchJson` silently fails.
 8. **Timer cleanup** — save `setInterval` IDs and `clearInterval` when done.
-9. **Use `app:snapshot`** — inspect the render tree when UI looks wrong.
-10. **Use `app:execute`** — fire events from CLI to test app logic without clicking.
-11. **Never call `app:install` on `~/.config/yoloit/apps/` paths** — it's already installed.
-12. **`app:run` is idempotent** — safe to call even if the panel already exists.
+9. **Use `app:snapshot .`** — inspect the render tree when UI looks wrong.
+10. **Use `app:logs .`** — see `console.log` output; use it liberally for debugging.
+11. **Use `app:execute . <evt>`** — fire events from CLI to test app logic without clicking.
+12. **`app:run .` is idempotent** — safe to call even if the panel already exists.
+13. **NEVER call `app:install .`** during development — use `app:run .` directly from your working directory.
