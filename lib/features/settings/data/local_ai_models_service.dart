@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
 import 'package:path/path.dart' as p;
@@ -548,8 +549,49 @@ class LocalAiModelsService {
     }
   }
 
-  Future<Directory> _resolveRegistryDirectory() {
-    return LocalModelRegistryLocator.resolveAsync();
+  Future<Directory> _resolveRegistryDirectory() async {
+    // First try to find registry in the standard locations (dev environment).
+    try {
+      return await LocalModelRegistryLocator.resolveAsync(
+        currentDirectory: PlatformDirs.instance.configDir,
+      );
+    } catch (_) {
+      // Not found — extract bundled registry assets to configDir.
+      await _ensureRegistryExtracted();
+      return LocalModelRegistryLocator.resolveAsync(
+        currentDirectory: PlatformDirs.instance.configDir,
+      );
+    }
+  }
+
+  static const _registryAssetPrefix =
+      'third_party/flutter_local_models/registry/models/';
+
+  Future<void> _ensureRegistryExtracted() async {
+    final destDir = Directory(
+      p.join(
+        PlatformDirs.instance.configDir,
+        'third_party',
+        'flutter_local_models',
+        'registry',
+        'models',
+      ),
+    );
+    await destDir.create(recursive: true);
+
+    final manifest = await rootBundle.loadString('AssetManifest.json');
+    final assets = (jsonDecode(manifest) as Map<String, dynamic>).keys.where(
+      (k) => k.startsWith(_registryAssetPrefix),
+    );
+
+    for (final assetKey in assets) {
+      final fileName = p.basename(assetKey);
+      final destFile = File(p.join(destDir.path, fileName));
+      if (!destFile.existsSync()) {
+        final data = await rootBundle.load(assetKey);
+        await destFile.writeAsBytes(data.buffer.asUint8List());
+      }
+    }
   }
 
   String get _preferencesPath =>

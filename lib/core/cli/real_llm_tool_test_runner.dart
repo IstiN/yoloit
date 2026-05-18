@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
 import 'package:yoloit/core/platform/local_model_registry_locator.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
@@ -236,7 +237,9 @@ class RealLlmToolTestRunner {
   static Future<flm.InstalledModel> _loadInstalledModel(
     String? requestedId,
   ) async {
-    final registryDir = await LocalModelRegistryLocator.resolveAsync();
+    final registryDir = await LocalModelRegistryLocator.resolveAsync(
+      currentDirectory: PlatformDirs.instance.configDir,
+    );
     final registry = await sdk.ModelRegistry.loadDirectory(registryDir.path);
     final store = sdk.LocalModelStore(registry: registry);
     final installed = await store.listInstalledModels();

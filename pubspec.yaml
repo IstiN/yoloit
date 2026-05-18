@@ -110,6 +110,7 @@ flutter:
     - tools/widgets/calculator/manifest.json
     - tools/widgets/calculator/widget.js
     - docs/app-development-skill.md
+    - third_party/flutter_local_models/registry/models/
 
   fonts:
     - family: JetBrainsMono
