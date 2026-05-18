@@ -410,6 +410,71 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     return value;
   }
 
+  static const _subAgentToolNames = <String>{
+    'task',
+    'run_agent',
+    'agent',
+    'subagent',
+    'sub_agent',
+  };
+
+  bool _isSubAgentToolCall(String toolName) =>
+      _subAgentToolNames.contains(toolName.toLowerCase().trim());
+
+  /// Creates a markdown note panel on the current board with the sub-agent output.
+  Future<void> _sendToolResultToPanel({
+    required String toolName,
+    required Map<String, dynamic> arguments,
+    required String content,
+  }) async {
+    final board = _currentBoardForPanel();
+    if (board == null) return;
+
+    final agentName = (arguments['name'] as String?)?.trim() ??
+        (arguments['description'] as String?)?.trim() ??
+        toolName;
+    final agentType = (arguments['agent_type'] as String?)?.trim() ?? '';
+    final title =
+        '🤖 ${agentName.isNotEmpty ? agentName : toolName}${agentType.isNotEmpty ? ' ($agentType)' : ''}';
+
+    // Format the note content with metadata header + result
+    final agentPrompt = (arguments['prompt'] as String?)?.trim() ?? '';
+    final buf = StringBuffer();
+    buf.writeln('# $title');
+    buf.writeln();
+    if (agentPrompt.isNotEmpty) {
+      buf.writeln('**Task:** $agentPrompt');
+      buf.writeln();
+    }
+    buf.writeln('---');
+    buf.writeln();
+    buf.write(content);
+
+    final noteContent = buf.toString();
+    final cwd =
+        _config.workingDir.isNotEmpty ? _config.workingDir : null;
+
+    try {
+      await Process.run(
+        'yoloit',
+        ['note:create', board.name, title, noteContent],
+        workingDirectory: cwd,
+        runInShell: true,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('📋 Agent output → panel "$title"'),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
+      // Silently ignore — panel creation is best-effort
+    }
+  }
+
   List<String> _collectChangedFilesForStrip() {
     final dedup = <String>{};
     final ordered = <String>[];
@@ -815,6 +880,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           );
         });
         _scrollToBottom();
+
+        // Auto-create a board panel for sub-agent (task) results
+        if (_isSubAgentToolCall(toolName) && resultContent.isNotEmpty) {
+          unawaited(
+            _sendToolResultToPanel(
+              toolName: toolName,
+              arguments: toolArguments,
+              content: resultContent,
+            ),
+          );
+        }
         break;
 
       case ChatEventType.result:
@@ -1407,12 +1483,22 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           return const SizedBox.shrink();
         }
         final persistedSuccess = message.metadata?['success'] as bool?;
+        final toolArgs = _activeToolCalls[message.toolCallId]?.arguments ?? {};
         return _ToolResultCard(
           toolName: resolvedToolName,
           toolCallId: message.toolCallId ?? '',
           content: message.content,
           success:
               _activeToolCalls[message.toolCallId]?.success ?? persistedSuccess,
+          onSendToPanel: message.content.isNotEmpty
+              ? () => unawaited(
+                    _sendToolResultToPanel(
+                      toolName: resolvedToolName,
+                      arguments: toolArgs,
+                      content: message.content,
+                    ),
+                  )
+              : null,
         );
       case ChatRole.system:
         final meta = message.metadata;
@@ -1438,44 +1524,70 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         children:
             tools
                 .map(
-                  (tool) => Container(
-                    margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0x15FBBF24),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0x30FBBF24)),
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: Color(0xFFFBBF24),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.build_outlined,
-                          size: 14,
-                          color: Color(0xFFFBBF24),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            tool.toolName,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFFBBF24),
-                              fontWeight: FontWeight.w500,
+                  (tool) {
+                    final isAgent = _isSubAgentToolCall(tool.toolName);
+                    final agentDesc =
+                        (tool.arguments['description'] as String?)?.trim() ??
+                        (tool.arguments['name'] as String?)?.trim();
+                    final color =
+                        isAgent ? const Color(0xFF818CF8) : const Color(0xFFFBBF24);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(22),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: color.withAlpha(60)),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: color,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            isAgent
+                                ? Icons.smart_toy_outlined
+                                : Icons.build_outlined,
+                            size: 14,
+                            color: color,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  isAgent ? 'Running sub-agent…' : tool.toolName,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: color,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (isAgent && agentDesc != null)
+                                  Text(
+                                    agentDesc,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: color.withAlpha(180),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 )
                 .toList(),
       ),
@@ -3732,11 +3844,13 @@ class _ToolResultCard extends StatefulWidget {
     required this.toolCallId,
     required this.content,
     this.success,
+    this.onSendToPanel,
   });
   final String toolName;
   final String toolCallId;
   final String content;
   final bool? success;
+  final VoidCallback? onSendToPanel;
 
   @override
   State<_ToolResultCard> createState() => _ToolResultCardState();
@@ -3908,6 +4022,22 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                       ),
                     ),
                   ),
+                  if (widget.onSendToPanel != null) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Send to panel',
+                      child: InkWell(
+                        onTap: widget.onSendToPanel,
+                        child: Icon(
+                          Icons.note_add_outlined,
+                          size: 14,
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: 8),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
