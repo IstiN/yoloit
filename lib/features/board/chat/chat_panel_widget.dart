@@ -1023,7 +1023,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final agentId = event.agentId ?? event.toolCallId ?? '';
         final state = _subAgents[agentId];
         if (state == null) break;
-        setState(() => state.isRunning = false);
+        setState(() {
+          state.isRunning = false;
+          // Also mark the outer task tool call as completed so it leaves
+          // the running-tools card. The CLI stdout may not emit toolComplete
+          // for the task tool itself — subagentCompleted is the signal.
+          final existing = _activeToolCalls[agentId];
+          if (existing != null && existing.isRunning) {
+            _activeToolCalls[agentId] = existing.copyWith(isRunning: false);
+          }
+        });
         unawaited(_updateAgentPanel(agentId));
         break;
     }
