@@ -755,6 +755,14 @@ commands = [
   },
   {
     "group": "app",
+    "name": "app:logs",
+    "description": "Show console.log output from a running app",
+    "params": [["id", "App id or local directory path", True], ["-f", "Follow/stream logs continuously", False]],
+    "example": "yoloit app:logs .",
+    "aliases": [],
+  },
+  {
+    "group": "app",
     "name": "app:snapshot",
     "description": "Get the current JSON render tree of a running app",
     "params": [["id", "App id", True]],
@@ -2052,9 +2060,21 @@ PY
     fi
     board_arg="${1:-}"; panel_arg="${2:-$(basename "$widget_id")}"
     bid=$(_require_board "$board_arg")
-    panel_json=$(_smart_panel "$bid" "$panel_arg" "board.widget.custom")
-    panel_id=$(echo "$panel_json" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('panel',d).get('id','') if isinstance(d.get('panel',d),dict) else '')" 2>/dev/null)
-    _post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}" | python3 -m json.tool 2>/dev/null
+    panel_id=$(_smart_panel "$bid" "board.widget.custom" "$panel_arg")
+    if [[ -z "$panel_id" ]]; then
+      echo "❌ Failed to create panel on board" >&2; exit 1
+    fi
+    result=$(_post "/boards/${bid}/panels/${panel_id}/action" "{\"action\":\"setState\",\"state\":{\"widgetId\":\"${widget_id}\"}}")
+    if echo "$result" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d.get('ok') or d.get('panel') or d.get('state') else 1)" 2>/dev/null; then
+      echo "✅ App running: $(basename "$widget_id")"
+      echo "   Reload: yoloit app:reload ."
+      echo "   Logs:   yoloit app:logs ."
+      echo "   Stop:   close the panel"
+    else
+      echo "❌ Failed to run app:" >&2
+      echo "$result" >&2
+      exit 1
+    fi
     ;;
   app:execute)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit app:execute <id|path> <action> [payload_json]" >&2; exit 1; }
@@ -2083,8 +2103,44 @@ PY
       echo "❌ Reload failed: $msg" >&2; exit 1
     fi
     ;;
+  app:logs)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:logs <id|path> [-f]" >&2; exit 1; }
+    raw_id="$1"; follow="${2:-}"
+    if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) ]]; then
+      app_id="$(cd "$raw_id" 2>/dev/null && pwd)"
+    else
+      app_id="$raw_id"
+    fi
+    if [[ "$follow" == "-f" || "$follow" == "--follow" ]]; then
+      echo "📋 Streaming logs for $(basename "$app_id") (Ctrl+C to stop)..."
+      while true; do
+        result=$(_get "/apps/$(_encode "$app_id")/logs" 2>/dev/null)
+        logs=$(echo "$result" | python3 -c "
+import sys, json, datetime
+d = json.load(sys.stdin)
+for entry in d.get('logs', []):
+    ts = datetime.datetime.fromtimestamp(entry['ts']/1000).strftime('%H:%M:%S.%f')[:-3]
+    print(f'[{ts}] {entry[\"msg\"]}')
+" 2>/dev/null)
+        [[ -n "$logs" ]] && echo "$logs"
+        sleep 1
+      done
+    else
+      result=$(_get "/apps/$(_encode "$app_id")/logs")
+      echo "$result" | python3 -c "
+import sys, json, datetime
+d = json.load(sys.stdin)
+logs = d.get('logs', [])
+if not logs:
+    print('(no logs yet)')
+else:
+    for entry in logs:
+        ts = datetime.datetime.fromtimestamp(entry['ts']/1000).strftime('%H:%M:%S.%f')[:-3]
+        print(f'[{ts}] {entry[\"msg\"]}')
+" 2>/dev/null
+    fi
+    ;;
   app:snapshot)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit app:snapshot <id|path>" >&2; exit 1; }
     raw_id="$1"
     if [[ "$raw_id" == ./* || "$raw_id" == ../* || ( "$raw_id" == /* && -d "$raw_id" ) ]]; then
       app_id="$(cd "$raw_id" 2>/dev/null && pwd)"

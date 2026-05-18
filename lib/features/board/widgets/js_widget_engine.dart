@@ -52,10 +52,23 @@ class JsWidgetEngine {
   JavascriptRuntime? _runtime;
   bool _disposed = false;
   final Map<String, Timer> _intervals = {};
+  final List<Map<String, dynamic>> _consoleLogs = [];
+  static const int _maxLogs = 200;
 
   static const _secureStorage = FlutterSecureStorage();
 
   // ── Public API ──────────────────────────────────────────────────────────
+
+  /// Return and clear the accumulated console.log buffer.
+  List<Map<String, dynamic>> flushLogs() {
+    final logs = List<Map<String, dynamic>>.from(_consoleLogs);
+    _consoleLogs.clear();
+    return logs;
+  }
+
+  /// Return a copy of the console.log buffer without clearing it.
+  List<Map<String, dynamic>> peekLogs() =>
+      List<Map<String, dynamic>>.from(_consoleLogs);
 
   /// Push updated theme colors into the running JS widget.
   void updateTheme(Map<String, dynamic> colors) {
@@ -75,6 +88,7 @@ class JsWidgetEngine {
   Future<void> run(String widgetJs) async {
     await dispose();
     _disposed = false;
+    _consoleLogs.clear();
 
     try {
       // Always use QuickJsRuntime2 — JavascriptCoreRuntime has a static
@@ -227,8 +241,14 @@ class JsWidgetEngine {
     });
 
     // console.log
-    rt.setupBridge('__yoloit_log', (msg) {
-      debugPrint('[JsWidget] ${msg?.toString() ?? ''}');
+    rt.setupBridge('__yoloit_log', (args) {
+      final msg = args?.toString() ?? '';
+      debugPrint('[JsWidget:$widgetId] $msg');
+      _consoleLogs.add({
+        'ts': DateTime.now().millisecondsSinceEpoch,
+        'msg': msg,
+      });
+      if (_consoleLogs.length > _maxLogs) _consoleLogs.removeAt(0);
     });
 
     // setInterval — Dart-backed

@@ -2685,6 +2685,16 @@ class CliServer {
         return _json({'ok': true, 'widgetId': id, 'action': actionId});
       }
 
+      // GET /api/apps/:id/logs — return console.log buffer
+      if (action == 'logs' && method == 'GET') {
+        final engine = appRegistry.engine(id);
+        if (engine == null) {
+          return _json({'ok': false, 'message': 'App "$id" is not currently running', 'logs': <Map<String, dynamic>>[]});
+        }
+        final logs = engine.peekLogs();
+        return _json({'ok': true, 'widgetId': id, 'logs': logs});
+      }
+
       // POST /api/apps/:id/reload — hot-reload widget JS without restarting the app
       if (action == 'reload' && method == 'POST') {
         final ok = await appRegistry.triggerReload(id);
