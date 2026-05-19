@@ -26,6 +26,7 @@ import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart'
 import 'package:yoloit/features/board/tools/board_tool.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/core/services/webview_zoom_service.dart';
+import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -350,10 +351,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                         details,
                                                       ),
                                               onDragEnd: _handlePanelDragEnd,
-                                              onDelete:
-                                                  () => context
-                                                      .read<BoardCubit>()
-                                                      .removePanel(panel.id),
+                                              onDelete: () async {
+                                                if (panel.type == 'board.widget.custom') {
+                                                  WidgetEngineManager.instance.remove(panel.id);
+                                                }
+                                                await context.read<BoardCubit>().removePanel(panel.id);
+                                              },
                                               onEditColor:
                                                   () => _showPanelColorDialog(
                                                     context,

@@ -20,6 +20,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
+import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
@@ -665,6 +666,9 @@ class CliServer {
     }
     // DELETE .../panels/:id
     if (sub.isEmpty && method == 'DELETE') {
+      if (panel.type == 'board.widget.custom') {
+        WidgetEngineManager.instance.remove(panel.id);
+      }
       await cubit.removePanel(panel.id, boardId: board.id);
       _scheduleRebuild();
       return _json({'ok': true, 'message': 'Panel deleted'});
@@ -1893,6 +1897,9 @@ class CliServer {
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
     if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    if (panel.type == 'board.widget.custom') {
+      WidgetEngineManager.instance.remove(panel.id);
+    }
     await cubit.removePanel(panel.id, boardId: board.id);
     return {'ok': true, 'panelId': panel.id};
   }

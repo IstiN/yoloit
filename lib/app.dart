@@ -20,6 +20,7 @@ import 'package:yoloit/core/cli/handlers/timer_handler.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
+import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -760,6 +761,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.start(cubit);
     // Wire service managers to BoardCubit for headless state updates
     TimerManager.instance.setCubit(cubit);
+    WidgetEngineManager.instance.setCubit(cubit);
   }
 
   @override
