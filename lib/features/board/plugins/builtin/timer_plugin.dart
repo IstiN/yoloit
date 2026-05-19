@@ -4,9 +4,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 
 class TimerPlugin extends BoardPanelPlugin {
   const TimerPlugin();
@@ -104,6 +107,8 @@ class _TimerContentState extends State<_TimerContent>
 
   @override
   void dispose() {
+    // Cancel local UI ticker but do NOT stop the manager timer —
+    // it keeps ticking when the widget is disposed (board switch).
     _tickTimer?.cancel();
     _pulseCtrl.dispose();
     _minutesCtrl.dispose();
@@ -137,6 +142,17 @@ class _TimerContentState extends State<_TimerContent>
 
   void _startTicker() {
     if (_tickTimer != null) return;
+    // Find the board ID for this panel
+    final boardId = _findBoardId();
+    // Register with TimerManager so countdown survives widget dispose
+    if (boardId != null) {
+      TimerManager.instance.start(
+        panelId: widget.panel.id,
+        boardId: boardId,
+        remaining: _remaining,
+      );
+    }
+    // Keep a local ticker for UI updates (smooth animation)
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!(widget.panel.state['isRunning'] as bool? ?? false)) return;
 
@@ -159,9 +175,25 @@ class _TimerContentState extends State<_TimerContent>
     });
   }
 
+  String? _findBoardId() {
+    try {
+      final cubit = context.read<BoardCubit>();
+      for (final board in cubit.state.boards) {
+        if (board.panels.any((p) => p.id == widget.panel.id)) {
+          return board.id;
+        }
+      }
+      return cubit.state.activeBoard?.id;
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _stopTicker() {
     _tickTimer?.cancel();
     _tickTimer = null;
+    // Stop manager timer too — if the user pauses or timer is done
+    TimerManager.instance.stop(widget.panel.id);
   }
 
   void _playAlarm() {

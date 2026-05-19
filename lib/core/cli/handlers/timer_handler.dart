@@ -1,5 +1,6 @@
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 
 /// CLI handler for Timer panels (`board.timer`).
 ///

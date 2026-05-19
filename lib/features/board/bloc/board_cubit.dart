@@ -10,6 +10,7 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
@@ -112,6 +113,12 @@ class BoardCubit extends Cubit<BoardState> {
 
   Future<void> deleteBoard(String id) async {
     if (state.boards.isEmpty) return;
+    final board = state.boards.where((entry) => entry.id == id).firstOrNull;
+    if (board != null) {
+      for (final panel in board.panels) {
+        WebViewManager.instance.remove(panel.id);
+      }
+    }
     final updated = state.boards.where((board) => board.id != id).toList();
     if (updated.isEmpty) {
       final replacement = _buildDefaultBoard(name: 'Board 1');
@@ -440,6 +447,7 @@ class BoardCubit extends Cubit<BoardState> {
   Future<void> removePanel(String panelId, {String? boardId}) async {
     // Release any persistent resources tied to the panel (e.g. media player).
     PlaylistPlayerRegistry.instance.release(panelId);
+    WebViewManager.instance.remove(panelId);
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
     await _updateBoard(targetId, (board) {
@@ -583,11 +591,13 @@ class BoardCubit extends Cubit<BoardState> {
     // If caller passed something other than the hardcoded default, use it as-is.
     if (explicitModel != hardcodedDefault) return explicitModel;
     // Check agent config for user-set default model.
-    final agentDefault = AgentConfigService.instance.defaultModelForAgent(provider);
+    final agentDefault = AgentConfigService.instance.defaultModelForAgent(
+      provider,
+    );
     if (agentDefault != null && agentDefault.isNotEmpty) return agentDefault;
     // Fall back to the first isDefault model in the catalog.
-    final catalogDefault =
-        ProviderModelCatalogService.instance.defaultModelForProvider(provider);
+    final catalogDefault = ProviderModelCatalogService.instance
+        .defaultModelForProvider(provider);
     if (catalogDefault != null) return catalogDefault;
     return hardcodedDefault;
   }

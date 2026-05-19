@@ -1,7 +1,7 @@
 import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 
 /// Singleton that tracks currently active [JsWidgetEngine] instances.
-/// [_CustomWidgetContentState] registers/unregisters on load/dispose.
+/// [WidgetEngineManager] registers and unregisters engines as panel lifecycles change.
 class WidgetAppRegistry {
   static final instance = WidgetAppRegistry._();
   WidgetAppRegistry._();
@@ -11,9 +11,17 @@ class WidgetAppRegistry {
 
   final Map<String, _WidgetAppEntry> _entries = {};
 
-  void register(String widgetId, JsWidgetEngine engine, Map<String, dynamic>? tree) {
+  void register(
+    String widgetId,
+    JsWidgetEngine engine,
+    Map<String, dynamic>? tree,
+  ) {
     final existing = _entries[widgetId];
-    _entries[widgetId] = _WidgetAppEntry(engine, tree, existing?.reloadCallback);
+    _entries[widgetId] = _WidgetAppEntry(
+      engine,
+      tree,
+      existing?.reloadCallback,
+    );
   }
 
   /// Register a callback that reloads the widget panel (called by CLI reload).
@@ -32,7 +40,10 @@ class WidgetAppRegistry {
     if (entry != null) entry.tree = tree;
   }
 
-  void unregister(String widgetId) {
+  void unregister(String widgetId, {JsWidgetEngine? engine}) {
+    final entry = _entries[widgetId];
+    if (entry == null) return;
+    if (engine != null && !identical(entry.engine, engine)) return;
     _entries.remove(widgetId);
   }
 

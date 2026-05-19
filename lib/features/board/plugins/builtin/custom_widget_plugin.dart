@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -7,6 +9,7 @@ import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
+import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_manifest.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -75,7 +78,10 @@ class CustomWidgetPlugin extends BoardPanelPlugin {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CustomWidgetContent extends StatefulWidget {
-  const _CustomWidgetContent({required this.panel, required this.renderContext});
+  const _CustomWidgetContent({
+    required this.panel,
+    required this.renderContext,
+  });
 
   final BoardPanelInstance panel;
   final BoardPanelRenderContext renderContext;
@@ -89,7 +95,6 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   JsonWidgetRenderer? _renderer;
   Map<String, dynamic>? _uiTree;
 
-  WidgetManifest? _manifest;
   bool _loading = true;
   String? _error;
 
@@ -99,11 +104,23 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   void initState() {
     super.initState();
     ThemeManager.instance.addListener(_onThemeChanged);
-    // Register reload callback immediately so CLI can trigger reload even before first load completes
     if (_widgetId.isNotEmpty) {
-      WidgetAppRegistry.instance.registerReload(_widgetId, _load);
+      WidgetAppRegistry.instance.registerReload(
+        _widgetId,
+        _reloadCurrentWidget,
+      );
     }
-    _load();
+    final existing = WidgetEngineManager.instance.engine(widget.panel.id);
+    if (existing != null) {
+      _engine = existing;
+      _renderer = _buildRenderer(existing);
+      _uiTree = WidgetEngineManager.instance.tree(widget.panel.id);
+      _loading = false;
+      _error = null;
+      unawaited(_load(keepExistingUi: true));
+    } else {
+      unawaited(_load());
+    }
   }
 
   @override
@@ -111,13 +128,21 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     super.didUpdateWidget(old);
     final oldId = old.panel.state['widgetId'] as String? ?? '';
     if (_widgetId != oldId) {
-      if (_widgetId.isNotEmpty) {
-        WidgetAppRegistry.instance.registerReload(_widgetId, _load);
+      if (oldId.isNotEmpty) {
+        WidgetAppRegistry.instance.unregister(
+          oldId,
+          engine: WidgetEngineManager.instance.engine(widget.panel.id),
+        );
       }
-      _load();
+      if (_widgetId.isNotEmpty) {
+        WidgetAppRegistry.instance.registerReload(
+          _widgetId,
+          _reloadCurrentWidget,
+        );
+      }
+      unawaited(_load(forceReload: oldId.isNotEmpty));
       return;
     }
-    // Sync env vars when env state changes (e.g. updated from header gear button)
     final oldGroups = old.panel.state['_selectedEnvGroups'];
     final newGroups = widget.panel.state['_selectedEnvGroups'];
     final oldCustom = old.panel.state['_customEnvVars'];
@@ -130,8 +155,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   @override
   void dispose() {
     ThemeManager.instance.removeListener(_onThemeChanged);
-    if (_widgetId.isNotEmpty) WidgetAppRegistry.instance.unregister(_widgetId);
-    _engine?.dispose();
+    WidgetEngineManager.instance.detach(widget.panel.id);
     super.dispose();
   }
 
@@ -143,12 +167,24 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     final isDark = tm.isDark;
     return {
       'isDark': isDark,
-      'bg': _hexColor(scheme?.background ?? (isDark ? const Color(0xFF0f172a) : Colors.white)),
-      'surface': _hexColor(scheme?.surface ?? (isDark ? const Color(0xFF1e293b) : const Color(0xFFF8FAFC))),
-      'border': _hexColor(scheme?.border ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))),
+      'bg': _hexColor(
+        scheme?.background ?? (isDark ? const Color(0xFF0f172a) : Colors.white),
+      ),
+      'surface': _hexColor(
+        scheme?.surface ??
+            (isDark ? const Color(0xFF1e293b) : const Color(0xFFF8FAFC)),
+      ),
+      'border': _hexColor(
+        scheme?.border ??
+            (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+      ),
       'accent': _hexColor(scheme?.primary ?? const Color(0xFF818cf8)),
-      'text': _hexColor(isDark ? const Color(0xFFf1f5f9) : const Color(0xFF1A1A2E)),
-      'muted': _hexColor(isDark ? const Color(0xFF64748b) : const Color(0xFF94A3B8)),
+      'text': _hexColor(
+        isDark ? const Color(0xFFf1f5f9) : const Color(0xFF1A1A2E),
+      ),
+      'muted': _hexColor(
+        isDark ? const Color(0xFF64748b) : const Color(0xFF94A3B8),
+      ),
     };
   }
 
@@ -159,105 +195,120 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     return '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}';
   }
 
-  /// Apply env vars synchronously from panel state (for initial load).
-  /// Merges selected global env groups + custom vars.
-  /// Falls back to legacy _envGroup flat map.
   void _applyEnvVars(JsWidgetEngine engine, Map<String, dynamic> state) {
-    // Legacy format backward compat
     final legacy = state['_envGroup'] as Map?;
-    final custom = (state['_customEnvVars'] as Map?)?.cast<String, String>() ?? {};
+    final custom =
+        (state['_customEnvVars'] as Map?)?.cast<String, String>() ?? {};
     if (legacy != null && state['_selectedEnvGroups'] == null) {
       engine.envVars = {...legacy.cast<String, String>(), ...custom};
       return;
     }
-    // New format: just apply custom vars synchronously; groups resolved async
     engine.envVars = custom;
     _applyEnvVarsAsync(state, engine: engine);
   }
 
-  /// Resolve global env groups asynchronously and merge into engine.envVars.
-  Future<void> _applyEnvVarsAsync(Map<String, dynamic> state, {JsWidgetEngine? engine}) async {
+  Future<void> _applyEnvVarsAsync(
+    Map<String, dynamic> state, {
+    JsWidgetEngine? engine,
+  }) async {
     final eng = engine ?? _engine;
     if (eng == null) return;
-    final selectedGroups = (state['_selectedEnvGroups'] as List?)
-        ?.whereType<String>().toList() ?? [];
-    final custom = (state['_customEnvVars'] as Map?)?.cast<String, String>() ?? {};
-    final groupVars = selectedGroups.isEmpty
-        ? <String, String>{}
-        : await GlobalEnvGroupsService.instance.resolveSelectedGroups(selectedGroups);
+    final selectedGroups =
+        (state['_selectedEnvGroups'] as List?)?.whereType<String>().toList() ??
+        [];
+    final custom =
+        (state['_customEnvVars'] as Map?)?.cast<String, String>() ?? {};
+    final groupVars =
+        selectedGroups.isEmpty
+            ? <String, String>{}
+            : await GlobalEnvGroupsService.instance.resolveSelectedGroups(
+              selectedGroups,
+            );
     if (!mounted) return;
     eng.envVars = {...groupVars, ...custom};
   }
 
-  Future<void> _load() async {
-    await _engine?.dispose();
-    _engine = null;
-    _renderer = null;
-    _uiTree = null;
+  Future<void> _reloadCurrentWidget() => _load(forceReload: true);
 
-    if (_widgetId.isEmpty) {
-      if (mounted) setState(() { _loading = false; _error = null; });
-      return;
-    }
+  void _handleRenderedTree(Map<String, dynamic> tree) {
+    if (!mounted) return;
+    setState(() => _uiTree = tree);
+  }
 
-    if (mounted) setState(() { _loading = true; _error = null; });
-
-    final manifest = await WidgetRegistryService.instance.find(_widgetId);
-    if (manifest == null) {
-      if (mounted) setState(() { _loading = false; _error = 'Widget "$_widgetId" not found'; });
-      return;
-    }
-
-    final js = await manifest.readJs();
-    if (js == null) {
-      if (mounted) setState(() { _loading = false; _error = 'widget.js missing for "$_widgetId"'; });
-      return;
-    }
-
-    final storage = Map<String, dynamic>.from(
-      widget.panel.state['_storage'] as Map? ?? {},
-    );
-
-    final engine = JsWidgetEngine(
-      widgetId: _widgetId,
-      appDir: manifest.appDir,
-      onRender: (tree) {
-        if (mounted) setState(() => _uiTree = tree);
-        WidgetAppRegistry.instance.updateTree(_widgetId, tree);
-      },
-      onSetTitle: (title) {
-        widget.renderContext.onUpdateState({
-          ...widget.panel.state,
-          '_title': title,
-        });
-      },
-      onStorageUpdate: (newStorage) {
-        widget.renderContext.onUpdateState({
-          ...widget.panel.state,
-          '_storage': newStorage,
-        });
-      },
-      initialStorage: storage,
-      initialTheme: _themeColors(),
-    );
-
-    // Inject env vars from panel state (new format: _selectedEnvGroups + _customEnvVars)
-    // Backward compat: fall back to _envGroup (old flat map format)
-    _applyEnvVars(engine, widget.panel.state);
-
-    _renderer = JsonWidgetRenderer(
+  JsonWidgetRenderer _buildRenderer(JsWidgetEngine engine) {
+    return JsonWidgetRenderer(
       onEvent: (actionId, payload) => engine.callEvent(actionId, payload),
     );
+  }
+
+  Future<void> _load({
+    bool forceReload = false,
+    bool keepExistingUi = false,
+  }) async {
+    if (!keepExistingUi) {
+      _engine = null;
+      _renderer = null;
+      _uiTree = null;
+    }
+
+    if (_widgetId.isEmpty) {
+      WidgetEngineManager.instance.remove(widget.panel.id);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+      }
+      return;
+    }
+
+    if (forceReload) {
+      WidgetEngineManager.instance.remove(widget.panel.id);
+    }
+
+    if (!keepExistingUi && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
-      await engine.run(js);
+      final engine = await WidgetEngineManager.instance.getOrCreate(
+        panelId: widget.panel.id,
+        widgetId: _widgetId,
+        panel: widget.panel,
+        initialTheme: _themeColors(),
+        onRenderUI: _handleRenderedTree,
+      );
+      if (engine == null) {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error = 'Widget "$_widgetId" not found';
+          });
+        }
+        return;
+      }
+
+      _applyEnvVars(engine, widget.panel.state);
       _engine = engine;
-      WidgetAppRegistry.instance.register(_widgetId, engine, null);
-      WidgetAppRegistry.instance.registerReload(_widgetId, _load);
-      if (mounted) setState(() { _manifest = manifest; _loading = false; });
+      _renderer = _buildRenderer(engine);
+      final tree = WidgetEngineManager.instance.tree(widget.panel.id);
+      if (mounted) {
+        setState(() {
+          _uiTree = tree ?? _uiTree;
+          _loading = false;
+          _error = null;
+        });
+      }
     } catch (e) {
-      engine.dispose();
-      if (mounted) setState(() { _loading = false; _error = 'Failed to run widget: $e'; });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = '$e';
+        });
+      }
     }
   }
 
@@ -270,7 +321,10 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       return _ErrorView(error: _error!, onRetry: _load);
     }
     if (_widgetId.isEmpty) {
-      return _PickerView(panel: widget.panel, renderContext: widget.renderContext);
+      return _PickerView(
+        panel: widget.panel,
+        renderContext: widget.renderContext,
+      );
     }
     final tree = _uiTree;
     if (tree == null) {
@@ -352,7 +406,11 @@ class _PickerViewState extends State<_PickerView> {
               const SizedBox(height: 12),
               Text(
                 'No widgets installed.',
-                style: TextStyle(color: cs.onSurface, fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -373,18 +431,20 @@ class _PickerViewState extends State<_PickerView> {
         return InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {
-              final createPanel = widget.renderContext.onCreateLinkedPanel;
-              if (createPanel != null) {
-                // Open widget as a new panel on the board
-                createPanel(CustomWidgetPlugin.kTypeId, {'widgetId': m.id}, m.name);
-              } else {
-                // Fallback: replace current panel's content
-                widget.renderContext.onUpdateState({
-                  ...widget.panel.state,
-                  'widgetId': m.id,
-                });
-              }
-            },
+            final createPanel = widget.renderContext.onCreateLinkedPanel;
+            if (createPanel != null) {
+              // Open widget as a new panel on the board
+              createPanel(CustomWidgetPlugin.kTypeId, {
+                'widgetId': m.id,
+              }, m.name);
+            } else {
+              // Fallback: replace current panel's content
+              widget.renderContext.onUpdateState({
+                ...widget.panel.state,
+                'widgetId': m.id,
+              });
+            }
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -410,12 +470,19 @@ class _PickerViewState extends State<_PickerView> {
                       if (m.description.isNotEmpty)
                         Text(
                           m.description,
-                          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
                         ),
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios, size: 12, color: cs.onSurfaceVariant),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 12,
+                  color: cs.onSurfaceVariant,
+                ),
               ],
             ),
           ),
@@ -434,7 +501,12 @@ class CustomWidgetCliHandler extends PanelCliHandler {
   String get typeId => CustomWidgetPlugin.kTypeId;
 
   @override
-  List<String> get supportedActions => const ['setState', 'info', 'execute', 'snapshot'];
+  List<String> get supportedActions => const [
+    'setState',
+    'info',
+    'execute',
+    'snapshot',
+  ];
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) => {
@@ -450,30 +522,60 @@ class CustomWidgetCliHandler extends PanelCliHandler {
     switch (action) {
       case 'setState':
         final state = args['state'] as Map?;
-        if (state == null) return const CliActionResult(ok: false, message: 'Missing "state" field');
-        return CliActionResult(ok: true, message: 'State updated', stateUpdate: Map<String, dynamic>.from(state));
+        if (state == null)
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "state" field',
+          );
+        return CliActionResult(
+          ok: true,
+          message: 'State updated',
+          stateUpdate: Map<String, dynamic>.from(state),
+        );
       case 'info':
         final wid = panel.state['widgetId'] as String? ?? '';
-        final manifest = wid.isNotEmpty ? await WidgetRegistryService.instance.find(wid) : null;
-        return CliActionResult(ok: true, data: {'widgetId': wid, 'manifest': manifest?.toJson()});
+        final manifest =
+            wid.isNotEmpty
+                ? await WidgetRegistryService.instance.find(wid)
+                : null;
+        return CliActionResult(
+          ok: true,
+          data: {'widgetId': wid, 'manifest': manifest?.toJson()},
+        );
       case 'execute':
         final widgetId = panel.state['widgetId'] as String? ?? '';
         final actionId = args['actionId'] as String?;
-        if (actionId == null) return const CliActionResult(ok: false, message: 'Missing "actionId" field');
+        if (actionId == null)
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "actionId" field',
+          );
         final payload = args['payload'] as Map<String, dynamic>?;
-        final engine = WidgetAppRegistry.instance.engine(widgetId);
+        final engine = WidgetEngineManager.instance.engine(panel.id);
         if (engine == null) {
-          return CliActionResult(ok: false, message: 'Widget "$widgetId" is not currently running');
+          return CliActionResult(
+            ok: false,
+            message: 'Widget "$widgetId" is not currently running',
+          );
         }
         engine.callEvent(actionId, payload);
-        return CliActionResult(ok: true, message: 'Event "$actionId" sent to widget "$widgetId"');
+        return CliActionResult(
+          ok: true,
+          message: 'Event "$actionId" sent to widget "$widgetId"',
+        );
       case 'snapshot':
         final widgetId = panel.state['widgetId'] as String? ?? '';
-        final tree = WidgetAppRegistry.instance.tree(widgetId);
+        final tree = WidgetEngineManager.instance.tree(panel.id);
         if (tree == null) {
-          return CliActionResult(ok: false, message: 'No render tree available for widget "$widgetId"');
+          return CliActionResult(
+            ok: false,
+            message: 'No render tree available for widget "$widgetId"',
+          );
         }
-        return CliActionResult(ok: true, data: {'widgetId': widgetId, 'tree': tree});
+        return CliActionResult(
+          ok: true,
+          data: {'widgetId': widgetId, 'tree': tree},
+        );
     }
     return CliActionResult(ok: false, message: 'Unknown action: $action');
   }
@@ -489,7 +591,12 @@ class _QuickSizeButton extends StatelessWidget {
     (icon: Icons.crop_free_outlined, label: 'Compact', w: 360.0, h: 420.0),
     (icon: Icons.smartphone_outlined, label: 'Mobile', w: 390.0, h: 844.0),
     (icon: Icons.tablet_outlined, label: 'Tablet', w: 768.0, h: 1024.0),
-    (icon: Icons.desktop_windows_outlined, label: 'Desktop', w: 1280.0, h: 800.0),
+    (
+      icon: Icons.desktop_windows_outlined,
+      label: 'Desktop',
+      w: 1280.0,
+      h: 800.0,
+    ),
   ];
 
   @override
@@ -507,18 +614,26 @@ class _QuickSizeButton extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(150),
         ),
         onSelected: (s) => onResize(s.w, s.h),
-        itemBuilder: (_) => _sizes
-            .map((s) => PopupMenuItem(
-                  value: (w: s.w, h: s.h),
-                  height: 36,
-                  child: Row(children: [
-                    Icon(s.icon, size: 14),
-                    const SizedBox(width: 8),
-                    Text('${s.label} (${s.w.toInt()}×${s.h.toInt()})',
-                        style: const TextStyle(fontSize: 12)),
-                  ]),
-                ))
-            .toList(),
+        itemBuilder:
+            (_) =>
+                _sizes
+                    .map(
+                      (s) => PopupMenuItem(
+                        value: (w: s.w, h: s.h),
+                        height: 36,
+                        child: Row(
+                          children: [
+                            Icon(s.icon, size: 14),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${s.label} (${s.w.toInt()}×${s.h.toInt()})',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
       ),
     );
   }
@@ -529,8 +644,13 @@ class _QuickSizeButton extends StatelessWidget {
 class _EnvGearButton extends StatelessWidget {
   const _EnvGearButton({required this.panel, required this.onUpdate});
   final BoardPanelInstance panel;
+
   /// Called with (selectedGroupIds, customVars)
-  final void Function(List<String> selectedGroups, Map<String, dynamic> customVars) onUpdate;
+  final void Function(
+    List<String> selectedGroups,
+    Map<String, dynamic> customVars,
+  )
+  onUpdate;
 
   bool get _hasEnv {
     final groups = panel.state['_selectedEnvGroups'] as List?;
@@ -553,9 +673,12 @@ class _EnvGearButton extends StatelessWidget {
         tooltip: 'Environment variables',
         icon: Icon(
           Icons.settings_outlined,
-          color: _hasEnv
-              ? const Color(0xFF4ade80)
-              : Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(120),
+          color:
+              _hasEnv
+                  ? const Color(0xFF4ade80)
+                  : Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withAlpha(120),
         ),
         onPressed: () => _showEnvDialog(context),
       ),
@@ -594,13 +717,15 @@ class _EnvDialogState extends State<_EnvDialog> {
 
     final customRaw = widget.panel.state['_customEnvVars'] as Map?;
     if (customRaw != null) {
-      _customRows = customRaw.entries
-          .map((e) => MapEntry(e.key.toString(), e.value.toString()))
-          .toList();
+      _customRows =
+          customRaw.entries
+              .map((e) => MapEntry(e.key.toString(), e.value.toString()))
+              .toList();
     } else {
       // Migrate legacy _envGroup
       final legacy = widget.panel.state['_envGroup'] as Map?;
-      _customRows = legacy?.entries
+      _customRows =
+          legacy?.entries
               .map((e) => MapEntry(e.key.toString(), e.value.toString()))
               .toList() ??
           [];
@@ -637,7 +762,10 @@ class _EnvDialogState extends State<_EnvDialog> {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return AlertDialog(
-      title: const Text('Environment Variables', style: TextStyle(fontSize: 14)),
+      title: const Text(
+        'Environment Variables',
+        style: TextStyle(fontSize: 14),
+      ),
       content: SizedBox(
         width: 380,
         child: SingleChildScrollView(
@@ -646,11 +774,19 @@ class _EnvDialogState extends State<_EnvDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Env group presets ──
-              Text('Env Group Presets',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: onSurface)),
+              Text(
+                'Env Group Presets',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: onSurface,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text('Select global groups from Settings → Environment',
-                  style: TextStyle(fontSize: 11, color: muted)),
+              Text(
+                'Select global groups from Settings → Environment',
+                style: TextStyle(fontSize: 11, color: muted),
+              ),
               const SizedBox(height: 8),
               EnvGroupSelectionField(
                 selectedGroupIds: _selectedGroups,
@@ -661,15 +797,24 @@ class _EnvDialogState extends State<_EnvDialog> {
               // ── Custom vars ──
               Row(
                 children: [
-                  Text('Custom Variables',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: onSurface)),
+                  Text(
+                    'Custom Variables',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: onSurface,
+                    ),
+                  ),
                   const Spacer(),
                   TextButton.icon(
                     onPressed: _addRow,
                     icon: const Icon(Icons.add, size: 14),
                     label: const Text('Add', style: TextStyle(fontSize: 12)),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
@@ -677,54 +822,74 @@ class _EnvDialogState extends State<_EnvDialog> {
                 ],
               ),
               const SizedBox(height: 4),
-              Text('Overrides group values. Injected into yoloit.exec().',
-                  style: TextStyle(fontSize: 11, color: muted)),
+              Text(
+                'Overrides group values. Injected into yoloit.exec().',
+                style: TextStyle(fontSize: 11, color: muted),
+              ),
               const SizedBox(height: 8),
               ..._customRows.asMap().entries.map((entry) {
                 final i = entry.key;
                 final e = entry.value;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(children: [
-                    Expanded(
-                      child: TextField(
-                        controller: TextEditingController(text: e.key)
-                          ..selection = TextSelection.collapsed(offset: e.key.length),
-                        onChanged: (v) => _updateKey(i, v),
-                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                        decoration: const InputDecoration(
-                          hintText: 'KEY',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: TextEditingController(text: e.key)
+                            ..selection = TextSelection.collapsed(
+                              offset: e.key.length,
+                            ),
+                          onChanged: (v) => _updateKey(i, v),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'KEY',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text('=', style: TextStyle(fontSize: 12)),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: TextEditingController(text: e.value)
-                          ..selection = TextSelection.collapsed(offset: e.value.length),
-                        onChanged: (v) => _updateVal(i, v),
-                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                        decoration: const InputDecoration(
-                          hintText: 'value',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      const SizedBox(width: 4),
+                      const Text('=', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: TextEditingController(text: e.value)
+                            ..selection = TextSelection.collapsed(
+                              offset: e.value.length,
+                            ),
+                          onChanged: (v) => _updateVal(i, v),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: 'value',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: () => _removeRow(i),
-                      icon: const Icon(Icons.close, size: 14),
-                      padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(),
-                    ),
-                  ]),
+                      IconButton(
+                        onPressed: () => _removeRow(i),
+                        icon: const Icon(Icons.close, size: 14),
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
                 );
               }),
             ],
@@ -745,10 +910,7 @@ class _EnvDialogState extends State<_EnvDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        ElevatedButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
+        ElevatedButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }

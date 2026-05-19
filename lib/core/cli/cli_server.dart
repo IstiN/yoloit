@@ -18,7 +18,9 @@ import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
+import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
@@ -664,6 +666,9 @@ class CliServer {
     }
     // DELETE .../panels/:id
     if (sub.isEmpty && method == 'DELETE') {
+      if (panel.type == 'board.widget.custom') {
+        WidgetEngineManager.instance.remove(panel.id);
+      }
       await cubit.removePanel(panel.id, boardId: board.id);
       _scheduleRebuild();
       return _json({'ok': true, 'message': 'Panel deleted'});
@@ -1114,6 +1119,18 @@ class CliServer {
         (p) => p.copyWith(state: mergedState),
         boardId: board.id,
       );
+      // Start/stop TimerManager when timer state changes via CLI
+      if (panel.type == 'board.timer') {
+        if (mergedState['isRunning'] == true) {
+          TimerManager.instance.start(
+            panelId: panel.id,
+            boardId: board.id,
+            remaining: mergedState['remaining'] as int? ?? 300,
+          );
+        } else {
+          TimerManager.instance.stop(panel.id);
+        }
+      }
       if (panel.type == 'board.note.markdown' &&
           mergedState['autoHeight'] == true) {
         final markdown = mergedState['markdown'] as String? ?? '';
@@ -1880,6 +1897,9 @@ class CliServer {
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
     if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    if (panel.type == 'board.widget.custom') {
+      WidgetEngineManager.instance.remove(panel.id);
+    }
     await cubit.removePanel(panel.id, boardId: board.id);
     return {'ok': true, 'panelId': panel.id};
   }

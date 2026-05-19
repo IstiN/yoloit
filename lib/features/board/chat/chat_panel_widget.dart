@@ -13,6 +13,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
+import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
@@ -91,6 +92,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   late ChatProvider _provider;
   late ChatSessionConfig _config;
+  ChatSession? _session;
 
   final List<ChatMessage> _messages = [];
   final Map<String, ChatToolCall> _activeToolCalls = {};
@@ -100,7 +102,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   bool _isFirstMessage = true;
   ChatTokenUsage? _lastUsage;
   int _totalOutputTokens = 0;
-  StreamSubscription<ChatEvent>? _eventSub;
 
   // Sub-agent panel tracking: agentId → board panelId
   final Map<String, String> _subAgentPanels = {};
@@ -131,10 +132,104 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ToolCallSettingsService.instance.ignoredToolsListenable.addListener(
       _handleIgnoredToolsChanged,
     );
-    _provider = _providerForId(_config.provider);
+    // Get or create session from manager — provider survives widget lifecycle.
+    _session = ChatSessionManager.instance.getOrCreate(
+      widget.panel.id,
+      _config,
+    );
+    _provider = _session!.provider;
+
+    // Restore messages from the session (source of truth).
+    // The session accumulates messages via _handleCoreEvent even when
+    // the widget is detached, so it always has the latest state.
+    if (_session!.messages.isNotEmpty) {
+      _messages.clear();
+      _messages.addAll(_session!.messages);
+      _isFirstMessage = _session!.isFirstMessage;
+      _isProcessing = _session!.isProcessing;
+      _streamingContent = _session!.streamingContent;
+      _streamingMessageId = _session!.streamingMessageId;
+      _totalOutputTokens = _session!.totalOutputTokens;
+      _lastUsage = _session!.lastUsage;
+      if (_session!.opencodeSessionId != null) {
+        _opencodeSessionId = _session!.opencodeSessionId;
+      }
+      // If the session finished processing while we were away, update UI
+      if (_isProcessing) {
+        _setProcessing(true);
+      }
+    } else if (_messages.isNotEmpty) {
+      // First mount with persisted board state — feed into session.
+      final savedMessages = widget.panel.state['messages'];
+      if (savedMessages is List) {
+        _session!.restoreMessages(
+          savedMessages.whereType<Map>().map(
+            (m) => Map<String, dynamic>.from(m),
+          ).toList(),
+        );
+      }
+      final savedUsage = widget.panel.state['lastUsage'];
+      if (savedUsage is Map) {
+        _session!.restoreLastUsage(Map<String, dynamic>.from(savedUsage));
+      }
+    }
+
     // Restore sessionID for opencode
-    if (_config.provider == 'opencode' && _opencodeSessionId != null) {
-      _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
+    if (_config.provider == 'opencode') {
+      if (_session!.opencodeSessionId != null) {
+        _opencodeSessionId = _session!.opencodeSessionId;
+      }
+      if (_opencodeSessionId != null) {
+        _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
+        _session!.restoreOpencodeSessionId(_opencodeSessionId);
+      }
+    }
+
+    // Re-attach UI callbacks if the session is still processing
+    // (e.g. widget disposed mid-stream, now re-mounting)
+    if (_session!.isProcessing) {
+      _isSending = true;
+      _setProcessing(true);
+      _session!.attachUI(
+        onEvent: _handleEvent,
+        onError: (Object error) {
+          if (!mounted) return;
+          setState(() {
+            _isSending = false;
+            _setProcessing(false);
+            _messages
+              ..clear()
+              ..addAll(_session!.messages);
+          });
+          _persistMessages();
+          _scrollToBottom();
+        },
+        onDone: () {
+          if (!mounted) return;
+          if (_config.provider == 'opencode') {
+            final sid = _provider.getSessionId(_config.sessionName);
+            if (sid != null && sid != _opencodeSessionId) {
+              _opencodeSessionId = sid;
+              widget.onUpdateState({
+                ...widget.panel.state,
+                'opencodeSessionId': sid,
+              });
+            }
+          }
+          setState(() {
+            _isSending = false;
+            _setProcessing(false);
+            _messages
+              ..clear()
+              ..addAll(_session!.messages);
+            _streamingContent = '';
+            _streamingMessageId = null;
+          });
+          _persistMessages();
+          _scrollToBottom();
+          _playCompletionSound();
+        },
+      );
     }
     _glowCtrl = AnimationController(
       vsync: this,
@@ -169,8 +264,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (nextConfig != previousConfig && nextConfig != _config) {
         setState(() {
           if (nextConfig.provider != _config.provider) {
-            _provider.dispose();
-            _provider = _providerForId(nextConfig.provider);
+            // Update session config — it will recreate the provider internally
+            _session?.updateConfig(nextConfig);
+            _provider = _session!.provider;
             // Restore sessionID for new provider
             if (nextConfig.provider == 'opencode' &&
                 _opencodeSessionId != null) {
@@ -179,6 +275,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 _opencodeSessionId!,
               );
             }
+          } else {
+            _session?.updateConfig(nextConfig);
           }
           _config = nextConfig;
         });
@@ -291,7 +389,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   @override
   void dispose() {
-    _eventSub?.cancel();
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
     );
@@ -308,11 +405,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         });
       }
     }
-    // Use detach() instead of dispose() so that any in-flight CLI process
-    // (copilot / opencode / cursor) is NOT killed when the user switches
-    // boards.  The OS process runs to completion and persists its session
-    // state; the next message will resume it correctly.
-    _provider.detach();
+    // Persist current messages to board state
+    _persistMessages();
+    // Detach from session — session keeps its stream subscription alive.
+    // The session already has accurate messages via _handleCoreEvent.
+    // When the widget re-mounts, it reads from session.messages.
+    ChatSessionManager.instance.detach(widget.panel.id);
+    _session = null;
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
@@ -584,12 +683,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Future<void> _stopStreaming() async {
     if (!_isSending) return;
-    _eventSub?.cancel();
-    _eventSub = null;
+    // Stop streaming through the session — it cancels its subscription
+    // and kills the underlying provider process.
+    await _session!.stopStreaming();
     // Update UI immediately so the stop button and loading disappear at once.
     if (mounted) {
+      // Sync messages from session (it finalized the partial content)
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
       setState(() {
-        _finalizeStreamingMessage();
         _streamingContent = '';
         _streamingMessageId = null;
         _activeToolCalls.clear();
@@ -598,8 +701,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _setProcessing(false);
       });
     }
-    // Kill the underlying process in the background.
-    unawaited(_provider.stop(_config.sessionName));
   }
 
   BoardDocument? _currentBoardForPanel() {
@@ -631,13 +732,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _inputController.clear();
     }
 
-    // If currently processing, finalize any partial response first
+    // If currently processing, stop the current stream first
     if (_isProcessing) {
-      _eventSub?.cancel();
-      _eventSub = null;
-      await _provider.stop(_config.sessionName);
+      await _session!.stopStreaming();
+      // Sync finalized messages from session
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
       setState(() {
-        _finalizeStreamingMessage();
         _streamingContent = '';
         _streamingMessageId = null;
         _activeToolCalls.clear();
@@ -645,83 +747,34 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       });
     }
 
-    // Start streaming
-    // Extract file paths from message text and pass as attachments.
-    // Any absolute path token (starts with /) is treated as an attachment.
-    final filePathRe = RegExp(r'^/.+');
-    final imageExtRe = RegExp(
-      r'\.(png|jpg|jpeg|gif|webp|bmp)$',
-      caseSensitive: false,
-    );
-    final tokens = text.split(RegExp(r'\s+'));
-    final attachments = <String>[
-      ...overrideAttachments,
-      ...tokens.where((t) => filePathRe.hasMatch(t)),
-    ];
-    final promptText =
-        tokens.where((t) => !filePathRe.hasMatch(t)).join(' ').trim();
-
-    // Add user message — store attachments separately, content without paths
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          id: 'user-${DateTime.now().millisecondsSinceEpoch}',
-          role: ChatRole.user,
-          content: promptText,
-          attachments: attachments,
-          timestamp: DateTime.now(),
-        ),
-      );
-      _setProcessing(true);
-      _streamingContent = '';
-      _streamingMessageId = null;
-      _activeToolCalls.clear();
-      _ignoredToolCallIds.clear();
-    });
-
-    _scrollToBottom();
-
-    // For providers that support native attachment (copilot uses --attachment)
-    // pass only image files as attachments; others get path embedded in prompt.
-    final imageAttachments =
-        attachments.where((t) => imageExtRe.hasMatch(t)).toList();
     final board = _currentBoardForPanel();
 
-    final stream = _provider.sendMessage(
-      message: promptText.isNotEmpty ? promptText : text,
-      config: _config,
-      isFirstMessage: _isFirstMessage,
-      attachments: imageAttachments,
+    // Route through the session — it owns the stream subscription.
+    // When this widget is disposed, the session keeps processing events.
+    final ok = _session!.sendMessage(
+      text: text,
+      attachments: overrideAttachments,
       runtimeContext: ChatRuntimeContext(
         boardId: board?.id,
         boardName: board?.name,
         panelId: widget.panel.id,
         panelTitle: widget.panel.title,
       ),
-    );
-
-    _isFirstMessage = false;
-
-    _eventSub?.cancel();
-    _eventSub = stream.listen(
-      _handleEvent,
+      onEvent: _handleEvent,
       onError: (Object error) {
+        if (!mounted) return;
         setState(() {
           _isSending = false;
           _setProcessing(false);
-          _messages.add(
-            ChatMessage(
-              id: 'error-${DateTime.now().millisecondsSinceEpoch}',
-              role: ChatRole.system,
-              content: '❌ Error: $error',
-              timestamp: DateTime.now(),
-            ),
-          );
+          _messages
+            ..clear()
+            ..addAll(_session!.messages);
         });
         _persistMessages();
         _scrollToBottom();
       },
       onDone: () {
+        if (!mounted) return;
         // Persist opencode session ID after first message completes
         if (_config.provider == 'opencode') {
           final sid = _provider.getSessionId(_config.sessionName);
@@ -736,10 +789,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         setState(() {
           _isSending = false;
           _setProcessing(false);
-          // Finalize any streaming message
-          if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
-            _finalizeStreamingMessage();
-          }
+          // Sync final messages from session (includes finalized streaming)
+          _messages
+            ..clear()
+            ..addAll(_session!.messages);
+          _streamingContent = '';
+          _streamingMessageId = null;
           _markAllActiveToolCallsCompleted();
         });
         _persistMessages();
@@ -748,6 +803,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _playCompletionSound();
       },
     );
+
+    if (!ok) {
+      setState(() => _isSending = false);
+      return;
+    }
+
+    // Sync user message and state from session for immediate render
+    setState(() {
+      _messages
+        ..clear()
+        ..addAll(_session!.messages);
+      _setProcessing(true);
+      _streamingContent = '';
+      _streamingMessageId = null;
+      _activeToolCalls.clear();
+      _ignoredToolCallIds.clear();
+      _isFirstMessage = false;
+    });
+
+    _scrollToBottom();
   }
 
   void _playCompletionSound() {
@@ -1196,11 +1271,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       models: _provider.availableModels,
       onStart: (config) {
         setState(() {
-          // Switch provider if it changed
-          if (config.provider != _config.provider) {
-            _provider.dispose();
-            _provider = _providerForId(config.provider);
-          }
+          // Update session config — it handles provider swap internally
+          _session?.updateConfig(config);
+          _provider = _session!.provider;
           _config = config;
           _isFirstMessage = true;
         });
