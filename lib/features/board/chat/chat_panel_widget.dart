@@ -340,10 +340,22 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   @override
   void dispose() {
+    // Cancel widget's own event subscription — session may keep its own.
     _eventSub?.cancel();
+    _eventSub = null;
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
     );
+    // If we were still processing when disposed, finalize any partial
+    // streaming content so the session has a complete message list.
+    if (_isProcessing) {
+      if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
+        _finalizeStreamingMessage();
+      }
+      _isProcessing = false;
+      _streamingContent = '';
+      _streamingMessageId = null;
+    }
     // Safety net: if the board is switched before the first opencode event
     // arrives (so _handleEvent never had a chance to run), persist the session
     // ID now so the next mount can resume the session correctly.
