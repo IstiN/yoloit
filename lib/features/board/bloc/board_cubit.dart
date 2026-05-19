@@ -11,6 +11,8 @@ import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 class BoardCubit extends Cubit<BoardState> {
   BoardCubit() : super(const BoardState());
@@ -211,6 +213,7 @@ class BoardCubit extends Cubit<BoardState> {
     String? sessionName,
     String workingDir = '',
     String model = 'gpt-5-mini',
+    String provider = 'copilot',
     List<String> envGroupIds = const [],
     List<Map<String, dynamic>>? messages,
   }) async {
@@ -221,11 +224,16 @@ class BoardCubit extends Cubit<BoardState> {
       preferredWidth: 420,
       preferredHeight: 500,
     );
+
+    // Resolve effective model: user's explicit arg → agent default model → catalog default → hardcoded default
+    final effectiveModel = _resolveDefaultModel(provider, model);
+
     final config = ChatSessionConfig(
       sessionName:
           sessionName ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
       workingDir: workingDir,
-      model: model,
+      model: effectiveModel,
+      provider: provider,
       envGroupIds: envGroupIds,
     );
     final panelState = <String, dynamic>{
@@ -566,6 +574,22 @@ class BoardCubit extends Cubit<BoardState> {
       name: name,
       metadata: const {'version': 1},
     );
+  }
+
+  /// Resolves the effective model for a new chat session.
+  /// Priority: explicit non-default arg → agent defaultModel setting → catalog default → hardcoded fallback.
+  String _resolveDefaultModel(String provider, String explicitModel) {
+    const hardcodedDefault = 'gpt-5-mini';
+    // If caller passed something other than the hardcoded default, use it as-is.
+    if (explicitModel != hardcodedDefault) return explicitModel;
+    // Check agent config for user-set default model.
+    final agentDefault = AgentConfigService.instance.defaultModelForAgent(provider);
+    if (agentDefault != null && agentDefault.isNotEmpty) return agentDefault;
+    // Fall back to the first isDefault model in the catalog.
+    final catalogDefault =
+        ProviderModelCatalogService.instance.defaultModelForProvider(provider);
+    if (catalogDefault != null) return catalogDefault;
+    return hardcodedDefault;
   }
 
   String _nextBoardName(String? requestedName) {

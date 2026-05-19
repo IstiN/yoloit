@@ -13,6 +13,7 @@ import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
@@ -683,11 +684,19 @@ class _AgentRowState extends State<_AgentRow> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    // Providers that have a remote model catalog.
+    final catalogModels = ProviderModelCatalogService.instance
+        .modelsForProvider(widget.config.id);
+    final hasCatalog = catalogModels != null && catalogModels.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
           // Visibility toggle
           Switch(
             value: widget.config.visible,
@@ -834,6 +843,79 @@ class _AgentRowState extends State<_AgentRow> {
             ),
           ] else
             const SizedBox(width: 36),
+        ],
+      ),
+      // Model picker for catalog-backed providers (copilot, cursor, opencode).
+      if (hasCatalog) ...[
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            const SizedBox(width: 8),
+            Text(
+              'Default model:',
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: catalogModels.any(
+                        (m) => m.id == widget.config.defaultModel)
+                    ? widget.config.defaultModel
+                    : null,
+                hint: Text(
+                  catalogModels.firstWhere(
+                    (m) => m.isDefault,
+                    orElse: () => catalogModels.first,
+                  ).displayName,
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                    fontSize: 12,
+                  ),
+                ),
+                items: catalogModels
+                    .map(
+                      (m) => DropdownMenuItem<String>(
+                        value: m.id,
+                        child: Text(
+                          m.displayName,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => widget.onChanged(
+                  widget.config.copyWith(defaultModel: v),
+                ),
+                dropdownColor: colors.surfaceElevated,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: colors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: colors.border),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 44), // align with star+delete space
+          ],
+        ),
+      ],
         ],
       ),
     );

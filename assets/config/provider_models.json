@@ -49,6 +49,7 @@
         { "id": "claude-4.5-sonnet-thinking", "displayName": "Sonnet 4.5 Thinking" },
         { "id": "claude-opus-4-7-thinking-medium", "displayName": "Opus 4.7 Thinking" },
         { "id": "claude-4.6-opus-high-thinking", "displayName": "Opus 4.6 Thinking" },
+        { "id": "composer-2.5", "displayName": "Composer 2.5" },
         { "id": "composer-2", "displayName": "Composer 2" }
       ]
     },

@@ -11,6 +11,8 @@ class AgentConfig {
   final String launchCommand;
   final bool visible;
   final bool isBuiltIn;
+  /// Default model for this provider (null = use catalog/provider default).
+  final String? defaultModel;
 
   const AgentConfig({
     required this.id,
@@ -19,6 +21,7 @@ class AgentConfig {
     required this.launchCommand,
     required this.visible,
     required this.isBuiltIn,
+    this.defaultModel,
   });
 
   AgentConfig copyWith({
@@ -26,6 +29,7 @@ class AgentConfig {
     String? iconLabel,
     String? launchCommand,
     bool? visible,
+    Object? defaultModel = _sentinel,
   }) =>
       AgentConfig(
         id: id,
@@ -34,6 +38,9 @@ class AgentConfig {
         launchCommand: launchCommand ?? this.launchCommand,
         visible: visible ?? this.visible,
         isBuiltIn: isBuiltIn,
+        defaultModel: defaultModel == _sentinel
+            ? this.defaultModel
+            : defaultModel as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -43,6 +50,7 @@ class AgentConfig {
         'launchCommand': launchCommand,
         'visible': visible,
         'isBuiltIn': isBuiltIn,
+        if (defaultModel != null) 'defaultModel': defaultModel,
       };
 
   factory AgentConfig.fromJson(Map<String, dynamic> j) => AgentConfig(
@@ -52,8 +60,11 @@ class AgentConfig {
         launchCommand: j['launchCommand'] as String? ?? '',
         visible: j['visible'] as bool? ?? true,
         isBuiltIn: j['isBuiltIn'] as bool? ?? false,
+        defaultModel: j['defaultModel'] as String?,
       );
 }
+
+const _sentinel = Object();
 
 class AgentConfigService {
   AgentConfigService._();
@@ -150,6 +161,15 @@ class AgentConfigService {
       return config.launchCommand;
     } catch (_) {
       return type.launchCommand;
+    }
+  }
+
+  /// Returns the user-configured default model for [agentId], or null if not set.
+  String? defaultModelForAgent(String agentId) {
+    try {
+      return _cached.firstWhere((c) => c.id == agentId).defaultModel;
+    } catch (_) {
+      return null;
     }
   }
 }
