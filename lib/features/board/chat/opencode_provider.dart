@@ -8,6 +8,7 @@ import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 /// [ChatProvider] implementation that wraps the OpenCode CLI.
 ///
@@ -28,7 +29,9 @@ class OpencodeProvider extends ChatProvider {
   String get displayName => 'OpenCode';
 
   @override
-  List<ChatModelInfo> get availableModels => kOpencodeModels;
+  List<ChatModelInfo> get availableModels =>
+      ProviderModelCatalogService.instance.modelsForProvider('opencode') ??
+      kOpencodeModels;
 
   @override
   bool get supportsImages => true;

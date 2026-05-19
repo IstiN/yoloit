@@ -8,14 +8,15 @@ import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
+import 'package:yoloit/features/settings/ui/provider_models_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/settings/ui/sync_section.dart';
 import 'package:yoloit/features/settings/ui/widget_permissions_section.dart';
@@ -30,6 +31,7 @@ const _kCategories = [
   'Appearance',
   'AI Agents',
   'AI Models',
+  'Provider Models',
   'Environment',
   'Notifications',
   'Sessions',
@@ -40,6 +42,8 @@ const _kCategories = [
   'Apps & Widgets',
   'About',
 ];
+
+const _kSkillsCategoryIndex = 8;
 
 /// Settings overlay shown as a modal dialog with sidebar navigation.
 class SettingsPage extends StatefulWidget {
@@ -169,7 +173,7 @@ class _SettingsPageState extends State<SettingsPage> {
           return InkWell(
             onTap: () => setState(() => _selectedCategory = index),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
               decoration: BoxDecoration(
                 border: Border(
                   left: BorderSide(
@@ -198,7 +202,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildContent() {
     // Skills panel needs full height, not scrollable wrapper
-    if (_selectedCategory == 7) {
+    if (_selectedCategory == _kSkillsCategoryIndex) {
       return const SkillsPanel();
     }
     return SingleChildScrollView(
@@ -232,31 +236,39 @@ class _SettingsPageState extends State<SettingsPage> {
             const _ChatContextSection(),
           ],
         ),
-        2 => Column(
+        2 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'AI Models'),
-            const SizedBox(height: 12),
-            const AiModelsSection(),
+            _SectionHeader(title: 'AI Models'),
+            SizedBox(height: 12),
+            AiModelsSection(),
           ],
         ),
-        3 => Column(
+        3 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Environment'),
-            const SizedBox(height: 12),
-            const GlobalEnvGroupsSection(),
+            _SectionHeader(title: 'Provider Models'),
+            SizedBox(height: 12),
+            ProviderModelsSection(),
           ],
         ),
-        4 => Column(
+        4 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Notifications'),
-            const SizedBox(height: 12),
-            const _NotificationsSection(),
+            _SectionHeader(title: 'Environment'),
+            SizedBox(height: 12),
+            GlobalEnvGroupsSection(),
           ],
         ),
-        5 => Column(
+        5 => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionHeader(title: 'Notifications'),
+            SizedBox(height: 12),
+            _NotificationsSection(),
+          ],
+        ),
+        6 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Sessions'),
@@ -264,7 +276,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _SessionSettings(),
           ],
         ),
-        6 => Column(
+        7 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Keyboard Shortcuts'),
@@ -272,21 +284,21 @@ class _SettingsPageState extends State<SettingsPage> {
             _ShortcutsTable(),
           ],
         ),
-        8 => Column(
+        9 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Sync'),
-            const SizedBox(height: 12),
-            const SyncSection(),
+            _SectionHeader(title: 'Sync'),
+            SizedBox(height: 12),
+            SyncSection(),
           ],
         ),
-        9 => const SetupGuideEmbedded(),
-        10 => Column(
+        10 => const SetupGuideEmbedded(),
+        11 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Widget API Permissions'),
-            const SizedBox(height: 12),
-            const WidgetPermissionsSection(),
+            _SectionHeader(title: 'Widget API Permissions'),
+            SizedBox(height: 12),
+            WidgetPermissionsSection(),
           ],
         ),
         _ => Column(

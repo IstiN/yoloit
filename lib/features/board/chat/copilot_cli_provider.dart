@@ -9,6 +9,7 @@ import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/sub_agent_event_watcher.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 /// [ChatProvider] implementation that wraps the GitHub Copilot CLI.
 ///
@@ -27,7 +28,9 @@ class CopilotCliProvider extends ChatProvider {
   String get displayName => 'GitHub Copilot';
 
   @override
-  List<ChatModelInfo> get availableModels => kCopilotModels;
+  List<ChatModelInfo> get availableModels =>
+      ProviderModelCatalogService.instance.modelsForProvider('copilot') ??
+      kCopilotModels;
 
   @override
   bool get supportsImages => true;

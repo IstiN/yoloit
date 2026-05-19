@@ -1,0 +1,93 @@
+{
+  "$schema": "https://raw.githubusercontent.com/IstiN/yoloit/main/assets/config/provider_models.json",
+  "version": 1,
+  "providers": [
+    {
+      "id": "copilot",
+      "displayName": "GitHub Copilot",
+      "models": [
+        { "id": "claude-sonnet-4.6", "displayName": "Claude Sonnet 4.6", "isDefault": true },
+        { "id": "claude-sonnet-4.5", "displayName": "Claude Sonnet 4.5" },
+        { "id": "claude-haiku-4.5", "displayName": "Claude Haiku 4.5" },
+        { "id": "claude-opus-4.7", "displayName": "Claude Opus 4.7" },
+        { "id": "claude-opus-4.6", "displayName": "Claude Opus 4.6" },
+        { "id": "claude-opus-4.5", "displayName": "Claude Opus 4.5" },
+        { "id": "gpt-5.5", "displayName": "GPT-5.5" },
+        { "id": "gpt-5.4", "displayName": "GPT-5.4" },
+        { "id": "gpt-5.3-codex", "displayName": "GPT-5.3-Codex" },
+        { "id": "gpt-5.2-codex", "displayName": "GPT-5.2-Codex" },
+        { "id": "gpt-5.2", "displayName": "GPT-5.2" },
+        { "id": "gpt-5.4-mini", "displayName": "GPT-5.4 mini" },
+        { "id": "gpt-5-mini", "displayName": "GPT-5 mini" },
+        { "id": "gpt-4.1", "displayName": "GPT-4.1" }
+      ]
+    },
+    {
+      "id": "cursor",
+      "displayName": "Cursor",
+      "models": [
+        { "id": "gpt-5.4-nano-medium", "displayName": "GPT-5.4 Nano", "isDefault": true },
+        { "id": "gpt-5.4-mini-medium", "displayName": "GPT-5.4 Mini" },
+        { "id": "gpt-5-mini", "displayName": "GPT-5 Mini" },
+        { "id": "gemini-3-flash", "displayName": "Gemini 3 Flash" },
+        { "id": "gpt-5.4-medium", "displayName": "GPT-5.4" },
+        { "id": "gpt-5.2", "displayName": "GPT-5.2" },
+        { "id": "gpt-5.1", "displayName": "GPT-5.1" },
+        { "id": "claude-4.6-sonnet-medium", "displayName": "Sonnet 4.6" },
+        { "id": "claude-4.5-sonnet", "displayName": "Sonnet 4.5" },
+        { "id": "claude-4-sonnet", "displayName": "Sonnet 4" },
+        { "id": "kimi-k2.5", "displayName": "Kimi K2.5" },
+        { "id": "gemini-3.1-pro", "displayName": "Gemini 3.1 Pro" },
+        { "id": "gpt-5.3-codex", "displayName": "Codex 5.3" },
+        { "id": "gpt-5.2-codex", "displayName": "Codex 5.2" },
+        { "id": "gpt-5.5-medium", "displayName": "GPT-5.5" },
+        { "id": "grok-4.3", "displayName": "Grok 4.3" },
+        { "id": "claude-opus-4-7-medium", "displayName": "Opus 4.7" },
+        { "id": "claude-4.6-opus-high", "displayName": "Opus 4.6" },
+        { "id": "claude-4.5-opus-high", "displayName": "Opus 4.5" },
+        { "id": "claude-4.6-sonnet-medium-thinking", "displayName": "Sonnet 4.6 Thinking" },
+        { "id": "claude-4.5-sonnet-thinking", "displayName": "Sonnet 4.5 Thinking" },
+        { "id": "claude-opus-4-7-thinking-medium", "displayName": "Opus 4.7 Thinking" },
+        { "id": "claude-4.6-opus-high-thinking", "displayName": "Opus 4.6 Thinking" },
+        { "id": "composer-2", "displayName": "Composer 2" }
+      ]
+    },
+    {
+      "id": "opencode",
+      "displayName": "OpenCode",
+      "models": [
+        { "id": "opencode/qwen3.6-plus-free", "displayName": "Qwen 3.6 Plus (Free)", "isDefault": true },
+        { "id": "opencode/big-pickle", "displayName": "Big Pickle (Free)" },
+        { "id": "opencode/deepseek-v4-flash-free", "displayName": "DeepSeek V4 Flash (Free)" },
+        { "id": "opencode/nemotron-3-super-free", "displayName": "Nemotron 3 Super (Free)" },
+        { "id": "opencode/minimax-m2.5-free", "displayName": "MiniMax M2.5 (Free)" },
+        { "id": "anthropic/claude-sonnet-4-5", "displayName": "Claude Sonnet 4.5" },
+        { "id": "anthropic/claude-opus-4-7", "displayName": "Claude Opus 4.7" },
+        { "id": "anthropic/claude-haiku-4-5", "displayName": "Claude Haiku 4.5" },
+        { "id": "anthropic/claude-sonnet-4", "displayName": "Claude Sonnet 4" },
+        { "id": "anthropic/claude-opus-4-5", "displayName": "Claude Opus 4.5" },
+        { "id": "openai/gpt-4o", "displayName": "GPT-4o" },
+        { "id": "openai/gpt-4.1", "displayName": "GPT-4.1" },
+        { "id": "openai/gpt-4o-mini", "displayName": "GPT-4o Mini" },
+        { "id": "openai/o3-mini", "displayName": "O3 Mini" },
+        { "id": "openai/o4-mini", "displayName": "O4 Mini" },
+        { "id": "google/gemini-2.5-pro", "displayName": "Gemini 2.5 Pro" },
+        { "id": "google/gemini-2.5-flash", "displayName": "Gemini 2.5 Flash" },
+        { "id": "xai/grok-4", "displayName": "Grok 4" },
+        { "id": "xai/grok-code-fast-1", "displayName": "Grok Code Fast" },
+        { "id": "openrouter/deepseek/deepseek-chat-v3-0324:free", "displayName": "OR DeepSeek V3 (Free)" },
+        { "id": "openrouter/deepseek/deepseek-r1:free", "displayName": "OR DeepSeek R1 (Free)" },
+        { "id": "openrouter/nvidia/llama-3.1-nemotron-ultra-253b-v1:free", "displayName": "OR Nemotron Ultra (Free)" },
+        { "id": "openrouter/meta-llama/llama-4-maverick:free", "displayName": "OR Llama 4 Maverick (Free)" },
+        { "id": "openrouter/google/gemma-3-27b-it:free", "displayName": "OR Gemma 3 27B (Free)" },
+        { "id": "openrouter/moonshotai/kimi-k2-instruct-0905:free", "displayName": "OR Kimi K2 (Free)" },
+        { "id": "openrouter/qwen/qwen-plus", "displayName": "OR Qwen Plus" },
+        { "id": "openrouter/qwen/qwen-2.5-72b-instruct", "displayName": "OR Qwen 2.5 72B" },
+        { "id": "openrouter/meta-llama/llama-3.3-70b-instruct", "displayName": "OR Llama 3.3 70B" },
+        { "id": "openrouter/deepseek/deepseek-r1-distill-qwen-32b:free", "displayName": "OR DeepSeek R1 Distill (Free)" },
+        { "id": "openrouter/mistralai/mistral-small-3.1-24b-instruct:free", "displayName": "OR Mistral Small 3.1 (Free)" },
+        { "id": "openrouter/microsoft/phi-4-multimodal-instruct", "displayName": "OR Phi-4 Multimodal" }
+      ]
+    }
+  ]
+}

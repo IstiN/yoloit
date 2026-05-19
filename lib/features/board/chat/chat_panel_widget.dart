@@ -2528,21 +2528,22 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           ),
                         ),
                       ),
-                      Text(
-                        '${m.costMultiplier}x',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color:
-                              m.costMultiplier == 0
-                                  ? const Color(0xFF34D399)
-                                  : m.costMultiplier > 3
-                                  ? const Color(0xFFF87171)
-                                  : Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall?.color ??
-                                      Theme.of(context).colorScheme.onSurface,
+                      if (m.costMultiplier != null)
+                        Text(
+                          '${m.costMultiplier}x',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color:
+                                m.costMultiplier == 0
+                                    ? const Color(0xFF34D399)
+                                    : m.costMultiplier! > 3
+                                    ? const Color(0xFFF87171)
+                                    : Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall?.color ??
+                                        Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -2813,18 +2814,19 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           ),
                         ),
                       ),
-                      Text(
-                        '${m.costMultiplier}x',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: m.costMultiplier == 0
-                              ? const Color(0xFF34D399)
-                              : m.costMultiplier > 3
-                              ? const Color(0xFFF87171)
-                              : Theme.of(context).textTheme.bodySmall?.color ??
-                                  Theme.of(context).colorScheme.onSurface,
+                      if (m.costMultiplier != null)
+                        Text(
+                          '${m.costMultiplier}x',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: m.costMultiplier == 0
+                                ? const Color(0xFF34D399)
+                                : m.costMultiplier! > 3
+                                ? const Color(0xFFF87171)
+                                : Theme.of(context).textTheme.bodySmall?.color ??
+                                    Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -3366,20 +3368,21 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                             child: Row(
                               children: [
                                 Expanded(child: Text(m.displayName)),
-                                Text(
-                                  '${m.costMultiplier}x',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color:
-                                        m.costMultiplier == 0
-                                            ? const Color(0xFF34D399)
-                                            : m.costMultiplier > 3
-                                            ? const Color(0xFFF87171)
-                                            : Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withOpacity(0.6),
-                                  ),
+                                if (m.costMultiplier != null)
+                                  Text(
+                                    '${m.costMultiplier}x',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color:
+                                          m.costMultiplier == 0
+                                              ? const Color(0xFF34D399)
+                                              : m.costMultiplier! > 3
+                                              ? const Color(0xFFF87171)
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.6),
+                                    ),
                                 ),
                               ],
                             ),

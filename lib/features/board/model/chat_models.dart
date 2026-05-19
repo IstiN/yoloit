@@ -626,14 +626,32 @@ class ChatModelInfo {
   const ChatModelInfo({
     required this.id,
     required this.displayName,
-    this.costMultiplier = 1.0,
+    this.costMultiplier,
     this.isDefault = false,
   });
 
   final String id;
   final String displayName;
-  final double costMultiplier;
+  /// Optional relative cost hint. May be absent when loaded from remote catalog.
+  final double? costMultiplier;
   final bool isDefault;
+
+  factory ChatModelInfo.fromJson(Map<String, dynamic> j) => ChatModelInfo(
+        id: j['id'] as String,
+        displayName: j['displayName'] as String,
+        costMultiplier: (j['costMultiplier'] as num?)?.toDouble(),
+        isDefault: j['isDefault'] as bool? ?? false,
+      );
+
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{
+      'id': id,
+      'displayName': displayName,
+      'isDefault': isDefault,
+    };
+    if (costMultiplier != null) m['costMultiplier'] = costMultiplier;
+    return m;
+  }
 }
 
 /// Copilot CLI available models.

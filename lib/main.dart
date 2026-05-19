@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform, File, exit;
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +62,7 @@ void main(List<String> args) async {
   await ThemeManager.instance.load();
   await HotkeyRegistry.instance.load();
   await AppConfig.instance.load();
+  unawaited(ProviderModelCatalogService.instance.load());
 
   await windowManager.ensureInitialized();
   const options = WindowOptions(

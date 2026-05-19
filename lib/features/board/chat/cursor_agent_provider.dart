@@ -8,6 +8,7 @@ import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 /// [ChatProvider] implementation that wraps the Cursor Agent CLI.
 ///
@@ -32,7 +33,9 @@ class CursorAgentProvider extends ChatProvider {
   String get displayName => 'Cursor Agent';
 
   @override
-  List<ChatModelInfo> get availableModels => kCursorModels;
+  List<ChatModelInfo> get availableModels =>
+      ProviderModelCatalogService.instance.modelsForProvider('cursor') ??
+      kCursorModels;
 
   @override
   bool get supportsImages => true;
