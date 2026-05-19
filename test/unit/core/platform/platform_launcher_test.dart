@@ -44,6 +44,12 @@ void main() {
       final activateArgs = fakeRunner.calls[1].arguments;
       expect(activateArgs.join(' '), contains('activate'));
     });
+
+    test('openTerminal embeds workdir in script', () async {
+      await launcher.openTerminal('/my/project');
+      final scriptArgs = fakeRunner.calls[0].arguments.join(' ');
+      expect(scriptArgs, contains('/my/project'));
+    });
   });
 
   group('LinuxPlatformLauncher', () {
@@ -78,6 +84,67 @@ void main() {
       expect(fakeRunner.calls[0].arguments, ['gnome-terminal']);
       expect(fakeRunner.calls[1].executable, 'gnome-terminal');
     });
+
+    test('openTerminal passes workdir in gnome-terminal argument', () async {
+      await launcher.openTerminal('/my/project');
+      expect(
+        fakeRunner.calls[1].arguments.first,
+        '--working-directory=/my/project',
+      );
+    });
+
+    test('openTerminal falls back to xterm', () async {
+      fakeRunner.reset();
+      fakeRunner.mockResultFor('which', ['gnome-terminal'], exitCode: 1);
+      fakeRunner.mockResultFor(
+        'which',
+        ['xterm'],
+        exitCode: 0,
+        stdout: '/usr/bin/xterm',
+      );
+      launcher = LinuxPlatformLauncher(processRunner: fakeRunner.run);
+
+      await launcher.openTerminal('/my/project');
+
+      expect(fakeRunner.calls[2].executable, 'xterm');
+      expect(
+        fakeRunner.calls[2].arguments.first,
+        '--working-directory=/my/project',
+      );
+    });
+
+    test('openTerminal falls back to konsole', () async {
+      fakeRunner.reset();
+      fakeRunner.mockResultFor('which', ['gnome-terminal'], exitCode: 1);
+      fakeRunner.mockResultFor('which', ['xterm'], exitCode: 1);
+      fakeRunner.mockResultFor(
+        'which',
+        ['konsole'],
+        exitCode: 0,
+        stdout: '/usr/bin/konsole',
+      );
+      launcher = LinuxPlatformLauncher(processRunner: fakeRunner.run);
+
+      await launcher.openTerminal('/my/project');
+
+      expect(fakeRunner.calls[3].executable, 'konsole');
+      expect(
+        fakeRunner.calls[3].arguments.first,
+        '--working-directory=/my/project',
+      );
+    });
+
+    test('openTerminal completes when no terminal is found', () async {
+      fakeRunner.reset();
+      fakeRunner.mockResult('which', exitCode: 1);
+      launcher = LinuxPlatformLauncher(processRunner: fakeRunner.run);
+
+      await expectLater(
+        launcher.openTerminal('/my/project'),
+        completes,
+      );
+      expect(fakeRunner.calls.where((c) => c.executable == 'which').length, 3);
+    });
   });
 
   group('WindowsPlatformLauncher', () {
@@ -89,27 +156,29 @@ void main() {
       launcher = WindowsPlatformLauncher(processRunner: fakeRunner.run);
     });
 
-    test('openUrl calls cmd /c start with url', () async {
+    test('openUrl calls cmd /c start with exact argv', () async {
       await launcher.openUrl('https://example.com');
       final call = fakeRunner.lastCall!;
       expect(call.executable, 'cmd');
-      expect(call.arguments, containsAll(['/c', 'start']));
-      expect(call.arguments, contains('https://example.com'));
+      expect(call.arguments, ['/c', 'start', '', 'https://example.com']);
     });
 
     test('revealInFinder calls explorer /select, with path', () async {
       await launcher.revealInFinder(r'C:\Users\test\file.txt');
       final call = fakeRunner.lastCall!;
       expect(call.executable, 'explorer');
-      expect(call.arguments, contains('/select,'));
+      expect(call.arguments, ['/select,', r'C:\Users\test\file.txt']);
     });
 
     test('openTerminal uses wt.exe when available', () async {
       // FakeProcessRunner returns exitCode 0 by default, so where wt.exe succeeds.
       await launcher.openTerminal(r'C:\my\project');
-      final call = fakeRunner.lastCall!;
-      expect(call.executable, 'wt.exe');
-      expect(call.arguments, contains('-d'));
+      expect(fakeRunner.calls.length, 2);
+      expect(fakeRunner.calls[0].executable, 'where');
+      expect(fakeRunner.calls[0].arguments, ['wt.exe']);
+      expect(fakeRunner.calls[0].runInShell, isTrue);
+      expect(fakeRunner.calls[1].executable, 'wt.exe');
+      expect(fakeRunner.calls[1].arguments, ['-d', r'C:\my\project']);
     });
 
     test('openTerminal falls back to cmd when wt.exe is not found', () async {
@@ -117,7 +186,19 @@ void main() {
       await launcher.openTerminal(r'C:\my\project');
       final call = fakeRunner.lastCall!;
       expect(call.executable, 'cmd');
+      expect(
+        call.arguments,
+        ['/c', 'start', 'cmd.exe', '/K', 'cd /d "C:\\my\\project"'],
+      );
+    });
+
+    test('openTerminal falls back to cmd when where throws', () async {
+      fakeRunner.mockThrow('where');
+      await launcher.openTerminal(r'C:\my\project');
+      final call = fakeRunner.lastCall!;
+      expect(call.executable, 'cmd');
       expect(call.arguments, contains('/K'));
+      expect(call.arguments.join(' '), contains(r'C:\my\project'));
     });
   });
 

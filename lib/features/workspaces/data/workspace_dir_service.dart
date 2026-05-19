@@ -39,18 +39,20 @@ class WorkspaceDirService {
     }
 
     // Remove stale symlinks (links whose target is no longer in paths).
-    final existing = await dir.list().toList();
+    final existing = await dir.list(followLinks: false).toList();
     for (final entity in existing) {
-      if (entity is Link) {
-        final target = await entity.target();
-        final isDesired = desired.values.any((d) => p.equals(d, target) || d == target);
-        if (!isDesired) await entity.delete();
-      }
+      final type = await FileSystemEntity.type(entity.path, followLinks: false);
+      if (type != FileSystemEntityType.link) continue;
+      final target = await Link(entity.path).target();
+      final isDesired =
+          desired.values.any((d) => p.equals(d, target) || d == target);
+      if (!isDesired) await Link(entity.path).delete();
     }
 
     // Create missing symlinks.
     for (final entry in desired.entries) {
-      final link = Link(p.join(workspace.workspaceDir, entry.key));
+      final linkPath = p.join(workspace.workspaceDir, entry.key);
+      final link = Link(linkPath);
       if (!await link.exists()) {
         await link.create(entry.value);
       }
