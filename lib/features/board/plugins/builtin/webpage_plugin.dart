@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -5,6 +7,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/services/webview_zoom_service.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
 
 class WebpagePlugin extends BoardPanelPlugin {
   const WebpagePlugin();
@@ -116,7 +119,7 @@ class _WebpageContentState extends State<_WebpageContent> {
 
   @override
   void dispose() {
-    WebpagePlugin.controllers.remove(widget.panel.id);
+    WebViewManager.instance.detach(widget.panel.id);
     WebpagePlugin.pendingCssZoom.remove(widget.panel.id);
     WebpagePlugin.viewportTargets.remove(widget.panel.id);
     WebpagePlugin.pageLoading.remove(widget.panel.id)?.dispose();
@@ -131,22 +134,51 @@ class _WebpageContentState extends State<_WebpageContent> {
       panelId,
       () => ValueNotifier<bool>(false),
     );
+    final existing = WebViewManager.instance.controller(panelId);
 
-    _controller =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageStarted: (_) {
-                loading.value = true;
-              },
-              onPageFinished: (_) {
-                // Re-inject CSS zoom so page reflows at panel's logical width.
-                // zoom = boardScale → CSS layout width = panel.logicalWidth.
-                // This makes sites like YouTube use desktop layout widths in CSS,
-                // even when the WKWebView NSView frame is smaller due to board zoom.
-                final panelId = widget.panel.id;
-                _controller!.runJavaScript('''
+    if (existing != null) {
+      _controller = existing;
+      WebViewManager.instance.register(panelId, existing);
+      _configureController(existing, loading);
+      WebpagePlugin.controllers[panelId] = existing;
+      _syncControllerState(existing);
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final controller = WebViewController();
+    _controller = controller;
+    WebViewManager.instance.register(panelId, controller);
+    _configureController(controller, loading);
+    controller.loadRequest(Uri.parse(url));
+
+    // Expose controller so the board view can render the WebView
+    // outside the InteractiveViewer transform.
+    WebpagePlugin.controllers[panelId] = controller;
+    if (mounted) setState(() {});
+  }
+
+  void _configureController(
+    WebViewController controller,
+    ValueNotifier<bool> loading,
+  ) {
+    controller
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            final activeLoading = WebpagePlugin.pageLoading[widget.panel.id];
+            if (activeLoading == loading) {
+              activeLoading?.value = true;
+            }
+          },
+          onPageFinished: (_) {
+            // Re-inject CSS zoom so page reflows at panel's logical width.
+            // zoom = boardScale → CSS layout width = panel.logicalWidth.
+            // This makes sites like YouTube use desktop layout widths in CSS,
+            // even when the WKWebView NSView frame is smaller due to board zoom.
+            final panelId = widget.panel.id;
+            controller.runJavaScript('''
 (function(){
   window.dispatchEvent(new Event('resize'));
   if(window.__yoloNewTabSetup) return;
@@ -161,51 +193,72 @@ class _WebpageContentState extends State<_WebpageContent> {
   },true);
 })();
 ''');
-                // Apply the native viewport-width fix: sets WKWebView pageZoom so
-                // window.innerWidth = targetViewportWidth. Uses per-panel target
-                // (set by mode switch) or defaults to 1280 (desktop).
-                final target = WebpagePlugin.viewportTargets[panelId] ?? 1280.0;
-                WebViewZoomService.setFixedViewportWidth(target);
-                Future.delayed(const Duration(milliseconds: 150), () {
-                  loading.value = false;
-                });
-              },
-              onUrlChange: (change) {
-                final newUrl = change.url ?? '';
-                if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {
-                  if (mounted) setState(() => _urlCtrl.text = newUrl);
-                  widget.renderContext.onUpdateState({
-                    ...widget.panel.state,
-                    'url': newUrl,
-                    'title': _hostname(newUrl),
-                  });
-                }
-              },
-            ),
-          )
-          ..loadRequest(Uri.parse(url));
+            final target = WebpagePlugin.viewportTargets[panelId] ?? 1280.0;
+            WebViewZoomService.setFixedViewportWidth(target);
+            Future.delayed(const Duration(milliseconds: 150), () {
+              final activeLoading = WebpagePlugin.pageLoading[panelId];
+              if (activeLoading == loading) {
+                activeLoading?.value = false;
+              }
+            });
+          },
+          onUrlChange: (change) {
+            if (!mounted) return;
+            final newUrl = change.url ?? '';
+            if (newUrl.isNotEmpty && newUrl != _urlCtrl.text) {
+              setState(() => _urlCtrl.text = newUrl);
+              widget.renderContext.onUpdateState({
+                ...widget.panel.state,
+                'url': newUrl,
+                'title': _hostname(newUrl),
+              });
+            }
+          },
+        ),
+      );
 
-    // Intercept target="_blank" links → create new panel with link.
-    _controller!.addJavaScriptChannel(
-      'YoloNewTab',
-      onMessageReceived: (message) {
-        final tabUrl = message.message;
-        if (tabUrl.isEmpty) return;
-        final createLinked = widget.renderContext.onCreateLinkedPanel;
-        if (createLinked != null) {
-          createLinked(WebpagePlugin.kTypeId, {
-            'url': tabUrl,
-            'title': _hostname(tabUrl),
-            'favicon': '',
-          }, _hostname(tabUrl));
+    unawaited(() async {
+      try {
+        await controller.removeJavaScriptChannel('YoloNewTab');
+      } catch (_) {}
+      await controller.addJavaScriptChannel(
+        'YoloNewTab',
+        onMessageReceived: (message) {
+          final tabUrl = message.message;
+          if (tabUrl.isEmpty) return;
+          final createLinked = widget.renderContext.onCreateLinkedPanel;
+          if (createLinked != null) {
+            createLinked(WebpagePlugin.kTypeId, {
+              'url': tabUrl,
+              'title': _hostname(tabUrl),
+              'favicon': '',
+            }, _hostname(tabUrl));
+          }
+        },
+      );
+    }());
+  }
+
+  void _syncControllerState(WebViewController controller) {
+    unawaited(() async {
+      try {
+        final liveUrl = await controller.currentUrl();
+        if (!mounted || liveUrl == null || liveUrl.isEmpty) return;
+        final liveTitle = await controller.getTitle();
+        if (!mounted) return;
+        if (_urlCtrl.text != liveUrl) {
+          setState(() => _urlCtrl.text = liveUrl);
         }
-      },
-    );
-
-    // Expose controller so the board view can render the WebView
-    // outside the InteractiveViewer transform.
-    WebpagePlugin.controllers[widget.panel.id] = _controller!;
-    if (mounted) setState(() {});
+        widget.renderContext.onUpdateState({
+          ...widget.panel.state,
+          'url': liveUrl,
+          'title':
+              liveTitle != null && liveTitle.trim().isNotEmpty
+                  ? liveTitle
+                  : _hostname(liveUrl),
+        });
+      } catch (_) {}
+    }());
   }
 
   String get _currentUrl => widget.panel.state['url'] as String? ?? '';
@@ -530,8 +583,11 @@ class _WebpageContentState extends State<_WebpageContent> {
                     }
                     // Update native WKWebView pageZoom so viewport = targetViewportWidth.
                     // Also persist per-panel so page reloads restore the same target.
-                    WebpagePlugin.viewportTargets[widget.panel.id] = targetViewportWidth;
-                    WebViewZoomService.setFixedViewportWidth(targetViewportWidth);
+                    WebpagePlugin.viewportTargets[widget.panel.id] =
+                        targetViewportWidth;
+                    WebViewZoomService.setFixedViewportWidth(
+                      targetViewportWidth,
+                    );
                     final ctrl = _controller;
                     if (ctrl != null) {
                       Future.delayed(const Duration(milliseconds: 300), () {
@@ -1023,8 +1079,12 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       final sb = StringBuffer('(function(){\n');
       // Always override window.innerWidth to the fixed viewport target.
       sb.writeln("  var iw = 1280;");
-      sb.writeln("  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
-      sb.writeln("  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}");
+      sb.writeln(
+        "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+      );
+      sb.writeln(
+        "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
+      );
       if (useInner && innerWidth.isNotEmpty && innerWidth != '1280') {
         sb.writeln("  iw = $innerWidth;");
       }
