@@ -546,4 +546,86 @@ void main() {
       expect(opencodeSession.opencodeSessionId, 'oc-live-1');
     });
   });
+
+  group('syncFromWidget', () {
+    test('overwrites session state with widget state', () {
+      SharedPreferences.setMockInitialValues({});
+      final manager = ChatSessionManager.testInstance(
+        providerFactory: (_) => FakeChatProvider(),
+      );
+      final session = manager.getOrCreate(
+        'sync-panel',
+        const ChatSessionConfig(sessionName: 'sess', workingDir: '/tmp'),
+      );
+
+      // Session starts empty
+      expect(session.messages, isEmpty);
+      expect(session.isFirstMessage, isTrue);
+
+      // Sync widget state into session
+      final msgs = [
+        ChatMessage(
+          id: 'u1',
+          role: ChatRole.user,
+          content: 'hi',
+          timestamp: DateTime(2026),
+        ),
+        ChatMessage(
+          id: 'a1',
+          role: ChatRole.assistant,
+          content: 'hello',
+          timestamp: DateTime(2026),
+        ),
+      ];
+      session.syncFromWidget(
+        messages: msgs,
+        isFirstMessage: false,
+        totalOutputTokens: 42,
+        opencodeSessionId: 'oc-123',
+      );
+
+      expect(session.messages.length, 2);
+      expect(session.messages[0].content, 'hi');
+      expect(session.messages[1].content, 'hello');
+      expect(session.isFirstMessage, isFalse);
+      expect(session.totalOutputTokens, 42);
+      expect(session.opencodeSessionId, 'oc-123');
+    });
+
+    test('session survives detach and returns synced state on re-mount', () {
+      SharedPreferences.setMockInitialValues({});
+      final manager = ChatSessionManager.testInstance(
+        providerFactory: (_) => FakeChatProvider(),
+      );
+      final config =
+          const ChatSessionConfig(sessionName: 's', workingDir: '/d');
+      final session = manager.getOrCreate('panel-A', config);
+
+      // Simulate widget lifecycle: send messages, then dispose
+      final msgs = [
+        ChatMessage(
+          id: 'u1',
+          role: ChatRole.user,
+          content: 'question',
+          timestamp: DateTime(2026),
+        ),
+        ChatMessage(
+          id: 'a1',
+          role: ChatRole.assistant,
+          content: 'answer',
+          timestamp: DateTime(2026),
+        ),
+      ];
+      session.syncFromWidget(messages: msgs, isFirstMessage: false);
+      manager.detach('panel-A');
+
+      // Re-mount: getOrCreate returns the same session with messages
+      final same = manager.getOrCreate('panel-A', config);
+      expect(identical(same, session), isTrue);
+      expect(same.messages.length, 2);
+      expect(same.messages[0].content, 'question');
+      expect(same.messages[1].content, 'answer');
+      expect(same.isFirstMessage, isFalse);
+    });
+  });
 }

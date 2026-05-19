@@ -139,9 +139,48 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _config,
     );
     _provider = _session!.provider;
+
+    // Sync messages between session and widget.
+    // If the session already has messages (from a previous mount or CLI), use
+    // those — they are the source of truth.  Otherwise, push messages loaded
+    // from board state (by _initConfig) into the session so it tracks them.
+    if (_session!.messages.isNotEmpty) {
+      _messages.clear();
+      _messages.addAll(_session!.messages);
+      _isFirstMessage = _session!.isFirstMessage;
+      _isProcessing = _session!.isProcessing;
+      _streamingContent = _session!.streamingContent;
+      _streamingMessageId = _session!.streamingMessageId;
+      _totalOutputTokens = _session!.totalOutputTokens;
+      _lastUsage = _session!.lastUsage;
+      if (_session!.opencodeSessionId != null) {
+        _opencodeSessionId = _session!.opencodeSessionId;
+      }
+    } else if (_messages.isNotEmpty) {
+      // First mount with persisted board state — feed into session.
+      final savedMessages = widget.panel.state['messages'];
+      if (savedMessages is List) {
+        _session!.restoreMessages(
+          savedMessages.whereType<Map>().map(
+            (m) => Map<String, dynamic>.from(m),
+          ).toList(),
+        );
+      }
+      final savedUsage = widget.panel.state['lastUsage'];
+      if (savedUsage is Map) {
+        _session!.restoreLastUsage(Map<String, dynamic>.from(savedUsage));
+      }
+    }
+
     // Restore sessionID for opencode
-    if (_config.provider == 'opencode' && _opencodeSessionId != null) {
-      _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
+    if (_config.provider == 'opencode') {
+      if (_session!.opencodeSessionId != null) {
+        _opencodeSessionId = _session!.opencodeSessionId;
+      }
+      if (_opencodeSessionId != null) {
+        _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
+        _session!.restoreOpencodeSessionId(_opencodeSessionId);
+      }
     }
     _glowCtrl = AnimationController(
       vsync: this,
@@ -320,6 +359,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
     // Persist current messages to board state before detaching
     _persistMessages();
+    // Sync widget state into session so it survives the widget lifecycle.
+    _session?.syncFromWidget(
+      messages: _messages,
+      isFirstMessage: _isFirstMessage,
+      isProcessing: _isProcessing,
+      streamingContent: _streamingContent,
+      streamingMessageId: _streamingMessageId,
+      totalOutputTokens: _totalOutputTokens,
+      lastUsage: _lastUsage,
+      opencodeSessionId: _opencodeSessionId,
+    );
     // Detach from session — provider and in-flight processes stay alive.
     // The session continues accumulating events in the ChatSessionManager.
     ChatSessionManager.instance.detach(widget.panel.id);

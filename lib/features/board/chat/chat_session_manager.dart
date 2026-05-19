@@ -107,6 +107,34 @@ class ChatSession extends ChangeNotifier {
     }
   }
 
+  /// Sync the widget's current messages/state into this session.
+  ///
+  /// Called by the widget before detaching so the session holds the latest
+  /// state.  When the widget re-mounts it reads from [messages] / getters.
+  void syncFromWidget({
+    required List<ChatMessage> messages,
+    bool isFirstMessage = true,
+    bool isProcessing = false,
+    String streamingContent = '',
+    String? streamingMessageId,
+    int totalOutputTokens = 0,
+    ChatTokenUsage? lastUsage,
+    String? opencodeSessionId,
+  }) {
+    _messages
+      ..clear()
+      ..addAll(messages);
+    _isFirstMessage = isFirstMessage;
+    _isProcessing = isProcessing;
+    _streamingContent = streamingContent;
+    _streamingMessageId = streamingMessageId;
+    _totalOutputTokens = totalOutputTokens;
+    _lastUsage = lastUsage;
+    if (opencodeSessionId != null) {
+      _opencodeSessionId = opencodeSessionId;
+    }
+  }
+
   void clearMessages() {
     _messages.clear();
     _totalOutputTokens = 0;
