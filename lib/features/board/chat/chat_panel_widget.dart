@@ -13,6 +13,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
+import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
@@ -91,6 +92,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   late ChatProvider _provider;
   late ChatSessionConfig _config;
+  ChatSession? _session;
 
   final List<ChatMessage> _messages = [];
   final Map<String, ChatToolCall> _activeToolCalls = {};
@@ -131,7 +133,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ToolCallSettingsService.instance.ignoredToolsListenable.addListener(
       _handleIgnoredToolsChanged,
     );
-    _provider = _providerForId(_config.provider);
+    // Get or create session from manager — provider survives widget lifecycle.
+    _session = ChatSessionManager.instance.getOrCreate(
+      widget.panel.id,
+      _config,
+    );
+    _provider = _session!.provider;
     // Restore sessionID for opencode
     if (_config.provider == 'opencode' && _opencodeSessionId != null) {
       _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
@@ -169,8 +176,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (nextConfig != previousConfig && nextConfig != _config) {
         setState(() {
           if (nextConfig.provider != _config.provider) {
-            _provider.dispose();
-            _provider = _providerForId(nextConfig.provider);
+            // Update session config — it will recreate the provider internally
+            _session?.updateConfig(nextConfig);
+            _provider = _session!.provider;
             // Restore sessionID for new provider
             if (nextConfig.provider == 'opencode' &&
                 _opencodeSessionId != null) {
@@ -179,6 +187,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 _opencodeSessionId!,
               );
             }
+          } else {
+            _session?.updateConfig(nextConfig);
           }
           _config = nextConfig;
         });
@@ -308,11 +318,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         });
       }
     }
-    // Use detach() instead of dispose() so that any in-flight CLI process
-    // (copilot / opencode / cursor) is NOT killed when the user switches
-    // boards.  The OS process runs to completion and persists its session
-    // state; the next message will resume it correctly.
-    _provider.detach();
+    // Persist current messages to board state before detaching
+    _persistMessages();
+    // Detach from session — provider and in-flight processes stay alive.
+    // The session continues accumulating events in the ChatSessionManager.
+    ChatSessionManager.instance.detach(widget.panel.id);
+    _session = null;
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
