@@ -29,8 +29,8 @@ class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
     _runChecks();
   }
 
-  Future<void> _runChecks() async {
-    setState(() => _loading = true);
+  Future<void> _runChecks({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     final result = await SetupCheckService.check();
     if (mounted) setState(() { _result = result; _loading = false; });
   }
@@ -41,7 +41,7 @@ class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Body(result: _result!, onRecheck: _runChecks),
+        _Body(result: _result!, onRecheck: _runChecks, onInstalled: () => _runChecks(silent: true)),
         Padding(
           padding: const EdgeInsets.only(top: 8),
           child: Row(
@@ -113,8 +113,8 @@ class _SetupGuidePageState extends State<SetupGuidePage> {
     _runChecks();
   }
 
-  Future<void> _runChecks() async {
-    setState(() => _loading = true);
+  Future<void> _runChecks({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     final result = await SetupCheckService.check();
     if (mounted) setState(() { _result = result; _loading = false; });
   }
@@ -135,7 +135,7 @@ class _SetupGuidePageState extends State<SetupGuidePage> {
             Expanded(
               child: _loading
                   ? const Center(child: _LoadingView())
-                  : _Body(result: _result!, onRecheck: _runChecks),
+                  : _Body(result: _result!, onRecheck: _runChecks, onInstalled: () => _runChecks(silent: true)),
             ),
             const Divider(height: 1),
             _Footer(
@@ -222,9 +222,10 @@ class _LoadingView extends StatelessWidget {
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 class _Body extends StatelessWidget {
-  const _Body({required this.result, required this.onRecheck});
+  const _Body({required this.result, required this.onRecheck, required this.onInstalled});
   final SetupCheckResult result;
   final VoidCallback onRecheck;
+  final VoidCallback onInstalled;
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +251,7 @@ class _Body extends StatelessWidget {
             subtitle: 'Required for core functionality',
           ),
           const SizedBox(height: 10),
-          ...result.deps.map((dep) => _DependencyCard(dep: dep, onInstalled: onRecheck)),
+          ...result.deps.map((dep) => _DependencyCard(dep: dep, onInstalled: onInstalled)),
           const SizedBox(height: 28),
 
           _SectionTitle(
@@ -262,7 +263,7 @@ class _Body extends StatelessWidget {
             subtitleColor: result.anyAgentAvailable ? null : AppColors.neonOrange,
           ),
           const SizedBox(height: 10),
-          ...result.agents.map((agent) => _DependencyCard(dep: agent, onInstalled: onRecheck)),
+          ...result.agents.map((agent) => _DependencyCard(dep: agent, onInstalled: onInstalled)),
         ],
       ),
     );
