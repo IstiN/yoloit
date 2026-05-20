@@ -28,6 +28,7 @@ import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
+import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
 import 'package:yoloit/ui/widgets/ui_components.dart';
 
@@ -3198,6 +3199,24 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   late String _selectedProvider;
   late String _selectedModel;
   late List<String> _selectedEnvGroupIds;
+  bool? _providerInstalled; // null = checking, true = ok, false = missing
+
+  static const _providerCommand = {
+    'copilot': 'copilot',
+    'cursor': 'cursor',
+    'opencode': 'opencode',
+    'local': null, // no CLI needed
+  };
+
+  static String _providerLabel(String id) {
+    return switch (id) {
+      'copilot' => 'GitHub Copilot',
+      'cursor' => 'Cursor Agent',
+      'opencode' => 'OpenCode',
+      'local' => 'Local LLM',
+      _ => id,
+    };
+  }
 
   static const _providers = [
     ('copilot', 'GitHub Copilot'),
@@ -3221,6 +3240,22 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     _selectedProvider = widget.config.provider;
     _selectedModel = widget.config.model;
     _selectedEnvGroupIds = List<String>.from(widget.config.envGroupIds);
+    _checkProviderInstalled(_selectedProvider);
+  }
+
+  Future<void> _checkProviderInstalled(String provider) async {
+    final cmd = _providerCommand[provider];
+    if (cmd == null) {
+      if (mounted) setState(() => _providerInstalled = true);
+      return;
+    }
+    setState(() => _providerInstalled = null);
+    try {
+      final result = await Process.run('which', [cmd]);
+      if (mounted) setState(() => _providerInstalled = result.exitCode == 0);
+    } catch (_) {
+      if (mounted) setState(() => _providerInstalled = false);
+    }
   }
 
   @override
@@ -3325,10 +3360,46 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                             )
                             .id;
                   });
+                  _checkProviderInstalled(v);
                 },
               ),
             ),
           ),
+          // ── Not-installed banner ──────────────────────────────────────────
+          if (_providerInstalled == false) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withAlpha(30),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange.withAlpha(80)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_providerLabel(_selectedProvider)} is not installed',
+                      style: const TextStyle(fontSize: 12, color: Colors.orange),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => SetupGuidePage.show(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      foregroundColor: Colors.orange,
+                    ),
+                    child: const Text('Install', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (_providerInstalled == null) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
           const SizedBox(height: 14),
           EnvGroupSelectionField(
             selectedGroupIds: _selectedEnvGroupIds,
@@ -3472,7 +3543,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
           const Spacer(),
 
           FilledButton(
-            onPressed: _dirCtrl.text.trim().isEmpty ? null : _start,
+            onPressed: (_dirCtrl.text.trim().isEmpty || _providerInstalled == false) ? null : _start,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF34D399),
               foregroundColor: const Color(0xFF0F172A),
@@ -3481,9 +3552,9 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
-              'Start Chat',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            child: Text(
+              _providerInstalled == false ? 'Install provider first' : 'Start Chat',
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ],
