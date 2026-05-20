@@ -188,23 +188,30 @@ class MacosPlatformInstaller extends PlatformInstaller {
 
   @override
   Future<void> launchAndExit(String launchToken) async {
-    // Write a tiny shell script that waits for the current process to die,
-    // then opens the new .app with -n (force new instance).
-    // This avoids macOS reusing the already-running instance on plain `open`.
-    final currentPid = pid; // top-level `pid` getter from dart:io
-    final script = '#!/bin/sh\n'
-        'while kill -0 $currentPid 2>/dev/null; do sleep 0.2; done\n'
-        'open -n "$launchToken"\n';
-    final scriptFile = File('${Directory.systemTemp.path}/yoloit_relaunch.sh');
-    await scriptFile.writeAsString(script);
-    await _run('chmod', ['+x', scriptFile.path]);
-    // Launch script detached so it survives our exit.
-    await Process.start(
-      '/bin/sh',
-      [scriptFile.path],
-      mode: ProcessStartMode.detached,
-    );
-    await Future.delayed(const Duration(milliseconds: 300));
+    final currentPid = pid;
+
+    // Remove macOS quarantine attribute so Gatekeeper doesn't block the relaunch.
+    await _run('xattr', ['-dr', 'com.apple.quarantine', launchToken]);
+
+    // Launch a truly detached background job via nohup + disown.
+    // ProcessStartMode.detached uses setsid() but some Flutter/macOS builds
+    // still get SIGHUP when the parent exits. nohup+disown is the portable
+    // Unix way to fully escape the parent's process group.
+    //
+    // We run this inline (Process.run, blocking) so the background job is
+    // registered with the OS before we call exit(0).
+    final logFile = '${Directory.systemTemp.path}/yoloit_relaunch.log';
+    final shellCmd = [
+      'nohup', '/bin/sh', '-c',
+      // Wait for old PID, timeout after 15 s, then open new app.
+      'i=0; while kill -0 $currentPid 2>/dev/null && [ \$i -lt 75 ]; do '
+          'sleep 0.2; i=\$((i+1)); done; '
+          'sleep 0.5; '
+          'open -n "$launchToken" >> $logFile 2>&1',
+    ].join(' ');
+    await _run('/bin/bash', ['-c', '$shellCmd </dev/null >$logFile 2>&1 & disown']);
+
+    await Future.delayed(const Duration(milliseconds: 400));
     exit(0);
   }
 }
