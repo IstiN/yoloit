@@ -521,6 +521,35 @@ class SetupCheckService {
         args: ['install', 'aider-chat'],
       ),
     ),
+    _checkTool(
+      id: 'opencode',
+      name: 'OpenCode',
+      description: 'AI coding agent for your terminal',
+      command: 'opencode',
+      versionArgs: ['--version'],
+      installHint: winget
+          ? 'npm i -g opencode-ai'
+          : _isMacOS
+              ? 'brew install anomalyco/tap/opencode'
+              : 'curl -fsSL https://opencode.ai/install | bash',
+      installUrl: 'https://opencode.ai',
+      isRequired: false,
+      installAction: winget
+          ? const InstallAction(
+              executable: 'npm',
+              args: ['i', '-g', 'opencode-ai'],
+            )
+          : _isMacOS
+              ? const InstallAction(
+                  executable: 'brew',
+                  args: ['install', 'anomalyco/tap/opencode'],
+                )
+              : const InstallAction(
+                  executable: 'bash',
+                  args: ['-c', 'curl -fsSL https://opencode.ai/install | bash'],
+                  requiresInteractiveTerminal: true,
+                ),
+    ),
   ];
 
   // ── Install (streaming) ──────────────────────────────────────────────────
