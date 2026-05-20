@@ -188,8 +188,23 @@ class MacosPlatformInstaller extends PlatformInstaller {
 
   @override
   Future<void> launchAndExit(String launchToken) async {
-    await _run('open', [launchToken]);
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Write a tiny shell script that waits for the current process to die,
+    // then opens the new .app with -n (force new instance).
+    // This avoids macOS reusing the already-running instance on plain `open`.
+    final currentPid = pid; // top-level `pid` getter from dart:io
+    final script = '#!/bin/sh\n'
+        'while kill -0 $currentPid 2>/dev/null; do sleep 0.2; done\n'
+        'open -n "$launchToken"\n';
+    final scriptFile = File('${Directory.systemTemp.path}/yoloit_relaunch.sh');
+    await scriptFile.writeAsString(script);
+    await _run('chmod', ['+x', scriptFile.path]);
+    // Launch script detached so it survives our exit.
+    await Process.start(
+      '/bin/sh',
+      [scriptFile.path],
+      mode: ProcessStartMode.detached,
+    );
+    await Future.delayed(const Duration(milliseconds: 300));
     exit(0);
   }
 }
