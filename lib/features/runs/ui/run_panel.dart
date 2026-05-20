@@ -11,14 +11,19 @@ import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/runs/models/run_session.dart';
 import 'package:yoloit/features/runs/ui/run_config_dialog.dart';
 
-typedef RunPanelDetachToPanelCallback = Future<void> Function(RunSession session);
-typedef RunPanelSendToGroupCallback = Future<void> Function(
-  RunSession session,
-  String group,
-  bool createNewPanel,
-);
+typedef RunPanelDetachToPanelCallback =
+    Future<void> Function(RunSession session);
+typedef RunPanelSendToGroupCallback =
+    Future<void> Function(
+      RunSession session,
+      String group,
+      bool createNewPanel,
+    );
 typedef RunPanelSessionVisibilityChanged =
     void Function(String sessionId, bool hidden);
+
+String _stripAnsi(String s) =>
+    s.replaceAll(RegExp(r'\x1B\[[\d;]*[A-Za-z]|\x1B[()][0-9A-Z]'), '');
 
 class RunPanel extends StatelessWidget {
   const RunPanel({
@@ -193,6 +198,9 @@ class _RunPanelViewState extends State<_RunPanelView> {
       _attachedSessionId = sessionId;
     });
     widget.onAttachedSessionChanged?.call(sessionId);
+    if (sessionId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
   }
 
   @override
@@ -211,7 +219,9 @@ class _RunPanelViewState extends State<_RunPanelView> {
             )
             .toList();
     final activeSessionId =
-        sessions.any((s) => s.id == _attachedSessionId) ? _attachedSessionId : null;
+        sessions.any((s) => s.id == _attachedSessionId)
+            ? _attachedSessionId
+            : null;
     if (activeSessionId == null && _attachedSessionId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -254,6 +264,7 @@ class _RunPanelViewState extends State<_RunPanelView> {
                   onSessionVisibilityChanged: widget.onSessionVisibilityChanged,
                   onDetachToPanel: widget.onDetachToPanel,
                   onSendToGroup: widget.onSendToGroup,
+                  scrollController: _scrollController,
                 ),
                 Expanded(
                   child: _Console(
@@ -284,6 +295,7 @@ class _ConsoleHeader extends StatelessWidget {
     this.onSessionVisibilityChanged,
     this.onDetachToPanel,
     this.onSendToGroup,
+    required this.scrollController,
   });
   final RunState state;
   final List<RunSession> allSessions;
@@ -295,6 +307,7 @@ class _ConsoleHeader extends StatelessWidget {
   final RunPanelSessionVisibilityChanged? onSessionVisibilityChanged;
   final RunPanelDetachToPanelCallback? onDetachToPanel;
   final RunPanelSendToGroupCallback? onSendToGroup;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -389,6 +402,34 @@ class _ConsoleHeader extends StatelessWidget {
               onTap: () => cubit.clearOutput(activeSession.id),
             ),
             _HeaderButton(
+              tooltip: 'Scroll to top',
+              icon: Icons.keyboard_double_arrow_up_rounded,
+              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+              onTap: () {
+                if (scrollController.hasClients) {
+                  scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+            ),
+            _HeaderButton(
+              tooltip: 'Scroll to bottom',
+              icon: Icons.keyboard_double_arrow_down_rounded,
+              iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+              onTap: () {
+                if (scrollController.hasClients) {
+                  scrollController.animateTo(
+                    scrollController.position.maxScrollExtent,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+            ),
+            _HeaderButton(
               tooltip: 'Detach session',
               icon: Icons.link_off_rounded,
               iconColor: Theme.of(context).colorScheme.onSurface.withAlpha(120),
@@ -470,7 +511,10 @@ class _ConsoleHeader extends StatelessWidget {
                     onAttachSession(attachCandidate.id);
                   }
                 } else if (value == 'attach') {
-                  final selected = await _pickAttachTarget(context, allSessions);
+                  final selected = await _pickAttachTarget(
+                    context,
+                    allSessions,
+                  );
                   if (selected != null) {
                     onSessionVisibilityChanged?.call(selected.id, false);
                     if (selected.config.group != currentGroup) {
@@ -480,31 +524,32 @@ class _ConsoleHeader extends StatelessWidget {
                   }
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'attach',
-                  child: Text('Attach…'),
-                ),
-                const PopupMenuItem(
-                  value: 'detach',
-                  child: Text('Detach from console'),
-                ),
-                if (onDetachToPanel != null)
-                  const PopupMenuItem(
-                    value: 'popout',
-                    child: Text('Detach to new panel'),
-                  ),
-                if (onSendToGroup != null)
-                  const PopupMenuItem(
-                    value: 'send-group',
-                    child: Text('Send to group'),
-                  ),
-                if (attachCandidate != null)
-                  const PopupMenuItem(
-                    value: 'attach-latest',
-                    child: Text('Attach latest session'),
-                  ),
-              ],
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'attach',
+                      child: Text('Attach…'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'detach',
+                      child: Text('Detach from console'),
+                    ),
+                    if (onDetachToPanel != null)
+                      const PopupMenuItem(
+                        value: 'popout',
+                        child: Text('Detach to new panel'),
+                      ),
+                    if (onSendToGroup != null)
+                      const PopupMenuItem(
+                        value: 'send-group',
+                        child: Text('Send to group'),
+                      ),
+                    if (attachCandidate != null)
+                      const PopupMenuItem(
+                        value: 'attach-latest',
+                        child: Text('Attach latest session'),
+                      ),
+                  ],
               child: Icon(
                 Icons.more_horiz_rounded,
                 size: 16,
@@ -583,7 +628,9 @@ class _ConsoleHeader extends StatelessWidget {
   ) {
     final grouped = <String, List<RunSession>>{};
     for (final session in sessions.reversed) {
-      grouped.putIfAbsent(session.config.group, () => <RunSession>[]).add(session);
+      grouped
+          .putIfAbsent(session.config.group, () => <RunSession>[])
+          .add(session);
     }
     if (grouped.isEmpty) return Future.value(null);
     return showDialog<RunSession>(
@@ -597,72 +644,77 @@ class _ConsoleHeader extends StatelessWidget {
             width: 420,
             height: 360,
             child: ListView(
-              children: grouped.entries.map((entry) {
-                final group = entry.key;
-                final groupSessions = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        group,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface.withAlpha(170),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      ...groupSessions.map((session) {
-                        final isRunning = session.status == RunStatus.running;
-                        return InkWell(
-                          onTap: () => Navigator.of(dialogContext).pop(session),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 6,
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.circle,
-                                  size: 8,
-                                  color:
-                                      isRunning
-                                          ? AppColors.neonGreen
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withAlpha(120),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    session.config.name,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  session.id.split('_').last,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withAlpha(120),
-                                  ),
-                                ),
-                              ],
+              children:
+                  grouped.entries.map((entry) {
+                    final group = entry.key;
+                    final groupSessions = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            group,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withAlpha(170),
                             ),
                           ),
-                        );
-                      }),
-                    ],
-                  ),
-                );
-              }).toList(),
+                          const SizedBox(height: 6),
+                          ...groupSessions.map((session) {
+                            final isRunning =
+                                session.status == RunStatus.running;
+                            return InkWell(
+                              onTap:
+                                  () =>
+                                      Navigator.of(dialogContext).pop(session),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.circle,
+                                      size: 8,
+                                      color:
+                                          isRunning
+                                              ? AppColors.neonGreen
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withAlpha(120),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        session.config.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Text(
+                                      session.id.split('_').last,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface.withAlpha(120),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    );
+                  }).toList(),
             ),
           ),
           actions: [
@@ -722,7 +774,10 @@ class _ConsoleHeader extends StatelessWidget {
                 const Divider(height: 10),
                 ListTile(
                   dense: true,
-                  leading: const Icon(Icons.create_new_folder_rounded, size: 18),
+                  leading: const Icon(
+                    Icons.create_new_folder_rounded,
+                    size: 18,
+                  ),
                   title: const Text('Create new group panel'),
                   subtitle: const Text('Choose group name'),
                   onTap: () async {
@@ -965,8 +1020,9 @@ class _ConfigList extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     softWrap: false,
                     style: TextStyle(
-                      color:
-                          Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(120),
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.8,
@@ -1670,7 +1726,7 @@ class _FullLogView extends StatelessWidget {
     // Build a TextSpan that colours error lines red / orange.
     final spans = <TextSpan>[];
     for (final line in output) {
-      final t = line.text;
+      final t = _stripAnsi(line.text);
       final Color color;
       if (t.startsWith('\n[Process exited')) {
         color = const Color(0xFF44446A);
