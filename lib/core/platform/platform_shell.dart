@@ -75,11 +75,15 @@ class MacosPlatformShell extends PlatformShell {
       if (_home.isNotEmpty) '$_home/.config/yoloit',
       if (_home.isNotEmpty) '$_home/.opencode/bin',
       if (_home.isNotEmpty) '$_home/.local/bin',
+      if (_home.isNotEmpty) '$_home/go/bin',
+      if (_home.isNotEmpty) '$_home/.local/go/bin',
       if (_home.isNotEmpty) '$_home/development/flutter/bin',
       if (_home.isNotEmpty) '$_home/flutter/bin',
+      if (_home.isNotEmpty) '$_home/fvm/default/bin',
       '/opt/homebrew/bin',
       '/opt/homebrew/sbin',
       '/usr/local/bin',
+      '/usr/local/go/bin',
     ];
     return _merge(extras, existing, pathSeparator);
   }
@@ -108,7 +112,11 @@ class LinuxPlatformShell extends PlatformShell {
     final extras = <String>[
       if (_home.isNotEmpty) '$_home/.config/yoloit',
       if (_home.isNotEmpty) '$_home/.local/bin',
+      if (_home.isNotEmpty) '$_home/go/bin',
+      if (_home.isNotEmpty) '$_home/.local/go/bin',
+      if (_home.isNotEmpty) '$_home/fvm/default/bin',
       '/usr/local/bin',
+      '/usr/local/go/bin',
       '/snap/bin',
     ];
     return _merge(extras, existing, pathSeparator);

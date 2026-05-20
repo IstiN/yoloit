@@ -99,13 +99,19 @@ class RunService {
           "echo \"__YOLOIT_EXIT_\$?\" >> \"$log\"";
     }
 
+    // Use the user's default shell with -ic so ~/.zshrc / ~/.bashrc is loaded.
+    // This ensures tools installed in non-standard paths (Flutter, Go, etc.)
+    // are found just like they would be in a freshly opened terminal.
+    final shell = PlatformShell.instance.defaultShell;
+    final shellArgs = Platform.isWindows ? ['-c', bash] : ['-ic', bash];
     final result = await Process.run(
       tmux,
       ["new-session", "-d", "-s", name, "-x", "220", "-y", "50",
-       "bash", "-c", bash],
+       shell, ...shellArgs],
       environment: {
         ...Platform.environment,
         "PATH": enrichedPath,
+        "TERM": "xterm-256color",
       },
     );
 
