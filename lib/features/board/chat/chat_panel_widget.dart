@@ -25,6 +25,7 @@ import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
+import 'package:yoloit/features/settings/data/setup_check_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
@@ -3251,8 +3252,8 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     }
     setState(() => _providerInstalled = null);
     try {
-      final result = await Process.run('which', [cmd]);
-      if (mounted) setState(() => _providerInstalled = result.exitCode == 0);
+      final found = await SetupCheckService.isCommandAvailable(cmd);
+      if (mounted) setState(() => _providerInstalled = found);
     } catch (_) {
       if (mounted) setState(() => _providerInstalled = false);
     }

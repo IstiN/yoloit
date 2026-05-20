@@ -618,6 +618,12 @@ class SetupCheckService {
   /// On Windows we first try PowerShell's `Get-Command` which reads PATH from
   /// the registry (HKLM + HKCU), so it sees tools installed after the app
   /// launched. Falls back to `where.exe` with our extended PATH as a backup.
+  /// Public helper — returns true if [cmd] is on the PATH (uses the same
+  /// extended-PATH lookup as the Setup Guide so results are consistent).
+  static Future<bool> isCommandAvailable(String cmd) async {
+    return (await _findPath(cmd)) != null;
+  }
+
   static Future<String?> _findPath(String cmd) async {
     if (_isWindows) {
       return _findPathWindows(cmd);
