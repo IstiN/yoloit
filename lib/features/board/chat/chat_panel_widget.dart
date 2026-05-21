@@ -178,6 +178,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
     _provider = _session!.provider;
 
+    // If opencode provider, refresh models and rebuild setup view once loaded.
+    if (_provider is OpencodeProvider) {
+      (_provider as OpencodeProvider)
+          .refreshModelsFromModelsDev()
+          .then((_) {
+        if (mounted) setState(() {});
+      });
+    }
+
     // Restore messages from the session (source of truth).
     // The session accumulates messages via _handleCoreEvent even when
     // the widget is detached, so it always has the latest state.
@@ -3373,6 +3382,23 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
       if (mounted) setState(() => _providerInstalled = found);
     } catch (_) {
       if (mounted) setState(() => _providerInstalled = false);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatSetupView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // When dynamic models arrive, reset selection to default if current is invalid.
+    if (oldWidget.models != widget.models) {
+      final models = _modelsForProvider;
+      if (models.isNotEmpty && !models.any((m) => m.id == _selectedModel)) {
+        setState(() {
+          _selectedModel =
+              models
+                  .firstWhere((m) => m.isDefault, orElse: () => models.first)
+                  .id;
+        });
+      }
     }
   }
 
