@@ -38,7 +38,7 @@ jobs:
 
           # Try multiple possible local repo paths
           LOCAL_REPO=""
-          for candidate in "$HOME/git/yoloit/yoloit" "/Users/Uladzimir_Klyshevich/git/yoloit/yoloit" "/Users/uladzimir_klyshevich/git/yoloit/yoloit"; do
+          for candidate in "$HOME/git/yoloit/yoloit" "/Users/Uladzimir_Klyshevich/git/yoloit/yoloit" "/Users/uladzimir_klyshevich/git/yoloit/yoloit" "/Users/shared/git/yoloit/yoloit" "/opt/git/yoloit/yoloit"; do
             echo "Checking: $candidate"
             if [ -d "$candidate/.git" ]; then
               LOCAL_REPO="$candidate"
@@ -69,8 +69,8 @@ jobs:
             git -C "$GITHUB_WORKSPACE" log -1 --oneline
           fi
 
-          # Initialize and update git submodules (e.g. mermaid_renderer_flutter)
-          git -C "$GITHUB_WORKSPACE" submodule update --init --recursive
+          # Initialize and update git submodules with shallow clone for speed
+          git -C "$GITHUB_WORKSPACE" submodule update --init --recursive --depth=1 --jobs=8
           echo "Submodules initialized:"
           git -C "$GITHUB_WORKSPACE" submodule status
 
