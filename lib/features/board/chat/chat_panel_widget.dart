@@ -50,6 +50,43 @@ class _SlashCommand {
   bool matches(String text) => triggers.any(text.startsWith);
 }
 
+/// Small grey provider badge used in model picker lists.
+Widget _buildProviderBadge(String providerName) {
+  final label = switch (providerName.toLowerCase()) {
+    'openrouter' => 'OR',
+    'opencode'   => 'OC',
+    'siliconflow' => 'SF',
+    'anthropic'  => 'ANT',
+    'openai'     => 'OAI',
+    'google'     => 'GGL',
+    'mistral'    => 'MST',
+    'groq'       => 'GRQ',
+    _ => providerName.length > 6
+        ? providerName.substring(0, 2).toUpperCase()
+        : providerName,
+  };
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(3),
+      color: const Color(0xFF34D399).withOpacity(0.08),
+      border: Border.all(
+        color: const Color(0xFF34D399).withOpacity(0.2),
+        width: 0.5,
+      ),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        fontSize: 8,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF9CA3AF),
+        letterSpacing: 0.3,
+      ),
+    ),
+  );
+}
+
 /// The chat UI rendered inside a board panel.
 ///
 /// Manages its own [ChatProvider] instance, message list, and streaming state.
@@ -2598,16 +2635,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                         const SizedBox(width: 14),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          m.displayName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color:
-                                m.id == _config.model
-                                    ? const Color(0xFF34D399)
-                                    : Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
+                       child: Row(
+                         children: [
+                           if (m.providerGroup != null) ...[
+                             _providerBadge(m.providerGroup!),
+                             const SizedBox(width: 4),
+                           ],
+                           Flexible(
+                             child: Text(
+                               m.displayName,
+                               overflow: TextOverflow.ellipsis,
+                               style: TextStyle(
+                                 fontSize: 12,
+                                 color:
+                                     m.id == _config.model
+                                         ? const Color(0xFF34D399)
+                                         : Theme.of(context).colorScheme.onSurface,
+                               ),
+                             ),
+                           ),
+                         ],
+                       ),
                       ),
                       if (m.isFree)
                         Text(
@@ -2669,8 +2717,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final q = _modelQuery.toLowerCase();
     return models.where((m) =>
       m.displayName.toLowerCase().contains(q) ||
-      m.id.toLowerCase().contains(q)
+      m.id.toLowerCase().contains(q) ||
+      (m.providerGroup?.toLowerCase().contains(q) ?? false)
     ).toList();
+  }
+
+  /// Small grey provider badge shown next to model name in pickers.
+  static Widget _providerBadge(String providerName) {
+    return _buildProviderBadge(providerName);
   }
 
   static const _slashCommands = [
@@ -2908,14 +2962,25 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                         const SizedBox(width: 14),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          m.displayName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isActive
-                                ? const Color(0xFF34D399)
-                                : Theme.of(context).colorScheme.onSurface,
-                          ),
+                        child: Row(
+                          children: [
+                            if (m.providerGroup != null) ...[
+                              _providerBadge(m.providerGroup!),
+                              const SizedBox(width: 4),
+                            ],
+                            Flexible(
+                              child: Text(
+                                m.displayName,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isActive
+                                      ? const Color(0xFF34D399)
+                                      : Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (m.isFree)
@@ -3561,7 +3626,11 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                             value: m.id,
                             child: Row(
                               children: [
-                                Expanded(child: Text(m.displayName)),
+                               if (m.providerGroup != null) ...[
+                                 _buildProviderBadge(m.providerGroup!),
+                                 const SizedBox(width: 4),
+                               ],
+                               Expanded(child: Text(m.displayName, overflow: TextOverflow.ellipsis)),
                                 if (m.isFree)
                                   Text(
                                     'FREE',
