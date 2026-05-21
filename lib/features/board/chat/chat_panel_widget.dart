@@ -2706,6 +2706,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         setState(() {
           _config = _config.copyWith(model: selected);
         });
+        _session?.updateConfig(_config);
         _persistMessages();
       }
     });
@@ -3343,7 +3344,9 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   List<ChatModelInfo> get _modelsForProvider => switch (_selectedProvider) {
     'cursor' => kCursorModels,
     'local' => kLocalModels,
-    'opencode' => kOpencodeModels,
+    // Use dynamic models (includes openrouter/siliconflow) when available
+    'opencode' =>
+      widget.models.isNotEmpty ? widget.models : kOpencodeModels,
     _ => kCopilotModels,
   };
 
