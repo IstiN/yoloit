@@ -689,10 +689,12 @@ class _OpenCodeLogWatcher {
     if (logFile == null || _stopped) return;
 
     debugPrint('[OpenCodeLog] Watching: ${logFile.path}');
-    var offset = logFile.lengthSync();
+    // Start from beginning — the 429 error may already be in the file
+    // by the time we find it, and we don't want to miss it.
+    var offset = 0;
 
     while (!_stopped) {
-      await Future<void>.delayed(const Duration(seconds: 1));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
       if (_stopped) break;
       try {
         final length = logFile.lengthSync();
@@ -704,25 +706,22 @@ class _OpenCodeLogWatcher {
         offset = length;
 
         final newContent = utf8.decode(bytes, allowMalformed: true);
-        for (final line in newContent.split('\n')) {
-          _parseLine(line.trim());
-        }
+        // 429 log lines can be 37KB+ (full request body included).
+        // Don't split by '\n' — scan the raw chunk directly for error patterns.
+        _parseChunk(newContent);
       } catch (e) {
         debugPrint('[OpenCodeLog] read error: $e');
       }
     }
   }
 
-  void _parseLine(String line) {
-    if (line.isEmpty) return;
-    if (!line.startsWith('ERROR') && !line.contains('retry')) return;
-
-    // Extract statusCode
-    final statusMatch = RegExp(r'"statusCode":(\d+)').firstMatch(line);
+  void _parseChunk(String content) {
+    // Search raw content directly — log lines can be 37KB+ and may arrive
+    // across multiple polls, so don't rely on complete line boundaries.
+    final statusMatch = RegExp(r'"statusCode":(\d+)').firstMatch(content);
     final statusCode = statusMatch != null ? int.tryParse(statusMatch.group(1)!) : null;
 
-    // Extract message
-    final msgMatch = RegExp(r'"message":"([^"]+)"').firstMatch(line);
+    final msgMatch = RegExp(r'"message":"([^"]+)"').firstMatch(content);
     final msg = msgMatch?.group(1);
 
     if (statusCode == null && msg == null) return;
@@ -730,13 +729,12 @@ class _OpenCodeLogWatcher {
     String display;
     if (statusCode == 429) {
       display = '⏳ Rate limit (429): ${msg ?? 'Please try again later'}';
-    } else if (msg != null) {
+    } else if (content.contains('ERROR') && msg != null) {
       display = '⚠️ OpenCode: $msg';
     } else {
       return;
     }
 
-    // Deduplicate — same message shown max once per run
     if (_emittedMessages.contains(display)) return;
     _emittedMessages.add(display);
 
