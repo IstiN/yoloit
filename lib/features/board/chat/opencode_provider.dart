@@ -216,15 +216,15 @@ class OpencodeProvider extends ChatProvider {
         ),
       );
 
-      // Timeout: if no JSON event arrives within 90s, opencode is likely
-      // rate-limited and silently retrying. Surface an error and kill it.
+      // Timeout: if no JSON event arrives within 120s (with live log monitoring),
+      // kill the process.
       var receivedFirstEvent = false;
-      final startupTimer = Timer(const Duration(seconds: 90), () {
+      final startupTimer = Timer(const Duration(seconds: 120), () {
         if (!receivedFirstEvent && !controller.isClosed) {
-          debugPrint('[OpenCode] Startup timeout — no events in 90s');
+          debugPrint('[OpenCode] Startup timeout — no events in 120s');
           _emitErrorMessage(
             controller,
-            'OpenCode не отвечает. Возможно, превышен лимит запросов (rate limit) — попробуйте через несколько минут.',
+            'OpenCode не отвечает 120 секунд. Попробуйте позже.',
           );
           controller.add(
             const ChatEvent(
@@ -236,6 +236,13 @@ class OpencodeProvider extends ChatProvider {
           process.kill(ProcessSignal.sigterm);
         }
       });
+
+      // Watch the opencode log file in real-time and surface retries immediately.
+      // Log is at ~/.local/share/opencode/log/*.log — a new file per run.
+      final logWatcher = _OpenCodeLogWatcher(
+        onRetry: (msg) => _emitErrorMessage(controller, msg),
+      );
+      unawaited(logWatcher.start());
 
       final buffer = StringBuffer();
 
@@ -307,7 +314,8 @@ class OpencodeProvider extends ChatProvider {
       });
 
       final exitCode = await process.exitCode;
-      startupTimer.cancel(); // No-op if already fired or cancelled
+      startupTimer.cancel();
+      logWatcher.stop();
       debugPrint('[OpenCode] Process exited: $exitCode');
 
       // Flush remaining buffer
@@ -619,5 +627,117 @@ class OpencodeProvider extends ChatProvider {
   @override
   void detach() {
     _processes.clear();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenCode Log Watcher
+//
+// Tails ~/.local/share/opencode/log/ in real-time and surfaces 429 / retry
+// errors immediately so the user sees them instead of an infinite spinner.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _OpenCodeLogWatcher {
+  _OpenCodeLogWatcher({required this.onRetry});
+
+  final void Function(String message) onRetry;
+
+  bool _stopped = false;
+  final _emittedMessages = <String>{};
+
+  static Directory? get _logDir {
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isEmpty) return null;
+    final xdgDataHome =
+        Platform.environment['XDG_DATA_HOME'] ??
+        '$home/.local/share';
+    final dir = Directory('$xdgDataHome/opencode/log');
+    return dir.existsSync() ? dir : null;
+  }
+
+  Future<void> start() async {
+    final dir = _logDir;
+    if (dir == null) return;
+
+    // Find the log file created most recently (within last 10 seconds)
+    File? logFile;
+    final now = DateTime.now();
+    for (int attempt = 0; attempt < 10 && !_stopped; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.log'))
+          .toList()
+        ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      if (files.isNotEmpty) {
+        final newest = files.first;
+        if (now.difference(newest.statSync().modified).abs() <
+            const Duration(seconds: 30)) {
+          logFile = newest;
+          break;
+        }
+      }
+    }
+    if (logFile == null || _stopped) return;
+
+    debugPrint('[OpenCodeLog] Watching: ${logFile.path}');
+    var offset = logFile.lengthSync();
+
+    while (!_stopped) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (_stopped) break;
+      try {
+        final length = logFile.lengthSync();
+        if (length <= offset) continue;
+        final raf = logFile.openSync();
+        raf.setPositionSync(offset);
+        final bytes = raf.readSync(length - offset);
+        raf.closeSync();
+        offset = length;
+
+        final newContent = utf8.decode(bytes, allowMalformed: true);
+        for (final line in newContent.split('\n')) {
+          _parseLine(line.trim());
+        }
+      } catch (e) {
+        debugPrint('[OpenCodeLog] read error: $e');
+      }
+    }
+  }
+
+  void _parseLine(String line) {
+    if (line.isEmpty) return;
+    if (!line.startsWith('ERROR') && !line.contains('retry')) return;
+
+    // Extract statusCode
+    final statusMatch = RegExp(r'"statusCode":(\d+)').firstMatch(line);
+    final statusCode = statusMatch != null ? int.tryParse(statusMatch.group(1)!) : null;
+
+    // Extract message
+    final msgMatch = RegExp(r'"message":"([^"]+)"').firstMatch(line);
+    final msg = msgMatch?.group(1);
+
+    if (statusCode == null && msg == null) return;
+
+    String display;
+    if (statusCode == 429) {
+      display = '⏳ Rate limit (429): ${msg ?? 'Please try again later'}';
+    } else if (msg != null) {
+      display = '⚠️ OpenCode: $msg';
+    } else {
+      return;
+    }
+
+    // Deduplicate — same message shown max once per run
+    if (_emittedMessages.contains(display)) return;
+    _emittedMessages.add(display);
+
+    debugPrint('[OpenCodeLog] Emitting: $display');
+    onRetry(display);
+  }
+
+  void stop() {
+    _stopped = true;
   }
 }
