@@ -216,6 +216,27 @@ class OpencodeProvider extends ChatProvider {
         ),
       );
 
+      // Timeout: if no JSON event arrives within 90s, opencode is likely
+      // rate-limited and silently retrying. Surface an error and kill it.
+      var receivedFirstEvent = false;
+      final startupTimer = Timer(const Duration(seconds: 90), () {
+        if (!receivedFirstEvent && !controller.isClosed) {
+          debugPrint('[OpenCode] Startup timeout — no events in 90s');
+          _emitErrorMessage(
+            controller,
+            'OpenCode не отвечает. Возможно, превышен лимит запросов (rate limit) — попробуйте через несколько минут.',
+          );
+          controller.add(
+            const ChatEvent(
+              type: ChatEventType.result,
+              rawType: 'opencode.timeout',
+              data: {},
+            ),
+          );
+          process.kill(ProcessSignal.sigterm);
+        }
+      });
+
       final buffer = StringBuffer();
 
       process.stdout
@@ -232,6 +253,12 @@ class OpencodeProvider extends ChatProvider {
                 if (trimmed.isEmpty) continue;
                 try {
                   final json = jsonDecode(trimmed) as Map<String, dynamic>;
+
+                  // Cancel startup timeout on first received event
+                  if (!receivedFirstEvent) {
+                    receivedFirstEvent = true;
+                    startupTimer.cancel();
+                  }
 
                   // Capture sessionID from first event (for first message)
                   if (isFirstMessage) {
@@ -280,6 +307,7 @@ class OpencodeProvider extends ChatProvider {
       });
 
       final exitCode = await process.exitCode;
+      startupTimer.cancel(); // No-op if already fired or cancelled
       debugPrint('[OpenCode] Process exited: $exitCode');
 
       // Flush remaining buffer
