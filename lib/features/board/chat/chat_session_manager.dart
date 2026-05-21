@@ -538,9 +538,16 @@ class ChatSession extends ChangeNotifier {
     return switch (providerId) {
       'cursor' => CursorAgentProvider(),
       'local' => LocalLlmProvider(),
-      'opencode' => OpencodeProvider(),
+      'opencode' => _createOpencodeProvider(),
       _ => CopilotCliProvider(),
     };
+  }
+
+  static OpencodeProvider _createOpencodeProvider() {
+    final provider = OpencodeProvider();
+    // Kick off background refresh — result is stored in provider for next UI render
+    provider.refreshModelsFromModelsDev();
+    return provider;
   }
 }
 

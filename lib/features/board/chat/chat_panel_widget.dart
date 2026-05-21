@@ -246,9 +246,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     return switch (id) {
       'cursor' => CursorAgentProvider(),
       'local' => LocalLlmProvider(),
-      'opencode' => OpencodeProvider(),
+      'opencode' => _createOpencodeProvider(),
       _ => CopilotCliProvider(),
     };
+  }
+
+  static OpencodeProvider _createOpencodeProvider() {
+    final provider = OpencodeProvider();
+    provider.refreshModelsFromModelsDev();
+    return provider;
   }
 
   @override
@@ -2603,7 +2609,30 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           ),
                         ),
                       ),
-                      if (m.costMultiplier != null)
+                      if (m.isFree)
+                        Text(
+                          'FREE',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF34D399),
+                          ),
+                        )
+                      else if (m.inputCostPerMillion != null)
+                        Text(
+                          '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color:
+                                m.inputCostPerMillion! > 10
+                                    ? const Color(0xFFF87171)
+                                    : Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall?.color ??
+                                        Theme.of(context).colorScheme.onSurface,
+                          ),
+                        )
+                      else if (m.costMultiplier != null)
                         Text(
                           '${m.costMultiplier}x',
                           style: TextStyle(
@@ -2889,7 +2918,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           ),
                         ),
                       ),
-                      if (m.costMultiplier != null)
+                      if (m.isFree)
+                        Text(
+                          'FREE',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF34D399),
+                          ),
+                        )
+                      else if (m.inputCostPerMillion != null)
+                        Text(
+                          '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: m.inputCostPerMillion! > 10
+                                ? const Color(0xFFF87171)
+                                : Theme.of(context).textTheme.bodySmall?.color ??
+                                    Theme.of(context).colorScheme.onSurface,
+                          ),
+                        )
+                      else if (m.costMultiplier != null)
                         Text(
                           '${m.costMultiplier}x',
                           style: TextStyle(
@@ -3513,7 +3562,29 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                             child: Row(
                               children: [
                                 Expanded(child: Text(m.displayName)),
-                                if (m.costMultiplier != null)
+                                if (m.isFree)
+                                  Text(
+                                    'FREE',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF34D399),
+                                    ),
+                                  )
+                                else if (m.inputCostPerMillion != null)
+                                  Text(
+                                    '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: m.inputCostPerMillion! > 10
+                                          ? const Color(0xFFF87171)
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.6),
+                                    ),
+                                  )
+                                else if (m.costMultiplier != null)
                                   Text(
                                     '${m.costMultiplier}x',
                                     style: TextStyle(
@@ -3528,7 +3599,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                                                   .onSurface
                                                   .withOpacity(0.6),
                                     ),
-                                ),
+                                  ),
                               ],
                             ),
                           ),

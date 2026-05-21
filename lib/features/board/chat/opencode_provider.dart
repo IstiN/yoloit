@@ -8,6 +8,7 @@ import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/features/settings/data/models_dev_catalog_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 /// [ChatProvider] implementation that wraps the OpenCode CLI.
@@ -22,6 +23,9 @@ class OpencodeProvider extends ChatProvider {
   final Map<String, Process> _processes = {};
   String? _cachedYoloitBin;
 
+  // Cached models loaded from models.dev
+  List<ChatModelInfo>? _cachedModelsDevModels;
+
   @override
   String get providerId => 'opencode';
 
@@ -29,9 +33,33 @@ class OpencodeProvider extends ChatProvider {
   String get displayName => 'OpenCode';
 
   @override
-  List<ChatModelInfo> get availableModels =>
-      ProviderModelCatalogService.instance.modelsForProvider('opencode') ??
-      kOpencodeModels;
+  List<ChatModelInfo> get availableModels {
+    // 1. models.dev dynamically loaded (most up-to-date)
+    if (_cachedModelsDevModels != null && _cachedModelsDevModels!.isNotEmpty) {
+      return _cachedModelsDevModels!;
+    }
+    // 2. GitHub-hosted catalog (provider_models.json)
+    final catalogModels =
+        ProviderModelCatalogService.instance.modelsForProvider('opencode');
+    if (catalogModels != null && catalogModels.isNotEmpty) {
+      return catalogModels;
+    }
+    // 3. Hardcoded fallback
+    return kOpencodeModels;
+  }
+
+  /// Triggers a background refresh of models from models.dev.
+  Future<void> refreshModelsFromModelsDev({bool force = false}) async {
+    try {
+      final models = await ModelsDevCatalogService.instance
+          .opencodeModelsAsChatModelInfo(force: force);
+      if (models.isNotEmpty) {
+        _cachedModelsDevModels = models;
+      }
+    } catch (e) {
+      debugPrint('[OpenCode] models.dev refresh failed: $e');
+    }
+  }
 
   @override
   bool get supportsImages => true;

@@ -628,6 +628,10 @@ class ChatModelInfo {
     required this.displayName,
     this.costMultiplier,
     this.isDefault = false,
+    this.inputCostPerMillion,
+    this.outputCostPerMillion,
+    this.contextWindow,
+    this.providerGroup,
   });
 
   final String id;
@@ -635,12 +639,30 @@ class ChatModelInfo {
   /// Optional relative cost hint. May be absent when loaded from remote catalog.
   final double? costMultiplier;
   final bool isDefault;
+  /// Input cost in USD per 1M tokens (from models.dev).
+  final double? inputCostPerMillion;
+  /// Output cost in USD per 1M tokens (from models.dev).
+  final double? outputCostPerMillion;
+  /// Context window size in tokens.
+  final int? contextWindow;
+  /// Provider display group (e.g. "OpenCode", "Anthropic").
+  final String? providerGroup;
+
+  /// True when the model is free (cost = 0 or unknown).
+  bool get isFree =>
+      (inputCostPerMillion == null && outputCostPerMillion == null) ||
+      (inputCostPerMillion == 0 && outputCostPerMillion == 0) ||
+      costMultiplier == 0;
 
   factory ChatModelInfo.fromJson(Map<String, dynamic> j) => ChatModelInfo(
         id: j['id'] as String,
         displayName: j['displayName'] as String,
         costMultiplier: (j['costMultiplier'] as num?)?.toDouble(),
         isDefault: j['isDefault'] as bool? ?? false,
+        inputCostPerMillion: (j['inputCostPerMillion'] as num?)?.toDouble(),
+        outputCostPerMillion: (j['outputCostPerMillion'] as num?)?.toDouble(),
+        contextWindow: (j['contextWindow'] as num?)?.toInt(),
+        providerGroup: j['providerGroup'] as String?,
       );
 
   Map<String, dynamic> toJson() {
@@ -650,6 +672,10 @@ class ChatModelInfo {
       'isDefault': isDefault,
     };
     if (costMultiplier != null) m['costMultiplier'] = costMultiplier;
+    if (inputCostPerMillion != null) m['inputCostPerMillion'] = inputCostPerMillion;
+    if (outputCostPerMillion != null) m['outputCostPerMillion'] = outputCostPerMillion;
+    if (contextWindow != null) m['contextWindow'] = contextWindow;
+    if (providerGroup != null) m['providerGroup'] = providerGroup;
     return m;
   }
 }
