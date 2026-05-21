@@ -247,8 +247,12 @@ class OpencodeProvider extends ChatProvider {
                     controller.add(event);
                   }
                 } catch (e) {
-                  debugPrint('[OpenCode] Failed to parse: $trimmed');
-                  debugPrint('[OpenCode] Error: $e');
+                  // Non-JSON stdout line — show it if it looks like an error/status
+                  if (_looksLikeError(trimmed)) {
+                    _emitErrorMessage(controller, trimmed);
+                  } else {
+                    debugPrint('[OpenCode] Failed to parse: $trimmed');
+                  }
                 }
               }
             },
@@ -258,10 +262,21 @@ class OpencodeProvider extends ChatProvider {
             },
           );
 
+      // Monitor stderr in real-time. Rate-limit and other errors appear here
+      // while the process is still running (retrying). Show them immediately.
       final stderrBuf = StringBuffer();
       process.stderr.transform(utf8.decoder).listen((chunk) {
         debugPrint('[OpenCode] stderr: $chunk');
         stderrBuf.write(chunk);
+
+        // Emit each line that looks like an error so the spinner stops
+        for (final line in chunk.split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) continue;
+          if (_looksLikeError(trimmed)) {
+            _emitErrorMessage(controller, trimmed);
+          }
+        }
       });
 
       final exitCode = await process.exitCode;
@@ -434,6 +449,45 @@ class OpencodeProvider extends ChatProvider {
   }
 
   // ── helpers ────────────────────────────────────────────────────────────
+
+  /// Returns true if [line] looks like an error/status message from opencode
+  /// that should be surfaced in chat (not silently swallowed).
+  static bool _looksLikeError(String line) {
+    if (line.length < 4) return false;
+    // Strip ANSI escape sequences before checking
+    final clean = line.replaceAll(RegExp(r'\x1B\[[0-9;]*[mGKHF]'), '').toLowerCase();
+    return clean.contains('exceeded') ||
+        clean.contains('rate limit') ||
+        clean.contains('retrying') ||
+        clean.contains('subscribe') ||
+        clean.contains('quota') ||
+        clean.contains('unauthorized') ||
+        clean.contains('forbidden') ||
+        clean.contains('invalid api key') ||
+        clean.contains('authentication') ||
+        (clean.contains('error') && clean.length < 200);
+  }
+
+  /// Emits [message] as an assistant error message into [controller].
+  static void _emitErrorMessage(
+    StreamController<ChatEvent> controller,
+    String message,
+  ) {
+    if (controller.isClosed) return;
+    // Strip ANSI escapes and dots-only lines before showing
+    final clean = message
+        .replaceAll(RegExp(r'\x1B\[[0-9;]*[mGKHF]'), '')
+        .replaceAll(RegExp(r'^[.\s]+'), '')
+        .trim();
+    if (clean.isEmpty) return;
+    controller.add(
+      ChatEvent(
+        type: ChatEventType.assistantMessage,
+        rawType: 'opencode.stderr.error',
+        data: {'content': '⚠️ $clean', 'messageId': ''},
+      ),
+    );
+  }
 
   String _resolveWorkingDir(String configuredDir) {
     final trimmed = configuredDir.trim();
