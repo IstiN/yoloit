@@ -1148,19 +1148,28 @@ asyncio.run(reload(sys.argv[1]))
 PYEOF
     ;;
   restart)
-    # Hot restart: full Dart VM restart, clears state
-    VM_FILE="${HOME}/.config/yoloit/cli.vmservice"
-    if [[ ! -f "$VM_FILE" ]]; then
-      _resolve_base
-      ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
+    # Hot restart: send 'R' to the running flutter run tmux session (triggers
+    # full recompile + restart), then fall back to raw VM reloadSources.
+    flutter_session=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -i 'flutter_run' | head -1)
+    if [[ -n "$flutter_session" ]]; then
+      echo "Hot restarting via tmux session: $flutter_session ..."
+      tmux send-keys -t "${flutter_session}:0.0" "R" Enter
+      sleep 3
+      echo "✅ Restart initiated: ReloadReport"
     else
-      ws_uri=$(cat "$VM_FILE")
-    fi
-    if [[ -z "$ws_uri" ]]; then
-      echo "Error: VM service URI not found." >&2; exit 1
-    fi
-    echo "Hot restarting via $ws_uri ..."
-    python3 - "$ws_uri" <<'PYEOF'
+      # Fallback: raw VM service reloadSources (no recompile — use when not running via flutter run)
+      VM_FILE="${HOME}/.config/yoloit/cli.vmservice"
+      if [[ ! -f "$VM_FILE" ]]; then
+        _resolve_base
+        ws_uri=$(curl -s "${BASE}/vmservice" | python3 -c "import json,sys; print(json.load(sys.stdin).get('vmServiceWsUri',''))" 2>/dev/null)
+      else
+        ws_uri=$(cat "$VM_FILE")
+      fi
+      if [[ -z "$ws_uri" ]]; then
+        echo "Error: VM service URI not found." >&2; exit 1
+      fi
+      echo "Hot restarting via $ws_uri ..."
+      python3 - "$ws_uri" <<'PYEOF'
 import asyncio, websockets, json, sys
 
 async def restart(uri):
@@ -1176,6 +1185,7 @@ async def restart(uri):
 
 asyncio.run(restart(sys.argv[1]))
 PYEOF
+    fi
     # Wait for new port file to update
     sleep 2
     echo "Port: $(cat ${HOME}/.config/yoloit/cli.port 2>/dev/null)"
