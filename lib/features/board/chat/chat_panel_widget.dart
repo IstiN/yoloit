@@ -2614,104 +2614,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   void _showModelPicker(BuildContext context) {
     final models = _provider.availableModels;
-    final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-    final buttonPos = renderBox.localToGlobal(Offset.zero);
-    final menuHeight = (models.length * 32.0).clamp(0.0, 520.0);
-    // Position directly above the button
-    showMenu<String>(
+    final inputFill = Theme.of(context).colorScheme.surfaceContainerHighest;
+    showDialog<String>(
       context: context,
-      position: RelativeRect.fromLTRB(
-        buttonPos.dx,
-        buttonPos.dy - menuHeight,
-        buttonPos.dx + 260,
-        buttonPos.dy,
-      ),
-      color: context.appColors.surface,
-      items:
-          models
-              .map(
-                (m) => PopupMenuItem<String>(
-                  value: m.id,
-                  height: 32,
-                  child: Row(
-                    children: [
-                      if (m.id == _config.model)
-                        const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Color(0xFF34D399),
-                        )
-                      else
-                        const SizedBox(width: 14),
-                      const SizedBox(width: 6),
-                      Expanded(
-                       child: Row(
-                         children: [
-                           if (m.providerGroup != null) ...[
-                             _providerBadge(m.providerGroup!),
-                             const SizedBox(width: 4),
-                           ],
-                           Flexible(
-                             child: Text(
-                               m.displayName,
-                               overflow: TextOverflow.ellipsis,
-                               style: TextStyle(
-                                 fontSize: 12,
-                                 color:
-                                     m.id == _config.model
-                                         ? const Color(0xFF34D399)
-                                         : Theme.of(context).colorScheme.onSurface,
-                               ),
-                             ),
-                           ),
-                         ],
-                       ),
-                      ),
-                      if (m.isFree)
-                        Text(
-                          'FREE',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF34D399),
-                          ),
-                        )
-                      else if (m.inputCostPerMillion != null)
-                        Text(
-                          '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color:
-                                m.inputCostPerMillion! > 10
-                                    ? const Color(0xFFF87171)
-                                    : Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall?.color ??
-                                        Theme.of(context).colorScheme.onSurface,
-                          ),
-                        )
-                      else if (m.costMultiplier != null)
-                        Text(
-                          '${m.costMultiplier}x',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                m.costMultiplier == 0
-                                    ? const Color(0xFF34D399)
-                                    : m.costMultiplier! > 3
-                                    ? const Color(0xFFF87171)
-                                    : Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall?.color ??
-                                        Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
+      builder: (dialogCtx) {
+        return _ModelSearchDialog(
+          models: models,
+          selectedId: _config.model,
+          inputFill: inputFill,
+        );
+      },
     ).then((selected) {
       if (selected != null && selected != _config.model) {
         setState(() {
@@ -3462,6 +3374,28 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     );
   }
 
+  void _showModelSearch(
+    BuildContext context,
+    Color inputFill,
+    ColorScheme colorScheme,
+  ) {
+    final allModels = _modelsForProvider;
+    showDialog<String>(
+      context: context,
+      builder: (dialogCtx) {
+        return _ModelSearchDialog(
+          models: allModels,
+          selectedId: _selectedModel,
+          inputFill: inputFill,
+        );
+      },
+    ).then((selected) {
+      if (selected != null) {
+        setState(() => _selectedModel = selected);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -3664,76 +3598,49 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
           // Model selector
           Text('Model', style: labelStyle),
           const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: inputFill,
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedModel,
-                isExpanded: true,
-                dropdownColor: dropdownFill,
-                style: inputTextStyle,
-                items:
-                    _modelsForProvider
-                        .map(
-                          (m) => DropdownMenuItem(
-                            value: m.id,
-                            child: Row(
-                              children: [
-                               if (m.providerGroup != null) ...[
-                                 _buildProviderBadge(m.providerGroup!),
-                                 const SizedBox(width: 4),
-                               ],
-                               Expanded(child: Text(m.displayName, overflow: TextOverflow.ellipsis)),
-                                if (m.isFree)
-                                  Text(
-                                    'FREE',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF34D399),
-                                    ),
-                                  )
-                                else if (m.inputCostPerMillion != null)
-                                  Text(
-                                    '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: m.inputCostPerMillion! > 10
-                                          ? const Color(0xFFF87171)
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withOpacity(0.6),
-                                    ),
-                                  )
-                                else if (m.costMultiplier != null)
-                                  Text(
-                                    '${m.costMultiplier}x',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color:
-                                          m.costMultiplier == 0
-                                              ? const Color(0xFF34D399)
-                                              : m.costMultiplier! > 3
-                                              ? const Color(0xFFF87171)
-                                              : Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withOpacity(0.6),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        )
-                        .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _selectedModel = v);
-                },
+          GestureDetector(
+            onTap: () => _showModelSearch(context, inputFill, colorScheme),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: inputFill,
+              ),
+              child: Row(
+                children: [
+                  () {
+                    final m = _modelsForProvider.cast<ChatModelInfo?>().firstWhere(
+                      (m) => m!.id == _selectedModel,
+                      orElse: () => null,
+                    );
+                    if (m != null && m.providerGroup != null) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: _buildProviderBadge(m.providerGroup!),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  }(),
+                  Expanded(
+                    child: Text(
+                      _modelsForProvider
+                          .cast<ChatModelInfo?>()
+                          .firstWhere(
+                            (m) => m!.id == _selectedModel,
+                            orElse: () => null,
+                          )
+                          ?.displayName ??
+                          _selectedModel,
+                      style: inputTextStyle,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    Icons.unfold_more,
+                    size: 16,
+                    color: colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ],
               ),
             ),
           ),
@@ -4996,4 +4903,204 @@ class _SubAgentRunState {
   final String agentDescription;
   final List<_SubAgentEvent> events = [];
   bool isRunning = true;
+}
+
+// ── Searchable model picker dialog ──────────────────────────────────────────
+
+class _ModelSearchDialog extends StatefulWidget {
+  const _ModelSearchDialog({
+    required this.models,
+    required this.selectedId,
+    required this.inputFill,
+  });
+
+  final List<ChatModelInfo> models;
+  final String selectedId;
+  final Color inputFill;
+
+  @override
+  State<_ModelSearchDialog> createState() => _ModelSearchDialogState();
+}
+
+class _ModelSearchDialogState extends State<_ModelSearchDialog> {
+  final _searchCtrl = TextEditingController();
+  late List<ChatModelInfo> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.models;
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onSearch(String query) {
+    final q = query.toLowerCase().trim();
+    setState(() {
+      if (q.isEmpty) {
+        _filtered = widget.models;
+      } else {
+        _filtered = widget.models.where((m) {
+          return m.displayName.toLowerCase().contains(q) ||
+              m.id.toLowerCase().contains(q) ||
+              (m.providerGroup?.toLowerCase().contains(q) ?? false);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final surfaceColor = Theme.of(context).dialogBackgroundColor;
+
+    return Dialog(
+      backgroundColor: surfaceColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Search field
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: _onSearch,
+                style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+                decoration: InputDecoration(
+                  hintText: 'Search models…',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurface.withOpacity(0.4),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    size: 18,
+                    color: colorScheme.onSurface.withOpacity(0.4),
+                  ),
+                  filled: true,
+                  fillColor: widget.inputFill,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Results
+            Flexible(
+              child: _filtered.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'No models found',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      itemCount: _filtered.length,
+                      itemExtent: 34,
+                      itemBuilder: (ctx, i) {
+                        final m = _filtered[i];
+                        final isSelected = m.id == widget.selectedId;
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => Navigator.of(context).pop(m.id),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            child: Row(
+                              children: [
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.check,
+                                    size: 14,
+                                    color: Color(0xFF34D399),
+                                  )
+                                else
+                                  const SizedBox(width: 14),
+                                const SizedBox(width: 6),
+                                if (m.providerGroup != null) ...[
+                                  _buildProviderBadge(m.providerGroup!),
+                                  const SizedBox(width: 4),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    m.displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isSelected
+                                          ? const Color(0xFF34D399)
+                                          : colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                if (m.isFree)
+                                  Text(
+                                    'FREE',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF34D399),
+                                    ),
+                                  )
+                                else if (m.inputCostPerMillion != null)
+                                  Text(
+                                    '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: m.inputCostPerMillion! > 10
+                                          ? const Color(0xFFF87171)
+                                          : colorScheme.onSurface
+                                              .withOpacity(0.6),
+                                    ),
+                                  )
+                                else if (m.costMultiplier != null)
+                                  Text(
+                                    '${m.costMultiplier}x',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: m.costMultiplier == 0
+                                          ? const Color(0xFF34D399)
+                                          : m.costMultiplier! > 3
+                                              ? const Color(0xFFF87171)
+                                              : colorScheme.onSurface
+                                                  .withOpacity(0.6),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
 }
