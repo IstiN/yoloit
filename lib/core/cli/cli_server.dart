@@ -16,6 +16,7 @@ import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
@@ -204,6 +205,14 @@ class CliServer {
       final f = File(_vmServiceFilePath);
       final uri = f.existsSync() ? f.readAsStringSync().trim() : '';
       return _json({'vmServiceWsUri': uri, 'ok': uri.isNotEmpty});
+    }
+
+    // GET /api/catalog → command catalog with humanVariants for router model
+    if (path.length == 1 && path[0] == 'catalog' && method == 'GET') {
+      return shelf.Response.ok(
+        YoloitCliToolCatalog.catalogJson(),
+        headers: {'content-type': 'application/json'},
+      );
     }
 
     // /api/local-models/...

@@ -894,7 +894,7 @@ def param_to_key(name):
 
 if fmt == "short":
     print("yoloit help (short)")
-    print("Use: yoloit help --format [short|detailed|mermaid|mermaid_short|tools|registry]")
+    print("Use: yoloit help --format [short|detailed|mermaid|mermaid_short|tools|registry|catalog]")
     print("Board and panel are optional in note/checklist/kanban commands — uses active board/panel.")
     for g in group_order:
         if not by_group[g]:
@@ -994,6 +994,21 @@ elif fmt == "registry":
             "aliases": c.get("aliases", []),
         })
     print(json.dumps(out, ensure_ascii=False, indent=2))
+elif fmt == "catalog":
+    # Fetch catalog from Dart server (includes humanVariants from tool registry)
+    import urllib.request, urllib.error
+    port_file = os.path.expanduser("~/.config/yoloit/cli.port")
+    try:
+        with open(port_file) as f:
+            port = f.read().strip()
+        url = f"http://127.0.0.1:{port}/api/catalog"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception as e:
+        print(f"Error: Could not fetch catalog from Dart server: {e}", file=sys.stderr)
+        sys.exit(1)
 else:
     print(f"Unknown format: {fmt}", file=sys.stderr)
     sys.exit(2)
@@ -1008,7 +1023,7 @@ _parse_help_format() {
         format="${2:-short}"
         shift 2
         ;;
-      short|detailed|mermaid|mermaid_short|tools|registry)
+      short|detailed|mermaid|mermaid_short|tools|registry|catalog)
         format="$1"
         shift
         ;;

@@ -71,6 +71,7 @@ class YoloitCliTool {
     this.group = 'app',
     this.params = const <YoloitCliToolParam>[],
     this.destructive = false,
+    this.humanVariants = const <String, List<String>>{},
   });
 
   final String command;
@@ -80,9 +81,31 @@ class YoloitCliTool {
   final List<YoloitCliToolParam> params;
   final bool destructive;
 
+  /// Natural language phrases mapped by locale (e.g. 'ru', 'en').
+  /// Used to generate training data for a tiny command-router model.
+  /// Params are referenced as `{param_name}` placeholders.
+  /// Example: `{'ru': ['создай заметку {title}'], 'en': ['create note {title}']}`
+  final Map<String, List<String>> humanVariants;
+
   String get functionName =>
       alias ?? YoloitCliToolCatalog.functionNameFor(command);
   String get fullFunctionName => YoloitCliToolCatalog.functionNameFor(command);
+
+  /// Export for training catalog (help --format catalog).
+  Map<String, Object?> toCatalogJson() {
+    return {
+      'command': command,
+      'group': group,
+      'description': description,
+      'destructive': destructive,
+      'params': params.map((p) => {
+        'name': p.key,
+        'required': p.required,
+        'description': p.description,
+      }).toList(),
+      'human': humanVariants,
+    };
+  }
 
   flm.LocalTool toLocalTool() {
     final isCompact = alias != null;
@@ -256,6 +279,29 @@ class YoloitCliToolCatalog {
   }
 
   static String _normalizeFunctionName(String value) => value.trim();
+
+  /// Generate training catalog JSON for command-router model fine-tuning.
+  /// Only includes commands that have humanVariants defined.
+  /// Output format: { commands: [...], coverage: { total, withVariants, missing } }
+  static String catalogJson() {
+    final withVariants = <Map<String, Object?>>[];
+    final missing = <String>[];
+    for (final tool in _tools) {
+      if (tool.humanVariants.isNotEmpty) {
+        withVariants.add(tool.toCatalogJson());
+      } else {
+        missing.add(tool.command);
+      }
+    }
+    return jsonEncode({
+      'commands': withVariants,
+      'coverage': {
+        'total': _tools.length,
+        'withVariants': withVariants.length,
+        'missing': missing,
+      },
+    });
+  }
 }
 
 class YoloitCliToolArgumentNormalizer {
@@ -948,6 +994,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'bls',
     description: 'List all boards',
     group: 'board',
+    humanVariants: const {
+      'ru': ['покажи борды', 'список бордов', 'какие борды есть', 'мои доски'],
+      'en': ['show boards', 'list boards', 'what boards do I have', 'my boards'],
+    },
   ),
   YoloitCliTool(
     command: 'board',
@@ -961,6 +1011,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'bmk',
     description: 'Create a board',
     group: 'board',
+    humanVariants: const {
+      'ru': ['создай борд {name}', 'создай доску {name}', 'новый борд {name}', 'новая доска {name}'],
+      'en': ['create board {name}', 'new board {name}', 'add board {name}'],
+    },
     params: <YoloitCliToolParam>[
       _p('name', 'New board name', required: true, shortKey: 'n'),
     ],
@@ -987,6 +1041,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     description: 'Delete a board',
     group: 'board',
     destructive: true,
+    humanVariants: const {
+      'ru': ['удали борд {board}', 'удали доску {board}', 'убери борд {board}'],
+      'en': ['delete board {board}', 'remove board {board}'],
+    },
     params: <YoloitCliToolParam>[_boardParam('id_or_name')],
   ),
   YoloitCliTool(
@@ -994,6 +1052,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'bfc',
     description: 'Focus a board in the UI',
     group: 'board',
+    humanVariants: const {
+      'ru': ['открой борд {board}', 'переключись на {board}', 'покажи борд {board}', 'перейди на {board}'],
+      'en': ['open board {board}', 'show board {board}', 'switch to {board}', 'go to {board}'],
+    },
     params: <YoloitCliToolParam>[_boardParam('id_or_name')],
   ),
   YoloitCliTool(
@@ -1152,6 +1214,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'pls',
     description: 'List panels on a board',
     group: 'panel',
+    humanVariants: const {
+      'ru': ['покажи панели', 'список панелей', 'что на борде', 'какие панели есть'],
+      'en': ['show panels', 'list panels', 'what panels are there', 'what is on the board'],
+    },
     params: <YoloitCliToolParam>[_boardParam()],
   ),
   YoloitCliTool(
@@ -1174,6 +1240,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     description:
         'Create a panel. Always include the exact panel type id in `type`.',
     group: 'panel',
+    humanVariants: const {
+      'ru': ['создай панель {title}', 'добавь панель {title}', 'новая панель {title}'],
+      'en': ['create panel {title}', 'add panel {title}', 'new panel {title}'],
+    },
     params: <YoloitCliToolParam>[
       _boardParam(),
       _panelTypeParam(),
@@ -1185,6 +1255,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'prn',
     description: 'Rename a panel',
     group: 'panel',
+    humanVariants: const {
+      'ru': ['переименуй {panel} в {new_title}', 'назови {panel} {new_title}'],
+      'en': ['rename {panel} to {new_title}', 'call {panel} {new_title}'],
+    },
     params: <YoloitCliToolParam>[
       _boardParam(),
       _panelParam(),
@@ -1239,6 +1313,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     description: 'Delete a panel',
     group: 'panel',
     destructive: true,
+    humanVariants: const {
+      'ru': ['удали {panel}', 'удали панель {panel}', 'убери {panel}', 'удали все заметки', 'удали заметку {panel}'],
+      'en': ['delete {panel}', 'remove {panel}', 'delete panel {panel}', 'remove the note {panel}'],
+    },
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
   YoloitCliTool(
@@ -1622,6 +1700,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'nst',
     description: 'Set markdown note text',
     group: 'note',
+    humanVariants: const {
+      'ru': ['запиши {text}', 'обнови заметку {text}', 'напиши в заметку {text}', 'установи текст заметки {text}'],
+      'en': ['set note to {text}', 'write {text}', 'update note with {text}'],
+    },
     params: <YoloitCliToolParam>[
       _boardParam(),
       _panelParam(),
@@ -1658,6 +1740,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'nadd',
     description: 'Append text to note — board and panel optional',
     group: 'note',
+    humanVariants: const {
+      'ru': ['допиши {text}', 'добавь в заметку {text}', 'припиши {text}', 'дополни заметку {text}'],
+      'en': ['append {text} to note', 'add {text} to the note'],
+    },
     params: <YoloitCliToolParam>[
       _p('text', 'Text to append', required: true, shortKey: 'tx'),
       _panelParam(),
@@ -1669,6 +1755,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'ncrt',
     description: 'Create a new note panel',
     group: 'note',
+    humanVariants: const {
+      'ru': ['создай заметку {title}', 'добавь заметку {title}', 'новая заметка {title}', 'сделай заметку {title}'],
+      'en': ['create note {title}', 'add a note {title}', 'new note {title}', 'make a note {title}'],
+    },
     params: <YoloitCliToolParam>[
       _p('title', 'Note title', required: true, shortKey: 'ti'),
       _p('content', 'Markdown content', shortKey: 'c'),
@@ -1680,6 +1770,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'chad',
     description: 'Add checklist item',
     group: 'checklist',
+    humanVariants: const {
+      'ru': ['добавь в чеклист {item}', 'добавь пункт {item}', 'запиши в список {item}', 'добавь задачу {item}'],
+      'en': ['add {item} to checklist', 'add checklist item {item}', 'add task {item}'],
+    },
     params: <YoloitCliToolParam>[
       _boardParam(),
       _panelParam(),
@@ -1697,6 +1791,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'chck',
     description: 'Toggle checklist item state',
     group: 'checklist',
+    humanVariants: const {
+      'ru': ['отметь {item}', 'выполни {item}', 'сделано {item}', 'отметь как сделано {item}'],
+      'en': ['check {item}', 'mark {item} done', 'complete {item}', 'tick {item}'],
+    },
     params: <YoloitCliToolParam>[
       _boardParam(),
       _panelParam(),
@@ -1731,6 +1829,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'cln',
     description: 'Create a new checklist panel',
     group: 'checklist',
+    humanVariants: const {
+      'ru': ['создай чеклист {title}', 'новый чеклист {title}', 'создай список {title}', 'добавь чеклист {title}'],
+      'en': ['create checklist {title}', 'new checklist {title}', 'add checklist {title}'],
+    },
     params: <YoloitCliToolParam>[
       _p('title', 'Panel title', required: true, shortKey: 'ti'),
       _boardParam(),
@@ -1784,6 +1886,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     description:
         'Add kanban card. Parse "in/into/to <column>" as the required `column` and "named/called/titled <text>" as `title`.',
     group: 'kanban',
+    humanVariants: const {
+      'ru': ['добавь карточку {title} в {column}', 'создай карточку {title}', 'новая карточка {title} в {column}'],
+      'en': ['add card {title} to {column}', 'create card {title} in {column}', 'new card {title}'],
+    },
     params: <YoloitCliToolParam>[
       _boardParam(),
       _panelParam(),
@@ -1903,6 +2009,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'tmr',
     description: 'Create and optionally start a timer',
     group: 'timer',
+    humanVariants: const {
+      'ru': ['поставь таймер на {duration} секунд', 'таймер {duration}', 'засеки {duration}', 'создай таймер {label}'],
+      'en': ['set timer for {duration} seconds', 'timer {duration}', 'start a timer {label}', 'create timer {label}'],
+    },
     params: <YoloitCliToolParam>[
       _p('duration', 'Duration in seconds (default 300)', shortKey: 'd'),
       _p('label', 'Timer label text', shortKey: 'l'),
@@ -1939,6 +2049,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'wgo',
     description: 'Open an app in a new panel on a board',
     group: 'app',
+    humanVariants: const {
+      'ru': ['запусти приложение {id_or_path}', 'открой {id_or_path}', 'запусти {id_or_path}'],
+      'en': ['run app {id_or_path}', 'open app {id_or_path}', 'launch {id_or_path}'],
+    },
     params: <YoloitCliToolParam>[
       _p('id_or_path', 'App id or local directory path', required: true, shortKey: 'i'),
       _boardParam(),
