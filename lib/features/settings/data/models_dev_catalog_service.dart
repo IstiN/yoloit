@@ -136,6 +136,46 @@ class ModelsDevCatalogService {
     }).toList();
   }
 
+  /// Returns [ChatModelInfo] list combining:
+  /// - FREE opencode provider models (always available without a key)
+  /// - ALL models from [configuredProviderIds] (user has keys for these)
+  ///
+  /// Free models first, then paid grouped by provider.
+  Future<List<ChatModelInfo>> opencodeModelsWithAuth({
+    required List<String> configuredProviderIds,
+    bool force = false,
+  }) async {
+    final all = await loadAll(force: force);
+    if (all.isEmpty) return kOpencodeModels;
+
+    // Free opencode models — available to everyone without a key
+    final freeOpencode = all
+        .where((m) => m.providerId == 'opencode' && m.isFree)
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    // All models from providers the user has configured
+    final fromConfigured = <ModelsDevModel>[];
+    for (final pid in configuredProviderIds) {
+      if (pid == 'opencode') continue; // handled separately above
+      final providerModels = all.where((m) => m.providerId == pid).toList()
+        ..sort((a, b) {
+          // free first within provider, then by cost
+          if (a.isFree != b.isFree) return a.isFree ? -1 : 1;
+          return (a.inputCost ?? 0).compareTo(b.inputCost ?? 0);
+        });
+      fromConfigured.addAll(providerModels);
+    }
+
+    final combined = [...freeOpencode, ...fromConfigured];
+    if (combined.isEmpty) return kOpencodeModels;
+
+    return combined.indexed.map((entry) {
+      final (idx, m) = entry;
+      return m.toChatModelInfo(isDefault: idx == 0);
+    }).toList();
+  }
+
   // ── Fetch / load ────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> _fetchOrLoad({bool force = false}) async {

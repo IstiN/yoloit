@@ -9,6 +9,7 @@ import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/models_dev_catalog_service.dart';
+import 'package:yoloit/features/settings/data/opencode_auth_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
 /// [ChatProvider] implementation that wraps the OpenCode CLI.
@@ -48,11 +49,20 @@ class OpencodeProvider extends ChatProvider {
     return kOpencodeModels;
   }
 
-  /// Triggers a background refresh of models from models.dev.
+  /// Triggers a background refresh of models from models.dev + opencode auth.
+  ///
+  /// Loads:
+  /// - FREE opencode provider models (always available without a key)
+  /// - ALL models from providers configured in opencode's auth.json
   Future<void> refreshModelsFromModelsDev({bool force = false}) async {
     try {
+      final configuredProviders =
+          await OpenCodeAuthService.instance.configuredProviderIds();
       final models = await ModelsDevCatalogService.instance
-          .opencodeModelsAsChatModelInfo(force: force);
+          .opencodeModelsWithAuth(
+            configuredProviderIds: configuredProviders,
+            force: force,
+          );
       if (models.isNotEmpty) {
         _cachedModelsDevModels = models;
       }
