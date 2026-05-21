@@ -245,7 +245,7 @@ class OpencodeProvider extends ChatProvider {
           if (isFatal) {
             // Kill immediately so the spinner stops — no need to wait for timeout.
             startupTimer.cancel();
-            process.kill(ProcessSignal.sigterm);
+            process.kill(ProcessSignal.sigkill);
           }
         },
       );
