@@ -25,6 +25,8 @@ import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
+import 'package:yoloit/features/settings/data/models_dev_catalog_service.dart';
+import 'package:yoloit/features/settings/data/opencode_auth_service.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
@@ -3325,6 +3327,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   late String _selectedModel;
   late List<String> _selectedEnvGroupIds;
   bool? _providerInstalled; // null = checking, true = ok, false = missing
+  List<ChatModelInfo>? _opencodeModels; // loaded async from models.dev
 
   static const _providerCommand = {
     'copilot': 'copilot',
@@ -3353,9 +3356,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   List<ChatModelInfo> get _modelsForProvider => switch (_selectedProvider) {
     'cursor' => kCursorModels,
     'local' => kLocalModels,
-    // Use dynamic models (includes openrouter/siliconflow) when available
-    'opencode' =>
-      widget.models.isNotEmpty ? widget.models : kOpencodeModels,
+    'opencode' => _opencodeModels ?? kOpencodeModels,
     _ => kCopilotModels,
   };
 
@@ -3368,6 +3369,32 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     _selectedModel = widget.config.model;
     _selectedEnvGroupIds = List<String>.from(widget.config.envGroupIds);
     _checkProviderInstalled(_selectedProvider);
+    if (_selectedProvider == 'opencode') _loadOpencodeModels();
+  }
+
+  Future<void> _loadOpencodeModels() async {
+    try {
+      final configuredProviders =
+          await OpenCodeAuthService.instance.configuredProviderIds();
+      final models = await ModelsDevCatalogService.instance
+          .opencodeModelsWithAuth(
+            configuredProviderIds: configuredProviders,
+          );
+      if (models.isNotEmpty && mounted) {
+        setState(() {
+          _opencodeModels = models;
+          // Reset model if current selection is not in the new list
+          if (!models.any((m) => m.id == _selectedModel)) {
+            _selectedModel =
+                models
+                    .firstWhere((m) => m.isDefault, orElse: () => models.first)
+                    .id;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[ChatSetup] opencode models load failed: $e');
+    }
   }
 
   Future<void> _checkProviderInstalled(String provider) async {
@@ -3505,6 +3532,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                             .id;
                   });
                   _checkProviderInstalled(v);
+                  if (v == 'opencode') _loadOpencodeModels();
                 },
               ),
             ),
