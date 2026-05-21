@@ -96,7 +96,7 @@ void main() {
 
     expect(
       catalogCommands,
-      helpCommands.difference(const <String>{'lm:generate'}),
+      helpCommands.difference(const <String>{'lm:generate', 'process-command'}),
     );
   });
 

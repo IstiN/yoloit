@@ -1,0 +1,196 @@
+# Board management commands
+commands:
+  - id: boards
+    human:
+      ru:
+        - "покажи борды"
+        - "список бордов"
+        - "какие борды есть"
+        - "мои доски"
+        - "все борды"
+      en:
+        - "show boards"
+        - "list boards"
+        - "what boards do I have"
+        - "my boards"
+        - "all boards"
+
+  - id: board
+    human:
+      ru:
+        - "покажи борд {board}"
+        - "детали борда {board}"
+        - "информация о борде {board}"
+        - "что на борде {board}"
+      en:
+        - "show board {board}"
+        - "board details {board}"
+        - "info about board {board}"
+        - "what is on board {board}"
+
+  - id: board:create
+    human:
+      ru:
+        - "создай борд {name}"
+        - "создай доску {name}"
+        - "новый борд {name}"
+        - "новая доска {name}"
+        - "добавь борд {name}"
+      en:
+        - "create board {name}"
+        - "new board {name}"
+        - "add board {name}"
+        - "make a board called {name}"
+
+  - id: board:rename
+    human:
+      ru:
+        - "переименуй борд {board} в {new_name}"
+        - "назови борд {board} {new_name}"
+        - "измени имя борда {board} на {new_name}"
+      en:
+        - "rename board {board} to {new_name}"
+        - "change board name {board} to {new_name}"
+        - "call board {board} {new_name}"
+
+  - id: board:delete
+    human:
+      ru:
+        - "удали борд {board}"
+        - "удали доску {board}"
+        - "убери борд {board}"
+        - "удалить борд {board}"
+      en:
+        - "delete board {board}"
+        - "remove board {board}"
+        - "destroy board {board}"
+
+  - id: board:focus
+    human:
+      ru:
+        - "открой борд {board}"
+        - "переключись на {board}"
+        - "покажи борд {board}"
+        - "перейди на {board}"
+        - "открой доску {board}"
+      en:
+        - "open board {board}"
+        - "switch to board {board}"
+        - "go to board {board}"
+        - "show board {board}"
+        - "focus board {board}"
+
+  - id: board:use
+    human:
+      ru:
+        - "используй борд {board}"
+        - "выбери борд {board}"
+        - "установи борд {board}"
+      en:
+        - "use board {board}"
+        - "select board {board}"
+        - "set board {board}"
+
+  - id: board:current
+    human:
+      ru:
+        - "какой борд сейчас"
+        - "текущий борд"
+        - "на каком борде я"
+      en:
+        - "what board am I on"
+        - "current board"
+        - "which board is active"
+
+  - id: board:snapshot
+    human:
+      ru:
+        - "снепшот борда {board}"
+        - "текстовый снимок борда {board}"
+        - "структура борда {board}"
+      en:
+        - "snapshot of board {board}"
+        - "board snapshot {board}"
+        - "board structure {board}"
+
+  - id: board:screenshot
+    human:
+      ru:
+        - "скриншот борда {board}"
+        - "сфоткай борд {board}"
+        - "сохрани скриншот борда {board}"
+      en:
+        - "screenshot board {board}"
+        - "capture board {board}"
+        - "save screenshot of board {board}"
+
+  - id: board:arrange
+    human:
+      ru:
+        - "расставь панели"
+        - "упорядочи панели"
+        - "выровняй панели"
+        - "автораскладка"
+      en:
+        - "arrange panels"
+        - "organize panels"
+        - "auto arrange"
+        - "tidy up panels"
+
+  - id: board:fit
+    human:
+      ru:
+        - "покажи весь борд"
+        - "уместить все"
+        - "зумируй чтобы все влезло"
+      en:
+        - "fit to view"
+        - "show everything"
+        - "zoom to fit"
+
+  - id: board:zoom
+    human:
+      ru:
+        - "зум {scale}"
+        - "масштаб {scale}"
+        - "увеличь до {scale}"
+      en:
+        - "zoom {scale}"
+        - "set zoom {scale}"
+        - "scale to {scale}"
+
+  - id: board:diagram
+    human:
+      ru:
+        - "диаграмма борда {board}"
+        - "нарисуй схему борда {board}"
+      en:
+        - "board diagram {board}"
+        - "draw board diagram {board}"
+
+  - id: board:svg
+    human:
+      ru:
+        - "экспорт SVG борда {board}"
+        - "сохрани борд {board} как SVG"
+      en:
+        - "export board {board} as SVG"
+        - "save board {board} SVG"
+
+  - id: board:apply
+    human:
+      ru:
+        - "примени YAML {file}"
+        - "загрузи конфигурацию {file}"
+      en:
+        - "apply YAML {file}"
+        - "load config {file}"
+
+  - id: board:translate
+    human:
+      ru:
+        - "сдвинь борд на {x} {y}"
+        - "подвинь вид на {x} {y}"
+      en:
+        - "move viewport to {x} {y}"
+        - "translate board {x} {y}"

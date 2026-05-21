@@ -1,0 +1,170 @@
+# App/widget commands
+commands:
+  - id: reload
+    human:
+      ru:
+        - "перезагрузи"
+        - "хот релоад"
+        - "обнови"
+      en:
+        - "reload"
+        - "hot reload"
+        - "refresh"
+
+  - id: restart
+    human:
+      ru:
+        - "перезапусти"
+        - "рестарт"
+        - "хот рестарт"
+      en:
+        - "restart"
+        - "hot restart"
+
+  - id: help
+    human:
+      ru:
+        - "помощь"
+        - "что ты умеешь"
+        - "какие команды есть"
+        - "покажи команды"
+        - "хелп"
+      en:
+        - "help"
+        - "what can you do"
+        - "show commands"
+        - "list commands"
+
+  - id: app:list
+    human:
+      ru:
+        - "покажи приложения"
+        - "список приложений"
+        - "мои приложения"
+        - "какие приложения есть"
+      en:
+        - "show apps"
+        - "list apps"
+        - "my apps"
+        - "what apps are installed"
+
+  - id: app:run
+    human:
+      ru:
+        - "запусти приложение {id_or_path}"
+        - "открой приложение {id_or_path}"
+        - "запусти {id_or_path}"
+        - "открой {id_or_path}"
+      en:
+        - "run app {id_or_path}"
+        - "open app {id_or_path}"
+        - "launch {id_or_path}"
+        - "start {id_or_path}"
+
+  - id: app:install
+    human:
+      ru:
+        - "установи приложение {source}"
+        - "инсталл {source}"
+        - "поставь {source}"
+      en:
+        - "install app {source}"
+        - "install {source}"
+        - "add app {source}"
+
+  - id: app:remove
+    human:
+      ru:
+        - "удали приложение {id}"
+        - "удали апп {id}"
+        - "убери приложение {id}"
+      en:
+        - "remove app {id}"
+        - "uninstall app {id}"
+        - "delete app {id}"
+
+  - id: app:create
+    human:
+      ru:
+        - "создай приложение {name}"
+        - "новое приложение {name}"
+        - "сделай приложение {name}"
+      en:
+        - "create app {name}"
+        - "new app {name}"
+        - "scaffold app {name}"
+
+  - id: app:execute
+    human:
+      ru:
+        - "выполни {action} в приложении {id}"
+        - "нажми {action} в {id}"
+      en:
+        - "execute {action} in app {id}"
+        - "trigger {action} in {id}"
+
+  - id: app:reload
+    human:
+      ru:
+        - "перезагрузи приложение {id}"
+        - "обнови приложение {id}"
+      en:
+        - "reload app {id}"
+        - "refresh app {id}"
+
+  - id: app:logs
+    human:
+      ru:
+        - "покажи логи приложения {id}"
+        - "логи {id}"
+      en:
+        - "show app logs {id}"
+        - "app logs {id}"
+        - "logs for {id}"
+
+  - id: app:snapshot
+    human:
+      ru:
+        - "снепшот приложения {id}"
+        - "состояние приложения {id}"
+      en:
+        - "app snapshot {id}"
+        - "app state {id}"
+
+  - id: app:screenshot
+    human:
+      ru:
+        - "скриншот приложения {id}"
+        - "сфоткай приложение {id}"
+      en:
+        - "screenshot app {id}"
+        - "capture app {id}"
+
+  - id: app:dev-skill
+    human:
+      ru:
+        - "покажи гайд по разработке"
+        - "документация по виджетам"
+      en:
+        - "show dev guide"
+        - "widget development docs"
+
+  - id: app:demo
+    human:
+      ru:
+        - "покажи демо приложения"
+        - "примеры приложений"
+        - "демо"
+      en:
+        - "show demo apps"
+        - "demo apps"
+        - "examples"
+
+  - id: app:demo-view
+    human:
+      ru:
+        - "покажи код демо {id}"
+        - "исходник демо {id}"
+      en:
+        - "show demo source {id}"
+        - "view demo {id}"

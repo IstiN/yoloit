@@ -1,0 +1,100 @@
+# Kanban board commands
+commands:
+  - id: kanban:columns
+    human:
+      ru:
+        - "покажи колонки канбана"
+        - "какие колонки есть"
+        - "список колонок"
+      en:
+        - "show kanban columns"
+        - "list columns"
+        - "what columns are there"
+
+  - id: kanban:add-column
+    human:
+      ru:
+        - "добавь колонку {name}"
+        - "создай колонку {name}"
+        - "новая колонка {name}"
+      en:
+        - "add column {name}"
+        - "create column {name}"
+        - "new column {name}"
+
+  - id: kanban:rename-column
+    human:
+      ru:
+        - "переименуй колонку {column} в {new_name}"
+        - "назови колонку {column} {new_name}"
+      en:
+        - "rename column {column} to {new_name}"
+        - "change column name {column} to {new_name}"
+
+  - id: kanban:remove-column
+    human:
+      ru:
+        - "удали колонку {column}"
+        - "убери колонку {column}"
+      en:
+        - "remove column {column}"
+        - "delete column {column}"
+
+  - id: kanban:add-card
+    human:
+      ru:
+        - "добавь карточку {title} в {column}"
+        - "создай карточку {title} в {column}"
+        - "новая карточка {title} в {column}"
+        - "добавь задачу {title} в {column}"
+        - "добавь в {column} {title}"
+      en:
+        - "add card {title} to {column}"
+        - "create card {title} in {column}"
+        - "new card {title} in {column}"
+        - "add task {title} to {column}"
+        - "add {title} to {column}"
+
+  - id: kanban:move-card
+    human:
+      ru:
+        - "перемести карточку {card_id} в {to_column}"
+        - "двинь {card_id} в {to_column}"
+        - "передвинь {card_id} в {to_column}"
+      en:
+        - "move card {card_id} to {to_column}"
+        - "move {card_id} to {to_column}"
+        - "drag {card_id} to {to_column}"
+
+  - id: kanban:remove-card
+    human:
+      ru:
+        - "удали карточку {card_id}"
+        - "убери карточку {card_id}"
+        - "удали задачу {card_id}"
+      en:
+        - "remove card {card_id}"
+        - "delete card {card_id}"
+        - "remove task {card_id}"
+
+  - id: kanban:update-card
+    human:
+      ru:
+        - "обнови карточку {card_id} на {new_title}"
+        - "переименуй карточку {card_id} в {new_title}"
+        - "измени карточку {card_id} на {new_title}"
+      en:
+        - "update card {card_id} to {new_title}"
+        - "rename card {card_id} to {new_title}"
+        - "change card {card_id} to {new_title}"
+
+  - id: kanban:cards
+    human:
+      ru:
+        - "покажи карточки"
+        - "список карточек"
+        - "все карточки"
+      en:
+        - "show cards"
+        - "list cards"
+        - "all cards"

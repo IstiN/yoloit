@@ -1,0 +1,61 @@
+# Checklist commands
+commands:
+  - id: checklist:add
+    human:
+      ru:
+        - "добавь в чеклист {item}"
+        - "добавь пункт {item}"
+        - "запиши в список {item}"
+        - "добавь задачу {item}"
+        - "добавь в список {item}"
+        - "новый пункт {item}"
+      en:
+        - "add {item} to checklist"
+        - "add checklist item {item}"
+        - "add task {item}"
+        - "add to list {item}"
+        - "new item {item}"
+
+  - id: checklist:new
+    human:
+      ru:
+        - "создай чеклист {title}"
+        - "новый чеклист {title}"
+        - "создай список {title}"
+        - "добавь чеклист {title}"
+        - "создать список задач {title}"
+      en:
+        - "create checklist {title}"
+        - "new checklist {title}"
+        - "add checklist {title}"
+        - "make checklist {title}"
+        - "create todo list {title}"
+
+  - id: checklist:check
+    human:
+      ru:
+        - "отметь {item}"
+        - "выполни {item}"
+        - "сделано {item}"
+        - "отметь как сделано {item}"
+        - "галочка {item}"
+        - "чек {item}"
+      en:
+        - "check {item}"
+        - "mark {item} done"
+        - "complete {item}"
+        - "tick {item}"
+        - "done {item}"
+
+  - id: checklist:uncheck
+    human:
+      ru:
+        - "убери отметку {item}"
+        - "сними галочку {item}"
+        - "не сделано {item}"
+        - "анчек {item}"
+      en:
+        - "uncheck {item}"
+        - "mark {item} not done"
+        - "untick {item}"
+        - "undo {item}"

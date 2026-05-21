@@ -1,0 +1,274 @@
+# Link, timer, playlist, webpage, run, yolochat, models commands
+commands:
+  # ── Links ──
+  - id: links
+    human:
+      ru:
+        - "покажи связи"
+        - "список связей"
+        - "какие связи есть"
+      en:
+        - "show links"
+        - "list links"
+        - "what links are there"
+
+  - id: link:create
+    human:
+      ru:
+        - "свяжи {from} с {to}"
+        - "создай связь от {from} к {to}"
+        - "соедини {from} и {to}"
+      en:
+        - "link {from} to {to}"
+        - "connect {from} to {to}"
+        - "create link from {from} to {to}"
+
+  - id: link:delete
+    human:
+      ru:
+        - "удали связь {link_id}"
+        - "убери связь {link_id}"
+      en:
+        - "delete link {link_id}"
+        - "remove link {link_id}"
+
+  - id: link:style
+    human:
+      ru:
+        - "стиль связи {link_id} {style} {geometry}"
+        - "измени стиль связи {link_id}"
+      en:
+        - "set link style {link_id} {style} {geometry}"
+        - "change link style {link_id}"
+
+  - id: link:color
+    human:
+      ru:
+        - "цвет связи {link_id} {color}"
+        - "покрась связь {link_id} в {color}"
+      en:
+        - "link color {link_id} {color}"
+        - "color link {link_id} {color}"
+
+  # ── Timer ──
+  - id: timer:create
+    human:
+      ru:
+        - "поставь таймер на {duration} секунд"
+        - "таймер {duration}"
+        - "засеки {duration}"
+        - "создай таймер {label}"
+        - "таймер на {duration} минут"
+        - "поставь таймер"
+      en:
+        - "set timer for {duration} seconds"
+        - "timer {duration}"
+        - "start a timer {label}"
+        - "create timer {label}"
+        - "set timer for {duration} minutes"
+        - "start timer"
+
+  # ── Playlist ──
+  - id: play
+    human:
+      ru:
+        - "включи {file}"
+        - "проиграй {file}"
+        - "воспроизведи {file}"
+        - "плей {file}"
+      en:
+        - "play {file}"
+        - "start playing {file}"
+        - "play media {file}"
+
+  # ── Webpage ──
+  - id: web:open
+    human:
+      ru:
+        - "открой сайт {url}"
+        - "открой ссылку {url}"
+        - "загрузи {url}"
+        - "покажи страницу {url}"
+      en:
+        - "open website {url}"
+        - "open url {url}"
+        - "go to {url}"
+        - "load page {url}"
+
+  # ── Run sessions ──
+  - id: run:list
+    human:
+      ru:
+        - "покажи запущенные сессии"
+        - "список сессий"
+        - "что запущено"
+      en:
+        - "show running sessions"
+        - "list sessions"
+        - "what is running"
+
+  - id: run:input
+    human:
+      ru:
+        - "введи {text} в сессию {session}"
+        - "отправь {text} в {session}"
+      en:
+        - "send {text} to session {session}"
+        - "input {text} to {session}"
+
+  - id: run:attach
+    human:
+      ru:
+        - "подключись к сессии {session}"
+        - "аттач {session}"
+      en:
+        - "attach to session {session}"
+        - "connect to {session}"
+
+  - id: run:detach
+    human:
+      ru:
+        - "отключись от сессии {session}"
+        - "детач {session}"
+      en:
+        - "detach session {session}"
+        - "disconnect {session}"
+
+  - id: run:output
+    human:
+      ru:
+        - "покажи вывод сессии {session}"
+        - "лог сессии {session}"
+      en:
+        - "show output of {session}"
+        - "session output {session}"
+
+  - id: run:popout
+    human:
+      ru:
+        - "открой сессию {session} в панели"
+        - "попаут {session}"
+      en:
+        - "popout session {session}"
+        - "open {session} in panel"
+
+  # ── YoloChat ──
+  - id: yolochat:panels
+    human:
+      ru:
+        - "покажи чат панели"
+        - "список чатов"
+        - "какие чаты есть"
+      en:
+        - "show chat panels"
+        - "list chats"
+        - "what chats are there"
+
+  - id: yolochat:send
+    human:
+      ru:
+        - "отправь сообщение {text}"
+        - "напиши в чат {text}"
+        - "скажи {text}"
+      en:
+        - "send message {text}"
+        - "say {text}"
+        - "write {text} in chat"
+
+  - id: yolochat:messages
+    human:
+      ru:
+        - "покажи сообщения чата"
+        - "история чата"
+        - "прочитай сообщения"
+      en:
+        - "show chat messages"
+        - "chat history"
+        - "read messages"
+
+  # ── Models ──
+  - id: models:list
+    human:
+      ru:
+        - "покажи модели"
+        - "список моделей"
+        - "какие модели есть"
+        - "локальные модели"
+      en:
+        - "show models"
+        - "list models"
+        - "what models are available"
+        - "local models"
+
+  - id: models:download
+    human:
+      ru:
+        - "скачай модель {model_id}"
+        - "загрузи модель {model_id}"
+        - "установи модель {model_id}"
+      en:
+        - "download model {model_id}"
+        - "install model {model_id}"
+        - "get model {model_id}"
+
+  - id: models:delete
+    human:
+      ru:
+        - "удали модель {model_id}"
+        - "убери модель {model_id}"
+      en:
+        - "delete model {model_id}"
+        - "remove model {model_id}"
+
+  - id: models:select
+    human:
+      ru:
+        - "выбери модель {model_id} для {kind}"
+        - "используй модель {model_id}"
+        - "установи модель {model_id} для чата"
+      en:
+        - "select model {model_id} for {kind}"
+        - "use model {model_id}"
+        - "set model {model_id} for chat"
+
+  - id: models:pause
+    human:
+      ru:
+        - "пауза загрузки {model_id}"
+        - "приостанови загрузку {model_id}"
+      en:
+        - "pause download {model_id}"
+        - "stop downloading {model_id}"
+
+  - id: models:resume
+    human:
+      ru:
+        - "продолжи загрузку {model_id}"
+        - "возобнови загрузку {model_id}"
+      en:
+        - "resume download {model_id}"
+        - "continue downloading {model_id}"
+
+  - id: models:cancel
+    human:
+      ru:
+        - "отмени загрузку {model_id}"
+        - "отменить загрузку {model_id}"
+      en:
+        - "cancel download {model_id}"
+
+  - id: models:stop
+    human:
+      ru:
+        - "останови загрузку {model_id}"
+      en:
+        - "stop download {model_id}"
+
+  - id: lm:generate
+    human:
+      ru:
+        - "сгенерируй {message}"
+        - "спроси модель {message}"
+      en:
+        - "generate {message}"
+        - "ask model {message}"

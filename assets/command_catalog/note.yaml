@@ -1,0 +1,71 @@
+# Note commands
+commands:
+  - id: note
+    human:
+      ru:
+        - "запиши {text}"
+        - "обнови заметку {text}"
+        - "напиши в заметку {text}"
+        - "установи текст заметки {text}"
+        - "заметка {text}"
+      en:
+        - "set note to {text}"
+        - "write {text}"
+        - "update note with {text}"
+        - "note {text}"
+
+  - id: note:add
+    human:
+      ru:
+        - "допиши {text}"
+        - "добавь в заметку {text}"
+        - "припиши {text}"
+        - "дополни заметку {text}"
+        - "добавь текст {text}"
+      en:
+        - "append {text} to note"
+        - "add {text} to the note"
+        - "add to note {text}"
+
+  - id: note:create
+    human:
+      ru:
+        - "создай заметку {title}"
+        - "добавь заметку {title}"
+        - "новая заметка {title}"
+        - "сделай заметку {title}"
+        - "запиши заметку {title}"
+        - "создать заметку {title}"
+      en:
+        - "create note {title}"
+        - "add a note {title}"
+        - "new note {title}"
+        - "make a note {title}"
+        - "write a note {title}"
+
+  - id: note:append
+    human:
+      ru:
+        - "допиши к заметке {panel} текст {text}"
+        - "добавь в {panel} {text}"
+      en:
+        - "append {text} to note {panel}"
+        - "add {text} to {panel}"
+
+  - id: note:wrap
+    human:
+      ru:
+        - "включи автовысоту заметки {panel}"
+        - "авторазмер заметки {panel}"
+      en:
+        - "enable note wrap {panel}"
+        - "auto height for note {panel}"
+
+  - id: note:nowrap
+    human:
+      ru:
+        - "выключи автовысоту заметки {panel}"
+        - "фиксированный размер заметки {panel}"
+      en:
+        - "disable note wrap {panel}"
+        - "fixed height for note {panel}"

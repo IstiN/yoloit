@@ -1,0 +1,178 @@
+# Panel management commands
+commands:
+  - id: panels
+    human:
+      ru:
+        - "покажи панели"
+        - "список панелей"
+        - "какие панели есть"
+        - "что на борде"
+        - "все панели"
+      en:
+        - "show panels"
+        - "list panels"
+        - "what panels are there"
+        - "what is on the board"
+        - "all panels"
+
+  - id: panel
+    human:
+      ru:
+        - "покажи панель {panel}"
+        - "детали панели {panel}"
+        - "содержимое панели {panel}"
+        - "что в панели {panel}"
+      en:
+        - "show panel {panel}"
+        - "panel details {panel}"
+        - "panel content {panel}"
+        - "what is in panel {panel}"
+
+  - id: panel:create
+    human:
+      ru:
+        - "создай панель {title}"
+        - "добавь панель {title}"
+        - "новая панель {title}"
+        - "сделай панель {title}"
+      en:
+        - "create panel {title}"
+        - "add panel {title}"
+        - "new panel {title}"
+        - "make panel {title}"
+
+  - id: panel:delete
+    human:
+      ru:
+        - "удали панель {panel}"
+        - "убери панель {panel}"
+        - "удали {panel}"
+        - "убери {panel}"
+        - "удали все заметки"
+        - "удали заметку {panel}"
+        - "удали виджет {panel}"
+        - "удали чат {panel}"
+        - "удалить панель {panel}"
+      en:
+        - "delete panel {panel}"
+        - "remove panel {panel}"
+        - "delete {panel}"
+        - "remove {panel}"
+        - "delete all notes"
+        - "delete note {panel}"
+        - "remove widget {panel}"
+        - "delete chat {panel}"
+
+  - id: panel:rename
+    human:
+      ru:
+        - "переименуй панель {panel} в {new_title}"
+        - "назови панель {panel} {new_title}"
+        - "переименуй {panel} в {new_title}"
+        - "измени название {panel} на {new_title}"
+      en:
+        - "rename panel {panel} to {new_title}"
+        - "rename {panel} to {new_title}"
+        - "call panel {panel} {new_title}"
+        - "change panel name {panel} to {new_title}"
+
+  - id: panel:move
+    human:
+      ru:
+        - "подвинь панель {panel} на {x} {y}"
+        - "перемести {panel} на {x} {y}"
+        - "сдвинь {panel} на {x} {y}"
+      en:
+        - "move panel {panel} to {x} {y}"
+        - "move {panel} to {x} {y}"
+        - "position {panel} at {x} {y}"
+
+  - id: panel:resize
+    human:
+      ru:
+        - "измени размер панели {panel} на {width} {height}"
+        - "установи размер {panel} {width} на {height}"
+        - "сделай {panel} размером {width} на {height}"
+      en:
+        - "resize panel {panel} to {width} {height}"
+        - "resize {panel} to {width} by {height}"
+        - "set size of {panel} to {width} {height}"
+
+  - id: panel:focus
+    human:
+      ru:
+        - "открой панель {panel}"
+        - "покажи панель {panel}"
+        - "перейди к панели {panel}"
+        - "фокус на {panel}"
+      en:
+        - "focus panel {panel}"
+        - "open panel {panel}"
+        - "show panel {panel}"
+        - "go to panel {panel}"
+
+  - id: panel:color
+    human:
+      ru:
+        - "покрась панель {panel} в {color}"
+        - "цвет панели {panel} {color}"
+        - "установи цвет {panel} {color}"
+        - "сделай {panel} {color}"
+      en:
+        - "color panel {panel} {color}"
+        - "set panel {panel} color to {color}"
+        - "paint {panel} {color}"
+        - "make {panel} {color}"
+
+  - id: panel:hide
+    human:
+      ru:
+        - "спрячь панель {panel}"
+        - "скрой {panel}"
+        - "убери {panel} с экрана"
+      en:
+        - "hide panel {panel}"
+        - "hide {panel}"
+        - "conceal {panel}"
+
+  - id: panel:show
+    human:
+      ru:
+        - "покажи скрытую панель {panel}"
+        - "верни панель {panel}"
+        - "отобрази {panel}"
+      en:
+        - "show hidden panel {panel}"
+        - "unhide panel {panel}"
+        - "reveal {panel}"
+
+  - id: panel:types
+    human:
+      ru:
+        - "типы панелей"
+        - "какие типы панелей есть"
+        - "доступные типы"
+      en:
+        - "panel types"
+        - "what panel types are available"
+        - "available types"
+
+  - id: panel:help
+    human:
+      ru:
+        - "помощь по панели {panel}"
+        - "что умеет панель {panel}"
+        - "действия панели {panel}"
+      en:
+        - "panel help {panel}"
+        - "what can panel {panel} do"
+        - "panel actions {panel}"
+
+  - id: do
+    human:
+      ru:
+        - "выполни действие {action} на {panel}"
+        - "сделай {action} с {panel}"
+      en:
+        - "do {action} on {panel}"
+        - "execute {action} on {panel}"

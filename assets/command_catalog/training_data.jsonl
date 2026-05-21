@@ -1,0 +1,576 @@
+{"input": "перезагрузи", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "хот релоад", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "обнови", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "reload", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "hot reload", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "refresh", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "перезапусти", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "рестарт", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "хот рестарт", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "restart", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "hot restart", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "помощь", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "что ты умеешь", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "какие команды есть", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "покажи команды", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "хелп", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "help", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "what can you do", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "show commands", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "list commands", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "покажи приложения", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "список приложений", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "мои приложения", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "какие приложения есть", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "show apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "list apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "my apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "what apps are installed", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "запусти приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "открой приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "запусти my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "открой my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "run app my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "open app my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "launch my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "start my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "установи приложение https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "инсталл https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "поставь https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "install app https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "install https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "add app https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "удали приложение my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "удали апп my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "убери приложение my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "remove app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "uninstall app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "delete app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "создай приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "новое приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "сделай приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "create app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "new app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "scaffold app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "выполни click в приложении my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "нажми click в my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "execute click in app my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "trigger click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "перезагрузи приложение my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "обнови приложение my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "reload app my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "refresh app my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "покажи логи приложения my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "логи my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "show app logs my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "app logs my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "logs for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "снепшот приложения my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "состояние приложения my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "app snapshot my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "app state my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "скриншот приложения my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "сфоткай приложение my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "screenshot app my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "capture app my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "покажи гайд по разработке", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "документация по виджетам", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "show dev guide", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "widget development docs", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "покажи демо приложения", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "примеры приложений", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "демо", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "show demo apps", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "demo apps", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "examples", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "покажи код демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "исходник демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "show demo source my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "view demo my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "покажи борды", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "список бордов", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "какие борды есть", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "мои доски", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "все борды", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "show boards", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "list boards", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "what boards do I have", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "my boards", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "all boards", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "покажи борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "детали борда MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "информация о борде MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "что на борде MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "show board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "board details MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "info about board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "what is on board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "создай борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "создай доску Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "новый борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "новая доска Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "добавь борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "create board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "new board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "add board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "make a board called Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "переименуй борд MyBoard в Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "назови борд MyBoard Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "измени имя борда MyBoard на Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "rename board MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "change board name MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "call board MyBoard Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "удали борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "удали доску MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "убери борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "удалить борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "delete board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "remove board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "destroy board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "открой борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "переключись на MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "покажи борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "перейди на MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "открой доску MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "open board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "switch to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "go to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "show board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "focus board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "используй борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "выбери борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "установи борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "use board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "select board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "set board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "какой борд сейчас", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "текущий борд", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "на каком борде я", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "what board am I on", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "current board", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "which board is active", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "снепшот борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "текстовый снимок борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "структура борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "snapshot of board MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "board snapshot MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "board structure MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "скриншот борда MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "сфоткай борд MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "сохрани скриншот борда MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "screenshot board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "capture board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "save screenshot of board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "расставь панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "упорядочи панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "выровняй панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "автораскладка", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "arrange panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "organize panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "auto arrange", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "tidy up panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "покажи весь борд", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "уместить все", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "зумируй чтобы все влезло", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "fit to view", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "show everything", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "zoom to fit", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "зум scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
+{"input": "масштаб scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
+{"input": "увеличь до scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
+{"input": "zoom scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
+{"input": "set zoom scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
+{"input": "scale to scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
+{"input": "диаграмма борда MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "нарисуй схему борда MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "board diagram MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "draw board diagram MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "экспорт SVG борда MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "сохрани борд MyBoard как SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "export board MyBoard as SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "save board MyBoard SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "примени YAML song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "загрузи конфигурацию song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "apply YAML song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "load config song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "сдвинь борд на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "подвинь вид на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "move viewport to 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "translate board 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "добавь в чеклист молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "добавь пункт молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "запиши в список молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "добавь задачу молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "добавь в список молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "новый пункт молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "add молоко to checklist", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "add checklist item молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "add task молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "add to list молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "new item молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "создай чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "новый чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "создай список тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "добавь чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "создать список задач тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "create checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "new checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "add checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "make checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "create todo list тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "отметь молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "выполни молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "сделано молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "отметь как сделано молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "галочка молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "чек молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "check молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "mark молоко done", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "complete молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "tick молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "done молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "убери отметку молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "сними галочку молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "не сделано молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "анчек молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "uncheck молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "mark молоко not done", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "untick молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "undo молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "покажи колонки канбана", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "какие колонки есть", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "список колонок", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "show kanban columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "list columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "what columns are there", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "добавь колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "создай колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "новая колонка Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "add column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "create column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "new column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "переименуй колонку Todo в Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "назови колонку Todo Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "rename column Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "change column name Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "удали колонку Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "убери колонку Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "remove column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "delete column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "добавь карточку тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "создай карточку тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "новая карточка тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "добавь задачу тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "добавь в Todo тест", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"Todo\", \"тест\"]}"}
+{"input": "add card тест to Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "create card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "new card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "add task тест to Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "add тест to Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "перемести карточку c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "двинь c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "передвинь c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "move card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "move c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "drag c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "удали карточку c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "убери карточку c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "удали задачу c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "remove card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "delete card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "remove task c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "обнови карточку c-1 на Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "переименуй карточку c-1 в Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "измени карточку c-1 на Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "update card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "rename card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "change card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "покажи карточки", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "список карточек", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "все карточки", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "show cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "list cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "all cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "покажи связи", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "список связей", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "какие связи есть", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "show links", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "list links", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "what links are there", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "свяжи p-1 с p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "создай связь от p-1 к p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "соедини p-1 и p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "link p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "connect p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "create link from p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "удали связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "убери связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "delete link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "remove link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "стиль связи l-1 dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "измени стиль связи l-1", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\"]}"}
+{"input": "set link style l-1 dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "change link style l-1", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\"]}"}
+{"input": "цвет связи l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "покрась связь l-1 в blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "link color l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "color link l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "поставь таймер на 300 секунд", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "таймер 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "засеки 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "создай таймер Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
+{"input": "таймер на 300 минут", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "поставь таймер", "output": "{\"c\": \"timer:create\", \"a\": []}"}
+{"input": "set timer for 300 seconds", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "timer 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "start a timer Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
+{"input": "create timer Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
+{"input": "set timer for 300 minutes", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "start timer", "output": "{\"c\": \"timer:create\", \"a\": []}"}
+{"input": "включи song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "проиграй song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "воспроизведи song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "плей song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "play song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "start playing song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "play media song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "открой сайт https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "открой ссылку https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "загрузи https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "покажи страницу https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "open website https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "open url https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "go to https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "load page https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "покажи запущенные сессии", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "список сессий", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "что запущено", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "show running sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "list sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "what is running", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "введи hello world в сессию ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "отправь hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "send hello world to session ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "input hello world to ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "подключись к сессии ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "аттач ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "attach to session ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "connect to ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "отключись от сессии ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "детач ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "detach session ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "disconnect ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "покажи вывод сессии ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "лог сессии ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "show output of ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "session output ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "открой сессию ses-1 в панели", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "попаут ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "popout session ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "open ses-1 in panel", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "покажи чат панели", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "список чатов", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "какие чаты есть", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "show chat panels", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "list chats", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "what chats are there", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "отправь сообщение hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "напиши в чат hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "скажи hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "send message hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "say hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "write hello world in chat", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "покажи сообщения чата", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "история чата", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "прочитай сообщения", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "show chat messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "chat history", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "read messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "покажи модели", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "список моделей", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "какие модели есть", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "локальные модели", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "show models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "list models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "what models are available", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "local models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "скачай модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "загрузи модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "установи модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "download model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "install model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "get model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "удали модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "убери модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "delete model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "remove model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "выбери модель qwen3-0.6b-4bit для chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "используй модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "установи модель qwen3-0.6b-4bit для чата", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "select model qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "use model qwen3-0.6b-4bit", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "set model qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пауза загрузки qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "приостанови загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "pause download qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "stop downloading qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "продолжи загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "возобнови загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "resume download qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "continue downloading qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "отмени загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "отменить загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "cancel download qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "останови загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "stop download qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "сгенерируй hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "спроси модель hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "generate hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "ask model hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "запиши hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "обнови заметку hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "напиши в заметку hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "установи текст заметки hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "заметка hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "set note to hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "write hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "update note with hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "note hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "допиши hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "добавь в заметку hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "припиши hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "дополни заметку hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "добавь текст hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "append hello world to note", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "add hello world to the note", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "add to note hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "создай заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "добавь заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "новая заметка тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "сделай заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "запиши заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "создать заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "create note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "add a note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "new note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "make a note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "write a note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "допиши к заметке p-123 текст hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "добавь в p-123 hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "append hello world to note p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "add hello world to p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "включи автовысоту заметки p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "авторазмер заметки p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "enable note wrap p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "auto height for note p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "выключи автовысоту заметки p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "фиксированный размер заметки p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "disable note wrap p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "fixed height for note p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "покажи панели", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "список панелей", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "какие панели есть", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "что на борде", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "все панели", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "show panels", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "list panels", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "what panels are there", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "what is on the board", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "all panels", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "покажи панель p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "детали панели p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "содержимое панели p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "что в панели p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "show panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "panel details p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "panel content p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "what is in panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "создай панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "добавь панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "новая панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "сделай панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "create panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "add panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "new panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "make panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "удали панель p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "убери панель p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "удали p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "убери p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "удали все заметки", "output": "{\"c\": \"panel:delete\", \"a\": []}"}
+{"input": "удали заметку p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "удали виджет p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "удали чат p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "удалить панель p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "delete panel p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "remove panel p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "delete p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "remove p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "delete all notes", "output": "{\"c\": \"panel:delete\", \"a\": []}"}
+{"input": "delete note p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "remove widget p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "delete chat p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "переименуй панель p-123 в Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "назови панель p-123 Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "переименуй p-123 в Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "измени название p-123 на Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "rename panel p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "rename p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "call panel p-123 Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "change panel name p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "подвинь панель p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "перемести p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "сдвинь p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "move panel p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "move p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "position p-123 at 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "измени размер панели p-123 на 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "установи размер p-123 400 на 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "сделай p-123 размером 400 на 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "resize panel p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "resize p-123 to 400 by 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "set size of p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "открой панель p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "покажи панель p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "перейди к панели p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "фокус на p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "focus panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "open panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "show panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "go to panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "покрась панель p-123 в blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "цвет панели p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "установи цвет p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "сделай p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "color panel p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "set panel p-123 color to blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "paint p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "make p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "спрячь панель p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "скрой p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "убери p-123 с экрана", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "hide panel p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "hide p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "conceal p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "покажи скрытую панель p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "верни панель p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "отобрази p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "show hidden panel p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "unhide panel p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "reveal p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "типы панелей", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "какие типы панелей есть", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "доступные типы", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "panel types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "what panel types are available", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "available types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "помощь по панели p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "что умеет панель p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "действия панели p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "panel help p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "what can panel p-123 do", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "panel actions p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "выполни действие click на p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "сделай click с p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "do click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "execute click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}

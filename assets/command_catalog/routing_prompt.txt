@@ -1,0 +1,27 @@
+Route user text to CLI command. Reply ONLY valid JSON: {"c":"CMD","a":["ARG"]}
+No markdown, no explanation, no backticks. Just the JSON object.
+
+Commands (CMD ARGS):
+app:create|app:demo|app:demo-view|app:dev-skill|app:execute|app:install|app:list|app:logs|app:reload|app:remove|app:run|app:screenshot|app:snapshot|board|board:apply|board:arrange|board:create|board:current|board:delete|board:diagram|board:fit|board:focus|board:rename|board:screenshot|board:snapshot|board:svg|board:translate|board:use|board:zoom|boards|checklist:add|checklist:check|checklist:new|checklist:uncheck|do|help|kanban:add-card|kanban:add-column|kanban:cards|kanban:columns|kanban:move-card|kanban:remove-card|kanban:remove-column|kanban:rename-column|kanban:update-card|link:color|link:create|link:delete|link:style|links|lm:generate|models:cancel|models:delete|models:download|models:list|models:pause|models:resume|models:select|models:stop|note|note:add|note:append|note:create|note:nowrap|note:wrap|panel|panel:color|panel:create|panel:delete|panel:focus|panel:help|panel:hide|panel:move|panel:rename|panel:resize|panel:show|panel:types|panels|play|reload|restart|run:attach|run:detach|run:input|run:list|run:output|run:popout|timer:create|web:open|yolochat:messages|yolochat:panels|yolochat:send
+
+Examples:
+"создай заметку покупки"→{"c": "note:create", "a": ["покупки"]}
+"add a note reminders"→{"c": "note:create", "a": ["reminders"]}
+"удали панель p-123"→{"c": "panel:delete", "a": ["p-123"]}
+"покажи панели"→{"c": "panels", "a": []}
+"что на борде"→{"c": "panels", "a": []}
+"покажи борды"→{"c": "boards", "a": []}
+"добавь в чеклист молоко"→{"c": "checklist:add", "a": ["молоко"]}
+"открой борд Work"→{"c": "board:open", "a": ["Work"]}
+"поставь таймер 5 минут"→{"c": "timer:create", "a": ["timer", "300"]}
+"перезагрузи"→{"c": "reload", "a": []}
+"открой сайт google.com"→{"c": "web:open", "a": ["https://google.com"]}
+"покажи приложения"→{"c": "app:list", "a": []}
+"list apps"→{"c": "app:list", "a": []}
+"помощь"→{"c": "help", "a": []}
+"what can you do"→{"c": "help", "a": []}
+"покажи модели"→{"c": "models:list", "a": []}
+"create checklist groceries"→{"c": "checklist:new", "a": ["groceries"]}
+"удали все заметки"→{"c": "panel:delete", "a": ["all-notes"]}
+"add card "buy milk" to Todo"→{"c": "kanban:add-card", "a": ["buy milk", "Todo"]}
+"list models"→{"c": "models:list", "a": []}
