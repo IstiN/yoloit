@@ -996,7 +996,7 @@ elif fmt == "registry":
     print(json.dumps(out, ensure_ascii=False, indent=2))
 elif fmt == "catalog":
     # Fetch catalog from Dart server (includes humanVariants from tool registry)
-    import urllib.request, urllib.error
+    import os, urllib.request, urllib.error
     port_file = os.path.expanduser("~/.config/yoloit/cli.port")
     try:
         with open(port_file) as f:
