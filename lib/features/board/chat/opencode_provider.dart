@@ -240,7 +240,14 @@ class OpencodeProvider extends ChatProvider {
       // Watch the opencode log file in real-time and surface retries immediately.
       // Log is at ~/.local/share/opencode/log/*.log — a new file per run.
       final logWatcher = _OpenCodeLogWatcher(
-        onRetry: (msg) => _emitErrorMessage(controller, msg),
+        onRetry: (msg, {bool isFatal = false}) {
+          _emitErrorMessage(controller, msg);
+          if (isFatal) {
+            // Kill immediately so the spinner stops — no need to wait for timeout.
+            startupTimer.cancel();
+            process.kill(ProcessSignal.sigterm);
+          }
+        },
       );
       unawaited(logWatcher.start());
 
@@ -640,7 +647,7 @@ class OpencodeProvider extends ChatProvider {
 class _OpenCodeLogWatcher {
   _OpenCodeLogWatcher({required this.onRetry});
 
-  final void Function(String message) onRetry;
+  final void Function(String message, {bool isFatal}) onRetry;
 
   bool _stopped = false;
   final _emittedMessages = <String>{};
@@ -734,7 +741,7 @@ class _OpenCodeLogWatcher {
     _emittedMessages.add(display);
 
     debugPrint('[OpenCodeLog] Emitting: $display');
-    onRetry(display);
+    onRetry(display, isFatal: statusCode == 429);
   }
 
   void stop() {
