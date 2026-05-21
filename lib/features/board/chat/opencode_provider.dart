@@ -22,6 +22,8 @@ class OpencodeProvider extends ChatProvider {
 
   final Map<String, String> _sessionIds = {};
   final Map<String, Process> _processes = {};
+  // Tracks last model used per session — if model changes, session is reset.
+  final Map<String, String> _sessionModels = {};
   String? _cachedYoloitBin;
 
   // Cached models loaded from models.dev
@@ -135,8 +137,15 @@ class OpencodeProvider extends ChatProvider {
       args.addAll(['--agent', config.mode!]);
     }
 
-    // Session resume
+    // Session resume — reset session if model changed since last message.
     if (!isFirstMessage) {
+      final lastModel = _sessionModels[config.sessionName];
+      if (lastModel != null && lastModel != config.model) {
+        debugPrint(
+          '[OpenCode] Model changed ($lastModel → ${config.model}), starting new session',
+        );
+        _sessionIds.remove(config.sessionName);
+      }
       final sessionID = _sessionIds[config.sessionName];
       if (sessionID != null) {
         args.addAll(['--session', sessionID]);
@@ -147,6 +156,7 @@ class OpencodeProvider extends ChatProvider {
         );
       }
     }
+    _sessionModels[config.sessionName] = config.model;
 
     // Working directory
     if (config.workingDir.isNotEmpty) {
