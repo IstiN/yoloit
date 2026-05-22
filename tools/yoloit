@@ -356,6 +356,59 @@ commands = [
     "example": "yoloit yolochat:messages --board \"Main\" --panel \"AI Chat\" --limit 20",
   },
   {
+    "group": "cloud",
+    "name": "cloud:list",
+    "description": "List cloud LLM providers and active config",
+    "params": [],
+    "example": "yoloit cloud:list",
+  },
+  {
+    "group": "cloud",
+    "name": "cloud:add",
+    "description": "Add a cloud LLM provider config",
+    "params": [
+      ["name", "Provider display name", True],
+      ["--url base-url", "API base URL", True],
+      ["--key api-key", "API key", True],
+      ["--model model-id", "Model identifier", True],
+    ],
+    "example": "yoloit cloud:add OpenRouter --url https://openrouter.ai/api/v1 --key sk-... --model mistralai/mistral-small-3.1-24b-instruct",
+  },
+  {
+    "group": "cloud",
+    "name": "cloud:remove",
+    "description": "Remove a cloud provider config by id",
+    "params": [["id", "Config id", True]],
+    "example": "yoloit cloud:remove cloud-1234567890",
+  },
+  {
+    "group": "cloud",
+    "name": "cloud:select",
+    "description": "Set the active cloud provider config",
+    "params": [["id", "Config id", True]],
+    "example": "yoloit cloud:select cloud-1234567890",
+  },
+  {
+    "group": "cloud",
+    "name": "cloud:update",
+    "description": "Update fields of an existing cloud provider config",
+    "params": [
+      ["id", "Config id", True],
+      ["--name name", "New display name", False],
+      ["--url base-url", "New base URL", False],
+      ["--key api-key", "New API key", False],
+      ["--model model-id", "New model id", False],
+    ],
+    "example": "yoloit cloud:update cloud-123 --model gpt-4o",
+  },
+  {
+    "group": "cloud",
+    "name": "cloud:provider",
+    "description": "Get or set assistant provider type (local or cloud)",
+    "params": [["local|cloud", "Provider type (omit to show current)", False]],
+    "example": "yoloit cloud:provider cloud",
+  },
+  {
     "group": "link",
     "name": "links",
     "description": "List links on board",
@@ -886,7 +939,7 @@ by_group = defaultdict(list)
 for c in commands:
     by_group[c["group"]].append(c)
 
-group_order = ["app", "board", "panel", "run", "timer", "models", "yolochat", "link", "note", "checklist", "kanban", "playlist", "webpage"]
+group_order = ["app", "board", "panel", "run", "timer", "models", "cloud", "yolochat", "link", "note", "checklist", "kanban", "playlist", "webpage"]
 
 def params_inline(c):
     if not c["params"]:
@@ -1744,6 +1797,67 @@ PY
       path="${path}?$(IFS='&'; echo "${q[*]}")"
     fi
     _get "$path" | python3 -m json.tool 2>/dev/null || _get "$path"
+    ;;
+
+  # ── cloud providers ──
+  cloud:list)
+    _get "/cloud-providers" | python3 -m json.tool 2>/dev/null
+    ;;
+  cloud:add)
+    c_name=""; c_url=""; c_key=""; c_model=""
+    # First positional arg is name
+    if [[ $# -ge 1 && ! "$1" == --* ]]; then
+      c_name="$1"; shift
+    fi
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --url)  c_url="${2:-}"; shift 2 ;;
+        --key)  c_key="${2:-}"; shift 2 ;;
+        --model) c_model="${2:-}"; shift 2 ;;
+        --name) c_name="${2:-}"; shift 2 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+      esac
+    done
+    if [[ -z "$c_name" || -z "$c_url" || -z "$c_key" || -z "$c_model" ]]; then
+      echo "Usage: yoloit cloud:add <name> --url <base-url> --key <api-key> --model <model-id>" >&2
+      exit 1
+    fi
+    _post "/cloud-providers/add" "{\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$c_name"),\"baseUrl\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$c_url"),\"apiKey\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$c_key"),\"model\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$c_model")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  cloud:remove)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit cloud:remove <config-id>" >&2; exit 1; }
+    _post "/cloud-providers/remove" "{\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$1")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  cloud:select)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit cloud:select <config-id>" >&2; exit 1; }
+    _post "/cloud-providers/select" "{\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$1")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  cloud:update)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit cloud:update <config-id> [--name N] [--url U] [--key K] [--model M]" >&2; exit 1; }
+    cu_id="$1"; shift
+    cu_body="{\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$cu_id")"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --name)  cu_body="$cu_body,\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "${2:-}")"; shift 2 ;;
+        --url)   cu_body="$cu_body,\"baseUrl\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "${2:-}")"; shift 2 ;;
+        --key)   cu_body="$cu_body,\"apiKey\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "${2:-}")"; shift 2 ;;
+        --model) cu_body="$cu_body,\"model\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "${2:-}")"; shift 2 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+      esac
+    done
+    cu_body="$cu_body}"
+    _post "/cloud-providers/update" "$cu_body" | python3 -m json.tool 2>/dev/null
+    ;;
+  cloud:provider)
+    if [[ $# -lt 1 ]]; then
+      _get "/cloud-providers" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('providerType','local'))" 2>/dev/null
+    else
+      ptype="$1"
+      if [[ "$ptype" != "local" && "$ptype" != "cloud" ]]; then
+        echo "Usage: yoloit cloud:provider <local|cloud>" >&2; exit 1
+      fi
+      _post "/cloud-providers/provider-type" "{\"type\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$ptype")}" | python3 -m json.tool 2>/dev/null
+    fi
     ;;
 
   # ── links ──

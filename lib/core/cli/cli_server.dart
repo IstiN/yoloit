@@ -23,6 +23,7 @@ import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
+import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
@@ -230,6 +231,11 @@ class CliServer {
       return _handleYoloChat(method, path.sublist(1), request, cubit);
     }
 
+    // /api/cloud-providers/...
+    if (path.isNotEmpty && path[0] == 'cloud-providers') {
+      return _handleCloudProviders(method, path.sublist(1), request);
+    }
+
     // GET /api/active-board → active board details (or first board)
     if (path.length == 1 && path[0] == 'active-board' && method == 'GET') {
       final board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
@@ -371,6 +377,116 @@ class CliServer {
     }
 
     return _notFound('Unknown local-models route');
+  }
+
+  // ── Cloud provider routes ──────────────────────────────────────────────
+
+  Future<shelf.Response> _handleCloudProviders(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+  ) async {
+    final service = CloudLlmSettingsService.instance;
+
+    // GET /api/cloud-providers → list all configs + active id + provider type
+    if (sub.isEmpty && method == 'GET') {
+      final configs = await service.loadConfigs();
+      final activeId = await service.loadActiveConfigId();
+      final providerType = await service.loadAssistantProviderType();
+      return _json({
+        'ok': true,
+        'providerType': providerType,
+        'activeConfigId': activeId,
+        'configs': configs.map((c) => {
+          'id': c.id,
+          'name': c.name,
+          'baseUrl': c.baseUrl,
+          'model': c.model,
+          'hasKey': c.apiKey.isNotEmpty,
+        }).toList(),
+      });
+    }
+
+    // POST /api/cloud-providers/add { name, baseUrl, apiKey, model, extraHeaders? }
+    if (sub.length == 1 && sub[0] == 'add' && method == 'POST') {
+      final body = await _body(request);
+      final name = body['name'] as String?;
+      final baseUrl = body['baseUrl'] as String?;
+      final apiKey = body['apiKey'] as String?;
+      final model = body['model'] as String?;
+      if (name == null || baseUrl == null || apiKey == null || model == null) {
+        return _error('Missing required fields: name, baseUrl, apiKey, model');
+      }
+      final extra = <String, String>{};
+      if (body['extraHeaders'] is Map) {
+        (body['extraHeaders'] as Map).forEach((k, v) {
+          extra[k.toString()] = v.toString();
+        });
+      }
+      final config = CloudLlmConfig(
+        id: 'cloud-${DateTime.now().millisecondsSinceEpoch}',
+        name: name,
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+        model: model,
+        extraHeaders: extra,
+      );
+      await service.upsertConfig(config);
+      return _json({'ok': true, 'action': 'add', 'id': config.id});
+    }
+
+    // POST /api/cloud-providers/remove { id }
+    if (sub.length == 1 && sub[0] == 'remove' && method == 'POST') {
+      final body = await _body(request);
+      final id = body['id'] as String?;
+      if (id == null) return _error('Missing "id" field');
+      await service.removeConfig(id);
+      return _json({'ok': true, 'action': 'remove', 'id': id});
+    }
+
+    // POST /api/cloud-providers/select { id }
+    if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
+      final body = await _body(request);
+      final id = body['id'] as String?;
+      if (id == null) return _error('Missing "id" field');
+      await service.saveActiveConfigId(id);
+      return _json({'ok': true, 'action': 'select', 'id': id});
+    }
+
+    // POST /api/cloud-providers/provider-type { type: 'local'|'cloud' }
+    if (sub.length == 1 && sub[0] == 'provider-type' && method == 'POST') {
+      final body = await _body(request);
+      final type = body['type'] as String?;
+      if (type == null || (type != 'local' && type != 'cloud')) {
+        return _error('Missing or invalid "type" field. Expected "local" or "cloud".');
+      }
+      await service.saveAssistantProviderType(type);
+      return _json({'ok': true, 'action': 'set-provider-type', 'type': type});
+    }
+
+    // POST /api/cloud-providers/update { id, ...fields }
+    if (sub.length == 1 && sub[0] == 'update' && method == 'POST') {
+      final body = await _body(request);
+      final id = body['id'] as String?;
+      if (id == null) return _error('Missing "id" field');
+      final existing = await service.loadConfigById(id);
+      if (existing == null) return _error('Config not found: $id');
+      final updated = CloudLlmConfig(
+        id: id,
+        name: body['name'] as String? ?? existing.name,
+        baseUrl: body['baseUrl'] as String? ?? existing.baseUrl,
+        apiKey: body['apiKey'] as String? ?? existing.apiKey,
+        model: body['model'] as String? ?? existing.model,
+        extraHeaders: body['extraHeaders'] is Map
+            ? (body['extraHeaders'] as Map)
+                .map((k, v) => MapEntry(k.toString(), v.toString()))
+            : existing.extraHeaders,
+      );
+      await service.upsertConfig(updated);
+      return _json({'ok': true, 'action': 'update', 'id': id});
+    }
+
+    return _notFound('Unknown cloud-providers route');
   }
 
   Future<shelf.Response> _handleLmGenerate(shelf.Request request) async {

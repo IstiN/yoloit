@@ -31,10 +31,7 @@ import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 
 const _kCategories = [
   'Appearance',
-  'AI Agents',
-  'AI Models',
-  'Provider Models',
-  'Cloud Providers',
+  'AI & Models',
   'Environment',
   'Notifications',
   'Sessions',
@@ -46,7 +43,7 @@ const _kCategories = [
   'About',
 ];
 
-const _kSkillsCategoryIndex = 9;
+const _kSkillsCategoryIndex = 6;
 
 /// Settings overlay shown as a modal dialog with sidebar navigation.
 class SettingsPage extends StatefulWidget {
@@ -226,6 +223,10 @@ class _SettingsPageState extends State<SettingsPage> {
         1 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const _SectionHeader(title: 'Cloud Providers'),
+            const SizedBox(height: 12),
+            const CloudProvidersSection(),
+            const SizedBox(height: 24),
             const _SectionHeader(title: 'AI Agents'),
             const SizedBox(height: 12),
             _AgentSettingsSection(),
@@ -237,33 +238,17 @@ class _SettingsPageState extends State<SettingsPage> {
             const _SectionHeader(title: 'Chat Context'),
             const SizedBox(height: 12),
             const _ChatContextSection(),
+            const SizedBox(height: 24),
+            const _SectionHeader(title: 'Local Models'),
+            const SizedBox(height: 12),
+            const AiModelsSection(),
+            const SizedBox(height: 24),
+            const _SectionHeader(title: 'Provider Models'),
+            const SizedBox(height: 12),
+            const ProviderModelsSection(),
           ],
         ),
         2 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SectionHeader(title: 'AI Models'),
-            SizedBox(height: 12),
-            AiModelsSection(),
-          ],
-        ),
-        3 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SectionHeader(title: 'Provider Models'),
-            SizedBox(height: 12),
-            ProviderModelsSection(),
-          ],
-        ),
-        4 => const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SectionHeader(title: 'Cloud Providers'),
-            SizedBox(height: 12),
-            CloudProvidersSection(),
-          ],
-        ),
-        5 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Environment'),
@@ -271,7 +256,7 @@ class _SettingsPageState extends State<SettingsPage> {
             GlobalEnvGroupsSection(),
           ],
         ),
-        6 => const Column(
+        3 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Notifications'),
@@ -279,7 +264,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _NotificationsSection(),
           ],
         ),
-        7 => Column(
+        4 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Sessions'),
@@ -287,7 +272,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _SessionSettings(),
           ],
         ),
-        8 => Column(
+        5 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Keyboard Shortcuts'),
@@ -295,7 +280,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _ShortcutsTable(),
           ],
         ),
-        10 => const Column(
+        7 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Sync'),
@@ -303,8 +288,8 @@ class _SettingsPageState extends State<SettingsPage> {
             SyncSection(),
           ],
         ),
-        11 => const SetupGuideEmbedded(),
-        12 => const Column(
+        8 => const SetupGuideEmbedded(),
+        9 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Widget API Permissions'),
