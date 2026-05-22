@@ -839,9 +839,9 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
   ) {
     final out = <String>[tool.command];
     for (final param in tool.params) {
-      final value = _argumentValue(param, arguments, runtimeContext);
+      final value = _argumentValue(param, arguments, runtimeContext, tool);
       if (_isMissing(value)) {
-        if (param.required) {
+        if (param.required && !(_cliAutoResolvesPanel(tool.group) && param.runtimeDefault == YoloitCliRuntimeDefault.panel)) {
           throw ArgumentError(
             'Missing required "${param.key}" for ${tool.command}',
           );
@@ -869,6 +869,7 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     YoloitCliToolParam param,
     Map<String, Object?> arguments,
     ChatRuntimeContext? runtimeContext,
+    YoloitCliTool tool,
   ) {
     if (param.shortKey != null && arguments.containsKey(param.shortKey!)) {
       return arguments[param.shortKey!];
@@ -886,12 +887,31 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
         runtimeContext?.boardId,
         runtimeContext?.boardName,
       ),
-      YoloitCliRuntimeDefault.panel => _firstNotEmpty(
-        runtimeContext?.panelId,
-        runtimeContext?.panelTitle,
-      ),
+      YoloitCliRuntimeDefault.panel => _panelDefault(runtimeContext, tool),
       null => null,
     };
+  }
+
+  /// Returns the runtime panel default, but skips chat/assistant panels for
+  /// tools that operate on typed panels (note, checklist, kanban). The CLI
+  /// auto-resolves the correct panel by type when none is provided.
+  Object? _panelDefault(ChatRuntimeContext? ctx, YoloitCliTool tool) {
+    final id = _firstNotEmpty(ctx?.panelId, ctx?.panelTitle);
+    if (id == null) return null;
+    if (_cliAutoResolvesPanel(tool.group) && _isChatPanel('$id')) return null;
+    return id;
+  }
+
+  static bool _isChatPanel(String id) {
+    return id.contains('assistant') ||
+        id.contains('yolo_badge') ||
+        id.contains('yolochat');
+  }
+
+  /// Tool groups where the CLI auto-resolves the panel by type and the chat
+  /// panel should NOT be injected as a fallback.
+  static bool _cliAutoResolvesPanel(String group) {
+    return group == 'note' || group == 'checklist' || group == 'kanban';
   }
 
   bool _isMissing(Object? value) {
