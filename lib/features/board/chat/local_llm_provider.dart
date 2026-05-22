@@ -403,7 +403,31 @@ class LocalLlmProvider extends ChatProvider {
     } else {
       await LocalAiModelsService.instance.ensureRuntimeReady();
     }
-    final modelId = LocalAiModelsService.instance.selectedChatModelId;
+    var modelId = LocalAiModelsService.instance.selectedChatModelId;
+
+    // If a router model is selected for chat, auto-switch to the orchestrator.
+    // The orchestrator (Gemma 4) decides when to call tools vs respond with text.
+    if (modelId.toLowerCase().contains('router')) {
+      final service = LocalAiModelsService.instance;
+      final orchestratorId = service.chatModels
+          .map((m) => m.id)
+          .where(
+            (id) =>
+                id.toLowerCase().contains('gemma4') ||
+                id.toLowerCase().contains('gemma-4'),
+          )
+          .where((id) => service.installedModelById(id) != null)
+          .firstOrNull;
+      if (orchestratorId != null) {
+        // ignore: avoid_print
+        print(
+          '[LocalLlmProvider] auto-switching from router "$modelId" '
+          'to orchestrator "$orchestratorId" for chat',
+        );
+        modelId = orchestratorId;
+      }
+    }
+
     final installed = LocalAiModelsService.instance.installedModelById(modelId);
     if (installed == null) {
       throw StateError(
