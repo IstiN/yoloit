@@ -106,6 +106,13 @@ class LocalLlmProvider extends ChatProvider {
     try {
       final installed = await _loadInstalledModel();
       final requestProfile = _requestProfileFor(installed.manifest);
+      // ignore: avoid_print
+      print(
+        '[LocalLlmProvider] model=${installed.manifest.id} '
+        'router=${_isRouterModel(installed.manifest)} '
+        'compact=${requestProfile.compactPrompt} '
+        'maxTok=${requestProfile.maxTokens}',
+      );
 
       if (isFirstMessage) {
         _history[session] = [];

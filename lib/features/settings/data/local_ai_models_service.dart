@@ -75,6 +75,11 @@ class LocalAiModelsService {
       kind: LocalAiModelKind.chat,
     ),
     LocalAiModelDefinition(
+      id: 'yoloit-router-v6',
+      displayName: 'YoLoIT Router v6',
+      kind: LocalAiModelKind.chat,
+    ),
+    LocalAiModelDefinition(
       id: 'yoloit-router-v5',
       displayName: 'YoLoIT Router v5',
       kind: LocalAiModelKind.chat,

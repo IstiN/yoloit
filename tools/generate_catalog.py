@@ -29,7 +29,10 @@ SYSTEM_PROMPT = 'Route user text to YoLoIT CLI command. Reply ONLY JSON: {"c":"C
 # Multiple sample values per parameter for augmentation
 PARAM_SAMPLES = {
     'title': ['тест', 'покупки', 'Work', 'My Tasks', 'идеи', 'Проект', 'Sprint 1',
-              'заметки', 'Backlog', 'Daily', 'Important', 'weekly report'],
+              'заметки', 'Backlog', 'Daily', 'Important', 'weekly report',
+              'купить молоко', 'купить кефир', 'список дел', 'план на неделю',
+              'заметки с митинга', 'grocery list', 'meeting notes', 'bug fixes',
+              'сходить в магазин', 'позвонить маме', 'отправить отчёт'],
     'panel': ['p-123', 'Заметки', 'My Note', 'panel-chat', 'Dev Notes', 'Todo List',
               'Builds', 'p-42', 'Meeting Notes', 'Release Plan'],
     'board': ['MyBoard', '__SMOKE__', 'Work', 'Main Board', 'Planning', 'Retro',
@@ -38,7 +41,10 @@ PARAM_SAMPLES = {
              'call meeting at 3pm', 'review PR #123', 'send report',
              'заметки с митинга', 'обновить зависимости', 'check deploy status'],
     'item': ['молоко', 'хлеб', 'buy milk', 'call John', 'review PR',
-             'fix tests', 'deploy', 'write docs', 'send email', 'update README'],
+             'fix tests', 'deploy', 'write docs', 'send email', 'update README',
+             'купить кефир', 'позвонить маме', 'сходить за хлебом',
+             'забрать посылку', 'оплатить счёт', 'pick up groceries',
+             'book a meeting', 'check server logs'],
     'name': ['Work', 'Done', 'Проект', 'Sprint 1', 'Backlog', 'Archive',
              'In Progress', 'Blocked', 'Review', 'Testing'],
     'new_title': ['Новое', 'Updated', 'Задачи', 'Daily Notes', 'Sprint Plan',
@@ -94,6 +100,12 @@ def augment_text(text, lang):
     stripped = text.rstrip('.!?')
     if stripped != text:
         variants.append(stripped)
+    # Add punctuation variants (period, exclamation, question)
+    base = text.rstrip('.!?')
+    if not text.endswith('.'):
+        variants.append(base + '.')
+    if not text.endswith('!') and random.random() < 0.3:
+        variants.append(base + '!')
     return list(set(variants))
 
 
