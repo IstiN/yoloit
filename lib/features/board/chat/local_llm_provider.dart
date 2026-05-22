@@ -190,6 +190,8 @@ class LocalLlmProvider extends ChatProvider {
       }
 
       String completedContent = '';
+      // Track last failed tool signature to stop loop on repeated failure.
+      String? lastFailedToolSig;
 
       for (var iteration = 0; iteration < maxIterations; iteration++) {
         if (_cancelRequested[session] == true) break;
@@ -206,8 +208,9 @@ class LocalLlmProvider extends ChatProvider {
 
         var rawEmitted = '';
         var iterEmitted = '';
-        // Buffer content that might be a JSON tool call to avoid flashing
-        // raw JSON to the user. Once we see content that can't be JSON, flush.
+        // Buffer ALL streamed content during orchestrator loop iterations
+        // to prevent raw JSON / tool echoes from reaching the user.
+        // Only flush clean post-processed content.
         var jsonBuffering = true;
 
         final full = await _engine.completeStreaming(
@@ -237,17 +240,17 @@ class LocalLlmProvider extends ChatProvider {
             if (delta.isEmpty) return;
 
             // While buffering, check if the accumulated output still looks
-            // like it could be a JSON tool call. If it clearly isn't, flush
-            // the buffer and stream normally.
+            // like it could be a JSON tool call or tool echo. If it clearly
+            // isn't, flush the buffer and stream normally.
             if (jsonBuffering) {
               final soFar = (iterEmitted + delta).trimLeft();
-              if (soFar.startsWith('{') || soFar.startsWith('```')) {
-                // Still looks like potential JSON — keep buffering.
+              if (_looksLikeToolOutput(soFar)) {
+                // Still looks like potential JSON / tool output — keep buffering.
                 iterEmitted += delta;
                 emitted += delta;
                 return;
               }
-              // Definitely not JSON — stop buffering and flush.
+              // Definitely not tool output — stop buffering and flush.
               jsonBuffering = false;
             }
 
@@ -277,6 +280,10 @@ class LocalLlmProvider extends ChatProvider {
           toolHistoryCountBefore: iterToolCountBefore,
           onTool: toolHandler,
         );
+
+        // Strip any remaining tool-result-like patterns from content
+        // that may have leaked through (e.g. model echoing tool output).
+        iterContent = _stripToolEchoPatterns(iterContent);
 
         // Emit any post-processed content that wasn't streamed yet.
         // When JSON was buffered (jsonBuffering stayed true), iterEmitted
@@ -315,6 +322,23 @@ class LocalLlmProvider extends ChatProvider {
         // Check if new tool calls were made this iteration.
         final newToolCalls = sessionToolHistory.length - iterToolCountBefore;
         if (newToolCalls > 0 && iteration < maxIterations - 1) {
+          // Check for repeated failure — same tool+args failing again.
+          final lastCall = sessionToolHistory.last;
+          final sig = '${lastCall.toolName}:${lastCall.arguments}';
+          if (!lastCall.success) {
+            if (sig == lastFailedToolSig) {
+              // ignore: avoid_print
+              print(
+                '[LocalLlmProvider] orchestrator loop: repeated failure '
+                'on "$sig" — stopping loop',
+              );
+              break;
+            }
+            lastFailedToolSig = sig;
+          } else {
+            lastFailedToolSig = null;
+          }
+
           // Add assistant response + tool results to loop context for next
           // iteration so the model sees what it already did.
           loopContext.add({
@@ -1047,6 +1071,37 @@ class LocalLlmProvider extends ChatProvider {
       return incoming.substring(previous.length);
     }
     return incoming;
+  }
+
+  /// Detects content that looks like tool output / JSON tool calls.
+  /// Used by the streaming buffer to decide whether to hold content back.
+  static final _toolOutputPattern = RegExp(
+    r'^\[?\w{1,20}\]?\s*\{|'        // [alias] { or name{
+    r'^\{|'                          // raw JSON
+    r'^```|'                         // fenced code block
+    r'^\{"(ok|name|c|command)"',     // known JSON keys
+    caseSensitive: false,
+  );
+
+  bool _looksLikeToolOutput(String text) {
+    return _toolOutputPattern.hasMatch(text);
+  }
+
+  /// Strips tool-result-like patterns from model output text.
+  /// Catches patterns like `[nadd] {"ok":false,...}` that the model echoes.
+  static final _toolEchoPattern = RegExp(
+    r'\[?\w{1,20}\]?\s*\{"ok"\s*:\s*(true|false)\b[^}]*\}',
+  );
+
+  String _stripToolEchoPatterns(String content) {
+    // Remove tool echo lines (e.g. "[nadd] {"ok":false,...}")
+    var cleaned = content.replaceAll(_toolEchoPattern, '').trim();
+    // Remove standalone raw JSON tool results
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\{"ok"\s*:\s*(true|false)\s*,\s*"command"\s*:[^}]+\}'),
+      '',
+    ).trim();
+    return cleaned;
   }
 
   @override

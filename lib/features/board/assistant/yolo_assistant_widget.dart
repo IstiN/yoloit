@@ -259,8 +259,18 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
               success: true,
             );
           case ChatEventType.toolComplete:
-            // Tool result already recorded via onToolCompleted callback.
-            break;
+            final tcId = event.data['toolCallId'] as String? ?? '';
+            final tcResult = event.data['result'] as Map<String, dynamic>? ?? {};
+            final tcSuccess = event.data['success'] as bool? ?? true;
+            final tcToolName = event.data['toolName'] as String? ?? '';
+            final tcContent = tcResult['content'] as String? ?? '';
+            // Update the existing tool message with actual result.
+            _updateToolMessage(
+              callId: tcId,
+              toolName: tcToolName,
+              result: tcContent,
+              success: tcSuccess,
+            );
           case ChatEventType.assistantMessage:
             final content = event.data['content'] as String? ?? '';
             if (content.isNotEmpty) {
@@ -451,6 +461,25 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _messageDraft = current;
     _updateState({'messages': current, ...statePatch});
     _scrollToBottom();
+  }
+
+  void _updateToolMessage({
+    required String callId,
+    required String toolName,
+    required String result,
+    required bool success,
+  }) {
+    final current = _messageDraft ?? _messages;
+    for (final msg in current) {
+      if (msg['id'] == callId && msg['role'] == 'tool') {
+        msg['content'] = _compactToolResult(toolName, result, success);
+        msg['rawResult'] = result;
+        msg['success'] = success;
+        break;
+      }
+    }
+    _messageDraft = current;
+    _updateState({'messages': current});
   }
 
   /// Build structured messages list for `LmCompletionRequest.messages`.
