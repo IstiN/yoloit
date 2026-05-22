@@ -206,6 +206,9 @@ class LocalLlmProvider extends ChatProvider {
 
         var rawEmitted = '';
         var iterEmitted = '';
+        // Buffer content that might be a JSON tool call to avoid flashing
+        // raw JSON to the user. Once we see content that can't be JSON, flush.
+        var jsonBuffering = true;
 
         final full = await _engine.completeStreaming(
           flm.LmCompletionRequest(
@@ -232,6 +235,22 @@ class LocalLlmProvider extends ChatProvider {
             final delta =
                 _extractDelta(previous: iterEmitted, incoming: visible);
             if (delta.isEmpty) return;
+
+            // While buffering, check if the accumulated output still looks
+            // like it could be a JSON tool call. If it clearly isn't, flush
+            // the buffer and stream normally.
+            if (jsonBuffering) {
+              final soFar = (iterEmitted + delta).trimLeft();
+              if (soFar.startsWith('{') || soFar.startsWith('```')) {
+                // Still looks like potential JSON — keep buffering.
+                iterEmitted += delta;
+                emitted += delta;
+                return;
+              }
+              // Definitely not JSON — stop buffering and flush.
+              jsonBuffering = false;
+            }
+
             iterEmitted += delta;
             emitted += delta;
             controller.add(
@@ -260,7 +279,23 @@ class LocalLlmProvider extends ChatProvider {
         );
 
         // Emit any post-processed content that wasn't streamed yet.
-        if (iterContent.startsWith(iterEmitted)) {
+        // When JSON was buffered (jsonBuffering stayed true), iterEmitted
+        // contains text the user never saw. In that case, emit the entire
+        // post-processed content.
+        if (jsonBuffering && iterContent.trim().isNotEmpty) {
+          // The user hasn't seen anything yet — emit the full
+          // post-processed content (tool summary or clean text).
+          controller.add(
+            ChatEvent(
+              type: ChatEventType.assistantDelta,
+              rawType: 'assistant.message_delta',
+              timestamp: DateTime.now(),
+              data: {'deltaContent': iterContent},
+            ),
+          );
+          // Re-align emitted to match what the user actually saw.
+          emitted = iterContent;
+        } else if (!jsonBuffering && iterContent.startsWith(iterEmitted)) {
           final delta = iterContent.substring(iterEmitted.length);
           if (delta.isNotEmpty) {
             emitted += delta;
@@ -645,6 +680,29 @@ class LocalLlmProvider extends ChatProvider {
     if (parsed == null) {
       return currentContent;
     }
+
+    // Verify the tool exists before invoking. If the model hallucinated a
+    // non-existent tool name, treat the output as a non-command response.
+    final resolvedName =
+        YoloitCliToolArgumentNormalizer.normalizeFunctionName(
+          functionName: parsed.name,
+          userMessage: '',
+        );
+    final tool = YoloitCliToolCatalog.byFunctionName(resolvedName);
+    if (tool == null) {
+      // ignore: avoid_print
+      print(
+        '[LocalLlmProvider] model hallucinated unknown tool '
+        '"${parsed.name}" — ignoring',
+      );
+      // Strip the JSON from the output so the user doesn't see raw JSON.
+      final trimmed = currentContent.trim();
+      if (_parseRouterToolCall(trimmed) != null) {
+        return ''; // Entire output was a fake tool call — return empty.
+      }
+      return currentContent;
+    }
+
     final result = await onTool(parsed.name, parsed.arguments);
     final trimmed = currentContent.trim();
     if (trimmed.isEmpty || _parseRouterToolCall(trimmed) != null) {
