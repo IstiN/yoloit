@@ -12,8 +12,8 @@ Examples:
 "что на борде"→{"c": "panels", "a": []}
 "покажи борды"→{"c": "boards", "a": []}
 "добавь в чеклист молоко"→{"c": "checklist:add", "a": ["молоко"]}
-"открой борд Work"→{"c": "board:open", "a": ["Work"]}
-"поставь таймер 5 минут"→{"c": "timer:create", "a": ["timer", "300"]}
+"открой борд Work"→{"c": "board:focus", "a": ["Work"]}
+"поставь таймер 5 минут"→{"c": "timer:create", "a": ["Break", "300"]}
 "перезагрузи"→{"c": "reload", "a": []}
 "открой сайт google.com"→{"c": "web:open", "a": ["https://google.com"]}
 "покажи приложения"→{"c": "app:list", "a": []}
@@ -22,6 +22,10 @@ Examples:
 "what can you do"→{"c": "help", "a": []}
 "покажи модели"→{"c": "models:list", "a": []}
 "create checklist groceries"→{"c": "checklist:new", "a": ["groceries"]}
-"удали все заметки"→{"c": "panel:delete", "a": ["all-notes"]}
-"add card "buy milk" to Todo"→{"c": "kanban:add-card", "a": ["buy milk", "Todo"]}
+"add card buy milk to Todo"→{"c": "kanban:add-card", "a": ["buy milk", "Todo"]}
 "list models"→{"c": "models:list", "a": []}
+"rename board Work to Planning"→{"c": "board:rename", "a": ["Work", "Planning"]}
+"текущий борд"→{"c": "board:current", "a": []}
+"напиши в чат привет"→{"c": "yolochat:send", "a": ["привет"]}
+"покажи связи"→{"c": "links", "a": []}
+"скриншот борда Work"→{"c": "board:screenshot", "a": ["Work"]}

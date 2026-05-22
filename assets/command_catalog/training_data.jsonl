@@ -1,498 +1,1785 @@
 {"input": "перезагрузи", "output": "{\"c\": \"reload\", \"a\": []}"}
 {"input": "хот релоад", "output": "{\"c\": \"reload\", \"a\": []}"}
 {"input": "обнови", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "релоад", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "сделай релоад", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "перезагрузи приложение", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "обнови сейчас", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "можно перезагрузить?", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "пожалуйста перезагрузи", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "мне нужен релоад", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "давай обновим", "output": "{\"c\": \"reload\", \"a\": []}"}
 {"input": "reload", "output": "{\"c\": \"reload\", \"a\": []}"}
 {"input": "hot reload", "output": "{\"c\": \"reload\", \"a\": []}"}
 {"input": "refresh", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "do a reload", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "reload the app", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "can you reload?", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "please reload", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "i need a reload", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "refresh it", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "run hot reload", "output": "{\"c\": \"reload\", \"a\": []}"}
+{"input": "do a quick refresh", "output": "{\"c\": \"reload\", \"a\": []}"}
 {"input": "перезапусти", "output": "{\"c\": \"restart\", \"a\": []}"}
 {"input": "рестарт", "output": "{\"c\": \"restart\", \"a\": []}"}
 {"input": "хот рестарт", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "сделай рестарт", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "перезапусти приложение", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "можно рестарт?", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "пожалуйста перезапусти", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "нужен перезапуск", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "давай перезапустим", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "выполни рестарт", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "сделай hot restart", "output": "{\"c\": \"restart\", \"a\": []}"}
 {"input": "restart", "output": "{\"c\": \"restart\", \"a\": []}"}
 {"input": "hot restart", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "restart the app", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "do a restart", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "can you restart?", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "please restart", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "i need a restart", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "run a hot restart", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "restart it", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "start over", "output": "{\"c\": \"restart\", \"a\": []}"}
+{"input": "do a full restart", "output": "{\"c\": \"restart\", \"a\": []}"}
 {"input": "помощь", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "что ты умеешь", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "какие команды есть", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "покажи команды", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "хелп", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "покажи помощь", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "можно список команд?", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "что можно сделать", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "мне нужна помощь", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "подскажи команды", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "плиз хелп", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "help", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "what can you do", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "show commands", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "list commands", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "show help", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "can you help?", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "i need help", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "what commands are available", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "please show help", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "how do i use this?", "output": "{\"c\": \"help\", \"a\": []}"}
+{"input": "help me", "output": "{\"c\": \"help\", \"a\": []}"}
 {"input": "покажи приложения", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "список приложений", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "мои приложения", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "какие приложения есть", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "какие аппы установлены", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "покажи список аппов", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "можно увидеть приложения?", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "мне нужен список приложений", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "все приложения", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "покажи установленные приложения", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "аппы", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "show apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "list apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "my apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "what apps are installed", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "show installed apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "can i see the apps?", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "i need the app list", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "all apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "which apps do i have", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "display apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
+{"input": "apps", "output": "{\"c\": \"app:list\", \"a\": []}"}
 {"input": "запусти приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "открой приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "запусти my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "открой my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "стартуй приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "можно открыть my-app?", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "пожалуйста запусти my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "мне нужно приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "загрузи приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "launcher my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "включи приложение my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "run app my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "open app my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "launch my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "start my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "open my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "can you run my-app?", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "please launch my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "i want to open my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "load app my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "start app my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
+{"input": "bring up my-app", "output": "{\"c\": \"app:run\", \"a\": [\"my-app\"]}"}
 {"input": "установи приложение https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
 {"input": "инсталл https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
 {"input": "поставь https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "добавь приложение https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "можно установить https://gist.github.com/x?", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "пожалуйста установи https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "мне нужно установить https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "подключи приложение https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "заинсталь https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "установи апп https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "хочу добавить https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
 {"input": "install app https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
 {"input": "install https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
 {"input": "add app https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "can you install https://gist.github.com/x?", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "please install https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "i need to install https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "add https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "set up app https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "install this app https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "get app https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
+{"input": "bring in https://gist.github.com/x", "output": "{\"c\": \"app:install\", \"a\": [\"https://gist.github.com/x\"]}"}
 {"input": "удали приложение my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
 {"input": "удали апп my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
 {"input": "убери приложение my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "деинсталл my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "снеси приложение my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "можно удалить my-app?", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "пожалуйста убери my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "мне больше не нужно приложение my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "удали my-app из приложений", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "отключи приложение my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "remove app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
 {"input": "remove app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
 {"input": "uninstall app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
 {"input": "delete app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "remove my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "can you uninstall my-app?", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "please delete my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "i don't need app my-app anymore", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "take out app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "drop app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "uninstall my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
+{"input": "get rid of app my-app", "output": "{\"c\": \"app:remove\", \"a\": [\"my-app\"]}"}
 {"input": "создай приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
 {"input": "новое приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
 {"input": "сделай приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "создай апп Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "можно создать приложение Work?", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "пожалуйста создай приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "мне нужно новое приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "организуй приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "заскаффолди приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "хочу приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "создать приложение Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
 {"input": "create app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
 {"input": "new app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
 {"input": "scaffold app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "make app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "can you create app Work?", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "please create app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "i need a new app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "generate app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "set up app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "build app Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
+{"input": "create an app called Work", "output": "{\"c\": \"app:create\", \"a\": [\"Work\"]}"}
 {"input": "выполни click в приложении my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
 {"input": "нажми click в my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "запусти действие click в my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "сделай click в приложении my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "можно выполнить click в my-app?", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "пожалуйста выполни click в my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "триггерни click в my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "активируй click в приложении my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "вызови click в my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "мне нужно действие click в my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "execute click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
 {"input": "execute click in app my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
 {"input": "trigger click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "run click in app my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "do click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "can you execute click in my-app?", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "please trigger click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "activate click in app my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "invoke click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "i need click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "perform click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
+{"input": "fire click in my-app", "output": "{\"c\": \"app:execute\", \"a\": [\"click\", \"my-app\"]}"}
 {"input": "перезагрузи приложение my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
 {"input": "обнови приложение my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "релоад приложения my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "сделай релоад my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "можно перезагрузить приложение my-app?", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "пожалуйста обнови my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "мне нужен релоад приложения my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "перезагрузи апп my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "обнови my-app сейчас", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "reload app my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "сделай hot reload для my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
 {"input": "reload app my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
 {"input": "refresh app my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "reload my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "can you reload app my-app?", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "please refresh my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "i need to reload my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "do a reload for my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "run hot reload on my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "refresh my-app now", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "reload the application my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
+{"input": "reopen app my-app", "output": "{\"c\": \"app:reload\", \"a\": [\"my-app\"]}"}
 {"input": "покажи логи приложения my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
 {"input": "логи my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "выведи логи my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "покажи журнал приложения my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "можно посмотреть логи my-app?", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "пожалуйста открой логи my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "мне нужны логи приложения my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "что в логах my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "лог приложения my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "покажи вывод my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "logs for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
 {"input": "show app logs my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
 {"input": "app logs my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
 {"input": "logs for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "show logs for app my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "can i see logs for my-app?", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "please open logs for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "i need the logs for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "display app log my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "what do the logs say for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "show output for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
+{"input": "open the logs for my-app", "output": "{\"c\": \"app:logs\", \"a\": [\"my-app\"]}"}
 {"input": "снепшот приложения my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
 {"input": "состояние приложения my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "сделай снимок приложения my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "покажи снапшот my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "можно snapshot приложения my-app?", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "пожалуйста сохрани состояние my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "мне нужен снимок приложения my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "зафиксируй состояние my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "сделай snapshot my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "сними состояние приложения my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "app snapshot my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
 {"input": "app snapshot my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
 {"input": "app state my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "take a snapshot of app my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "capture app state my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "can you snapshot my-app?", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "please save the state of my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "i need a snapshot of my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "record the state of my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "grab a snapshot for my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "snapshot the app my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
+{"input": "save app snapshot my-app", "output": "{\"c\": \"app:snapshot\", \"a\": [\"my-app\"]}"}
 {"input": "скриншот приложения my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
 {"input": "сфоткай приложение my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "сделай скрин приложения my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "скрин приложения my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "можно скриншот my-app?", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "пожалуйста сними экран приложения my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "мне нужен скрин my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "сделай screenshot my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "захвати изображение my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "сохрани скриншот my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "capture app my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
 {"input": "screenshot app my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
 {"input": "capture app my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "take a screenshot of my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "grab a screenshot for my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "can you screenshot my-app?", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "please capture my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "i need a screenshot of my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "save a screenshot of my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "screen capture app my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "take app shot my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
+{"input": "snapshot the screen for my-app", "output": "{\"c\": \"app:screenshot\", \"a\": [\"my-app\"]}"}
 {"input": "покажи гайд по разработке", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
 {"input": "документация по виджетам", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "покажи доки для разработки", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "как разрабатывать виджеты", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "можно гайд для разработчика?", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "пожалуйста открой dev guide", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "мне нужна документация по приложениям", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "дев скилл", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "открой руководство по виджетам", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "покажи dev docs", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "хочу docs по разработке", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
 {"input": "show dev guide", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
 {"input": "widget development docs", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "open development guide", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "how do i build widgets", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "can you show the dev docs?", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "please open the widget guide", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "i need app development docs", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "dev skill", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "show developer documentation", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "open dev docs", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
+{"input": "widget dev help", "output": "{\"c\": \"app:dev-skill\", \"a\": []}"}
 {"input": "покажи демо приложения", "output": "{\"c\": \"app:demo\", \"a\": []}"}
 {"input": "примеры приложений", "output": "{\"c\": \"app:demo\", \"a\": []}"}
 {"input": "демо", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "покажи демо", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "можно посмотреть демо?", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "пожалуйста открой демо приложения", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "мне нужны примеры", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "демо аппов", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "покажи sample apps", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "хочу увидеть примеры приложений", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "витрина приложений", "output": "{\"c\": \"app:demo\", \"a\": []}"}
 {"input": "show demo apps", "output": "{\"c\": \"app:demo\", \"a\": []}"}
 {"input": "demo apps", "output": "{\"c\": \"app:demo\", \"a\": []}"}
 {"input": "examples", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "show demos", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "can i see demo apps?", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "please open the app demos", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "i need examples", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "sample apps", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "show example applications", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "demo showcase", "output": "{\"c\": \"app:demo\", \"a\": []}"}
+{"input": "let me see app examples", "output": "{\"c\": \"app:demo\", \"a\": []}"}
 {"input": "покажи код демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
 {"input": "исходник демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "открой демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "покажи исходники my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "можно посмотреть код демо my-app?", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "пожалуйста открой source демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "мне нужен код примера my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "посмотреть демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "покажи demo source my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "код примера my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "где исходник демо my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
 {"input": "show demo source my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
 {"input": "view demo my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "open demo source my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "show code for demo my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "can i see the demo source my-app?", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "please open demo my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "i need the example code for my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "view source of demo my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "show example source my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "open the code for my-app", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
+{"input": "where is demo my-app source", "output": "{\"c\": \"app:demo-view\", \"a\": [\"my-app\"]}"}
 {"input": "покажи борды", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "список бордов", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "какие борды есть", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "мои доски", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "все борды", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "покажи все доски", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "можно список бордов?", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "какие у меня борды", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "мне нужны борды", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "открой список досок", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "борды", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "show boards", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "list boards", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "what boards do I have", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "my boards", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "all boards", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "show all boards", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "can i see the boards?", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "which boards do i have", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "i need the board list", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "open board list", "output": "{\"c\": \"boards\", \"a\": []}"}
+{"input": "boards", "output": "{\"c\": \"boards\", \"a\": []}"}
 {"input": "покажи борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "детали борда MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "информация о борде MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "что на борде MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "открой борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "можно посмотреть борд MyBoard?", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "пожалуйста покажи доску MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "мне нужен борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "содержимое борда MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "расскажи про борд MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "покажи доску MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "show board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "board details MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "info about board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "what is on board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "open board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "can i see board MyBoard?", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "please show board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "i need board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "board info MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "tell me about board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
+{"input": "display board MyBoard", "output": "{\"c\": \"board\", \"a\": [\"MyBoard\"]}"}
 {"input": "создай борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "создай доску Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "новый борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "новая доска Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "добавь борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "сделай борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "можно создать борд Work?", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "пожалуйста создай доску Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "мне нужен новый борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "организуй борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "создать борд Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "create board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "new board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "add board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "make a board called Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "make board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "can you create board Work?", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "please create board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "i need a new board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "set up board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "create a board named Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
+{"input": "build board Work", "output": "{\"c\": \"board:create\", \"a\": [\"Work\"]}"}
 {"input": "переименуй борд MyBoard в Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
 {"input": "назови борд MyBoard Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
 {"input": "измени имя борда MyBoard на Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "переименуй доску MyBoard в Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "смени название MyBoard на Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "можно переименовать борд MyBoard в Done?", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "пожалуйста назови борд MyBoard как Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "хочу борд MyBoard назвать Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "задай имя Done для борда MyBoard", "output": "{\"c\": \"board:rename\", \"a\": [\"Done\", \"MyBoard\"]}"}
+{"input": "rename board MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "сделай имя борда MyBoard = Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
 {"input": "rename board MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
 {"input": "change board name MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
 {"input": "call board MyBoard Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "rename MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "set board MyBoard name to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "can you rename board MyBoard to Done?", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "please rename board MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "i want board MyBoard to be Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "update board title MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "change the board MyBoard to Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
+{"input": "make board MyBoard named Done", "output": "{\"c\": \"board:rename\", \"a\": [\"MyBoard\", \"Done\"]}"}
 {"input": "удали борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "удали доску MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "убери борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "удалить борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "снеси борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "можно удалить борд MyBoard?", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "пожалуйста убери доску MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "мне не нужен борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "удали board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "выкинь борд MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "remove board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "delete board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "remove board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "destroy board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "delete MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "can you remove board MyBoard?", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "please delete board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "i don't need board MyBoard anymore", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "drop board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "get rid of board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "erase board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
+{"input": "trash board MyBoard", "output": "{\"c\": \"board:delete\", \"a\": [\"MyBoard\"]}"}
 {"input": "открой борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "переключись на MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "покажи борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "перейди на MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "открой доску MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "сфокусируйся на борде MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "можно открыть борд MyBoard?", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "пожалуйста перейди на борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "мне нужен борд MyBoard на экране", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "зафокусить борд MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "go to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "open board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "switch to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "go to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "show board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "focus board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "bring up board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "can you open board MyBoard?", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "please switch to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "i want board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "move to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
+{"input": "take me to board MyBoard", "output": "{\"c\": \"board:focus\", \"a\": [\"MyBoard\"]}"}
 {"input": "используй борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "выбери борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "установи борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "выбери борд MyBoard как основной", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "работай с бордом MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "переключись на борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "сменить борд на MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "задай борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "мой борд MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "сделай MyBoard активным бордом", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "использовать доску MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "use board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
-{"input": "select board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "set board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "select board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "work with board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "switch to MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "change board to MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "set active board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "make MyBoard the current board", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "use MyBoard as the board", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "set MyBoard as active", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
+{"input": "work on board MyBoard", "output": "{\"c\": \"board:use\", \"a\": [\"MyBoard\"]}"}
 {"input": "какой борд сейчас", "output": "{\"c\": \"board:current\", \"a\": []}"}
 {"input": "текущий борд", "output": "{\"c\": \"board:current\", \"a\": []}"}
 {"input": "на каком борде я", "output": "{\"c\": \"board:current\", \"a\": []}"}
-{"input": "what board am I on", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "какая доска активна", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "какой сейчас активный борд", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "можно узнать текущий борд?", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "покажи текущую доску", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "мне нужен активный борд", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "что за борд открыт", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "current board", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "где я сейчас", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "what board am i on", "output": "{\"c\": \"board:current\", \"a\": []}"}
 {"input": "current board", "output": "{\"c\": \"board:current\", \"a\": []}"}
 {"input": "which board is active", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "what is the active board", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "which board is current", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "can you show the current board?", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "tell me the active board", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "what board is open", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "i need the current board", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "show active board", "output": "{\"c\": \"board:current\", \"a\": []}"}
+{"input": "where am i right now", "output": "{\"c\": \"board:current\", \"a\": []}"}
 {"input": "снепшот борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "текстовый снимок борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "структура борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "сделай snapshot борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "покажи снимок борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "можно snapshot для MyBoard?", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "пожалуйста сохрани снимок борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "мне нужен снапшот MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "зафиксируй состояние борда MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "сними структуру MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "board snapshot MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "snapshot of board MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "board snapshot MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "board structure MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "take a snapshot of board MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "capture board MyBoard state", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "can you snapshot board MyBoard?", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "please save a snapshot of MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "i need a snapshot of MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "record board MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "grab board snapshot MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "save board state MyBoard", "output": "{\"c\": \"board:snapshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "скриншот борда MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "сфоткай борд MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "сохрани скриншот борда MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "сделай скрин MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "можно скриншот борда MyBoard?", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "пожалуйста сфотографируй доску MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "мне нужен скрин борда MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "захвати экран борда MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "сделай screenshot MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "сними борд MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "capture board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "screenshot board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "capture board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "save screenshot of board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "take a screenshot of board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "grab a screenshot for MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "can you screenshot board MyBoard?", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "please capture board MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "i need a screenshot of MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "save a board shot for MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "screen capture MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
+{"input": "take board image MyBoard", "output": "{\"c\": \"board:screenshot\", \"a\": [\"MyBoard\"]}"}
 {"input": "расставь панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "упорядочи панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "выровняй панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "автораскладка", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "авторасставь панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "наведи порядок на борде", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "можно упорядочить панели?", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "пожалуйста разложи панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "мне нужно аккуратно разложить панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "организуй панели", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "arrange panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "arrange panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "organize panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "auto arrange", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "tidy up panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "auto layout panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "clean up the board", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "can you arrange the panels?", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "please organize the panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "i need the panels aligned", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "lay out the panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
+{"input": "straighten the panels", "output": "{\"c\": \"board:arrange\", \"a\": []}"}
 {"input": "покажи весь борд", "output": "{\"c\": \"board:fit\", \"a\": []}"}
 {"input": "уместить все", "output": "{\"c\": \"board:fit\", \"a\": []}"}
 {"input": "зумируй чтобы все влезло", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "подгони под экран", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "покажи весь холст", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "можно уместить весь борд?", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "пожалуйста fit to screen", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "мне нужно видеть все", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "зум до всего содержимого", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "вписать борд в экран", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "fit board", "output": "{\"c\": \"board:fit\", \"a\": []}"}
 {"input": "fit to view", "output": "{\"c\": \"board:fit\", \"a\": []}"}
 {"input": "show everything", "output": "{\"c\": \"board:fit\", \"a\": []}"}
 {"input": "zoom to fit", "output": "{\"c\": \"board:fit\", \"a\": []}"}
-{"input": "зум scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
-{"input": "масштаб scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
-{"input": "увеличь до scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
-{"input": "zoom scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
-{"input": "set zoom scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
-{"input": "scale to scale", "output": "{\"c\": \"board:zoom\", \"a\": [\"scale\"]}"}
+{"input": "fit board to screen", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "show the whole board", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "can you fit everything?", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "please zoom to fit", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "i need to see it all", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "fit all content", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "frame the whole board", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "fit board", "output": "{\"c\": \"board:fit\", \"a\": []}"}
+{"input": "зум 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "масштаб 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "увеличь до 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "установи зум 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "сделай масштаб 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "можно zoom 1.0?", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "пожалуйста поставь масштаб 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "мне нужен зум 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "приблизь до 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "отдалить до 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "zoom 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "zoom 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "set zoom 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "scale to 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "set board zoom to 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "make zoom 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "can you zoom to 1.0?", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "please set zoom to 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "i need zoom 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "adjust scale to 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "change zoom to 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
+{"input": "board zoom 1.0", "output": "{\"c\": \"board:zoom\", \"a\": [\"1.0\"]}"}
 {"input": "диаграмма борда MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
 {"input": "нарисуй схему борда MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "покажи диаграмму MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "схема доски MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "можно диаграмму борда MyBoard?", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "пожалуйста построй схему MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "мне нужна диаграмма MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "визуализируй борд MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "сделай diagram для MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "нарисуй карту борда MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "board diagram MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
 {"input": "board diagram MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
 {"input": "draw board diagram MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "show diagram for board MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "map board MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "can you diagram board MyBoard?", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "please build a diagram of MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "i need a diagram of MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "visualize board MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "render board map MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "draw a scheme for MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
+{"input": "board map MyBoard", "output": "{\"c\": \"board:diagram\", \"a\": [\"MyBoard\"]}"}
 {"input": "экспорт SVG борда MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
 {"input": "сохрани борд MyBoard как SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "выгрузи MyBoard в SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "сделай svg для борда MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "можно экспортировать борд MyBoard в SVG?", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "пожалуйста сохрани MyBoard svg", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "мне нужен SVG борда MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "экспортни борд MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "создай svg-версию MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "board MyBoard в svg", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "export board MyBoard as SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
 {"input": "export board MyBoard as SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
 {"input": "save board MyBoard SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "export MyBoard to SVG", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "make an SVG of board MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "can you export board MyBoard as SVG?", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "please save MyBoard as svg", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "i need an SVG for MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "generate svg for board MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "create svg version of MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "output board MyBoard as svg", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
+{"input": "board svg MyBoard", "output": "{\"c\": \"board:svg\", \"a\": [\"MyBoard\"]}"}
 {"input": "примени YAML song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
 {"input": "загрузи конфигурацию song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "примени файл song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "импортируй yaml song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "можно применить song.mp3?", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "пожалуйста загрузи song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "мне нужно применить конфиг song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "подтяни board yaml song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "используй файл song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "apply yaml song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "загрузи board config song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
 {"input": "apply YAML song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
 {"input": "load config song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "apply file song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "import yaml song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "can you apply song.mp3?", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "please load song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "i need to apply config song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "use file song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "load board config song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "read yaml song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
+{"input": "apply board yaml song.mp3", "output": "{\"c\": \"board:apply\", \"a\": [\"song.mp3\"]}"}
 {"input": "сдвинь борд на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
 {"input": "подвинь вид на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "перемести холст на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "сдвинь viewport на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "можно сместить борд на 100 200?", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "пожалуйста подвинь борд на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "мне нужно смещение 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "панорамируй на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "перетащи вид на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "translate board 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "смести доску на 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
 {"input": "move viewport to 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
 {"input": "translate board 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "pan to 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "move the board by 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "shift viewport 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "can you move the view to 100 200?", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "please pan the board to 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "i need an offset of 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "drag the view to 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "shift the canvas 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
+{"input": "move board view 100 200", "output": "{\"c\": \"board:translate\", \"a\": [\"100\", \"200\"]}"}
 {"input": "добавь в чеклист молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "добавь пункт молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "запиши в список молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "добавь задачу молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "добавь в список молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "новый пункт молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "внеси пункт молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "можно добавить молоко в чеклист?", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "пожалуйста добавь молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "мне нужен пункт молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "закинь в чеклист молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "add молоко to checklist", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "add checklist item молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "add task молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "add to list молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "new item молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "put молоко on the checklist", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "can you add молоко to the checklist?", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "please add молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "i need checklist item молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "insert item молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
+{"input": "append checklist with молоко", "output": "{\"c\": \"checklist:add\", \"a\": [\"молоко\"]}"}
 {"input": "создай чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "новый чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "создай список тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "добавь чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "создать список задач тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "сделай чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "можно создать чеклист тест?", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "пожалуйста создай чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "мне нужен чеклист тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "хочу список тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "create checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "create checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "new checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "add checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "make checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "create todo list тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "make a checklist called тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "can you create checklist тест?", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "please create checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "i need a checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "set up checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
+{"input": "start checklist тест", "output": "{\"c\": \"checklist:new\", \"a\": [\"тест\"]}"}
 {"input": "отметь молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "выполни молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "сделано молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "отметь как сделано молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "галочка молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "чек молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "закрой пункт молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "можно отметить молоко?", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "пожалуйста отметь молоко как выполнено", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "мне нужно зачекать молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "пометь молоко выполненным", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "check молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "mark молоко done", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "complete молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "tick молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "done молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "mark молоко as completed", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "can you check молоко?", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "please mark молоко done", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "i need to complete молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "check off молоко", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
+{"input": "set молоко to done", "output": "{\"c\": \"checklist:check\", \"a\": [\"молоко\"]}"}
 {"input": "убери отметку молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "сними галочку молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "не сделано молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "анчек молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "сделай молоко невыполненным", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "можно снять отметку с молоко?", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "пожалуйста разчекни молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "мне нужно вернуть молоко в список", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "отмени выполнение молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "убери done с молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "верни пункт молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "uncheck молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "mark молоко not done", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "untick молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "undo молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "mark молоко as incomplete", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "can you uncheck молоко?", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "please mark молоко not done", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "i need to reopen молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "clear the check on молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "set молоко back to todo", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
+{"input": "unmark молоко", "output": "{\"c\": \"checklist:uncheck\", \"a\": [\"молоко\"]}"}
 {"input": "покажи колонки канбана", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
 {"input": "какие колонки есть", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
 {"input": "список колонок", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "покажи столбцы канбана", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "какие колонки на канбане", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "можно список колонок?", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "пожалуйста покажи колонки", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "мне нужны колонки канбана", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "все колонки", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "открой список колонок", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "kanban columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
 {"input": "show kanban columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
 {"input": "list columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
 {"input": "what columns are there", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "show board columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "which kanban columns exist", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "can i see the columns?", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "please show the columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "i need the kanban columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "all columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "open column list", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
+{"input": "kanban columns", "output": "{\"c\": \"kanban:columns\", \"a\": []}"}
 {"input": "добавь колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
 {"input": "создай колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
 {"input": "новая колонка Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "сделай колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "можно создать колонку Work?", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "пожалуйста добавь колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "мне нужна колонка Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "организуй колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "создать столбец Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "хочу колонку Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "add column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
 {"input": "add column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
 {"input": "create column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
 {"input": "new column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "make column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "can you create column Work?", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "please add column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "i need a column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "set up column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "create kanban column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "start column Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
+{"input": "add a column called Work", "output": "{\"c\": \"kanban:add-column\", \"a\": [\"Work\"]}"}
 {"input": "переименуй колонку Todo в Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
 {"input": "назови колонку Todo Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "смени имя колонки Todo на Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "измени название Todo на Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "можно переименовать колонку Todo в Done?", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "пожалуйста переименуй Todo в Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "хочу назвать колонку Todo как Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "задай имя Done для колонки Todo", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Done\", \"Todo\"]}"}
+{"input": "rename column Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "сделай Done названием колонки Todo", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Done\", \"Todo\"]}"}
+{"input": "переименовать столбец Todo в Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
 {"input": "rename column Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
 {"input": "change column name Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "rename Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "set column Todo name to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "can you rename column Todo to Done?", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "please rename Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "i want column Todo named Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "update column title Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "make column Todo called Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "change the title of Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
+{"input": "rename kanban column Todo to Done", "output": "{\"c\": \"kanban:rename-column\", \"a\": [\"Todo\", \"Done\"]}"}
 {"input": "удали колонку Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
 {"input": "убери колонку Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "снеси колонку Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "удалить столбец Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "можно удалить колонку Todo?", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "пожалуйста убери Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "мне не нужна колонка Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "delete column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "выкинь колонку Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "удали канбан-колонку Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "remove column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
 {"input": "remove column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
 {"input": "delete column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "drop column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "remove kanban column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "can you delete column Todo?", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "please remove Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "i don't need column Todo anymore", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "get rid of column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "erase column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "trash column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
+{"input": "delete the column Todo", "output": "{\"c\": \"kanban:remove-column\", \"a\": [\"Todo\"]}"}
 {"input": "добавь карточку тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "создай карточку тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "новая карточка тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "добавь задачу тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "добавь в Todo тест", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"Todo\", \"тест\"]}"}
+{"input": "сделай карточку тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "можно добавить карточку тест в Todo?", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "пожалуйста создай карточку тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "мне нужна карточка тест в Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "закинь тест в колонку Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "add card тест to Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "add card тест to Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "create card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "new card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "add task тест to Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "add тест to Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "make card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "can you add card тест to Todo?", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "please create card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "i need a card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "put card тест into Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
+{"input": "start card тест in Todo", "output": "{\"c\": \"kanban:add-card\", \"a\": [\"тест\", \"Todo\"]}"}
 {"input": "перемести карточку c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
 {"input": "двинь c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
 {"input": "передвинь c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "перетащи c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "можно перенести карточку c-1 в Done?", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "пожалуйста перемести c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "мне нужно отправить c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "move card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "скинь c-1 в колонку Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "переложи c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "перекинь карточку c-1 в Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
 {"input": "move card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
 {"input": "move c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
 {"input": "drag c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "send card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "can you move c-1 to Done?", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "please move card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "i need c-1 in Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "shift card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "drop c-1 into Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "transfer card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
+{"input": "move the card c-1 to Done", "output": "{\"c\": \"kanban:move-card\", \"a\": [\"c-1\", \"Done\"]}"}
 {"input": "удали карточку c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
 {"input": "убери карточку c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
 {"input": "удали задачу c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "снеси карточку c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "можно удалить карточку c-1?", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "пожалуйста убери c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "мне не нужна карточка c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "delete card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "выкинь карточку c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "удали канбан-карточку c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "remove task c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
 {"input": "remove card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
 {"input": "delete card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
 {"input": "remove task c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "drop card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "can you delete card c-1?", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "please remove c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "i don't need card c-1 anymore", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "get rid of card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "erase card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "trash card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
+{"input": "delete the card c-1", "output": "{\"c\": \"kanban:remove-card\", \"a\": [\"c-1\"]}"}
 {"input": "обнови карточку c-1 на Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
 {"input": "переименуй карточку c-1 в Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
 {"input": "измени карточку c-1 на Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "смени заголовок карточки c-1 на Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "можно обновить c-1 на Новое?", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "пожалуйста переименуй c-1 в Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "мне нужно назвать c-1 как Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "update card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "сделай название Новое у карточки c-1", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"Новое\", \"c-1\"]}"}
+{"input": "задай новый текст Новое для c-1", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"Новое\", \"c-1\"]}"}
+{"input": "rename card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
 {"input": "update card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
 {"input": "rename card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
 {"input": "change card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "change the title of c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "can you update c-1 to Новое?", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "please rename c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "i need card c-1 named Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "set card c-1 title to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "make Новое the new title for c-1", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"Новое\", \"c-1\"]}"}
+{"input": "edit card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
+{"input": "update the card c-1 to Новое", "output": "{\"c\": \"kanban:update-card\", \"a\": [\"c-1\", \"Новое\"]}"}
 {"input": "покажи карточки", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
 {"input": "список карточек", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
 {"input": "все карточки", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "покажи все карточки", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "какие карточки есть", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "можно список карточек?", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "пожалуйста покажи карточки", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "мне нужны карточки", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "карточки канбана", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "открой список карточек", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "show cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
 {"input": "show cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
 {"input": "list cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
 {"input": "all cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "show all cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "what cards are there", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "can i see the cards?", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "please show the cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "i need the card list", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "kanban cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "open card list", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
+{"input": "display cards", "output": "{\"c\": \"kanban:cards\", \"a\": []}"}
 {"input": "покажи связи", "output": "{\"c\": \"links\", \"a\": []}"}
 {"input": "список связей", "output": "{\"c\": \"links\", \"a\": []}"}
 {"input": "какие связи есть", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "покажи все связи", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "можно список связей?", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "какие линki есть", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "мне нужны связи", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "открой связи", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "связи на борде", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "линки", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "show links", "output": "{\"c\": \"links\", \"a\": []}"}
 {"input": "show links", "output": "{\"c\": \"links\", \"a\": []}"}
 {"input": "list links", "output": "{\"c\": \"links\", \"a\": []}"}
 {"input": "what links are there", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "show all links", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "can i see the links?", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "which links exist", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "i need the links", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "open links", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "board links", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "display links", "output": "{\"c\": \"links\", \"a\": []}"}
+{"input": "links", "output": "{\"c\": \"links\", \"a\": []}"}
 {"input": "свяжи p-1 с p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
 {"input": "создай связь от p-1 к p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
 {"input": "соедини p-1 и p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "сделай линк от p-1 к p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "можно связать p-1 с p-2?", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "пожалуйста свяжи p-1 и p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "мне нужна связь между p-1 и p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "протяни связь от p-1 к p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "линкань p-1 к p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "link p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "соедини узлы p-1 и p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
 {"input": "link p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
 {"input": "connect p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
 {"input": "create link from p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "join p-1 and p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "can you link p-1 to p-2?", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "please connect p-1 with p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "i need a link from p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "draw a link from p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "wire p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "attach p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
+{"input": "make a connection from p-1 to p-2", "output": "{\"c\": \"link:create\", \"a\": [\"p-1\", \"p-2\"]}"}
 {"input": "удали связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
 {"input": "убери связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "удали линк l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "снеси связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "можно удалить связь l-1?", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "пожалуйста убери линк l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "мне не нужна связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "delete link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "выкинь связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "разорви связь l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "remove link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
 {"input": "delete link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
 {"input": "remove link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "delete connection l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "drop link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "can you delete link l-1?", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "please remove link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "i don't need link l-1 anymore", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "erase link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "unlink l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "get rid of link l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
+{"input": "remove connection l-1", "output": "{\"c\": \"link:delete\", \"a\": [\"l-1\"]}"}
 {"input": "стиль связи l-1 dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
 {"input": "измени стиль связи l-1", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\"]}"}
+{"input": "задай стиль dashed curved для связи l-1", "output": "{\"c\": \"link:style\", \"a\": [\"dashed\", \"curved\", \"l-1\"]}"}
+{"input": "сделай связь l-1 стилем dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "можно поменять стиль связи l-1?", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\"]}"}
+{"input": "пожалуйста смени стиль l-1 на dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "мне нужен стиль dashed curved для l-1", "output": "{\"c\": \"link:style\", \"a\": [\"dashed\", \"curved\", \"l-1\"]}"}
+{"input": "оформи связь l-1 как dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "link style l-1 dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "перестрой связь l-1 в dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "измени геометрию связи l-1 на dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
 {"input": "set link style l-1 dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
 {"input": "change link style l-1", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\"]}"}
+{"input": "set style of link l-1 to dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "make link l-1 dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "can you change link l-1 style?", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\"]}"}
+{"input": "please set link l-1 to dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "i need link l-1 styled dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "restyle link l-1 dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "format link l-1 as dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "update link l-1 style to dashed curved", "output": "{\"c\": \"link:style\", \"a\": [\"l-1\", \"dashed\", \"curved\"]}"}
+{"input": "apply dashed curved to link l-1", "output": "{\"c\": \"link:style\", \"a\": [\"dashed\", \"curved\", \"l-1\"]}"}
 {"input": "цвет связи l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
 {"input": "покрась связь l-1 в blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "задай цвет blue для связи l-1", "output": "{\"c\": \"link:color\", \"a\": [\"blue\", \"l-1\"]}"}
+{"input": "сделай связь l-1 цвета blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "можно поменять цвет связи l-1 на blue?", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "пожалуйста покрась линк l-1 в blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "мне нужен цвет blue для связи l-1", "output": "{\"c\": \"link:color\", \"a\": [\"blue\", \"l-1\"]}"}
+{"input": "раскрась связь l-1 в blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "link color l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "сделай линк l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "измени цвет связи l-1 на blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
 {"input": "link color l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
 {"input": "color link l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "set link l-1 color to blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "paint link l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "can you color link l-1 blue?", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "please set link l-1 to blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "i need link l-1 in blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "recolor link l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "change the color of link l-1 to blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "make link l-1 blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
+{"input": "set connection l-1 color to blue", "output": "{\"c\": \"link:color\", \"a\": [\"l-1\", \"blue\"]}"}
 {"input": "поставь таймер на 300 секунд", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "таймер 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "засеки 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "создай таймер Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
 {"input": "таймер на 300 минут", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "поставь таймер", "output": "{\"c\": \"timer:create\", \"a\": []}"}
+{"input": "запусти таймер на 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "можно таймер на 300?", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "пожалуйста создай таймер Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
+{"input": "мне нужен таймер Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
+{"input": "старт таймер 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "set timer for 300 seconds", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "timer 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "start a timer Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
 {"input": "create timer Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
 {"input": "set timer for 300 minutes", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "start timer", "output": "{\"c\": \"timer:create\", \"a\": []}"}
+{"input": "run a timer for 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "can you set a timer for 300?", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
+{"input": "please create timer Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
+{"input": "i need a timer Break", "output": "{\"c\": \"timer:create\", \"a\": [\"Break\"]}"}
+{"input": "begin timer 300", "output": "{\"c\": \"timer:create\", \"a\": [\"300\"]}"}
 {"input": "включи song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
 {"input": "проиграй song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
 {"input": "воспроизведи song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
 {"input": "плей song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "запусти song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "можно включить song.mp3?", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "пожалуйста воспроизведи song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "мне нужно проиграть song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "стартуй медиа song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "play song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "открой плеер для song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
 {"input": "play song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
 {"input": "start playing song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
 {"input": "play media song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "open song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "can you play song.mp3?", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "please play song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "i want to hear song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "start song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "launch media song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "play this file song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
+{"input": "begin playback for song.mp3", "output": "{\"c\": \"play\", \"a\": [\"song.mp3\"]}"}
 {"input": "открой сайт https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "открой ссылку https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "загрузи https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "покажи страницу https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "открой url https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "можно открыть https://google.com?", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "пожалуйста открой страницу https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "мне нужен сайт https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "перейди на https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "web open https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "зайди на https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "open website https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "open url https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "go to https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "load page https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "open webpage https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "can you open https://google.com?", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "please open https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "i need site https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "navigate to https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "visit https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
+{"input": "load website https://google.com", "output": "{\"c\": \"web:open\", \"a\": [\"https://google.com\"]}"}
 {"input": "покажи запущенные сессии", "output": "{\"c\": \"run:list\", \"a\": []}"}
 {"input": "список сессий", "output": "{\"c\": \"run:list\", \"a\": []}"}
 {"input": "что запущено", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "какие сессии активны", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "можно список ран-сессий?", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "пожалуйста покажи сессии", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "мне нужны активные сессии", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "открой список запусков", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "run sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "покажи рантаймы", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "все сессии", "output": "{\"c\": \"run:list\", \"a\": []}"}
 {"input": "show running sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
 {"input": "list sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
 {"input": "what is running", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "which sessions are active", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "can i see the run sessions?", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "please show sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "i need active sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "open run list", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "run sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "show runtimes", "output": "{\"c\": \"run:list\", \"a\": []}"}
+{"input": "all sessions", "output": "{\"c\": \"run:list\", \"a\": []}"}
 {"input": "введи hello world в сессию ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
 {"input": "отправь hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "передай hello world в сессию ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "впиши hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "можно отправить hello world в ses-1?", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "пожалуйста введи hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "мне нужно послать hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "send hello world to session ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "пробрось hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "отправь ввод hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "засунь hello world в ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
 {"input": "send hello world to session ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
 {"input": "input hello world to ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "type hello world into session ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "pass hello world to ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "can you send hello world to ses-1?", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "please input hello world into ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "i need to send hello world to ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "write hello world to session ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "feed hello world into ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "enter hello world in ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
+{"input": "push hello world to ses-1", "output": "{\"c\": \"run:input\", \"a\": [\"hello world\", \"ses-1\"]}"}
 {"input": "подключись к сессии ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
 {"input": "аттач ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "присоединись к ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "открой сессию ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "можно подключиться к ses-1?", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "пожалуйста аттачнись к ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "мне нужен доступ к ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "attach to session ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "зайди в сессию ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "подцепись к ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "подключи меня к ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
 {"input": "attach to session ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
 {"input": "connect to ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "join session ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "open session ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "can you attach to ses-1?", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "please connect me to ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "i need access to ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "attach ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "hook into session ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "enter session ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
+{"input": "connect me with ses-1", "output": "{\"c\": \"run:attach\", \"a\": [\"ses-1\"]}"}
 {"input": "отключись от сессии ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
 {"input": "детач ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "отсоединись от ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "выйди из сессии ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "можно отключиться от ses-1?", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "пожалуйста детачнись от ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "мне нужно отсоединиться от ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "detach session ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "отцепись от ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "закрой подключение к ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "disconnect ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
 {"input": "detach session ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
 {"input": "disconnect ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "detach from session ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "leave session ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "can you detach from ses-1?", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "please disconnect from ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "i need to leave ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "detach ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "drop connection to ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "exit session ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
+{"input": "unhook from ses-1", "output": "{\"c\": \"run:detach\", \"a\": [\"ses-1\"]}"}
 {"input": "покажи вывод сессии ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
 {"input": "лог сессии ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "покажи output ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "что вывела сессия ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "можно посмотреть вывод ses-1?", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "пожалуйста открой лог ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "мне нужен вывод сессии ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "show output of ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "покажи консоль ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "журнал ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "читай вывод ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
 {"input": "show output of ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
 {"input": "session output ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "show logs for ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "what did session ses-1 print", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "can i see output from ses-1?", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "please open output for ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "i need the output of ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "display console for ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "read output ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "show session log ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
+{"input": "open output stream ses-1", "output": "{\"c\": \"run:output\", \"a\": [\"ses-1\"]}"}
 {"input": "открой сессию ses-1 в панели", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
 {"input": "попаут ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "вынеси сессию ses-1 в отдельную панель", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "открой попаут для ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "можно вынести ses-1 в панель?", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "пожалуйста попауть ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "мне нужна отдельная панель для ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "popout session ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "всплывающее окно для ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "открой ses-1 отдельно", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "покажи ses-1 в новом окне", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
 {"input": "popout session ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
 {"input": "open ses-1 in panel", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "open session ses-1 in a panel", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "pop out ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "can you popout ses-1?", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "please open ses-1 separately", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "i need a separate panel for ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "show ses-1 in a new panel", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "detach ses-1 into panel", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "open popout for ses-1", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
+{"input": "move session ses-1 to panel", "output": "{\"c\": \"run:popout\", \"a\": [\"ses-1\"]}"}
 {"input": "покажи чат панели", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
 {"input": "список чатов", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
 {"input": "какие чаты есть", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "покажи все чаты", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "можно список чат-панелей?", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "пожалуйста покажи чаты", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "мне нужны чат панели", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "открой список чатов", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "yolochat панели", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "чат панели", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "show chat panels", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
 {"input": "show chat panels", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
 {"input": "list chats", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
 {"input": "what chats are there", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "show all chats", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "can i see the chat panels?", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "please show chats", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "i need the chat panels", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "open chat list", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "yolochat panels", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "chat panels", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
+{"input": "display chats", "output": "{\"c\": \"yolochat:panels\", \"a\": []}"}
 {"input": "отправь сообщение hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
 {"input": "напиши в чат hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
 {"input": "скажи hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "пошли в чат hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "можно отправить hello world?", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "пожалуйста напиши hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "мне нужно отправить hello world в чат", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "send message hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "зашли hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "отправь текст hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "передай в чат hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
 {"input": "send message hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
 {"input": "say hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
 {"input": "write hello world in chat", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "send hello world to chat", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "can you send hello world?", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "please write hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "i need to send hello world to chat", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "post hello world in chat", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "message the chat: hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "submit hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
+{"input": "send chat text hello world", "output": "{\"c\": \"yolochat:send\", \"a\": [\"hello world\"]}"}
 {"input": "покажи сообщения чата", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
 {"input": "история чата", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
 {"input": "прочитай сообщения", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "покажи чат-историю", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "можно посмотреть сообщения?", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "пожалуйста открой историю чата", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "мне нужны сообщения чата", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "show chat messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "что писали в чате", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "открой переписку", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "все сообщения", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
 {"input": "show chat messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
 {"input": "chat history", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
 {"input": "read messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "show conversation history", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "can i see the chat messages?", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "please open chat history", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "i need the chat messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "display the conversation", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "what was said in chat", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "open the messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
+{"input": "all chat messages", "output": "{\"c\": \"yolochat:messages\", \"a\": []}"}
 {"input": "покажи модели", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "список моделей", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "какие модели есть", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "локальные модели", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "покажи все модели", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "можно список моделей?", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "пожалуйста покажи модели", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "мне нужны доступные модели", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "модельки", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "какие llm доступны", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "show models", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "show models", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "list models", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "what models are available", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "local models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "show all models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "can i see the models?", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "please show models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "i need available models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "which llms are available", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "display models", "output": "{\"c\": \"models:list\", \"a\": []}"}
+{"input": "models", "output": "{\"c\": \"models:list\", \"a\": []}"}
 {"input": "скачай модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "загрузи модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "установи модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "подтяни модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "можно скачать модель qwen3-0.6b-4bit?", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пожалуйста загрузи qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "мне нужна модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "download model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "докачай модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "получи модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "импортируй модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "download model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "install model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "get model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "fetch model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "can you download model qwen3-0.6b-4bit?", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "please install qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "i need model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "pull model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "grab model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "download the model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "bring in model qwen3-0.6b-4bit", "output": "{\"c\": \"models:download\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "удали модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "убери модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "снеси модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "можно удалить модель qwen3-0.6b-4bit?", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пожалуйста убери qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "мне не нужна модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "delete model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "выкинь модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "деинсталь модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "remove model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "стереть модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "delete model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "remove model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "delete the model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "drop model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "can you delete model qwen3-0.6b-4bit?", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "please remove qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "i don't need model qwen3-0.6b-4bit anymore", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "erase model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "uninstall model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "get rid of model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "trash model qwen3-0.6b-4bit", "output": "{\"c\": \"models:delete\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "выбери модель qwen3-0.6b-4bit для chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
 {"input": "используй модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "установи модель qwen3-0.6b-4bit для чата", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "сделай qwen3-0.6b-4bit активной моделью для chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "можно выбрать модель qwen3-0.6b-4bit для chat?", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "пожалуйста используй qwen3-0.6b-4bit для chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "мне нужна модель qwen3-0.6b-4bit для chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "select model qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "переключи chat на модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:select\", \"a\": [\"chat\", \"qwen3-0.6b-4bit\"]}"}
+{"input": "назначь qwen3-0.6b-4bit для chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "сделай модель qwen3-0.6b-4bit основной", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "select model qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
 {"input": "use model qwen3-0.6b-4bit", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "set model qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "make qwen3-0.6b-4bit the active model for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "can you select model qwen3-0.6b-4bit for chat?", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "please use qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "i need model qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "switch chat to model qwen3-0.6b-4bit", "output": "{\"c\": \"models:select\", \"a\": [\"chat\", \"qwen3-0.6b-4bit\"]}"}
+{"input": "assign qwen3-0.6b-4bit to chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "set active model qwen3-0.6b-4bit for chat", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\", \"chat\"]}"}
+{"input": "make qwen3-0.6b-4bit the default model", "output": "{\"c\": \"models:select\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "пауза загрузки qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "приостанови загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "поставь загрузку qwen3-0.6b-4bit на паузу", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "можно приостановить qwen3-0.6b-4bit?", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пожалуйста поставь на паузу qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "мне нужно заморозить загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "pause download qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "замри загрузка qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "стопни пока загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пауза qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "прерви загрузку qwen3-0.6b-4bit временно", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "pause download qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "stop downloading qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "pause model download qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "can you pause qwen3-0.6b-4bit?", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "please pause download of qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "i need to pause qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "hold download qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "freeze download qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "put qwen3-0.6b-4bit on pause", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "pause qwen3-0.6b-4bit", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "temporarily stop qwen3-0.6b-4bit download", "output": "{\"c\": \"models:pause\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "продолжи загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "возобнови загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "сними с паузы qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "можно продолжить загрузку qwen3-0.6b-4bit?", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пожалуйста возобнови qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "мне нужно докачать qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "resume download qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "продолжай качать qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "разморозь загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "верни загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "возобновить модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "resume download qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "continue downloading qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "resume model qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "can you resume qwen3-0.6b-4bit?", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "please continue download of qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "i need to finish downloading qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "restart download qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "unpause qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "pick up download qwen3-0.6b-4bit again", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "continue with qwen3-0.6b-4bit", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "resume qwen3-0.6b-4bit download", "output": "{\"c\": \"models:resume\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "отмени загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "отменить загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "кансел загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "сбрось загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "можно отменить qwen3-0.6b-4bit?", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пожалуйста отмени загрузку модели qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "мне нужно прервать загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "cancel download qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "отруби загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "аннулируй скачивание qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "убери загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "cancel download qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "cancel model download qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "abort download qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "can you cancel qwen3-0.6b-4bit?", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "please cancel download of qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "i need to cancel qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "stop and cancel qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "drop download qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "terminate download qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "cancel qwen3-0.6b-4bit download", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "abort the download of qwen3-0.6b-4bit", "output": "{\"c\": \"models:cancel\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "останови загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "стоп загрузки qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "останови скачивание qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "можно остановить qwen3-0.6b-4bit?", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "пожалуйста стопни загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "мне нужно остановить qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "stop download qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "прекрати загрузку qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "стопни модель qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "замри загрузка модели qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "хватит качать qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "stop download qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "stop downloading qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "halt download qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "can you stop qwen3-0.6b-4bit?", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "please stop download of qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "i need to stop qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "end download qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "freeze download qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "stop model qwen3-0.6b-4bit download", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "cut off download qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
+{"input": "stop the download of qwen3-0.6b-4bit", "output": "{\"c\": \"models:stop\", \"a\": [\"qwen3-0.6b-4bit\"]}"}
 {"input": "сгенерируй hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
 {"input": "спроси модель hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "сделай генерацию hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "ответь на hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "можно сгенерировать hello?", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "пожалуйста сгенерируй hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "мне нужен ответ на hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "generate hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "дай ответ по hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "попроси модель: hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "создай текст hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
 {"input": "generate hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
 {"input": "ask model hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "generate text for hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "answer hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "can you generate hello?", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "please generate hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "i need a response for hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "prompt the model with hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "make text for hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "produce output for hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
+{"input": "run generation for hello", "output": "{\"c\": \"lm:generate\", \"a\": [\"hello\"]}"}
 {"input": "запиши hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "обнови заметку hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "напиши в заметку hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "установи текст заметки hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "заметка hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "вставь в заметку hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "можно записать hello world?", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "пожалуйста напиши hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "мне нужно сохранить hello world в заметке", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "задай заметке текст hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "write hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "set note to hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "write hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "update note with hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "note hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "put hello world in the note", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "can you write hello world?", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "please write hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "i need the note to say hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "set the note text to hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "save hello world in the note", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
+{"input": "replace note with hello world", "output": "{\"c\": \"note\", \"a\": [\"hello world\"]}"}
 {"input": "допиши hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "добавь в заметку hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "припиши hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "дополни заметку hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "добавь текст hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "докинь в заметку hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "можно дописать hello world?", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "пожалуйста добавь hello world в заметку", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "мне нужно дописать hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "append hello world to note", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "внеси hello world в заметку", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "append hello world to note", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "add hello world to the note", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "add to note hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "append note with hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "can you add hello world to the note?", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "please append hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "i need to add hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "put hello world at the end of the note", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "extend the note with hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "add text hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
+{"input": "write more: hello world", "output": "{\"c\": \"note:add\", \"a\": [\"hello world\"]}"}
 {"input": "создай заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "добавь заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "новая заметка тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "сделай заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "запиши заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "создать заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "сделай новую заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "можно создать заметку тест?", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "пожалуйста создай заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "мне нужна заметка тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "хочу заметку тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "create note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "add a note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "new note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "make a note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "write a note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "create a new note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "can you create note тест?", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "please create note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "i need a note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "set up note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
+{"input": "make note тест", "output": "{\"c\": \"note:create\", \"a\": [\"тест\"]}"}
 {"input": "допиши к заметке p-123 текст hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
 {"input": "добавь в p-123 hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "дополни заметку p-123 текстом hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "припиши в p-123 hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "можно добавить hello world в p-123?", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "пожалуйста допиши hello world в p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "мне нужно внести hello world в p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "append hello world to note p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "добавь текст hello world в заметку p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "закинь в p-123 hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "обнови p-123 текстом hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
 {"input": "append hello world to note p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
 {"input": "add hello world to p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "append p-123 with hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "add text hello world to note p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "can you add hello world to p-123?", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "please append hello world to p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "i need to add hello world to p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "put hello world into p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
+{"input": "extend note p-123 with hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "update p-123 with hello world", "output": "{\"c\": \"note:append\", \"a\": [\"p-123\", \"hello world\"]}"}
+{"input": "write hello world in note p-123", "output": "{\"c\": \"note:append\", \"a\": [\"hello world\", \"p-123\"]}"}
 {"input": "включи автовысоту заметки p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
 {"input": "авторазмер заметки p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "включи перенос для заметки p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "сделай заметку p-123 с переносом", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "можно включить wrap для p-123?", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста включи wrap у p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "мне нужен авторазмер для p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "разреши перенос текста в p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "note wrap p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "автовысота для p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "включи wrap p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
 {"input": "enable note wrap p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
 {"input": "auto height for note p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "turn on wrap for note p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "make note p-123 wrapped", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "can you enable wrap for p-123?", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "please turn on wrap for p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "i need auto height on p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "allow text wrapping in p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "note wrap p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "enable auto height p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
+{"input": "wrap note p-123", "output": "{\"c\": \"note:wrap\", \"a\": [\"p-123\"]}"}
 {"input": "выключи автовысоту заметки p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
 {"input": "фиксированный размер заметки p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "выключи перенос у заметки p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "сделай заметку p-123 без переноса", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "можно отключить wrap для p-123?", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста выключи wrap у p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "мне нужен фиксированный размер для p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "запрети перенос текста в p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "disable note wrap p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "фикс высота p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "выключи wrap p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
 {"input": "disable note wrap p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
 {"input": "fixed height for note p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "turn off wrap for note p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "make note p-123 not wrap", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "can you disable wrap for p-123?", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "please turn off wrap for p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "i need fixed height on p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "prevent text wrapping in p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "note nowrap p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "disable auto height p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
+{"input": "unwrap note p-123", "output": "{\"c\": \"note:nowrap\", \"a\": [\"p-123\"]}"}
 {"input": "покажи панели", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "список панелей", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "какие панели есть", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "что на борде", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "все панели", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "покажи все панели", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "можно список панелей?", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "какие панели на доске", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "мне нужны панели", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "открой список панелей", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "панели", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "show panels", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "list panels", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "what panels are there", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "what is on the board", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "all panels", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "show all panels", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "can i see the panels?", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "which panels are on the board", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "i need the panel list", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "open panel list", "output": "{\"c\": \"panels\", \"a\": []}"}
+{"input": "panels", "output": "{\"c\": \"panels\", \"a\": []}"}
 {"input": "покажи панель p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "детали панели p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "содержимое панели p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "что в панели p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "открой панель p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "можно посмотреть панель p-123?", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста покажи панель p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "мне нужна панель p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "информация о панели p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "раскрой панель p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "show panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "show panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "panel details p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "panel content p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "what is in panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "open panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "can i see panel p-123?", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "please show panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "i need panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "panel info p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "display panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
+{"input": "reveal panel p-123", "output": "{\"c\": \"panel\", \"a\": [\"p-123\"]}"}
 {"input": "создай панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "добавь панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "новая панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "сделай панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "создай виджет тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "можно создать панель тест?", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "пожалуйста добавь панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "мне нужна панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "организуй панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "хочу новую панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "создать панель тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "create panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "add panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "new panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "make panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "create widget тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "can you create panel тест?", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "please add panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "i need a panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "set up panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "make a new panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
+{"input": "build panel тест", "output": "{\"c\": \"panel:create\", \"a\": [\"тест\"]}"}
 {"input": "удали панель p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "убери панель p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "удали p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
@@ -502,6 +1789,8 @@
 {"input": "удали виджет p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "удали чат p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "удалить панель p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "можно удалить панель p-123?", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста убери p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "delete panel p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "remove panel p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "delete p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
@@ -510,67 +1799,226 @@
 {"input": "delete note p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "remove widget p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "delete chat p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "can you delete panel p-123?", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "please remove p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
+{"input": "get rid of panel p-123", "output": "{\"c\": \"panel:delete\", \"a\": [\"p-123\"]}"}
 {"input": "переименуй панель p-123 в Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
 {"input": "назови панель p-123 Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
 {"input": "переименуй p-123 в Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
 {"input": "измени название p-123 на Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "смени имя панели p-123 на Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "можно переименовать p-123 в Новое?", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "пожалуйста назови панель p-123 как Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "хочу назвать p-123 как Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "задай заголовок Новое для p-123", "output": "{\"c\": \"panel:rename\", \"a\": [\"Новое\", \"p-123\"]}"}
+{"input": "rename panel p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "сделай Новое названием панели p-123", "output": "{\"c\": \"panel:rename\", \"a\": [\"Новое\", \"p-123\"]}"}
 {"input": "rename panel p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
 {"input": "rename p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
 {"input": "call panel p-123 Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
 {"input": "change panel name p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "set panel p-123 title to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "can you rename panel p-123 to Новое?", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "please rename p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "i want p-123 named Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "update panel title p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "make panel p-123 called Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
+{"input": "change the title of p-123 to Новое", "output": "{\"c\": \"panel:rename\", \"a\": [\"p-123\", \"Новое\"]}"}
 {"input": "подвинь панель p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
 {"input": "перемести p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
 {"input": "сдвинь p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "поставь панель p-123 в 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "можно переместить p-123 на 100 200?", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "пожалуйста передвинь p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "мне нужно сместить p-123 в 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "перетащи p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "move panel p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "подай панель p-123 в 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "расположи p-123 на 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
 {"input": "move panel p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
 {"input": "move p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
 {"input": "position p-123 at 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "place panel p-123 at 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "can you move p-123 to 100 200?", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "please move panel p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "i need p-123 at 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "drag p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "shift panel p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "set the position of p-123 to 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
+{"input": "put p-123 at 100 200", "output": "{\"c\": \"panel:move\", \"a\": [\"p-123\", \"100\", \"200\"]}"}
 {"input": "измени размер панели p-123 на 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
 {"input": "установи размер p-123 400 на 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
 {"input": "сделай p-123 размером 400 на 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "ресайз p-123 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "можно изменить размер p-123 на 400 300?", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "пожалуйста задай размер p-123 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "мне нужен размер 400 300 для p-123", "output": "{\"c\": \"panel:resize\", \"a\": [\"400\", \"300\", \"p-123\"]}"}
+{"input": "растяни p-123 до 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "сожми p-123 до 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "resize panel p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "выставь габариты p-123 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
 {"input": "resize panel p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
 {"input": "resize p-123 to 400 by 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
 {"input": "set size of p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "make panel p-123 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "can you resize p-123 to 400 300?", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "please set p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "i need p-123 sized 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "stretch p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "shrink p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "change dimensions of p-123 to 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
+{"input": "panel size p-123 400 300", "output": "{\"c\": \"panel:resize\", \"a\": [\"p-123\", \"400\", \"300\"]}"}
 {"input": "открой панель p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "покажи панель p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "перейди к панели p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "фокус на p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "сфокусируйся на панели p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "можно открыть панель p-123?", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста покажи p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "мне нужна панель p-123 на экране", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "активируй панель p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "зафокусить p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "go to panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "focus panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "open panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "show panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "go to panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "bring up panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "can you focus panel p-123?", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "please open p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "i want panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "activate panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "take me to panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
+{"input": "jump to panel p-123", "output": "{\"c\": \"panel:focus\", \"a\": [\"p-123\"]}"}
 {"input": "покрась панель p-123 в blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
 {"input": "цвет панели p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
 {"input": "установи цвет p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
 {"input": "сделай p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "перекрась панель p-123 в blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "можно задать цвет blue для p-123?", "output": "{\"c\": \"panel:color\", \"a\": [\"blue\", \"p-123\"]}"}
+{"input": "пожалуйста покрась p-123 в blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "мне нужен цвет blue для p-123", "output": "{\"c\": \"panel:color\", \"a\": [\"blue\", \"p-123\"]}"}
+{"input": "change color of p-123 to blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "сделай цвет панели p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "задай blue для панели p-123", "output": "{\"c\": \"panel:color\", \"a\": [\"blue\", \"p-123\"]}"}
 {"input": "color panel p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
 {"input": "set panel p-123 color to blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
 {"input": "paint p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
 {"input": "make p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "change panel p-123 to blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "can you color p-123 blue?", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "please set p-123 to blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "i need panel p-123 in blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "recolor panel p-123 blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "set the color of p-123 to blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
+{"input": "panel p-123 color blue", "output": "{\"c\": \"panel:color\", \"a\": [\"p-123\", \"blue\"]}"}
 {"input": "спрячь панель p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
 {"input": "скрой p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
 {"input": "убери p-123 с экрана", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "скрой панель p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "можно спрятать p-123?", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста спрячь p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "мне не нужна панель p-123 на экране", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "закрой видимость p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "hide panel p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "замаскируй p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "убери из вида p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
 {"input": "hide panel p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
 {"input": "hide p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
 {"input": "conceal p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "hide the panel p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "can you hide p-123?", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "please hide panel p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "i don't want to see p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "make p-123 invisible", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "close visibility for p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "take p-123 off screen", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
+{"input": "stash panel p-123", "output": "{\"c\": \"panel:hide\", \"a\": [\"p-123\"]}"}
 {"input": "покажи скрытую панель p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
 {"input": "верни панель p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
 {"input": "отобрази p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "раскрой панель p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "можно показать p-123?", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста верни p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "мне снова нужна панель p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "сделай p-123 видимой", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "show panel p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "unhide p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "покажи p-123 обратно", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
 {"input": "show hidden panel p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
 {"input": "unhide panel p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
 {"input": "reveal p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "show panel p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "can you unhide p-123?", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "please bring back p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "i need panel p-123 again", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "make p-123 visible", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "restore panel p-123", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "show p-123 again", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
+{"input": "bring panel p-123 back", "output": "{\"c\": \"panel:show\", \"a\": [\"p-123\"]}"}
 {"input": "типы панелей", "output": "{\"c\": \"panel:types\", \"a\": []}"}
 {"input": "какие типы панелей есть", "output": "{\"c\": \"panel:types\", \"a\": []}"}
 {"input": "доступные типы", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "покажи типы панелей", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "какие панели можно создать", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "можно список типов панелей?", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "пожалуйста покажи доступные виды панелей", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "мне нужны типы виджетов", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "виды панелей", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "какие есть виды панелей", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "panel types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
 {"input": "panel types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
 {"input": "what panel types are available", "output": "{\"c\": \"panel:types\", \"a\": []}"}
 {"input": "available types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "show panel types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "what panels can i create", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "can i get the panel type list?", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "please show available panel kinds", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "i need widget types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "panel kinds", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "which panel types exist", "output": "{\"c\": \"panel:types\", \"a\": []}"}
+{"input": "list panel types", "output": "{\"c\": \"panel:types\", \"a\": []}"}
 {"input": "помощь по панели p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
 {"input": "что умеет панель p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
 {"input": "действия панели p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "покажи help для p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "как использовать панель p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "можно помощь по p-123?", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "пожалуйста подскажи по панели p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "мне нужна справка по p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "что можно сделать с p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "panel help p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "инструкция для панели p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
 {"input": "panel help p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
 {"input": "what can panel p-123 do", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
 {"input": "panel actions p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "show help for panel p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "how do i use panel p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "can you help with panel p-123?", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "please show panel p-123 help", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "i need help for p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "what can i do with p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "panel guide p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
+{"input": "instructions for panel p-123", "output": "{\"c\": \"panel:help\", \"a\": [\"p-123\"]}"}
 {"input": "выполни действие click на p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
 {"input": "сделай click с p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "запусти click на p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "примени click к p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "можно выполнить click на p-123?", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "пожалуйста сделай click с p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "мне нужно действие click для p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "триггерни click на p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "активируй click у p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "do click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "вызови click для p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
 {"input": "do click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
 {"input": "execute click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "run click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "apply click to p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "can you do click on p-123?", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "please execute click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "i need click for p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "trigger click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "activate click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "perform click on p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}
+{"input": "invoke click for p-123", "output": "{\"c\": \"do\", \"a\": [\"click\", \"p-123\"]}"}

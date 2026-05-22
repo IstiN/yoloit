@@ -75,6 +75,16 @@ class LocalAiModelsService {
       kind: LocalAiModelKind.chat,
     ),
     LocalAiModelDefinition(
+      id: 'yoloit-router-v5',
+      displayName: 'YoLoIT Router v5',
+      kind: LocalAiModelKind.chat,
+    ),
+    LocalAiModelDefinition(
+      id: 'yoloit-router-v4',
+      displayName: 'YoLoIT Router v4',
+      kind: LocalAiModelKind.chat,
+    ),
+    LocalAiModelDefinition(
       id: 'qwen3-4b-instruct-4bit',
       displayName: 'Qwen3 4B Instruct 4bit (latest)',
       kind: LocalAiModelKind.chat,
@@ -589,9 +599,9 @@ class LocalAiModelsService {
     await destDir.create(recursive: true);
 
     final assetManifest = await AssetManifest.loadFromAssetBundle(rootBundle);
-    final assets = assetManifest
-        .listAssets()
-        .where((k) => k.startsWith(_registryAssetPrefix));
+    final assets = assetManifest.listAssets().where(
+      (k) => k.startsWith(_registryAssetPrefix),
+    );
 
     // Always overwrite to ensure bundled assets are up to date.
     for (final assetKey in assets) {
