@@ -1,0 +1,118 @@
+{
+  "version": 2,
+  "runtimeContext": {
+    "boardId": "board-main",
+    "boardName": "My Board",
+    "panelId": "panel-chat",
+    "panelTitle": "YoLo Chat"
+  },
+  "cases": [
+    {
+      "id": "single-note-create",
+      "category": "single",
+      "message": "Создай заметку купить молоко",
+      "expectedTool": "note:create",
+      "expectedArguments": {
+        "title": "купить молоко"
+      }
+    },
+    {
+      "id": "single-checklist-add",
+      "category": "single",
+      "message": "Add an item 'buy coffee' to the checklist",
+      "expectedTool": "checklist:add",
+      "expectedArguments": {
+        "item": "buy coffee"
+      }
+    },
+    {
+      "id": "single-board-list",
+      "category": "single",
+      "message": "Покажи все доски",
+      "expectedTool": "boards",
+      "expectedArguments": {}
+    },
+    {
+      "id": "single-help",
+      "category": "single",
+      "message": "Show help",
+      "expectedTool": "help",
+      "expectedArguments": {}
+    },
+    {
+      "id": "multi-note-and-checklist",
+      "category": "multi",
+      "message": "Создай заметку позвонить артему и добавь в чеклист купить цветы",
+      "expectedToolCalls": [
+        {
+          "tool": "note:create",
+          "arguments": {
+            "title": "позвонить артему"
+          }
+        },
+        {
+          "tool": "checklist:add",
+          "arguments": {
+            "item": "купить цветы"
+          }
+        }
+      ]
+    },
+    {
+      "id": "multi-two-notes",
+      "category": "multi",
+      "message": "Create a note 'Meeting at 3pm' and another note 'Call John'",
+      "expectedToolCalls": [
+        {
+          "tool": "note:create",
+          "arguments": {
+            "title": "Meeting at 3pm"
+          }
+        },
+        {
+          "tool": "note:create",
+          "arguments": {
+            "title": "Call John"
+          }
+        }
+      ]
+    },
+    {
+      "id": "multi-checklist-items",
+      "category": "multi",
+      "message": "Добавь в чеклист: молоко, хлеб, масло",
+      "expectedToolCalls": [
+        {
+          "tool": "checklist:add",
+          "arguments": {
+            "item": "молоко"
+          }
+        },
+        {
+          "tool": "checklist:add",
+          "arguments": {
+            "item": "хлеб"
+          }
+        },
+        {
+          "tool": "checklist:add",
+          "arguments": {
+            "item": "масло"
+          }
+        }
+      ]
+    },
+    {
+      "id": "no-tool-greeting",
+      "category": "no-tool",
+      "message": "Привет! Как дела?",
+      "expectNoToolCall": true
+    },
+    {
+      "id": "no-tool-question",
+      "category": "no-tool",
+      "message": "What is the capital of France?",
+      "expectNoToolCall": true
+    }
+  ]
+}

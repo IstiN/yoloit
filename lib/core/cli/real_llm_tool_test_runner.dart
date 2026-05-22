@@ -163,6 +163,32 @@ class RealLlmToolTestRunner {
             .cast<Map<String, Object?>>()
             .lastOrNull;
 
+    // No-tool-call cases (e.g. greeting).
+    if (item.expectNoToolCall) {
+      return <String, Object?>{
+        'ok': toolStarts.isEmpty,
+        'id': item.id,
+        'message': item.message,
+        'expectedTool': '(none)',
+        'actualTool': toolStarts.isEmpty ? '(none)' : toolStarts.first.toolName,
+        'assistantText': assistantText,
+        if (resultUsage != null) 'usage': resultUsage,
+        if (toolStarts.isNotEmpty) 'error': 'Expected no tool call but got one.',
+      };
+    }
+
+    // Multi-step orchestrator cases.
+    if (item.isMultiStep) {
+      return _validateMultiStep(
+        item: item,
+        toolStarts: toolStarts,
+        toolCompletes: toolCompletes,
+        assistantText: assistantText,
+        resultUsage: resultUsage,
+      );
+    }
+
+    // Legacy single-tool cases.
     if (toolStarts.isEmpty) {
       return <String, Object?>{
         'ok': false,
@@ -208,6 +234,70 @@ class RealLlmToolTestRunner {
       if (!toolMatches) 'error': 'Wrong tool selected.',
       if (argMismatches.isNotEmpty) 'argumentMismatches': argMismatches,
       if (assistantText.isNotEmpty) 'assistantText': assistantText,
+    };
+  }
+
+  static Map<String, Object?> _validateMultiStep({
+    required _RealToolCase item,
+    required List<ChatEvent> toolStarts,
+    required List<ChatEvent> toolCompletes,
+    required String assistantText,
+    required Map<String, Object?>? resultUsage,
+  }) {
+    if (toolStarts.length < item.expectedToolCalls.length) {
+      return <String, Object?>{
+        'ok': false,
+        'id': item.id,
+        'message': item.message,
+        'expectedTool': item.expectedToolCalls.map((e) => e.tool).join(', '),
+        'actualTool': toolStarts.map((e) => e.toolName).join(', '),
+        'error':
+            'Expected ${item.expectedToolCalls.length} tool calls, '
+            'got ${toolStarts.length}.',
+        'assistantText': assistantText,
+        if (resultUsage != null) 'usage': resultUsage,
+      };
+    }
+
+    final errors = <String>[];
+    for (var i = 0; i < item.expectedToolCalls.length; i++) {
+      final expected = item.expectedToolCalls[i];
+      final actual = toolStarts[i];
+      if (actual.toolName != expected.tool) {
+        errors.add(
+          'Step $i: expected ${expected.tool}, got ${actual.toolName}',
+        );
+      }
+      final actualArgs = actual.toolArguments ?? <String, dynamic>{};
+      final completeContent =
+          i < toolCompletes.length
+              ? (toolCompletes[i].toolResultContent ?? '')
+              : '';
+      for (final entry in expected.arguments.entries) {
+        if (!_argumentMatched(
+          entry.key,
+          entry.value,
+          actualArgs,
+          completeContent,
+        )) {
+          errors.add(
+            'Step $i: arg "${entry.key}" expected "${entry.value}", '
+            'got "${actualArgs[entry.key]}"',
+          );
+        }
+      }
+    }
+
+    return <String, Object?>{
+      'ok': errors.isEmpty,
+      'id': item.id,
+      'message': item.message,
+      'expectedTool': item.expectedToolCalls.map((e) => e.tool).join(', '),
+      'actualTool': toolStarts.map((e) => e.toolName).join(', '),
+      'toolCallCount': toolStarts.length,
+      'assistantText': assistantText,
+      if (resultUsage != null) 'usage': resultUsage,
+      if (errors.isNotEmpty) 'error': errors.join('; '),
     };
   }
 
@@ -355,23 +445,57 @@ class _RealToolCase {
     required this.message,
     required this.expectedTool,
     required this.expectedArguments,
+    this.expectedToolCalls = const [],
+    this.expectNoToolCall = false,
   });
 
   factory _RealToolCase.fromJson(Map<String, Object?> json) {
+    final toolCalls = json['expectedToolCalls'] as List?;
     return _RealToolCase(
       id: json['id'] as String,
       category: json['category'] as String? ?? 'general',
       message: json['message'] as String,
-      expectedTool: json['expectedTool'] as String,
-      expectedArguments: Map<String, Object?>.from(
-        json['expectedArguments'] as Map,
-      ),
+      expectedTool: json['expectedTool'] as String? ?? '',
+      expectedArguments: json['expectedArguments'] != null
+          ? Map<String, Object?>.from(json['expectedArguments'] as Map)
+          : <String, Object?>{},
+      expectedToolCalls: toolCalls
+              ?.map((e) => _ExpectedToolCall.fromJson(e as Map<String, Object?>))
+              .toList(growable: false) ??
+          const [],
+      expectNoToolCall: json['expectNoToolCall'] as bool? ?? false,
     );
   }
 
   final String id;
   final String category;
   final String message;
+  /// First expected tool (backward compat).
   final String expectedTool;
   final Map<String, Object?> expectedArguments;
+  /// For orchestrator multi-step cases: ordered list of expected tool calls.
+  final List<_ExpectedToolCall> expectedToolCalls;
+  /// If true, the test expects NO tool call (e.g. greeting).
+  final bool expectNoToolCall;
+
+  bool get isMultiStep => expectedToolCalls.isNotEmpty;
+}
+
+class _ExpectedToolCall {
+  const _ExpectedToolCall({
+    required this.tool,
+    this.arguments = const <String, Object?>{},
+  });
+
+  factory _ExpectedToolCall.fromJson(Map<String, Object?> json) {
+    return _ExpectedToolCall(
+      tool: json['tool'] as String,
+      arguments: json['arguments'] != null
+          ? Map<String, Object?>.from(json['arguments'] as Map)
+          : <String, Object?>{},
+    );
+  }
+
+  final String tool;
+  final Map<String, Object?> arguments;
 }

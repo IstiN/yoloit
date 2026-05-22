@@ -92,6 +92,9 @@ class LocalLlmProvider extends ChatProvider {
     return controller.stream;
   }
 
+  /// Maximum agentic loop iterations for orchestrator models.
+  static const _maxOrchestratorIterations = 5;
+
   Future<void> _run({
     required String message,
     required ChatSessionConfig config,
@@ -106,11 +109,16 @@ class LocalLlmProvider extends ChatProvider {
     try {
       final installed = await _loadInstalledModel();
       final requestProfile = _requestProfileFor(installed.manifest);
+      final isRouter = _isRouterModel(installed.manifest);
+      final isOrchestrator = _isOrchestratorModel(installed.manifest);
+      final maxIterations =
+          isOrchestrator ? _maxOrchestratorIterations : 1;
       // ignore: avoid_print
       print(
         '[LocalLlmProvider] model=${installed.manifest.id} '
-        'router=${_isRouterModel(installed.manifest)} '
-        'compact=${requestProfile.compactPrompt} '
+        'router=$isRouter '
+        'orchestrator=$isOrchestrator '
+        'maxIter=$maxIterations '
         'maxTok=${requestProfile.maxTokens}',
       );
 
@@ -135,13 +143,6 @@ class LocalLlmProvider extends ChatProvider {
             >[],
       );
 
-      final messages = await _buildMessages(
-        installed.manifest,
-        sessionHistory,
-        sessionToolHistory,
-        message,
-        runtimeContext,
-      );
       final messageId = 'assistant-${DateTime.now().millisecondsSinceEpoch}';
       controller.add(
         ChatEvent(
@@ -153,15 +154,25 @@ class LocalLlmProvider extends ChatProvider {
       );
 
       var emitted = '';
-      var rawEmitted = '';
       final completionStopwatch = Stopwatch()..start();
       var firstTokenMs = -1;
       var streamedChunkCount = 0;
-      final toolHistoryCountBefore = sessionToolHistory.length;
+      final loopContext = <Map<String, String>>[];
+
+      final disabledTools = YoloitCliToolCatalog.normalizeFunctionNames(
+        config.disabledLocalToolNames,
+      );
+      final tools =
+          isRouter
+              ? const <flm.LocalTool>[]
+              : YoloitCliToolCatalog.localToolsFor(
+                disabledFunctionNames:
+                    config.disabledLocalToolNames
+                        .map((name) => name.trim())
+                        .toSet(),
+              );
+
       Future<String> toolHandler(String name, Map<String, Object?> arguments) {
-        final disabledTools = YoloitCliToolCatalog.normalizeFunctionNames(
-          config.disabledLocalToolNames,
-        );
         final resolvedName =
             YoloitCliToolArgumentNormalizer.normalizeFunctionName(
               functionName: name,
@@ -178,79 +189,128 @@ class LocalLlmProvider extends ChatProvider {
         );
       }
 
-      final full = await _engine.completeStreaming(
-        flm.LmCompletionRequest(
-          modelPath: installed.directory.path,
-          manifest: installed.manifest,
-          messages: messages,
-          maxTokens: requestProfile.maxTokens,
-          temperature: requestProfile.temperature,
-          enableThinking: requestProfile.enableThinking,
-          // Router/fine-tuned models output compact JSON directly — don't pass
-          // tool definitions (which would switch Qwen3 to native tool calling).
-          tools:
-              _isRouterModel(installed.manifest)
-                  ? const []
-                  : YoloitCliToolCatalog.localToolsFor(
-                    disabledFunctionNames:
-                        config.disabledLocalToolNames
-                            .map((name) => name.trim())
-                            .toSet(),
-                  ),
-          onToolCall: toolHandler,
-        ),
-        (chunk) {
-          if (_cancelRequested[session] == true) return;
-          if (firstTokenMs < 0 && chunk.trim().isNotEmpty) {
-            firstTokenMs = completionStopwatch.elapsedMilliseconds;
-          }
-          final rawDelta = _extractDelta(previous: rawEmitted, incoming: chunk);
-          if (rawDelta.isEmpty) return;
-          streamedChunkCount++;
-          rawEmitted += rawDelta;
-          final visible = stripEmbeddedGemmaToolCallBlocks(rawEmitted);
-          final delta = _extractDelta(previous: emitted, incoming: visible);
-          if (delta.isEmpty) return;
-          emitted += delta;
-          controller.add(
-            ChatEvent(
-              type: ChatEventType.assistantDelta,
-              rawType: 'assistant.message_delta',
-              timestamp: DateTime.now(),
-              data: {'deltaContent': delta},
-            ),
-          );
-        },
-      );
-      completionStopwatch.stop();
+      String completedContent = '';
 
-      final rawFull = full.trim().isNotEmpty ? full : rawEmitted;
-      var completedContent = await applyEmbeddedGemmaToolCallsIfAny(
-        rawModelOutput: rawFull,
-        cleanedOutput: stripEmbeddedGemmaToolCallBlocks(rawFull),
-        onTool: toolHandler,
-      );
-      completedContent = await _applyRouterJsonToolCallIfAny(
-        rawModelOutput: rawFull,
-        currentContent: completedContent,
-        toolHistory: sessionToolHistory,
-        toolHistoryCountBefore: toolHistoryCountBefore,
-        onTool: toolHandler,
-      );
-      if (completedContent.startsWith(emitted)) {
-        final delta = completedContent.substring(emitted.length);
-        if (delta.isNotEmpty) {
-          emitted = completedContent;
-          controller.add(
-            ChatEvent(
-              type: ChatEventType.assistantDelta,
-              rawType: 'assistant.message_delta',
-              timestamp: DateTime.now(),
-              data: {'deltaContent': delta},
-            ),
-          );
+      for (var iteration = 0; iteration < maxIterations; iteration++) {
+        if (_cancelRequested[session] == true) break;
+
+        final iterToolCountBefore = sessionToolHistory.length;
+        final messages = await _buildMessages(
+          installed.manifest,
+          sessionHistory,
+          sessionToolHistory,
+          message,
+          runtimeContext,
+          loopContext: loopContext,
+        );
+
+        var rawEmitted = '';
+        var iterEmitted = '';
+
+        final full = await _engine.completeStreaming(
+          flm.LmCompletionRequest(
+            modelPath: installed.directory.path,
+            manifest: installed.manifest,
+            messages: messages,
+            maxTokens: requestProfile.maxTokens,
+            temperature: requestProfile.temperature,
+            enableThinking: requestProfile.enableThinking,
+            tools: tools,
+            onToolCall: toolHandler,
+          ),
+          (chunk) {
+            if (_cancelRequested[session] == true) return;
+            if (firstTokenMs < 0 && chunk.trim().isNotEmpty) {
+              firstTokenMs = completionStopwatch.elapsedMilliseconds;
+            }
+            final rawDelta =
+                _extractDelta(previous: rawEmitted, incoming: chunk);
+            if (rawDelta.isEmpty) return;
+            streamedChunkCount++;
+            rawEmitted += rawDelta;
+            final visible = stripEmbeddedGemmaToolCallBlocks(rawEmitted);
+            final delta =
+                _extractDelta(previous: iterEmitted, incoming: visible);
+            if (delta.isEmpty) return;
+            iterEmitted += delta;
+            emitted += delta;
+            controller.add(
+              ChatEvent(
+                type: ChatEventType.assistantDelta,
+                rawType: 'assistant.message_delta',
+                timestamp: DateTime.now(),
+                data: {'deltaContent': delta},
+              ),
+            );
+          },
+        );
+
+        final rawFull = full.trim().isNotEmpty ? full : rawEmitted;
+        var iterContent = await applyEmbeddedGemmaToolCallsIfAny(
+          rawModelOutput: rawFull,
+          cleanedOutput: stripEmbeddedGemmaToolCallBlocks(rawFull),
+          onTool: toolHandler,
+        );
+        iterContent = await _applyRouterJsonToolCallIfAny(
+          rawModelOutput: rawFull,
+          currentContent: iterContent,
+          toolHistory: sessionToolHistory,
+          toolHistoryCountBefore: iterToolCountBefore,
+          onTool: toolHandler,
+        );
+
+        // Emit any post-processed content that wasn't streamed yet.
+        if (iterContent.startsWith(iterEmitted)) {
+          final delta = iterContent.substring(iterEmitted.length);
+          if (delta.isNotEmpty) {
+            emitted += delta;
+            controller.add(
+              ChatEvent(
+                type: ChatEventType.assistantDelta,
+                rawType: 'assistant.message_delta',
+                timestamp: DateTime.now(),
+                data: {'deltaContent': delta},
+              ),
+            );
+          }
         }
+
+        completedContent = iterContent;
+
+        // Check if new tool calls were made this iteration.
+        final newToolCalls = sessionToolHistory.length - iterToolCountBefore;
+        if (newToolCalls > 0 && iteration < maxIterations - 1) {
+          // Add assistant response + tool results to loop context for next
+          // iteration so the model sees what it already did.
+          loopContext.add({
+            'role': 'assistant',
+            'content': iterContent.trim(),
+          });
+          for (var i = iterToolCountBefore;
+              i < sessionToolHistory.length;
+              i++) {
+            final tc = sessionToolHistory[i];
+            loopContext.add({
+              'role': 'tool',
+              'content':
+                  '${tc.toolName} ${tc.success ? "→ ok" : "→ error"}: '
+                  '${_compactToolResultForPrompt(tc.result)}',
+            });
+          }
+
+          // ignore: avoid_print
+          print(
+            '[LocalLlmProvider] orchestrator loop: iteration=$iteration '
+            'newToolCalls=$newToolCalls → continuing',
+          );
+          continue;
+        }
+
+        // No tool calls or last iteration — done.
+        break;
       }
+
+      completionStopwatch.stop();
 
       if (_cancelRequested[session] == true) {
         return;
@@ -302,6 +362,11 @@ class LocalLlmProvider extends ChatProvider {
               'generationDurationMs':
                   generationDurationMs < 0 ? 0 : generationDurationMs,
               if (nativeTimings != null) 'nativeTimings': nativeTimings,
+              'orchestratorIterations':
+                  loopContext
+                          .where((m) => m['role'] == 'assistant')
+                          .length +
+                      1,
             },
           },
         ),
@@ -716,6 +781,12 @@ class LocalLlmProvider extends ChatProvider {
   bool _isRouterModel(flm.LocalModelManifest manifest) =>
       manifest.id.toLowerCase().contains('router');
 
+  /// Models that support agentic multi-step tool calling loops.
+  bool _isOrchestratorModel(flm.LocalModelManifest manifest) {
+    final id = manifest.id.toLowerCase();
+    return id.contains('gemma4') || id.contains('gemma-4');
+  }
+
   bool _usesCompactRoutingPrompt(flm.LocalModelManifest manifest) {
     final id = manifest.id.toLowerCase();
     return _isRouterModel(manifest) || id == 'qwen3-0.6b-4bit';
@@ -754,8 +825,9 @@ class LocalLlmProvider extends ChatProvider {
     >
     toolHistory,
     String userMessage,
-    ChatRuntimeContext? runtimeContext,
-  ) async {
+    ChatRuntimeContext? runtimeContext, {
+    List<Map<String, String>> loopContext = const [],
+  }) async {
     final boardId = runtimeContext?.boardId?.trim();
     final boardName = runtimeContext?.boardName?.trim();
     final panelId = runtimeContext?.panelId?.trim();
@@ -827,6 +899,13 @@ class LocalLlmProvider extends ChatProvider {
           .trim();
     }
     result.add({'role': 'user', 'content': cleanedMessage});
+
+    // Append agentic loop context (intermediate assistant + tool messages from
+    // previous iterations of the current request).
+    if (loopContext.isNotEmpty) {
+      result.addAll(loopContext);
+    }
+
     return result;
   }
 
