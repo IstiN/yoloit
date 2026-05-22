@@ -739,8 +739,13 @@ class LocalLlmProvider extends ChatProvider {
     final isRouter = _isRouterModel(manifest);
     final systemBuf = StringBuffer();
     if (isRouter) {
-      // Fine-tuned router: no system prompt needed — model was trained to
-      // output compact JSON directly from user text.
+      // Fine-tuned router: minimal prompt so the model outputs compact JSON.
+      // Same prompt used by CLI process-command.
+      systemBuf.write(
+        'Route user text to YoLoIT CLI command. '
+        'Reply ONLY JSON: {"c":"CMD","a":["ARG"]}. '
+        'No markdown, no thinking, no explanation.',
+      );
     } else {
       systemBuf.writeln(
         _usesCompactRoutingPrompt(manifest)
@@ -784,7 +789,14 @@ class LocalLlmProvider extends ChatProvider {
       }
     }
 
-    result.add({'role': 'user', 'content': userMessage});
+    var cleanedMessage = userMessage;
+    if (isRouter) {
+      // Strip /no_think suffix — thinking is already disabled for router models.
+      cleanedMessage = cleanedMessage
+          .replaceAll(RegExp(r'\s*/no_think\b', caseSensitive: false), '')
+          .trim();
+    }
+    result.add({'role': 'user', 'content': cleanedMessage});
     return result;
   }
 
