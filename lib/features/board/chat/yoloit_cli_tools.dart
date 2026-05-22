@@ -361,6 +361,8 @@ class YoloitCliToolArgumentNormalizer {
     ChatRuntimeContext? runtimeContext,
   }) {
     final normalized = Map<String, Object?>.from(arguments);
+    // Strip LLM placeholder values early so downstream logic sees them as missing.
+    normalized.removeWhere((_, v) => _isMissing(v));
     final tool = YoloitCliToolCatalog.byFunctionName(functionName);
     _canonicalizeCompactArguments(tool, normalized);
     if (tool?.command == 'panel:create' && _isMissing(normalized['type'])) {
@@ -640,7 +642,14 @@ class YoloitCliToolArgumentNormalizer {
 
   static bool _isMissing(Object? value) {
     if (value == null) return true;
-    if (value is String && value.trim().isEmpty) return true;
+    if (value is String) {
+      final v = value.trim();
+      if (v.isEmpty) return true;
+      // Treat common LLM placeholder tokens as missing.
+      if (v == '__' || v == '_' || v == '...' || v == 'null' || v == 'none') {
+        return true;
+      }
+    }
     return false;
   }
 
@@ -887,7 +896,13 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
 
   bool _isMissing(Object? value) {
     if (value == null) return true;
-    if (value is String && value.trim().isEmpty) return true;
+    if (value is String) {
+      final v = value.trim();
+      if (v.isEmpty) return true;
+      if (v == '__' || v == '_' || v == '...' || v == 'null' || v == 'none') {
+        return true;
+      }
+    }
     return false;
   }
 

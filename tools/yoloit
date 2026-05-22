@@ -2402,7 +2402,7 @@ if os.path.exists(router_port_file):
         pass  # Fall through to lm:generate
 
 # Fallback: use YoLoIT lm:generate API (slower: ~2-3s)
-model = os.environ.get('YOLOIT_ROUTER_MODEL', 'qwen3-0.6b-4bit')
+model = os.environ.get('YOLOIT_ROUTER_MODEL', 'yoloit-router-v5')
 prompt = 'Route user text to YoLoIT CLI command. Reply ONLY JSON: {\"c\":\"CMD\",\"a\":[\"ARG\"]}. No markdown, no thinking, no explanation.'
 
 payload = json.dumps({
