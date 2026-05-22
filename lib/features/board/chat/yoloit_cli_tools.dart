@@ -365,6 +365,9 @@ class YoloitCliToolArgumentNormalizer {
     normalized.removeWhere((_, v) => _isMissing(v));
     final tool = YoloitCliToolCatalog.byFunctionName(functionName);
     _canonicalizeCompactArguments(tool, normalized);
+    // Strip chat/assistant panel IDs from tools that auto-resolve their own
+    // panel type. The CLI finds the correct panel by type.
+    _stripChatPanelForTypedTools(tool, normalized);
     if (tool?.command == 'panel:create' && _isMissing(normalized['type'])) {
       final type = _inferPanelType(userMessage);
       if (type != null) {
@@ -413,6 +416,32 @@ class YoloitCliToolArgumentNormalizer {
         }
       }
     }
+  }
+
+  /// For note/checklist/kanban tools, strip chat/assistant panel IDs from the
+  /// arguments. The model sometimes passes the assistant panel ID from the
+  /// system prompt context snapshot, but the CLI auto-resolves the correct
+  /// panel by type.
+  static void _stripChatPanelForTypedTools(
+    YoloitCliTool? tool,
+    Map<String, Object?> normalized,
+  ) {
+    if (tool == null) return;
+    final g = tool.group;
+    if (g != 'note' && g != 'checklist' && g != 'kanban') return;
+    for (final key in const ['panel', 'panel_id', 'panel_title', 'p', 'id']) {
+      final v = normalized[key];
+      if (v is String && _isChatPanelId(v)) {
+        normalized.remove(key);
+      }
+    }
+  }
+
+  static bool _isChatPanelId(String id) {
+    final lower = id.toLowerCase();
+    return lower.contains('assistant') ||
+        lower.contains('yolo_badge') ||
+        lower.contains('yolochat');
   }
 
   static void _normalizeHelpArguments(
