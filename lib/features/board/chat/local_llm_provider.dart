@@ -642,6 +642,12 @@ class LocalLlmProvider extends ChatProvider {
   String? _extractJsonObject(String text) {
     var trimmed = text.trim();
     if (trimmed.isEmpty) return null;
+    // Strip <think>...</think> blocks from Qwen3 models.
+    trimmed = trimmed.replaceAll(
+      RegExp(r'<think>[\s\S]*?</think>\s*', caseSensitive: false),
+      '',
+    ).trim();
+    if (trimmed.isEmpty) return null;
     if (trimmed.startsWith('```')) {
       trimmed =
           trimmed
@@ -660,19 +666,20 @@ class LocalLlmProvider extends ChatProvider {
     try {
       final decoded = jsonDecode(result);
       if (decoded is Map) {
-        final command = decoded['command'] as String?;
-        if (command != null && command.trim().isNotEmpty) {
-          return 'Prepared $command';
-        }
         final error = decoded['error'] as String?;
         if (error != null && error.trim().isNotEmpty) {
-          return 'Tool $toolName failed: $error';
+          return '❌ $error';
+        }
+        final command = decoded['command'] as String?;
+        if (command != null && command.trim().isNotEmpty) {
+          return '✅ Готово';
         }
       }
-    } catch (_) {
-      // Keep empty if the tool result is not JSON.
+    } catch (_) {}
+    if (result.contains('"error"')) {
+      return '❌ Команда не выполнена';
     }
-    return '';
+    return '✅ Готово';
   }
 
   ({
