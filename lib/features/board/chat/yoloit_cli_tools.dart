@@ -374,6 +374,8 @@ class YoloitCliToolArgumentNormalizer {
     ChatRuntimeContext? runtimeContext,
   }) {
     final normalized = Map<String, Object?>.from(arguments);
+    // Strip LLM artifacts from string values (e.g. Mistral appends "/no_think").
+    _stripLlmArtifacts(normalized);
     // Strip LLM placeholder values early so downstream logic sees them as missing.
     normalized.removeWhere((_, v) => _isMissing(v));
     final tool = YoloitCliToolCatalog.byFunctionName(functionName);
@@ -690,6 +692,19 @@ class YoloitCliToolArgumentNormalizer {
     }
     if (text.contains('chat panel')) return 'board.chat';
     return null;
+  }
+
+  /// Strip known LLM artifacts from string values (e.g. Mistral's "/no_think").
+  static void _stripLlmArtifacts(Map<String, Object?> args) {
+    for (final key in args.keys.toList()) {
+      final v = args[key];
+      if (v is String) {
+        args[key] = v
+            .replaceAll(RegExp(r'\s*/no_think\s*'), '')
+            .replaceAll(RegExp(r'\s*/think\s*'), '')
+            .trim();
+      }
+    }
   }
 
   static bool _isMissing(Object? value) {

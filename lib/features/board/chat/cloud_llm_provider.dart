@@ -134,6 +134,9 @@ class CloudLlmProvider extends ChatProvider {
       for (var iteration = 0; iteration < _maxIterations; iteration++) {
         if (_cancelRequested[session] == true) break;
 
+        // Reset emitted each iteration — only keep final response text.
+        emitted = '';
+
         // ignore: avoid_print
         print(
           '[CloudLlmProvider] ${cfg.name} model=${cfg.model} '
@@ -250,7 +253,7 @@ class CloudLlmProvider extends ChatProvider {
       stopwatch.stop();
       if (_cancelRequested[session] == true) return;
 
-      final content = emitted.trim();
+      final content = _stripThinkTags(emitted.trim());
       sessionHistory.add({'role': 'user', 'content': message});
       sessionHistory.add({'role': 'assistant', 'content': content});
 
@@ -487,6 +490,14 @@ class CloudLlmProvider extends ChatProvider {
       toolCalls: parsedToolCalls,
     );
   }
+
+  static final _thinkTagRe = RegExp(
+    r'<think>[\s\S]*?</think>\s*',
+    caseSensitive: false,
+  );
+
+  /// Strip `<think>...</think>` blocks some models emit (Qwen3, Mistral, etc.)
+  String _stripThinkTags(String text) => text.replaceAll(_thinkTagRe, '').trim();
 
   bool _toolResultSucceeded(String result) {
     try {

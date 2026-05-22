@@ -137,6 +137,21 @@ const kCloudLlmPresets = <CloudLlmPreset>[
     ],
   ),
   CloudLlmPreset(
+    id: 'ollama',
+    name: 'Ollama',
+    baseUrl: 'https://ollama.com/v1',
+    defaultModel: 'ministral-3:14b',
+    models: [
+      (id: 'ministral-3:14b', name: 'Ministral 3 14B'),
+      (id: 'qwen3:32b', name: 'Qwen 3 32B'),
+      (id: 'qwen3:8b', name: 'Qwen 3 8B'),
+      (id: 'llama3.1:8b', name: 'Llama 3.1 8B'),
+      (id: 'mistral:7b', name: 'Mistral 7B'),
+      (id: 'gemma3:27b', name: 'Gemma 3 27B'),
+      (id: 'deepseek-r1:14b', name: 'DeepSeek R1 14B'),
+    ],
+  ),
+  CloudLlmPreset(
     id: 'gemini',
     name: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
