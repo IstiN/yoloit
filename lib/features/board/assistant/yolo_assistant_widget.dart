@@ -7,7 +7,6 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
@@ -16,9 +15,11 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
@@ -45,15 +46,14 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   final _scrollController = ScrollController();
   final _inputFocusNode = FocusNode();
   final AudioRecorder _micRecorder = AudioRecorder();
-  final flm.NativeLmEngine _engine = flm.NativeLmEngine();
   final YoloitToolExecutor _toolExecutor = YoloitCliToolExecutor();
+  LocalLlmProvider? _chatProvider;
   bool _isRecordingMic = false;
   bool _isStartingMic = false;
   bool _stopMicAfterStart = false;
   bool _isTranscribingMic = false;
   bool _isGeneratingReply = false;
   bool _isCancelled = false;
-  int _toolCallSequence = 0;
   List<Map<String, dynamic>>? _messageDraft;
 
   // In-memory ring buffer of raw LLM debug sessions (last 20, not persisted).
@@ -156,31 +156,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _updateState({'messages': msgs});
     _scrollToBottom();
 
-    await LocalAiModelsService.instance.initialize();
-    await LocalAiModelsService.instance.ensureRuntimeReady();
-    final selectedModelId = LocalAiModelsService.instance.selectedChatModelId;
-    final installed = LocalAiModelsService.instance.installedModelById(
-      selectedModelId,
-    );
-    if (installed == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Install Local Chat model first. Opening Settings → AI Models…',
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      await SettingsPage.show(context, initialCategory: 'AI Models');
-      return;
-    }
-
     setState(() {
       _isGeneratingReply = true;
       _isCancelled = false;
     });
-    var emitted = '';
 
     // ── Debug session ──────────────────────────────────────────────────────
     final dbg = <String, dynamic>{
@@ -193,117 +172,126 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
     try {
       _messageDraft = msgs;
-      final messages = await _buildMessagesForRequest(msgs);
-      final disabledTools = _disabledLocalToolNames.toSet();
-      final tools = YoloitCliToolCatalog.localToolsFor(
-        disabledFunctionNames: disabledTools,
-      );
       final runtimeContext = _runtimeContext();
       final calledTools = <String>[];
 
-      // Capture what we are about to send.
-      dbg['messages'] = messages;
-      dbg['maxTokens'] = _maxOutputTokens;
-      dbg['temperature'] = _temperature;
-      dbg['toolSchemas'] =
-          const JsonEncoder.withIndent('  ').convert(
-            tools.map((t) => t.toJson()).toList(),
+      // Wrap the base executor with assistant-specific pre/post processing
+      // (retarget note, ensure panel, focus created panel, etc.).
+      final wrappedExecutor = _AssistantToolExecutor(
+        delegate: _toolExecutor,
+        assistantPanelId: widget.panel.id,
+        assistantPanelTitle: widget.panel.title,
+        lastTargetNotePanelId: _lastTargetNotePanelId,
+        userMessage: text,
+        onToolCompleted: (String toolCommand, Map<String, Object?> arguments, String result, bool success) {
+          calledTools.add(toolCommand);
+          final statePatch = _toolTargetPatchIfNeeded(
+            toolCommand: toolCommand,
+            arguments: arguments,
+            result: result,
           );
-      dbg['promptSentAt'] = DateTime.now().toIso8601String();
-
-      var firstTokenReceived = false;
-      final rawChunks = StringBuffer();
-
-      Future<String> toolHandler(
-        String name,
-        Map<String, Object?> arguments,
-      ) async {
-        final resolvedName =
-            YoloitCliToolArgumentNormalizer.normalizeFunctionName(
-              functionName: name,
-              userMessage: text,
-            );
-        final tool = YoloitCliToolCatalog.byFunctionName(resolvedName);
-        if (tool != null) {
-          calledTools.add(tool.command);
-        }
-        final toolCallStartAt = DateTime.now().toIso8601String();
-        final result = await _handleToolCall(
-          name: resolvedName,
-          arguments: arguments,
-          userMessage: text,
-          runtimeContext: runtimeContext,
-          disabledFunctionNames: disabledTools,
-        );
-        (dbg['toolCalls'] as List<Map<String, dynamic>>).add({
-          'name': resolvedName,
-          'arguments': arguments,
-          'result': result,
-          'startAt': toolCallStartAt,
-          'endAt': DateTime.now().toIso8601String(),
-        });
-        return result;
-      }
-
-      final response = await _engine.completeStreaming(
-        flm.LmCompletionRequest(
-          modelPath: installed.directory.path,
-          manifest: installed.manifest,
-          messages: messages,
-          maxTokens: _maxOutputTokens,
-          temperature: _temperature,
-          enableThinking: _enableThinking ? true : false,
-          tools: tools,
-          onToolCall: toolHandler,
-        ),
-        (chunk) {
-          rawChunks.write(chunk);
-          if (_isCancelled) return;
-          if (!firstTokenReceived && chunk.trim().isNotEmpty) {
-            firstTokenReceived = true;
-            dbg['firstTokenAt'] = DateTime.now().toIso8601String();
+          if (statePatch.isNotEmpty) {
+            _updateState(statePatch);
           }
-          if (!mounted) return;
-          final visible = stripEmbeddedGemmaToolCallBlocks(chunk);
-          final delta =
-              visible.startsWith(emitted)
-                  ? visible.substring(emitted.length)
-                  : visible;
-          if (delta.isEmpty) return;
-          emitted += delta;
-          _replaceAssistantMessageContent(
-            assistantMessageId: assistantMessageId,
-            content: emitted.trim(),
+          (dbg['toolCalls'] as List<Map<String, dynamic>>).add({
+            'name': toolCommand,
+            'arguments': arguments,
+            'result': result,
+            'startAt': DateTime.now().toIso8601String(),
+          });
+        },
+        onFocusPanel: (focusArgs) async {
+          await _toolExecutor.invoke(
+            'yoloit_panel_focus',
+            focusArgs,
+            runtimeContext: runtimeContext,
           );
         },
       );
-      dbg['completedAt'] = DateTime.now().toIso8601String();
 
-      // Capture Swift-level timing metadata if available
-      if (_engine case final flm.NativeLmEngine nativeEngine) {
-        final swiftMeta = nativeEngine.lastNativeTimings;
-        if (swiftMeta != null) dbg['swiftTimings'] = swiftMeta;
+      // Use LocalLlmProvider — single source of truth for model selection,
+      // agentic loop, JSON buffering, tool validation, etc.
+      final provider = LocalLlmProvider(toolExecutor: wrappedExecutor);
+      _chatProvider = provider;
+
+      final config = ChatSessionConfig(
+        sessionName: '__yolo_badge_assistant__',
+        workingDir: Directory.current.path,
+        provider: 'local',
+        disabledLocalToolNames: _disabledLocalToolNames,
+      );
+
+      dbg['promptSentAt'] = DateTime.now().toIso8601String();
+      var emitted = '';
+      var firstTokenReceived = false;
+
+      await for (final event in provider.sendMessage(
+        message: text,
+        config: config,
+        isFirstMessage: msgs.where((m) => m['role'] == 'user').length <= 1,
+        runtimeContext: runtimeContext,
+      )) {
+        if (_isCancelled) break;
+
+        switch (event.type) {
+          case ChatEventType.assistantDelta:
+            final delta = event.data['deltaContent'] as String? ?? '';
+            if (delta.isEmpty) continue;
+            if (!firstTokenReceived && delta.trim().isNotEmpty) {
+              firstTokenReceived = true;
+              dbg['firstTokenAt'] = DateTime.now().toIso8601String();
+            }
+            emitted += delta;
+            if (mounted) {
+              _replaceAssistantMessageContent(
+                assistantMessageId: assistantMessageId,
+                content: emitted.trim(),
+              );
+            }
+          case ChatEventType.toolStart:
+            final toolName = event.data['toolName'] as String? ?? '';
+            final args = event.data['arguments'] as Map<String, Object?>? ?? {};
+            _appendToolMessage(
+              callId: event.data['toolCallId'] as String? ?? 'tool-${DateTime.now().microsecondsSinceEpoch}',
+              toolName: toolName,
+              arguments: Map<String, Object?>.from(args),
+              result: '⏳ running…',
+              success: true,
+            );
+          case ChatEventType.toolComplete:
+            // Tool result already recorded via onToolCompleted callback.
+            break;
+          case ChatEventType.assistantMessage:
+            final content = event.data['content'] as String? ?? '';
+            if (content.isNotEmpty) {
+              final cleaned = _cleanAssistantToolEchoes(content, calledTools);
+              if (mounted) {
+                _replaceAssistantMessageContent(
+                  assistantMessageId: assistantMessageId,
+                  content: cleaned,
+                );
+              }
+            }
+          case ChatEventType.result:
+            dbg['completedAt'] = DateTime.now().toIso8601String();
+            final usage = event.data['usage'] as Map<String, dynamic>? ?? {};
+            dbg['usage'] = usage;
+          default:
+            break;
+        }
       }
 
-      // If user cancelled, keep partial content already shown — skip post-processing.
-      if (_isCancelled) return;
+      dbg['completedAt'] ??= DateTime.now().toIso8601String();
 
-      final rawFinal = response.trim().isNotEmpty ? response : emitted;
-      dbg['rawChunksOutput'] = rawChunks.toString();
-      dbg['rawFinalResponse'] = rawFinal;
-
-      final finalText = await applyEmbeddedGemmaToolCallsIfAny(
-        rawModelOutput: rawFinal,
-        cleanedOutput: stripEmbeddedGemmaToolCallBlocks(rawFinal),
-        onTool: toolHandler,
-      );
-      final cleaned = _cleanAssistantToolEchoes(finalText, calledTools);
-      dbg['cleanedResponse'] = cleaned;
-
-      _replaceAssistantMessageContent(
-        assistantMessageId: assistantMessageId,
-        content: cleaned,
-      );
+      // Final cleanup of the displayed content.
+      if (emitted.isNotEmpty && mounted) {
+        final cleaned = _cleanAssistantToolEchoes(emitted.trim(), calledTools);
+        _replaceAssistantMessageContent(
+          assistantMessageId: assistantMessageId,
+          content: cleaned,
+        );
+      }
+      dbg['cleanedResponse'] = emitted.trim();
     } catch (e) {
       dbg['error'] = '$e';
       dbg['completedAt'] = DateTime.now().toIso8601String();
@@ -316,6 +304,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       if (_debugSessions.length > 20) _debugSessions.removeAt(0);
       _activeDebugSession = null;
       _messageDraft = null;
+      _chatProvider = null;
       if (mounted) {
         setState(() {
           _isGeneratingReply = false;
@@ -351,190 +340,36 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     );
   }
 
-  Future<String> _handleToolCall({
-    required String name,
-    required Map<String, Object?> arguments,
-    required String userMessage,
-    required ChatRuntimeContext runtimeContext,
-    required Set<String> disabledFunctionNames,
-  }) async {
-    if (name == 'get_tools' || name == 'list_tools') {
-      return YoloitCliToolCatalog.compactToolsJson(
-        disabledFunctionNames: disabledFunctionNames,
-      );
-    }
-
-    final tool = YoloitCliToolCatalog.byFunctionName(name);
-    final toolLabel = tool?.command ?? name;
-    final callId =
-        'yolo-tool-${DateTime.now().microsecondsSinceEpoch}-'
-        '${_toolCallSequence++}';
-    final normalizedArgs = YoloitCliToolArgumentNormalizer.normalize(
-      functionName: name,
-      arguments: arguments,
-      userMessage: userMessage,
-      runtimeContext: runtimeContext,
-    );
-    _retargetNoteToolIfNeeded(
-      toolCommand: tool?.command,
-      arguments: normalizedArgs,
-      userMessage: userMessage,
-    );
-    final preInvokePatch = await _ensureNoteToolHasRealPanelIfNeeded(
-      toolCommand: tool?.command,
-      arguments: normalizedArgs,
-      userMessage: userMessage,
-      runtimeContext: runtimeContext,
-      disabledFunctionNames: disabledFunctionNames,
-    );
-
-    if (disabledFunctionNames.contains(name)) {
-      final result = jsonEncode(<String, Object?>{
-        'ok': false,
-        'error': 'YoLoIT tool $name is disabled for this chat.',
-      });
-      _appendToolMessage(
-        callId: callId,
-        toolName: toolLabel,
-        arguments: normalizedArgs,
-        result: result,
-        success: false,
-      );
-      return result;
-    }
-
-    try {
-      final result = await _toolExecutor.invoke(
-        name,
-        normalizedArgs,
-        runtimeContext: runtimeContext,
-      );
-      _appendToolMessage(
-        callId: callId,
-        toolName: toolLabel,
-        arguments: normalizedArgs,
-        result: result,
-        success: _toolResultSucceeded(result),
-        statePatch: _toolTargetPatchIfNeeded(
-          toolCommand: tool?.command,
-          arguments: normalizedArgs,
-          result: result,
-        )..addAll(preInvokePatch),
-      );
-      await _focusCreatedPanelIfNeeded(
-        toolCommand: tool?.command,
-        arguments: normalizedArgs,
-        result: result,
-        runtimeContext: runtimeContext,
-      );
-      return result;
-    } catch (e) {
-      final result = jsonEncode(<String, Object?>{'ok': false, 'error': '$e'});
-      _appendToolMessage(
-        callId: callId,
-        toolName: toolLabel,
-        arguments: normalizedArgs,
-        result: result,
-        success: false,
-      );
-      return result;
-    }
-  }
-
-  bool _toolResultSucceeded(String result) {
-    try {
-      final decoded = jsonDecode(result);
-      if (decoded is Map && decoded['ok'] is bool) {
-        return decoded['ok'] as bool;
-      }
-    } catch (_) {}
-    return true;
-  }
-
-  void _retargetNoteToolIfNeeded({
-    required String? toolCommand,
-    required Map<String, Object?> arguments,
-    required String userMessage,
-  }) {
-    if (toolCommand == null ||
-        (toolCommand != 'note' && !toolCommand.startsWith('note:'))) {
-      return;
-    }
-    final lastPanelId = _lastTargetNotePanelId?.trim();
-    if (lastPanelId == null || lastPanelId.isEmpty) return;
-    final panel = '${arguments['panel'] ?? ''}'.trim();
-    final shouldRetarget =
-        panel.isEmpty ||
-        panel == widget.panel.id ||
-        panel == widget.panel.title ||
-        _mentionsPreviousNote(userMessage);
-    if (shouldRetarget) {
-      arguments['panel'] = lastPanelId;
-    }
-  }
-
-  /// Guard: if a note tool targets the assistant chat panel (invalid), return
-  /// an error instead of silently creating a real panel. The LLM should call
-  /// panel:create itself and then use the returned panel id.
-  Future<Map<String, dynamic>> _ensureNoteToolHasRealPanelIfNeeded({
-    required String? toolCommand,
-    required Map<String, Object?> arguments,
-    required String userMessage,
-    required ChatRuntimeContext runtimeContext,
-    required Set<String> disabledFunctionNames,
-  }) async {
-    if (!_isNoteToolCommand(toolCommand)) return const {};
-    if (!_isAssistantPanelTarget(arguments['panel'])) return const {};
-    // If a prior note panel is remembered, silently retarget (arg normalization
-    // already did this, but double-check here).
-    final lastPanelId = _lastTargetNotePanelId?.trim();
-    if (lastPanelId != null && lastPanelId.isNotEmpty) {
-      arguments['panel'] = lastPanelId;
-      return const {};
-    }
-    // No real panel known — fail visibly so the model learns to create one.
-    throw StateError(
-      'Cannot run $toolCommand against the YoLo Assistant panel '
-      '(id: ${widget.panel.id}). '
-      'First call panel:create with type=board.note.markdown to create a note '
-      'panel, then use the returned panel id.',
-    );
-  }
-
-  bool _isNoteToolCommand(String? toolCommand) =>
-      toolCommand == 'note' || toolCommand?.startsWith('note:') == true;
-
-  bool _isAssistantPanelTarget(Object? panel) {
-    final value = '$panel'.trim();
-    return value.isEmpty ||
-        value == widget.panel.id ||
-        value == widget.panel.title;
-  }
-
-  bool _mentionsPreviousNote(String userMessage) {
-    final text = userMessage.toLowerCase();
-    return text.contains('в нее') ||
-        text.contains('в неё') ||
-        text.contains('туда') ||
-        text.contains('заметк') ||
-        text.contains('note');
-  }
-
   Map<String, dynamic> _toolTargetPatchIfNeeded({
     required String? toolCommand,
     required Map<String, Object?> arguments,
     required String result,
   }) {
-    if (!_toolResultSucceeded(result)) return const {};
+    try {
+      final decoded = jsonDecode(result);
+      if (decoded is Map && decoded['ok'] == false) return const {};
+    } catch (_) {}
     if (toolCommand == 'panel:create') {
       final type = '${arguments['type'] ?? ''}'.trim();
       if (type != 'board.note.markdown') return const {};
-      final created = _createdPanelFromResult(result);
-      if (created == null) return const {};
-      return {
-        'lastTargetNotePanelId': created.id,
-        'lastTargetNotePanelTitle': created.title,
-      };
+      try {
+        final decoded = jsonDecode(result);
+        if (decoded is! Map) return const {};
+        final stdout = decoded['stdout'];
+        final payload = stdout is String ? jsonDecode(stdout) : decoded;
+        if (payload is! Map) return const {};
+        final panel = payload['panel'];
+        if (panel is! Map) return const {};
+        final id = '${panel['id'] ?? ''}'.trim();
+        final title = '${panel['title'] ?? id}'.trim();
+        if (id.isEmpty) return const {};
+        return {
+          'lastTargetNotePanelId': id,
+          'lastTargetNotePanelTitle': title.isEmpty ? id : title,
+        };
+      } catch (_) {
+        return const {};
+      }
     }
     if (toolCommand == 'note' || toolCommand?.startsWith('note:') == true) {
       final panel = '${arguments['panel'] ?? ''}'.trim();
@@ -545,54 +380,6 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       };
     }
     return const {};
-  }
-
-  Future<void> _focusCreatedPanelIfNeeded({
-    required String? toolCommand,
-    required Map<String, Object?> arguments,
-    required String result,
-    required ChatRuntimeContext runtimeContext,
-  }) async {
-    if (toolCommand != 'panel:create' || !_toolResultSucceeded(result)) return;
-    final created = _createdPanelFromResult(result);
-    if (created == null) return;
-    final board =
-        '${arguments['board'] ?? runtimeContext.boardId ?? runtimeContext.boardName ?? ''}'
-            .trim();
-    if (board.isEmpty) return;
-    final focusArgs = <String, Object?>{'board': board, 'panel': created.id};
-    final focusResult = await _toolExecutor.invoke(
-      'yoloit_panel_focus',
-      focusArgs,
-      runtimeContext: runtimeContext,
-    );
-    _appendToolMessage(
-      callId:
-          'yolo-tool-${DateTime.now().microsecondsSinceEpoch}-'
-          '${_toolCallSequence++}',
-      toolName: 'panel:focus',
-      arguments: focusArgs,
-      result: focusResult,
-      success: _toolResultSucceeded(focusResult),
-    );
-  }
-
-  ({String id, String title})? _createdPanelFromResult(String result) {
-    try {
-      final decoded = jsonDecode(result);
-      if (decoded is! Map) return null;
-      final stdout = decoded['stdout'];
-      final payload = stdout is String ? jsonDecode(stdout) : decoded;
-      if (payload is! Map) return null;
-      final panel = payload['panel'];
-      if (panel is! Map) return null;
-      final id = '${panel['id'] ?? ''}'.trim();
-      final title = '${panel['title'] ?? id}'.trim();
-      if (id.isEmpty) return null;
-      return (id: id, title: title.isEmpty ? id : title);
-    } catch (_) {
-      return null;
-    }
   }
 
   String _cleanAssistantToolEchoes(String content, List<String> calledTools) {
@@ -2586,6 +2373,145 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
     if (value is! String || value.isEmpty) return null;
     try {
       return DateTime.parse(value);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+/// Wraps the base CLI tool executor with assistant-specific pre/post processing
+/// (note retargeting, panel creation guard, focus after create).
+class _AssistantToolExecutor implements YoloitToolExecutor {
+  _AssistantToolExecutor({
+    required this.delegate,
+    required this.assistantPanelId,
+    required this.assistantPanelTitle,
+    required this.lastTargetNotePanelId,
+    required this.userMessage,
+    required this.onToolCompleted,
+    required this.onFocusPanel,
+  });
+
+  final YoloitToolExecutor delegate;
+  final String assistantPanelId;
+  final String assistantPanelTitle;
+  final String? lastTargetNotePanelId;
+  final String userMessage;
+  final void Function(String toolCommand, Map<String, Object?> arguments, String result, bool success) onToolCompleted;
+  final Future<void> Function(Map<String, Object?> focusArgs) onFocusPanel;
+
+  @override
+  Future<String> invoke(
+    String functionName,
+    Map<String, Object?> arguments, {
+    ChatRuntimeContext? runtimeContext,
+  }) async {
+    final tool = YoloitCliToolCatalog.byFunctionName(functionName);
+    final toolCommand = tool?.command ?? functionName;
+    final mutableArgs = Map<String, Object?>.from(arguments);
+
+    // Retarget note tools to last known note panel.
+    _retargetNoteToolIfNeeded(toolCommand, mutableArgs);
+
+    // Guard: fail if note tool targets the assistant panel itself.
+    _ensureNoteToolHasRealPanel(toolCommand, mutableArgs);
+
+    final result = await delegate.invoke(
+      functionName,
+      mutableArgs,
+      runtimeContext: runtimeContext,
+    );
+
+    final success = _toolResultSucceeded(result);
+    onToolCompleted(toolCommand, mutableArgs, result, success);
+
+    // Auto-focus newly created panels.
+    if (toolCommand == 'panel:create' && success && runtimeContext != null) {
+      final created = _createdPanelFromResult(result);
+      if (created != null) {
+        final board =
+            '${mutableArgs['board'] ?? runtimeContext.boardId ?? runtimeContext.boardName ?? ''}'
+                .trim();
+        if (board.isNotEmpty) {
+          await onFocusPanel({'board': board, 'panel': created.id});
+        }
+      }
+    }
+
+    return result;
+  }
+
+  void _retargetNoteToolIfNeeded(
+    String toolCommand,
+    Map<String, Object?> arguments,
+  ) {
+    if (toolCommand != 'note' && !toolCommand.startsWith('note:')) return;
+    final lastPanelId = lastTargetNotePanelId?.trim();
+    if (lastPanelId == null || lastPanelId.isEmpty) return;
+    final panel = '${arguments['panel'] ?? ''}'.trim();
+    final shouldRetarget =
+        panel.isEmpty ||
+        panel == assistantPanelId ||
+        panel == assistantPanelTitle ||
+        _mentionsPreviousNote(userMessage);
+    if (shouldRetarget) {
+      arguments['panel'] = lastPanelId;
+    }
+  }
+
+  void _ensureNoteToolHasRealPanel(
+    String toolCommand,
+    Map<String, Object?> arguments,
+  ) {
+    if (toolCommand != 'note' && !toolCommand.startsWith('note:')) return;
+    final panel = '${arguments['panel'] ?? ''}'.trim();
+    if (panel.isEmpty || panel == assistantPanelId || panel == assistantPanelTitle) {
+      final lastPanelId = lastTargetNotePanelId?.trim();
+      if (lastPanelId != null && lastPanelId.isNotEmpty) {
+        arguments['panel'] = lastPanelId;
+        return;
+      }
+      throw StateError(
+        'Cannot run $toolCommand against the YoLo Assistant panel '
+        '(id: $assistantPanelId). '
+        'First call panel:create with type=board.note.markdown to create a note '
+        'panel, then use the returned panel id.',
+      );
+    }
+  }
+
+  bool _mentionsPreviousNote(String msg) {
+    final text = msg.toLowerCase();
+    return text.contains('в нее') ||
+        text.contains('в неё') ||
+        text.contains('туда') ||
+        text.contains('заметк') ||
+        text.contains('note');
+  }
+
+  bool _toolResultSucceeded(String result) {
+    try {
+      final decoded = jsonDecode(result);
+      if (decoded is Map && decoded['ok'] is bool) {
+        return decoded['ok'] as bool;
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  ({String id, String title})? _createdPanelFromResult(String result) {
+    try {
+      final decoded = jsonDecode(result);
+      if (decoded is! Map) return null;
+      final stdout = decoded['stdout'];
+      final payload = stdout is String ? jsonDecode(stdout) : decoded;
+      if (payload is! Map) return null;
+      final panel = payload['panel'];
+      if (panel is! Map) return null;
+      final id = '${panel['id'] ?? ''}'.trim();
+      final title = '${panel['title'] ?? id}'.trim();
+      if (id.isEmpty) return null;
+      return (id: id, title: title.isEmpty ? id : title);
     } catch (_) {
       return null;
     }
