@@ -348,6 +348,19 @@ class YoloitCliToolArgumentNormalizer {
     if (functionName == 'yoloit_note_replace') {
       return 'yoloit_note';
     }
+    // Model picks "note" (set text) when user wants "note:create" (new panel).
+    if ((functionName == 'nst' ||
+            functionName == 'yoloit_note' ||
+            functionName == 'note') &&
+        (text.contains('сделай заметку') ||
+            text.contains('создай заметку') ||
+            text.contains('новая заметка') ||
+            text.contains('добавь заметку') ||
+            (text.contains('create') && text.contains('note')) ||
+            (text.contains('make') && text.contains('note')) ||
+            (text.contains('new') && text.contains('note')))) {
+      return 'ncrt';
+    }
     if (functionName == 'yoloit_reload' && text.contains('restart')) {
       return 'yoloit_restart';
     }
@@ -368,6 +381,13 @@ class YoloitCliToolArgumentNormalizer {
     // Strip chat/assistant panel IDs from tools that auto-resolve their own
     // panel type. The CLI finds the correct panel by type.
     _stripChatPanelForTypedTools(tool, normalized);
+    // When note→note:create redirect happened, remap text→title.
+    if (tool?.command == 'note:create' && _isMissing(normalized['title']) && _isMissing(normalized['ti'])) {
+      final text = normalized.remove('text') ?? normalized.remove('tx');
+      if (text != null) {
+        normalized['title'] = text;
+      }
+    }
     if (tool?.command == 'panel:create' && _isMissing(normalized['type'])) {
       final type = _inferPanelType(userMessage);
       if (type != null) {
@@ -429,7 +449,10 @@ class YoloitCliToolArgumentNormalizer {
     if (tool == null) return;
     final g = tool.group;
     if (g != 'note' && g != 'checklist' && g != 'kanban') return;
-    for (final key in const ['panel', 'panel_id', 'panel_title', 'p', 'id']) {
+    for (final key in const [
+      'panel', 'panel_id', 'panel_title', 'p', 'id',
+      'board', 'board_id', 'board_name', 'b',
+    ]) {
       final v = normalized[key];
       if (v is String && _isChatPanelId(v)) {
         normalized.remove(key);

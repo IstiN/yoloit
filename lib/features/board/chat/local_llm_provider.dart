@@ -352,13 +352,15 @@ class LocalLlmProvider extends ChatProvider {
     required String sessionName,
     required Set<String> disabledFunctionNames,
   }) async {
+    // Defensive copy — native FFI callbacks may pass unmodifiable maps.
+    final mutableArgs = Map<String, Object?>.from(arguments);
     final tool = YoloitCliToolCatalog.byFunctionName(name);
     final toolName = tool?.command ?? name;
     final toolCallId =
         'local-tool-${DateTime.now().microsecondsSinceEpoch}-${_toolCallSequence++}';
     final normalizedArgs = YoloitCliToolArgumentNormalizer.normalize(
       functionName: name,
-      arguments: arguments,
+      arguments: mutableArgs,
       userMessage: userMessage,
       runtimeContext: runtimeContext,
     );
