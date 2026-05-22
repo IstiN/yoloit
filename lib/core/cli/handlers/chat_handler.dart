@@ -147,7 +147,11 @@ class ChatCliHandler extends PanelCliHandler {
       final messages = await session.sendAndWait(
         text: text,
         attachments: attachments,
-        runtimeContext: ChatRuntimeContext(panelId: panel.id),
+        runtimeContext: ChatRuntimeContext(
+          boardId: args['_boardId'] as String?,
+          boardName: args['_boardName'] as String?,
+          panelId: panel.id,
+        ),
       );
 
       final stateUpdate = session.serializeState();
@@ -174,7 +178,11 @@ class ChatCliHandler extends PanelCliHandler {
     session.sendMessage(
       text: text,
       attachments: attachments,
-      runtimeContext: ChatRuntimeContext(panelId: panel.id),
+      runtimeContext: ChatRuntimeContext(
+        boardId: args['_boardId'] as String?,
+        boardName: args['_boardName'] as String?,
+        panelId: panel.id,
+      ),
     );
     return CliActionResult(
       message: 'Message sent (not waiting for response)',

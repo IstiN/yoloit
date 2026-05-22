@@ -1118,7 +1118,11 @@ class CliServer {
       );
     }
 
-    final result = await handler.handleAction(action, body, panel);
+    final result = await handler.handleAction(action, {
+      ...body,
+      '_boardId': board.id,
+      '_boardName': board.name,
+    }, panel);
 
     // Apply state update if provided
     if (result.stateUpdate != null && result.ok) {
@@ -2003,7 +2007,11 @@ class CliServer {
       };
     }
 
-    final result = await handler.handleAction(action, body, panel);
+    final result = await handler.handleAction(action, {
+      ...body,
+      '_boardId': board.id,
+      '_boardName': board.name,
+    }, panel);
     if (result.stateUpdate != null && result.ok) {
       final mergedState = {...panel.state, ...result.stateUpdate!};
       await cubit.updatePanel(
