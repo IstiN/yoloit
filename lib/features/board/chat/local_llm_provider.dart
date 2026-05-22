@@ -615,12 +615,13 @@ class LocalLlmProvider extends ChatProvider {
     final result = <String, Object?>{};
     final params = tool.params;
 
-    // Separate required and optional params. The model typically omits
-    // board/panel (they come from runtimeContext), so map positional args
-    // to required params first, then overflow to optional ones.
-    final required = params.where((p) => p.required).toList();
-    final optional = params.where((p) => !p.required).toList();
-    final orderedParams = [...required, ...optional];
+    // Context-injected params (board/panel) are filled from runtimeContext,
+    // so map positional args to content params first, then overflow to
+    // context params as fallback.
+    const contextKeys = {'board', 'panel'};
+    final contentParams = params.where((p) => !contextKeys.contains(p.key)).toList();
+    final contextParams = params.where((p) => contextKeys.contains(p.key)).toList();
+    final orderedParams = [...contentParams, ...contextParams];
 
     for (var i = 0; i < positional.length && i < orderedParams.length; i++) {
       final value = positional[i];
