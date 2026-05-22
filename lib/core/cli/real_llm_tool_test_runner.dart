@@ -53,7 +53,10 @@ class RealLlmToolTestRunner {
         final stopwatch = Stopwatch()..start();
         final result = await _runCase(installed, fixture.runtimeContext, item);
         stopwatch.stop();
-        results.add(result);
+        results.add(<String, Object?>{
+          ...result,
+          'elapsedMs': stopwatch.elapsedMilliseconds,
+        });
 
         final status = result['ok'] == true ? '✓' : '✗';
         final duration = stopwatch.elapsedMilliseconds;
@@ -87,8 +90,7 @@ class RealLlmToolTestRunner {
       final failed = results.length - passed;
 
       stderr.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      final statusText =
-          failed > 0 ? '($failed failed)' : '(100% ✓)';
+      final statusText = failed > 0 ? '($failed failed)' : '(100% ✓)';
       stderr.writeln(
         '📈 Results: $passed/${results.length} passed $statusText',
       );
@@ -153,6 +155,13 @@ class RealLlmToolTestRunner {
         .where((event) => event.type == ChatEventType.assistantMessage)
         .map((event) => event.messageContent ?? '')
         .join('\n');
+    final resultUsage =
+        events
+            .where((event) => event.type == ChatEventType.result)
+            .map((event) => event.usageData)
+            .whereType<Map<String, dynamic>>()
+            .cast<Map<String, Object?>>()
+            .lastOrNull;
 
     if (toolStarts.isEmpty) {
       return <String, Object?>{
@@ -162,6 +171,7 @@ class RealLlmToolTestRunner {
         'expectedTool': item.expectedTool,
         'error': 'No tool call emitted.',
         'assistantText': assistantText,
+        if (resultUsage != null) 'usage': resultUsage,
       };
     }
 
@@ -194,6 +204,7 @@ class RealLlmToolTestRunner {
       'actualTool': firstTool.toolName,
       'actualArguments': actualArgs,
       'toolResult': completeContent,
+      if (resultUsage != null) 'usage': resultUsage,
       if (!toolMatches) 'error': 'Wrong tool selected.',
       if (argMismatches.isNotEmpty) 'argumentMismatches': argMismatches,
       if (assistantText.isNotEmpty) 'assistantText': assistantText,

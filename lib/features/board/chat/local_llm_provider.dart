@@ -9,6 +9,19 @@ import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
+const _compactLocalRoutingPrompt = '''
+You are YoLo Assistant router.
+
+Map the user's request to the single best `yoloit_` tool call.
+Prefer calling a tool over describing steps. Keep normal assistant text short.
+
+Rules:
+- Use the current board/panel context when arguments are omitted.
+- Infer obvious panel types and simple arguments from the user's wording.
+- For destructive actions, require explicit user confirmation first.
+- If no tool fits, answer briefly instead of inventing a tool.
+''';
+
 class LocalLlmProvider extends ChatProvider {
   LocalLlmProvider({
     flm.LmEngine? engine,
@@ -92,6 +105,7 @@ class LocalLlmProvider extends ChatProvider {
 
     try {
       final installed = await _loadInstalledModel();
+      final requestProfile = _requestProfileFor(installed.manifest);
 
       if (isFirstMessage) {
         _history[session] = [];
@@ -115,6 +129,7 @@ class LocalLlmProvider extends ChatProvider {
       );
 
       final messages = await _buildMessages(
+        installed.manifest,
         sessionHistory,
         sessionToolHistory,
         message,
@@ -132,6 +147,10 @@ class LocalLlmProvider extends ChatProvider {
 
       var emitted = '';
       var rawEmitted = '';
+      final completionStopwatch = Stopwatch()..start();
+      var firstTokenMs = -1;
+      var streamedChunkCount = 0;
+      final toolHistoryCountBefore = sessionToolHistory.length;
       Future<String> toolHandler(String name, Map<String, Object?> arguments) {
         final disabledTools = YoloitCliToolCatalog.normalizeFunctionNames(
           config.disabledLocalToolNames,
@@ -157,8 +176,9 @@ class LocalLlmProvider extends ChatProvider {
           modelPath: installed.directory.path,
           manifest: installed.manifest,
           messages: messages,
-          maxTokens: 1024,
-          temperature: 0.2,
+          maxTokens: requestProfile.maxTokens,
+          temperature: requestProfile.temperature,
+          enableThinking: requestProfile.enableThinking,
           tools: YoloitCliToolCatalog.localToolsFor(
             disabledFunctionNames:
                 config.disabledLocalToolNames
@@ -169,8 +189,12 @@ class LocalLlmProvider extends ChatProvider {
         ),
         (chunk) {
           if (_cancelRequested[session] == true) return;
+          if (firstTokenMs < 0 && chunk.trim().isNotEmpty) {
+            firstTokenMs = completionStopwatch.elapsedMilliseconds;
+          }
           final rawDelta = _extractDelta(previous: rawEmitted, incoming: chunk);
           if (rawDelta.isEmpty) return;
+          streamedChunkCount++;
           rawEmitted += rawDelta;
           final visible = stripEmbeddedGemmaToolCallBlocks(rawEmitted);
           final delta = _extractDelta(previous: emitted, incoming: visible);
@@ -186,11 +210,19 @@ class LocalLlmProvider extends ChatProvider {
           );
         },
       );
+      completionStopwatch.stop();
 
       final rawFull = full.trim().isNotEmpty ? full : rawEmitted;
-      final completedContent = await applyEmbeddedGemmaToolCallsIfAny(
+      var completedContent = await applyEmbeddedGemmaToolCallsIfAny(
         rawModelOutput: rawFull,
         cleanedOutput: stripEmbeddedGemmaToolCallBlocks(rawFull),
+        onTool: toolHandler,
+      );
+      completedContent = await _applyRouterJsonToolCallIfAny(
+        rawModelOutput: rawFull,
+        currentContent: completedContent,
+        toolHistory: sessionToolHistory,
+        toolHistoryCountBefore: toolHistoryCountBefore,
         onTool: toolHandler,
       );
       if (completedContent.startsWith(emitted)) {
@@ -216,6 +248,22 @@ class LocalLlmProvider extends ChatProvider {
           completedContent.trim().isNotEmpty
               ? completedContent.trim()
               : emitted.trim();
+      Map<String, Object?>? nativeTimings;
+      final engine = _engine;
+      if (engine is flm.NativeLmEngine) {
+        nativeTimings = engine.lastNativeTimings;
+      }
+      final totalApiDurationMs =
+          (nativeTimings?['swiftTotalMs'] as num?)?.toInt() ??
+          completionStopwatch.elapsedMilliseconds;
+      final effectiveFirstTokenMs =
+          (nativeTimings?['swiftFirstTokenMs'] as num?)?.toInt() ??
+          firstTokenMs;
+      final generationDurationMs =
+          (nativeTimings?['swiftGenerateMs'] as num?)?.toInt() ??
+          (effectiveFirstTokenMs >= 0
+              ? totalApiDurationMs - effectiveFirstTokenMs
+              : totalApiDurationMs);
       sessionHistory.add((user: message, assistant: content));
       controller.add(
         ChatEvent(
@@ -230,13 +278,18 @@ class LocalLlmProvider extends ChatProvider {
           type: ChatEventType.result,
           rawType: 'result',
           timestamp: DateTime.now(),
-          data: const {
+          data: {
             'usage': {
-              'outputTokens': 0,
+              'outputTokens': streamedChunkCount,
               'premiumRequests': 0,
-              'totalApiDurationMs': 0,
-              'sessionDurationMs': 0,
-              'codeChanges': {'linesAdded': 0, 'linesRemoved': 0},
+              'totalApiDurationMs': totalApiDurationMs,
+              'sessionDurationMs': totalApiDurationMs,
+              'codeChanges': const {'linesAdded': 0, 'linesRemoved': 0},
+              if (effectiveFirstTokenMs >= 0)
+                'firstTokenMs': effectiveFirstTokenMs,
+              'generationDurationMs':
+                  generationDurationMs < 0 ? 0 : generationDurationMs,
+              if (nativeTimings != null) 'nativeTimings': nativeTimings,
             },
           },
         ),
@@ -461,7 +514,198 @@ class LocalLlmProvider extends ChatProvider {
     return true;
   }
 
+  Future<String> _applyRouterJsonToolCallIfAny({
+    required String rawModelOutput,
+    required String currentContent,
+    required List<
+      ({
+        String toolName,
+        Map<String, Object?> arguments,
+        String result,
+        bool success,
+      })
+    >
+    toolHistory,
+    required int toolHistoryCountBefore,
+    required Future<String> Function(
+      String name,
+      Map<String, Object?> arguments,
+    )
+    onTool,
+  }) async {
+    if (toolHistory.length > toolHistoryCountBefore) {
+      return currentContent;
+    }
+    final parsed =
+        _parseRouterToolCall(currentContent) ??
+        _parseRouterToolCall(rawModelOutput);
+    if (parsed == null) {
+      return currentContent;
+    }
+    final result = await onTool(parsed.name, parsed.arguments);
+    final trimmed = currentContent.trim();
+    if (trimmed.isEmpty || _parseRouterToolCall(trimmed) != null) {
+      return _routerToolSummary(parsed.name, result);
+    }
+    return currentContent;
+  }
+
+  ({String name, Map<String, Object?> arguments})? _parseRouterToolCall(
+    String text,
+  ) {
+    final candidate = _extractJsonObject(text);
+    if (candidate == null) return null;
+    try {
+      final decoded = jsonDecode(candidate);
+      if (decoded is! Map) return null;
+      final root = Map<String, Object?>.from(decoded);
+      final function = root['function'];
+      String? name;
+      Map<String, Object?> arguments = <String, Object?>{};
+      if (function is Map) {
+        final functionMap = Map<String, Object?>.from(function);
+        name = functionMap['name'] as String?;
+        final rawArgs =
+            functionMap['arguments'] ??
+            functionMap['args'] ??
+            functionMap['params'];
+        if (rawArgs is Map) {
+          arguments = Map<String, Object?>.from(rawArgs);
+        }
+      } else {
+        // Compact router format: {"c":"command","a":["arg1","arg2"]}
+        final compactName = root['c'] as String?;
+        if (compactName != null) {
+          name = compactName;
+          final rawA = root['a'];
+          if (rawA is List) {
+            arguments = _positionalArgsToNamed(compactName, rawA);
+          }
+        } else {
+          name =
+              root['name'] as String? ??
+              root['tool'] as String? ??
+              root['functionName'] as String?;
+          final rawArgs = root['arguments'] ?? root['args'] ?? root['params'];
+          if (rawArgs is Map) {
+            arguments = Map<String, Object?>.from(rawArgs);
+          }
+        }
+      }
+      final trimmedName = name?.trim();
+      if (trimmedName == null || trimmedName.isEmpty) {
+        return null;
+      }
+      return (name: trimmedName, arguments: arguments);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, Object?> _positionalArgsToNamed(String command, List<Object?> positional) {
+    final tool = YoloitCliToolCatalog.byFunctionName(command);
+    if (tool == null) return <String, Object?>{};
+    final result = <String, Object?>{};
+    final params = tool.params;
+    for (var i = 0; i < positional.length && i < params.length; i++) {
+      final value = positional[i];
+      if (value != null && value.toString().isNotEmpty) {
+        result[params[i].key] = value;
+      }
+    }
+    return result;
+  }
+
+  String? _extractJsonObject(String text) {
+    var trimmed = text.trim();
+    if (trimmed.isEmpty) return null;
+    if (trimmed.startsWith('```')) {
+      trimmed =
+          trimmed
+              .replaceFirst(RegExp(r'^```(?:json)?\s*'), '')
+              .replaceFirst(RegExp(r'\s*```$'), '')
+              .trim();
+    }
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      return trimmed;
+    }
+    final match = RegExp(r'\{[\s\S]*\}').firstMatch(trimmed);
+    return match?.group(0);
+  }
+
+  String _routerToolSummary(String toolName, String result) {
+    try {
+      final decoded = jsonDecode(result);
+      if (decoded is Map) {
+        final command = decoded['command'] as String?;
+        if (command != null && command.trim().isNotEmpty) {
+          return 'Prepared $command';
+        }
+        final error = decoded['error'] as String?;
+        if (error != null && error.trim().isNotEmpty) {
+          return 'Tool $toolName failed: $error';
+        }
+      }
+    } catch (_) {
+      // Keep empty if the tool result is not JSON.
+    }
+    return '';
+  }
+
+  ({
+    bool compactPrompt,
+    int maxTokens,
+    double temperature,
+    bool? enableThinking,
+  })
+  _requestProfileFor(flm.LocalModelManifest manifest) {
+    final compactPrompt = _usesCompactRoutingPrompt(manifest);
+    final defaults = manifest.runtimeConfig.defaultParameters;
+    return (
+      compactPrompt: compactPrompt,
+      maxTokens:
+          _intDefault(defaults, 'max_tokens') ??
+          _intDefault(defaults, 'maxTokens') ??
+          (compactPrompt ? (_isRouterModel(manifest) ? 96 : 128) : 1024),
+      temperature:
+          _doubleDefault(defaults, 'temperature') ??
+          (compactPrompt ? 0.0 : 0.2),
+      enableThinking:
+          _boolDefault(defaults, 'enableThinking') ??
+          (_shouldDisableThinking(manifest) ? false : null),
+    );
+  }
+
+  bool _isRouterModel(flm.LocalModelManifest manifest) =>
+      manifest.id.toLowerCase().contains('router');
+
+  bool _usesCompactRoutingPrompt(flm.LocalModelManifest manifest) {
+    final id = manifest.id.toLowerCase();
+    return _isRouterModel(manifest) || id == 'qwen3-0.6b-4bit';
+  }
+
+  bool _shouldDisableThinking(flm.LocalModelManifest manifest) {
+    final id = manifest.id.toLowerCase();
+    return _usesCompactRoutingPrompt(manifest) || id.contains('qwen3');
+  }
+
+  int? _intDefault(Map<String, Object?> defaults, String key) {
+    final value = defaults[key];
+    return value is num ? value.toInt() : null;
+  }
+
+  double? _doubleDefault(Map<String, Object?> defaults, String key) {
+    final value = defaults[key];
+    return value is num ? value.toDouble() : null;
+  }
+
+  bool? _boolDefault(Map<String, Object?> defaults, String key) {
+    final value = defaults[key];
+    return value is bool ? value : null;
+  }
+
   Future<List<Map<String, String>>> _buildMessages(
+    flm.LocalModelManifest manifest,
     List<({String user, String assistant})> turns,
     List<
       ({
@@ -486,7 +730,11 @@ class LocalLlmProvider extends ChatProvider {
         (panelTitle != null && panelTitle.isNotEmpty);
 
     final systemBuf = StringBuffer();
-    systemBuf.writeln(await loadYoloChatSystemPrompt());
+    systemBuf.writeln(
+      _usesCompactRoutingPrompt(manifest)
+          ? _compactLocalRoutingPrompt.trim()
+          : await loadYoloChatSystemPrompt(),
+    );
     if (hasContext) {
       systemBuf.writeln('\nCurrent UI context:');
       systemBuf.writeln('- Board id: ${boardId ?? 'unknown'}');

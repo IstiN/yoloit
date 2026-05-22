@@ -47,12 +47,9 @@ void main() {
       ).timeout(const Duration(minutes: 35));
 
       final output = result.stdout.toString();
-      final decoded = _decodeTrailingJson(output);
-      expect(
-        result.exitCode,
-        0,
-        reason: 'stderr:\n${result.stderr}\nstdout:\n$output',
-      );
+      final stderr = result.stderr.toString();
+      final decoded = _decodeTrailingJson('$output\n$stderr');
+      expect(result.exitCode, 0, reason: 'stderr:\n$stderr\nstdout:\n$output');
       expect(decoded['ok'], isTrue, reason: output);
     },
     timeout: const Timeout(Duration(minutes: 40)),
@@ -60,9 +57,17 @@ void main() {
 }
 
 Map<String, Object?> _decodeTrailingJson(String output) {
-  final start = output.indexOf('{');
-  if (start == -1) {
-    throw const FormatException('No JSON object found in runner output.');
+  final starts = <int>[
+    output.lastIndexOf('\n{'),
+    output.indexOf('{'),
+  ].where((index) => index >= 0).toList(growable: false);
+  for (final start in starts) {
+    final offset = output[start] == '\n' ? start + 1 : start;
+    try {
+      return jsonDecode(output.substring(offset)) as Map<String, Object?>;
+    } catch (_) {
+      // Try the next candidate.
+    }
   }
-  return jsonDecode(output.substring(start)) as Map<String, Object?>;
+  throw const FormatException('No JSON object found in runner output.');
 }

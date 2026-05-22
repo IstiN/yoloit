@@ -39,6 +39,37 @@ const _manifest = flm.LocalModelManifest(
   ),
 );
 
+const _qwenTinyManifest = flm.LocalModelManifest(
+  id: 'qwen3-0.6b-4bit',
+  displayName: 'Qwen3 0.6B 4bit',
+  description: 'fixture',
+  runtimeAdapter: flm.RuntimeAdapter.mlxLm,
+  tasks: <flm.ModelTask>[flm.ModelTask.chat],
+  source: flm.ModelSource(
+    provider: 'huggingface',
+    repo: 'mlx-community/Qwen3-0.6B-4bit',
+    revision: 'main',
+    license: 'apache-2.0',
+  ),
+  packaging: flm.PackagingSpec(
+    releaseTag: 'test',
+    archiveName: 'test.tar',
+    chunkSizeBytes: 1,
+    assetPrefix: 'test',
+  ),
+  requirements: flm.SystemRequirements(
+    platform: 'macos-apple-silicon',
+    minMemoryGb: 4,
+    recommendedMemoryGb: 8,
+    notes: <String>[],
+  ),
+  capabilities: flm.CapabilitySpec(
+    audioInput: false,
+    audioOutput: false,
+    toolCalling: true,
+  ),
+);
+
 void main() {
   test('catalog exposes CLI tools as local-model function tools', () {
     final names = YoloitCliToolCatalog.localTools.map((t) => t.name).toList();
@@ -59,6 +90,18 @@ void main() {
     for (final name in names) {
       expect(name, matches(RegExp(r'^[a-zA-Z0-9_]+$')));
     }
+  });
+
+  test('catalog resolves compact, full, and command-style tool names', () {
+    expect(YoloitCliToolCatalog.byFunctionName('bmk')?.command, 'board:create');
+    expect(
+      YoloitCliToolCatalog.byFunctionName('yoloit_board_create')?.command,
+      'board:create',
+    );
+    expect(
+      YoloitCliToolCatalog.byFunctionName('board:create')?.command,
+      'board:create',
+    );
   });
 
   test('catalog can expose a filtered local-model tool set', () {
@@ -179,6 +222,25 @@ void main() {
     );
   });
 
+  test('argument normalizer infers help format from user message', () {
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_help',
+        arguments: const <String, Object?>{},
+        userMessage: 'Show detailed YoLoIT CLI help.',
+      ),
+      containsPair('format', 'detailed'),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_help',
+        arguments: const <String, Object?>{},
+        userMessage: 'Show the tools help output.',
+      ),
+      containsPair('format', 'tools'),
+    );
+  });
+
   test('argument normalizer fills obvious board arguments from user message', () {
     expect(
       YoloitCliToolArgumentNormalizer.normalize(
@@ -220,6 +282,15 @@ void main() {
         containsPair('id_or_name', 'Scratch Board'),
         containsPair('confirm', true),
       ),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'bgt',
+        arguments: const <String, Object?>{'b': 'current board'},
+        userMessage: 'Show details for the current board.',
+        runtimeContext: const ChatRuntimeContext(boardId: 'board-main'),
+      ),
+      containsPair('id_or_name', 'board-main'),
     );
   });
 
@@ -394,6 +465,92 @@ void main() {
         events.where((e) => e.type == ChatEventType.toolComplete).single;
     expect(complete.toolSuccess, isTrue);
     expect(complete.toolResultContent, contains('yoloit board:create Sprint'));
+  });
+
+  test(
+    'local chat applies compact routing profile for tiny qwen router runs',
+    () async {
+      final tmp = Directory.systemTemp.createTempSync(
+        'yoloit-local-fast-route',
+      );
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      final engine = _SequentialToolEngine([
+        (request, onChunk) async {
+          expect(request.maxTokens, 128);
+          expect(request.temperature, 0.0);
+          expect(request.enableThinking, isFalse);
+          final prompt = _requestText(request);
+          expect(prompt, contains('YoLo Assistant router'));
+          expect(prompt, isNot(contains('chat UI assistant')));
+          const response = 'Routing complete.';
+          onChunk(response);
+          return response;
+        },
+      ]);
+      final provider = LocalLlmProvider(
+        engine: engine,
+        installedModelLoader:
+            () async => _installedModel(tmp, _qwenTinyManifest),
+        toolExecutor: YoloitCliToolExecutor(execute: false),
+      );
+
+      await provider
+          .sendMessage(
+            message: 'show detailed cli help',
+            config: _config(
+              model: _qwenTinyManifest.id,
+              sessionName: 'fast-route',
+            ),
+            isFirstMessage: true,
+            runtimeContext: const ChatRuntimeContext(
+              boardId: 'board-1',
+              panelId: 'chat-panel',
+            ),
+          )
+          .toList();
+    },
+  );
+
+  test('local chat executes router JSON fallback tool call', () async {
+    final tmp = Directory.systemTemp.createTempSync('yoloit-local-router-json');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    final engine = _SequentialToolEngine([
+      (request, onChunk) async {
+        const response = '{"name":"bmk","arguments":{"n":"Sprint"}}';
+        onChunk(response);
+        return response;
+      },
+    ]);
+    final provider = LocalLlmProvider(
+      engine: engine,
+      installedModelLoader: () async => _installedModel(tmp, _qwenTinyManifest),
+      toolExecutor: YoloitCliToolExecutor(execute: false),
+    );
+
+    final events =
+        await provider
+            .sendMessage(
+              message: 'create a board named Sprint',
+              config: _config(
+                model: _qwenTinyManifest.id,
+                sessionName: 'router-json',
+              ),
+              isFirstMessage: true,
+              runtimeContext: const ChatRuntimeContext(boardId: 'board-1'),
+            )
+            .toList();
+
+    expect(
+      events.where((e) => e.type == ChatEventType.toolStart).single.toolName,
+      'board:create',
+    );
+    expect(
+      events
+          .where((e) => e.type == ChatEventType.toolComplete)
+          .single
+          .toolResultContent,
+      contains('yoloit board:create Sprint'),
+    );
   });
 
   test(
@@ -605,9 +762,12 @@ void main() {
   );
 }
 
-flm.InstalledModel _installedModel(Directory dir) {
+flm.InstalledModel _installedModel(
+  Directory dir, [
+  flm.LocalModelManifest manifest = _manifest,
+]) {
   return flm.InstalledModel(
-    manifest: _manifest,
+    manifest: manifest,
     directory: dir,
     sourceLabel: 'test',
     installedAt: DateTime.now(),
@@ -617,13 +777,14 @@ flm.InstalledModel _installedModel(Directory dir) {
 
 ChatSessionConfig _config({
   String sessionName = 'local-test',
+  String model = 'test-local-chat-tools',
   Set<String> disabledLocalToolNames = const <String>{},
 }) {
   return ChatSessionConfig(
     sessionName: sessionName,
     workingDir: Directory.current.path,
     provider: 'local',
-    model: _manifest.id,
+    model: model,
     disabledLocalToolNames: disabledLocalToolNames.toList(),
   );
 }
