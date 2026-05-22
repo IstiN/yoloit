@@ -2360,42 +2360,51 @@ JSEOF
   # ── process-command (AI router) ──
   process-command|pc)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit process-command <natural text>" >&2; exit 1; }
-    pc_text="$*"
-    pc_model="${YOLOIT_ROUTER_MODEL:-qwen3-0.6b-4bit}"
-    pc_prompt='Route user text to CLI command. Reply ONLY valid JSON: {"c":"CMD","a":["ARG"]}
-No markdown, no explanation, no backticks. Just the JSON object.
+    pc_dry_run=false
+    pc_text_parts=()
+    for arg in "$@"; do
+      if [[ "$arg" == "--dry-run" ]]; then
+        pc_dry_run=true
+      else
+        pc_text_parts+=("$arg")
+      fi
+    done
+    pc_text="${pc_text_parts[*]}"
 
-Commands (CMD ARGS):
-note:create TITLE|panel:delete PANEL|panels|boards|board:open NAME|board:create NAME|checklist:new TITLE|checklist:add ITEM|checklist:check ITEM|kanban:add-card TITLE COLUMN|timer:create LABEL DURATION|note:add TEXT|note TEXT|board:rename NAME NEWNAME|board:delete NAME|panel:rename PANEL NEWNAME|panel:move PANEL X Y|panel:resize PANEL W H|panel:focus PANEL|panel:color PANEL COLOR|kanban:columns|kanban:add-column NAME|kanban:move-card CARDID COLUMN|web:open URL|app:run ID|app:list|app:create NAME|models:list|reload|restart|help|board:snapshot|board:screenshot|board:diagram|board:svg|board:fit|board:zoom LEVEL|board:arrange
-
-Examples:
-"создай заметку покупки"→{"c":"note:create","a":["покупки"]}
-"add a note reminders"→{"c":"note:create","a":["reminders"]}
-"удали панель p-123"→{"c":"panel:delete","a":["p-123"]}
-"покажи панели"→{"c":"panels","a":[]}
-"что на борде"→{"c":"panels","a":[]}
-"покажи борды"→{"c":"boards","a":[]}
-"добавь в чеклист молоко"→{"c":"checklist:add","a":["молоко"]}
-"открой борд Work"→{"c":"board:open","a":["Work"]}
-"поставь таймер 5 минут"→{"c":"timer:create","a":["timer","300"]}
-"перезагрузи"→{"c":"reload","a":[]}
-"открой сайт google.com"→{"c":"web:open","a":["https://google.com"]}
-"покажи приложения"→{"c":"app:list","a":[]}
-"list apps"→{"c":"app:list","a":[]}
-"помощь"→{"c":"help","a":[]}
-"what can you do"→{"c":"help","a":[]}
-"покажи модели"→{"c":"models:list","a":[]}'
-
-    # Call local model
+    # Try fast router server first, fall back to lm:generate
     pc_result=$(python3 -c "
-import json, sys, subprocess, re, time
+import json, sys, os, time, urllib.request, re
 
 text = sys.argv[1]
-model = sys.argv[2]
-prompt = sys.argv[3]
-script = sys.argv[4]
 
-# Build payload
+# Try router server (fast: ~120ms)
+router_port_file = os.path.expanduser('~/.config/yoloit/router.port')
+if os.path.exists(router_port_file):
+    with open(router_port_file) as f:
+        rport = f.read().strip()
+    try:
+        t0 = time.time()
+        req = urllib.request.Request(
+            f'http://127.0.0.1:{rport}/route',
+            data=json.dumps({'text': text}).encode(),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
+        resp = urllib.request.urlopen(req, timeout=5)
+        data = json.loads(resp.read())
+        data['elapsed_ms'] = int((time.time() - t0) * 1000)
+        data['source'] = 'router'
+        print(json.dumps(data))
+        sys.exit(0)
+    except SystemExit:
+        raise  # Don't catch sys.exit!
+    except:
+        pass  # Fall through to lm:generate
+
+# Fallback: use YoLoIT lm:generate API (slower: ~2-3s)
+model = os.environ.get('YOLOIT_ROUTER_MODEL', 'qwen3-0.6b-4bit')
+prompt = 'Route user text to YoLoIT CLI command. Reply ONLY JSON: {\"c\":\"CMD\",\"a\":[\"ARG\"]}. No markdown, no thinking, no explanation.'
+
 payload = json.dumps({
     'messages': [{'role': 'user', 'content': text}],
     'systemPrompt': prompt,
@@ -2404,8 +2413,6 @@ payload = json.dumps({
     'temperature': 0.0
 })
 
-# Get port
-import os
 port_file = os.path.expanduser('~/.config/yoloit/cli.port')
 with open(port_file) as f:
     port = f.read().strip()
@@ -2413,7 +2420,6 @@ base = f'http://127.0.0.1:{port}/api'
 
 t0 = time.time()
 
-import urllib.request
 req = urllib.request.Request(
     f'{base}/lm/generate',
     data=payload.encode(),
@@ -2430,7 +2436,6 @@ if not data.get('ok'):
     sys.exit(1)
 
 response_text = data['response']
-timings = data.get('timings', {})
 
 # Extract JSON from response (handles markdown wrapping)
 json_match = re.search(r'\{[^{}]*\}', response_text)
@@ -2447,15 +2452,32 @@ except:
 cmd = cmd_data.get('c', cmd_data.get('command', ''))
 args = cmd_data.get('a', cmd_data.get('args', []))
 
+# Alias map: fix common model hallucinations to valid command IDs
+ALIAS = {
+    'board:show':'panels','board:switch':'board:use','board:reduce':'board:fit',
+    'boards:list':'boards','checklist:create':'checklist:new',
+    'checklist:mark':'checklist:check','checklist:mark-done':'checklist:check',
+    'checklist:toggle':'checklist:check','models':'models:list',
+    'model:select':'models:select','model:delete':'models:delete',
+    'model:download':'models:download','link:open':'web:open',
+    'webpage:open':'web:open','widget:create':'app:create',
+    'yolochat:history':'yolochat:messages','chat:history':'yolochat:messages',
+    'board:generate-screenshot':'board:screenshot','board:generate':'board:snapshot',
+    'panel:close':'panel:hide','note:write':'note:add',
+    'board:copy':'board:clone','board:config':'board:settings',
+    'board:translate':'board:use','note:delete':'panel:delete',
+    'panel:stop':'panel:hide','run:script':'run:attach',
+}
+if cmd in ALIAS:
+    cmd = ALIAS[cmd]
+
 print(json.dumps({
     'command': cmd,
     'args': args,
     'elapsed_ms': elapsed_ms,
-    'ttft_ms': timings.get('ttftMs', 0),
-    'gen_ms': timings.get('generationMs', 0),
-    'model': model
+    'source': 'lm_generate'
 }))
-" "$pc_text" "$pc_model" "$pc_prompt" "$0" 2>&1)
+" "$pc_text" 2>&1)
 
     # Parse result and execute
     pc_cmd=$(echo "$pc_result" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null)
@@ -2476,8 +2498,8 @@ print(json.dumps({
 
     echo "🤖 ${pc_cmd} ${pc_args} (${pc_elapsed}ms)"
 
-    # Check --dry-run flag in original args
-    if [[ "$pc_text" == *"--dry-run"* ]]; then
+    # Check --dry-run flag
+    if [[ "$pc_dry_run" == "true" ]]; then
       exit 0
     fi
 

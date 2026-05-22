@@ -129,3 +129,8 @@ app.*.symbols
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 !/dev/ci/**/Gemfile.lockdiff:*
 .metadata
+
+# Fine-tuned ML models (too large for git)
+assets/command_catalog/models/
+assets/command_catalog/adapters/*/adapters.safetensors
+assets/command_catalog/adapters/*/0*_adapters.safetensors
