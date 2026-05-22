@@ -95,13 +95,16 @@ void main() {
         MaterialApp(
           theme: AppThemePreset.neonPurple.theme,
           home: const Scaffold(
-            body: SizedBox(width: 700, height: 600, child: SettingsPage()),
+            body: SizedBox(width: 700, height: 700, child: SettingsPage()),
           ),
         ),
       );
       await tester.pump();
-      // 'Setup Guide' appears as a sidebar category
-      expect(find.text('Setup Guide'), findsOneWidget);
+      // 'Setup Guide' appears as a sidebar category (may be off-screen in ListView)
+      expect(
+        find.text('Setup Guide', skipOffstage: false),
+        findsOneWidget,
+      );
     });
 
     testWidgets('close button pops dialog', (tester) async {

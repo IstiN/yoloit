@@ -16,6 +16,7 @@ import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/ai_models_section.dart';
+import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
 import 'package:yoloit/features/settings/ui/provider_models_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
@@ -33,6 +34,7 @@ const _kCategories = [
   'AI Agents',
   'AI Models',
   'Provider Models',
+  'Cloud Providers',
   'Environment',
   'Notifications',
   'Sessions',
@@ -44,7 +46,7 @@ const _kCategories = [
   'About',
 ];
 
-const _kSkillsCategoryIndex = 8;
+const _kSkillsCategoryIndex = 9;
 
 /// Settings overlay shown as a modal dialog with sidebar navigation.
 class SettingsPage extends StatefulWidget {
@@ -256,12 +258,20 @@ class _SettingsPageState extends State<SettingsPage> {
         4 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _SectionHeader(title: 'Cloud Providers'),
+            SizedBox(height: 12),
+            CloudProvidersSection(),
+          ],
+        ),
+        5 => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             _SectionHeader(title: 'Environment'),
             SizedBox(height: 12),
             GlobalEnvGroupsSection(),
           ],
         ),
-        5 => const Column(
+        6 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Notifications'),
@@ -269,7 +279,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _NotificationsSection(),
           ],
         ),
-        6 => Column(
+        7 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Sessions'),
@@ -277,7 +287,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _SessionSettings(),
           ],
         ),
-        7 => Column(
+        8 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Keyboard Shortcuts'),
@@ -285,7 +295,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _ShortcutsTable(),
           ],
         ),
-        9 => const Column(
+        10 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Sync'),
@@ -293,8 +303,8 @@ class _SettingsPageState extends State<SettingsPage> {
             SyncSection(),
           ],
         ),
-        10 => const SetupGuideEmbedded(),
-        11 => const Column(
+        11 => const SetupGuideEmbedded(),
+        12 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Widget API Permissions'),

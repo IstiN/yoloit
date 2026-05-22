@@ -15,12 +15,14 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/cloud_llm_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
+import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
 
@@ -47,7 +49,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   final _inputFocusNode = FocusNode();
   final AudioRecorder _micRecorder = AudioRecorder();
   final YoloitToolExecutor _toolExecutor = YoloitCliToolExecutor();
-  LocalLlmProvider? _chatProvider;
+  ChatProvider? _chatProvider;
   bool _isRecordingMic = false;
   bool _isStartingMic = false;
   bool _stopMicAfterStart = false;
@@ -209,15 +211,35 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         },
       );
 
-      // Use LocalLlmProvider — single source of truth for model selection,
-      // agentic loop, JSON buffering, tool validation, etc.
-      final provider = LocalLlmProvider(toolExecutor: wrappedExecutor);
+      // Pick provider: cloud or local based on user settings.
+      final ChatProvider provider;
+      final String providerType;
+      final providerPref =
+          await CloudLlmSettingsService.instance.loadAssistantProviderType();
+      if (providerPref == 'cloud') {
+        final cloudConfig =
+            await CloudLlmSettingsService.instance.loadActiveConfig();
+        if (cloudConfig != null && cloudConfig.isValid) {
+          provider = CloudLlmProvider(
+            config: cloudConfig,
+            toolExecutor: wrappedExecutor,
+          );
+          providerType = 'cloud:${cloudConfig.id}';
+        } else {
+          // Fallback to local if no valid cloud config.
+          provider = LocalLlmProvider(toolExecutor: wrappedExecutor);
+          providerType = 'local';
+        }
+      } else {
+        provider = LocalLlmProvider(toolExecutor: wrappedExecutor);
+        providerType = 'local';
+      }
       _chatProvider = provider;
 
       final config = ChatSessionConfig(
         sessionName: '__yolo_badge_assistant__',
         workingDir: Directory.current.path,
-        provider: 'local',
+        provider: providerType,
         disabledLocalToolNames: _disabledLocalToolNames,
       );
 
