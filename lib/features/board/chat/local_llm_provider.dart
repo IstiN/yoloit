@@ -614,10 +614,18 @@ class LocalLlmProvider extends ChatProvider {
     if (tool == null) return <String, Object?>{};
     final result = <String, Object?>{};
     final params = tool.params;
-    for (var i = 0; i < positional.length && i < params.length; i++) {
+
+    // Separate required and optional params. The model typically omits
+    // board/panel (they come from runtimeContext), so map positional args
+    // to required params first, then overflow to optional ones.
+    final required = params.where((p) => p.required).toList();
+    final optional = params.where((p) => !p.required).toList();
+    final orderedParams = [...required, ...optional];
+
+    for (var i = 0; i < positional.length && i < orderedParams.length; i++) {
       final value = positional[i];
       if (value != null && value.toString().isNotEmpty) {
-        result[params[i].key] = value;
+        result[orderedParams[i].key] = value;
       }
     }
     return result;
