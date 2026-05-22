@@ -871,7 +871,9 @@ class LocalLlmProvider extends ChatProvider {
 
   bool _usesCompactRoutingPrompt(flm.LocalModelManifest manifest) {
     final id = manifest.id.toLowerCase();
-    return _isRouterModel(manifest) || id == 'qwen3-0.6b-4bit';
+    return _isRouterModel(manifest) ||
+        _isOrchestratorModel(manifest) ||
+        id == 'qwen3-0.6b-4bit';
   }
 
   bool _shouldDisableThinking(flm.LocalModelManifest manifest) {
