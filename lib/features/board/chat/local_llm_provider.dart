@@ -179,12 +179,17 @@ class LocalLlmProvider extends ChatProvider {
           maxTokens: requestProfile.maxTokens,
           temperature: requestProfile.temperature,
           enableThinking: requestProfile.enableThinking,
-          tools: YoloitCliToolCatalog.localToolsFor(
-            disabledFunctionNames:
-                config.disabledLocalToolNames
-                    .map((name) => name.trim())
-                    .toSet(),
-          ),
+          // Router/fine-tuned models output compact JSON directly — don't pass
+          // tool definitions (which would switch Qwen3 to native tool calling).
+          tools:
+              _isRouterModel(installed.manifest)
+                  ? const []
+                  : YoloitCliToolCatalog.localToolsFor(
+                    disabledFunctionNames:
+                        config.disabledLocalToolNames
+                            .map((name) => name.trim())
+                            .toSet(),
+                  ),
           onToolCall: toolHandler,
         ),
         (chunk) {
@@ -731,42 +736,52 @@ class LocalLlmProvider extends ChatProvider {
         (panelId != null && panelId.isNotEmpty) ||
         (panelTitle != null && panelTitle.isNotEmpty);
 
+    final isRouter = _isRouterModel(manifest);
     final systemBuf = StringBuffer();
-    systemBuf.writeln(
-      _usesCompactRoutingPrompt(manifest)
-          ? _compactLocalRoutingPrompt.trim()
-          : await loadYoloChatSystemPrompt(),
-    );
-    if (hasContext) {
-      systemBuf.writeln('\nCurrent UI context:');
-      systemBuf.writeln('- Board id: ${boardId ?? 'unknown'}');
-      systemBuf.writeln('- Board name: ${boardName ?? 'unknown'}');
-      systemBuf.writeln('- Chat panel id: ${panelId ?? 'unknown'}');
-      systemBuf.writeln('- Chat panel title: ${panelTitle ?? 'unknown'}');
-      systemBuf.write(
-        'Default to this board/panel when a tool argument is omitted.',
+    if (isRouter) {
+      // Fine-tuned router: no system prompt needed — model was trained to
+      // output compact JSON directly from user text.
+    } else {
+      systemBuf.writeln(
+        _usesCompactRoutingPrompt(manifest)
+            ? _compactLocalRoutingPrompt.trim()
+            : await loadYoloChatSystemPrompt(),
       );
-    }
-
-    final result = <Map<String, String>>[
-      {'role': 'system', 'content': systemBuf.toString().trim()},
-    ];
-
-    for (final turn in turns) {
-      result.add({'role': 'user', 'content': turn.user});
-      result.add({'role': 'assistant', 'content': turn.assistant});
-    }
-
-    if (toolHistory.isNotEmpty) {
-      final toolBuf = StringBuffer('Tool call history:\n');
-      for (final call in toolHistory) {
-        toolBuf.writeln(
-          '- ${call.toolName} ${call.success ? 'succeeded' : 'failed'} '
-          'args=${_compactPromptJson(call.arguments, 600)} '
-          'result=${_compactToolResultForPrompt(call.result)}',
+      if (hasContext) {
+        systemBuf.writeln('\nCurrent UI context:');
+        systemBuf.writeln('- Board id: ${boardId ?? 'unknown'}');
+        systemBuf.writeln('- Board name: ${boardName ?? 'unknown'}');
+        systemBuf.writeln('- Chat panel id: ${panelId ?? 'unknown'}');
+        systemBuf.writeln('- Chat panel title: ${panelTitle ?? 'unknown'}');
+        systemBuf.write(
+          'Default to this board/panel when a tool argument is omitted.',
         );
       }
-      result.add({'role': 'tool', 'content': toolBuf.toString().trim()});
+    }
+
+    final result = <Map<String, String>>[];
+    final systemContent = systemBuf.toString().trim();
+    if (systemContent.isNotEmpty) {
+      result.add({'role': 'system', 'content': systemContent});
+    }
+
+    if (!isRouter) {
+      for (final turn in turns) {
+        result.add({'role': 'user', 'content': turn.user});
+        result.add({'role': 'assistant', 'content': turn.assistant});
+      }
+
+      if (toolHistory.isNotEmpty) {
+        final toolBuf = StringBuffer('Tool call history:\n');
+        for (final call in toolHistory) {
+          toolBuf.writeln(
+            '- ${call.toolName} ${call.success ? 'succeeded' : 'failed'} '
+            'args=${_compactPromptJson(call.arguments, 600)} '
+            'result=${_compactToolResultForPrompt(call.result)}',
+          );
+        }
+        result.add({'role': 'tool', 'content': toolBuf.toString().trim()});
+      }
     }
 
     result.add({'role': 'user', 'content': userMessage});
