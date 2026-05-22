@@ -586,7 +586,14 @@ class LocalLlmProvider extends ChatProvider {
           name = compactName;
           final rawA = root['a'];
           if (rawA is List) {
-            arguments = _positionalArgsToNamed(compactName, rawA);
+            // Filter out /no_think artifacts leaked from the prompt.
+            final cleaned = rawA
+                .where((e) =>
+                    e != null &&
+                    !RegExp(r'^/?no_think$', caseSensitive: false)
+                        .hasMatch(e.toString().trim()))
+                .toList();
+            arguments = _positionalArgsToNamed(compactName, cleaned);
           }
         } else {
           name =
