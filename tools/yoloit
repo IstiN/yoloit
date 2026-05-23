@@ -1447,7 +1447,9 @@ lines = [
     'flowchart TB',
     '  classDef hiddenPanel fill:#f1f5f9,stroke:#94a3b8,color:#64748b,stroke-dasharray: 4 3;',
 ]
+lines.append('  ROOT["YoLoIT Boards Snapshot"]')
 
+board_contexts = []
 for board in boards:
     board_id = str(board.get('id') or '').strip()
     if not board_id:
@@ -1459,17 +1461,69 @@ for board in boards:
     board_title = f"{board_name} ({board_id})"
     if is_active:
         board_title += ' [CURRENT]'
-    lines.append(f'  subgraph {sg_node}["{label(board_title)}"]')
-    lines.append('    direction TB')
-    lines.append(f'    {b_node}["{label(board_name)}"]')
     try:
         encoded = urllib.parse.quote(board_id)
         panels_payload = get_json(f'/boards/{encoded}/panels')
         panels = panels_payload.get('panels') or []
     except Exception:
         panels = []
+    # Approximate board position using panel bounds centroid.
+    xs = []
+    ys = []
+    for p in panels:
+        b = p.get('bounds') if isinstance(p, dict) else None
+        if isinstance(b, dict):
+            x = b.get('x')
+            y = b.get('y')
+            if isinstance(x, (int, float)):
+                xs.append(float(x))
+            if isinstance(y, (int, float)):
+                ys.append(float(y))
+    centroid_x = sum(xs) / len(xs) if xs else 0.0
+    centroid_y = sum(ys) / len(ys) if ys else 0.0
+    board_contexts.append({
+        'id': board_id,
+        'name': board_name,
+        'active': is_active,
+        'b_node': b_node,
+        'sg_node': sg_node,
+        'title': board_title,
+        'panels': panels,
+        'centroid_x': centroid_x,
+        'centroid_y': centroid_y,
+    })
+
+# Keep layout deterministic and closer to current structure.
+board_contexts.sort(key=lambda c: (c['centroid_y'], c['centroid_x'], c['name']))
+for i, ctx in enumerate(board_contexts):
+    lines.append(f'  ROOT --> {ctx["b_node"]}')
+    if i > 0:
+        prev = board_contexts[i - 1]
+        # Ordered hint to keep board blocks close to spatial structure.
+        lines.append(f'  {prev["b_node"]} -.-> {ctx["b_node"]}')
+
+for idx, ctx in enumerate(board_contexts):
+    board_id = ctx['id']
+    board_name = ctx['name']
+    is_active = ctx['active']
+    b_node = ctx['b_node']
+    sg_node = ctx['sg_node']
+    panels = ctx['panels']
+    lines.append(f'  subgraph {sg_node}["{label(ctx["title"])}"]')
+    lines.append('    direction TB')
+    lines.append(f'    {b_node}["{label(board_name)}"]')
     panel_nodes = {}
+    sorted_panels = []
     for panel in panels:
+        bounds = panel.get('bounds') if isinstance(panel, dict) else None
+        x = bounds.get('x') if isinstance(bounds, dict) else None
+        y = bounds.get('y') if isinstance(bounds, dict) else None
+        px = float(x) if isinstance(x, (int, float)) else 0.0
+        py = float(y) if isinstance(y, (int, float)) else 0.0
+        pid = str(panel.get('id') or '').strip()
+        sorted_panels.append((py, px, pid, panel))
+    sorted_panels.sort(key=lambda it: (it[0], it[1], it[2]))
+    for _, _, _, panel in sorted_panels:
         panel_id = str(panel.get('id') or '').strip()
         if not panel_id:
             continue
@@ -1478,9 +1532,32 @@ for board in boards:
         panel_title = str(panel.get('title') or panel_id).strip()
         panel_type = str(panel.get('type') or 'unknown').strip()
         hidden = bool(panel.get('hidden') is True)
+        extra = ''
+        if panel_type == 'board.webpage':
+            state = panel.get('state') if isinstance(panel, dict) else None
+            url = ''
+            if isinstance(state, dict):
+                url = str(state.get('url') or '').strip()
+            if not url:
+                try:
+                    encoded_bid = urllib.parse.quote(board_id)
+                    encoded_pid = urllib.parse.quote(panel_id)
+                    details = get_json(f'/boards/{encoded_bid}/panels/{encoded_pid}')
+                    if isinstance(details, dict):
+                        st = details.get('state')
+                        ct = details.get('content')
+                        if isinstance(st, dict):
+                            url = str(st.get('url') or '').strip()
+                        if not url and isinstance(ct, dict):
+                            url = str(ct.get('url') or '').strip()
+                except Exception:
+                    url = ''
+            if url:
+                host = urllib.parse.urlparse(url).netloc or url
+                extra = f'\\n{label(host)}'
         suffix = ' [hidden]' if hidden else ''
         lines.append(
-            f'    {p_node}["{label(panel_title)}\\n{label(panel_type)}\\n{label(panel_id)}{suffix}"]'
+            f'    {p_node}["{label(panel_title)}\\n{label(panel_type)}\\n{label(panel_id)}{suffix}{extra}"]'
         )
         lines.append(f'    {b_node} --> {p_node}')
         if hidden:
