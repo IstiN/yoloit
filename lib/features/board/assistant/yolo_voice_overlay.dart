@@ -629,8 +629,8 @@ class _BlobOrbPainter extends CustomPainter {
     (angle: 5.10, scale: 1.00, aspect: 0.86, phase: 1.8),
   ];
 
-  /// Create an organic blob path using cubic bezier curves.
-  /// The blob is a deformed ellipse where control points wobble.
+  /// Create a plectrum (guitar pick) shaped path.
+  /// Rounded top with a pointed bottom tip, rotated by wobbleT for variety.
   Path _blobPath(
     Offset center,
     double w,
@@ -639,40 +639,60 @@ class _BlobOrbPainter extends CustomPainter {
     int seed,
   ) {
     final path = Path();
-    const segments = 12; // More segments = smoother curve
     final rng = math.Random(seed);
-    final points = <Offset>[];
 
-    for (var i = 0; i < segments; i++) {
-      final angle = (i / segments) * 2 * math.pi;
-      // Gentle wobble for organic feel (not too bumpy)
-      // Integer multipliers ensure animation loops seamlessly (2π period)
-      final wobble = 1.0 +
-          math.sin(wobbleT * 2 + i * 0.55 + rng.nextDouble() * 0.3) * 0.04 +
-          math.cos(wobbleT * 1 + i * 0.7) * 0.03;
-      final rx = w / 2 * wobble;
-      final ry = h / 2 * wobble;
-      points.add(Offset(
-        center.dx + math.cos(angle) * rx,
-        center.dy + math.sin(angle) * ry,
-      ));
-    }
+    // Slight wobble on proportions for organic feel (integer multipliers for loop)
+    final wobble = 1.0 +
+        math.sin(wobbleT * 2 + rng.nextDouble() * 0.3) * 0.03 +
+        math.cos(wobbleT * 1 + rng.nextDouble() * 0.2) * 0.02;
+    final rw = w / 2 * wobble;
+    final rh = h / 2 * wobble;
 
-    // Catmull-Rom style: smooth cubic through all points
-    path.moveTo(points[0].dx, points[0].dy);
-    for (var i = 0; i < segments; i++) {
-      final p0 = points[i];
-      final p1 = points[(i + 1) % segments];
-      final prev = points[(i - 1 + segments) % segments];
-      final next2 = points[(i + 2) % segments];
-      // Tangent-based control points for smooth curve
+    // Rotation per blob for variety (based on seed + slow animation)
+    final rot = rng.nextDouble() * math.pi * 2 + wobbleT * 0.15;
+
+    // Plectrum control points (before rotation):
+    // Top: wide rounded arc
+    // Bottom: pointed tip
+    final tipY = rh * 1.1;      // pointed end extends slightly past radius
+    final bulgeX = rw * 0.92;   // width of the round part
+    final bulgeY = -rh * 0.50;  // round part above center
+    final topY = -rh * 0.85;    // top of the rounded arc
+
+    // Build plectrum as cubic beziers (unrotated, centered at origin)
+    final pts = <Offset>[
+      Offset(0, -topY.abs()),              // top center
+      Offset(bulgeX, bulgeY),               // right bulge
+      Offset(bulgeX * 0.45, tipY * 0.7),    // right lower
+      Offset(0, tipY),                       // bottom tip
+      Offset(-bulgeX * 0.45, tipY * 0.7),   // left lower
+      Offset(-bulgeX, bulgeY),               // left bulge
+    ];
+
+    // Rotate all points
+    final cosR = math.cos(rot);
+    final sinR = math.sin(rot);
+    Offset rotate(Offset p) => Offset(
+          center.dx + p.dx * cosR - p.dy * sinR,
+          center.dy + p.dx * sinR + p.dy * cosR,
+        );
+
+    final rPts = pts.map(rotate).toList();
+
+    // Draw with smooth cubic curves through the 6 points
+    path.moveTo(rPts[0].dx, rPts[0].dy);
+    for (var i = 0; i < rPts.length; i++) {
+      final p0 = rPts[i];
+      final p1 = rPts[(i + 1) % rPts.length];
+      final prev = rPts[(i - 1 + rPts.length) % rPts.length];
+      final next2 = rPts[(i + 2) % rPts.length];
       final cp1 = Offset(
-        p0.dx + (p1.dx - prev.dx) / 6,
-        p0.dy + (p1.dy - prev.dy) / 6,
+        p0.dx + (p1.dx - prev.dx) / 4,
+        p0.dy + (p1.dy - prev.dy) / 4,
       );
       final cp2 = Offset(
-        p1.dx - (next2.dx - p0.dx) / 6,
-        p1.dy - (next2.dy - p0.dy) / 6,
+        p1.dx - (next2.dx - p0.dx) / 4,
+        p1.dy - (next2.dy - p0.dy) / 4,
       );
       path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
     }
@@ -717,44 +737,31 @@ class _BlobOrbPainter extends CustomPainter {
       final dy = math.sin(blobAngle) * r * 0.26;
       final blobCenter = Offset(center.dx + dx, center.dy + dy);
 
-      final blobW = r * 2 * cfg.scale * (0.82 + math.sin(t) * 0.04);
+      final blobW = r * 2 * cfg.scale * (0.72 + math.sin(t) * 0.04);
       final blobH = blobW * cfg.aspect;
 
       final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
 
-      // Fill: linear gradient — OPAQUE at far edge → TRANSPARENT toward orb center
-      // Direction: from blob's far side to orb center
-      final dirX = blobCenter.dx - center.dx;
-      final dirY = blobCenter.dy - center.dy;
-      final dirLen = math.sqrt(dirX * dirX + dirY * dirY).clamp(1.0, double.infinity);
-      final normX = dirX / dirLen;
-      final normY = dirY / dirLen;
-      final gradRadius = blobW * 0.50;
-      final gradFrom = Offset(blobCenter.dx + normX * gradRadius,
-                               blobCenter.dy + normY * gradRadius);
-      final gradTo = Offset(blobCenter.dx - normX * gradRadius,
-                             blobCenter.dy - normY * gradRadius);
-
+      // Fill: subtle tinted interior — glass bubble look
       final fillPaint = Paint()
-        ..shader = ui.Gradient.linear(
-          gradFrom,
-          gradTo,
-          [
-            colors[i].withValues(alpha: 0.28 + 0.14 * intensity),
-            colors[i].withValues(alpha: 0.10 + 0.06 * intensity),
-            colors[i].withValues(alpha: 0.0),
-          ],
-          [0.0, 0.5, 1.0],
-        )
+        ..color = colors[i].withValues(alpha: 0.09 + 0.04 * intensity)
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, fillPaint);
 
-      // Wide halo glow — very soft, creates the glowing aura
-      final glowEdge = Paint()
-        ..color = colors[i].withValues(alpha: 0.05 + 0.04 * intensity)
+      // Edge: bright glowing stroke — defines each blob shape
+      final edgePaint = Paint()
+        ..color = colors[i].withValues(alpha: 0.50 + 0.22 * intensity)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 14
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16)
+        ..strokeWidth = 1.4
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
+      canvas.drawPath(path, edgePaint);
+
+      // Soft outer glow halo
+      final glowEdge = Paint()
+        ..color = colors[i].withValues(alpha: 0.10 + 0.07 * intensity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, glowEdge);
     }
