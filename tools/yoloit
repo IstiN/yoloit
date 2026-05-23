@@ -1443,8 +1443,10 @@ def label(text):
 
 boards_payload = get_json('/boards')
 boards = boards_payload.get('boards') or []
-root = 'ROOT'
-lines = ['flowchart TB', f'  {root}["YoLoIT Boards Snapshot"]']
+lines = [
+    'flowchart TB',
+    '  classDef hiddenPanel fill:#f1f5f9,stroke:#94a3b8,color:#64748b,stroke-dasharray: 4 3;',
+]
 
 for board in boards:
     board_id = str(board.get('id') or '').strip()
@@ -1453,30 +1455,63 @@ for board in boards:
     board_name = str(board.get('name') or board_id).strip()
     is_active = bool(board.get('active') is True)
     b_node = node_id('B', board_id)
+    sg_node = node_id('SG', board_id)
     board_title = f"{board_name} ({board_id})"
     if is_active:
         board_title += ' [CURRENT]'
-    lines.append(f'  {b_node}["{label(board_title)}"]')
-    lines.append(f'  {root} --> {b_node}')
+    lines.append(f'  subgraph {sg_node}["{label(board_title)}"]')
+    lines.append('    direction TB')
+    lines.append(f'    {b_node}["{label(board_name)}"]')
     try:
         encoded = urllib.parse.quote(board_id)
         panels_payload = get_json(f'/boards/{encoded}/panels')
         panels = panels_payload.get('panels') or []
     except Exception:
         panels = []
+    panel_nodes = {}
     for panel in panels:
         panel_id = str(panel.get('id') or '').strip()
         if not panel_id:
             continue
         p_node = node_id('P', f'{board_id}_{panel_id}')
+        panel_nodes[panel_id] = p_node
         panel_title = str(panel.get('title') or panel_id).strip()
         panel_type = str(panel.get('type') or 'unknown').strip()
         hidden = bool(panel.get('hidden') is True)
         suffix = ' [hidden]' if hidden else ''
         lines.append(
-            f'  {p_node}["{label(panel_title)} | {label(panel_type)} | {label(panel_id)}{suffix}"]'
+            f'    {p_node}["{label(panel_title)}\\n{label(panel_type)}\\n{label(panel_id)}{suffix}"]'
         )
-        lines.append(f'  {b_node} --> {p_node}')
+        lines.append(f'    {b_node} --> {p_node}')
+        if hidden:
+            lines.append(f'    class {p_node} hiddenPanel;')
+    try:
+        encoded = urllib.parse.quote(board_id)
+        links_payload = get_json(f'/boards/{encoded}/links')
+        links = links_payload.get('links') or []
+    except Exception:
+        links = []
+    for link in links:
+        from_id = str(link.get('from') or '').strip()
+        to_id = str(link.get('to') or '').strip()
+        if not from_id or not to_id:
+            continue
+        from_node = panel_nodes.get(from_id)
+        to_node = panel_nodes.get(to_id)
+        if not from_node or not to_node:
+            continue
+        style = str(link.get('style') or 'arrow').strip().lower()
+        geometry = str(link.get('geometry') or '').strip()
+        edge = '---' if style == 'line' else '-->'
+        if geometry:
+            lines.append(f'    {from_node} {edge}|{label(geometry)}| {to_node}')
+        else:
+            lines.append(f'    {from_node} {edge} {to_node}')
+    lines.append('  end')
+    if is_active:
+        lines.append(f'  style {sg_node} fill:#ecfeff,stroke:#0891b2,stroke-width:2px;')
+    else:
+        lines.append(f'  style {sg_node} fill:#f8fafc,stroke:#64748b,stroke-width:1px;')
 
 diagram = '\n'.join(lines)
 if fmt == 'md':
