@@ -461,8 +461,12 @@ class CloudLlmProvider extends ChatProvider {
     var content = '';
     final toolCalls = <_ToolCallAccumulator>{};
 
+    var sseBuffer = '';
     await for (final chunk in response.transform(utf8.decoder)) {
-      for (final line in chunk.split('\n')) {
+      sseBuffer += chunk;
+      final lines = sseBuffer.split('\n');
+      sseBuffer = lines.removeLast();
+      for (final line in lines) {
         if (!line.startsWith('data: ')) continue;
         final data = line.substring(6).trim();
         if (data == '[DONE]') continue;
@@ -508,6 +512,27 @@ class CloudLlmProvider extends ChatProvider {
                   acc.arguments += fn['arguments'] as String;
                 }
               }
+            }
+          }
+
+          final legacyFunctionCall =
+              (delta?['function_call'] as Map<String, dynamic>?) ??
+              (message?['function_call'] as Map<String, dynamic>?);
+          if (legacyFunctionCall != null) {
+            final acc = toolCalls.firstWhere(
+              (a) => a.index == 0,
+              orElse: () {
+                final a = _ToolCallAccumulator(index: 0);
+                toolCalls.add(a);
+                return a;
+              },
+            );
+            acc.id = acc.id.isNotEmpty ? acc.id : 'legacy-function-call';
+            if (legacyFunctionCall['name'] != null) {
+              acc.name += legacyFunctionCall['name'] as String;
+            }
+            if (legacyFunctionCall['arguments'] != null) {
+              acc.arguments += legacyFunctionCall['arguments'] as String;
             }
           }
         } catch (_) {}

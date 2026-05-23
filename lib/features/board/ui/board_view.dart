@@ -873,6 +873,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
     _stopPanAnimation();
     _transformController.value = _matrixFromViewport(board.viewport);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _syncedBoardId != board.id) return;
+      if (_shouldAutoFit(board)) return;
+      if (_hasVisiblePanels(board) && !_hasAnyPanelInViewport(board)) {
+        _boardDebugLog('syncViewport.recoverOffscreen board=${board.id}');
+        _fitBoardPanels(board, persist: true);
+      }
+    });
   }
 
   Future<void> _persistViewport(BuildContext context, BoardDocument board) {
@@ -1305,6 +1313,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         comfortRect.contains(panelRect.topRight) &&
         comfortRect.contains(panelRect.bottomLeft) &&
         comfortRect.contains(panelRect.bottomRight);
+  }
+
+  bool _hasVisiblePanels(BoardDocument board) =>
+      board.panels.any((panel) => !panel.hidden);
+
+  bool _hasAnyPanelInViewport(BoardDocument board) {
+    final size = _viewportSize;
+    if (size == null || size.isEmpty) return true;
+    final tl = _transformController.toScene(Offset.zero);
+    final br = _transformController.toScene(Offset(size.width, size.height));
+    final viewportRect = Rect.fromLTRB(
+      math.min(tl.dx, br.dx),
+      math.min(tl.dy, br.dy),
+      math.max(tl.dx, br.dx),
+      math.max(tl.dy, br.dy),
+    );
+    for (final panel in board.panels) {
+      if (panel.hidden) continue;
+      if (panel.bounds.rect.overlaps(viewportRect)) return true;
+    }
+    return false;
   }
 
   Offset _boardPointFromCanvasScene(Offset scenePoint) {
