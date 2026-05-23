@@ -631,7 +631,8 @@ class _BlobOrbPainter extends CustomPainter {
 
   /// Create a plectrum (guitar pick) shaped path.
   /// 10-point organic shape matching SinglePlectrumPreview.
-  Path _blobPath(
+  /// Returns (path, rotation) so gradient can follow shape orientation.
+  (Path, double) _blobPath(
     Offset center,
     double w,
     double h,
@@ -692,7 +693,7 @@ class _BlobOrbPainter extends CustomPainter {
       path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
     }
     path.close();
-    return path;
+    return (path, rot);
   }
 
   @override
@@ -735,7 +736,7 @@ class _BlobOrbPainter extends CustomPainter {
       final blobW = r * 2 * cfg.scale * (0.72 + math.sin(t) * 0.04);
       final blobH = blobW * cfg.aspect;
 
-      final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
+      final (path, rot) = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
       final bounds = path.getBounds();
 
       // Shadow behind each blob
@@ -744,12 +745,25 @@ class _BlobOrbPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
       canvas.drawPath(path, shadowPaint);
 
-      // Solid fill with gradient transparency:
-      // Wide part (top) = opaque, narrow tip (bottom) = fully transparent
+      // Gradient follows shape rotation:
+      // Wide end (top of unrotated shape) = opaque
+      // Narrow tip (bottom of unrotated shape) = transparent
+      final gradLen = bounds.height * 0.5;
+      // "top" in shape-local coords is (0, -1), rotated by rot
+      final gradStart = Offset(
+        bounds.center.dx - math.sin(rot) * gradLen,
+        bounds.center.dy - math.cos(rot) * gradLen,
+      );
+      // "bottom" in shape-local coords is (0, +1), rotated by rot
+      final gradEnd = Offset(
+        bounds.center.dx + math.sin(rot) * gradLen,
+        bounds.center.dy + math.cos(rot) * gradLen,
+      );
+
       final fillPaint = Paint()
         ..shader = ui.Gradient.linear(
-          Offset(bounds.center.dx, bounds.top),
-          Offset(bounds.center.dx, bounds.bottom),
+          gradStart,
+          gradEnd,
           [
             colors[i].withValues(alpha: 0.40 * intensity),
             colors[i].withValues(alpha: 0.35 * intensity),
@@ -1287,18 +1301,29 @@ class _SinglePlectrumPainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
     canvas.drawPath(path, shadowPaint);
 
-    // Fill: solid color with gradient transparency
-    // Top (wide part) = fully opaque, bottom (narrow tip) = fully transparent
+    // Gradient follows shape rotation:
+    // Wide end = opaque, narrow tip = transparent
     final bounds = path.getBounds();
+    final gradRot = rotation + t * 0.08;
+    final gradLen = bounds.height * 0.5;
+    final gradStart = Offset(
+      bounds.center.dx - math.sin(gradRot) * gradLen,
+      bounds.center.dy - math.cos(gradRot) * gradLen,
+    );
+    final gradEnd = Offset(
+      bounds.center.dx + math.sin(gradRot) * gradLen,
+      bounds.center.dy + math.cos(gradRot) * gradLen,
+    );
+
     final fillPaint = Paint()
       ..shader = ui.Gradient.linear(
-        Offset(bounds.center.dx, bounds.top),
-        Offset(bounds.center.dx, bounds.bottom),
+        gradStart,
+        gradEnd,
         [
-          color.withValues(alpha: 0.45),  // top: fully visible
-          color.withValues(alpha: 0.40),  // ~40%: still solid
-          color.withValues(alpha: 0.0),   // 50%: fully transparent
-          color.withValues(alpha: 0.0),   // bottom: stays transparent
+          color.withValues(alpha: 0.45),
+          color.withValues(alpha: 0.40),
+          color.withValues(alpha: 0.0),
+          color.withValues(alpha: 0.0),
         ],
         [0.0, 0.35, 0.5, 1.0],
       );
