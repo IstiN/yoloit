@@ -612,11 +612,11 @@ class _BlobOrbPainter extends CustomPainter {
 
   // Blob shape configs: each blob has offset angle, size multiplier, aspect ratio
   static const _blobConfigs = [
-    (angle: 0.0, scale: 1.08, aspect: 0.72, phase: 0.0),
-    (angle: 1.25, scale: 0.96, aspect: 0.78, phase: 0.4),
-    (angle: 2.50, scale: 1.02, aspect: 0.68, phase: 0.8),
-    (angle: 3.90, scale: 0.94, aspect: 0.82, phase: 1.3),
-    (angle: 5.10, scale: 1.00, aspect: 0.74, phase: 1.8),
+    (angle: 0.0, scale: 1.06, aspect: 0.88, phase: 0.0),
+    (angle: 1.25, scale: 0.98, aspect: 0.92, phase: 0.4),
+    (angle: 2.50, scale: 1.04, aspect: 0.84, phase: 0.8),
+    (angle: 3.90, scale: 0.96, aspect: 0.90, phase: 1.3),
+    (angle: 5.10, scale: 1.00, aspect: 0.86, phase: 1.8),
   ];
 
   /// Create an organic blob path using cubic bezier curves.
@@ -710,52 +710,52 @@ class _BlobOrbPainter extends CustomPainter {
 
       final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
 
-      // Fill: very light blur so individual blob shape is CLEARLY visible
+      // Fill: very subtle translucent tint
       final fillPaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.12 + 0.05 * intensity)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2)
+        ..color = colors[i].withValues(alpha: 0.08 + 0.04 * intensity)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1)
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, fillPaint);
 
-      // Edge: bright visible border
+      // Edge: the PRIMARY visual element — soft glowing border
       final edgePaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.30 + 0.18 * intensity)
+        ..color = colors[i].withValues(alpha: 0.26 + 0.16 * intensity)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+        ..strokeWidth = 1.6
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5);
       canvas.drawPath(path, edgePaint);
 
-      // Second inner fill layer for glass depth
-      final innerFill = Paint()
+      // Subtle wider glow around each blob edge
+      final glowEdge = Paint()
         ..color = colors[i].withValues(alpha: 0.06 + 0.04 * intensity)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
         ..blendMode = BlendMode.plus;
-      canvas.drawPath(path, innerFill);
+      canvas.drawPath(path, glowEdge);
     }
 
-    // Bright inner highlight (frosted glass center)
+    // Subtle inner center highlight
     final innerGlow = Paint()
       ..shader = RadialGradient(
         colors: [
-          Colors.white.withValues(alpha: 0.12 * intensity),
-          colors[0].withValues(alpha: 0.06 * intensity),
+          Colors.white.withValues(alpha: 0.08 * intensity),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.30, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: r * 0.45));
-    canvas.drawCircle(center, r * 0.38, innerGlow);
+        stops: const [0.0, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: r * 0.40));
+    canvas.drawCircle(center, r * 0.35, innerGlow);
 
-    // Dark depth in core
+    // Subtle depth shadow in very center (not dark ring)
     final corePaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF0C1024).withValues(alpha: 0.48),
-          const Color(0xFF141830).withValues(alpha: 0.28),
+          const Color(0xFF0C1024).withValues(alpha: 0.22),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.50, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: r * 0.42));
-    canvas.drawCircle(center, r * 0.35, corePaint);
+        stops: const [0.0, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: r * 0.28));
+    canvas.drawCircle(center, r * 0.22, corePaint);
   }
 
   @override
