@@ -2830,14 +2830,17 @@ class _DebugUISection extends StatefulWidget {
 class _DebugUISectionState extends State<_DebugUISection> {
   String _voiceStatus = 'idle';
   double _scale = 1.0;
-  double _orbScale = 1.0;
-  double _ovalWidth = 1.0;
-  double _ovalHeight = 0.45;
-  double _titleFontSize = 22.0;
+  double _orbScale = 0.30;
+  double _ovalWidth = 2.0;
+  double _ovalHeight = 1.10;
+  double _titleFontSize = 9.0;
   Color _titleColor = const Color(0xFF64DFFF);
   double _plectrumRotation = 0.0;
   double _plectrumSize = 250.0;
   Color _plectrumColor = const Color(0xFF3CE8FF);
+  int _waveBarCount = 22;
+  double _waveAmplitude = 0.85;
+  int _waveSpeed = 1400;
   String _voiceResponse = 'This is a sample response from the LLM model. '
       'It demonstrates how text appears in the response card.';
   String _voiceTranscript = 'Show me the weather today';
@@ -3084,6 +3087,14 @@ class _DebugUISectionState extends State<_DebugUISection> {
           ],
         ),
         const SizedBox(height: 8),
+        // Waveform controls (listening state)
+        ..._debugSlider('Wave Bars', _waveBarCount.toDouble(), 4, 60, 56,
+            (v) => setState(() => _waveBarCount = v.round())),
+        ..._debugSlider('Wave Amp', _waveAmplitude, 0.1, 2.0, 38,
+            (v) => setState(() => _waveAmplitude = v)),
+        ..._debugSlider('Wave Speed', _waveSpeed.toDouble(), 400, 4000, 36,
+            (v) => setState(() => _waveSpeed = v.round())),
+        const SizedBox(height: 8),
         Container(
           width: double.infinity,
           height: 500,
@@ -3106,6 +3117,9 @@ class _DebugUISectionState extends State<_DebugUISection> {
               ovalHeight: _ovalHeight,
               titleFontSize: _titleFontSize,
               titleColor: _titleColor,
+              waveBarCount: _waveBarCount,
+              waveAmplitude: _waveAmplitude,
+              waveSpeed: _waveSpeed,
               onHide: () => setState(() => _voiceStatus = 'idle'),
               onPrimaryAction: () {
                 final idx = _statuses.indexOf(_voiceStatus);

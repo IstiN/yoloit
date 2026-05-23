@@ -17,12 +17,15 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.focusNode,
     this.onHide,
     this.onPrimaryAction,
-    this.scale = 1.0,
-    this.orbScale = 1.0,
-    this.ovalWidth = 1.0,
-    this.ovalHeight = 0.45,
-    this.titleFontSize,
+    this.scale = 2.0,
+    this.orbScale = 0.30,
+    this.ovalWidth = 2.0,
+    this.ovalHeight = 1.10,
+    this.titleFontSize = 9,
     this.titleColor,
+    this.waveBarCount = 22,
+    this.waveAmplitude = 0.85,
+    this.waveSpeed = 1400,
   });
 
   final String status;
@@ -40,6 +43,9 @@ class YoloVoiceOverlay extends StatefulWidget {
   final double ovalHeight;
   final double? titleFontSize;
   final Color? titleColor;
+  final int waveBarCount;
+  final double waveAmplitude;
+  final int waveSpeed;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -182,7 +188,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   double get _orbSize => switch (_shown) {
         _VS.listening => 260,
         _VS.thinking => 250,
-        _VS.processing => 200,
+        _VS.processing => 250,
         _VS.responding => 220,
         _VS.idle => 220,
       };
@@ -233,26 +239,19 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
               child: Stack(
             fit: StackFit.expand,
             children: [
-              // ── orbit particles (thinking) ──────────────────────────
+              // ── orbit particles (thinking + processing) ────────────
               AnimatedOpacity(
-                opacity: _isThinking ? 1.0 : 0.0,
+                opacity: (_isThinking || _isSending) ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 700),
                 child: Center(
                   child: _OrbitParticles(
-                    animate: _isThinking && widget.animate,
+                    animate: (_isThinking || _isSending) && widget.animate,
                   ),
                 ),
               ),
 
-              // ── upload beam (sending) ───────────────────────────────
-              AnimatedOpacity(
-                opacity: _isSending ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 500),
-                child: Align(
-                  alignment: const Alignment(0.0, -0.70),
-                  child: _UploadBeam(animate: _isSending && widget.animate),
-                ),
-              ),
+              // ── upload beam (sending) — hidden, processing uses orb ──
+              const SizedBox.shrink(),
 
               // ── waveform left (listening) ───────────────────────────
               AnimatedOpacity(
@@ -266,6 +265,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     child: _Waveform(
                       animate: _isListening && widget.animate,
                       flip: true,
+                      barCount: widget.waveBarCount,
+                      amplitude: widget.waveAmplitude,
+                      speed: widget.waveSpeed,
                     ),
                   ),
                 ),
@@ -282,6 +284,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     height: 80,
                     child: _Waveform(
                       animate: _isListening && widget.animate,
+                      barCount: widget.waveBarCount,
+                      amplitude: widget.waveAmplitude,
+                      speed: widget.waveSpeed,
                     ),
                   ),
                 ),
@@ -333,6 +338,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                       child: _ResponseCard(
                         response: widget.response,
                         streaming: widget.status == 'responding',
+                        animate: widget.animate,
                       ),
                     ),
                   ),
@@ -419,13 +425,13 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
               secondarySize: 14,
             ),
           _VS.processing => const _TextBlock(
-              primary: 'Sending audio...',
+              primary: 'Processing...',
               primaryColor: Color(0xFF62C9FF),
-              primarySize: 17,
+              primarySize: 18,
+              primaryBold: true,
               secondary: 'Please wait',
-              secondaryColor: Color(0xFFA08DFF),
-              secondarySize: 18,
-              secondaryBold: true,
+              secondaryColor: Color(0xFF9A9BAD),
+              secondarySize: 15,
             ),
           _VS.thinking => const _TextBlock(
               primary: 'Thinking...',
@@ -524,50 +530,103 @@ class _GlowText extends StatelessWidget {
 
 // ─────────────────────────── response card ───────────────────────────────────
 
-class _ResponseCard extends StatelessWidget {
-  const _ResponseCard({required this.response, required this.streaming});
+class _ResponseCard extends StatefulWidget {
+  const _ResponseCard({
+    required this.response,
+    required this.streaming,
+    this.animate = true,
+  });
 
   final String response;
   final bool streaming;
+  final bool animate;
+
+  @override
+  State<_ResponseCard> createState() => _ResponseCardState();
+}
+
+class _ResponseCardState extends State<_ResponseCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _borderAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _borderAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+    if (widget.streaming && widget.animate) _borderAnim.repeat();
+  }
+
+  @override
+  void didUpdateWidget(_ResponseCard old) {
+    super.didUpdateWidget(old);
+    final shouldAnimate = widget.streaming && widget.animate;
+    final wasAnimating = old.streaming && old.animate;
+    if (shouldAnimate && !wasAnimating) {
+      _borderAnim.repeat();
+    } else if (!shouldAnimate && wasAnimating) {
+      _borderAnim.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _borderAnim.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final text = response.trim().isEmpty
+    final text = widget.response.trim().isEmpty
         ? 'YoLo! Here is what I found for you...'
-        : response.trim();
+        : widget.response.trim();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 620),
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-          decoration: BoxDecoration(
-            color: const Color(0xF2181A24),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF9B6BFF)
-                    .withValues(alpha: streaming ? 0.30 : 0.08),
-                blurRadius: streaming ? 40 : 18,
-                spreadRadius: -6,
-              ),
-            ],
+        AnimatedBuilder(
+          animation: _borderAnim,
+          builder: (ctx, child) => CustomPaint(
+            foregroundPainter: widget.streaming
+                ? _RunningBorderPainter(
+                    progress: _borderAnim.value,
+                    radius: 28,
+                  )
+                : null,
+            child: child,
           ),
-          child: Text(
-            text,
-            maxLines: 8,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.95),
-              fontSize: 17,
-              height: 1.52,
-              fontWeight: FontWeight.w500,
-              shadows: streaming
-                  ? const [
-                      Shadow(color: Color(0x889B6BFF), blurRadius: 14),
-                    ]
-                  : const [],
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 620),
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xF2181A24),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF9B6BFF)
+                      .withValues(alpha: widget.streaming ? 0.30 : 0.08),
+                  blurRadius: widget.streaming ? 40 : 18,
+                  spreadRadius: -6,
+                ),
+              ],
+            ),
+            child: Text(
+              text,
+              maxLines: 8,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontSize: 17,
+                height: 1.52,
+                fontWeight: FontWeight.w500,
+                shadows: widget.streaming
+                    ? const [
+                        Shadow(color: Color(0x889B6BFF), blurRadius: 14),
+                      ]
+                    : const [],
+              ),
             ),
           ),
         ),
@@ -583,6 +642,62 @@ class _ResponseCard extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Animated border painter — draws a running gradient stroke around the card.
+class _RunningBorderPainter extends CustomPainter {
+  _RunningBorderPainter({required this.progress, required this.radius});
+
+  final double progress;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
+    final path = Path()..addRRect(rrect);
+    final metrics = path.computeMetrics().first;
+    final totalLen = metrics.length;
+
+    // Bright head + fading tail
+    final headLen = totalLen * 0.25;
+    final startDist = progress * totalLen;
+
+    // Draw the running segment
+    final extractStart = startDist;
+    final extractEnd = startDist + headLen;
+
+    Path segment;
+    if (extractEnd <= totalLen) {
+      segment = metrics.extractPath(extractStart, extractEnd);
+    } else {
+      // Wrap around
+      segment = metrics.extractPath(extractStart, totalLen);
+      segment.addPath(metrics.extractPath(0, extractEnd - totalLen), Offset.zero);
+    }
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        center: Alignment.center,
+        startAngle: 0,
+        endAngle: math.pi * 2,
+        colors: const [
+          Color(0xFF64DFFF),
+          Color(0xFFB980FF),
+          Color(0xFFFF60DD),
+          Color(0xFF64DFFF),
+        ],
+        transform: GradientRotation(progress * math.pi * 2),
+      ).createShader(rect);
+
+    canvas.drawPath(segment, paint);
+  }
+
+  @override
+  bool shouldRepaint(_RunningBorderPainter old) => old.progress != progress;
 }
 
 // ─────────────────────────── BLOB ORB PAINTER ───────────────────────────────
@@ -752,10 +867,10 @@ class _BlobOrbPainter extends CustomPainter {
   // Blob shape configs: each blob has offset angle, size multiplier, aspect ratio
   static const _blobConfigs = [
     (angle: 0.0, scale: 1.06, aspect: 0.88, phase: 0.0),
-    (angle: 1.25, scale: 0.98, aspect: 0.92, phase: 0.4),
-    (angle: 2.50, scale: 1.04, aspect: 0.84, phase: 0.8),
-    (angle: 3.90, scale: 0.96, aspect: 0.90, phase: 1.3),
-    (angle: 5.10, scale: 1.00, aspect: 0.86, phase: 1.8),
+    (angle: 1.25, scale: 0.98, aspect: 0.92, phase: 1.26),
+    (angle: 2.50, scale: 1.04, aspect: 0.84, phase: 2.51),
+    (angle: 3.90, scale: 0.96, aspect: 0.90, phase: 3.77),
+    (angle: 5.10, scale: 1.00, aspect: 0.86, phase: 5.03),
   ];
 
   @override
@@ -802,7 +917,7 @@ class _BlobOrbPainter extends CustomPainter {
           math.cos(t * 1 + rng.nextDouble() * 0.2) * 0.02;
       final rw = blobW / 2 * wobble;
       final rh = blobH / 2 * wobble;
-      final rot = rng.nextDouble() * math.pi * 2 + t * 0.15;
+      final rot = rng.nextDouble() * math.pi * 2 + t * 1;
 
       final path = _buildPlectrumPath(
         center: blobCenter,
@@ -853,10 +968,19 @@ class _BlobOrbPainter extends CustomPainter {
 // ─────────────────────────── waveform ────────────────────────────────────────
 
 class _Waveform extends StatefulWidget {
-  const _Waveform({required this.animate, this.flip = false});
+  const _Waveform({
+    required this.animate,
+    this.flip = false,
+    this.barCount = 22,
+    this.amplitude = 0.85,
+    this.speed = 1400,
+  });
 
   final bool animate;
   final bool flip;
+  final int barCount;
+  final double amplitude;
+  final int speed;
 
   @override
   State<_Waveform> createState() => _WaveformState();
@@ -864,14 +988,14 @@ class _Waveform extends StatefulWidget {
 
 class _WaveformState extends State<_Waveform>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
+  late AnimationController _c;
 
   @override
   void initState() {
     super.initState();
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: Duration(milliseconds: widget.speed),
     );
     if (widget.animate) {
       _c.repeat();
@@ -883,7 +1007,14 @@ class _WaveformState extends State<_Waveform>
   @override
   void didUpdateWidget(_Waveform old) {
     super.didUpdateWidget(old);
-    if (widget.animate != old.animate) {
+    if (widget.speed != old.speed) {
+      _c.dispose();
+      _c = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: widget.speed),
+      );
+      if (widget.animate) _c.repeat();
+    } else if (widget.animate != old.animate) {
       if (widget.animate) {
         _c.repeat();
       } else {
@@ -905,43 +1036,50 @@ class _WaveformState extends State<_Waveform>
           painter: _WaveformPainter(
             progress: widget.animate ? _c.value : 0.42,
             flip: widget.flip,
+            barCount: widget.barCount,
+            amplitude: widget.amplitude,
           ),
         ),
       );
 }
 
 class _WaveformPainter extends CustomPainter {
-  const _WaveformPainter({required this.progress, required this.flip});
+  const _WaveformPainter({
+    required this.progress,
+    required this.flip,
+    this.barCount = 22,
+    this.amplitude = 0.85,
+  });
 
   final double progress;
   final bool flip;
+  final int barCount;
+  final double amplitude;
 
   @override
   void paint(Canvas canvas, Size size) {
     final cy = size.height / 2;
     final paint = Paint()..strokeCap = StrokeCap.round;
+    final count = barCount.clamp(4, 60);
 
-    // Mix of thin lines and small dots like the reference
-    for (var i = 0; i < 22; i++) {
-      final x = i * size.width / 21;
+    for (var i = 0; i < count; i++) {
+      final x = i * size.width / (count - 1).clamp(1, 999);
       final phase = progress * 2 * math.pi + i * 0.72;
-      final amp = math.sin(phase).abs() * 0.85 + 0.08;
+      final amp = math.sin(phase).abs() * amplitude + 0.08;
       final drawX = flip ? size.width - x : x;
       final color = Color.lerp(
         const Color(0xFF4066FF),
         const Color(0xFFD460FF),
-        i / 21,
+        i / (count - 1).clamp(1, 999),
       )!;
 
       if (i % 3 == 2) {
-        // Dots
         paint
           ..style = PaintingStyle.fill
           ..color = color.withValues(alpha: 0.65 + amp * 0.2)
           ..strokeWidth = 0;
         canvas.drawCircle(Offset(drawX, cy), 1.6 + amp * 1.2, paint);
       } else {
-        // Lines
         final h = size.height * amp * (i % 5 == 0 ? 0.78 : 0.40);
         paint
           ..style = PaintingStyle.stroke
@@ -958,7 +1096,8 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WaveformPainter old) =>
-      old.progress != progress || old.flip != flip;
+      old.progress != progress || old.flip != flip ||
+      old.barCount != barCount || old.amplitude != amplitude;
 }
 
 // ─────────────────────────── upload beam ─────────────────────────────────────
@@ -1312,7 +1451,7 @@ class _SinglePlectrumPainter extends CustomPainter {
     final wobble = 1.0 + math.sin(t * 2) * 0.02;
     final rw = r * 0.85 * wobble;
     final rh = r * 0.80 * wobble;
-    final rot = rotation + t * 0.08;
+    final rot = rotation + t * 1;
 
     final path = _buildPlectrumPath(
       center: center,
