@@ -172,7 +172,7 @@ commands = [
   {
     "group": "panel",
     "name": "panel",
-    "description": "Show panel details and content",
+    "description": "Show panel details and content (useful for note content search)",
     "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True]],
     "example": "yoloit panel \"My Board\" \"Run\"",
   },
@@ -563,7 +563,7 @@ commands = [
   {
     "group": "panel",
     "name": "panel:focus",
-    "description": "Focus a panel",
+    "description": "Focus a panel (for 'show/open note' flows after finding target panel)",
     "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True]],
     "example": "yoloit panel:focus \"My Board\" \"Run\"",
   },

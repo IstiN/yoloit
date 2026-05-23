@@ -349,6 +349,13 @@ void main() {
       'yoloit_note_create',
     );
     expect(
+      YoloitCliToolArgumentNormalizer.normalizeFunctionName(
+        functionName: 'yoloit_panel',
+        userMessage: 'Сделай фокус на заметку с mermaid диаграммой.',
+      ),
+      'yoloit_panel_focus',
+    );
+    expect(
       YoloitCliToolArgumentNormalizer.normalize(
         functionName: 'yoloit_panel_move',
         arguments: const <String, Object?>{},
@@ -381,10 +388,7 @@ void main() {
         userMessage: 'Увеличь ее размер.',
         runtimeContext: const ChatRuntimeContext(panelId: 'panel-chat'),
       ),
-      allOf(
-        containsPair('width', 500),
-        containsPair('height', 400),
-      ),
+      allOf(containsPair('width', 500), containsPair('height', 400)),
     );
     expect(
       YoloitCliToolArgumentNormalizer.normalize(
@@ -393,10 +397,7 @@ void main() {
         userMessage: 'Увеличь панель до 700x520.',
         runtimeContext: const ChatRuntimeContext(panelId: 'panel-chat'),
       ),
-      allOf(
-        containsPair('width', 700),
-        containsPair('height', 520),
-      ),
+      allOf(containsPair('width', 700), containsPair('height', 520)),
     );
     expect(
       YoloitCliToolArgumentNormalizer.normalize(

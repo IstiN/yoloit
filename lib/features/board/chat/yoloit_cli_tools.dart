@@ -344,6 +344,10 @@ class YoloitCliToolArgumentNormalizer {
     if (functionName == 'yoloit_board_focus' && text.contains('panel')) {
       return 'yoloit_panel_focus';
     }
+    if (functionName == 'yoloit_panel' &&
+        (text.contains('focus') || text.contains('фокус'))) {
+      return 'yoloit_panel_focus';
+    }
     if (functionName == 'yoloit_panel_focus' &&
         text.contains('show') &&
         text.contains('panel') &&
@@ -584,7 +588,8 @@ class YoloitCliToolArgumentNormalizer {
       final sizePair = _extractSizePair(userMessage);
       if (sizePair != null) {
         if (_isMissing(normalized['width'])) normalized['width'] = sizePair.$1;
-        if (_isMissing(normalized['height'])) normalized['height'] = sizePair.$2;
+        if (_isMissing(normalized['height']))
+          normalized['height'] = sizePair.$2;
       }
       if (_isMissing(normalized['width'])) {
         final value = _numberAfterLabel(
@@ -600,10 +605,13 @@ class YoloitCliToolArgumentNormalizer {
         );
         if (value != null) normalized['height'] = value;
       }
-      if ((_isMissing(normalized['width']) || _isMissing(normalized['height'])) &&
+      if ((_isMissing(normalized['width']) ||
+              _isMissing(normalized['height'])) &&
           _mentionsResizeIntent(userMessage)) {
-        normalized['width'] = _isMissing(normalized['width']) ? 500 : normalized['width'];
-        normalized['height'] = _isMissing(normalized['height']) ? 400 : normalized['height'];
+        normalized['width'] =
+            _isMissing(normalized['width']) ? 500 : normalized['width'];
+        normalized['height'] =
+            _isMissing(normalized['height']) ? 400 : normalized['height'];
       }
     }
     if (command == 'panel:create' && _isMissing(normalized['title'])) {
@@ -1488,7 +1496,8 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'panel',
     alias: 'pgt',
-    description: 'Show panel details and content',
+    description:
+        'Show panel details and content. Use this to inspect note markdown when searching by content.',
     group: 'panel',
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
@@ -1602,8 +1611,17 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'panel:focus',
     alias: 'pfc',
-    description: 'Focus a panel',
+    description:
+        'Focus a panel. For requests like "show/open/focus note", first find the note panel then call this.',
     group: 'panel',
+    humanVariants: const {
+      'ru': [
+        'сфокусируйся на панели {panel}',
+        'покажи заметку {panel}',
+        'открой заметку {panel}',
+      ],
+      'en': ['focus panel {panel}', 'show note {panel}', 'open note {panel}'],
+    },
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
   YoloitCliTool(

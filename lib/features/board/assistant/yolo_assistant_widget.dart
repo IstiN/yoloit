@@ -2679,6 +2679,12 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     final toolCommand = tool?.command ?? functionName;
     final mutableArgs = Map<String, Object?>.from(arguments);
 
+    await _retargetPanelLookupToRealNoteIfNeeded(
+      toolCommand,
+      mutableArgs,
+      runtimeContext,
+    );
+
     // Retarget note tools to last known note panel.
     _retargetNoteToolIfNeeded(toolCommand, mutableArgs);
 
@@ -2745,57 +2751,156 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
         arguments['panel'] = lastPanelId;
         return;
       }
-      final resolved = await _resolveLatestNotePanel(runtimeContext);
-      if (resolved != null && resolved.isNotEmpty) {
-        arguments['panel'] = resolved;
+      final resolved = await _resolveNoteTarget(runtimeContext);
+      if (resolved != null) {
+        arguments['panel'] = resolved.panelId;
+        arguments['board'] = resolved.boardId;
       }
     }
   }
 
-  Future<String?> _resolveLatestNotePanel(ChatRuntimeContext? runtimeContext) async {
-    final board =
-        '${runtimeContext?.boardId ?? runtimeContext?.boardName ?? ''}'.trim();
-    if (board.isEmpty) return null;
+  Future<void> _retargetPanelLookupToRealNoteIfNeeded(
+    String toolCommand,
+    Map<String, Object?> arguments,
+    ChatRuntimeContext? runtimeContext,
+  ) async {
+    final isPanelLookup =
+        toolCommand == 'panel' || toolCommand == 'panel:focus';
+    if (!isPanelLookup || !_looksLikeNoteLookupIntent(userMessage)) return;
+    final panel = '${arguments['panel'] ?? ''}'.trim();
+    if (panel.isNotEmpty &&
+        panel != assistantPanelId &&
+        panel != assistantPanelTitle) {
+      return;
+    }
+    final resolved = await _resolveNoteTarget(runtimeContext);
+    if (resolved == null) return;
+    arguments['board'] = resolved.boardId;
+    arguments['panel'] = resolved.panelId;
+  }
+
+  bool _looksLikeNoteLookupIntent(String msg) {
+    final text = msg.toLowerCase();
+    return text.contains('замет') ||
+        text.contains('note') ||
+        text.contains('mermaid') ||
+        text.contains('diagram') ||
+        text.contains('диаграм') ||
+        text.contains('покажи') ||
+        text.contains('show');
+  }
+
+  Future<({String boardId, String panelId})?> _resolveNoteTarget(
+    ChatRuntimeContext? runtimeContext,
+  ) async {
+    final tokens = _searchTokens(userMessage);
+    final hintedBoardId = '${runtimeContext?.boardId ?? ''}'.trim();
     try {
-      final raw = await delegate.invoke(
-        'yoloit_panels',
-        {'id_or_name': board},
+      final boardsRaw = await delegate.invoke(
+        'yoloit_boards',
+        const <String, Object?>{},
         runtimeContext: runtimeContext,
       );
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return null;
-      final list = decoded['panels'];
-      if (list is! List) return null;
-      final notes =
-          list
-              .whereType<Map>()
-              .map((e) => Map<String, Object?>.from(e.cast<String, Object?>()))
-              .where(
-                (panel) =>
-                    panel['type'] == 'board.note.markdown' &&
-                    panel['hidden'] != true &&
-                    '${panel['id'] ?? ''}'.trim().isNotEmpty,
-              )
-              .toList();
-      if (notes.isEmpty) return null;
-      notes.sort((a, b) {
-        final az = (a['zIndex'] as num?) ?? 0;
-        final bz = (b['zIndex'] as num?) ?? 0;
-        return bz.compareTo(az);
-      });
-      final diagramPreferred = notes.firstWhere(
-        (panel) {
+      final boardsDecoded = jsonDecode(boardsRaw);
+      if (boardsDecoded is! Map) return null;
+      final boards = boardsDecoded['boards'];
+      if (boards is! List) return null;
+
+      ({String boardId, String panelId, int score, num zIndex})? best;
+      for (final b in boards) {
+        if (b is! Map) continue;
+        final boardMap = Map<String, Object?>.from(b.cast<String, Object?>());
+        final boardId = '${boardMap['id'] ?? ''}'.trim();
+        if (boardId.isEmpty) continue;
+        final panelsRaw = await delegate.invoke('yoloit_panels', {
+          'id_or_name': boardId,
+        }, runtimeContext: runtimeContext);
+        final panelsDecoded = jsonDecode(panelsRaw);
+        if (panelsDecoded is! Map) continue;
+        final panels = panelsDecoded['panels'];
+        if (panels is! List) continue;
+        for (final p in panels) {
+          if (p is! Map) continue;
+          final panel = Map<String, Object?>.from(p.cast<String, Object?>());
+          if (panel['type'] != 'board.note.markdown' ||
+              panel['hidden'] == true) {
+            continue;
+          }
+          final panelId = '${panel['id'] ?? ''}'.trim();
+          if (panelId.isEmpty) continue;
           final title = '${panel['title'] ?? ''}'.toLowerCase();
-          return title.contains('mermaid') ||
-              title.contains('диаграм') ||
-              title.contains('diagram');
-        },
-        orElse: () => notes.first,
-      );
-      return '${diagramPreferred['id']}'.trim();
+          final zIndex = (panel['zIndex'] as num?) ?? 0;
+          var score = 0;
+          if (boardId == hintedBoardId) score += 2;
+          if (title.contains('mermaid') ||
+              title.contains('diagram') ||
+              title.contains('диаграм')) {
+            score += 3;
+          }
+          for (final token in tokens) {
+            if (token.length < 3) continue;
+            if (title.contains(token)) score += 2;
+          }
+
+          if (score < 4 && tokens.isNotEmpty) {
+            try {
+              final detailsRaw = await delegate.invoke('yoloit_panel', {
+                'board': boardId,
+                'panel': panelId,
+              }, runtimeContext: runtimeContext);
+              final details = jsonDecode(detailsRaw);
+              if (details is Map) {
+                final markdown =
+                    '${(details['state'] as Map?)?['markdown'] ?? (details['content'] as Map?)?['markdown'] ?? ''}'
+                        .toLowerCase();
+                for (final token in tokens) {
+                  if (token.length < 3) continue;
+                  if (markdown.contains(token)) score += 2;
+                }
+              }
+            } catch (_) {}
+          }
+
+          if (best == null ||
+              score > best.score ||
+              (score == best.score && zIndex > best.zIndex)) {
+            best = (
+              boardId: boardId,
+              panelId: panelId,
+              score: score,
+              zIndex: zIndex,
+            );
+          }
+        }
+      }
+      if (best == null) return null;
+      return (boardId: best.boardId, panelId: best.panelId);
     } catch (_) {
       return null;
     }
+  }
+
+  Set<String> _searchTokens(String text) {
+    final lower = text.toLowerCase();
+    final parts = lower.split(RegExp(r'[^a-zа-я0-9_]+'));
+    const skip = {
+      'сделай',
+      'покажи',
+      'найди',
+      'фокус',
+      'focus',
+      'show',
+      'note',
+      'заметку',
+      'заметка',
+      'на',
+      'борде',
+      'with',
+      'for',
+      'the',
+      'and',
+    };
+    return parts.where((p) => p.isNotEmpty && !skip.contains(p)).toSet();
   }
 
   bool _mentionsPreviousNote(String msg) {
