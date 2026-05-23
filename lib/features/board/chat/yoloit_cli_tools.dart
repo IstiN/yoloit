@@ -581,13 +581,29 @@ class YoloitCliToolArgumentNormalizer {
       }
     }
     if (command == 'panel:resize') {
+      final sizePair = _extractSizePair(userMessage);
+      if (sizePair != null) {
+        if (_isMissing(normalized['width'])) normalized['width'] = sizePair.$1;
+        if (_isMissing(normalized['height'])) normalized['height'] = sizePair.$2;
+      }
       if (_isMissing(normalized['width'])) {
-        final value = _numberAfterLabel(userMessage, RegExp(r'\bwidth\b'));
+        final value = _numberAfterLabel(
+          userMessage,
+          RegExp(r'\bwidth\b|ширин|широк', caseSensitive: false),
+        );
         if (value != null) normalized['width'] = value;
       }
       if (_isMissing(normalized['height'])) {
-        final value = _numberAfterLabel(userMessage, RegExp(r'\bheight\b'));
+        final value = _numberAfterLabel(
+          userMessage,
+          RegExp(r'\bheight\b|высот', caseSensitive: false),
+        );
         if (value != null) normalized['height'] = value;
+      }
+      if ((_isMissing(normalized['width']) || _isMissing(normalized['height'])) &&
+          _mentionsResizeIntent(userMessage)) {
+        normalized['width'] = _isMissing(normalized['width']) ? 500 : normalized['width'];
+        normalized['height'] = _isMissing(normalized['height']) ? 400 : normalized['height'];
       }
     }
     if (command == 'panel:create' && _isMissing(normalized['title'])) {
@@ -761,6 +777,24 @@ class YoloitCliToolArgumentNormalizer {
     if (match == null) return null;
     final value = match.group(0)!;
     return value.contains('.') ? double.parse(value) : int.parse(value);
+  }
+
+  static (num, num)? _extractSizePair(String source) {
+    final match = RegExp(r'(\d{2,4})\s*[xх×]\s*(\d{2,4})').firstMatch(source);
+    if (match == null) return null;
+    final width = int.tryParse(match.group(1) ?? '');
+    final height = int.tryParse(match.group(2) ?? '');
+    if (width == null || height == null) return null;
+    return (width, height);
+  }
+
+  static bool _mentionsResizeIntent(String userMessage) {
+    final text = userMessage.toLowerCase();
+    return text.contains('resize') ||
+        text.contains('bigger') ||
+        text.contains('larger') ||
+        text.contains('увелич') ||
+        text.contains('больше');
   }
 
   static String? _extractAfterPhrase(String userMessage, RegExp phrase) {

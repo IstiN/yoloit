@@ -493,9 +493,10 @@ class CloudLlmProvider extends ChatProvider {
               (delta?['tool_calls'] as List?) ??
               (message?['tool_calls'] as List?);
           if (tcList != null) {
-            for (final tc in tcList) {
+            for (var i = 0; i < tcList.length; i++) {
+              final tc = tcList[i];
               final tcMap = tc as Map<String, dynamic>;
-              final index = tcMap['index'] as int? ?? 0;
+              final index = tcMap['index'] as int? ?? i;
               final acc = toolCalls.firstWhere(
                 (a) => a.index == index,
                 orElse: () {
@@ -507,9 +508,14 @@ class CloudLlmProvider extends ChatProvider {
               if (tcMap['id'] != null) acc.id = tcMap['id'] as String;
               final fn = tcMap['function'] as Map<String, dynamic>?;
               if (fn != null) {
-                if (fn['name'] != null) acc.name += fn['name'] as String;
+                if (fn['name'] != null) {
+                  acc.name = _appendStreamFragment(acc.name, fn['name'] as String);
+                }
                 if (fn['arguments'] != null) {
-                  acc.arguments += fn['arguments'] as String;
+                  acc.arguments = _appendStreamFragment(
+                    acc.arguments,
+                    fn['arguments'] as String,
+                  );
                 }
               }
             }
@@ -529,10 +535,16 @@ class CloudLlmProvider extends ChatProvider {
             );
             acc.id = acc.id.isNotEmpty ? acc.id : 'legacy-function-call';
             if (legacyFunctionCall['name'] != null) {
-              acc.name += legacyFunctionCall['name'] as String;
+              acc.name = _appendStreamFragment(
+                acc.name,
+                legacyFunctionCall['name'] as String,
+              );
             }
             if (legacyFunctionCall['arguments'] != null) {
-              acc.arguments += legacyFunctionCall['arguments'] as String;
+              acc.arguments = _appendStreamFragment(
+                acc.arguments,
+                legacyFunctionCall['arguments'] as String,
+              );
             }
           }
         } catch (_) {}
@@ -575,6 +587,14 @@ class CloudLlmProvider extends ChatProvider {
       if (decoded is Map) return decoded['ok'] == true;
     } catch (_) {}
     return !result.contains('"ok":false');
+  }
+
+  String _appendStreamFragment(String current, String incoming) {
+    if (incoming.isEmpty) return current;
+    if (current.isEmpty) return incoming;
+    if (incoming.startsWith(current)) return incoming;
+    if (current.endsWith(incoming)) return current;
+    return '$current$incoming';
   }
 
   @override

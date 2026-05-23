@@ -376,6 +376,30 @@ void main() {
     );
     expect(
       YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_panel_resize',
+        arguments: const <String, Object?>{},
+        userMessage: 'Увеличь ее размер.',
+        runtimeContext: const ChatRuntimeContext(panelId: 'panel-chat'),
+      ),
+      allOf(
+        containsPair('width', 500),
+        containsPair('height', 400),
+      ),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_panel_resize',
+        arguments: const <String, Object?>{},
+        userMessage: 'Увеличь панель до 700x520.',
+        runtimeContext: const ChatRuntimeContext(panelId: 'panel-chat'),
+      ),
+      allOf(
+        containsPair('width', 700),
+        containsPair('height', 520),
+      ),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
         functionName: 'yoloit_panel_create',
         arguments: const <String, Object?>{},
         userMessage:
