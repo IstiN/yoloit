@@ -457,8 +457,7 @@ class ChatEvent extends Equatable {
           : (data['agentName'] as String?)?.trim();
 
   /// For subagent.started — the agent description.
-  String? get agentDescription =>
-      (data['agentDescription'] as String?)?.trim();
+  String? get agentDescription => (data['agentDescription'] as String?)?.trim();
 
   /// For result — output tokens.
   int? get outputTokens => (data['outputTokens'] as num?)?.toInt();
@@ -636,15 +635,20 @@ class ChatModelInfo {
 
   final String id;
   final String displayName;
+
   /// Optional relative cost hint. May be absent when loaded from remote catalog.
   final double? costMultiplier;
   final bool isDefault;
+
   /// Input cost in USD per 1M tokens (from models.dev).
   final double? inputCostPerMillion;
+
   /// Output cost in USD per 1M tokens (from models.dev).
   final double? outputCostPerMillion;
+
   /// Context window size in tokens.
   final int? contextWindow;
+
   /// Provider display group (e.g. "OpenCode", "Anthropic").
   final String? providerGroup;
 
@@ -655,15 +659,15 @@ class ChatModelInfo {
       costMultiplier == 0;
 
   factory ChatModelInfo.fromJson(Map<String, dynamic> j) => ChatModelInfo(
-        id: j['id'] as String,
-        displayName: j['displayName'] as String,
-        costMultiplier: (j['costMultiplier'] as num?)?.toDouble(),
-        isDefault: j['isDefault'] as bool? ?? false,
-        inputCostPerMillion: (j['inputCostPerMillion'] as num?)?.toDouble(),
-        outputCostPerMillion: (j['outputCostPerMillion'] as num?)?.toDouble(),
-        contextWindow: (j['contextWindow'] as num?)?.toInt(),
-        providerGroup: j['providerGroup'] as String?,
-      );
+    id: j['id'] as String,
+    displayName: j['displayName'] as String,
+    costMultiplier: (j['costMultiplier'] as num?)?.toDouble(),
+    isDefault: j['isDefault'] as bool? ?? false,
+    inputCostPerMillion: (j['inputCostPerMillion'] as num?)?.toDouble(),
+    outputCostPerMillion: (j['outputCostPerMillion'] as num?)?.toDouble(),
+    contextWindow: (j['contextWindow'] as num?)?.toInt(),
+    providerGroup: j['providerGroup'] as String?,
+  );
 
   Map<String, dynamic> toJson() {
     final m = <String, dynamic>{
@@ -672,8 +676,10 @@ class ChatModelInfo {
       'isDefault': isDefault,
     };
     if (costMultiplier != null) m['costMultiplier'] = costMultiplier;
-    if (inputCostPerMillion != null) m['inputCostPerMillion'] = inputCostPerMillion;
-    if (outputCostPerMillion != null) m['outputCostPerMillion'] = outputCostPerMillion;
+    if (inputCostPerMillion != null)
+      m['inputCostPerMillion'] = inputCostPerMillion;
+    if (outputCostPerMillion != null)
+      m['outputCostPerMillion'] = outputCostPerMillion;
     if (contextWindow != null) m['contextWindow'] = contextWindow;
     if (providerGroup != null) m['providerGroup'] = providerGroup;
     return m;
@@ -872,7 +878,6 @@ const List<ChatModelInfo> kLocalModels = [
   ),
 ];
 
-
 /// OpenCode models (providerID/modelID format, from `opencode models`).
 const List<ChatModelInfo> kOpencodeModels = [
   // ── OpenCode built-in free models ─────────────────────────────────────
@@ -966,78 +971,43 @@ const List<ChatModelInfo> kOpencodeModels = [
   ),
 
   // ── xAI Grok ─────────────────────────────────────────────────────────
-  ChatModelInfo(
-    id: 'xai/grok-4',
-    displayName: 'Grok 4',
-    costMultiplier: 2,
-  ),
+  ChatModelInfo(id: 'xai/grok-4', displayName: 'Grok 4', costMultiplier: 2),
   ChatModelInfo(
     id: 'xai/grok-code-fast-1',
     displayName: 'Grok Code Fast',
     costMultiplier: 0.5,
   ),
 
-  // ── OpenRouter free models ────────────────────────────────────────────
+  // ── OpenRouter models ─────────────────────────────────────────────────
   ChatModelInfo(
-    id: 'openrouter/deepseek/deepseek-chat-v3-0324:free',
-    displayName: 'OR DeepSeek V3 (Free)',
+    id: 'openrouter/google/gemma-4-31b-it',
+    displayName: 'OR Gemma 4 31B',
+    costMultiplier: 0.2,
+    isDefault: true,
+  ),
+  ChatModelInfo(
+    id: 'openrouter/nvidia/nemotron-nano-12b-v2-vl:free',
+    displayName: 'OR Nemotron Nano 12B VL (Free)',
     costMultiplier: 0,
   ),
   ChatModelInfo(
-    id: 'openrouter/deepseek/deepseek-r1:free',
-    displayName: 'OR DeepSeek R1 (Free)',
-    costMultiplier: 0,
+    id: 'openrouter/qwen/qwen3.5-flash-02-23',
+    displayName: 'OR Qwen 3.5 Flash',
+    costMultiplier: 0.1,
   ),
   ChatModelInfo(
-    id: 'openrouter/nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
-    displayName: 'OR Nemotron Ultra (Free)',
-    costMultiplier: 0,
+    id: 'openrouter/google/gemma-4-26b-a4b-it',
+    displayName: 'OR Gemma 4 26B A4B',
+    costMultiplier: 0.2,
   ),
   ChatModelInfo(
-    id: 'openrouter/meta-llama/llama-4-maverick:free',
-    displayName: 'OR Llama 4 Maverick (Free)',
-    costMultiplier: 0,
+    id: 'openrouter/mistralai/mistral-small-3.2-24b-instruct',
+    displayName: 'OR Mistral Small 3.2 24B',
+    costMultiplier: 0.2,
   ),
   ChatModelInfo(
-    id: 'openrouter/google/gemma-3-27b-it:free',
-    displayName: 'OR Gemma 3 27B (Free)',
-    costMultiplier: 0,
-  ),
-  ChatModelInfo(
-    id: 'openrouter/moonshotai/kimi-k2-instruct-0905:free',
-    displayName: 'OR Kimi K2 (Free)',
-    costMultiplier: 0,
-  ),
-
-  // ── OpenRouter paid models ────────────────────────────────────────────
-  ChatModelInfo(
-    id: 'openrouter/qwen/qwen-plus',
-    displayName: 'OR Qwen Plus',
-    costMultiplier: 0.5,
-  ),
-  ChatModelInfo(
-    id: 'openrouter/qwen/qwen-2.5-72b-instruct',
-    displayName: 'OR Qwen 2.5 72B',
-    costMultiplier: 0.3,
-  ),
-  ChatModelInfo(
-    id: 'openrouter/meta-llama/llama-3.3-70b-instruct',
-    displayName: 'OR Llama 3.3 70B',
-    costMultiplier: 0.3,
-  ),
-  ChatModelInfo(
-    id: 'openrouter/deepseek/deepseek-r1-distill-qwen-32b:free',
-    displayName: 'OR DeepSeek R1 Distill (Free)',
-    costMultiplier: 0,
-  ),
-  ChatModelInfo(
-    id: 'openrouter/mistralai/mistral-small-3.1-24b-instruct:free',
-    displayName: 'OR Mistral Small 3.1 (Free)',
-    costMultiplier: 0,
-  ),
-  ChatModelInfo(
-    id: 'openrouter/microsoft/phi-4-multimodal-instruct',
-    displayName: 'OR Phi-4 Multimodal',
+    id: 'openrouter/qwen/qwen3.6-35b-a3b',
+    displayName: 'OR Qwen 3.6 35B A3B',
     costMultiplier: 0.2,
   ),
 ];

@@ -108,6 +108,12 @@ class CloudLlmProvider extends ChatProvider {
         session,
         () => <Map<String, Object?>>[],
       );
+      final sanitizedSessionHistory = _sanitizeStoredHistory(sessionHistory);
+      if (!identical(sanitizedSessionHistory, sessionHistory)) {
+        sessionHistory
+          ..clear()
+          ..addAll(sanitizedSessionHistory);
+      }
 
       final messageId = 'assistant-${DateTime.now().millisecondsSinceEpoch}';
       controller.add(
@@ -191,16 +197,25 @@ class CloudLlmProvider extends ChatProvider {
         final toolCalls = response.toolCalls;
         if (toolCalls.isNotEmpty) {
           hadToolCalls = true;
+          final resolvedToolCalls =
+              toolCalls.map((tc) {
+                final id = tc.id ?? 'tc-${_toolCallSequence++}';
+                return _ParsedToolCall(
+                  id: id,
+                  functionName: tc.functionName,
+                  arguments: Map<String, Object?>.from(tc.arguments),
+                );
+              }).toList();
           // Add assistant message with tool calls.
           messages.add({
             'role': 'assistant',
             'content': response.content ?? '',
             '_tool_calls_json': jsonEncode(
-              toolCalls.map((tc) => tc.toJson()).toList(),
+              resolvedToolCalls.map((tc) => tc.toJson()).toList(),
             ),
           });
 
-          for (final tc in toolCalls) {
+          for (final tc in resolvedToolCalls) {
             if (_cancelRequested[session] == true) break;
 
             final resolvedName =
@@ -214,7 +229,7 @@ class CloudLlmProvider extends ChatProvider {
               userMessage: message,
               runtimeContext: runtimeContext,
             );
-            final toolCallId = tc.id ?? 'tc-${_toolCallSequence++}';
+            final toolCallId = tc.id!;
 
             controller.add(
               ChatEvent(
@@ -322,6 +337,12 @@ class CloudLlmProvider extends ChatProvider {
         }
         sessionHistory.add({'role': 'assistant', 'content': content});
       }
+      final sanitizedFinalHistory = _sanitizeStoredHistory(sessionHistory);
+      if (!identical(sanitizedFinalHistory, sessionHistory)) {
+        sessionHistory
+          ..clear()
+          ..addAll(sanitizedFinalHistory);
+      }
 
       controller.add(
         ChatEvent(
@@ -418,6 +439,83 @@ class CloudLlmProvider extends ChatProvider {
 
     messages.add({'role': 'user', 'content': userMessage});
     return messages;
+  }
+
+  List<Map<String, Object?>> _sanitizeStoredHistory(
+    List<Map<String, Object?>> history,
+  ) {
+    var changed = false;
+    var generatedIdSequence = 0;
+    final cleaned = <Map<String, Object?>>[];
+
+    for (var i = 0; i < history.length; i++) {
+      final current = Map<String, Object?>.from(history[i]);
+      final role = current['role'] as String? ?? '';
+      if (role == 'tool') {
+        changed = true;
+        continue;
+      }
+
+      if (role == 'assistant') {
+        final toolCallsJson = current['_tool_calls_json'];
+        if (toolCallsJson is String && toolCallsJson.isNotEmpty) {
+          try {
+            final decoded = jsonDecode(toolCallsJson) as List;
+            final lookaheadTools = <Map<String, Object?>>[];
+            var j = i + 1;
+            while (j < history.length) {
+              final next = history[j];
+              if ((next['role'] as String?) != 'tool') break;
+              lookaheadTools.add(Map<String, Object?>.from(next));
+              j++;
+            }
+
+            final normalizedToolCalls = <Map<String, Object?>>[];
+            final expectedIds = <String>{};
+            for (var idx = 0; idx < decoded.length; idx++) {
+              final toolCall = Map<String, Object?>.from(decoded[idx] as Map);
+              final currentId = (toolCall['id'] as String?)?.trim();
+              final lookaheadId =
+                  idx < lookaheadTools.length
+                      ? (lookaheadTools[idx]['tool_call_id'] as String?)?.trim()
+                      : null;
+              final resolvedId =
+                  (currentId != null && currentId.isNotEmpty)
+                      ? currentId
+                      : (lookaheadId != null && lookaheadId.isNotEmpty)
+                      ? lookaheadId
+                      : 'history-tc-${generatedIdSequence++}';
+              if (resolvedId != currentId) changed = true;
+              toolCall['id'] = resolvedId;
+              normalizedToolCalls.add(toolCall);
+              expectedIds.add(resolvedId);
+            }
+            current['_tool_calls_json'] = jsonEncode(normalizedToolCalls);
+            cleaned.add(current);
+            for (final tool in lookaheadTools) {
+              final toolId = (tool['tool_call_id'] as String?)?.trim();
+              if (toolId == null || !expectedIds.contains(toolId)) {
+                changed = true;
+                continue;
+              }
+              cleaned.add(tool);
+            }
+            if (lookaheadTools.isNotEmpty) {
+              i = j - 1;
+            }
+            continue;
+          } catch (_) {
+            changed = true;
+            current.remove('_tool_calls_json');
+          }
+        }
+      }
+
+      cleaned.add(current);
+    }
+
+    if (!changed && cleaned.length == history.length) return history;
+    return cleaned;
   }
 
   List<Map<String, Object?>> _buildToolDefinitions(

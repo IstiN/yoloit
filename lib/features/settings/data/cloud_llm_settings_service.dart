@@ -54,9 +54,10 @@ class CloudLlmConfig {
       baseUrl: json['baseUrl'] as String? ?? '',
       apiKey: json['apiKey'] as String? ?? '',
       model: json['model'] as String? ?? '',
-      extraHeaders: json['extraHeaders'] is Map
-          ? Map<String, String>.from(json['extraHeaders'] as Map)
-          : const {},
+      extraHeaders:
+          json['extraHeaders'] is Map
+              ? Map<String, String>.from(json['extraHeaders'] as Map)
+              : const {},
     );
   }
 
@@ -116,24 +117,37 @@ class CloudLlmPreset {
   );
 }
 
+const _openRouterRecommendedModelIds = <String>[
+  'google/gemma-4-31b-it',
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'qwen/qwen3.5-flash-02-23',
+  'google/gemma-4-26b-a4b-it',
+  'mistralai/mistral-small-3.2-24b-instruct',
+  'qwen/qwen3.6-35b-a3b',
+];
+
+const _openRouterDefaultModel = 'google/gemma-4-31b-it';
+
 const kCloudLlmPresets = <CloudLlmPreset>[
   CloudLlmPreset(
     id: 'openrouter',
     name: 'OpenRouter',
     baseUrl: 'https://openrouter.ai/api/v1',
-    defaultModel: 'google/gemini-2.0-flash-001',
-    extraHeaders: {
-      'HTTP-Referer': 'https://yoloit.app',
-      'X-Title': 'YoLoIT',
-    },
+    defaultModel: _openRouterDefaultModel,
+    extraHeaders: {'HTTP-Referer': 'https://yoloit.app', 'X-Title': 'YoLoIT'},
     models: [
-      (id: 'google/gemini-2.0-flash-001', name: 'Gemini 2.0 Flash'),
-      (id: 'google/gemini-2.5-flash-preview', name: 'Gemini 2.5 Flash Preview'),
-      (id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B'),
-      (id: 'mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral Small 3.1'),
-      (id: 'qwen/qwen-2.5-7b-instruct', name: 'Qwen 2.5 7B'),
-      (id: 'deepseek/deepseek-chat-v3-0324', name: 'DeepSeek V3'),
-      (id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4'),
+      (id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B'),
+      (
+        id: 'nvidia/nemotron-nano-12b-v2-vl:free',
+        name: 'Nemotron Nano 12B VL (Free)',
+      ),
+      (id: 'qwen/qwen3.5-flash-02-23', name: 'Qwen 3.5 Flash'),
+      (id: 'google/gemma-4-26b-a4b-it', name: 'Gemma 4 26B A4B'),
+      (
+        id: 'mistralai/mistral-small-3.2-24b-instruct',
+        name: 'Mistral Small 3.2 24B',
+      ),
+      (id: 'qwen/qwen3.6-35b-a3b', name: 'Qwen 3.6 35B A3B'),
     ],
   ),
   CloudLlmPreset(
@@ -219,7 +233,10 @@ class CloudLlmSettingsService {
     try {
       final decoded = jsonDecode(raw) as List;
       return decoded
-          .map((e) => CloudLlmConfig.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) => CloudLlmConfig.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .map(_normalizeConfig)
           .toList();
     } catch (_) {
       return [];
@@ -242,13 +259,21 @@ class CloudLlmSettingsService {
   /// Add or update a config (matched by id).
   Future<void> upsertConfig(CloudLlmConfig config) async {
     final configs = await loadConfigs();
-    final idx = configs.indexWhere((c) => c.id == config.id);
+    final normalized = _normalizeConfig(config);
+    final idx = configs.indexWhere((c) => c.id == normalized.id);
     if (idx >= 0) {
-      configs[idx] = config;
+      configs[idx] = normalized;
     } else {
-      configs.add(config);
+      configs.add(normalized);
     }
     await saveConfigs(configs);
+  }
+
+  CloudLlmConfig _normalizeConfig(CloudLlmConfig config) {
+    if (config.id != 'openrouter') return config;
+    final model = config.model.trim();
+    if (_openRouterRecommendedModelIds.contains(model)) return config;
+    return config.copyWith(model: _openRouterDefaultModel);
   }
 
   /// Remove a config by id.

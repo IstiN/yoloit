@@ -111,11 +111,7 @@ void main() {
         final json = {
           'type': 'text',
           'sessionID': 'sess_abc123',
-          'part': {
-            'id': 'prt_xyz',
-            'type': 'text',
-            'text': '',
-          },
+          'part': {'id': 'prt_xyz', 'type': 'text', 'text': ''},
         };
 
         final part = json['part'] as Map<String, dynamic>;
@@ -293,10 +289,7 @@ void main() {
       });
 
       test('captures sessionID from text event', () {
-        final json = {
-          'type': 'text',
-          'sessionID': 'ses_abc123',
-        };
+        final json = {'type': 'text', 'sessionID': 'ses_abc123'};
 
         expect(json['sessionID'], 'ses_abc123');
       });
@@ -309,8 +302,7 @@ void main() {
     });
 
     test('OpenCode built-in Qwen 3.6 Plus is default (free)', () {
-      final defaultModel =
-          kOpencodeModels.firstWhere((m) => m.isDefault);
+      final defaultModel = kOpencodeModels.firstWhere((m) => m.isDefault);
       expect(defaultModel.id, 'opencode/qwen3.6-plus-free');
       expect(defaultModel.costMultiplier, 0);
     });
@@ -324,11 +316,23 @@ void main() {
       }
     });
 
-    test('contains multiple free (cost=0) OpenRouter models', () {
-      final freeModels = kOpencodeModels.where(
-        (m) => m.id.startsWith('openrouter/') && m.costMultiplier == 0,
+    test('contains the curated OpenRouter chat models', () {
+      final openrouterIds =
+          kOpencodeModels
+              .where((m) => m.id.startsWith('openrouter/'))
+              .map((m) => m.id)
+              .toSet();
+      expect(
+        openrouterIds,
+        containsAll(<String>{
+          'openrouter/google/gemma-4-31b-it',
+          'openrouter/nvidia/nemotron-nano-12b-v2-vl:free',
+          'openrouter/qwen/qwen3.5-flash-02-23',
+          'openrouter/google/gemma-4-26b-a4b-it',
+          'openrouter/mistralai/mistral-small-3.2-24b-instruct',
+          'openrouter/qwen/qwen3.6-35b-a3b',
+        }),
       );
-      expect(freeModels.length, greaterThanOrEqualTo(5));
     });
   });
 
