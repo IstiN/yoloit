@@ -1802,6 +1802,13 @@ print(d['response'])
           ;;
       esac
     done
+    if [[ -n "$provider" ]]; then
+      case "$provider" in
+        cloud:*) ;;
+        copilot|cursor|local|opencode) ;;
+        *) provider="cloud:${provider}" ;;
+      esac
+    fi
     payload=$(python3 - "$text" "$board" "$panel" "$provider" <<'PY'
 import json, sys
 text, board, panel, provider = sys.argv[1:5]

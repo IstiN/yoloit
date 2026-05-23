@@ -8,14 +8,13 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 BoardPanelInstance _panel({
   String id = 'p1',
   Map<String, dynamic> state = const {},
-}) =>
-    BoardPanelInstance(
-      id: id,
-      type: 'board.chat',
-      title: 'Chat',
-      bounds: const BoardPanelBounds(x: 0, y: 0, width: 300, height: 200),
-      state: state,
-    );
+}) => BoardPanelInstance(
+  id: id,
+  type: 'board.chat',
+  title: 'Chat',
+  bounds: const BoardPanelBounds(x: 0, y: 0, width: 300, height: 200),
+  state: state,
+);
 
 void main() {
   final handler = const ChatCliHandler();
@@ -49,27 +48,31 @@ void main() {
   });
 
   test('messages action returns messages from panel state', () async {
-    final panel = _panel(state: {
-      'messages': [
-        {'role': 'user', 'content': 'hi'}
-      ]
-    });
+    final panel = _panel(
+      state: {
+        'messages': [
+          {'role': 'user', 'content': 'hi'},
+        ],
+      },
+    );
     final r = await handler.handleAction('messages', {}, panel);
     expect(r.ok, isTrue);
     expect((r.data!['messages'] as List).length, 1);
   });
 
   test('messages action prefers live session data', () async {
-    final panel = _panel(state: {
-      'config': {
-        'sessionName': 'test',
-        'workingDir': '/tmp',
-        'provider': 'copilot',
+    final panel = _panel(
+      state: {
+        'config': {
+          'sessionName': 'test',
+          'workingDir': '/tmp',
+          'provider': 'copilot',
+        },
+        'messages': [
+          {'role': 'user', 'content': 'old'},
+        ],
       },
-      'messages': [
-        {'role': 'user', 'content': 'old'}
-      ],
-    });
+    );
     // Create a session with more messages
     final session = ChatSessionManager.instance.getOrCreate(
       'p1',
@@ -91,7 +94,9 @@ void main() {
 
   test('config returns provider info from panel state', () async {
     final panel = _panel(
-      state: {'config': {'provider': 'openai', 'model': 'gpt-4'}},
+      state: {
+        'config': {'provider': 'openai', 'model': 'gpt-4'},
+      },
     );
     final r = await handler.handleAction('config', {}, panel);
     expect(r.ok, isTrue);
@@ -99,36 +104,55 @@ void main() {
   });
 
   test('config update propagates to live session', () async {
-    final panel = _panel(state: {
-      'config': {
-        'sessionName': 'test',
-        'workingDir': '/tmp',
-        'provider': 'copilot',
-        'model': 'gpt-5-mini',
+    final panel = _panel(
+      state: {
+        'config': {
+          'sessionName': 'test',
+          'workingDir': '/tmp',
+          'provider': 'copilot',
+          'model': 'gpt-5-mini',
+        },
       },
-    });
+    );
     // Create a session first
     ChatSessionManager.instance.getOrCreate(
       'p1',
       ChatSessionConfig(sessionName: 'test', workingDir: '/tmp'),
     );
-    final r = await handler.handleAction(
-      'config',
-      {'model': 'claude-opus'},
-      panel,
-    );
+    final r = await handler.handleAction('config', {
+      'model': 'claude-opus',
+    }, panel);
     expect(r.ok, isTrue);
     expect(r.data!['config']['model'], 'claude-opus');
     final session = ChatSessionManager.instance.get('p1');
     expect(session?.config.model, 'claude-opus');
   });
 
+  test('config update normalizes cloud provider id format', () async {
+    final panel = _panel(
+      state: {
+        'config': {
+          'sessionName': 'test',
+          'workingDir': '/tmp',
+          'provider': 'copilot',
+        },
+      },
+    );
+    final r = await handler.handleAction('config', {
+      'provider': 'cloud-123',
+    }, panel);
+    expect(r.ok, isTrue);
+    expect(r.data!['config']['provider'], 'cloud:cloud-123');
+  });
+
   test('clear resets messages on live session', () async {
-    final panel = _panel(state: {
-      'messages': [
-        {'role': 'user', 'content': 'hi'}
-      ],
-    });
+    final panel = _panel(
+      state: {
+        'messages': [
+          {'role': 'user', 'content': 'hi'},
+        ],
+      },
+    );
     // Create a session and add messages
     final session = ChatSessionManager.instance.getOrCreate(
       'p1',
@@ -144,7 +168,11 @@ void main() {
   });
 
   test('status returns hasSession false when no session', () async {
-    final r = await handler.handleAction('status', {}, _panel(id: 'no-session'));
+    final r = await handler.handleAction(
+      'status',
+      {},
+      _panel(id: 'no-session'),
+    );
     expect(r.ok, isTrue);
     expect(r.data!['hasSession'], false);
   });

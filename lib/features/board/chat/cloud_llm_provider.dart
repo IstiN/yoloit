@@ -89,8 +89,9 @@ class CloudLlmProvider extends ChatProvider {
     try {
       // Resolve deferred config if needed.
       if (_config == null && _deferredConfigId != null) {
-        _config =
-            await CloudLlmSettingsService.instance.loadConfigById(_deferredConfigId!);
+        _config = await CloudLlmSettingsService.instance.loadConfigById(
+          _deferredConfigId!,
+        );
       }
       final cfg = _config;
       if (cfg == null || !cfg.isValid) {
@@ -122,13 +123,11 @@ class CloudLlmProvider extends ChatProvider {
       var emitted = '';
       var streamedChunks = 0;
       var firstTokenMs = -1;
+      var hadToolCalls = false;
+      var retriedAfterEmptyResponse = false;
 
       final tools = _buildToolDefinitions(config.disabledLocalToolNames);
-      final messages = _buildMessages(
-        sessionHistory,
-        message,
-        runtimeContext,
-      );
+      final messages = _buildMessages(sessionHistory, message, runtimeContext);
 
       // Agentic loop — keep calling if the model requests tool calls.
       for (var iteration = 0; iteration < _maxIterations; iteration++) {
@@ -167,6 +166,7 @@ class CloudLlmProvider extends ChatProvider {
 
         final toolCalls = response.toolCalls;
         if (toolCalls.isNotEmpty) {
+          hadToolCalls = true;
           // Add assistant message with tool calls.
           messages.add({
             'role': 'assistant',
@@ -246,6 +246,11 @@ class CloudLlmProvider extends ChatProvider {
         // No tool calls — done.
         if (response.content != null && response.content!.isNotEmpty) {
           emitted = response.content!;
+          break;
+        }
+        if (!retriedAfterEmptyResponse) {
+          retriedAfterEmptyResponse = true;
+          continue;
         }
         break;
       }
@@ -253,7 +258,17 @@ class CloudLlmProvider extends ChatProvider {
       stopwatch.stop();
       if (_cancelRequested[session] == true) return;
 
-      final content = _stripThinkTags(emitted.trim());
+      var content = _stripThinkTags(emitted.trim());
+      if (content.isEmpty) {
+        if (hadToolCalls) {
+          content = _looksCyrillic(message) ? 'Готово.' : 'Done.';
+        } else {
+          content =
+              _looksCyrillic(message)
+                  ? 'Не удалось сформировать ответ. Попробуйте уточнить запрос.'
+                  : 'I could not generate a response. Please rephrase your request.';
+        }
+      }
 
       // Save full interaction to session history (including tool calls).
       // messages[0] is system, messages[1..N-1] are prior history,
@@ -273,7 +288,7 @@ class CloudLlmProvider extends ChatProvider {
         if (sessionHistory.isNotEmpty &&
             sessionHistory.last['role'] == 'assistant' &&
             (sessionHistory.last['content'] == null ||
-             (sessionHistory.last['content'] as String?)?.isEmpty == true)) {
+                (sessionHistory.last['content'] as String?)?.isEmpty == true)) {
           sessionHistory.removeLast();
         }
         sessionHistory.add({'role': 'assistant', 'content': content});
@@ -399,20 +414,22 @@ class CloudLlmProvider extends ChatProvider {
     required List<Map<String, Object?>> tools,
     required void Function(String delta) onDelta,
   }) async {
-    final url = '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+    final url =
+        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
 
     // Convert internal message format to OpenAI API format.
-    final apiMessages = messages.map((m) {
-      final msg = Map<String, Object?>.from(m);
-      // Restore tool_calls from internal storage format.
-      final tcJson = msg.remove('_tool_calls_json');
-      if (tcJson is String) {
-        try {
-          msg['tool_calls'] = jsonDecode(tcJson);
-        } catch (_) {}
-      }
-      return msg;
-    }).toList();
+    final apiMessages =
+        messages.map((m) {
+          final msg = Map<String, Object?>.from(m);
+          // Restore tool_calls from internal storage format.
+          final tcJson = msg.remove('_tool_calls_json');
+          if (tcJson is String) {
+            try {
+              msg['tool_calls'] = jsonDecode(tcJson);
+            } catch (_) {}
+          }
+          return msg;
+        }).toList();
 
     final body = jsonEncode({
       'model': config.model,
@@ -457,15 +474,20 @@ class CloudLlmProvider extends ChatProvider {
 
           final choice = choices[0] as Map<String, dynamic>;
           final delta = choice['delta'] as Map<String, dynamic>?;
-          if (delta == null) continue;
+          final message = choice['message'] as Map<String, dynamic>?;
+          if (delta == null && message == null) continue;
 
-          final textDelta = delta['content'] as String?;
+          final textDelta =
+              (delta?['content'] as String?) ??
+              (message?['content'] as String?);
           if (textDelta != null && textDelta.isNotEmpty) {
             content += textDelta;
             onDelta(textDelta);
           }
 
-          final tcList = delta['tool_calls'] as List?;
+          final tcList =
+              (delta?['tool_calls'] as List?) ??
+              (message?['tool_calls'] as List?);
           if (tcList != null) {
             for (final tc in tcList) {
               final tcMap = tc as Map<String, dynamic>;
@@ -496,9 +518,7 @@ class CloudLlmProvider extends ChatProvider {
         toolCalls.map((acc) {
           Map<String, Object?> args = {};
           try {
-            args = Map<String, Object?>.from(
-              jsonDecode(acc.arguments) as Map,
-            );
+            args = Map<String, Object?>.from(jsonDecode(acc.arguments) as Map);
           } catch (_) {}
           return _ParsedToolCall(
             id: acc.id.isNotEmpty ? acc.id : null,
@@ -519,7 +539,10 @@ class CloudLlmProvider extends ChatProvider {
   );
 
   /// Strip `<think>...</think>` blocks some models emit (Qwen3, Mistral, etc.)
-  String _stripThinkTags(String text) => text.replaceAll(_thinkTagRe, '').trim();
+  String _stripThinkTags(String text) =>
+      text.replaceAll(_thinkTagRe, '').trim();
+
+  bool _looksCyrillic(String text) => RegExp(r'[\u0400-\u04FF]').hasMatch(text);
 
   bool _toolResultSucceeded(String result) {
     try {
@@ -560,10 +583,7 @@ class _ParsedToolCall {
   Map<String, Object?> toJson() => {
     'id': id,
     'type': 'function',
-    'function': {
-      'name': functionName,
-      'arguments': jsonEncode(arguments),
-    },
+    'function': {'name': functionName, 'arguments': jsonEncode(arguments)},
   };
 }
 

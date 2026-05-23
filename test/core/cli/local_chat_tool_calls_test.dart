@@ -102,6 +102,14 @@ void main() {
       YoloitCliToolCatalog.byFunctionName('board:create')?.command,
       'board:create',
     );
+    expect(
+      YoloitCliToolCatalog.byFunctionName('note_create')?.command,
+      'note:create',
+    );
+    expect(
+      YoloitCliToolCatalog.byFunctionName('note_append')?.command,
+      'note:append',
+    );
   });
 
   test('catalog can expose a filtered local-model tool set', () {
@@ -165,6 +173,22 @@ void main() {
       expect(result['command'], 'yoloit note:append board-1 panel-1 hello');
     },
   );
+
+  test('executor keeps note:create board/title argument order', () async {
+    final executor = YoloitCliToolExecutor(execute: false);
+    final result =
+        jsonDecode(
+              await executor.invoke(
+                'ncrt',
+                <String, Object?>{'title': 'milk'},
+                runtimeContext: const ChatRuntimeContext(boardId: 'board-1'),
+              ),
+            )
+            as Map<String, Object?>;
+    expect(result['ok'], isTrue);
+    expect(result['executed'], isFalse);
+    expect(result['command'], 'yoloit note:create board-1 milk');
+  });
 
   test(
     'executor resolves tools/yoloit when launched from nested app cwd',
@@ -316,6 +340,13 @@ void main() {
             'On the current board, create a markdown note panel titled Architecture Notes.',
       ),
       'yoloit_panel_create',
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalizeFunctionName(
+        functionName: 'yoloit_note_create',
+        userMessage: 'Сделай заметку купить молоко.',
+      ),
+      'yoloit_note_create',
     );
     expect(
       YoloitCliToolArgumentNormalizer.normalize(

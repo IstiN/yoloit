@@ -112,7 +112,9 @@ class ChatCliHandler extends PanelCliHandler {
             ? Map<String, dynamic>.from(panel.state['lastUsage'] as Map)
             : null,
       );
-      session.restoreOpencodeSessionId(panel.state['opencodeSessionId'] as String?);
+      session.restoreOpencodeSessionId(
+        panel.state['opencodeSessionId'] as String?,
+      );
     }
 
     final attachments =
@@ -319,7 +321,12 @@ class ChatCliHandler extends PanelCliHandler {
               panel.state['config'] as Map? ?? const {},
             );
     final patch = _extractConfigPatch(args);
-    return {...current, ...patch};
+    final merged = <String, dynamic>{...current, ...patch};
+    final provider = merged['provider'];
+    if (provider is String) {
+      merged['provider'] = _normalizeProviderValue(provider);
+    }
+    return merged;
   }
 
   Map<String, dynamic> _extractConfigPatch(Map<String, dynamic> args) {
@@ -342,7 +349,25 @@ class ChatCliHandler extends PanelCliHandler {
     for (final key in knownKeys) {
       if (args.containsKey(key)) patch[key] = args[key];
     }
+    final provider = patch['provider'];
+    if (provider is String) {
+      patch['provider'] = _normalizeProviderValue(provider);
+    }
     return patch;
+  }
+
+  String _normalizeProviderValue(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return value;
+    if (value.startsWith('cloud:')) return value;
+    if (value.startsWith('cloud-')) return 'cloud:$value';
+    if (value == 'copilot' ||
+        value == 'cursor' ||
+        value == 'local' ||
+        value == 'opencode') {
+      return value;
+    }
+    return value;
   }
 
   bool _isUiMounted(BoardPanelInstance panel) {

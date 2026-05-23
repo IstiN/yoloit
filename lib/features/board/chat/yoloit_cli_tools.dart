@@ -205,17 +205,21 @@ class YoloitCliToolCatalog {
     }
     final rawCommand =
         name.startsWith('yoloit ') ? name.substring('yoloit '.length) : name;
+    final rawCommandWithColons = rawCommand.replaceAll('_', ':');
     final resolvedCommand =
         resolvedName.startsWith('yoloit ')
             ? resolvedName.substring('yoloit '.length)
             : resolvedName;
+    final resolvedCommandWithColons = resolvedCommand.replaceAll('_', ':');
     for (final tool in _tools) {
       if (tool.functionName == resolvedName ||
           tool.functionName == name ||
           tool.fullFunctionName == resolvedName ||
           tool.alias == name ||
           tool.command == rawCommand ||
-          tool.command == resolvedCommand) {
+          tool.command == rawCommandWithColons ||
+          tool.command == resolvedCommand ||
+          tool.command == resolvedCommandWithColons) {
         return tool;
       }
     }
@@ -333,7 +337,8 @@ class YoloitCliToolArgumentNormalizer {
     }
     if (functionName == 'yoloit_note_create' &&
         ((text.contains('create') && text.contains('panel')) ||
-            text.contains('замет'))) {
+            (text.contains('создай') && text.contains('панел')) ||
+            (text.contains('сделай') && text.contains('панел')))) {
       return 'yoloit_panel_create';
     }
     if (functionName == 'yoloit_board_focus' && text.contains('panel')) {
@@ -2166,9 +2171,9 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       'en': ['append {text} to note', 'add {text} to the note'],
     },
     params: <YoloitCliToolParam>[
-      _p('text', 'Text to append', required: true, shortKey: 'tx'),
-      _panelParam(),
       _boardParam(),
+      _panelParam(),
+      _p('text', 'Text to append', required: true, shortKey: 'tx'),
     ],
   ),
   YoloitCliTool(
@@ -2191,9 +2196,9 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       ],
     },
     params: <YoloitCliToolParam>[
+      _boardParam(),
       _p('title', 'Note title', required: true, shortKey: 'ti'),
       _p('content', 'Markdown content', shortKey: 'c'),
-      _boardParam(),
     ],
   ),
   YoloitCliTool(

@@ -335,14 +335,17 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       dbg['completedAt'] ??= DateTime.now().toIso8601String();
 
       // Final cleanup of the displayed content.
-      if (emitted.isNotEmpty && mounted) {
-        final cleaned = _cleanAssistantToolEchoes(emitted.trim(), calledTools);
+      final cleanedFinal = _cleanAssistantToolEchoes(
+        emitted.trim(),
+        calledTools,
+      );
+      if (mounted && cleanedFinal.isNotEmpty) {
         _replaceAssistantMessageContent(
           assistantMessageId: assistantMessageId,
-          content: cleaned,
+          content: cleanedFinal,
         );
       }
-      dbg['cleanedResponse'] = emitted.trim();
+      dbg['cleanedResponse'] = cleanedFinal;
     } catch (e) {
       dbg['error'] = '$e';
       dbg['completedAt'] = DateTime.now().toIso8601String();
@@ -355,7 +358,6 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       if (_debugSessions.length > 20) _debugSessions.removeAt(0);
       _activeDebugSession = null;
       _messageDraft = null;
-      _chatProvider = null;
       if (mounted) {
         setState(() {
           _isGeneratingReply = false;
@@ -2713,6 +2715,7 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     Map<String, Object?> arguments,
   ) {
     if (toolCommand != 'note' && !toolCommand.startsWith('note:')) return;
+    if (toolCommand == 'note:create') return;
     final lastPanelId = lastTargetNotePanelId?.trim();
     if (lastPanelId == null || lastPanelId.isEmpty) return;
     final panel = '${arguments['panel'] ?? ''}'.trim();
@@ -2731,6 +2734,7 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     Map<String, Object?> arguments,
   ) {
     if (toolCommand != 'note' && !toolCommand.startsWith('note:')) return;
+    if (toolCommand == 'note:create') return;
     final panel = '${arguments['panel'] ?? ''}'.trim();
     if (panel.isEmpty ||
         panel == assistantPanelId ||
