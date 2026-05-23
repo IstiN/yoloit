@@ -576,6 +576,105 @@ class _ResponseCard extends StatelessWidget {
 
 enum _OrbMode { ready, recording, sending, thinking, response }
 
+/// Shared plectrum shape + painting used by both _BlobOrbPainter and
+/// SinglePlectrumPreview. Single source of truth for the shape.
+Path _buildPlectrumPath({
+  required Offset center,
+  required double rw,
+  required double rh,
+  required double rotation,
+}) {
+  final cosR = math.cos(rotation);
+  final sinR = math.sin(rotation);
+
+  // 10-point organic plectrum shape
+  final pts = <Offset>[
+    Offset(0, -rh * 0.90),
+    Offset(rw * 0.65, -rh * 0.65),
+    Offset(rw * 0.95, -rh * 0.05),
+    Offset(rw * 0.72, rh * 0.48),
+    Offset(rw * 0.28, rh * 0.78),
+    Offset(0, rh * 0.88),
+    Offset(-rw * 0.30, rh * 0.76),
+    Offset(-rw * 0.74, rh * 0.44),
+    Offset(-rw * 0.92, -rh * 0.10),
+    Offset(-rw * 0.60, -rh * 0.68),
+  ];
+
+  Offset rotate(Offset p) => Offset(
+        center.dx + p.dx * cosR - p.dy * sinR,
+        center.dy + p.dx * sinR + p.dy * cosR,
+      );
+  final rPts = pts.map(rotate).toList();
+
+  // Smooth Catmull-Rom cubic spline (divisor 5)
+  final path = Path();
+  path.moveTo(rPts[0].dx, rPts[0].dy);
+  for (var i = 0; i < rPts.length; i++) {
+    final p0 = rPts[i];
+    final p1 = rPts[(i + 1) % rPts.length];
+    final prev = rPts[(i - 1 + rPts.length) % rPts.length];
+    final next2 = rPts[(i + 2) % rPts.length];
+    final cp1 = Offset(
+      p0.dx + (p1.dx - prev.dx) / 5,
+      p0.dy + (p1.dy - prev.dy) / 5,
+    );
+    final cp2 = Offset(
+      p1.dx - (next2.dx - p0.dx) / 5,
+      p1.dy - (next2.dy - p0.dy) / 5,
+    );
+    path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
+  }
+  path.close();
+  return path;
+}
+
+/// Paint a single plectrum shape with shadow + rotation-aware gradient.
+/// Wide end = transparent, narrow tip = opaque.
+void _paintPlectrum(
+  Canvas canvas,
+  Path path,
+  double rotation,
+  Color color, {
+  double intensity = 1.0,
+}) {
+  final bounds = path.getBounds();
+
+  // Shadow
+  final shadowPaint = Paint()
+    ..color = color.withValues(alpha: 0.12 * intensity)
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+  canvas.drawPath(path, shadowPaint);
+
+  // Gradient direction follows shape rotation
+  final gradLen = bounds.longestSide * 0.55;
+  // Wide end = "top" of unrotated shape (y = -1) → transparent
+  final gradStart = Offset(
+    bounds.center.dx - math.sin(rotation) * gradLen,
+    bounds.center.dy - math.cos(rotation) * gradLen,
+  );
+  // Narrow tip = "bottom" of unrotated shape (y = +1) → opaque
+  final gradEnd = Offset(
+    bounds.center.dx + math.sin(rotation) * gradLen,
+    bounds.center.dy + math.cos(rotation) * gradLen,
+  );
+
+  final fillPaint = Paint()
+    ..shader = ui.Gradient.linear(
+      gradStart,
+      gradEnd,
+      [
+        color.withValues(alpha: 0.0),
+        color.withValues(alpha: 0.0),
+        color.withValues(alpha: 0.08 * intensity),
+        color.withValues(alpha: 0.22 * intensity),
+        color.withValues(alpha: 0.40 * intensity),
+      ],
+      [0.0, 0.4, 0.6, 0.8, 1.0],
+    );
+  canvas.drawPath(path, fillPaint);
+}
+
 class _BlobOrbPainter extends CustomPainter {
   const _BlobOrbPainter({required this.progress, required this.mode});
 
@@ -629,73 +728,6 @@ class _BlobOrbPainter extends CustomPainter {
     (angle: 5.10, scale: 1.00, aspect: 0.86, phase: 1.8),
   ];
 
-  /// Create a plectrum (guitar pick) shaped path.
-  /// 10-point organic shape matching SinglePlectrumPreview.
-  /// Returns (path, rotation) so gradient can follow shape orientation.
-  (Path, double) _blobPath(
-    Offset center,
-    double w,
-    double h,
-    double wobbleT,
-    int seed,
-  ) {
-    final rng = math.Random(seed);
-
-    // Slight wobble on proportions for organic feel
-    final wobble = 1.0 +
-        math.sin(wobbleT * 2 + rng.nextDouble() * 0.3) * 0.03 +
-        math.cos(wobbleT * 1 + rng.nextDouble() * 0.2) * 0.02;
-    final rw = w / 2 * wobble;
-    final rh = h / 2 * wobble;
-
-    // Rotation per blob
-    final rot = rng.nextDouble() * math.pi * 2 + wobbleT * 0.15;
-    final cosR = math.cos(rot);
-    final sinR = math.sin(rot);
-
-    // Same 10-point plectrum shape as SinglePlectrumPainter
-    final pts = <Offset>[
-      Offset(0, -rh * 0.90),                  // top center
-      Offset(rw * 0.65, -rh * 0.65),          // top-right
-      Offset(rw * 0.95, -rh * 0.05),          // right bulge
-      Offset(rw * 0.72, rh * 0.48),           // right-lower
-      Offset(rw * 0.28, rh * 0.78),           // bottom-right approach
-      Offset(0, rh * 0.88),                   // bottom tip (rounder)
-      Offset(-rw * 0.30, rh * 0.76),          // bottom-left approach
-      Offset(-rw * 0.74, rh * 0.44),          // left-lower
-      Offset(-rw * 0.92, -rh * 0.10),         // left bulge
-      Offset(-rw * 0.60, -rh * 0.68),         // top-left
-    ];
-
-    // Rotate all points
-    Offset rotate(Offset p) => Offset(
-          center.dx + p.dx * cosR - p.dy * sinR,
-          center.dy + p.dx * sinR + p.dy * cosR,
-        );
-    final rPts = pts.map(rotate).toList();
-
-    // Smooth Catmull-Rom cubic spline (divisor 5 for smoother curves)
-    final path = Path();
-    path.moveTo(rPts[0].dx, rPts[0].dy);
-    for (var i = 0; i < rPts.length; i++) {
-      final p0 = rPts[i];
-      final p1 = rPts[(i + 1) % rPts.length];
-      final prev = rPts[(i - 1 + rPts.length) % rPts.length];
-      final next2 = rPts[(i + 2) % rPts.length];
-      final cp1 = Offset(
-        p0.dx + (p1.dx - prev.dx) / 5,
-        p0.dy + (p1.dy - prev.dy) / 5,
-      );
-      final cp2 = Offset(
-        p1.dx - (next2.dx - p0.dx) / 5,
-        p1.dy - (next2.dy - p0.dy) / 5,
-      );
-      path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
-    }
-    path.close();
-    return (path, rot);
-  }
-
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -721,14 +753,12 @@ class _BlobOrbPainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
     canvas.drawCircle(center, r * 1.2, glowPaint);
 
-    // Draw 5 distinct translucent blobs with visible edges
+    // Draw 5 plectrum blobs using shared painter
     for (var i = 0; i < 5; i++) {
       final cfg = _blobConfigs[i];
       final t = progress * 2 * math.pi + cfg.phase;
-      // Slow orbital movement — integer multiplier for seamless loop
       final blobAngle = cfg.angle + t;
 
-      // Larger offset so individual shapes are clearly visible
       final dx = math.cos(blobAngle) * r * 0.32;
       final dy = math.sin(blobAngle) * r * 0.26;
       final blobCenter = Offset(center.dx + dx, center.dy + dy);
@@ -736,49 +766,22 @@ class _BlobOrbPainter extends CustomPainter {
       final blobW = r * 2 * cfg.scale * (0.72 + math.sin(t) * 0.04);
       final blobH = blobW * cfg.aspect;
 
-      final (path, rot) = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
-      final bounds = path.getBounds();
+      final rng = math.Random(i * 42 + 7);
+      final wobble = 1.0 +
+          math.sin(t * 2 + rng.nextDouble() * 0.3) * 0.03 +
+          math.cos(t * 1 + rng.nextDouble() * 0.2) * 0.02;
+      final rw = blobW / 2 * wobble;
+      final rh = blobH / 2 * wobble;
+      final rot = rng.nextDouble() * math.pi * 2 + t * 0.15;
 
-      // Shadow behind each blob
-      final shadowPaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.12 * intensity)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-      canvas.drawPath(path, shadowPaint);
-
-      // Gradient follows shape rotation:
-      // Wide end (top) = fully transparent
-      // Narrow tip (bottom) = opaque, smoothly fading from ~50%
-      final gradLen = bounds.height * 0.5;
-      // gradStart = wide end (top of shape before rotation)
-      final gradStart = Offset(
-        bounds.center.dx - math.sin(rot) * gradLen,
-        bounds.center.dy - math.cos(rot) * gradLen,
+      final path = _buildPlectrumPath(
+        center: blobCenter,
+        rw: rw,
+        rh: rh,
+        rotation: rot,
       );
-      // gradEnd = narrow tip (bottom of shape before rotation)
-      final gradEnd = Offset(
-        bounds.center.dx + math.sin(rot) * gradLen,
-        bounds.center.dy + math.cos(rot) * gradLen,
-      );
-
-      final fillPaint = Paint()
-        ..shader = ui.Gradient.linear(
-          gradStart,
-          gradEnd,
-          [
-            colors[i].withValues(alpha: 0.0),                    // wide end: transparent
-            colors[i].withValues(alpha: 0.0),                    // still transparent
-            colors[i].withValues(alpha: 0.08 * intensity),       // ~50%: start appearing
-            colors[i].withValues(alpha: 0.22 * intensity),       // ~70%: building up
-            colors[i].withValues(alpha: 0.40 * intensity),       // tip: fully visible
-          ],
-          [0.0, 0.4, 0.6, 0.8, 1.0],
-        );
-      canvas.drawPath(path, fillPaint);
+      _paintPlectrum(canvas, path, rot, colors[i], intensity: intensity);
     }
-
-    // No inner glow — keep center clear for YoLo text
-
-    // No dark core — center stays clean
   }
 
   @override
@@ -1244,92 +1247,19 @@ class _SinglePlectrumPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final r = size.width / 2;
 
-    // Build plectrum path
     final t = progress * 2 * math.pi;
     final wobble = 1.0 + math.sin(t * 2) * 0.02;
     final rw = r * 0.85 * wobble;
     final rh = r * 0.80 * wobble;
-
     final rot = rotation + t * 0.08;
-    final cosR = math.cos(rot);
-    final sinR = math.sin(rot);
 
-    // Plectrum shape — rounded top, soft tapered bottom
-    // 10 control points for organic feel
-    final pts = <Offset>[
-      Offset(0, -rh * 0.90),                  // top center
-      Offset(rw * 0.65, -rh * 0.65),          // top-right
-      Offset(rw * 0.95, -rh * 0.05),          // right bulge
-      Offset(rw * 0.72, rh * 0.48),           // right-lower
-      Offset(rw * 0.28, rh * 0.78),           // bottom-right approach
-      Offset(0, rh * 0.88),                   // bottom tip (rounder)
-      Offset(-rw * 0.30, rh * 0.76),          // bottom-left approach
-      Offset(-rw * 0.74, rh * 0.44),          // left-lower
-      Offset(-rw * 0.92, -rh * 0.10),         // left bulge
-      Offset(-rw * 0.60, -rh * 0.68),         // top-left
-    ];
-
-    // Rotate
-    Offset rotate(Offset p) => Offset(
-          center.dx + p.dx * cosR - p.dy * sinR,
-          center.dy + p.dx * sinR + p.dy * cosR,
-        );
-    final rPts = pts.map(rotate).toList();
-
-    // Smooth Catmull-Rom cubic spline
-    final path = Path();
-    path.moveTo(rPts[0].dx, rPts[0].dy);
-    for (var i = 0; i < rPts.length; i++) {
-      final p0 = rPts[i];
-      final p1 = rPts[(i + 1) % rPts.length];
-      final prev = rPts[(i - 1 + rPts.length) % rPts.length];
-      final next2 = rPts[(i + 2) % rPts.length];
-      final cp1 = Offset(
-        p0.dx + (p1.dx - prev.dx) / 5,
-        p0.dy + (p1.dy - prev.dy) / 5,
-      );
-      final cp2 = Offset(
-        p1.dx - (next2.dx - p0.dx) / 5,
-        p1.dy - (next2.dy - p0.dy) / 5,
-      );
-      path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
-    }
-    path.close();
-
-    // Shadow behind
-    final shadowPaint = Paint()
-      ..color = color.withValues(alpha: 0.15)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
-    canvas.drawPath(path, shadowPaint);
-
-    // Gradient follows shape rotation:
-    // Wide end = fully transparent, narrow tip = opaque
-    final bounds = path.getBounds();
-    final gradRot = rotation + t * 0.08;
-    final gradLen = bounds.height * 0.5;
-    final gradStart = Offset(
-      bounds.center.dx - math.sin(gradRot) * gradLen,
-      bounds.center.dy - math.cos(gradRot) * gradLen,
+    final path = _buildPlectrumPath(
+      center: center,
+      rw: rw,
+      rh: rh,
+      rotation: rot,
     );
-    final gradEnd = Offset(
-      bounds.center.dx + math.sin(gradRot) * gradLen,
-      bounds.center.dy + math.cos(gradRot) * gradLen,
-    );
-
-    final fillPaint = Paint()
-      ..shader = ui.Gradient.linear(
-        gradStart,
-        gradEnd,
-        [
-          color.withValues(alpha: 0.0),      // wide end: transparent
-          color.withValues(alpha: 0.0),      // still transparent
-          color.withValues(alpha: 0.10),     // ~50%: start appearing
-          color.withValues(alpha: 0.25),     // ~70%: building up
-          color.withValues(alpha: 0.45),     // tip: fully visible
-        ],
-        [0.0, 0.4, 0.6, 0.8, 1.0],
-      );
-    canvas.drawPath(path, fillPaint);
+    _paintPlectrum(canvas, path, rot, color);
   }
 
   @override
