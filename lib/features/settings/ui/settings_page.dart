@@ -2829,7 +2829,7 @@ class _DebugUISection extends StatefulWidget {
 
 class _DebugUISectionState extends State<_DebugUISection> {
   String _voiceStatus = 'idle';
-  double _scale = 1.0;
+  double _scale = 0.7;
   double _orbScale = 0.30;
   double _ovalWidth = 2.0;
   double _ovalHeight = 1.10;
@@ -2843,8 +2843,9 @@ class _DebugUISectionState extends State<_DebugUISection> {
   int _waveSpeed = 1400;
   double _waveWidth = 160;
   double _waveSpread = 0.50;
-  double _particleScale = 1.0;
-  double _responseFontSize = 17.0;
+  double _particleScale = 0.3;
+  double _responseFontSize = 18.0;
+  int _borderSpeed = 1200;
   String _voiceResponse = 'This is a sample response from the LLM model. '
       'It demonstrates how text appears in the response card.';
   String _voiceTranscript = 'Show me the weather today';
@@ -3106,6 +3107,8 @@ class _DebugUISectionState extends State<_DebugUISection> {
             (v) => setState(() => _particleScale = v)),
         ..._debugSlider('Resp. Font', _responseFontSize, 10, 30, 20,
             (v) => setState(() => _responseFontSize = v)),
+        ..._debugSlider('Border Speed', _borderSpeed.toDouble(), 400, 4000, 36,
+            (v) => setState(() => _borderSpeed = v.round())),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -3136,6 +3139,7 @@ class _DebugUISectionState extends State<_DebugUISection> {
               waveSpread: _waveSpread,
               particleScale: _particleScale,
               responseFontSize: _responseFontSize,
+              borderSpeed: _borderSpeed,
               onHide: () => setState(() => _voiceStatus = 'idle'),
               onPrimaryAction: () {
                 final idx = _statuses.indexOf(_voiceStatus);

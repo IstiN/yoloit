@@ -28,8 +28,9 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.waveSpeed = 1400,
     this.waveWidth = 160,
     this.waveSpread = 0.50,
-    this.particleScale = 1.0,
-    this.responseFontSize = 17.0,
+    this.particleScale = 0.3,
+    this.responseFontSize = 18.0,
+    this.borderSpeed = 1200,
   });
 
   final String status;
@@ -54,6 +55,7 @@ class YoloVoiceOverlay extends StatefulWidget {
   final double waveSpread;
   final double particleScale;
   final double responseFontSize;
+  final int borderSpeed;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -349,6 +351,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         streaming: widget.status == 'responding',
                         animate: widget.animate,
                         fontSize: widget.responseFontSize,
+                        borderSpeed: widget.borderSpeed,
                       ),
                     ),
                   ),
@@ -535,13 +538,15 @@ class _ResponseCard extends StatefulWidget {
     required this.response,
     required this.streaming,
     this.animate = true,
-    this.fontSize = 17.0,
+    this.fontSize = 18.0,
+    this.borderSpeed = 1200,
   });
 
   final String response;
   final bool streaming;
   final bool animate;
   final double fontSize;
+  final int borderSpeed;
 
   @override
   State<_ResponseCard> createState() => _ResponseCardState();
@@ -559,7 +564,7 @@ class _ResponseCardState extends State<_ResponseCard>
     super.initState();
     _borderAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
+      duration: Duration(milliseconds: widget.borderSpeed),
     );
     if (widget.streaming && widget.animate) _borderAnim.repeat();
 
@@ -588,6 +593,9 @@ class _ResponseCardState extends State<_ResponseCard>
   void didUpdateWidget(_ResponseCard old) {
     super.didUpdateWidget(old);
     // Border animation
+    if (widget.borderSpeed != old.borderSpeed) {
+      _borderAnim.duration = Duration(milliseconds: widget.borderSpeed);
+    }
     final shouldAnimate = widget.streaming && widget.animate;
     final wasAnimating = old.streaming && old.animate;
     if (shouldAnimate && !wasAnimating) {
@@ -1137,10 +1145,10 @@ class _WaveformPainter extends CustomPainter {
       for (var i = 0; i <= count; i++) {
         final frac = i / count;
         final x = frac * size.width;
-        // Multi-frequency organic wave
+        // Multi-frequency organic wave (all t multipliers must be integers for seamless loop)
         final wave = math.sin(t + frac * 8 + phaseShift) * 0.5 +
             math.sin(t * 2 + frac * 12 + phaseShift * 1.5) * 0.3 +
-            math.cos(t * 0.5 + frac * 5 + phaseShift * 0.7) * 0.2;
+            math.cos(t * 3 + frac * 5 + phaseShift * 0.7) * 0.2;
         // Taper at edges
         final envelope =
             math.sin(frac * math.pi).clamp(0.0, 1.0);
@@ -1366,7 +1374,8 @@ class _ScatteredParticlesPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
+    // Center shifted up so particles orbit above vertical midpoint
+    final center = Offset(size.width / 2, size.height * 0.42);
     final halfW = size.width / 2;
     final paint = Paint();
 
