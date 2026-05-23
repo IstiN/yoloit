@@ -15,7 +15,6 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
-import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/cloud_llm_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
@@ -50,7 +49,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   final _inputFocusNode = FocusNode();
   final AudioRecorder _micRecorder = AudioRecorder();
   final YoloitToolExecutor _toolExecutor = YoloitCliToolExecutor();
+  _AssistantToolExecutor? _wrappedExecutor;
   ChatProvider? _chatProvider;
+  String? _chatProviderType; // tracks current provider type for re-creation
   bool _isRecordingMic = false;
   bool _isStartingMic = false;
   bool _stopMicAfterStart = false;
@@ -123,6 +124,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
+    _chatProvider?.dispose();
     unawaited(_micRecorder.dispose());
     super.dispose();
   }
@@ -178,64 +180,78 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       final runtimeContext = _runtimeContext();
       final calledTools = <String>[];
 
-      // Wrap the base executor with assistant-specific pre/post processing
-      // (retarget note, ensure panel, focus created panel, etc.).
-      final wrappedExecutor = _AssistantToolExecutor(
+      // Create or reuse the wrapped executor (persistent across messages).
+      _wrappedExecutor ??= _AssistantToolExecutor(
         delegate: _toolExecutor,
         assistantPanelId: widget.panel.id,
         assistantPanelTitle: widget.panel.title,
-        lastTargetNotePanelId: _lastTargetNotePanelId,
-        userMessage: text,
-        onToolCompleted: (String toolCommand, Map<String, Object?> arguments, String result, bool success) {
-          calledTools.add(toolCommand);
-          final statePatch = _toolTargetPatchIfNeeded(
-            toolCommand: toolCommand,
-            arguments: arguments,
-            result: result,
-          );
-          if (statePatch.isNotEmpty) {
-            _updateState(statePatch);
-          }
-          (dbg['toolCalls'] as List<Map<String, dynamic>>).add({
-            'name': toolCommand,
-            'arguments': arguments,
-            'result': result,
-            'startAt': DateTime.now().toIso8601String(),
-          });
-        },
         onFocusPanel: (focusArgs) async {
           await _toolExecutor.invoke(
             'yoloit_panel_focus',
             focusArgs,
-            runtimeContext: runtimeContext,
+            runtimeContext: _runtimeContext(),
           );
         },
       );
+      // Update per-message mutable state on the executor.
+      _wrappedExecutor!.userMessage = text;
+      _wrappedExecutor!.lastTargetNotePanelId = _lastTargetNotePanelId;
+      _wrappedExecutor!.onToolCompleted = (
+        String toolCommand,
+        Map<String, Object?> arguments,
+        String result,
+        bool success,
+      ) {
+        calledTools.add(toolCommand);
+        final statePatch = _toolTargetPatchIfNeeded(
+          toolCommand: toolCommand,
+          arguments: arguments,
+          result: result,
+        );
+        if (statePatch.isNotEmpty) {
+          _updateState(statePatch);
+        }
+        (dbg['toolCalls'] as List<Map<String, dynamic>>).add({
+          'name': toolCommand,
+          'arguments': arguments,
+          'result': result,
+          'startAt': DateTime.now().toIso8601String(),
+        });
+      };
 
       // Pick provider: cloud or local based on user settings.
-      final ChatProvider provider;
-      final String providerType;
+      // Provider is reused across messages to preserve history.
       final providerPref =
           await CloudLlmSettingsService.instance.loadAssistantProviderType();
+      String providerType;
       if (providerPref == 'cloud') {
         final cloudConfig =
             await CloudLlmSettingsService.instance.loadActiveConfig();
         if (cloudConfig != null && cloudConfig.isValid) {
-          provider = CloudLlmProvider(
-            config: cloudConfig,
-            toolExecutor: wrappedExecutor,
-          );
           providerType = 'cloud:${cloudConfig.id}';
         } else {
-          // Fallback to local if no valid cloud config.
-          provider = LocalLlmProvider(toolExecutor: wrappedExecutor);
           providerType = 'local';
         }
       } else {
-        provider = LocalLlmProvider(toolExecutor: wrappedExecutor);
         providerType = 'local';
       }
-      _chatProvider = provider;
+
+      // Re-create provider only if type changed or first use.
+      if (_chatProvider == null || _chatProviderType != providerType) {
+        _chatProvider?.dispose();
+        if (providerType.startsWith('cloud:')) {
+          final cloudConfig =
+              await CloudLlmSettingsService.instance.loadActiveConfig();
+          _chatProvider = CloudLlmProvider(
+            config: cloudConfig!,
+            toolExecutor: _wrappedExecutor!,
+          );
+        } else {
+          _chatProvider = LocalLlmProvider(toolExecutor: _wrappedExecutor!);
+        }
+        _chatProviderType = providerType;
+      }
+      final provider = _chatProvider!;
 
       final config = ChatSessionConfig(
         sessionName: '__yolo_badge_assistant__',
@@ -275,7 +291,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             final toolName = event.data['toolName'] as String? ?? '';
             final args = event.data['arguments'] as Map<String, Object?>? ?? {};
             _appendToolMessage(
-              callId: event.data['toolCallId'] as String? ?? 'tool-${DateTime.now().microsecondsSinceEpoch}',
+              callId:
+                  event.data['toolCallId'] as String? ??
+                  'tool-${DateTime.now().microsecondsSinceEpoch}',
               toolName: toolName,
               arguments: Map<String, Object?>.from(args),
               result: '⏳ running…',
@@ -283,7 +301,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             );
           case ChatEventType.toolComplete:
             final tcId = event.data['toolCallId'] as String? ?? '';
-            final tcResult = event.data['result'] as Map<String, dynamic>? ?? {};
+            final tcResult =
+                event.data['result'] as Map<String, dynamic>? ?? {};
             final tcSuccess = event.data['success'] as bool? ?? true;
             final tcToolName = event.data['toolName'] as String? ?? '';
             final tcContent = tcResult['content'] as String? ?? '';
@@ -856,11 +875,13 @@ $messagesJson
       builder:
           (dialogContext) => StatefulBuilder(
             builder: (ctx, setDialogState) {
-              final sessions = List<Map<String, dynamic>>.from(
-                _debugSessions,
-              ).reversed.toList();
+              final sessions =
+                  List<Map<String, dynamic>>.from(
+                    _debugSessions,
+                  ).reversed.toList();
               final active = _activeDebugSession;
-              if (active != null && !sessions.any((s) => s['id'] == active['id'])) {
+              if (active != null &&
+                  !sessions.any((s) => s['id'] == active['id'])) {
                 sessions.insert(0, active);
               }
               return AlertDialog(
@@ -1182,19 +1203,14 @@ $messagesJson
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: colors.border.withAlpha(40)),
-        ),
+        border: Border(bottom: BorderSide(color: colors.border.withAlpha(40))),
       ),
       child: Row(
         children: [
           // Session info
           Text(
             '$msgCount msgs',
-            style: TextStyle(
-              fontSize: 11,
-              color: colors.border,
-            ),
+            style: TextStyle(fontSize: 11, color: colors.border),
           ),
           const Spacer(),
           // New session
@@ -1216,23 +1232,22 @@ $messagesJson
   }
 
   void _newSession() {
+    _chatProvider?.dispose();
+    _chatProvider = null;
+    _chatProviderType = null;
     _updateState({
       'messages': <dynamic>[],
       'lastUsage': null,
       'opencodeSessionId': null,
     });
-    final session = ChatSessionManager.instance.get(widget.panel.id);
-    session?.clearMessages();
     setState(() {});
   }
 
   void _clearSession() {
-    _updateState({
-      'messages': <dynamic>[],
-      'lastUsage': null,
-    });
-    final session = ChatSessionManager.instance.get(widget.panel.id);
-    session?.clearMessages();
+    _chatProvider?.dispose();
+    _chatProvider = null;
+    _chatProviderType = null;
+    _updateState({'messages': <dynamic>[], 'lastUsage': null});
     setState(() {});
   }
 
@@ -1532,7 +1547,9 @@ $messagesJson
                   border:
                       _isGeneratingReply
                           ? Border.all(
-                            color: Theme.of(context).colorScheme.error.withAlpha(120),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.error.withAlpha(120),
                           )
                           : null,
                 ),
@@ -1619,13 +1636,14 @@ $messagesJson
           const SizedBox(width: 6),
           // Microphone button — tap to start recording, tap again to stop & send
           GestureDetector(
-            onTap: _isTranscribingMic
-                ? null
-                : () => unawaited(
-                    _isRecordingMic
-                        ? _stopAndSendMic()
-                        : _startPushToTalkMic(),
-                  ),
+            onTap:
+                _isTranscribingMic
+                    ? null
+                    : () => unawaited(
+                      _isRecordingMic
+                          ? _stopAndSendMic()
+                          : _startPushToTalkMic(),
+                    ),
             child: Container(
               width: 28,
               height: 28,
@@ -1660,7 +1678,10 @@ $messagesJson
               height: 28,
               margin: const EdgeInsets.only(bottom: 2),
               decoration: BoxDecoration(
-                color: _isGeneratingReply ? Theme.of(context).colorScheme.error : _kAccent,
+                color:
+                    _isGeneratingReply
+                        ? Theme.of(context).colorScheme.error
+                        : _kAccent,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
@@ -1927,7 +1948,9 @@ $messagesJson
         if (dbg['error'] != null) buf.writeln('ERROR: ${dbg['error']}');
         final resp = dbg['response'] as String? ?? '';
         if (resp.isNotEmpty) {
-          buf.writeln('Response: ${resp.substring(0, resp.length.clamp(0, 500))}');
+          buf.writeln(
+            'Response: ${resp.substring(0, resp.length.clamp(0, 500))}',
+          );
         }
         buf.writeln('');
       }
@@ -2169,10 +2192,7 @@ class _AssistantThinkingIndicatorState
 // ── Debug session list/detail view ────────────────────────────────────────
 
 class _DebugSessionListView extends StatefulWidget {
-  const _DebugSessionListView({
-    required this.sessions,
-    required this.colors,
-  });
+  const _DebugSessionListView({required this.sessions, required this.colors});
 
   final List<Map<String, dynamic>> sessions;
   final AppColorScheme colors;
@@ -2220,8 +2240,7 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
                     final s = sessions[i];
                     final isActive = s['completedAt'] == null;
                     final isSelected = i == _selectedIndex;
-                    final userMsg =
-                        '${s['userMessage'] ?? ''}'.trim();
+                    final userMsg = '${s['userMessage'] ?? ''}'.trim();
                     final short =
                         userMsg.length > 32
                             ? '${userMsg.substring(0, 32)}…'
@@ -2319,48 +2338,53 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: _tabs.map((tab) {
-                            final sel = tab == _selectedTab;
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedTab = tab),
-                              child: Container(
-                                margin: const EdgeInsets.only(right: 6, bottom: 6),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      sel
-                                          ? colors.primary.withAlpha(40)
-                                          : colors.surfaceElevated,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color:
-                                        sel
-                                            ? colors.primary
-                                            : colors.border.withAlpha(60),
+                          children:
+                              _tabs.map((tab) {
+                                final sel = tab == _selectedTab;
+                                return GestureDetector(
+                                  onTap:
+                                      () => setState(() => _selectedTab = tab),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(
+                                      right: 6,
+                                      bottom: 6,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          sel
+                                              ? colors.primary.withAlpha(40)
+                                              : colors.surfaceElevated,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color:
+                                            sel
+                                                ? colors.primary
+                                                : colors.border.withAlpha(60),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      tab,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight:
+                                            sel
+                                                ? FontWeight.w700
+                                                : FontWeight.normal,
+                                        color:
+                                            sel
+                                                ? colors.primary
+                                                : Theme.of(
+                                                  context,
+                                                ).textTheme.bodySmall?.color,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                child: Text(
-                                  tab,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight:
-                                        sel
-                                            ? FontWeight.w700
-                                            : FontWeight.normal,
-                                    color:
-                                        sel
-                                            ? colors.primary
-                                            : Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall?.color,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                                );
+                              }).toList(),
                         ),
                       ),
                       Expanded(
@@ -2482,12 +2506,17 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       buf.writeln('Swift (MLX native) timings:');
       final cacheHit = swift['swiftCacheHit'];
       buf.writeln(
-        '  model cache:    ${cacheHit == true ? 'HIT ✓' : cacheHit == false ? 'MISS (loaded from disk)' : '-'}',
+        '  model cache:    ${cacheHit == true
+            ? 'HIT ✓'
+            : cacheHit == false
+            ? 'MISS (loaded from disk)'
+            : '-'}',
       );
       final loadMs = swift['swiftLoadMs'];
       if (loadMs != null) buf.writeln('  load time:      ${loadMs}ms');
       final ttft = swift['swiftFirstTokenMs'];
-      if (ttft != null) buf.writeln('  first token:    ${ttft}ms  (TTFT inside Swift)');
+      if (ttft != null)
+        buf.writeln('  first token:    ${ttft}ms  (TTFT inside Swift)');
       final genMs = swift['swiftGenerateMs'];
       if (genMs != null) buf.writeln('  generation:     ${genMs}ms');
       final totalMs = swift['swiftTotalMs'];
@@ -2592,19 +2621,24 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     required this.delegate,
     required this.assistantPanelId,
     required this.assistantPanelTitle,
-    required this.lastTargetNotePanelId,
-    required this.userMessage,
-    required this.onToolCompleted,
     required this.onFocusPanel,
   });
 
   final YoloitToolExecutor delegate;
   final String assistantPanelId;
   final String assistantPanelTitle;
-  final String? lastTargetNotePanelId;
-  final String userMessage;
-  final void Function(String toolCommand, Map<String, Object?> arguments, String result, bool success) onToolCompleted;
   final Future<void> Function(Map<String, Object?> focusArgs) onFocusPanel;
+
+  // Mutable per-message state — set before each sendMessage call.
+  String? lastTargetNotePanelId;
+  String userMessage = '';
+  void Function(
+    String toolCommand,
+    Map<String, Object?> arguments,
+    String result,
+    bool success,
+  )?
+  onToolCompleted;
 
   @override
   Future<String> invoke(
@@ -2629,7 +2663,7 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     );
 
     final success = _toolResultSucceeded(result);
-    onToolCompleted(toolCommand, mutableArgs, result, success);
+    onToolCompleted?.call(toolCommand, mutableArgs, result, success);
 
     // Auto-focus newly created panels.
     if (toolCommand == 'panel:create' && success && runtimeContext != null) {
@@ -2671,7 +2705,9 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
   ) {
     if (toolCommand != 'note' && !toolCommand.startsWith('note:')) return;
     final panel = '${arguments['panel'] ?? ''}'.trim();
-    if (panel.isEmpty || panel == assistantPanelId || panel == assistantPanelTitle) {
+    if (panel.isEmpty ||
+        panel == assistantPanelId ||
+        panel == assistantPanelTitle) {
       final lastPanelId = lastTargetNotePanelId?.trim();
       if (lastPanelId != null && lastPanelId.isNotEmpty) {
         arguments['panel'] = lastPanelId;

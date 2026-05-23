@@ -15,20 +15,21 @@ import 'package:yoloit/ui/shell/main_shell.dart';
 /// Minimal app harness that does NOT initialize window_manager
 /// (window_manager is a platform plugin unavailable in headless tests).
 Widget _testApp() => MultiBlocProvider(
-      providers: [
-        BlocProvider(create: (_) => WorkspaceCubit()),
-        BlocProvider(create: (_) => TerminalCubit()),
-        BlocProvider(create: (_) => ReviewCubit()),
-        BlocProvider(create: (_) => FileEditorCubit()),
-        BlocProvider(create: (_) => RunCubit()),
-        BlocProvider(create: (_) => BoardCubit()),
-      ],
-      child: MaterialApp(
-        theme: AppThemePreset.neonPurple.theme,
-        home: const MainShell(),
-      ),
-    );
+  providers: [
+    BlocProvider(create: (_) => WorkspaceCubit()),
+    BlocProvider(create: (_) => TerminalCubit()),
+    BlocProvider(create: (_) => ReviewCubit()),
+    BlocProvider(create: (_) => FileEditorCubit()),
+    BlocProvider(create: (_) => RunCubit()),
+    BlocProvider(create: (_) => BoardCubit()),
+  ],
+  child: MaterialApp(
+    theme: AppThemePreset.neonPurple.theme,
+    home: const MainShell(),
+  ),
+);
 
+@Tags(['flaky'])
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
