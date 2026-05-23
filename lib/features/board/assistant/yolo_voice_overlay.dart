@@ -294,6 +294,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         painter: _BlobOrbPainter(
                           progress: widget.animate ? _orbAnim.value : 0.23,
                           mode: _orbMode,
+                          bgColor: Theme.of(ctx).scaffoldBackgroundColor,
                         ),
                         child: Center(child: _orbLabel(sz)),
                       ),
@@ -682,10 +683,15 @@ void _paintPlectrum(
 }
 
 class _BlobOrbPainter extends CustomPainter {
-  const _BlobOrbPainter({required this.progress, required this.mode});
+  const _BlobOrbPainter({
+    required this.progress,
+    required this.mode,
+    required this.bgColor,
+  });
 
   final double progress;
   final _OrbMode mode;
+  final Color bgColor;
 
   static const _palettes = <_OrbMode, List<Color>>{
     _OrbMode.ready: [
@@ -789,11 +795,70 @@ class _BlobOrbPainter extends CustomPainter {
       _paintPlectrum(canvas, path, rot, colors[i], blobCenter, rh * 2,
           intensity: intensity);
     }
+
+    // Center overlay: organic rounded blob in theme color
+    // Soft uneven shape so plectrum tips peek through naturally
+    final spikeCount = 14;
+    final baseR = r * 0.50;
+    final spikeR = r * 0.58;
+    final rng = math.Random(77);
+    final spikeDepths = List.generate(spikeCount, (_) => 0.85 + rng.nextDouble() * 0.15);
+    final spikeWidths = List.generate(spikeCount, (_) => 0.90 + rng.nextDouble() * 0.20);
+
+    // Build points: alternating valley → peak → valley → peak ...
+    final allPts = <Offset>[];
+    for (var i = 0; i < spikeCount; i++) {
+      final angle0 = (i / spikeCount) * 2 * math.pi;
+      final angle1 = ((i + 0.5) / spikeCount) * 2 * math.pi;
+
+      final valleyR = baseR * spikeDepths[i];
+      final peakR = spikeR * spikeWidths[i];
+
+      allPts.add(Offset(
+        center.dx + math.cos(angle0) * valleyR,
+        center.dy + math.sin(angle0) * valleyR,
+      ));
+      allPts.add(Offset(
+        center.dx + math.cos(angle1) * peakR,
+        center.dy + math.sin(angle1) * peakR,
+      ));
+    }
+
+    // Smooth Catmull-Rom through all points (same approach as plectrum)
+    final centerPath = Path();
+    centerPath.moveTo(allPts[0].dx, allPts[0].dy);
+    for (var i = 0; i < allPts.length; i++) {
+      final p0 = allPts[i];
+      final p1 = allPts[(i + 1) % allPts.length];
+      final prev = allPts[(i - 1 + allPts.length) % allPts.length];
+      final next2 = allPts[(i + 2) % allPts.length];
+      final cp1 = Offset(
+        p0.dx + (p1.dx - prev.dx) / 3.5,
+        p0.dy + (p1.dy - prev.dy) / 3.5,
+      );
+      final cp2 = Offset(
+        p1.dx - (next2.dx - p0.dx) / 3.5,
+        p1.dy - (next2.dy - p0.dy) / 3.5,
+      );
+      centerPath.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
+    }
+    centerPath.close();
+
+    final centerPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          bgColor,
+          bgColor.withValues(alpha: 0.92),
+          bgColor.withValues(alpha: 0.0),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: spikeR));
+    canvas.drawPath(centerPath, centerPaint);
   }
 
   @override
   bool shouldRepaint(covariant _BlobOrbPainter old) =>
-      old.progress != progress || old.mode != mode;
+      old.progress != progress || old.mode != mode || old.bgColor != bgColor;
 }
 
 // ─────────────────────────── waveform ────────────────────────────────────────
