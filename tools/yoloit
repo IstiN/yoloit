@@ -1775,11 +1775,12 @@ print(d['response'])
     _get "/yolochat/panels" | python3 -m json.tool 2>/dev/null || _get "/yolochat/panels"
     ;;
   yolochat:send)
-    [[ $# -lt 1 ]] && { echo "Usage: yoloit yolochat:send <text> [--board <id|name>] [--panel <id|title>]" >&2; exit 1; }
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit yolochat:send <text> [--board <id|name>] [--panel <id|title>] [--provider <id>]" >&2; exit 1; }
     text="$1"
     shift
     board=""
     panel=""
+    provider=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --board)
@@ -1790,21 +1791,27 @@ print(d['response'])
           panel="${2:-}"
           shift 2
           ;;
+        --provider)
+          provider="${2:-}"
+          shift 2
+          ;;
         *)
           echo "Unknown option: $1" >&2
-          echo "Usage: yoloit yolochat:send <text> [--board <id|name>] [--panel <id|title>]" >&2
+          echo "Usage: yoloit yolochat:send <text> [--board <id|name>] [--panel <id|title>] [--provider <id>]" >&2
           exit 1
           ;;
       esac
     done
-    payload=$(python3 - "$text" "$board" "$panel" <<'PY'
+    payload=$(python3 - "$text" "$board" "$panel" "$provider" <<'PY'
 import json, sys
-text, board, panel = sys.argv[1:4]
+text, board, panel, provider = sys.argv[1:5]
 body = {"text": text}
 if board:
     body["board"] = board
 if panel:
     body["panel"] = panel
+if provider:
+    body["provider"] = provider
 print(json.dumps(body))
 PY
 )

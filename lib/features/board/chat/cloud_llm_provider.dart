@@ -33,7 +33,7 @@ class CloudLlmProvider extends ChatProvider {
   final YoloitToolExecutor _toolExecutor;
   final Map<String, bool> _running = {};
   final Map<String, bool> _cancelRequested = {};
-  final Map<String, List<Map<String, String>>> _history = {};
+  final Map<String, List<Map<String, Object?>>> _history = {};
   int _toolCallSequence = 0;
 
   @override
@@ -105,7 +105,7 @@ class CloudLlmProvider extends ChatProvider {
       }
       final sessionHistory = _history.putIfAbsent(
         session,
-        () => <Map<String, String>>[],
+        () => <Map<String, Object?>>[],
       );
 
       final messageId = 'assistant-${DateTime.now().millisecondsSinceEpoch}';
@@ -254,8 +254,30 @@ class CloudLlmProvider extends ChatProvider {
       if (_cancelRequested[session] == true) return;
 
       final content = _stripThinkTags(emitted.trim());
-      sessionHistory.add({'role': 'user', 'content': message});
-      sessionHistory.add({'role': 'assistant', 'content': content});
+
+      // Save full interaction to session history (including tool calls).
+      // messages[0] is system, messages[1..N-1] are prior history,
+      // new messages start after that. We need to save everything after
+      // the prior history end.
+      final priorCount = sessionHistory.length + 1; // +1 for system msg
+      for (var i = priorCount; i < messages.length; i++) {
+        sessionHistory.add(Map<String, Object?>.from(messages[i]));
+      }
+      // If the final assistant text response wasn't already added via messages
+      // (happens when model responds without tool calls on first iteration),
+      // add it explicitly.
+      if (sessionHistory.isEmpty ||
+          sessionHistory.last['role'] != 'assistant' ||
+          sessionHistory.last['content'] != content) {
+        // Remove any trailing assistant entry that had empty content from streaming
+        if (sessionHistory.isNotEmpty &&
+            sessionHistory.last['role'] == 'assistant' &&
+            (sessionHistory.last['content'] == null ||
+             (sessionHistory.last['content'] as String?)?.isEmpty == true)) {
+          sessionHistory.removeLast();
+        }
+        sessionHistory.add({'role': 'assistant', 'content': content});
+      }
 
       controller.add(
         ChatEvent(
@@ -295,7 +317,7 @@ class CloudLlmProvider extends ChatProvider {
   }
 
   List<Map<String, Object?>> _buildMessages(
-    List<Map<String, String>> history,
+    List<Map<String, Object?>> history,
     String userMessage,
     ChatRuntimeContext? runtimeContext,
   ) {

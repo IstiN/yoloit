@@ -618,6 +618,17 @@ class CliServer {
       if (target == null) {
         return _error('No board.chat panel found (or target not found)');
       }
+      // Inject global cloud provider if no explicit provider specified
+      if (!body.containsKey('provider')) {
+        final service = CloudLlmSettingsService.instance;
+        final providerType = await service.loadAssistantProviderType();
+        if (providerType == 'cloud') {
+          final activeId = await service.loadActiveConfigId();
+          if (activeId != null) {
+            body['provider'] = 'cloud:$activeId';
+          }
+        }
+      }
       final actionBody = <String, dynamic>{
         ...body,
         'action': 'send',

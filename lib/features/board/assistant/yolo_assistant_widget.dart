@@ -15,6 +15,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/cloud_llm_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
@@ -1167,11 +1168,72 @@ $messagesJson
     final colors = context.appColors;
     return Column(
       children: [
+        _buildSessionBar(colors),
         _buildSkillsBar(colors),
         Expanded(child: _buildMessageList(colors)),
         _buildInputBar(colors),
       ],
     );
+  }
+
+  Widget _buildSessionBar(AppColorScheme colors) {
+    final msgCount = _messages.length;
+    return Container(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: colors.border.withAlpha(40)),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Session info
+          Text(
+            '$msgCount msgs',
+            style: TextStyle(
+              fontSize: 11,
+              color: colors.border,
+            ),
+          ),
+          const Spacer(),
+          // New session
+          _SessionBarButton(
+            icon: Icons.add_circle_outline,
+            tooltip: 'New session',
+            onTap: _newSession,
+          ),
+          const SizedBox(width: 4),
+          // Clear
+          _SessionBarButton(
+            icon: Icons.delete_outline,
+            tooltip: 'Clear chat',
+            onTap: _clearSession,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _newSession() {
+    _updateState({
+      'messages': <dynamic>[],
+      'lastUsage': null,
+      'opencodeSessionId': null,
+    });
+    final session = ChatSessionManager.instance.get(widget.panel.id);
+    session?.clearMessages();
+    setState(() {});
+  }
+
+  void _clearSession() {
+    _updateState({
+      'messages': <dynamic>[],
+      'lastUsage': null,
+    });
+    final session = ChatSessionManager.instance.get(widget.panel.id);
+    session?.clearMessages();
+    setState(() {});
   }
 
   Widget _buildSkillsBar(AppColorScheme colors) {
@@ -2009,6 +2071,33 @@ $messagesJson
           'Please update/reinstall the selected local model runtime in Settings → AI Models, then restart YoLoIT.';
     }
     return 'Error: $raw';
+  }
+}
+
+class _SessionBarButton extends StatelessWidget {
+  const _SessionBarButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 16, color: context.appColors.border),
+        ),
+      ),
+    );
   }
 }
 
