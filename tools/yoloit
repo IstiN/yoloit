@@ -134,6 +134,15 @@ commands = [
   },
   {
     "group": "board",
+    "name": "boards:snapshot",
+    "description": "Snapshot all boards with panels as Mermaid graph",
+    "params": [
+      ["--format mermaid|md", "Output format (default: mermaid)", False],
+    ],
+    "example": "yoloit boards:snapshot --format mermaid",
+  },
+  {
+    "group": "board",
     "name": "board:screenshot",
     "description": "Save PNG screenshot",
     "params": [
@@ -1401,6 +1410,84 @@ PYEOF
       format="$1"
     fi
     _get "/boards/${bid}/snapshot?format=${format}"
+    ;;
+  boards:snapshot)
+    format="mermaid"
+    if [[ "${1:-}" == "--format" ]]; then
+      format="${2:-mermaid}"
+    elif [[ -n "${1:-}" ]]; then
+      format="$1"
+    fi
+    _resolve_base
+    python3 - "$BASE" "$format" <<'PYEOF'
+import json
+import re
+import sys
+import urllib.parse
+import urllib.request
+
+base = sys.argv[1].rstrip('/')
+fmt = (sys.argv[2] if len(sys.argv) > 2 else 'mermaid').strip().lower()
+
+def get_json(path):
+    req = urllib.request.Request(f"{base}{path}")
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read().decode() or "{}")
+
+def node_id(prefix, raw):
+    safe = re.sub(r'[^A-Za-z0-9_]', '_', str(raw))
+    return f"{prefix}_{safe}"
+
+def label(text):
+    return str(text).replace('"', "'").replace('\n', ' ').strip()
+
+boards_payload = get_json('/boards')
+boards = boards_payload.get('boards') or []
+root = 'ROOT'
+lines = ['flowchart TB', f'  {root}["YoLoIT Boards Snapshot"]']
+
+for board in boards:
+    board_id = str(board.get('id') or '').strip()
+    if not board_id:
+        continue
+    board_name = str(board.get('name') or board_id).strip()
+    is_active = bool(board.get('active') is True)
+    b_node = node_id('B', board_id)
+    board_title = f"{board_name} ({board_id})"
+    if is_active:
+        board_title += ' [CURRENT]'
+    lines.append(f'  {b_node}["{label(board_title)}"]')
+    lines.append(f'  {root} --> {b_node}')
+    try:
+        encoded = urllib.parse.quote(board_id)
+        panels_payload = get_json(f'/boards/{encoded}/panels')
+        panels = panels_payload.get('panels') or []
+    except Exception:
+        panels = []
+    for panel in panels:
+        panel_id = str(panel.get('id') or '').strip()
+        if not panel_id:
+            continue
+        p_node = node_id('P', f'{board_id}_{panel_id}')
+        panel_title = str(panel.get('title') or panel_id).strip()
+        panel_type = str(panel.get('type') or 'unknown').strip()
+        hidden = bool(panel.get('hidden') is True)
+        suffix = ' [hidden]' if hidden else ''
+        lines.append(
+            f'  {p_node}["{label(panel_title)} | {label(panel_type)} | {label(panel_id)}{suffix}"]'
+        )
+        lines.append(f'  {b_node} --> {p_node}')
+
+diagram = '\n'.join(lines)
+if fmt == 'md':
+    print('# Boards Snapshot')
+    print()
+    print('```mermaid')
+    print(diagram)
+    print('```')
+else:
+    print(diagram)
+PYEOF
     ;;
   board:screenshot)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit board:screenshot <id|name> [file.png]" >&2; exit 1; }

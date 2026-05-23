@@ -1421,6 +1421,15 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     ],
   ),
   YoloitCliTool(
+    command: 'boards:snapshot',
+    alias: 'bss',
+    description: 'Snapshot all boards and panels as Mermaid graph',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('format', 'mermaid or md', flag: '--format', shortKey: 'fmt'),
+    ],
+  ),
+  YoloitCliTool(
     command: 'board:screenshot',
     alias: 'bsc',
     description: 'Save PNG screenshot',
