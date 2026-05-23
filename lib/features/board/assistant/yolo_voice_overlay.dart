@@ -16,6 +16,7 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.focusNode,
     this.onHide,
     this.onPrimaryAction,
+    this.scale = 1.0,
   });
 
   final String status;
@@ -27,6 +28,7 @@ class YoloVoiceOverlay extends StatefulWidget {
   final FocusNode? focusNode;
   final VoidCallback? onHide;
   final VoidCallback? onPrimaryAction;
+  final double scale;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -210,9 +212,14 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
         behavior: HitTestBehavior.translucent,
         onTap: _isResponse ? widget.onHide : widget.onPrimaryAction,
         child: SizedBox(
-          width: _kW,
-          height: _kH,
-          child: Stack(
+          width: _kW * widget.scale,
+          height: _kH * widget.scale,
+          child: Transform.scale(
+            scale: widget.scale,
+            child: SizedBox(
+              width: _kW,
+              height: _kH,
+              child: Stack(
             fit: StackFit.expand,
             children: [
               // ── orbit particles (thinking) ──────────────────────────
@@ -353,6 +360,8 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                 ),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

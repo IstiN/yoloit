@@ -2829,6 +2829,7 @@ class _DebugUISection extends StatefulWidget {
 
 class _DebugUISectionState extends State<_DebugUISection> {
   String _voiceStatus = 'idle';
+  double _scale = 1.0;
   String _voiceResponse = 'This is a sample response from the LLM model. '
       'It demonstrates how text appears in the response card.';
   String _voiceTranscript = 'Show me the weather today';
@@ -2881,7 +2882,30 @@ class _DebugUISectionState extends State<_DebugUISection> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Text(
+              'Scale: ${_scale.toStringAsFixed(2)}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Expanded(
+              child: Slider(
+                value: _scale,
+                min: 0.3,
+                max: 2.0,
+                divisions: 34,
+                onChanged: (v) => setState(() => _scale = v),
+                activeColor: const Color(0xFF6644FF),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Container(
           width: double.infinity,
           height: 500,
@@ -2898,6 +2922,7 @@ class _DebugUISectionState extends State<_DebugUISection> {
               transcript: _voiceTranscript,
               response: _voiceResponse,
               animate: true,
+              scale: _scale,
               onHide: () => setState(() => _voiceStatus = 'idle'),
               onPrimaryAction: () {
                 final idx = _statuses.indexOf(_voiceStatus);
