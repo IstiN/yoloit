@@ -344,6 +344,24 @@ class YoloitCliToolArgumentNormalizer {
     if (functionName == 'yoloit_board_focus' && text.contains('panel')) {
       return 'yoloit_panel_focus';
     }
+    final looksLikeBoardNavigation =
+        text.contains('перейд') ||
+        text.contains('переди') ||
+        text.contains('переключ') ||
+        text.contains('открой') ||
+        text.contains('show') ||
+        text.contains('open') ||
+        text.contains('switch') ||
+        text.contains('go to');
+    final looksLikeContextOnly =
+        text.contains('для следующих команд') ||
+        text.contains('for subsequent commands') ||
+        text.contains('as default context');
+    if (functionName == 'yoloit_board_use' &&
+        looksLikeBoardNavigation &&
+        !looksLikeContextOnly) {
+      return 'yoloit_board_focus';
+    }
     if (functionName == 'yoloit_panel' &&
         (text.contains('focus') || text.contains('фокус'))) {
       return 'yoloit_panel_focus';
@@ -1378,7 +1396,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'board:use',
     alias: 'buse',
-    description: 'Set current board for subsequent commands',
+    description: 'Set default board for subsequent commands (no UI switch)',
     group: 'board',
     params: <YoloitCliToolParam>[
       _p('board', 'Board id or name', required: true, shortKey: 'b'),

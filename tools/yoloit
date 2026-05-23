@@ -523,7 +523,7 @@ commands = [
   {
     "group": "board",
     "name": "board:use",
-    "description": "Set current board for subsequent commands",
+    "description": "Set current board context for subsequent commands (does not switch UI focus)",
     "params": [["board", "Board id or name", True]],
     "example": "yoloit board:use \"My Board\"",
   },
@@ -2911,7 +2911,7 @@ args = cmd_data.get('a', cmd_data.get('args', []))
 
 # Alias map: fix common model hallucinations to valid command IDs
 ALIAS = {
-    'board:show':'panels','board:switch':'board:use','board:reduce':'board:fit',
+    'board:show':'panels','board:switch':'board:focus','board:reduce':'board:fit',
     'boards:list':'boards','checklist:create':'checklist:new',
     'checklist:mark':'checklist:check','checklist:mark-done':'checklist:check',
     'checklist:toggle':'checklist:check','models':'models:list',
@@ -2925,7 +2925,7 @@ ALIAS = {
     'board:generate-screenshot':'board:screenshot','board:generate':'board:snapshot',
     'panel:close':'panel:hide','note:write':'note:add',
     'board:copy':'board:clone','board:config':'board:settings',
-    'board:translate':'board:use','note:delete':'panel:delete',
+    'board:translate':'board:focus','note:delete':'panel:delete',
     'panel:stop':'panel:hide','run:script':'run:attach',
 }
 if cmd in ALIAS:

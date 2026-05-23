@@ -356,6 +356,20 @@ void main() {
       'yoloit_panel_focus',
     );
     expect(
+      YoloitCliToolArgumentNormalizer.normalizeFunctionName(
+        functionName: 'yoloit_board_use',
+        userMessage: 'перейди на music борд',
+      ),
+      'yoloit_board_focus',
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalizeFunctionName(
+        functionName: 'yoloit_board_use',
+        userMessage: 'Переди на таспорт.',
+      ),
+      'yoloit_board_focus',
+    );
+    expect(
       YoloitCliToolArgumentNormalizer.normalize(
         functionName: 'yoloit_panel_move',
         arguments: const <String, Object?>{},
