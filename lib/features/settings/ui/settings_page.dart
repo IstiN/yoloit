@@ -2841,6 +2841,9 @@ class _DebugUISectionState extends State<_DebugUISection> {
   int _waveBarCount = 22;
   double _waveAmplitude = 0.85;
   int _waveSpeed = 1400;
+  double _waveWidth = 160;
+  double _particleScale = 1.0;
+  double _responseFontSize = 17.0;
   String _voiceResponse = 'This is a sample response from the LLM model. '
       'It demonstrates how text appears in the response card.';
   String _voiceTranscript = 'Show me the weather today';
@@ -3094,6 +3097,12 @@ class _DebugUISectionState extends State<_DebugUISection> {
             (v) => setState(() => _waveAmplitude = v)),
         ..._debugSlider('Wave Speed', _waveSpeed.toDouble(), 400, 4000, 36,
             (v) => setState(() => _waveSpeed = v.round())),
+        ..._debugSlider('Wave Width', _waveWidth, 60, 300, 48,
+            (v) => setState(() => _waveWidth = v)),
+        ..._debugSlider('Particle Scale', _particleScale, 0.3, 3.0, 27,
+            (v) => setState(() => _particleScale = v)),
+        ..._debugSlider('Resp. Font', _responseFontSize, 10, 30, 20,
+            (v) => setState(() => _responseFontSize = v)),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -3120,6 +3129,9 @@ class _DebugUISectionState extends State<_DebugUISection> {
               waveBarCount: _waveBarCount,
               waveAmplitude: _waveAmplitude,
               waveSpeed: _waveSpeed,
+              waveWidth: _waveWidth,
+              particleScale: _particleScale,
+              responseFontSize: _responseFontSize,
               onHide: () => setState(() => _voiceStatus = 'idle'),
               onPrimaryAction: () {
                 final idx = _statuses.indexOf(_voiceStatus);

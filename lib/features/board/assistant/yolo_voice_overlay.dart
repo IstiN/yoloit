@@ -26,6 +26,9 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.waveBarCount = 22,
     this.waveAmplitude = 0.85,
     this.waveSpeed = 1400,
+    this.waveWidth = 160,
+    this.particleScale = 1.0,
+    this.responseFontSize = 17.0,
   });
 
   final String status;
@@ -46,6 +49,9 @@ class YoloVoiceOverlay extends StatefulWidget {
   final int waveBarCount;
   final double waveAmplitude;
   final int waveSpeed;
+  final double waveWidth;
+  final double particleScale;
+  final double responseFontSize;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -202,7 +208,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
       };
 
   Alignment get _orbAlign =>
-      _isResponse ? const Alignment(-0.70, -0.06) : const Alignment(0.0, -0.10);
+      _isResponse ? const Alignment(-0.40, -0.06) : const Alignment(0.0, -0.10);
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -246,6 +252,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                 child: Center(
                   child: _OrbitParticles(
                     animate: (_isThinking || _isSending) && widget.animate,
+                    scale: widget.particleScale,
                   ),
                 ),
               ),
@@ -260,7 +267,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                 child: Align(
                   alignment: const Alignment(-0.50, -0.08),
                   child: SizedBox(
-                    width: 160,
+                    width: widget.waveWidth,
                     height: 80,
                     child: _Waveform(
                       animate: _isListening && widget.animate,
@@ -280,7 +287,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                 child: Align(
                   alignment: const Alignment(0.50, -0.08),
                   child: SizedBox(
-                    width: 160,
+                    width: widget.waveWidth,
                     height: 80,
                     child: _Waveform(
                       animate: _isListening && widget.animate,
@@ -331,7 +338,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     child: Padding(
                       padding: const EdgeInsets.only(
                         right: 18,
-                        left: 260,
+                        left: 200,
                         top: 20,
                         bottom: 56,
                       ),
@@ -339,6 +346,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         response: widget.response,
                         streaming: widget.status == 'responding',
                         animate: widget.animate,
+                        fontSize: widget.responseFontSize,
                       ),
                     ),
                   ),
@@ -356,16 +364,6 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        AnimatedOpacity(
-                          opacity: _isThinking ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 600),
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _ThinkingDots(
-                              animate: _isThinking && widget.animate,
-                            ),
-                          ),
-                        ),
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 650),
                           switchInCurve: Curves.easeOut,
@@ -535,19 +533,24 @@ class _ResponseCard extends StatefulWidget {
     required this.response,
     required this.streaming,
     this.animate = true,
+    this.fontSize = 17.0,
   });
 
   final String response;
   final bool streaming;
   final bool animate;
+  final double fontSize;
 
   @override
   State<_ResponseCard> createState() => _ResponseCardState();
 }
 
 class _ResponseCardState extends State<_ResponseCard>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _borderAnim;
+  late AnimationController _typingAnim;
+  int _visibleChars = 0;
+  String _lastResponse = '';
 
   @override
   void initState() {
@@ -557,11 +560,32 @@ class _ResponseCardState extends State<_ResponseCard>
       duration: const Duration(milliseconds: 2400),
     );
     if (widget.streaming && widget.animate) _borderAnim.repeat();
+
+    _lastResponse = widget.response;
+    _visibleChars = widget.streaming ? 0 : widget.response.length;
+    _typingAnim = AnimationController(
+      vsync: this,
+      duration: Duration(
+        milliseconds: (widget.response.length * 30).clamp(300, 6000),
+      ),
+    );
+    if (widget.streaming && widget.animate && widget.response.isNotEmpty) {
+      _typingAnim.forward();
+    }
+    _typingAnim.addListener(_updateVisibleChars);
+  }
+
+  void _updateVisibleChars() {
+    final target = (_typingAnim.value * _lastResponse.length).round();
+    if (target != _visibleChars) {
+      setState(() => _visibleChars = target);
+    }
   }
 
   @override
   void didUpdateWidget(_ResponseCard old) {
     super.didUpdateWidget(old);
+    // Border animation
     final shouldAnimate = widget.streaming && widget.animate;
     final wasAnimating = old.streaming && old.animate;
     if (shouldAnimate && !wasAnimating) {
@@ -569,19 +593,46 @@ class _ResponseCardState extends State<_ResponseCard>
     } else if (!shouldAnimate && wasAnimating) {
       _borderAnim.stop();
     }
+    // Typing animation — when response text changes (new chars)
+    if (widget.response != old.response) {
+      _lastResponse = widget.response;
+      if (widget.streaming && widget.animate) {
+        final oldLen = _visibleChars;
+        _typingAnim.dispose();
+        _typingAnim = AnimationController(
+          vsync: this,
+          duration: Duration(
+            milliseconds:
+                ((widget.response.length - oldLen) * 30).clamp(100, 4000),
+          ),
+          lowerBound: oldLen / widget.response.length.clamp(1, 99999),
+        );
+        _typingAnim.addListener(_updateVisibleChars);
+        _typingAnim.forward();
+      } else {
+        _visibleChars = widget.response.length;
+      }
+    }
+    if (!widget.streaming) {
+      _visibleChars = widget.response.length;
+    }
   }
 
   @override
   void dispose() {
     _borderAnim.dispose();
+    _typingAnim.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final text = widget.response.trim().isEmpty
+    final fullText = widget.response.trim().isEmpty
         ? 'YoLo! Here is what I found for you...'
         : widget.response.trim();
+    final displayText = widget.streaming
+        ? fullText.substring(0, _visibleChars.clamp(0, fullText.length))
+        : fullText;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -613,12 +664,12 @@ class _ResponseCardState extends State<_ResponseCard>
               ],
             ),
             child: Text(
-              text,
+              displayText,
               maxLines: 8,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.95),
-                fontSize: 17,
+                fontSize: widget.fontSize,
                 height: 1.52,
                 fontWeight: FontWeight.w500,
                 shadows: widget.streaming
@@ -1059,38 +1110,65 @@ class _WaveformPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final cy = size.height / 2;
-    final paint = Paint()..strokeCap = StrokeCap.round;
-    final count = barCount.clamp(4, 60);
+    final count = barCount.clamp(6, 60);
+    final t = progress * 2 * math.pi;
 
-    for (var i = 0; i < count; i++) {
-      final x = i * size.width / (count - 1).clamp(1, 999);
-      final phase = progress * 2 * math.pi + i * 0.72;
-      final amp = math.sin(phase).abs() * amplitude + 0.08;
-      final drawX = flip ? size.width - x : x;
-      final color = Color.lerp(
+    // Build smooth organic wave path (filled curves, not bars)
+    for (var layer = 0; layer < 3; layer++) {
+      final phaseShift = layer * 1.2;
+      final ampScale = amplitude * (1.0 - layer * 0.25);
+      final path = Path();
+      path.moveTo(flip ? size.width : 0, cy);
+
+      final points = <Offset>[];
+      for (var i = 0; i <= count; i++) {
+        final frac = i / count;
+        final x = frac * size.width;
+        // Multi-frequency organic wave
+        final wave = math.sin(t + frac * 8 + phaseShift) * 0.5 +
+            math.sin(t * 2 + frac * 12 + phaseShift * 1.5) * 0.3 +
+            math.cos(t * 0.5 + frac * 5 + phaseShift * 0.7) * 0.2;
+        // Taper at edges
+        final envelope =
+            math.sin(frac * math.pi).clamp(0.0, 1.0);
+        final y = cy + wave * size.height * 0.4 * ampScale * envelope;
+        points.add(Offset(flip ? size.width - x : x, y));
+      }
+
+      // Draw smooth curve through points
+      path.moveTo(points.first.dx, cy);
+      path.lineTo(points.first.dx, points.first.dy);
+      for (var i = 0; i < points.length - 1; i++) {
+        final p0 = points[i];
+        final p1 = points[i + 1];
+        final cpx = (p0.dx + p1.dx) / 2;
+        path.cubicTo(cpx, p0.dy, cpx, p1.dy, p1.dx, p1.dy);
+      }
+      // Close back to center line
+      path.lineTo(points.last.dx, cy);
+      path.close();
+
+      final colorStart = Color.lerp(
+        const Color(0xFF66D4FF),
+        const Color(0xFFFF6EE0),
+        layer / 2.0,
+      )!;
+      final colorEnd = Color.lerp(
+        const Color(0xFFB980FF),
         const Color(0xFF4066FF),
-        const Color(0xFFD460FF),
-        i / (count - 1).clamp(1, 999),
+        layer / 2.0,
       )!;
 
-      if (i % 3 == 2) {
-        paint
-          ..style = PaintingStyle.fill
-          ..color = color.withValues(alpha: 0.65 + amp * 0.2)
-          ..strokeWidth = 0;
-        canvas.drawCircle(Offset(drawX, cy), 1.6 + amp * 1.2, paint);
-      } else {
-        final h = size.height * amp * (i % 5 == 0 ? 0.78 : 0.40);
-        paint
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = i % 4 == 0 ? 2.8 : 1.6
-          ..color = color.withValues(alpha: i.isEven ? 0.80 : 0.35);
-        canvas.drawLine(
-          Offset(drawX, cy - h / 2),
-          Offset(drawX, cy + h / 2),
-          paint,
-        );
-      }
+      final paint = Paint()
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          colors: [
+            colorStart.withValues(alpha: 0.45 - layer * 0.10),
+            colorEnd.withValues(alpha: 0.45 - layer * 0.10),
+          ],
+        ).createShader(Offset.zero & size);
+
+      canvas.drawPath(path, paint);
     }
   }
 
@@ -1198,9 +1276,10 @@ class _UploadBeamPainter extends CustomPainter {
 // Scattered floating dots at varying distances — NOT uniform circle.
 
 class _OrbitParticles extends StatefulWidget {
-  const _OrbitParticles({required this.animate});
+  const _OrbitParticles({required this.animate, this.scale = 1.0});
 
   final bool animate;
+  final double scale;
 
   @override
   State<_OrbitParticles> createState() => _OrbitParticlesState();
@@ -1246,7 +1325,7 @@ class _OrbitParticlesState extends State<_OrbitParticles>
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: _c,
         builder: (ctx, _) => CustomPaint(
-          size: const Size(320, 320),
+          size: Size(320 * widget.scale, 320 * widget.scale),
           painter: _ScatteredParticlesPainter(
             progress: widget.animate ? _c.value : 0.2,
           ),
@@ -1263,12 +1342,12 @@ class _ScatteredParticlesPainter extends CustomPainter {
   static final _particles = List.generate(50, (i) {
     final rng = math.Random(i * 37 + 13);
     return (
-      radiusBase: 0.50 + rng.nextDouble() * 0.40, // 0.50..0.90 of half-width
+      radiusBase: 0.50 + rng.nextDouble() * 0.40,
       angleOffset: rng.nextDouble() * 2 * math.pi,
       size: 1.0 + rng.nextDouble() * 2.4,
-      speed: 0.6 + rng.nextDouble() * 0.8,
+      speed: (1 + rng.nextInt(3)).toDouble(), // integer 1,2,3 for seamless loop
       colorT: rng.nextDouble(),
-      bright: rng.nextDouble() > 0.70, // ~30% are bright
+      bright: rng.nextDouble() > 0.70,
     );
   });
 
