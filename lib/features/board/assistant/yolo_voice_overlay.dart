@@ -630,7 +630,7 @@ class _BlobOrbPainter extends CustomPainter {
   ];
 
   /// Create a plectrum (guitar pick) shaped path.
-  /// Rounded top with a pointed bottom tip, rotated by wobbleT for variety.
+  /// 10-point organic shape matching SinglePlectrumPreview.
   Path _blobPath(
     Offset center,
     double w,
@@ -638,48 +638,43 @@ class _BlobOrbPainter extends CustomPainter {
     double wobbleT,
     int seed,
   ) {
-    final path = Path();
     final rng = math.Random(seed);
 
-    // Slight wobble on proportions for organic feel (integer multipliers for loop)
+    // Slight wobble on proportions for organic feel
     final wobble = 1.0 +
         math.sin(wobbleT * 2 + rng.nextDouble() * 0.3) * 0.03 +
         math.cos(wobbleT * 1 + rng.nextDouble() * 0.2) * 0.02;
     final rw = w / 2 * wobble;
     final rh = h / 2 * wobble;
 
-    // Rotation per blob for variety (based on seed + slow animation)
+    // Rotation per blob
     final rot = rng.nextDouble() * math.pi * 2 + wobbleT * 0.15;
+    final cosR = math.cos(rot);
+    final sinR = math.sin(rot);
 
-    // Plectrum control points (before rotation):
-    // Top: wide rounded arc
-    // Bottom: pointed tip
-    final tipY = rh * 1.1;      // pointed end extends slightly past radius
-    final bulgeX = rw * 0.92;   // width of the round part
-    final bulgeY = -rh * 0.50;  // round part above center
-    final topY = -rh * 0.85;    // top of the rounded arc
-
-    // Build plectrum as cubic beziers (unrotated, centered at origin)
+    // Same 10-point plectrum shape as SinglePlectrumPainter
     final pts = <Offset>[
-      Offset(0, -topY.abs()),              // top center
-      Offset(bulgeX, bulgeY),               // right bulge
-      Offset(bulgeX * 0.45, tipY * 0.7),    // right lower
-      Offset(0, tipY),                       // bottom tip
-      Offset(-bulgeX * 0.45, tipY * 0.7),   // left lower
-      Offset(-bulgeX, bulgeY),               // left bulge
+      Offset(0, -rh * 0.90),                  // top center
+      Offset(rw * 0.65, -rh * 0.65),          // top-right
+      Offset(rw * 0.95, -rh * 0.05),          // right bulge
+      Offset(rw * 0.72, rh * 0.48),           // right-lower
+      Offset(rw * 0.28, rh * 0.78),           // bottom-right approach
+      Offset(0, rh * 0.88),                   // bottom tip (rounder)
+      Offset(-rw * 0.30, rh * 0.76),          // bottom-left approach
+      Offset(-rw * 0.74, rh * 0.44),          // left-lower
+      Offset(-rw * 0.92, -rh * 0.10),         // left bulge
+      Offset(-rw * 0.60, -rh * 0.68),         // top-left
     ];
 
     // Rotate all points
-    final cosR = math.cos(rot);
-    final sinR = math.sin(rot);
     Offset rotate(Offset p) => Offset(
           center.dx + p.dx * cosR - p.dy * sinR,
           center.dy + p.dx * sinR + p.dy * cosR,
         );
-
     final rPts = pts.map(rotate).toList();
 
-    // Draw with smooth cubic curves through the 6 points
+    // Smooth Catmull-Rom cubic spline (divisor 5 for smoother curves)
+    final path = Path();
     path.moveTo(rPts[0].dx, rPts[0].dy);
     for (var i = 0; i < rPts.length; i++) {
       final p0 = rPts[i];
@@ -687,12 +682,12 @@ class _BlobOrbPainter extends CustomPainter {
       final prev = rPts[(i - 1 + rPts.length) % rPts.length];
       final next2 = rPts[(i + 2) % rPts.length];
       final cp1 = Offset(
-        p0.dx + (p1.dx - prev.dx) / 4,
-        p0.dy + (p1.dy - prev.dy) / 4,
+        p0.dx + (p1.dx - prev.dx) / 5,
+        p0.dy + (p1.dy - prev.dy) / 5,
       );
       final cp2 = Offset(
-        p1.dx - (next2.dx - p0.dx) / 4,
-        p1.dy - (next2.dy - p0.dy) / 4,
+        p1.dx - (next2.dx - p0.dx) / 5,
+        p1.dy - (next2.dy - p0.dy) / 5,
       );
       path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
     }
