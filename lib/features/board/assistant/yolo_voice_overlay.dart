@@ -796,63 +796,30 @@ class _BlobOrbPainter extends CustomPainter {
           intensity: intensity);
     }
 
-    // Center overlay: organic rounded blob in theme color
-    // Soft uneven shape so plectrum tips peek through naturally
-    final spikeCount = 14;
-    final baseR = r * 0.50;
-    final spikeR = r * 0.58;
-    final rng = math.Random(77);
-    final spikeDepths = List.generate(spikeCount, (_) => 0.85 + rng.nextDouble() * 0.15);
-    final spikeWidths = List.generate(spikeCount, (_) => 0.90 + rng.nextDouble() * 0.20);
-
-    // Build points: alternating valley → peak → valley → peak ...
-    final allPts = <Offset>[];
-    for (var i = 0; i < spikeCount; i++) {
-      final angle0 = (i / spikeCount) * 2 * math.pi;
-      final angle1 = ((i + 0.5) / spikeCount) * 2 * math.pi;
-
-      final valleyR = baseR * spikeDepths[i];
-      final peakR = spikeR * spikeWidths[i];
-
-      allPts.add(Offset(
-        center.dx + math.cos(angle0) * valleyR,
-        center.dy + math.sin(angle0) * valleyR,
-      ));
-      allPts.add(Offset(
-        center.dx + math.cos(angle1) * peakR,
-        center.dy + math.sin(angle1) * peakR,
-      ));
-    }
-
-    // Smooth Catmull-Rom through all points (same approach as plectrum)
-    final centerPath = Path();
-    centerPath.moveTo(allPts[0].dx, allPts[0].dy);
-    for (var i = 0; i < allPts.length; i++) {
-      final p0 = allPts[i];
-      final p1 = allPts[(i + 1) % allPts.length];
-      final prev = allPts[(i - 1 + allPts.length) % allPts.length];
-      final next2 = allPts[(i + 2) % allPts.length];
-      final cp1 = Offset(
-        p0.dx + (p1.dx - prev.dx) / 3.5,
-        p0.dy + (p1.dy - prev.dy) / 3.5,
-      );
-      final cp2 = Offset(
-        p1.dx - (next2.dx - p0.dx) / 3.5,
-        p1.dy - (next2.dy - p0.dy) / 3.5,
-      );
-      centerPath.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
-    }
-    centerPath.close();
+    // Center overlay: horizontal oval in theme color
+    // Wider than tall, soft radial gradient fade
+    final ovalW = r * 0.85;
+    final ovalH = r * 0.55;
+    final ovalRect = Rect.fromCenter(
+      center: center,
+      width: ovalW * 2,
+      height: ovalH * 2,
+    );
 
     final centerPaint = Paint()
       ..shader = RadialGradient(
         colors: [
           bgColor,
-          bgColor.withValues(alpha: 0.92),
+          bgColor,
+          bgColor.withValues(alpha: 0.85),
+          bgColor.withValues(alpha: 0.35),
           bgColor.withValues(alpha: 0.0),
         ],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: spikeR));
+        stops: const [0.0, 0.30, 0.55, 0.78, 1.0],
+      ).createShader(ovalRect);
+
+    // Draw as oval path
+    final centerPath = Path()..addOval(ovalRect);
     canvas.drawPath(centerPath, centerPaint);
   }
 

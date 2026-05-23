@@ -2998,7 +2998,7 @@ class _DebugUISectionState extends State<_DebugUISection> {
           width: double.infinity,
           height: 500,
           decoration: BoxDecoration(
-            color: const Color(0xFF0D0E16),
+            color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFF2A2C3A)),
           ),
