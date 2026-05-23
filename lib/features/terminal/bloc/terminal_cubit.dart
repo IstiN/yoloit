@@ -404,11 +404,9 @@ class TerminalCubit extends Cubit<TerminalState> {
   void _onHookEvent(HookEvent event) {
     debugPrint('[HookEvent] event=${event.event} phase=${event.phase} cwd=${event.workspacePath}');
 
-    // Match the event's workspace path to a session with the same workspacePath.
-    final idx = _allSessions.indexWhere(
-      (s) => s.workspacePath == event.workspacePath,
-    );
+    final idx = _findSessionIndexForWorkspacePath(event.workspacePath);
     if (idx < 0) {
+      if (_allSessions.isEmpty) return;
       debugPrint('[HookEvent] NO MATCH for cwd=${event.workspacePath}  '
           'sessions: ${_allSessions.map((s) => s.workspacePath).toList()}');
       return;
@@ -423,7 +421,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     // PTY idle-timer (5s) will usually clear it sooner via spinner detection.
     if (newPhase is ThinkingPhase) {
       Future.delayed(const Duration(seconds: 15), () {
-        final i = _allSessions.indexWhere((s) => s.workspacePath == event.workspacePath);
+        final i = _findSessionIndexForWorkspacePath(event.workspacePath);
         if (i >= 0 && _allSessions[i].hookPhase is ThinkingPhase) {
           _allSessions[i] = _allSessions[i].copyWith(clearHookPhase: true);
           final cur = _loaded;
@@ -438,7 +436,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     // DonePhase auto-clears after 3s (brief green flash).
     if (newPhase is DonePhase) {
       Future.delayed(const Duration(seconds: 3), () {
-        final i = _allSessions.indexWhere((s) => s.workspacePath == event.workspacePath);
+        final i = _findSessionIndexForWorkspacePath(event.workspacePath);
         if (i >= 0 && _allSessions[i].hookPhase is DonePhase) {
           _allSessions[i] = _allSessions[i].copyWith(clearHookPhase: true);
           final cur = _loaded;
@@ -465,6 +463,31 @@ class TerminalCubit extends Cubit<TerminalState> {
       final visible = _workspaceSessions;
       emit(cur.copyWith(sessions: visible, allSessions: List.unmodifiable(_allSessions)));
     }
+  }
+
+  int _findSessionIndexForWorkspacePath(String workspacePath) {
+    final eventPath = _normalizeWorkspacePath(workspacePath);
+    if (eventPath.isEmpty) return -1;
+
+    final exact = _allSessions.indexWhere(
+      (s) => _normalizeWorkspacePath(s.workspacePath) == eventPath,
+    );
+    if (exact >= 0) return exact;
+
+    return _allSessions.indexWhere((s) {
+      final sessionPath = _normalizeWorkspacePath(s.workspacePath);
+      return eventPath.startsWith('$sessionPath/') || sessionPath.startsWith('$eventPath/');
+    });
+  }
+
+  String _normalizeWorkspacePath(String path) {
+    var normalized = path.trim();
+    if (normalized.isEmpty) return normalized;
+    normalized = normalized.replaceAll('\\', '/');
+    while (normalized.length > 1 && normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
   }
 
   void _attachPtyToSession(Pty pty, AgentSession session) {
