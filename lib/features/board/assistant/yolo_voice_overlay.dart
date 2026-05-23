@@ -741,29 +741,29 @@ class _BlobOrbPainter extends CustomPainter {
       final blobH = blobW * cfg.aspect;
 
       final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
+      final bounds = path.getBounds();
 
-      // Fill: subtle tinted interior — glass bubble look
+      // Shadow behind each blob
+      final shadowPaint = Paint()
+        ..color = colors[i].withValues(alpha: 0.12 * intensity)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+      canvas.drawPath(path, shadowPaint);
+
+      // Solid fill with gradient transparency:
+      // Wide part (top) = opaque, narrow tip (bottom) = fully transparent
       final fillPaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.09 + 0.04 * intensity)
-        ..blendMode = BlendMode.plus;
+        ..shader = ui.Gradient.linear(
+          Offset(bounds.center.dx, bounds.top),
+          Offset(bounds.center.dx, bounds.bottom),
+          [
+            colors[i].withValues(alpha: 0.40 * intensity),
+            colors[i].withValues(alpha: 0.35 * intensity),
+            colors[i].withValues(alpha: 0.0),
+            colors[i].withValues(alpha: 0.0),
+          ],
+          [0.0, 0.35, 0.5, 1.0],
+        );
       canvas.drawPath(path, fillPaint);
-
-      // Edge: bright glowing stroke — defines each blob shape
-      final edgePaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.50 + 0.22 * intensity)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
-      canvas.drawPath(path, edgePaint);
-
-      // Soft outer glow halo
-      final glowEdge = Paint()
-        ..color = colors[i].withValues(alpha: 0.10 + 0.07 * intensity)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
-        ..blendMode = BlendMode.plus;
-      canvas.drawPath(path, glowEdge);
     }
 
     // No inner glow — keep center clear for YoLo text
@@ -1300,11 +1300,12 @@ class _SinglePlectrumPainter extends CustomPainter {
         Offset(bounds.center.dx, bounds.top),
         Offset(bounds.center.dx, bounds.bottom),
         [
-          color.withValues(alpha: 0.40),  // top: visible
-          color.withValues(alpha: 0.35),  // upper-mid: still visible
-          color.withValues(alpha: 0.0),   // bottom: fully transparent
+          color.withValues(alpha: 0.45),  // top: fully visible
+          color.withValues(alpha: 0.40),  // ~40%: still solid
+          color.withValues(alpha: 0.0),   // 50%: fully transparent
+          color.withValues(alpha: 0.0),   // bottom: stays transparent
         ],
-        [0.0, 0.5, 1.0],
+        [0.0, 0.35, 0.5, 1.0],
       );
     canvas.drawPath(path, fillPaint);
   }
