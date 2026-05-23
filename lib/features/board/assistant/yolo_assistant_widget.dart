@@ -1485,6 +1485,28 @@ $messagesJson
               ),
             ),
           ),
+          const SizedBox(width: 4),
+          // Copy full chat log to clipboard
+          GestureDetector(
+            onTap: () => unawaited(_copyFullLogsToClipboard()),
+            child: Tooltip(
+              message: 'Copy chat log to clipboard',
+              child: Container(
+                width: 28,
+                height: 28,
+                margin: const EdgeInsets.only(bottom: 2),
+                decoration: BoxDecoration(
+                  color: colors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.content_copy_outlined,
+                  size: 15,
+                  color: _kAccent,
+                ),
+              ),
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Focus(
@@ -1810,6 +1832,50 @@ $messagesJson
       const SnackBar(
         content: Text('Copied to clipboard'),
         duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  Future<void> _copyFullLogsToClipboard() async {
+    final buf = StringBuffer();
+    buf.writeln('=== YoLoIT Chat Logs ===');
+    buf.writeln('Messages: ${_messages.length}');
+    buf.writeln('');
+    for (final msg in _messages) {
+      final role = msg['role'] ?? 'unknown';
+      final content = msg['content'] as String? ?? '';
+      buf.writeln('--- [$role] ---');
+      buf.writeln(content);
+      final toolCalls = msg['toolCalls'] as List<dynamic>?;
+      if (toolCalls != null && toolCalls.isNotEmpty) {
+        for (final tc in toolCalls) {
+          if (tc is Map) {
+            buf.writeln('  [tool] ${tc['toolName']}(${tc['arguments']})');
+            if (tc['result'] != null) buf.writeln('  [result] ${tc['result']}');
+          }
+        }
+      }
+      buf.writeln('');
+    }
+    // Also append debug session data if available.
+    if (_debugSessions.isNotEmpty) {
+      buf.writeln('=== LLM Debug Sessions ===');
+      for (final dbg in _debugSessions) {
+        buf.writeln('User: ${dbg['userMessage'] ?? ''}');
+        if (dbg['error'] != null) buf.writeln('ERROR: ${dbg['error']}');
+        final resp = dbg['response'] as String? ?? '';
+        if (resp.isNotEmpty) {
+          buf.writeln('Response: ${resp.substring(0, resp.length.clamp(0, 500))}');
+        }
+        buf.writeln('');
+      }
+    }
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Full chat log copied to clipboard'),
+        duration: Duration(seconds: 2),
       ),
     );
   }

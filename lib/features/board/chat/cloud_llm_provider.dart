@@ -403,11 +403,11 @@ class CloudLlmProvider extends ChatProvider {
 
     final request = await HttpClient().postUrl(Uri.parse(url));
     request.headers.set('Authorization', 'Bearer ${config.apiKey}');
-    request.headers.set('Content-Type', 'application/json');
+    request.headers.set('Content-Type', 'application/json; charset=utf-8');
     for (final entry in config.extraHeaders.entries) {
       request.headers.set(entry.key, entry.value);
     }
-    request.write(body);
+    request.add(utf8.encode(body));
 
     final response = await request.close();
 

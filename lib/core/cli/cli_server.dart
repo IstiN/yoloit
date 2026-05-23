@@ -16,6 +16,7 @@ import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
@@ -643,6 +644,114 @@ class CliServer {
         body['limit'] = limit;
       }
       return _panelAction(cubit, target.board, target.panel, body);
+    }
+
+    // POST /yolochat/clear
+    if (sub.length == 1 && sub[0] == 'clear' && method == 'POST') {
+      final body = await _body(request);
+      final target = _resolveYoloChatTarget(
+        cubit,
+        boardHint: body['board'] as String?,
+        panelHint: body['panel'] as String?,
+      );
+      if (target == null) {
+        return _error('No board.chat panel found (or target not found)');
+      }
+      return _panelAction(
+        cubit, target.board, target.panel, {'action': 'clear'},
+      );
+    }
+
+    // GET /yolochat/sessions
+    // GET /yolochat/sessions — list all active sessions (no target needed)
+    if (sub.length == 1 && sub[0] == 'sessions' && method == 'GET') {
+      final ids = ChatSessionManager.instance.activeSessionIds;
+      final sessions = <Map<String, dynamic>>[];
+      for (final id in ids) {
+        final session = ChatSessionManager.instance.get(id);
+        if (session != null) {
+          sessions.add({
+            'panelId': id,
+            'provider': session.config.provider,
+            'model': session.config.model,
+            'messageCount': session.messages.length,
+            'isProcessing': session.isProcessing,
+          });
+        }
+      }
+      return _json({'ok': true, 'sessions': sessions});
+    }
+
+    // GET /yolochat/status
+    if (sub.length == 1 && sub[0] == 'status' && method == 'GET') {
+      final boardHint = request.url.queryParameters['board'];
+      final panelHint = request.url.queryParameters['panel'];
+      final target = _resolveYoloChatTarget(
+        cubit,
+        boardHint: boardHint,
+        panelHint: panelHint,
+      );
+      if (target == null) {
+        return _error('No board.chat panel found (or target not found)');
+      }
+      return _panelAction(
+        cubit, target.board, target.panel, {'action': 'status'},
+      );
+    }
+
+    // POST /yolochat/stop
+    if (sub.length == 1 && sub[0] == 'stop' && method == 'POST') {
+      final body = await _body(request);
+      final target = _resolveYoloChatTarget(
+        cubit,
+        boardHint: body['board'] as String?,
+        panelHint: body['panel'] as String?,
+      );
+      if (target == null) {
+        return _error('No board.chat panel found (or target not found)');
+      }
+      return _panelAction(
+        cubit, target.board, target.panel, {'action': 'stop'},
+      );
+    }
+
+    // GET /yolochat/logs — full session log for debugging (copy-paste friendly)
+    if (sub.length == 1 && sub[0] == 'logs' && method == 'GET') {
+      final boardHint = request.url.queryParameters['board'];
+      final panelHint = request.url.queryParameters['panel'];
+      final target = _resolveYoloChatTarget(
+        cubit,
+        boardHint: boardHint,
+        panelHint: panelHint,
+      );
+      if (target == null) {
+        return _error('No board.chat panel found (or target not found)');
+      }
+      final session = ChatSessionManager.instance.get(target.panel.id);
+      final messages = session?.messages ?? [];
+      final buf = StringBuffer();
+      buf.writeln('=== YoLoIT Chat Logs ===');
+      buf.writeln('Board: ${target.board.name}');
+      buf.writeln('Panel: ${target.panel.title ?? target.panel.id}');
+      buf.writeln('Provider: ${session?.config.provider ?? "unknown"}');
+      buf.writeln('Model: ${session?.config.model ?? "unknown"}');
+      buf.writeln('Messages: ${messages.length}');
+      buf.writeln('');
+      for (final msg in messages) {
+        buf.writeln('--- [${msg.role.name}] ---');
+        buf.writeln(msg.content);
+        if (msg.toolCalls.isNotEmpty) {
+          for (final tc in msg.toolCalls) {
+            buf.writeln('  [tool] ${tc.toolName}(${tc.arguments})');
+            if (tc.result != null) buf.writeln('  [result] ${tc.result}');
+          }
+        }
+        buf.writeln('');
+      }
+      return shelf.Response.ok(
+        buf.toString(),
+        headers: {'content-type': 'text/plain; charset=utf-8'},
+      );
     }
 
     return _notFound('Unknown yolochat route');

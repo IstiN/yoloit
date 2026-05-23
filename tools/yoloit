@@ -356,6 +356,53 @@ commands = [
     "example": "yoloit yolochat:messages --board \"Main\" --panel \"AI Chat\" --limit 20",
   },
   {
+    "group": "yolochat",
+    "name": "yolochat:clear",
+    "description": "Clear all messages in a chat session",
+    "params": [
+      ["--board id|name", "Target board (optional)", False],
+      ["--panel id|title", "Target chat panel (optional)", False],
+    ],
+    "example": "yoloit yolochat:clear --board \"Main\"",
+  },
+  {
+    "group": "yolochat",
+    "name": "yolochat:sessions",
+    "description": "List all active chat sessions",
+    "params": [],
+    "example": "yoloit yolochat:sessions",
+  },
+  {
+    "group": "yolochat",
+    "name": "yolochat:status",
+    "description": "Show current chat session status (provider, model, processing)",
+    "params": [
+      ["--board id|name", "Target board (optional)", False],
+      ["--panel id|title", "Target chat panel (optional)", False],
+    ],
+    "example": "yoloit yolochat:status --board \"Main\"",
+  },
+  {
+    "group": "yolochat",
+    "name": "yolochat:stop",
+    "description": "Stop active streaming in a chat session",
+    "params": [
+      ["--board id|name", "Target board (optional)", False],
+      ["--panel id|title", "Target chat panel (optional)", False],
+    ],
+    "example": "yoloit yolochat:stop",
+  },
+  {
+    "group": "yolochat",
+    "name": "yolochat:logs",
+    "description": "Export full chat session log as plain text (for debugging/copy-paste)",
+    "params": [
+      ["--board id|name", "Target board (optional)", False],
+      ["--panel id|title", "Target chat panel (optional)", False],
+    ],
+    "example": "yoloit yolochat:logs --board \"Main\"",
+  },
+  {
     "group": "cloud",
     "name": "cloud:list",
     "description": "List cloud LLM providers and active config",
@@ -1798,6 +1845,89 @@ PY
     fi
     _get "$path" | python3 -m json.tool 2>/dev/null || _get "$path"
     ;;
+  yolochat:clear)
+    board=""
+    panel=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board="${2:-}"; shift 2 ;;
+        --panel) panel="${2:-}"; shift 2 ;;
+        *) echo "Usage: yoloit yolochat:clear [--board <id|name>] [--panel <id|title>]" >&2; exit 1 ;;
+      esac
+    done
+    payload=$(python3 - "$board" "$panel" <<'PY'
+import json, sys
+board, panel = sys.argv[1:3]
+body = {}
+if board: body["board"] = board
+if panel: body["panel"] = panel
+print(json.dumps(body))
+PY
+)
+    _post "/yolochat/clear" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
+  yolochat:sessions)
+    _get "/yolochat/sessions" | python3 -m json.tool 2>/dev/null
+    ;;
+  yolochat:status)
+    board=""
+    panel=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board="${2:-}"; shift 2 ;;
+        --panel) panel="${2:-}"; shift 2 ;;
+        *) echo "Usage: yoloit yolochat:status [--board <id|name>] [--panel <id|title>]" >&2; exit 1 ;;
+      esac
+    done
+    path="/yolochat/status"
+    if [[ -n "$board" || -n "$panel" ]]; then
+      q=()
+      if [[ -n "$board" ]]; then q+=("board=$(_encode "$board")"); fi
+      if [[ -n "$panel" ]]; then q+=("panel=$(_encode "$panel")"); fi
+      path="${path}?$(IFS='&'; echo "${q[*]}")"
+    fi
+    _get "$path" | python3 -m json.tool 2>/dev/null
+    ;;
+  yolochat:stop)
+    board=""
+    panel=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board="${2:-}"; shift 2 ;;
+        --panel) panel="${2:-}"; shift 2 ;;
+        *) echo "Usage: yoloit yolochat:stop [--board <id|name>] [--panel <id|title>]" >&2; exit 1 ;;
+      esac
+    done
+    payload=$(python3 - "$board" "$panel" <<'PY'
+import json, sys
+board, panel = sys.argv[1:3]
+body = {}
+if board: body["board"] = board
+if panel: body["panel"] = panel
+print(json.dumps(body))
+PY
+)
+    _post "/yolochat/stop" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
+  yolochat:logs)
+    board=""
+    panel=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board="${2:-}"; shift 2 ;;
+        --panel) panel="${2:-}"; shift 2 ;;
+        *) echo "Usage: yoloit yolochat:logs [--board <id|name>] [--panel <id|title>]" >&2; exit 1 ;;
+      esac
+    done
+    path="/yolochat/logs"
+    if [[ -n "$board" || -n "$panel" ]]; then
+      q=()
+      if [[ -n "$board" ]]; then q+=("board=$(_encode "$board")"); fi
+      if [[ -n "$panel" ]]; then q+=("panel=$(_encode "$panel")"); fi
+      path="${path}?$(IFS='&'; echo "${q[*]}")"
+    fi
+    _get "$path"
+    ;;
 
   # ── cloud providers ──
   cloud:list)
@@ -2576,6 +2706,9 @@ ALIAS = {
     'model:download':'models:download','link:open':'web:open',
     'webpage:open':'web:open','widget:create':'app:create',
     'yolochat:history':'yolochat:messages','chat:history':'yolochat:messages',
+    'chat:clear':'yolochat:clear','chat:sessions':'yolochat:sessions',
+    'chat:status':'yolochat:status','chat:stop':'yolochat:stop',
+    'chat:logs':'yolochat:logs','chat:send':'yolochat:send',
     'board:generate-screenshot':'board:screenshot','board:generate':'board:snapshot',
     'panel:close':'panel:hide','note:write':'note:add',
     'board:copy':'board:clone','board:config':'board:settings',
