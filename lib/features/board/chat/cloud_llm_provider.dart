@@ -464,9 +464,11 @@ class CloudLlmProvider extends ChatProvider {
     final text = userMessage.toLowerCase().trim();
     final boardMatch = _matchBoardNavigationShortcut(text, runtimeContext);
     if (boardMatch != null) {
+      final callId = 'shortcut-${_toolCallSequence++}';
       return _ApiResponse(
         toolCalls: <_ParsedToolCall>[
           _ParsedToolCall(
+            id: callId,
             functionName: 'yoloit_board_focus',
             arguments: <String, Object?>{'id_or_name': boardMatch.$1},
           ),
@@ -477,9 +479,11 @@ class CloudLlmProvider extends ChatProvider {
 
     final playlistMatch = _matchPlaylistPlayShortcut(text, runtimeContext);
     if (playlistMatch != null) {
+      final callId = 'shortcut-${_toolCallSequence++}';
       return _ApiResponse(
         toolCalls: <_ParsedToolCall>[
           _ParsedToolCall(
+            id: callId,
             functionName: 'yoloit_play',
             arguments: <String, Object?>{
               if (runtimeContext?.boardId?.trim().isNotEmpty == true)
