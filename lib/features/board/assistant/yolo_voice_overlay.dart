@@ -746,15 +746,15 @@ class _BlobOrbPainter extends CustomPainter {
       canvas.drawPath(path, shadowPaint);
 
       // Gradient follows shape rotation:
-      // Wide end (top of unrotated shape) = opaque
-      // Narrow tip (bottom of unrotated shape) = transparent
+      // Wide end (top) = fully transparent
+      // Narrow tip (bottom) = opaque, smoothly fading from ~50%
       final gradLen = bounds.height * 0.5;
-      // "top" in shape-local coords is (0, -1), rotated by rot
+      // gradStart = wide end (top of shape before rotation)
       final gradStart = Offset(
         bounds.center.dx - math.sin(rot) * gradLen,
         bounds.center.dy - math.cos(rot) * gradLen,
       );
-      // "bottom" in shape-local coords is (0, +1), rotated by rot
+      // gradEnd = narrow tip (bottom of shape before rotation)
       final gradEnd = Offset(
         bounds.center.dx + math.sin(rot) * gradLen,
         bounds.center.dy + math.cos(rot) * gradLen,
@@ -765,12 +765,13 @@ class _BlobOrbPainter extends CustomPainter {
           gradStart,
           gradEnd,
           [
-            colors[i].withValues(alpha: 0.40 * intensity),
-            colors[i].withValues(alpha: 0.35 * intensity),
-            colors[i].withValues(alpha: 0.0),
-            colors[i].withValues(alpha: 0.0),
+            colors[i].withValues(alpha: 0.0),                    // wide end: transparent
+            colors[i].withValues(alpha: 0.0),                    // still transparent
+            colors[i].withValues(alpha: 0.08 * intensity),       // ~50%: start appearing
+            colors[i].withValues(alpha: 0.22 * intensity),       // ~70%: building up
+            colors[i].withValues(alpha: 0.40 * intensity),       // tip: fully visible
           ],
-          [0.0, 0.35, 0.5, 1.0],
+          [0.0, 0.4, 0.6, 0.8, 1.0],
         );
       canvas.drawPath(path, fillPaint);
     }
@@ -1302,7 +1303,7 @@ class _SinglePlectrumPainter extends CustomPainter {
     canvas.drawPath(path, shadowPaint);
 
     // Gradient follows shape rotation:
-    // Wide end = opaque, narrow tip = transparent
+    // Wide end = fully transparent, narrow tip = opaque
     final bounds = path.getBounds();
     final gradRot = rotation + t * 0.08;
     final gradLen = bounds.height * 0.5;
@@ -1320,12 +1321,13 @@ class _SinglePlectrumPainter extends CustomPainter {
         gradStart,
         gradEnd,
         [
-          color.withValues(alpha: 0.45),
-          color.withValues(alpha: 0.40),
-          color.withValues(alpha: 0.0),
-          color.withValues(alpha: 0.0),
+          color.withValues(alpha: 0.0),      // wide end: transparent
+          color.withValues(alpha: 0.0),      // still transparent
+          color.withValues(alpha: 0.10),     // ~50%: start appearing
+          color.withValues(alpha: 0.25),     // ~70%: building up
+          color.withValues(alpha: 0.45),     // tip: fully visible
         ],
-        [0.0, 0.35, 0.5, 1.0],
+        [0.0, 0.4, 0.6, 0.8, 1.0],
       );
     canvas.drawPath(path, fillPaint);
   }
