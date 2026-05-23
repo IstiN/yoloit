@@ -1960,6 +1960,49 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     ],
   ),
   YoloitCliTool(
+    command: 'agent:list',
+    alias: 'agl',
+    description:
+        'List configured agents, default agent, and live agent sessions',
+    group: 'agents',
+  ),
+  YoloitCliTool(
+    command: 'agent:default',
+    alias: 'agd',
+    description: 'Get or set the default terminal agent (default: copilot)',
+    group: 'agents',
+    params: <YoloitCliToolParam>[_p('agent', 'Agent id to set', shortKey: 'a')],
+  ),
+  YoloitCliTool(
+    command: 'agent:run',
+    alias: 'agr',
+    description:
+        'Launch an agent session in a folder and optionally send an initial task',
+    group: 'agents',
+    params: <YoloitCliToolParam>[
+      _p('agent', 'Agent id', shortKey: 'a'),
+      _p('path', 'Workspace or folder path', required: true, shortKey: 'pth'),
+      _p('task', 'Optional initial task/prompt', shortKey: 'tsk'),
+      _p('name', 'Optional session name', flag: '--name', shortKey: 'n'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'search',
+    alias: 'srh',
+    description:
+        'Search text across all boards, panels, active chats, and saved chat sessions',
+    group: 'search',
+    params: <YoloitCliToolParam>[
+      _p('query', 'Search text', required: true, shortKey: 'q'),
+      _p(
+        'scope',
+        'Search scope: all, boards, active-chats, sessions',
+        flag: '--scope',
+        shortKey: 's',
+      ),
+    ],
+  ),
+  YoloitCliTool(
     command: 'yolochat:panels',
     alias: 'cls',
     description: 'List all board.chat panels',
@@ -2052,6 +2095,35 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     group: 'yolochat',
   ),
   YoloitCliTool(
+    command: 'yolochat:history',
+    alias: 'chy',
+    description: 'List saved YoLo chat sessions from chat history',
+    group: 'yolochat',
+  ),
+  YoloitCliTool(
+    command: 'yolochat:restore',
+    alias: 'crs',
+    description: 'Restore a saved YoLo chat session into a chat panel',
+    group: 'yolochat',
+    params: <YoloitCliToolParam>[
+      _p('session_id', 'Saved session id', required: true, shortKey: 'sid'),
+      _p(
+        'board',
+        'Target board',
+        flag: '--board',
+        runtimeDefault: YoloitCliRuntimeDefault.board,
+        shortKey: 'b',
+      ),
+      _p(
+        'panel',
+        'Target chat panel',
+        flag: '--panel',
+        runtimeDefault: YoloitCliRuntimeDefault.panel,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+  YoloitCliTool(
     command: 'yolochat:status',
     alias: 'cst',
     description: 'Show YoLo chat status',
@@ -2138,6 +2210,50 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         required: true,
         flag: '--model',
         shortKey: 'm',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'files:search',
+    alias: 'fsh',
+    description:
+        'Read-only search for files and folders on the local file system (default root: home)',
+    group: 'files',
+    params: <YoloitCliToolParam>[
+      _p('query', 'File or folder name query', required: true, shortKey: 'q'),
+      _p('root', 'Search root path', flag: '--root', shortKey: 'r'),
+      _p('type', 'files, dirs, or all', flag: '--type', shortKey: 't'),
+      _p(
+        'limit',
+        'Max results',
+        flag: '--limit',
+        kind: YoloitCliToolParamKind.number,
+        shortKey: 'lim',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'files:list',
+    alias: 'fls',
+    description: 'Read-only list of directory entries for a file system path',
+    group: 'files',
+    params: <YoloitCliToolParam>[
+      _p('path', 'Directory path', required: true, shortKey: 'p'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'files:read',
+    alias: 'frd',
+    description: 'Read-only display of a text file from the local file system',
+    group: 'files',
+    params: <YoloitCliToolParam>[
+      _p('path', 'File path', required: true, shortKey: 'p'),
+      _p(
+        'lines',
+        'Max lines to print',
+        flag: '--lines',
+        kind: YoloitCliToolParamKind.number,
+        shortKey: 'ln',
       ),
     ],
   ),

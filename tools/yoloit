@@ -336,6 +336,42 @@ commands = [
     "example": "yoloit process-command \"создай заметку покупки\"",
   },
   {
+    "group": "agents",
+    "name": "agent:list",
+    "description": "List configured agents, default agent, and live sessions",
+    "params": [],
+    "example": "yoloit agent:list",
+  },
+  {
+    "group": "agents",
+    "name": "agent:default",
+    "description": "Get or set the default terminal agent",
+    "params": [["agent-id", "Optional agent id to set", False]],
+    "example": "yoloit agent:default copilot",
+  },
+  {
+    "group": "agents",
+    "name": "agent:run",
+    "description": "Launch an agent in a folder and optionally send an initial task",
+    "params": [
+      ["agent-id", "Optional agent id (default: configured default agent)", False],
+      ["path", "Workspace or folder path", True],
+      ["task", "Optional initial task text", False],
+      ["--name label", "Optional session label", False]
+    ],
+    "example": "yoloit agent:run copilot ~/src/project \"fix tests\"",
+  },
+  {
+    "group": "search",
+    "name": "search",
+    "description": "Search text across boards, panels, active chats, and saved chat sessions",
+    "params": [
+      ["query", "Search text", True],
+      ["--scope all|boards|active-chats|sessions", "Search scope", False]
+    ],
+    "example": "yoloit search mermaid --scope all",
+  },
+  {
     "group": "yolochat",
     "name": "yolochat:panels",
     "description": "List all board.chat panels",
@@ -380,6 +416,24 @@ commands = [
     "description": "List all active chat sessions",
     "params": [],
     "example": "yoloit yolochat:sessions",
+  },
+  {
+    "group": "yolochat",
+    "name": "yolochat:history",
+    "description": "List saved chat sessions from history",
+    "params": [],
+    "example": "yoloit yolochat:history",
+  },
+  {
+    "group": "yolochat",
+    "name": "yolochat:restore",
+    "description": "Restore a saved chat session into a panel",
+    "params": [
+      ["session-id", "Saved session id", True],
+      ["--board id|name", "Target board (optional)", False],
+      ["--panel id|title", "Target chat panel (optional)", False]
+    ],
+    "example": "yoloit yolochat:restore session-123 --board \"Main\"",
   },
   {
     "group": "yolochat",
@@ -456,6 +510,35 @@ commands = [
       ["--model model-id", "New model id", False],
     ],
     "example": "yoloit cloud:update cloud-123 --model gpt-4o",
+  },
+  {
+    "group": "files",
+    "name": "files:search",
+    "description": "Read-only search for files and folders (default root: home)",
+    "params": [
+      ["query", "File or folder query", True],
+      ["--root path", "Search root path", False],
+      ["--type files|dirs|all", "Search item type", False],
+      ["--limit N", "Max results", False]
+    ],
+    "example": "yoloit files:search README.md --root ~/ai.m",
+  },
+  {
+    "group": "files",
+    "name": "files:list",
+    "description": "Read-only list of a directory path",
+    "params": [["path", "Directory path", True]],
+    "example": "yoloit files:list ~/ai.m",
+  },
+  {
+    "group": "files",
+    "name": "files:read",
+    "description": "Read-only display of a text file",
+    "params": [
+      ["path", "File path", True],
+      ["--lines N", "Max lines", False]
+    ],
+    "example": "yoloit files:read ~/ai.m/README.md --lines 120",
   },
   {
     "group": "cloud",
@@ -1930,6 +2013,69 @@ print(json.dumps(b))
     kind="$1"; model_id="$2"
     _post "/local-models/select" "{\"kind\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$kind"),\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$model_id")}" | python3 -m json.tool 2>/dev/null
     ;;
+  agent:list)
+    _get "/agents" | python3 -m json.tool 2>/dev/null
+    ;;
+  agent:default)
+    if [[ $# -eq 0 ]]; then
+      _get "/agents" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('defaultAgentId','copilot'))" 2>/dev/null
+    else
+      _post "/agents/default" "{\"id\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$1")}" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  agent:run)
+    if [[ $# -eq 0 ]]; then
+      echo "Usage: yoloit agent:run [agent-id] <path> [task] [--name label]" >&2; exit 1
+    fi
+    agent_id=""; path_arg=""; task_arg=""; name_arg=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --name) name_arg="${2:-}"; shift 2 ;;
+        copilot|claude|gemini|cursor|pi|terminal)
+          if [[ -z "$agent_id" && -z "$path_arg" ]]; then
+            agent_id="$1"; shift
+          else
+            if [[ -z "$path_arg" ]]; then path_arg="$1"; else task_arg="${task_arg:+$task_arg }$1"; fi
+            shift
+          fi
+          ;;
+        *)
+          if [[ -z "$path_arg" ]]; then path_arg="$1"; else task_arg="${task_arg:+$task_arg }$1"; fi
+          shift
+          ;;
+      esac
+    done
+    [[ -z "$path_arg" ]] && { echo "Usage: yoloit agent:run [agent-id] <path> [task] [--name label]" >&2; exit 1; }
+    [[ "$path_arg" == ~* ]] && path_arg="${path_arg/#\~/$HOME}"
+    if [[ "$path_arg" != /* ]]; then
+      path_arg="$(cd "$path_arg" 2>/dev/null && pwd)" || { echo "❌ Path not found: $path_arg" >&2; exit 1; }
+    fi
+    payload=$(python3 - "$path_arg" "$agent_id" "$task_arg" "$name_arg" <<'PY'
+import json, sys
+path_arg, agent_id, task_arg, name_arg = sys.argv[1:5]
+body = {'path': path_arg}
+if agent_id:
+    body['agent'] = agent_id
+if task_arg:
+    body['task'] = task_arg
+if name_arg:
+    body['name'] = name_arg
+print(json.dumps(body))
+PY
+)
+    _post "/agents/run" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
+  search)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit search <query> [--scope all|boards|active-chats|sessions]" >&2; exit 1; }
+    query=""; scope="all"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --scope) scope="${2:-all}"; shift 2 ;;
+        *) query="${query:+$query }$1"; shift ;;
+      esac
+    done
+    _get "/search?q=$(_encode "$query")&scope=$(_encode "$scope")" | python3 -m json.tool 2>/dev/null
+    ;;
 
   lm:generate)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit lm:generate <message> [--model <id>] [--system <prompt>] [--max-tokens <N>]" >&2; exit 1; }
@@ -2082,6 +2228,33 @@ PY
   yolochat:sessions)
     _get "/yolochat/sessions" | python3 -m json.tool 2>/dev/null
     ;;
+  yolochat:history)
+    _get "/yolochat/history" | python3 -m json.tool 2>/dev/null
+    ;;
+  yolochat:restore)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit yolochat:restore <session-id> [--board <id|name>] [--panel <id|title>]" >&2; exit 1; }
+    session_id="$1"; shift
+    board=""; panel=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board="${2:-}"; shift 2 ;;
+        --panel) panel="${2:-}"; shift 2 ;;
+        *) echo "Usage: yoloit yolochat:restore <session-id> [--board <id|name>] [--panel <id|title>]" >&2; exit 1 ;;
+      esac
+    done
+    payload=$(python3 - "$session_id" "$board" "$panel" <<'PY'
+import json, sys
+session_id, board, panel = sys.argv[1:4]
+body = {'sessionId': session_id}
+if board:
+    body['board'] = board
+if panel:
+    body['panel'] = panel
+print(json.dumps(body))
+PY
+)
+    _post "/yolochat/restore" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
   yolochat:status)
     board=""
     panel=""
@@ -2201,6 +2374,91 @@ PY
       fi
       _post "/cloud-providers/provider-type" "{\"type\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$ptype")}" | python3 -m json.tool 2>/dev/null
     fi
+    ;;
+  files:search)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit files:search <query> [--root <path>] [--type files|dirs|all] [--limit N]" >&2; exit 1; }
+    query=""; root="$HOME"; type="all"; limit="50"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --root) root="${2:-$HOME}"; shift 2 ;;
+        --type) type="${2:-all}"; shift 2 ;;
+        --limit) limit="${2:-50}"; shift 2 ;;
+        *) query="${query:+$query }$1"; shift ;;
+      esac
+    done
+    [[ "$root" == ~* ]] && root="${root/#\~/$HOME}"
+    python3 - "$query" "$root" "$type" "$limit" <<'PYEOF'
+import json, os, sys
+from pathlib import Path
+query, root, item_type, limit = sys.argv[1], os.path.expanduser(sys.argv[2]), sys.argv[3], int(sys.argv[4] or 50)
+root_path = Path(root).expanduser()
+if not root_path.exists():
+    print(json.dumps({"ok": False, "error": f"Path not found: {root}"}))
+    raise SystemExit(0)
+needle = query.lower()
+results = []
+for path in root_path.rglob('*'):
+    try:
+        is_dir = path.is_dir()
+    except OSError:
+        continue
+    if item_type == 'files' and is_dir:
+        continue
+    if item_type == 'dirs' and not is_dir:
+        continue
+    if needle in path.name.lower():
+        results.append({"path": str(path), "type": "dir" if is_dir else "file"})
+    if len(results) >= limit:
+        break
+print(json.dumps({"ok": True, "query": query, "root": str(root_path), "results": results}, ensure_ascii=False, indent=2))
+PYEOF
+    ;;
+  files:list)
+    path_arg="${1:-$HOME}"
+    [[ "$path_arg" == ~* ]] && path_arg="${path_arg/#\~/$HOME}"
+    python3 - "$path_arg" <<'PYEOF'
+import json, os, sys
+from pathlib import Path
+path = Path(os.path.expanduser(sys.argv[1]))
+if not path.exists():
+    print(json.dumps({"ok": False, "error": f"Path not found: {path}"}))
+    raise SystemExit(0)
+if not path.is_dir():
+    print(json.dumps({"ok": False, "error": f"Not a directory: {path}"}))
+    raise SystemExit(0)
+entries = [{"name": child.name, "path": str(child), "type": "dir" if child.is_dir() else "file"} for child in sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))]
+print(json.dumps({"ok": True, "path": str(path), "entries": entries}, ensure_ascii=False, indent=2))
+PYEOF
+    ;;
+  files:read)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit files:read <path> [--lines N]" >&2; exit 1; }
+    path_arg="$1"; shift
+    lines="200"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --lines) lines="${2:-200}"; shift 2 ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+      esac
+    done
+    [[ "$path_arg" == ~* ]] && path_arg="${path_arg/#\~/$HOME}"
+    python3 - "$path_arg" "$lines" <<'PYEOF'
+import os, sys
+from pathlib import Path
+path = Path(os.path.expanduser(sys.argv[1]))
+limit = int(sys.argv[2] or 200)
+if not path.exists():
+    print(f"Error: Path not found: {path}", file=sys.stderr)
+    raise SystemExit(1)
+if path.is_dir():
+    print(f"Error: Path is a directory: {path}", file=sys.stderr)
+    raise SystemExit(1)
+with path.open('r', encoding='utf-8', errors='replace') as f:
+    for i, line in enumerate(f, start=1):
+        if i > limit:
+            print("…")
+            break
+        print(f"{i}. {line.rstrip()}")
+PYEOF
     ;;
 
   # ── links ──

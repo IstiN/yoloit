@@ -738,6 +738,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
 
   void _startCliServer() {
     final cubit = context.read<BoardCubit>();
+    final terminalCubit = context.read<TerminalCubit>();
     final server = CliServer.instance;
     // Register all panel CLI handlers
     server.registerPanelHandler(const NoteCliHandler());
@@ -758,7 +759,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     server.registerPanelHandler(const AssistantCliHandler());
     server.registerPanelHandler(const TimerCliHandler());
     server.registerPanelHandler(const CustomWidgetCliHandler());
-    server.start(cubit);
+    server.start(cubit, terminalCubit: terminalCubit);
     // Wire service managers to BoardCubit for headless state updates
     TimerManager.instance.setCubit(cubit);
     WidgetEngineManager.instance.setCubit(cubit);

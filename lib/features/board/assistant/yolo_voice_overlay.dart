@@ -72,7 +72,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     _shown = _VS.from(widget.status);
     _orbAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 5000),
+      duration: const Duration(milliseconds: 8000),
     );
     if (widget.animate) {
       _orbAnim.repeat();
@@ -368,8 +368,8 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
           style: TextStyle(
             color: Colors.white,
             fontSize: sz * 0.20,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.2,
+            fontWeight: FontWeight.w300,
+            letterSpacing: -0.8,
             shadows: const [
               Shadow(color: Color(0xAA63B8FF), blurRadius: 16),
             ],
@@ -636,9 +636,10 @@ class _BlobOrbPainter extends CustomPainter {
     for (var i = 0; i < segments; i++) {
       final angle = (i / segments) * 2 * math.pi;
       // Gentle wobble for organic feel (not too bumpy)
+      // Integer multipliers ensure animation loops seamlessly (2π period)
       final wobble = 1.0 +
-          math.sin(wobbleT * 1.8 + i * 0.55 + rng.nextDouble() * 0.3) * 0.04 +
-          math.cos(wobbleT * 1.3 + i * 0.7) * 0.03;
+          math.sin(wobbleT * 2 + i * 0.55 + rng.nextDouble() * 0.3) * 0.04 +
+          math.cos(wobbleT * 1 + i * 0.7) * 0.03;
       final rx = w / 2 * wobble;
       final ry = h / 2 * wobble;
       points.add(Offset(
@@ -698,39 +699,47 @@ class _BlobOrbPainter extends CustomPainter {
     for (var i = 0; i < 5; i++) {
       final cfg = _blobConfigs[i];
       final t = progress * 2 * math.pi + cfg.phase;
-      final blobAngle = cfg.angle + t * 0.14;
+      // Slow orbital movement — integer multiplier for seamless loop, small radius
+      final blobAngle = cfg.angle + t;  // t = progress*2π, full cycle = seamless
 
-      // Each blob significantly offset from center to show overlap
-      final dx = math.cos(blobAngle) * r * 0.30;
-      final dy = math.sin(blobAngle * 1.15) * r * 0.24;
+      // Small orbit so movement is gentle despite full 2π cycle
+      final dx = math.cos(blobAngle) * r * 0.22;
+      final dy = math.sin(blobAngle * 1.0) * r * 0.18;
       final blobCenter = Offset(center.dx + dx, center.dy + dy);
 
-      final blobW = r * 2 * cfg.scale * (0.82 + math.sin(t * 0.7) * 0.04);
+      final blobW = r * 2 * cfg.scale * (0.82 + math.sin(t * 1.0) * 0.04);
       final blobH = blobW * cfg.aspect;
 
       final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
 
-      // Fill: very subtle translucent tint
+      // Fill: radial gradient — opaque center → transparent at boundary
+      final blobRect = path.getBounds();
       final fillPaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.08 + 0.04 * intensity)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1)
+        ..shader = RadialGradient(
+          colors: [
+            colors[i].withValues(alpha: 0.22 + 0.12 * intensity),
+            colors[i].withValues(alpha: 0.10 + 0.06 * intensity),
+            colors[i].withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.6, 1.0],
+        ).createShader(blobRect)
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, fillPaint);
 
-      // Edge: the PRIMARY visual element — soft glowing border
+      // Edge: soft glowing border — fades out at boundary
       final edgePaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.26 + 0.16 * intensity)
+        ..color = colors[i].withValues(alpha: 0.20 + 0.14 * intensity)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5);
+        ..strokeWidth = 1.8
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
       canvas.drawPath(path, edgePaint);
 
-      // Subtle wider glow around each blob edge
+      // Wide halo glow — very soft, transparent at outer edge
       final glowEdge = Paint()
-        ..color = colors[i].withValues(alpha: 0.06 + 0.04 * intensity)
+        ..color = colors[i].withValues(alpha: 0.04 + 0.03 * intensity)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
+        ..strokeWidth = 12
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14)
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, glowEdge);
     }

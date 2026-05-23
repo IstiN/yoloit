@@ -1,8 +1,10 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/config/app_config.dart';
+import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/core/hotkeys/hotkey_definition.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
@@ -41,6 +43,11 @@ const _kCategories = [
   'Setup Guide',
   'Apps & Widgets',
   'About',
+];
+
+const _kDebugCategories = [
+  ..._kCategories,
+  'Debug UI',
 ];
 
 const _kSkillsCategoryIndex = 6;
@@ -98,7 +105,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return Container(
-      constraints: const BoxConstraints(maxWidth: 760, maxHeight: 680),
+      constraints: const BoxConstraints(maxWidth: 900, maxHeight: 780),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(12),
@@ -161,13 +168,17 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  List<String> get _categories =>
+      kDebugMode ? _kDebugCategories : _kCategories;
+
   Widget _buildSidebar(BuildContext context) {
     final colors = context.appColors;
+    final cats = _categories;
     return SizedBox(
       width: 140,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _kCategories.length,
+        itemCount: cats.length,
         itemBuilder: (context, index) {
           final isActive = index == _selectedCategory;
           return InkWell(
@@ -183,7 +194,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               child: Text(
-                _kCategories[index],
+                cats[index],
                 style: TextStyle(
                   color:
                       isActive
@@ -297,7 +308,7 @@ class _SettingsPageState extends State<SettingsPage> {
             WidgetPermissionsSection(),
           ],
         ),
-        _ => Column(
+        10 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'About'),
@@ -305,6 +316,9 @@ class _SettingsPageState extends State<SettingsPage> {
             _AboutSection(),
           ],
         ),
+        _ => kDebugMode
+            ? const _DebugUISection()
+            : const SizedBox.shrink(),
       },
     );
   }
@@ -2800,6 +2814,149 @@ class _SettingsToggle extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Debug UI Section ─────────────────────────────────────────────────────────
+
+class _DebugUISection extends StatefulWidget {
+  const _DebugUISection();
+
+  @override
+  State<_DebugUISection> createState() => _DebugUISectionState();
+}
+
+class _DebugUISectionState extends State<_DebugUISection> {
+  String _voiceStatus = 'idle';
+  String _voiceResponse = 'This is a sample response from the LLM model. '
+      'It demonstrates how text appears in the response card.';
+  String _voiceTranscript = 'Show me the weather today';
+
+  static const _statuses = [
+    'idle',
+    'listening',
+    'processing',
+    'thinking',
+    'responding',
+    'output',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(title: 'Debug UI Components'),
+        const SizedBox(height: 16),
+        Text(
+          'Voice Overlay State',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: _statuses.map((s) {
+            final active = s == _voiceStatus;
+            return ChoiceChip(
+              label: Text(s),
+              selected: active,
+              onSelected: (_) => setState(() => _voiceStatus = s),
+              selectedColor: const Color(0xFF6644FF),
+              labelStyle: TextStyle(
+                color: active ? Colors.white : Colors.white70,
+                fontSize: 12,
+              ),
+              backgroundColor: const Color(0xFF2A2C3A),
+              side: BorderSide(
+                color: active
+                    ? const Color(0xFF6644FF)
+                    : const Color(0xFF3A3C4E),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          height: 500,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D0E16),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF2A2C3A)),
+          ),
+          child: Center(
+            child: YoloVoiceOverlay(
+              status: _voiceStatus,
+              title: 'YoLo',
+              hint: 'Esc to cancel  •  Space to send',
+              transcript: _voiceTranscript,
+              response: _voiceResponse,
+              animate: true,
+              onHide: () => setState(() => _voiceStatus = 'idle'),
+              onPrimaryAction: () {
+                final idx = _statuses.indexOf(_voiceStatus);
+                final next = (idx + 1) % _statuses.length;
+                setState(() => _voiceStatus = _statuses[next]);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Response Text',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          maxLines: 3,
+          controller: TextEditingController(text: _voiceResponse),
+          onChanged: (v) => setState(() => _voiceResponse = v),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFF1E2030),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF3A3C4E)),
+            ),
+            contentPadding: const EdgeInsets.all(12),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Transcript Text',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: TextEditingController(text: _voiceTranscript),
+          onChanged: (v) => setState(() => _voiceTranscript = v),
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFF1E2030),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF3A3C4E)),
+            ),
+            contentPadding: const EdgeInsets.all(12),
+          ),
+        ),
+      ],
     );
   }
 }

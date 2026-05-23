@@ -17,6 +17,7 @@ import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
+import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
@@ -24,8 +25,12 @@ import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
+import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
+import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
+import 'package:yoloit/features/terminal/models/agent_type.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
 /// API on `localhost`. A companion CLI script (`tools/yoloit`) communicates
@@ -42,6 +47,7 @@ class CliServer {
 
   HttpServer? _server;
   BoardCubit? _cubit;
+  TerminalCubit? _terminalCubit;
   final Set<String> _warnedActionHelpTypes = <String>{};
 
   /// Port file written so the CLI client knows which port to connect to.
@@ -80,14 +86,16 @@ class CliServer {
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
-  Future<void> start(BoardCubit cubit) async {
+  Future<void> start(BoardCubit cubit, {TerminalCubit? terminalCubit}) async {
     // If server is already running but cubit changed (e.g. after hot restart),
     // update cubit reference and return — routes close over _cubit field.
     if (_server != null) {
       _cubit = cubit;
+      _terminalCubit = terminalCubit ?? _terminalCubit;
       return;
     }
     _cubit = cubit;
+    _terminalCubit = terminalCubit;
 
     final handler = const shelf.Pipeline()
         .addMiddleware(
@@ -112,6 +120,7 @@ class CliServer {
     await _server?.close(force: true);
     _server = null;
     _cubit = null;
+    _terminalCubit = null;
     _deletePortFile();
   }
 
@@ -238,6 +247,14 @@ class CliServer {
     // /api/cloud-providers/...
     if (path.isNotEmpty && path[0] == 'cloud-providers') {
       return _handleCloudProviders(method, path.sublist(1), request);
+    }
+
+    if (path.isNotEmpty && path[0] == 'agents') {
+      return _handleAgents(method, path.sublist(1), request);
+    }
+
+    if (path.isNotEmpty && path[0] == 'search') {
+      return _handleSearch(method, path.sublist(1), request, cubit);
     }
 
     // GET /api/active-board → active board details (or first board)
@@ -502,6 +519,166 @@ class CliServer {
     return _notFound('Unknown cloud-providers route');
   }
 
+  Future<shelf.Response> _handleAgents(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+  ) async {
+    final terminalCubit = _terminalCubit;
+    if (terminalCubit == null) return _error('Terminal cubit not available');
+
+    if ((sub.isEmpty || (sub.length == 1 && sub[0] == 'list')) &&
+        method == 'GET') {
+      final configs = await AgentConfigService.instance.load();
+      final defaultId =
+          AgentConfigService.instance.defaultAgentId ?? AgentType.copilot.name;
+      final state = terminalCubit.state;
+      final sessions =
+          state is TerminalLoaded
+              ? state.allSessions
+                  .map(
+                    (session) => {
+                      'id': session.id,
+                      'agent': session.type.name,
+                      'displayName':
+                          session.customName ?? session.type.displayName,
+                      'workspacePath': session.workspacePath,
+                      'workspaceId': session.workspaceId,
+                      'status': session.status.name,
+                    },
+                  )
+                  .toList()
+              : const <Map<String, Object?>>[];
+      return _json({
+        'ok': true,
+        'defaultAgentId': defaultId,
+        'agents':
+            configs
+                .map(
+                  (config) => {
+                    'id': config.id,
+                    'displayName': config.displayName,
+                    'iconLabel': config.iconLabel,
+                    'launchCommand': config.launchCommand,
+                    'visible': config.visible,
+                    'isBuiltIn': config.isBuiltIn,
+                    'defaultModel': config.defaultModel,
+                    'isDefault': config.id == defaultId,
+                  },
+                )
+                .toList(),
+        'sessions': sessions,
+      });
+    }
+
+    if (sub.length == 1 && sub[0] == 'default' && method == 'POST') {
+      final body = await _body(request);
+      final id = body['id'] as String?;
+      if (id != null &&
+          AgentType.values.every((type) => type.name != id) &&
+          id.isNotEmpty) {
+        return _error('Unknown agent id: $id');
+      }
+      await AgentConfigService.instance.setDefaultAgentId(id);
+      return _json({
+        'ok': true,
+        'defaultAgentId': id ?? AgentType.copilot.name,
+      });
+    }
+
+    if (sub.length == 1 && sub[0] == 'run' && method == 'POST') {
+      final body = await _body(request);
+      final agentId =
+          (body['agent'] as String?) ??
+          (body['id'] as String?) ??
+          AgentConfigService.instance.defaultAgentType.name;
+      final workspacePath =
+          (body['path'] as String?) ??
+          (body['workspacePath'] as String?) ??
+          Directory.current.path;
+      final customName = body['name'] as String?;
+      final task = body['task'] as String?;
+
+      late final AgentType type;
+      try {
+        type = AgentType.values.firstWhere((value) => value.name == agentId);
+      } catch (_) {
+        return _error('Unknown agent id: $agentId');
+      }
+
+      final beforeState = terminalCubit.state;
+      final beforeIds =
+          beforeState is TerminalLoaded
+              ? beforeState.allSessions.map((session) => session.id).toSet()
+              : <String>{};
+
+      await terminalCubit.spawnSession(
+        type: type,
+        workspacePath: workspacePath,
+        customName: customName,
+      );
+
+      final afterState = terminalCubit.state;
+      if (afterState is! TerminalLoaded) {
+        return _error('Terminal sessions are not ready');
+      }
+      final session = afterState.allSessions.lastWhere(
+        (candidate) => !beforeIds.contains(candidate.id),
+        orElse: () => afterState.allSessions.last,
+      );
+
+      if (task != null && task.trim().isNotEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 1400));
+        terminalCubit.sendInput(session.id, '${task.trim()}\n');
+      }
+
+      return _json({
+        'ok': true,
+        'session': {
+          'id': session.id,
+          'agent': session.type.name,
+          'displayName': session.customName ?? session.type.displayName,
+          'workspacePath': session.workspacePath,
+          'workspaceId': session.workspaceId,
+          'status': session.status.name,
+        },
+      });
+    }
+
+    return _notFound('Unknown agents route');
+  }
+
+  Future<shelf.Response> _handleSearch(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+    BoardCubit cubit,
+  ) async {
+    if (method != 'GET' || (sub.isNotEmpty && sub[0] != 'all')) {
+      return _notFound('Unknown search route');
+    }
+    final query =
+        request.url.queryParameters['q']?.trim() ??
+        request.url.queryParameters['query']?.trim() ??
+        '';
+    if (query.isEmpty) return _error('Missing "q" query parameter');
+    final scope =
+        request.url.queryParameters['scope']?.trim().toLowerCase() ?? 'all';
+
+    final items = <Map<String, Object?>>[];
+    if (scope == 'all' || scope == 'boards' || scope == 'panels') {
+      items.addAll(_searchBoards(cubit, query));
+    }
+    if (scope == 'all' || scope == 'active-chats' || scope == 'chats') {
+      items.addAll(_searchActiveChats(query));
+    }
+    if (scope == 'all' || scope == 'sessions' || scope == 'history') {
+      items.addAll(await _searchSavedChatSessions(query));
+    }
+
+    return _json({'ok': true, 'query': query, 'scope': scope, 'items': items});
+  }
+
   Future<shelf.Response> _handleLmGenerate(shelf.Request request) async {
     final body = await _body(request);
     final service = LocalAiModelsService.instance;
@@ -705,6 +882,74 @@ class CliServer {
         }
       }
       return _json({'ok': true, 'sessions': sessions});
+    }
+
+    if (sub.length == 1 && sub[0] == 'history' && method == 'GET') {
+      final entries = await ChatSessionHistory.instance.loadAll();
+      return _json({
+        'ok': true,
+        'sessions':
+            entries
+                .map(
+                  (entry) => {
+                    'id': entry.id,
+                    'sessionName': entry.sessionName,
+                    'provider': entry.provider,
+                    'model': entry.model,
+                    'workingDir': entry.workingDir,
+                    'messageCount': entry.messageCount,
+                    'createdAt': entry.createdAt.toIso8601String(),
+                    'lastMessageAt': entry.lastMessageAt?.toIso8601String(),
+                  },
+                )
+                .toList(),
+      });
+    }
+
+    if (sub.length == 1 && sub[0] == 'restore' && method == 'POST') {
+      final body = await _body(request);
+      final sessionId = body['sessionId'] as String? ?? body['id'] as String?;
+      if (sessionId == null || sessionId.isEmpty) {
+        return _error('Missing "sessionId" field');
+      }
+      final entries = await ChatSessionHistory.instance.loadAll();
+      final entry = entries.where((item) => item.id == sessionId).firstOrNull;
+      if (entry == null) {
+        return _error('Saved session not found: $sessionId');
+      }
+      final messages = await ChatSessionHistory.instance.loadMessages(
+        sessionId,
+      );
+      final target = _resolveYoloChatTarget(
+        cubit,
+        boardHint: body['board'] as String?,
+        panelHint: body['panel'] as String?,
+      );
+      if (target == null) {
+        return _error('No board.chat panel found (or target not found)');
+      }
+      final restoredState = Map<String, dynamic>.from(target.panel.state)
+        ..addAll({
+          'messages': messages,
+          'provider': entry.provider,
+          'model': entry.model,
+          'sessionName': entry.sessionName,
+          'workingDir': entry.workingDir,
+        });
+      await cubit.updatePanel(
+        target.panel.id,
+        (panel) => panel.copyWith(state: restoredState),
+        boardId: target.board.id,
+      );
+      _scheduleRebuild();
+      return _json({
+        'ok': true,
+        'restored': {
+          'id': entry.id,
+          'sessionName': entry.sessionName,
+          'messageCount': messages.length,
+        },
+      });
     }
 
     // GET /yolochat/status
@@ -2545,6 +2790,118 @@ class CliServer {
       return Map<String, dynamic>.from(dart);
     }
     return null;
+  }
+
+  List<Map<String, Object?>> _searchBoards(BoardCubit cubit, String query) {
+    final items = <Map<String, Object?>>[];
+    for (final board in cubit.state.boards) {
+      for (final panel in board.panels) {
+        final texts = <String>[
+          if ((panel.title ?? '').trim().isNotEmpty) panel.title!.trim(),
+          ..._collectSearchStrings(panel.state),
+        ];
+        for (final text in texts) {
+          final snippet = _matchSnippet(text, query);
+          if (snippet == null) continue;
+          items.add({
+            'scope': 'board',
+            'boardId': board.id,
+            'boardName': board.name,
+            'panelId': panel.id,
+            'panelTitle': panel.title ?? panel.id,
+            'panelType': panel.type,
+            'snippet': snippet,
+          });
+          break;
+        }
+      }
+    }
+    return items;
+  }
+
+  List<Map<String, Object?>> _searchActiveChats(String query) {
+    final items = <Map<String, Object?>>[];
+    for (final panelId in ChatSessionManager.instance.activeSessionIds) {
+      final session = ChatSessionManager.instance.get(panelId);
+      if (session == null) continue;
+      for (final message in session.messages) {
+        final snippet = _matchSnippet(message.content, query);
+        if (snippet == null) continue;
+        items.add({
+          'scope': 'active-chat',
+          'panelId': panelId,
+          'provider': session.config.provider,
+          'model': session.config.model,
+          'role': message.role.name,
+          'snippet': snippet,
+        });
+      }
+    }
+    return items;
+  }
+
+  Future<List<Map<String, Object?>>> _searchSavedChatSessions(
+    String query,
+  ) async {
+    final entries = await ChatSessionHistory.instance.loadAll();
+    final items = <Map<String, Object?>>[];
+    for (final entry in entries) {
+      final messages = await ChatSessionHistory.instance.loadMessages(entry.id);
+      for (final message in messages) {
+        if (message is! Map<String, dynamic>) continue;
+        final content = message['content'] as String? ?? '';
+        final snippet = _matchSnippet(content, query);
+        if (snippet == null) continue;
+        items.add({
+          'scope': 'saved-session',
+          'sessionId': entry.id,
+          'sessionName': entry.sessionName,
+          'provider': entry.provider,
+          'model': entry.model,
+          'workingDir': entry.workingDir,
+          'role': message['role'] ?? 'unknown',
+          'snippet': snippet,
+        });
+      }
+    }
+    return items;
+  }
+
+  List<String> _collectSearchStrings(dynamic value, {int depth = 0}) {
+    if (value == null || depth > 4) return const [];
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? const [] : <String>[trimmed];
+    }
+    if (value is num || value is bool) return <String>['$value'];
+    if (value is List) {
+      final out = <String>[];
+      for (final item in value) {
+        out.addAll(_collectSearchStrings(item, depth: depth + 1));
+      }
+      return out;
+    }
+    if (value is Map) {
+      final out = <String>[];
+      for (final entry in value.entries) {
+        if (entry.key == 'id' || entry.key == 'timestamp') continue;
+        out.addAll(_collectSearchStrings(entry.value, depth: depth + 1));
+      }
+      return out;
+    }
+    return const [];
+  }
+
+  String? _matchSnippet(String text, String query) {
+    final haystack = text.toLowerCase();
+    final needle = query.toLowerCase();
+    final index = haystack.indexOf(needle);
+    if (index < 0) return null;
+    final start = (index - 48).clamp(0, text.length);
+    final end = (index + query.length + 72).clamp(0, text.length);
+    final prefix = start > 0 ? '…' : '';
+    final suffix = end < text.length ? '…' : '';
+    return '$prefix${text.substring(start, end).replaceAll('\n', ' ')}$suffix';
   }
 
   String? _string(dynamic value) => value?.toString();

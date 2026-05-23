@@ -25,6 +25,48 @@ import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
 
+class YoloAssistantController {
+  Future<void> Function()? _startMic;
+  Future<void> Function({bool sendAfterTranscription})? _stopMic;
+  Future<void> Function()? _cancelMic;
+  Future<void> Function()? _sendDraft;
+  VoidCallback? _resetOverlay;
+
+  void _attach({
+    required Future<void> Function() startMic,
+    required Future<void> Function({bool sendAfterTranscription}) stopMic,
+    required Future<void> Function() cancelMic,
+    required Future<void> Function() sendDraft,
+    required VoidCallback resetOverlay,
+  }) {
+    _startMic = startMic;
+    _stopMic = stopMic;
+    _cancelMic = cancelMic;
+    _sendDraft = sendDraft;
+    _resetOverlay = resetOverlay;
+  }
+
+  void _detach() {
+    _startMic = null;
+    _stopMic = null;
+    _cancelMic = null;
+    _sendDraft = null;
+    _resetOverlay = null;
+  }
+
+  Future<void> startMic() => _startMic?.call() ?? Future<void>.value();
+
+  Future<void> stopMic({bool sendAfterTranscription = false}) =>
+      _stopMic?.call(sendAfterTranscription: sendAfterTranscription) ??
+      Future<void>.value();
+
+  Future<void> cancelMic() => _cancelMic?.call() ?? Future<void>.value();
+
+  Future<void> sendDraft() => _sendDraft?.call() ?? Future<void>.value();
+
+  void resetOverlay() => _resetOverlay?.call();
+}
+
 /// Main widget for the YoLo Assistant panel.
 ///
 /// Supports two modes: **text** (chat) and **voice** (voice-to-voice).
@@ -33,10 +75,12 @@ class YoloAssistantWidget extends StatefulWidget {
     super.key,
     required this.panel,
     required this.onUpdateState,
+    this.controller,
   });
 
   final BoardPanelInstance panel;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
+  final YoloAssistantController? controller;
 
   @override
   State<YoloAssistantWidget> createState() => _YoloAssistantWidgetState();
@@ -57,6 +101,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   bool _isTranscribingMic = false;
   bool _isGeneratingReply = false;
   bool _isCancelled = false;
+  bool _receivedAssistantToken = false;
   List<Map<String, dynamic>>? _messageDraft;
 
   // In-memory ring buffer of raw LLM debug sessions (last 20, not persisted).
@@ -64,6 +109,51 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   Map<String, dynamic>? _activeDebugSession;
 
   static const _kAccent = Color(0xFF8B5CF6);
+
+  bool get _voiceOverlayHidden =>
+      widget.panel.state['voiceOverlayHidden'] as bool? ?? true;
+
+  void _syncOverlayState({
+    String? draftOverride,
+    String? forcedStatus,
+    String? responseOverride,
+    String? promptOverride,
+    bool? hiddenOverride,
+  }) {
+    final draft = draftOverride ?? _inputController.text.trim();
+    final status =
+        forcedStatus ??
+        (_isRecordingMic
+            ? 'listening'
+            : _isTranscribingMic
+            ? 'processing'
+            : _isGeneratingReply
+            ? (_receivedAssistantToken ? 'responding' : 'thinking')
+            : draft.isNotEmpty
+            ? 'ready'
+            : 'idle');
+    _updateState({
+      'voiceDraft': draft,
+      'assistantStatus': status,
+      'voiceResponse':
+          responseOverride ??
+          (widget.panel.state['voiceResponse'] as String? ?? ''),
+      'voicePrompt':
+          promptOverride ??
+          (widget.panel.state['voicePrompt'] as String? ?? ''),
+      'voiceOverlayHidden': hiddenOverride ?? _voiceOverlayHidden,
+    });
+  }
+
+  void _resetVoiceOverlay() {
+    _updateState({
+      'voiceDraft': '',
+      'voicePrompt': '',
+      'voiceResponse': '',
+      'assistantStatus': 'idle',
+      'voiceOverlayHidden': true,
+    });
+  }
 
   // ── Derived state from panel ──────────────────────────────────────────────
 
@@ -119,7 +209,45 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
+  void initState() {
+    super.initState();
+    widget.controller?._attach(
+      startMic: _startRecordingFromMic,
+      stopMic:
+          ({bool sendAfterTranscription = false}) =>
+              _stopRecordingAndTranscribe(
+                sendAfterTranscription: sendAfterTranscription,
+                mirrorToOverlay: true,
+              ),
+      cancelMic: _cancelRecordingFromMic,
+      sendDraft: () => _sendMessage(mirrorToOverlay: true),
+      resetOverlay: _resetVoiceOverlay,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant YoloAssistantWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach();
+      widget.controller?._attach(
+        startMic: _startRecordingFromMic,
+        stopMic:
+            ({bool sendAfterTranscription = false}) =>
+                _stopRecordingAndTranscribe(
+                  sendAfterTranscription: sendAfterTranscription,
+                  mirrorToOverlay: true,
+                ),
+        cancelMic: _cancelRecordingFromMic,
+        sendDraft: () => _sendMessage(mirrorToOverlay: true),
+        resetOverlay: _resetVoiceOverlay,
+      );
+    }
+  }
+
+  @override
   void dispose() {
+    widget.controller?._detach();
     _inputController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
@@ -135,7 +263,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     widget.onUpdateState(merged);
   }
 
-  Future<void> _sendMessage() async {
+  Future<void> _sendMessage({bool mirrorToOverlay = false}) async {
     if (_isGeneratingReply) return;
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
@@ -157,13 +285,34 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       'content': '',
       'timestamp': DateTime.now().toIso8601String(),
     });
-    _updateState({'messages': msgs});
+    _receivedAssistantToken = false;
+    _updateState({
+      'messages': msgs,
+      if (mirrorToOverlay) ...{
+        'voiceDraft': '',
+        'voicePrompt': text,
+        'voiceResponse': '',
+        'assistantStatus': 'thinking',
+        'voiceOverlayHidden': false,
+      },
+    });
     _scrollToBottom();
 
     setState(() {
       _isGeneratingReply = true;
       _isCancelled = false;
     });
+    if (mirrorToOverlay) {
+      _syncOverlayState(
+        draftOverride: '',
+        forcedStatus: 'thinking',
+        responseOverride: '',
+        promptOverride: text,
+        hiddenOverride: false,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 850));
+      if (!mounted || _isCancelled) return;
+    }
 
     // ── Debug session ──────────────────────────────────────────────────────
     final dbg = <String, dynamic>{
@@ -284,6 +433,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
               _replaceAssistantMessageContent(
                 assistantMessageId: assistantMessageId,
                 content: emitted.trim(),
+                mirrorToOverlay: mirrorToOverlay,
               );
             }
           case ChatEventType.toolStart:
@@ -320,6 +470,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
                 _replaceAssistantMessageContent(
                   assistantMessageId: assistantMessageId,
                   content: cleaned,
+                  mirrorToOverlay: mirrorToOverlay,
                 );
               }
             }
@@ -343,6 +494,16 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         _replaceAssistantMessageContent(
           assistantMessageId: assistantMessageId,
           content: cleanedFinal,
+          mirrorToOverlay: mirrorToOverlay,
+        );
+      }
+      if (mirrorToOverlay) {
+        _syncOverlayState(
+          draftOverride: '',
+          forcedStatus: 'output',
+          responseOverride: cleanedFinal,
+          promptOverride: text,
+          hiddenOverride: false,
         );
       }
       dbg['cleanedResponse'] = cleanedFinal;
@@ -352,7 +513,17 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       _replaceAssistantMessageContent(
         assistantMessageId: assistantMessageId,
         content: _formatAssistantError(e),
+        mirrorToOverlay: mirrorToOverlay,
       );
+      if (mirrorToOverlay) {
+        _syncOverlayState(
+          draftOverride: '',
+          forcedStatus: 'output',
+          responseOverride: _formatAssistantError(e),
+          promptOverride: text,
+          hiddenOverride: false,
+        );
+      }
     } finally {
       _debugSessions.add(dbg);
       if (_debugSessions.length > 20) _debugSessions.removeAt(0);
@@ -363,6 +534,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           _isGeneratingReply = false;
           _isCancelled = false;
         });
+        if (!mirrorToOverlay ||
+            ((widget.panel.state['assistantStatus'] as String?) != 'output')) {
+          _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
+        }
       }
     }
   }
@@ -370,13 +545,23 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   void _replaceAssistantMessageContent({
     required String assistantMessageId,
     required String content,
+    bool mirrorToOverlay = false,
   }) {
     final current = _messageDraft ?? _messages;
     final idx = current.indexWhere((m) => m['id'] == assistantMessageId);
     if (idx == -1) return;
+    if (_isGeneratingReply && content.trim().isNotEmpty) {
+      _receivedAssistantToken = true;
+    }
     current[idx] = {...current[idx], 'content': content};
     _messageDraft = current;
-    _updateState({'messages': current});
+    _updateState({
+      'messages': current,
+      if (mirrorToOverlay && !_voiceOverlayHidden) ...{
+        'voiceResponse': content,
+        'assistantStatus': _isGeneratingReply ? 'responding' : 'output',
+      },
+    });
     _scrollToBottom();
   }
 
@@ -1917,10 +2102,12 @@ $messagesJson
     }
     if (!mounted) return;
     setState(() => _isRecordingMic = true);
+    _syncOverlayState(hiddenOverride: false);
   }
 
   Future<void> _stopRecordingAndTranscribe({
     bool sendAfterTranscription = false,
+    bool mirrorToOverlay = false,
   }) async {
     final path = await _micRecorder.stop();
     if (!mounted) return;
@@ -1928,6 +2115,7 @@ $messagesJson
       _isRecordingMic = false;
       _isTranscribingMic = true;
     });
+    _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
 
     var shouldSend = false;
     try {
@@ -1943,6 +2131,7 @@ $messagesJson
         _inputController.selection = TextSelection.collapsed(
           offset: _inputController.text.length,
         );
+        _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
         shouldSend = sendAfterTranscription;
       }
     } catch (e) {
@@ -1964,11 +2153,41 @@ $messagesJson
       }
       if (mounted) {
         setState(() => _isTranscribingMic = false);
+        _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
       }
     }
     if (shouldSend && mounted && _inputController.text.trim().isNotEmpty) {
-      await _sendMessage();
+      if (mirrorToOverlay) {
+        await Future<void>.delayed(const Duration(milliseconds: 850));
+        if (!mounted) return;
+      }
+      await _sendMessage(mirrorToOverlay: mirrorToOverlay);
     }
+  }
+
+  Future<void> _cancelRecordingFromMic() async {
+    if (!_isRecordingMic) {
+      _resetVoiceOverlay();
+      return;
+    }
+    final path = await _micRecorder.stop();
+    if (path != null && path.isNotEmpty) {
+      final file = File(path);
+      if (file.existsSync()) {
+        try {
+          await file.delete();
+        } on FileSystemException {
+          // ignore temp cleanup failure
+        }
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _isRecordingMic = false;
+      _isTranscribingMic = false;
+    });
+    _inputController.clear();
+    _resetVoiceOverlay();
   }
 
   Future<void> _copyMessageToClipboard(String text) async {

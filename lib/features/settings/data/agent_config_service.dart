@@ -11,6 +11,7 @@ class AgentConfig {
   final String launchCommand;
   final bool visible;
   final bool isBuiltIn;
+
   /// Default model for this provider (null = use catalog/provider default).
   final String? defaultModel;
 
@@ -30,38 +31,36 @@ class AgentConfig {
     String? launchCommand,
     bool? visible,
     Object? defaultModel = _sentinel,
-  }) =>
-      AgentConfig(
-        id: id,
-        displayName: displayName ?? this.displayName,
-        iconLabel: iconLabel ?? this.iconLabel,
-        launchCommand: launchCommand ?? this.launchCommand,
-        visible: visible ?? this.visible,
-        isBuiltIn: isBuiltIn,
-        defaultModel: defaultModel == _sentinel
-            ? this.defaultModel
-            : defaultModel as String?,
-      );
+  }) => AgentConfig(
+    id: id,
+    displayName: displayName ?? this.displayName,
+    iconLabel: iconLabel ?? this.iconLabel,
+    launchCommand: launchCommand ?? this.launchCommand,
+    visible: visible ?? this.visible,
+    isBuiltIn: isBuiltIn,
+    defaultModel:
+        defaultModel == _sentinel ? this.defaultModel : defaultModel as String?,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'displayName': displayName,
-        'iconLabel': iconLabel,
-        'launchCommand': launchCommand,
-        'visible': visible,
-        'isBuiltIn': isBuiltIn,
-        if (defaultModel != null) 'defaultModel': defaultModel,
-      };
+    'id': id,
+    'displayName': displayName,
+    'iconLabel': iconLabel,
+    'launchCommand': launchCommand,
+    'visible': visible,
+    'isBuiltIn': isBuiltIn,
+    if (defaultModel != null) 'defaultModel': defaultModel,
+  };
 
   factory AgentConfig.fromJson(Map<String, dynamic> j) => AgentConfig(
-        id: j['id'] as String,
-        displayName: j['displayName'] as String,
-        iconLabel: j['iconLabel'] as String? ?? '◈',
-        launchCommand: j['launchCommand'] as String? ?? '',
-        visible: j['visible'] as bool? ?? true,
-        isBuiltIn: j['isBuiltIn'] as bool? ?? false,
-        defaultModel: j['defaultModel'] as String?,
-      );
+    id: j['id'] as String,
+    displayName: j['displayName'] as String,
+    iconLabel: j['iconLabel'] as String? ?? '◈',
+    launchCommand: j['launchCommand'] as String? ?? '',
+    visible: j['visible'] as bool? ?? true,
+    isBuiltIn: j['isBuiltIn'] as bool? ?? false,
+    defaultModel: j['defaultModel'] as String?,
+  );
 }
 
 const _sentinel = Object();
@@ -74,18 +73,19 @@ class AgentConfigService {
   List<AgentConfig> _cached = [];
   String? _defaultAgentId;
 
-  static List<AgentConfig> get _defaults => AgentType.values
-      .map(
-        (t) => AgentConfig(
-          id: t.name,
-          displayName: t.displayName,
-          iconLabel: t.iconLabel,
-          launchCommand: t.launchCommand,
-          visible: true,
-          isBuiltIn: true,
-        ),
-      )
-      .toList();
+  static List<AgentConfig> get _defaults =>
+      AgentType.values
+          .map(
+            (t) => AgentConfig(
+              id: t.name,
+              displayName: t.displayName,
+              iconLabel: t.iconLabel,
+              launchCommand: t.launchCommand,
+              visible: true,
+              isBuiltIn: true,
+            ),
+          )
+          .toList();
 
   String get _configPath =>
       p.join(PlatformDirs.instance.configDir, 'agent_configs.json');
@@ -100,9 +100,10 @@ class AgentConfigService {
         _cached = _defaults;
       } else {
         final data = jsonDecode(await file.readAsString()) as List;
-        final saved = data
-            .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
-            .toList();
+        final saved =
+            data
+                .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
+                .toList();
         // Merge: ensure all built-ins are present
         final savedIds = saved.map((c) => c.id).toSet();
         for (final d in _defaults) {
@@ -117,7 +118,8 @@ class AgentConfigService {
     try {
       final prefsFile = File(_prefsPath);
       if (await prefsFile.exists()) {
-        final prefs = jsonDecode(await prefsFile.readAsString()) as Map<String, dynamic>;
+        final prefs =
+            jsonDecode(await prefsFile.readAsString()) as Map<String, dynamic>;
         _defaultAgentId = prefs['defaultAgentId'] as String?;
       }
     } catch (_) {}
@@ -143,13 +145,13 @@ class AgentConfigService {
 
   String? get defaultAgentId => _defaultAgentId;
 
-  /// Returns the AgentType for the configured default, falling back to terminal.
+  /// Returns the AgentType for the configured default, falling back to Copilot.
   AgentType get defaultAgentType {
-    if (_defaultAgentId == null) return AgentType.terminal;
+    if (_defaultAgentId == null) return AgentType.copilot;
     try {
       return AgentType.values.firstWhere((t) => t.name == _defaultAgentId);
     } catch (_) {
-      return AgentType.terminal;
+      return AgentType.copilot;
     }
   }
 

@@ -59,11 +59,13 @@ class TerminalCubit extends Cubit<TerminalState> {
 
   /// Emits a TerminalLoaded with both visible (workspace) sessions and allSessions.
   void _emitLoaded(List<AgentSession> visible, int activeIndex) {
-    emit(TerminalLoaded(
-      sessions: visible,
-      activeIndex: activeIndex,
-      allSessions: List.unmodifiable(_allSessions),
-    ));
+    emit(
+      TerminalLoaded(
+        sessions: visible,
+        activeIndex: activeIndex,
+        allSessions: List.unmodifiable(_allSessions),
+      ),
+    );
   }
 
   /// Initialises services (no sessions loaded yet — call setActiveWorkspace).
@@ -91,9 +93,12 @@ class TerminalCubit extends Cubit<TerminalState> {
       if (changed) {
         final cur = _loaded;
         if (cur != null && !isClosed) {
-          emit(cur.copyWith(
+          emit(
+            cur.copyWith(
               sessions: _workspaceSessions,
-              allSessions: List.unmodifiable(_allSessions)));
+              allSessions: List.unmodifiable(_allSessions),
+            ),
+          );
         }
       }
     });
@@ -104,7 +109,9 @@ class TerminalCubit extends Cubit<TerminalState> {
   /// Loads persisted session metadata for other (non-active) workspaces so
   /// the mindmap view can render them as idle cards without spawning PTYs.
   /// Existing sessions are preserved; new stubs get status=idle.
-  Future<void> loadPersistedMetadataForWorkspaces(List<String> workspaceIds) async {
+  Future<void> loadPersistedMetadataForWorkspaces(
+    List<String> workspaceIds,
+  ) async {
     var added = false;
     final existingIds = _allSessions.map((s) => s.id).toSet();
     for (final wsId in workspaceIds) {
@@ -112,13 +119,15 @@ class TerminalCubit extends Cubit<TerminalState> {
       final saved = await _persistence.load(wsId);
       for (final s in saved) {
         if (existingIds.contains(s.id)) continue;
-        _allSessions.add(AgentSession(
-          id: s.id,
-          type: s.type,
-          workspacePath: s.workspacePath,
-          workspaceId: s.workspaceId ?? wsId,
-          status: AgentStatus.idle,
-        ));
+        _allSessions.add(
+          AgentSession(
+            id: s.id,
+            type: s.type,
+            workspacePath: s.workspacePath,
+            workspaceId: s.workspaceId ?? wsId,
+            status: AgentStatus.idle,
+          ),
+        );
         existingIds.add(s.id);
         added = true;
       }
@@ -151,8 +160,10 @@ class TerminalCubit extends Cubit<TerminalState> {
     // Show workspace sessions that are already running in memory.
     final running = _workspaceSessions;
     if (running.isNotEmpty) {
-      final savedIdx = (_activeIndexPerWorkspace[workspaceId] ?? 0)
-          .clamp(0, running.length - 1);
+      final savedIdx = (_activeIndexPerWorkspace[workspaceId] ?? 0).clamp(
+        0,
+        running.length - 1,
+      );
       _emitLoaded(running, savedIdx);
       return;
     }
@@ -164,7 +175,8 @@ class TerminalCubit extends Cubit<TerminalState> {
     final allWsPaths = workspacePaths ?? [workspacePath];
     if (saved.isNotEmpty) {
       for (var i = 0; i < saved.length; i++) {
-        if (i > 0) await Future<void>.delayed(const Duration(milliseconds: 200));
+        if (i > 0)
+          await Future<void>.delayed(const Duration(milliseconds: 200));
         final s = saved[i];
 
         // Recover worktreeContexts from symlinks if not persisted (old format).
@@ -172,7 +184,10 @@ class TerminalCubit extends Cubit<TerminalState> {
         if (worktreeContexts == null) {
           worktreeContexts = await AgentWorkspaceDirService.instance
               .readWorktreeContexts(
-                  s.workspaceId ?? workspaceId, s.id, allWsPaths);
+                s.workspaceId ?? workspaceId,
+                s.id,
+                allWsPaths,
+              );
         }
 
         await spawnSession(
@@ -209,17 +224,23 @@ class TerminalCubit extends Cubit<TerminalState> {
     if (state is! TerminalLoaded) return;
 
     final sessionId =
-        savedSessionId ?? '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
+        savedSessionId ??
+        '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
 
     String effectivePath = workspacePath;
     if (worktreeContexts != null && workspaceId != null) {
-      effectivePath = await AgentWorkspaceDirService.instance
-          .createAgentDir(workspaceId, sessionId, worktreeContexts);
+      effectivePath = await AgentWorkspaceDirService.instance.createAgentDir(
+        workspaceId,
+        sessionId,
+        worktreeContexts,
+      );
       if (enabledSkills.isNotEmpty) {
-        unawaited(SkillsInstallService.instance.syncSessionSkills(
-          sessionDir: effectivePath,
-          enabledSkillIds: enabledSkills,
-        ));
+        unawaited(
+          SkillsInstallService.instance.syncSessionSkills(
+            sessionDir: effectivePath,
+            enabledSkillIds: enabledSkills,
+          ),
+        );
       }
     }
 
@@ -234,9 +255,10 @@ class TerminalCubit extends Cubit<TerminalState> {
       customName: customName,
     );
 
-    final secrets = workspaceId != null
-        ? await WorkspaceSecretsService.instance.load(workspaceId)
-        : <String, String>{};
+    final secrets =
+        workspaceId != null
+            ? await WorkspaceSecretsService.instance.load(workspaceId)
+            : <String, String>{};
     final extraEnv = secrets.isEmpty ? null : secrets;
 
     final Pty pty;
@@ -257,7 +279,9 @@ class TerminalCubit extends Cubit<TerminalState> {
       );
     }
 
-    unawaited(_logging.startSession(sessionId, '${type.displayName} @ $effectivePath'));
+    unawaited(
+      _logging.startSession(sessionId, '${type.displayName} @ $effectivePath'),
+    );
     _attachPtyToSession(pty, session);
 
     // Install YoLoIT hooks into the workspace so Copilot CLI can pick them up.
@@ -271,14 +295,20 @@ class TerminalCubit extends Cubit<TerminalState> {
 
     final effectiveWorkspaceId = workspaceId ?? _activeWorkspaceId;
     if (effectiveWorkspaceId != null) {
-      unawaited(_persistence.save(
-        _allSessions.where((s) => s.workspaceId == effectiveWorkspaceId).toList(),
-        effectiveWorkspaceId,
-      ));
+      unawaited(
+        _persistence.save(
+          _allSessions
+              .where((s) => s.workspaceId == effectiveWorkspaceId)
+              .toList(),
+          effectiveWorkspaceId,
+        ),
+      );
     }
 
     // Auto-run agent command (skip for plain terminal and when restoring tmux session).
-    final effectiveCommand = AgentConfigService.instance.effectiveLaunchCommand(type);
+    final effectiveCommand = AgentConfigService.instance.effectiveLaunchCommand(
+      type,
+    );
     if (effectiveCommand.isNotEmpty && !(isRestore && _tmux.isActive)) {
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       _ptyService.write(sessionId, '$effectiveCommand\n');
@@ -289,11 +319,20 @@ class TerminalCubit extends Cubit<TerminalState> {
     final current = _loaded;
     if (current == null) return;
     if (index < 0 || index >= current.sessions.length) return;
-    emit(current.copyWith(activeIndex: index, allSessions: List.unmodifiable(_allSessions)));
+    emit(
+      current.copyWith(
+        activeIndex: index,
+        allSessions: List.unmodifiable(_allSessions),
+      ),
+    );
     if (_activeWorkspaceId != null) {
       _activeIndexPerWorkspace[_activeWorkspaceId!] = index;
     }
     unawaited(SessionPrefs.saveActiveTerminalIdx(index));
+  }
+
+  void sendInput(String sessionId, String text) {
+    _ptyService.write(sessionId, text);
   }
 
   /// Switches the active session to the one with [sessionId].
@@ -322,11 +361,17 @@ class TerminalCubit extends Cubit<TerminalState> {
 
   /// Updates the worktree path for [repoPath] inside [sessionId].
   /// Returns the updated [AgentSession] so callers can react (e.g. reload file tree).
-  AgentSession? updateSessionWorktree(String sessionId, String repoPath, String newWorktreePath) {
+  AgentSession? updateSessionWorktree(
+    String sessionId,
+    String repoPath,
+    String newWorktreePath,
+  ) {
     final idx = _allSessions.indexWhere((s) => s.id == sessionId);
     if (idx == -1) return null;
     final old = _allSessions[idx];
-    final updatedContexts = Map<String, String>.from(old.worktreeContexts ?? {});
+    final updatedContexts = Map<String, String>.from(
+      old.worktreeContexts ?? {},
+    );
     updatedContexts[repoPath] = newWorktreePath;
     _allSessions[idx] = old.copyWith(worktreeContexts: updatedContexts);
     final visible = _workspaceSessions;
@@ -344,13 +389,14 @@ class TerminalCubit extends Cubit<TerminalState> {
     // Find session before removing it (needed for cleanup).
     final session = _allSessions.firstWhere(
       (s) => s.id == sessionId,
-      orElse: () => AgentSession(
-        id: sessionId,
-        type: AgentType.claude,
-        workspacePath: '',
-        status: AgentStatus.live,
-        sessionId: '',
-      ),
+      orElse:
+          () => AgentSession(
+            id: sessionId,
+            type: AgentType.claude,
+            workspacePath: '',
+            status: AgentStatus.live,
+            sessionId: '',
+          ),
     );
 
     _ptyService.kill(
@@ -362,13 +408,17 @@ class TerminalCubit extends Cubit<TerminalState> {
     // Delete the agent dir if one was created (session had worktree contexts).
     if (session.worktreeContexts != null && session.workspaceId != null) {
       unawaited(
-        AgentWorkspaceDirService.instance.deleteAgentDir(session.workspaceId!, sessionId),
+        AgentWorkspaceDirService.instance.deleteAgentDir(
+          session.workspaceId!,
+          sessionId,
+        ),
       );
     }
 
     _allSessions.removeWhere((s) => s.id == sessionId);
     final visible = _workspaceSessions;
-    final newIndex = visible.isEmpty ? 0 : current.activeIndex.clamp(0, visible.length - 1);
+    final newIndex =
+        visible.isEmpty ? 0 : current.activeIndex.clamp(0, visible.length - 1);
     _emitLoaded(visible, newIndex);
     final wsId = _activeWorkspaceId;
     if (wsId != null) unawaited(_persistence.save(visible, wsId));
@@ -392,30 +442,41 @@ class TerminalCubit extends Cubit<TerminalState> {
     _approvalClearTimers[sessionId]?.cancel();
     _approvalClearTimers.remove(sessionId);
     _ptyTailBuffers[sessionId]?.clear();
-    _allSessions[i] = _allSessions[i].copyWith(hookPhase: const ThinkingPhase());
+    _allSessions[i] = _allSessions[i].copyWith(
+      hookPhase: const ThinkingPhase(),
+    );
     final cur = _loaded;
     if (cur != null && !isClosed) {
-      emit(cur.copyWith(
+      emit(
+        cur.copyWith(
           sessions: _workspaceSessions,
-          allSessions: List.unmodifiable(_allSessions)));
+          allSessions: List.unmodifiable(_allSessions),
+        ),
+      );
     }
   }
 
   void _onHookEvent(HookEvent event) {
-    debugPrint('[HookEvent] event=${event.event} phase=${event.phase} cwd=${event.workspacePath}');
+    debugPrint(
+      '[HookEvent] event=${event.event} phase=${event.phase} cwd=${event.workspacePath}',
+    );
 
     final idx = _findSessionIndexForWorkspacePath(event.workspacePath);
     if (idx < 0) {
       if (_allSessions.isEmpty) return;
-      debugPrint('[HookEvent] NO MATCH for cwd=${event.workspacePath}  '
-          'sessions: ${_allSessions.map((s) => s.workspacePath).toList()}');
+      debugPrint(
+        '[HookEvent] NO MATCH for cwd=${event.workspacePath}  '
+        'sessions: ${_allSessions.map((s) => s.workspacePath).toList()}',
+      );
       return;
     }
 
     // sessionStart → phase is null, already handled by AgentStatus.live.
     final newPhase = event.phase; // AgentPhase? — null means clear
 
-    debugPrint('[HookEvent] MATCHED session[${_allSessions[idx].id}] → newPhase=$newPhase');
+    debugPrint(
+      '[HookEvent] MATCHED session[${_allSessions[idx].id}] → newPhase=$newPhase',
+    );
 
     // ThinkingPhase auto-clears after 15s if no other event fires.
     // PTY idle-timer (5s) will usually clear it sooner via spinner detection.
@@ -427,7 +488,12 @@ class TerminalCubit extends Cubit<TerminalState> {
           final cur = _loaded;
           if (cur != null && !isClosed) {
             final visible = _workspaceSessions;
-            emit(cur.copyWith(sessions: visible, allSessions: List.unmodifiable(_allSessions)));
+            emit(
+              cur.copyWith(
+                sessions: visible,
+                allSessions: List.unmodifiable(_allSessions),
+              ),
+            );
           }
         }
       });
@@ -442,7 +508,12 @@ class TerminalCubit extends Cubit<TerminalState> {
           final cur = _loaded;
           if (cur != null && !isClosed) {
             final visible = _workspaceSessions;
-            emit(cur.copyWith(sessions: visible, allSessions: List.unmodifiable(_allSessions)));
+            emit(
+              cur.copyWith(
+                sessions: visible,
+                allSessions: List.unmodifiable(_allSessions),
+              ),
+            );
           }
         }
       });
@@ -454,14 +525,20 @@ class TerminalCubit extends Cubit<TerminalState> {
       // it must persist until the user explicitly responds in the terminal.
       // It will be cleared when: userPromptSubmitted fires (new user request)
       // or explicitly via another hook event with a non-null phase.
-      clearHookPhase: newPhase == null &&
+      clearHookPhase:
+          newPhase == null &&
           _allSessions[idx].hookPhase is! AwaitingApprovalPhase,
     );
 
     final cur = _loaded;
     if (cur != null && !isClosed) {
       final visible = _workspaceSessions;
-      emit(cur.copyWith(sessions: visible, allSessions: List.unmodifiable(_allSessions)));
+      emit(
+        cur.copyWith(
+          sessions: visible,
+          allSessions: List.unmodifiable(_allSessions),
+        ),
+      );
     }
   }
 
@@ -476,7 +553,8 @@ class TerminalCubit extends Cubit<TerminalState> {
 
     return _allSessions.indexWhere((s) {
       final sessionPath = _normalizeWorkspacePath(s.workspacePath);
-      return eventPath.startsWith('$sessionPath/') || sessionPath.startsWith('$eventPath/');
+      return eventPath.startsWith('$sessionPath/') ||
+          sessionPath.startsWith('$eventPath/');
     });
   }
 
@@ -525,11 +603,17 @@ class TerminalCubit extends Cubit<TerminalState> {
     // Flash DonePhase briefly then clear.
     _allSessions[i] = _allSessions[i].copyWith(hookPhase: const DonePhase());
     final visible = _workspaceSessions;
-    emit(current.copyWith(sessions: visible, allSessions: List.unmodifiable(_allSessions)));
+    emit(
+      current.copyWith(
+        sessions: visible,
+        allSessions: List.unmodifiable(_allSessions),
+      ),
+    );
 
     // Play completion sound (interactive mode micro-completion).
     SessionPrefs.isCompletionSoundEnabled().then((enabled) {
-      if (enabled && Platform.isMacOS) Process.run('afplay', ['/System/Library/Sounds/Glass.aiff']);
+      if (enabled && Platform.isMacOS)
+        Process.run('afplay', ['/System/Library/Sounds/Glass.aiff']);
     });
 
     Future.delayed(const Duration(seconds: 3), () {
@@ -538,7 +622,12 @@ class TerminalCubit extends Cubit<TerminalState> {
         _allSessions[i2] = _allSessions[i2].copyWith(clearHookPhase: true);
         final cur = _loaded;
         if (cur != null && !isClosed) {
-          emit(cur.copyWith(sessions: _workspaceSessions, allSessions: List.unmodifiable(_allSessions)));
+          emit(
+            cur.copyWith(
+              sessions: _workspaceSessions,
+              allSessions: List.unmodifiable(_allSessions),
+            ),
+          );
         }
       }
     });
@@ -548,7 +637,11 @@ class TerminalCubit extends Cubit<TerminalState> {
   /// Uses per-agent config to detect spinner (→ ThinkingPhase),
   /// done-prompts (→ DonePhase + sound), and approval dialogs
   /// (→ AwaitingApprovalPhase + urgent sound).
-  void _onPtyActivity(AgentSession session, String data, AgentPtyConfig config) {
+  void _onPtyActivity(
+    AgentSession session,
+    String data,
+    AgentPtyConfig config,
+  ) {
     final sessionId = session.id;
 
     // Always look up CURRENT session state — the captured `session` is stale.
@@ -573,16 +666,21 @@ class TerminalCubit extends Cubit<TerminalState> {
         current.hookPhase is! AwaitingApprovalPhase) {
       _ptyIdleTimers[sessionId]?.cancel();
       _allSessions[i] = current.copyWith(
-          hookPhase: const AwaitingApprovalPhase());
+        hookPhase: const AwaitingApprovalPhase(),
+      );
       final cur = _loaded;
       if (cur != null && !isClosed) {
-        emit(cur.copyWith(
+        emit(
+          cur.copyWith(
             sessions: _workspaceSessions,
-            allSessions: List.unmodifiable(_allSessions)));
+            allSessions: List.unmodifiable(_allSessions),
+          ),
+        );
       }
       // Urgent sound — different from completion sound.
       SessionPrefs.isApprovalSoundEnabled().then((enabled) {
-        if (enabled && Platform.isMacOS) Process.run('afplay', ['/System/Library/Sounds/Sosumi.aiff']);
+        if (enabled && Platform.isMacOS)
+          Process.run('afplay', ['/System/Library/Sounds/Sosumi.aiff']);
       });
     }
 
@@ -600,9 +698,12 @@ class TerminalCubit extends Cubit<TerminalState> {
           _allSessions[j] = _allSessions[j].copyWith(clearHookPhase: true);
           final cur = _loaded;
           if (cur != null && !isClosed) {
-            emit(cur.copyWith(
+            emit(
+              cur.copyWith(
                 sessions: _workspaceSessions,
-                allSessions: List.unmodifiable(_allSessions)));
+                allSessions: List.unmodifiable(_allSessions),
+              ),
+            );
           }
         }
       });
@@ -610,8 +711,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     }
 
     // Done-prompt detected while thinking → transition to done.
-    if (current.hookPhase is ThinkingPhase &&
-        config.containsDonePrompt(data)) {
+    if (current.hookPhase is ThinkingPhase && config.containsDonePrompt(data)) {
       _onCopilotPromptDetected(sessionId);
       return;
     }
@@ -627,7 +727,12 @@ class TerminalCubit extends Cubit<TerminalState> {
         _allSessions[j] = _allSessions[j].copyWith(clearHookPhase: true);
         final cur = _loaded;
         if (cur != null && !isClosed) {
-          emit(cur.copyWith(sessions: _workspaceSessions, allSessions: List.unmodifiable(_allSessions)));
+          emit(
+            cur.copyWith(
+              sessions: _workspaceSessions,
+              allSessions: List.unmodifiable(_allSessions),
+            ),
+          );
         }
       }
     });
@@ -638,7 +743,12 @@ class TerminalCubit extends Cubit<TerminalState> {
     _allSessions[i] = current.copyWith(hookPhase: const ThinkingPhase());
     final cur = _loaded;
     if (cur != null && !isClosed) {
-      emit(cur.copyWith(sessions: _workspaceSessions, allSessions: List.unmodifiable(_allSessions)));
+      emit(
+        cur.copyWith(
+          sessions: _workspaceSessions,
+          allSessions: List.unmodifiable(_allSessions),
+        ),
+      );
     }
   }
 
@@ -651,7 +761,13 @@ class TerminalCubit extends Cubit<TerminalState> {
       _allSessions[idx] = _allSessions[idx].copyWith(status: AgentStatus.idle);
     }
     final visible = _workspaceSessions;
-    if (!isClosed) emit(current.copyWith(sessions: visible, allSessions: List.unmodifiable(_allSessions)));
+    if (!isClosed)
+      emit(
+        current.copyWith(
+          sessions: visible,
+          allSessions: List.unmodifiable(_allSessions),
+        ),
+      );
   }
 
   String _generateSessionId() {
