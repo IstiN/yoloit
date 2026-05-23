@@ -18,6 +18,11 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.onHide,
     this.onPrimaryAction,
     this.scale = 1.0,
+    this.orbScale = 1.0,
+    this.ovalWidth = 1.0,
+    this.ovalHeight = 0.45,
+    this.titleFontSize,
+    this.titleColor,
   });
 
   final String status;
@@ -30,6 +35,11 @@ class YoloVoiceOverlay extends StatefulWidget {
   final VoidCallback? onHide;
   final VoidCallback? onPrimaryAction;
   final double scale;
+  final double orbScale;
+  final double ovalWidth;
+  final double ovalHeight;
+  final double? titleFontSize;
+  final Color? titleColor;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -289,12 +299,14 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                   builder: (ctx, sz, _) => AnimatedBuilder(
                     animation: _orbAnim,
                     builder: (ctx, _) => SizedBox.square(
-                      dimension: sz,
+                      dimension: sz * widget.orbScale,
                       child: CustomPaint(
                         painter: _BlobOrbPainter(
                           progress: widget.animate ? _orbAnim.value : 0.23,
                           mode: _orbMode,
                           bgColor: Theme.of(ctx).scaffoldBackgroundColor,
+                          ovalWidth: widget.ovalWidth,
+                          ovalHeight: widget.ovalHeight,
                         ),
                         child: Center(child: _orbLabel(sz)),
                       ),
@@ -371,14 +383,16 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   }
 
   Widget _orbLabel(double sz) => ShaderMask(
-        shaderCallback: (b) => const LinearGradient(
-          colors: [Color(0xFF64DFFF), Color(0xFFB980FF)],
+        shaderCallback: (b) => LinearGradient(
+          colors: widget.titleColor != null
+              ? [widget.titleColor!, widget.titleColor!]
+              : const [Color(0xFF64DFFF), Color(0xFFB980FF)],
         ).createShader(b),
         child: Text(
           'YoLo',
           style: TextStyle(
             color: Colors.white,
-            fontSize: sz * 0.15,
+            fontSize: widget.titleFontSize ?? sz * 0.15,
             fontWeight: FontWeight.w300,
             letterSpacing: -0.8,
             shadows: const [
@@ -687,11 +701,15 @@ class _BlobOrbPainter extends CustomPainter {
     required this.progress,
     required this.mode,
     required this.bgColor,
+    required this.ovalWidth,
+    required this.ovalHeight,
   });
 
   final double progress;
   final _OrbMode mode;
   final Color bgColor;
+  final double ovalWidth;
+  final double ovalHeight;
 
   static const _palettes = <_OrbMode, List<Color>>{
     _OrbMode.ready: [
@@ -797,9 +815,8 @@ class _BlobOrbPainter extends CustomPainter {
     }
 
     // Center overlay: horizontal oval in theme color
-    // Much wider than tall for proper oval feel, smoother fade
-    final ovalW = r * 1.0;
-    final ovalH = r * 0.45;
+    final ovalW = r * ovalWidth;
+    final ovalH = r * ovalHeight;
     final ovalRect = Rect.fromCenter(
       center: center,
       width: ovalW * 2,
@@ -826,7 +843,11 @@ class _BlobOrbPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BlobOrbPainter old) =>
-      old.progress != progress || old.mode != mode || old.bgColor != bgColor;
+      old.progress != progress ||
+      old.mode != mode ||
+      old.bgColor != bgColor ||
+      old.ovalWidth != ovalWidth ||
+      old.ovalHeight != ovalHeight;
 }
 
 // ─────────────────────────── waveform ────────────────────────────────────────

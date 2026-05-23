@@ -2830,6 +2830,11 @@ class _DebugUISection extends StatefulWidget {
 class _DebugUISectionState extends State<_DebugUISection> {
   String _voiceStatus = 'idle';
   double _scale = 1.0;
+  double _orbScale = 1.0;
+  double _ovalWidth = 1.0;
+  double _ovalHeight = 0.45;
+  double _titleFontSize = 22.0;
+  Color _titleColor = const Color(0xFF64DFFF);
   double _plectrumRotation = 0.0;
   double _plectrumSize = 250.0;
   Color _plectrumColor = const Color(0xFF3CE8FF);
@@ -2845,6 +2850,38 @@ class _DebugUISectionState extends State<_DebugUISection> {
     'responding',
     'output',
   ];
+
+  List<Widget> _debugSlider(
+    String label,
+    double value,
+    double min,
+    double max,
+    int divisions,
+    ValueChanged<double> onChanged,
+  ) => [
+        Row(
+          children: [
+            Text(
+              '$label: ${value.toStringAsFixed(2)}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Expanded(
+              child: Slider(
+                value: value,
+                min: min,
+                max: max,
+                divisions: divisions,
+                onChanged: onChanged,
+                activeColor: const Color(0xFF6644FF),
+              ),
+            ),
+          ],
+        ),
+      ];
 
   Widget _colorChip(String label, Color c) {
     final active = _plectrumColor.value == c.value;
@@ -2994,6 +3031,59 @@ class _DebugUISectionState extends State<_DebugUISection> {
           ],
         ),
         const SizedBox(height: 8),
+        // Orb scale (animation only, not text)
+        ..._debugSlider('Orb Scale', _orbScale, 0.3, 2.0, 34,
+            (v) => setState(() => _orbScale = v)),
+        // Center oval width
+        ..._debugSlider('Oval Width', _ovalWidth, 0.3, 2.0, 34,
+            (v) => setState(() => _ovalWidth = v)),
+        // Center oval height
+        ..._debugSlider('Oval Height', _ovalHeight, 0.1, 1.5, 28,
+            (v) => setState(() => _ovalHeight = v)),
+        // YoLo font size
+        ..._debugSlider('YoLo Size', _titleFontSize, 8, 60, 52,
+            (v) => setState(() => _titleFontSize = v)),
+        // YoLo color picker
+        Row(
+          children: [
+            Text(
+              'YoLo Color:',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            for (final c in const [
+              Color(0xFF64DFFF),
+              Color(0xFFB980FF),
+              Color(0xFF3CE8FF),
+              Color(0xFFFFFFFF),
+              Color(0xFF80FFB0),
+              Color(0xFFFF80B0),
+            ])
+              GestureDetector(
+                onTap: () => setState(() => _titleColor = c),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: c,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _titleColor == c
+                          ? Colors.white
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Container(
           width: double.infinity,
           height: 500,
@@ -3011,6 +3101,11 @@ class _DebugUISectionState extends State<_DebugUISection> {
               response: _voiceResponse,
               animate: true,
               scale: _scale,
+              orbScale: _orbScale,
+              ovalWidth: _ovalWidth,
+              ovalHeight: _ovalHeight,
+              titleFontSize: _titleFontSize,
+              titleColor: _titleColor,
               onHide: () => setState(() => _voiceStatus = 'idle'),
               onPrimaryAction: () {
                 final idx = _statuses.indexOf(_voiceStatus);
