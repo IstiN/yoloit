@@ -384,7 +384,9 @@ class YoloitCliToolArgumentNormalizer {
     // panel type. The CLI finds the correct panel by type.
     _stripChatPanelForTypedTools(tool, normalized);
     // When note→note:create redirect happened, remap text→title.
-    if (tool?.command == 'note:create' && _isMissing(normalized['title']) && _isMissing(normalized['ti'])) {
+    if (tool?.command == 'note:create' &&
+        _isMissing(normalized['title']) &&
+        _isMissing(normalized['ti'])) {
       final text = normalized.remove('text') ?? normalized.remove('tx');
       if (text != null) {
         normalized['title'] = text;
@@ -452,8 +454,15 @@ class YoloitCliToolArgumentNormalizer {
     final g = tool.group;
     if (g != 'note' && g != 'checklist' && g != 'kanban') return;
     for (final key in const [
-      'panel', 'panel_id', 'panel_title', 'p', 'id',
-      'board', 'board_id', 'board_name', 'b',
+      'panel',
+      'panel_id',
+      'panel_title',
+      'p',
+      'id',
+      'board',
+      'board_id',
+      'board_name',
+      'b',
     ]) {
       final v = normalized[key];
       if (v is String && _isChatPanelId(v)) {
@@ -699,10 +708,11 @@ class YoloitCliToolArgumentNormalizer {
     for (final key in args.keys.toList()) {
       final v = args[key];
       if (v is String) {
-        args[key] = v
-            .replaceAll(RegExp(r'\s*/no_think\s*'), '')
-            .replaceAll(RegExp(r'\s*/think\s*'), '')
-            .trim();
+        args[key] =
+            v
+                .replaceAll(RegExp(r'\s*/no_think\s*'), '')
+                .replaceAll(RegExp(r'\s*/think\s*'), '')
+                .trim();
       }
     }
   }
@@ -908,7 +918,9 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     for (final param in tool.params) {
       final value = _argumentValue(param, arguments, runtimeContext, tool);
       if (_isMissing(value)) {
-        if (param.required && !(_cliAutoResolvesPanel(tool.group) && param.runtimeDefault == YoloitCliRuntimeDefault.panel)) {
+        if (param.required &&
+            !(_cliAutoResolvesPanel(tool.group) &&
+                param.runtimeDefault == YoloitCliRuntimeDefault.panel)) {
           throw ArgumentError(
             'Missing required "${param.key}" for ${tool.command}',
           );
@@ -1823,6 +1835,12 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         runtimeDefault: YoloitCliRuntimeDefault.panel,
         shortKey: 'p',
       ),
+      _p(
+        'provider',
+        'Provider override (for example cloud:<config-id>)',
+        flag: '--provider',
+        shortKey: 'pr',
+      ),
     ],
   ),
   YoloitCliTool(
@@ -1851,6 +1869,170 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         flag: '--limit',
         kind: YoloitCliToolParamKind.number,
         shortKey: 'lim',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'yolochat:clear',
+    alias: 'ccl',
+    description: 'Clear YoLo chat messages',
+    group: 'yolochat',
+    params: <YoloitCliToolParam>[
+      _p(
+        'board',
+        'Target board',
+        flag: '--board',
+        runtimeDefault: YoloitCliRuntimeDefault.board,
+        shortKey: 'b',
+      ),
+      _p(
+        'panel',
+        'Target chat panel',
+        flag: '--panel',
+        runtimeDefault: YoloitCliRuntimeDefault.panel,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'yolochat:sessions',
+    alias: 'css',
+    description: 'List active YoLo chat sessions',
+    group: 'yolochat',
+  ),
+  YoloitCliTool(
+    command: 'yolochat:status',
+    alias: 'cst',
+    description: 'Show YoLo chat status',
+    group: 'yolochat',
+    params: <YoloitCliToolParam>[
+      _p(
+        'board',
+        'Target board',
+        flag: '--board',
+        runtimeDefault: YoloitCliRuntimeDefault.board,
+        shortKey: 'b',
+      ),
+      _p(
+        'panel',
+        'Target chat panel',
+        flag: '--panel',
+        runtimeDefault: YoloitCliRuntimeDefault.panel,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'yolochat:stop',
+    alias: 'csp',
+    description: 'Stop active YoLo chat streaming',
+    group: 'yolochat',
+    params: <YoloitCliToolParam>[
+      _p(
+        'board',
+        'Target board',
+        flag: '--board',
+        runtimeDefault: YoloitCliRuntimeDefault.board,
+        shortKey: 'b',
+      ),
+      _p(
+        'panel',
+        'Target chat panel',
+        flag: '--panel',
+        runtimeDefault: YoloitCliRuntimeDefault.panel,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'yolochat:logs',
+    alias: 'clg',
+    description: 'Dump full YoLo chat log for debugging',
+    group: 'yolochat',
+    params: <YoloitCliToolParam>[
+      _p(
+        'board',
+        'Target board',
+        flag: '--board',
+        runtimeDefault: YoloitCliRuntimeDefault.board,
+        shortKey: 'b',
+      ),
+      _p(
+        'panel',
+        'Target chat panel',
+        flag: '--panel',
+        runtimeDefault: YoloitCliRuntimeDefault.panel,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'cloud:list',
+    alias: 'clp',
+    description: 'List cloud LLM providers and active config',
+    group: 'cloud',
+  ),
+  YoloitCliTool(
+    command: 'cloud:add',
+    alias: 'cpa',
+    description: 'Add a cloud LLM provider config',
+    group: 'cloud',
+    params: <YoloitCliToolParam>[
+      _p('name', 'Provider display name', required: true, shortKey: 'n'),
+      _p('url', 'API base URL', required: true, flag: '--url', shortKey: 'u'),
+      _p('key', 'API key', required: true, flag: '--key', shortKey: 'k'),
+      _p(
+        'model',
+        'Model identifier',
+        required: true,
+        flag: '--model',
+        shortKey: 'm',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'cloud:remove',
+    alias: 'cpr',
+    description: 'Remove a cloud provider config by id',
+    group: 'cloud',
+    destructive: true,
+    params: <YoloitCliToolParam>[
+      _p('id', 'Config id', required: true, shortKey: 'id'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'cloud:select',
+    alias: 'cps',
+    description: 'Set the active cloud provider config',
+    group: 'cloud',
+    params: <YoloitCliToolParam>[
+      _p('id', 'Config id', required: true, shortKey: 'id'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'cloud:update',
+    alias: 'cpu',
+    description: 'Update fields of an existing cloud provider config',
+    group: 'cloud',
+    params: <YoloitCliToolParam>[
+      _p('id', 'Config id', required: true, shortKey: 'id'),
+      _p('name', 'New display name', flag: '--name', shortKey: 'n'),
+      _p('url', 'New base URL', flag: '--url', shortKey: 'u'),
+      _p('key', 'New API key', flag: '--key', shortKey: 'k'),
+      _p('model', 'New model id', flag: '--model', shortKey: 'm'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'cloud:provider',
+    alias: 'cpp',
+    description: 'Get or set assistant provider type (local or cloud)',
+    group: 'cloud',
+    params: <YoloitCliToolParam>[
+      _p(
+        'provider',
+        'Provider type (omit to show current)',
+        enumValues: const <String>['local', 'cloud'],
+        shortKey: 'p',
       ),
     ],
   ),

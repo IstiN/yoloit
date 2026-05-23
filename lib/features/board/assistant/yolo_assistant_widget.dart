@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
@@ -1190,7 +1189,6 @@ $messagesJson
     return Column(
       children: [
         _buildSessionBar(colors),
-        _buildSkillsBar(colors),
         Expanded(child: _buildMessageList(colors)),
         _buildInputBar(colors),
       ],
@@ -1299,24 +1297,20 @@ $messagesJson
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SvgPicture.asset(
-              'assets/icon/yolo_assistant.svg',
-              width: 48,
-              height: 48,
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 30,
+              color: Theme.of(context).colorScheme.onSurface.withAlpha(76),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
-              'YoLo Assistant',
+              'Send a message to start',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: _kAccent.withAlpha(180),
+                fontSize: 13,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface.withAlpha(153),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Ask me anything!',
-              style: TextStyle(fontSize: 12, color: colors.border),
             ),
           ],
         ),
@@ -1324,7 +1318,7 @@ $messagesJson
     }
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       itemCount: msgs.length,
       itemBuilder: (_, i) => _buildMessageBubble(msgs[i], colors),
     );
@@ -1391,60 +1385,93 @@ $messagesJson
       );
     }
 
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: GestureDetector(
-        onLongPress:
-            content.isEmpty
-                ? null
-                : () => unawaited(_copyMessageToClipboard(content)),
-        child: Container(
-          constraints: BoxConstraints(maxWidth: containsMermaid ? 740 : 460),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: isUser ? _kAccent.withAlpha(30) : colors.surfaceElevated,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color:
-                  isUser ? _kAccent.withAlpha(50) : colors.border.withAlpha(40),
+    return Padding(
+      padding: EdgeInsets.only(
+        top: 6,
+        bottom: 2,
+        left: isUser ? 48 : 0,
+        right: isUser ? 0 : 48,
+      ),
+      child: Align(
+        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: GestureDetector(
+          onLongPress:
+              content.isEmpty
+                  ? null
+                  : () => unawaited(_copyMessageToClipboard(content)),
+          child: Container(
+            constraints: BoxConstraints(maxWidth: containsMermaid ? 740 : 460),
+            margin: const EdgeInsets.symmetric(vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              gradient:
+                  isUser
+                      ? const LinearGradient(
+                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                      : null,
+              color: isUser ? null : colors.surfaceElevated,
+              borderRadius:
+                  isUser
+                      ? const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(4),
+                      )
+                      : const BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
             ),
-          ),
-          child:
-              showThinking
-                  ? _AssistantThinkingIndicator(
-                    color:
-                        Theme.of(context).textTheme.bodyMedium?.color ??
-                        Theme.of(context).colorScheme.onSurface,
-                  )
-                  : isUser
-                  ? SelectableText(
-                    content,
-                    style: TextStyle(fontSize: 13, color: textColor),
-                  )
-                  : containsMermaid
-                  ? MarkdownDocumentPreview(content: content)
-                  : MarkdownBody(
-                    data: content,
-                    styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(fontSize: 13, color: textColor, height: 1.5),
-                      a: TextStyle(
+            child:
+                showThinking
+                    ? _AssistantThinkingIndicator(
+                      color:
+                          Theme.of(context).textTheme.bodyMedium?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                    )
+                    : isUser
+                    ? SelectableText(
+                      content,
+                      style: const TextStyle(
                         fontSize: 13,
-                        color: colors.primary,
-                        decoration: TextDecoration.underline,
+                        color: Colors.white,
+                        height: 1.4,
                       ),
-                      code: TextStyle(
-                        fontSize: 11.5,
-                        color: colors.terminalPrompt,
-                        backgroundColor: codeBg,
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: codeBg,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: colors.border),
+                    )
+                    : containsMermaid
+                    ? MarkdownDocumentPreview(content: content)
+                    : MarkdownBody(
+                      data: content,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          fontSize: 13,
+                          color: textColor,
+                          height: 1.5,
+                        ),
+                        a: TextStyle(
+                          fontSize: 13,
+                          color: colors.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                        code: TextStyle(
+                          fontSize: 11.5,
+                          color: colors.terminalPrompt,
+                          backgroundColor: codeBg,
+                        ),
+                        codeblockDecoration: BoxDecoration(
+                          color: codeBg,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: colors.border),
+                        ),
                       ),
                     ),
-                  ),
+          ),
         ),
       ),
     );
@@ -1629,7 +1656,6 @@ $messagesJson
                 ),
                 maxLines: 4,
                 minLines: 1,
-                onSubmitted: (_) => unawaited(_sendMessage()),
               ),
             ),
           ),
@@ -2515,8 +2541,9 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       final loadMs = swift['swiftLoadMs'];
       if (loadMs != null) buf.writeln('  load time:      ${loadMs}ms');
       final ttft = swift['swiftFirstTokenMs'];
-      if (ttft != null)
+      if (ttft != null) {
         buf.writeln('  first token:    ${ttft}ms  (TTFT inside Swift)');
+      }
       final genMs = swift['swiftGenerateMs'];
       if (genMs != null) buf.writeln('  generation:     ${genMs}ms');
       final totalMs = swift['swiftTotalMs'];
