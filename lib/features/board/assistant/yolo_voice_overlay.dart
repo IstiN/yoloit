@@ -630,33 +630,39 @@ Path _buildPlectrumPath({
 }
 
 /// Paint a single plectrum shape with shadow + rotation-aware gradient.
-/// Wide end = transparent, narrow tip = opaque.
+/// Wide end (top before rotation) = opaque, narrow tip (bottom) = transparent.
+/// Gradient rotates WITH the shape.
 void _paintPlectrum(
   Canvas canvas,
   Path path,
   double rotation,
-  Color color, {
+  Color color,
+  Offset center,
+  double shapeHeight, {
   double intensity = 1.0,
 }) {
-  final bounds = path.getBounds();
-
   // Shadow
   final shadowPaint = Paint()
     ..color = color.withValues(alpha: 0.12 * intensity)
     ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
   canvas.drawPath(path, shadowPaint);
 
-  // Gradient direction follows shape rotation
-  final gradLen = bounds.longestSide * 0.55;
-  // Wide end = "top" of unrotated shape (y = -1) → transparent
+  // Gradient endpoints match exactly the shape's top/bottom after rotation.
+  // Unrotated: top=(0, -h/2), bottom=(0, +h/2).
+  // After rotation by `rotation`: apply same cos/sin transform.
+  final cosR = math.cos(rotation);
+  final sinR = math.sin(rotation);
+  final halfH = shapeHeight * 0.5;
+
+  // Wide end (top of unrotated shape) → OPAQUE
   final gradStart = Offset(
-    bounds.center.dx - math.sin(rotation) * gradLen,
-    bounds.center.dy - math.cos(rotation) * gradLen,
+    center.dx + 0 * cosR - (-halfH) * sinR,   // = center.dx + halfH * sinR
+    center.dy + 0 * sinR + (-halfH) * cosR,   // = center.dy - halfH * cosR
   );
-  // Narrow tip = "bottom" of unrotated shape (y = +1) → opaque
+  // Narrow tip (bottom of unrotated shape) → TRANSPARENT
   final gradEnd = Offset(
-    bounds.center.dx + math.sin(rotation) * gradLen,
-    bounds.center.dy + math.cos(rotation) * gradLen,
+    center.dx + 0 * cosR - halfH * sinR,       // = center.dx - halfH * sinR
+    center.dy + 0 * sinR + halfH * cosR,       // = center.dy + halfH * cosR
   );
 
   final fillPaint = Paint()
@@ -664,13 +670,13 @@ void _paintPlectrum(
       gradStart,
       gradEnd,
       [
-        color.withValues(alpha: 0.0),
-        color.withValues(alpha: 0.0),
-        color.withValues(alpha: 0.08 * intensity),
-        color.withValues(alpha: 0.22 * intensity),
-        color.withValues(alpha: 0.40 * intensity),
+        color.withValues(alpha: 0.45 * intensity),   // wide end: fully visible
+        color.withValues(alpha: 0.40 * intensity),   // still visible
+        color.withValues(alpha: 0.15 * intensity),   // ~50%: fading
+        color.withValues(alpha: 0.04 * intensity),   // ~80%: almost gone
+        color.withValues(alpha: 0.0),                // tip: fully transparent
       ],
-      [0.0, 0.4, 0.6, 0.8, 1.0],
+      [0.0, 0.3, 0.55, 0.8, 1.0],
     );
   canvas.drawPath(path, fillPaint);
 }
@@ -780,7 +786,8 @@ class _BlobOrbPainter extends CustomPainter {
         rh: rh,
         rotation: rot,
       );
-      _paintPlectrum(canvas, path, rot, colors[i], intensity: intensity);
+      _paintPlectrum(canvas, path, rot, colors[i], blobCenter, rh * 2,
+          intensity: intensity);
     }
   }
 
@@ -1259,7 +1266,7 @@ class _SinglePlectrumPainter extends CustomPainter {
       rh: rh,
       rotation: rot,
     );
-    _paintPlectrum(canvas, path, rot, color);
+    _paintPlectrum(canvas, path, rot, color, center, rh * 2);
   }
 
   @override
