@@ -1292,36 +1292,21 @@ class _SinglePlectrumPainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
     canvas.drawPath(path, shadowPaint);
 
-    // Fill: semi-transparent glass with top-down gradient for 3D depth
+    // Fill: solid color with gradient transparency
+    // Top (wide part) = fully opaque, bottom (narrow tip) = fully transparent
     final bounds = path.getBounds();
     final fillPaint = Paint()
       ..shader = ui.Gradient.linear(
         Offset(bounds.center.dx, bounds.top),
         Offset(bounds.center.dx, bounds.bottom),
         [
-          color.withValues(alpha: 0.22),
-          color.withValues(alpha: 0.08),
+          color.withValues(alpha: 0.40),  // top: visible
+          color.withValues(alpha: 0.35),  // upper-mid: still visible
+          color.withValues(alpha: 0.0),   // bottom: fully transparent
         ],
-      )
-      ..blendMode = BlendMode.plus;
+        [0.0, 0.5, 1.0],
+      );
     canvas.drawPath(path, fillPaint);
-
-    // Edge: bright thin glowing border
-    final edgePaint = Paint()
-      ..color = color.withValues(alpha: 0.60)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
-    canvas.drawPath(path, edgePaint);
-
-    // Outer glow halo
-    final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.10)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
-      ..blendMode = BlendMode.plus;
-    canvas.drawPath(path, glowPaint);
   }
 
   @override
