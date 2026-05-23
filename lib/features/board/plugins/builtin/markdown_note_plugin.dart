@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -138,6 +139,8 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
 
   @override
   Widget build(BuildContext context) {
+    final markdown = widget.markdown.isEmpty ? '*Empty note*' : widget.markdown;
+    final renderAsMermaid = markdown.contains('```mermaid');
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -148,9 +151,9 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
               controller: _scrollCtrl,
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child: MarkdownBody(
-                  data: widget.markdown.isEmpty ? '*Empty note*' : widget.markdown,
-                ),
+                child: renderAsMermaid
+                    ? MarkdownDocumentPreview(content: markdown)
+                    : MarkdownBody(data: markdown),
               ),
             ),
           ),
@@ -274,14 +277,16 @@ class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
 
   @override
   Widget build(BuildContext context) {
+    final markdown = widget.markdown.isEmpty ? '*Empty note*' : widget.markdown;
+    final renderAsMermaid = markdown.contains('```mermaid');
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
       child: Padding(
         key: _contentKey,
         padding: const EdgeInsets.all(_innerPadding),
-        child: MarkdownBody(
-          data: widget.markdown.isEmpty ? '*Empty note*' : widget.markdown,
-        ),
+        child: renderAsMermaid
+            ? MarkdownDocumentPreview(content: markdown)
+            : MarkdownBody(data: markdown),
       ),
     );
   }
