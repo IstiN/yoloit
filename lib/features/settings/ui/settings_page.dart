@@ -2830,6 +2830,9 @@ class _DebugUISection extends StatefulWidget {
 class _DebugUISectionState extends State<_DebugUISection> {
   String _voiceStatus = 'idle';
   double _scale = 1.0;
+  double _plectrumRotation = 0.0;
+  double _plectrumSize = 250.0;
+  Color _plectrumColor = const Color(0xFF3CE8FF);
   String _voiceResponse = 'This is a sample response from the LLM model. '
       'It demonstrates how text appears in the response card.';
   String _voiceTranscript = 'Show me the weather today';
@@ -2843,6 +2846,19 @@ class _DebugUISectionState extends State<_DebugUISection> {
     'output',
   ];
 
+  Widget _colorChip(String label, Color c) {
+    final active = _plectrumColor.value == c.value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: active,
+      onSelected: (_) => setState(() => _plectrumColor = c),
+      selectedColor: c.withValues(alpha: 0.6),
+      labelStyle: TextStyle(color: active ? Colors.white : Colors.white70, fontSize: 11),
+      backgroundColor: const Color(0xFF2A2C3A),
+      side: BorderSide(color: active ? c : const Color(0xFF3A3C4E)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -2850,6 +2866,78 @@ class _DebugUISectionState extends State<_DebugUISection> {
       children: [
         const _SectionHeader(title: 'Debug UI Components'),
         const SizedBox(height: 16),
+
+        // ── Single Plectrum Preview ──
+        Text(
+          'Single Plectrum Shape',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Color picker
+        Wrap(
+          spacing: 8,
+          children: [
+            _colorChip('Cyan', const Color(0xFF3CE8FF)),
+            _colorChip('Blue', const Color(0xFF5A7AFF)),
+            _colorChip('Purple', const Color(0xFFAA66FF)),
+            _colorChip('Pink', const Color(0xFFE060E0)),
+            _colorChip('Magenta', const Color(0xFFFF60CC)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text('Rotation: ${(_plectrumRotation * 180 / 3.14159).toStringAsFixed(0)}°',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+            Expanded(
+              child: Slider(
+                value: _plectrumRotation,
+                min: 0,
+                max: 6.28,
+                onChanged: (v) => setState(() => _plectrumRotation = v),
+                activeColor: const Color(0xFF6644FF),
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Text('Size: ${_plectrumSize.toStringAsFixed(0)}',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+            Expanded(
+              child: Slider(
+                value: _plectrumSize,
+                min: 80,
+                max: 400,
+                onChanged: (v) => setState(() => _plectrumSize = v),
+                activeColor: const Color(0xFF6644FF),
+              ),
+            ),
+          ],
+        ),
+        Container(
+          width: double.infinity,
+          height: 350,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D0E16),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF2A2C3A)),
+          ),
+          child: Center(
+            child: SinglePlectrumPreview(
+              color: _plectrumColor,
+              rotation: _plectrumRotation,
+              size: _plectrumSize,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // ── Voice Overlay ──
         Text(
           'Voice Overlay State',
           style: TextStyle(

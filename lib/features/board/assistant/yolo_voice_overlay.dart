@@ -1165,3 +1165,166 @@ class _ThinkingDotsState extends State<_ThinkingDots>
         ),
       );
 }
+
+// ─────────────────────────── single plectrum preview ─────────────────────────
+
+/// Debug widget — renders a single plectrum shape for visual tuning.
+class SinglePlectrumPreview extends StatefulWidget {
+  const SinglePlectrumPreview({
+    super.key,
+    this.color = const Color(0xFF3CE8FF),
+    this.rotation = 0.0,
+    this.size = 200.0,
+  });
+
+  final Color color;
+  final double rotation;
+  final double size;
+
+  @override
+  State<SinglePlectrumPreview> createState() => _SinglePlectrumPreviewState();
+}
+
+class _SinglePlectrumPreviewState extends State<SinglePlectrumPreview>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 8000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _anim,
+        builder: (ctx, _) => CustomPaint(
+          size: Size(widget.size, widget.size),
+          painter: _SinglePlectrumPainter(
+            color: widget.color,
+            rotation: widget.rotation,
+            progress: _anim.value,
+          ),
+        ),
+      );
+}
+
+class _SinglePlectrumPainter extends CustomPainter {
+  const _SinglePlectrumPainter({
+    required this.color,
+    required this.rotation,
+    required this.progress,
+  });
+
+  final Color color;
+  final double rotation;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2;
+
+    // Build plectrum path
+    final t = progress * 2 * math.pi;
+    final wobble = 1.0 + math.sin(t * 2) * 0.02;
+    final rw = r * 0.85 * wobble;
+    final rh = r * 0.80 * wobble;
+
+    final rot = rotation + t * 0.08;
+    final cosR = math.cos(rot);
+    final sinR = math.sin(rot);
+
+    // Plectrum shape — rounded top, soft tapered bottom
+    // 10 control points for organic feel
+    final pts = <Offset>[
+      Offset(0, -rh * 0.90),                  // top center
+      Offset(rw * 0.65, -rh * 0.65),          // top-right
+      Offset(rw * 0.95, -rh * 0.05),          // right bulge
+      Offset(rw * 0.72, rh * 0.48),           // right-lower
+      Offset(rw * 0.28, rh * 0.78),           // bottom-right approach
+      Offset(0, rh * 0.88),                   // bottom tip (rounder)
+      Offset(-rw * 0.30, rh * 0.76),          // bottom-left approach
+      Offset(-rw * 0.74, rh * 0.44),          // left-lower
+      Offset(-rw * 0.92, -rh * 0.10),         // left bulge
+      Offset(-rw * 0.60, -rh * 0.68),         // top-left
+    ];
+
+    // Rotate
+    Offset rotate(Offset p) => Offset(
+          center.dx + p.dx * cosR - p.dy * sinR,
+          center.dy + p.dx * sinR + p.dy * cosR,
+        );
+    final rPts = pts.map(rotate).toList();
+
+    // Smooth Catmull-Rom cubic spline
+    final path = Path();
+    path.moveTo(rPts[0].dx, rPts[0].dy);
+    for (var i = 0; i < rPts.length; i++) {
+      final p0 = rPts[i];
+      final p1 = rPts[(i + 1) % rPts.length];
+      final prev = rPts[(i - 1 + rPts.length) % rPts.length];
+      final next2 = rPts[(i + 2) % rPts.length];
+      final cp1 = Offset(
+        p0.dx + (p1.dx - prev.dx) / 5,
+        p0.dy + (p1.dy - prev.dy) / 5,
+      );
+      final cp2 = Offset(
+        p1.dx - (next2.dx - p0.dx) / 5,
+        p1.dy - (next2.dy - p0.dy) / 5,
+      );
+      path.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, p1.dx, p1.dy);
+    }
+    path.close();
+
+    // Shadow behind
+    final shadowPaint = Paint()
+      ..color = color.withValues(alpha: 0.15)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
+    canvas.drawPath(path, shadowPaint);
+
+    // Fill: semi-transparent glass with top-down gradient for 3D depth
+    final bounds = path.getBounds();
+    final fillPaint = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(bounds.center.dx, bounds.top),
+        Offset(bounds.center.dx, bounds.bottom),
+        [
+          color.withValues(alpha: 0.22),
+          color.withValues(alpha: 0.08),
+        ],
+      )
+      ..blendMode = BlendMode.plus;
+    canvas.drawPath(path, fillPaint);
+
+    // Edge: bright thin glowing border
+    final edgePaint = Paint()
+      ..color = color.withValues(alpha: 0.60)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
+    canvas.drawPath(path, edgePaint);
+
+    // Outer glow halo
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.10)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
+      ..blendMode = BlendMode.plus;
+    canvas.drawPath(path, glowPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SinglePlectrumPainter old) =>
+      old.progress != progress || old.color != color || old.rotation != rotation;
+}

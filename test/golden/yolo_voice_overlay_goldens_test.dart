@@ -85,5 +85,33 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await screenMatchesGolden(tester, 'yolo_voice_overlay_responding');
     });
+
+    testGoldens('single plectrum shape', (tester) async {
+      tester.view.physicalSize = const Size(400, 400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: AppThemePreset.neonPurple.theme,
+          home: Scaffold(
+            backgroundColor: const Color(0xFF020617),
+            body: Center(
+              child: SinglePlectrumPreview(
+                color: const Color(0xFF3CE8FF),
+                rotation: 0.0,
+                size: 280,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      await expectLater(
+        find.byType(MaterialApp),
+        matchesGoldenFile('goldens/yolo_single_plectrum.png'),
+      );
+    });
   });
 }
