@@ -2105,7 +2105,7 @@ PY
     bid_raw=$(_require_board "$bid_raw")
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     local state
-    state=$(python3 -c "import json,sys; print(json.dumps({'text': sys.argv[1] if len(sys.argv)>1 else ''}))" "${content:-}" 2>/dev/null)
+    state=$(python3 -c "import json,sys; print(json.dumps({'markdown': sys.argv[1] if len(sys.argv)>1 else ''}))" "${content:-}" 2>/dev/null)
     pid=$(_auto_panel "$bid" "board.note.markdown" "$title" "$state")
     echo "Note panel created: $pid"
     ;;
