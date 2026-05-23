@@ -712,15 +712,15 @@ class _BlobOrbPainter extends CustomPainter {
 
       final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
 
-      // Fill: radial gradient from blob center — visible in center, transparent at edge
+      // Fill: radial gradient — TRANSPARENT at center → OPAQUE at edge
       final fillPaint = Paint()
         ..shader = RadialGradient(
           colors: [
-            colors[i].withValues(alpha: 0.30 + 0.14 * intensity),
-            colors[i].withValues(alpha: 0.12 + 0.06 * intensity),
             colors[i].withValues(alpha: 0.0),
+            colors[i].withValues(alpha: 0.04 + 0.02 * intensity),
+            colors[i].withValues(alpha: 0.22 + 0.14 * intensity),
           ],
-          stops: const [0.0, 0.55, 1.0],
+          stops: const [0.0, 0.45, 1.0],
         ).createShader(Rect.fromCircle(
           center: blobCenter,
           radius: blobW * 0.52,
@@ -738,27 +738,9 @@ class _BlobOrbPainter extends CustomPainter {
       canvas.drawPath(path, glowEdge);
     }
 
-    // Subtle inner center highlight
-    final innerGlow = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          Colors.white.withValues(alpha: 0.08 * intensity),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: r * 0.40));
-    canvas.drawCircle(center, r * 0.35, innerGlow);
+    // No inner glow — keep center clear for YoLo text
 
-    // Subtle depth shadow in very center (not dark ring)
-    final corePaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF0C1024).withValues(alpha: 0.22),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: r * 0.28));
-    canvas.drawCircle(center, r * 0.22, corePaint);
+    // No dark core — center stays clean
   }
 
   @override
