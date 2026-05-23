@@ -153,6 +153,11 @@ class ChatCliHandler extends PanelCliHandler {
           boardId: args['_boardId'] as String?,
           boardName: args['_boardName'] as String?,
           panelId: panel.id,
+          panelTitle: panel.title,
+          panelType: args['_panelType'] as String?,
+          availableBoardsSummary: args['_availableBoardsSummary'] as String?,
+          currentBoardPanelsSummary:
+              args['_currentBoardPanelsSummary'] as String?,
         ),
       );
 
@@ -184,6 +189,11 @@ class ChatCliHandler extends PanelCliHandler {
         boardId: args['_boardId'] as String?,
         boardName: args['_boardName'] as String?,
         panelId: panel.id,
+        panelTitle: panel.title,
+        panelType: args['_panelType'] as String?,
+        availableBoardsSummary: args['_availableBoardsSummary'] as String?,
+        currentBoardPanelsSummary:
+            args['_currentBoardPanelsSummary'] as String?,
       ),
     );
     return CliActionResult(

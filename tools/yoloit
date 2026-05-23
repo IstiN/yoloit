@@ -797,8 +797,8 @@ commands = [
   {
     "group": "playlist",
     "name": "play",
-    "description": "Add media and start playback",
-    "params": [["board", "Board id or name", True], ["panel", "Playlist panel id or title", True], ["file-or-url", "Media path or URL", True]],
+    "description": "Start playlist playback (optionally add media first)",
+    "params": [["board", "Board id or name", False], ["panel", "Playlist panel id or title", False], ["file-or-url", "Media path or URL", False]],
     "example": "yoloit play \"My Board\" \"Playlist\" video.mp4",
   },
   {
@@ -2514,12 +2514,26 @@ PY
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"cards"}' | python3 -m json.tool 2>/dev/null
     ;;
   play)
-    [[ $# -lt 3 ]] && { echo "Usage: yoloit play <board> <panel> <file-or-url>" >&2; exit 1; }
-    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    src="$3"
-    name=$(basename "$src")
-    _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add\",\"path\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$src"),\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$name")}" | python3 -m json.tool 2>/dev/null
-    sleep 0.1
+    # Usage variants:
+    #   yoloit play
+    #   yoloit play <board>
+    #   yoloit play <board> <panel>
+    #   yoloit play <board> <panel> <file-or-url>
+    local bid_raw="" panel_hint="" src=""
+    case $# in
+      0) ;;
+      1) bid_raw="$1" ;;
+      2) bid_raw="$1"; panel_hint="$2" ;;
+      *) bid_raw="$1"; panel_hint="$2"; src="$3" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.playlist" "$panel_hint"); pid=$(_encode "$pid")
+    if [[ -n "$src" ]]; then
+      name=$(basename "$src")
+      _post "/boards/${bid}/panels/${pid}/action" "{\"action\":\"add\",\"path\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$src"),\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$name")}" | python3 -m json.tool 2>/dev/null
+      sleep 0.1
+    fi
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"play"}' | python3 -m json.tool 2>/dev/null
     ;;
   web:open)

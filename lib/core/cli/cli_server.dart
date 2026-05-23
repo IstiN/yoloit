@@ -223,7 +223,10 @@ class CliServer {
     }
 
     // POST /api/lm/generate  { messages: [...], systemPrompt?: "...", maxTokens?: 512 }
-    if (path.length == 2 && path[0] == 'lm' && path[1] == 'generate' && method == 'POST') {
+    if (path.length == 2 &&
+        path[0] == 'lm' &&
+        path[1] == 'generate' &&
+        method == 'POST') {
       return _handleLmGenerate(request);
     }
 
@@ -398,13 +401,18 @@ class CliServer {
         'ok': true,
         'providerType': providerType,
         'activeConfigId': activeId,
-        'configs': configs.map((c) => {
-          'id': c.id,
-          'name': c.name,
-          'baseUrl': c.baseUrl,
-          'model': c.model,
-          'hasKey': c.apiKey.isNotEmpty,
-        }).toList(),
+        'configs':
+            configs
+                .map(
+                  (c) => {
+                    'id': c.id,
+                    'name': c.name,
+                    'baseUrl': c.baseUrl,
+                    'model': c.model,
+                    'hasKey': c.apiKey.isNotEmpty,
+                  },
+                )
+                .toList(),
       });
     }
 
@@ -459,7 +467,9 @@ class CliServer {
       final body = await _body(request);
       final type = body['type'] as String?;
       if (type == null || (type != 'local' && type != 'cloud')) {
-        return _error('Missing or invalid "type" field. Expected "local" or "cloud".');
+        return _error(
+          'Missing or invalid "type" field. Expected "local" or "cloud".',
+        );
       }
       await service.saveAssistantProviderType(type);
       return _json({'ok': true, 'action': 'set-provider-type', 'type': type});
@@ -478,10 +488,12 @@ class CliServer {
         baseUrl: body['baseUrl'] as String? ?? existing.baseUrl,
         apiKey: body['apiKey'] as String? ?? existing.apiKey,
         model: body['model'] as String? ?? existing.model,
-        extraHeaders: body['extraHeaders'] is Map
-            ? (body['extraHeaders'] as Map)
-                .map((k, v) => MapEntry(k.toString(), v.toString()))
-            : existing.extraHeaders,
+        extraHeaders:
+            body['extraHeaders'] is Map
+                ? (body['extraHeaders'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), v.toString()),
+                )
+                : existing.extraHeaders,
       );
       await service.upsertConfig(updated);
       return _json({'ok': true, 'action': 'update', 'id': id});
@@ -499,9 +511,10 @@ class CliServer {
     final maxTokens = (body['maxTokens'] as num?)?.toInt() ?? 512;
     final temperature = (body['temperature'] as num?)?.toDouble() ?? 0.2;
     // enableThinking: explicit bool from body, or auto-false for Qwen3 models
-    final bool? enableThinking = body.containsKey('enableThinking')
-        ? (body['enableThinking'] as bool?)
-        : (modelId.toLowerCase().contains('qwen3') ? false : null);
+    final bool? enableThinking =
+        body.containsKey('enableThinking')
+            ? (body['enableThinking'] as bool?)
+            : (modelId.toLowerCase().contains('qwen3') ? false : null);
 
     await service.initialize();
     await service.ensureRuntimeReady();
@@ -562,7 +575,8 @@ class CliServer {
 
       final totalMs = DateTime.now().difference(t0).inMilliseconds;
       final genMs = totalMs - (firstTokenMs < 0 ? 0 : firstTokenMs);
-      final response = full.trim().isNotEmpty ? full.trim() : buffer.toString().trim();
+      final response =
+          full.trim().isNotEmpty ? full.trim() : buffer.toString().trim();
       final hasThink = response.contains('<think>');
 
       return _json({
@@ -668,9 +682,9 @@ class CliServer {
       if (target == null) {
         return _error('No board.chat panel found (or target not found)');
       }
-      return _panelAction(
-        cubit, target.board, target.panel, {'action': 'clear'},
-      );
+      return _panelAction(cubit, target.board, target.panel, {
+        'action': 'clear',
+      });
     }
 
     // GET /yolochat/sessions
@@ -705,9 +719,9 @@ class CliServer {
       if (target == null) {
         return _error('No board.chat panel found (or target not found)');
       }
-      return _panelAction(
-        cubit, target.board, target.panel, {'action': 'status'},
-      );
+      return _panelAction(cubit, target.board, target.panel, {
+        'action': 'status',
+      });
     }
 
     // POST /yolochat/stop
@@ -721,9 +735,9 @@ class CliServer {
       if (target == null) {
         return _error('No board.chat panel found (or target not found)');
       }
-      return _panelAction(
-        cubit, target.board, target.panel, {'action': 'stop'},
-      );
+      return _panelAction(cubit, target.board, target.panel, {
+        'action': 'stop',
+      });
     }
 
     // GET /yolochat/logs — full session log for debugging (copy-paste friendly)
@@ -1358,6 +1372,16 @@ class CliServer {
       ...body,
       '_boardId': board.id,
       '_boardName': board.name,
+      '_panelType': panel.type,
+      '_availableBoardsSummary': cubit.state.boards
+          .map((b) {
+            final marker = b.id == board.id ? ' (current)' : '';
+            return '- ${b.name} [${b.id}]$marker';
+          })
+          .join('\n'),
+      '_currentBoardPanelsSummary': board.panels
+          .map((p) => '- ${p.title} [${p.type}] (${p.id})')
+          .join('\n'),
     }, panel);
 
     // Apply state update if provided
@@ -2792,9 +2816,7 @@ class CliServer {
     // GET /api/widgets — list all installed widgets
     if (sub.isEmpty && method == 'GET') {
       final widgets = await registry.loadAll();
-      return _json({
-        'widgets': widgets.map((m) => m.toJson()).toList(),
-      });
+      return _json({'widgets': widgets.map((m) => m.toJson()).toList()});
     }
 
     // POST /api/widgets/install  { path: "..." }
@@ -2805,7 +2827,8 @@ class CliServer {
         return _error('Missing "path" field');
       }
       final manifest = await registry.install(srcPath.trim());
-      if (manifest == null) return _error('Failed to install widget from: $srcPath');
+      if (manifest == null)
+        return _error('Failed to install widget from: $srcPath');
       return _json({'ok': true, 'widget': manifest.toJson()});
     }
 
@@ -2841,10 +2864,10 @@ class CliServer {
       final widgets = await registry.loadAll();
       final activeIds = appRegistry.activeIds();
       return _json({
-        'apps': widgets.map((m) => {
-          ...m.toJson(),
-          'active': activeIds.contains(m.id),
-        }).toList(),
+        'apps':
+            widgets
+                .map((m) => {...m.toJson(), 'active': activeIds.contains(m.id)})
+                .toList(),
         'activeIds': activeIds,
       });
     }
@@ -2852,8 +2875,13 @@ class CliServer {
     // GET /api/apps/dev-skill — return the app development skill doc
     if (sub.length == 1 && sub[0] == 'dev-skill' && method == 'GET') {
       try {
-        final content = await rootBundle.loadString('docs/app-development-skill.md');
-        return shelf.Response.ok(content, headers: {'content-type': 'text/plain; charset=utf-8'});
+        final content = await rootBundle.loadString(
+          'docs/app-development-skill.md',
+        );
+        return shelf.Response.ok(
+          content,
+          headers: {'content-type': 'text/plain; charset=utf-8'},
+        );
       } catch (e) {
         return _error('Skill doc not found: $e');
       }
@@ -2876,7 +2904,8 @@ class CliServer {
           final raw = await manifestFile.readAsString();
           final manifest = jsonDecode(raw) as Map<String, dynamic>;
           demos.add({
-            'id': manifest['id'] ?? entry.path.split(Platform.pathSeparator).last,
+            'id':
+                manifest['id'] ?? entry.path.split(Platform.pathSeparator).last,
             'name': manifest['name'] ?? '',
             'description': manifest['description'] ?? '',
             'icon': manifest['icon'] ?? '',
@@ -2899,19 +2928,22 @@ class CliServer {
       final appsDir = '${Platform.environment['HOME']}/.config/yoloit/apps';
       final appDir = Directory('$appsDir/$id');
       if (!await appDir.exists()) {
-        return _error('Demo app "$id" not found. Run app:demo to list available apps.');
+        return _error(
+          'Demo app "$id" not found. Run app:demo to list available apps.',
+        );
       }
       final manifestFile = File('${appDir.path}/manifest.json');
       final widgetFile = File('${appDir.path}/widget.js');
-      final manifestContent = await manifestFile.exists()
-          ? await manifestFile.readAsString()
-          : null;
-      final widgetContent = await widgetFile.exists()
-          ? await widgetFile.readAsString()
-          : null;
+      final manifestContent =
+          await manifestFile.exists()
+              ? await manifestFile.readAsString()
+              : null;
+      final widgetContent =
+          await widgetFile.exists() ? await widgetFile.readAsString() : null;
       Map<String, dynamic> manifest = {};
       try {
-        if (manifestContent != null) manifest = jsonDecode(manifestContent) as Map<String, dynamic>;
+        if (manifestContent != null)
+          manifest = jsonDecode(manifestContent) as Map<String, dynamic>;
       } catch (_) {}
       return _json({
         'id': id,
@@ -2935,9 +2967,10 @@ class CliServer {
       }
       try {
         final zipName = zipFile.path.split(Platform.pathSeparator).last;
-        final appNameFromZip = zipName.endsWith('.zip')
-            ? zipName.substring(0, zipName.length - 4)
-            : zipName;
+        final appNameFromZip =
+            zipName.endsWith('.zip')
+                ? zipName.substring(0, zipName.length - 4)
+                : zipName;
         final appsDir = Directory(
           '${Platform.environment['HOME']}/.config/yoloit/apps',
         );
@@ -2946,10 +2979,12 @@ class CliServer {
           '${appsDir.path}${Platform.pathSeparator}__zip_extract_${DateTime.now().millisecondsSinceEpoch}',
         );
         await extractDir.create();
-        final unzipResult = await Process.run(
-          'unzip',
-          ['-q', zipFile.path, '-d', extractDir.path],
-        );
+        final unzipResult = await Process.run('unzip', [
+          '-q',
+          zipFile.path,
+          '-d',
+          extractDir.path,
+        ]);
         if (unzipResult.exitCode != 0) {
           await extractDir.delete(recursive: true);
           return _error('Failed to extract ZIP: ${unzipResult.stderr}');
@@ -2973,7 +3008,9 @@ class CliServer {
         );
         if (await manifestFile.exists()) {
           try {
-            final raw = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+            final raw =
+                jsonDecode(await manifestFile.readAsString())
+                    as Map<String, dynamic>;
             appName = (raw['id'] as String?)?.trim() ?? appNameFromZip;
           } catch (_) {}
         }
@@ -2985,7 +3022,11 @@ class CliServer {
         await extractDir.delete(recursive: true);
         final manifest = await registry.find(appName);
         await registry.loadAll(); // refresh registry cache
-        return _json({'ok': true, 'appName': appName, 'widget': manifest?.toJson()});
+        return _json({
+          'ok': true,
+          'appName': appName,
+          'widget': manifest?.toJson(),
+        });
       } catch (e) {
         return _error('ZIP install failed: $e');
       }
@@ -3000,7 +3041,11 @@ class CliServer {
       if (action == 'snapshot' && method == 'GET') {
         final tree = appRegistry.tree(id);
         if (tree == null) {
-          return _json({'ok': false, 'message': 'No render tree available for widget "$id". Is it running?'});
+          return _json({
+            'ok': false,
+            'message':
+                'No render tree available for widget "$id". Is it running?',
+          });
         }
         return _json({'ok': true, 'widgetId': id, 'tree': tree});
       }
@@ -3014,7 +3059,10 @@ class CliServer {
         }
         final engine = appRegistry.engine(id);
         if (engine == null) {
-          return _json({'ok': false, 'message': 'Widget "$id" is not currently running'});
+          return _json({
+            'ok': false,
+            'message': 'Widget "$id" is not currently running',
+          });
         }
         final payload = body['payload'] as Map<String, dynamic>?;
         engine.callEvent(actionId, payload);
@@ -3025,7 +3073,11 @@ class CliServer {
       if (action == 'logs' && method == 'GET') {
         final engine = appRegistry.engine(id);
         if (engine == null) {
-          return _json({'ok': false, 'message': 'App "$id" is not currently running', 'logs': <Map<String, dynamic>>[]});
+          return _json({
+            'ok': false,
+            'message': 'App "$id" is not currently running',
+            'logs': <Map<String, dynamic>>[],
+          });
         }
         final logs = engine.peekLogs();
         return _json({'ok': true, 'widgetId': id, 'logs': logs});
@@ -3035,9 +3087,16 @@ class CliServer {
       if (action == 'reload' && method == 'POST') {
         final ok = await appRegistry.triggerReload(id);
         if (!ok) {
-          return _json({'ok': false, 'message': 'Widget "$id" is not currently running'});
+          return _json({
+            'ok': false,
+            'message': 'Widget "$id" is not currently running',
+          });
         }
-        return _json({'ok': true, 'widgetId': id, 'message': 'Widget reloaded'});
+        return _json({
+          'ok': true,
+          'widgetId': id,
+          'message': 'Widget reloaded',
+        });
       }
 
       // POST /api/apps/:id/screenshot
@@ -3045,7 +3104,8 @@ class CliServer {
         // TODO: implement full screenshot once BoardScreenshotService.capturePanel(panelId) is wired to widgetId lookup
         return _json({
           'ok': false,
-          'message': 'Widget screenshot requires the panel to be visible on screen. Use app:snapshot for the render tree.',
+          'message':
+              'Widget screenshot requires the panel to be visible on screen. Use app:snapshot for the render tree.',
         });
       }
     }

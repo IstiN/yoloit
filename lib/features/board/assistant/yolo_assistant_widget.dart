@@ -383,6 +383,26 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   BoardDocument? _currentBoard() =>
       context.read<BoardCubit>().state.activeBoard;
 
+  String _availableBoardsSummary() {
+    final cubit = context.read<BoardCubit>();
+    final current = cubit.state.activeBoard;
+    return cubit.state.boards
+        .map((board) {
+          final marker = board.id == current?.id ? ' (current)' : '';
+          return '- ${board.name} [${board.id}]$marker';
+        })
+        .join('\n');
+  }
+
+  String _currentBoardPanelsSummary(BoardDocument? board) {
+    if (board == null) return '';
+    final panels = [...board.panels]
+      ..sort((a, b) => b.zIndex.compareTo(a.zIndex));
+    return panels
+        .map((panel) => '- ${panel.title} [${panel.type}] (${panel.id})')
+        .join('\n');
+  }
+
   ChatRuntimeContext _runtimeContext() {
     final board = _currentBoard();
     return ChatRuntimeContext(
@@ -390,6 +410,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       boardName: board?.name,
       panelId: widget.panel.id,
       panelTitle: widget.panel.title,
+      panelType: widget.panel.type,
+      availableBoardsSummary: _availableBoardsSummary(),
+      currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
     );
   }
 
@@ -559,8 +582,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   }
 
   String _buildContextSnapshotMarkdown() {
-    final board = _currentBoard();
+    final cubit = context.read<BoardCubit>();
+    final board = cubit.state.activeBoard;
     final enabledTools = _enabledLocalToolCount();
+    final boardsList = _availableBoardsSummary();
+    final panelsList = _currentBoardPanelsSummary(board);
     return '''
 ## Current YoLoIT context snapshot
 
@@ -572,6 +598,16 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 - Max output tokens: $_maxOutputTokens
 - Temperature: $_temperature
 - Thinking: ${_enableThinking ? 'enabled' : 'disabled'}
+
+### Available boards (id-aware)
+$boardsList
+
+Use this list when user asks to switch/open a board. Do not claim missing access without trying board:focus.
+
+### Current board panels
+$panelsList
+
+Use this list when user asks to show/focus/play an existing panel on the current board.
 '''.trim();
   }
 

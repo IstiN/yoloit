@@ -111,8 +111,7 @@ class LocalLlmProvider extends ChatProvider {
       final requestProfile = _requestProfileFor(installed.manifest);
       final isRouter = _isRouterModel(installed.manifest);
       final isOrchestrator = _isOrchestratorModel(installed.manifest);
-      final maxIterations =
-          isOrchestrator ? _maxOrchestratorIterations : 1;
+      final maxIterations = isOrchestrator ? _maxOrchestratorIterations : 1;
       // ignore: avoid_print
       print(
         '[LocalLlmProvider] model=${installed.manifest.id} '
@@ -229,14 +228,18 @@ class LocalLlmProvider extends ChatProvider {
             if (firstTokenMs < 0 && chunk.trim().isNotEmpty) {
               firstTokenMs = completionStopwatch.elapsedMilliseconds;
             }
-            final rawDelta =
-                _extractDelta(previous: rawEmitted, incoming: chunk);
+            final rawDelta = _extractDelta(
+              previous: rawEmitted,
+              incoming: chunk,
+            );
             if (rawDelta.isEmpty) return;
             streamedChunkCount++;
             rawEmitted += rawDelta;
             final visible = stripEmbeddedGemmaToolCallBlocks(rawEmitted);
-            final delta =
-                _extractDelta(previous: iterEmitted, incoming: visible);
+            final delta = _extractDelta(
+              previous: iterEmitted,
+              incoming: visible,
+            );
             if (delta.isEmpty) return;
 
             // While buffering, check if the accumulated output still looks
@@ -341,13 +344,12 @@ class LocalLlmProvider extends ChatProvider {
 
           // Add assistant response + tool results to loop context for next
           // iteration so the model sees what it already did.
-          loopContext.add({
-            'role': 'assistant',
-            'content': iterContent.trim(),
-          });
-          for (var i = iterToolCountBefore;
-              i < sessionToolHistory.length;
-              i++) {
+          loopContext.add({'role': 'assistant', 'content': iterContent.trim()});
+          for (
+            var i = iterToolCountBefore;
+            i < sessionToolHistory.length;
+            i++
+          ) {
             final tc = sessionToolHistory[i];
             loopContext.add({
               'role': 'tool',
@@ -422,10 +424,7 @@ class LocalLlmProvider extends ChatProvider {
                   generationDurationMs < 0 ? 0 : generationDurationMs,
               if (nativeTimings != null) 'nativeTimings': nativeTimings,
               'orchestratorIterations':
-                  loopContext
-                          .where((m) => m['role'] == 'assistant')
-                          .length +
-                      1,
+                  loopContext.where((m) => m['role'] == 'assistant').length + 1,
             },
           },
         ),
@@ -468,15 +467,16 @@ class LocalLlmProvider extends ChatProvider {
     // The orchestrator (Gemma 4) decides when to call tools vs respond with text.
     if (modelId.toLowerCase().contains('router')) {
       final service = LocalAiModelsService.instance;
-      final orchestratorId = service.chatModels
-          .map((m) => m.id)
-          .where(
-            (id) =>
-                id.toLowerCase().contains('gemma4') ||
-                id.toLowerCase().contains('gemma-4'),
-          )
-          .where((id) => service.installedModelById(id) != null)
-          .firstOrNull;
+      final orchestratorId =
+          service.chatModels
+              .map((m) => m.id)
+              .where(
+                (id) =>
+                    id.toLowerCase().contains('gemma4') ||
+                    id.toLowerCase().contains('gemma-4'),
+              )
+              .where((id) => service.installedModelById(id) != null)
+              .firstOrNull;
       if (orchestratorId != null) {
         // ignore: avoid_print
         print(
@@ -707,11 +707,10 @@ class LocalLlmProvider extends ChatProvider {
 
     // Verify the tool exists before invoking. If the model hallucinated a
     // non-existent tool name, treat the output as a non-command response.
-    final resolvedName =
-        YoloitCliToolArgumentNormalizer.normalizeFunctionName(
-          functionName: parsed.name,
-          userMessage: '',
-        );
+    final resolvedName = YoloitCliToolArgumentNormalizer.normalizeFunctionName(
+      functionName: parsed.name,
+      userMessage: '',
+    );
     final tool = YoloitCliToolCatalog.byFunctionName(resolvedName);
     if (tool == null) {
       // ignore: avoid_print
@@ -765,12 +764,17 @@ class LocalLlmProvider extends ChatProvider {
           final rawA = root['a'];
           if (rawA is List) {
             // Filter out /no_think artifacts leaked from the prompt.
-            final cleaned = rawA
-                .where((e) =>
-                    e != null &&
-                    !RegExp(r'^/?no_think$', caseSensitive: false)
-                        .hasMatch(e.toString().trim()))
-                .toList();
+            final cleaned =
+                rawA
+                    .where(
+                      (e) =>
+                          e != null &&
+                          !RegExp(
+                            r'^/?no_think$',
+                            caseSensitive: false,
+                          ).hasMatch(e.toString().trim()),
+                    )
+                    .toList();
             arguments = _positionalArgsToNamed(compactName, cleaned);
           }
         } else {
@@ -794,7 +798,10 @@ class LocalLlmProvider extends ChatProvider {
     }
   }
 
-  Map<String, Object?> _positionalArgsToNamed(String command, List<Object?> positional) {
+  Map<String, Object?> _positionalArgsToNamed(
+    String command,
+    List<Object?> positional,
+  ) {
     final tool = YoloitCliToolCatalog.byFunctionName(command);
     if (tool == null) return <String, Object?>{};
     final result = <String, Object?>{};
@@ -804,8 +811,10 @@ class LocalLlmProvider extends ChatProvider {
     // so map positional args to content params first, then overflow to
     // context params as fallback.
     const contextKeys = {'board', 'panel'};
-    final contentParams = params.where((p) => !contextKeys.contains(p.key)).toList();
-    final contextParams = params.where((p) => contextKeys.contains(p.key)).toList();
+    final contentParams =
+        params.where((p) => !contextKeys.contains(p.key)).toList();
+    final contextParams =
+        params.where((p) => contextKeys.contains(p.key)).toList();
     final orderedParams = [...contentParams, ...contextParams];
 
     for (var i = 0; i < positional.length && i < orderedParams.length; i++) {
@@ -821,10 +830,13 @@ class LocalLlmProvider extends ChatProvider {
     var trimmed = text.trim();
     if (trimmed.isEmpty) return null;
     // Strip <think>...</think> blocks from Qwen3 models.
-    trimmed = trimmed.replaceAll(
-      RegExp(r'<think>[\s\S]*?</think>\s*', caseSensitive: false),
-      '',
-    ).trim();
+    trimmed =
+        trimmed
+            .replaceAll(
+              RegExp(r'<think>[\s\S]*?</think>\s*', caseSensitive: false),
+              '',
+            )
+            .trim();
     if (trimmed.isEmpty) return null;
     if (trimmed.startsWith('```')) {
       trimmed =
@@ -940,11 +952,15 @@ class LocalLlmProvider extends ChatProvider {
     final boardName = runtimeContext?.boardName?.trim();
     final panelId = runtimeContext?.panelId?.trim();
     final panelTitle = runtimeContext?.panelTitle?.trim();
+    final panelType = runtimeContext?.panelType?.trim();
+    final boardsSummary = runtimeContext?.availableBoardsSummary?.trim();
+    final panelsSummary = runtimeContext?.currentBoardPanelsSummary?.trim();
     final hasContext =
         (boardId != null && boardId.isNotEmpty) ||
         (boardName != null && boardName.isNotEmpty) ||
         (panelId != null && panelId.isNotEmpty) ||
-        (panelTitle != null && panelTitle.isNotEmpty);
+        (panelTitle != null && panelTitle.isNotEmpty) ||
+        (panelType != null && panelType.isNotEmpty);
 
     final isRouter = _isRouterModel(manifest);
     final systemBuf = StringBuffer();
@@ -968,8 +984,23 @@ class LocalLlmProvider extends ChatProvider {
         systemBuf.writeln('- Board name: ${boardName ?? 'unknown'}');
         systemBuf.writeln('- Chat panel id: ${panelId ?? 'unknown'}');
         systemBuf.writeln('- Chat panel title: ${panelTitle ?? 'unknown'}');
+        systemBuf.writeln('- Chat panel type: ${panelType ?? 'unknown'}');
         systemBuf.write(
           'Default to this board/panel when a tool argument is omitted.',
+        );
+      }
+      if (boardsSummary != null && boardsSummary.isNotEmpty) {
+        systemBuf.writeln('\nAvailable boards:');
+        systemBuf.writeln(boardsSummary);
+        systemBuf.writeln(
+          'When asked to switch/open a board, use board:focus if the board is listed here.',
+        );
+      }
+      if (panelsSummary != null && panelsSummary.isNotEmpty) {
+        systemBuf.writeln('\nCurrent board panels:');
+        systemBuf.writeln(panelsSummary);
+        systemBuf.writeln(
+          'When asked to show/focus/play an existing panel, use the listed panel instead of asking for a new URL/file.',
         );
       }
     }
@@ -1002,9 +1033,10 @@ class LocalLlmProvider extends ChatProvider {
     var cleanedMessage = userMessage;
     if (isRouter) {
       // Strip /no_think suffix — thinking is already disabled for router models.
-      cleanedMessage = cleanedMessage
-          .replaceAll(RegExp(r'\s*/no_think\b', caseSensitive: false), '')
-          .trim();
+      cleanedMessage =
+          cleanedMessage
+              .replaceAll(RegExp(r'\s*/no_think\b', caseSensitive: false), '')
+              .trim();
     }
     result.add({'role': 'user', 'content': cleanedMessage});
 
@@ -1076,10 +1108,10 @@ class LocalLlmProvider extends ChatProvider {
   /// Detects content that looks like tool output / JSON tool calls.
   /// Used by the streaming buffer to decide whether to hold content back.
   static final _toolOutputPattern = RegExp(
-    r'^\[?\w{1,20}\]?\s*\{|'        // [alias] { or name{
-    r'^\{|'                          // raw JSON
-    r'^```|'                         // fenced code block
-    r'^\{"(ok|name|c|command)"',     // known JSON keys
+    r'^\[?\w{1,20}\]?\s*\{|' // [alias] { or name{
+    r'^\{|' // raw JSON
+    r'^```|' // fenced code block
+    r'^\{"(ok|name|c|command)"', // known JSON keys
     caseSensitive: false,
   );
 
@@ -1097,10 +1129,13 @@ class LocalLlmProvider extends ChatProvider {
     // Remove tool echo lines (e.g. "[nadd] {"ok":false,...}")
     var cleaned = content.replaceAll(_toolEchoPattern, '').trim();
     // Remove standalone raw JSON tool results
-    cleaned = cleaned.replaceAll(
-      RegExp(r'\{"ok"\s*:\s*(true|false)\s*,\s*"command"\s*:[^}]+\}'),
-      '',
-    ).trim();
+    cleaned =
+        cleaned
+            .replaceAll(
+              RegExp(r'\{"ok"\s*:\s*(true|false)\s*,\s*"command"\s*:[^}]+\}'),
+              '',
+            )
+            .trim();
     return cleaned;
   }
 

@@ -174,6 +174,28 @@ void main() {
     },
   );
 
+  test(
+    'executor can preview play command without file when playlist panel auto-resolves',
+    () async {
+      final executor = YoloitCliToolExecutor(execute: false);
+      final result =
+          jsonDecode(
+                await executor.invoke(
+                  'yoloit_play',
+                  <String, Object?>{},
+                  runtimeContext: const ChatRuntimeContext(
+                    boardId: 'board-1',
+                    panelId: 'panel-chat',
+                    panelType: 'board.chat',
+                  ),
+                ),
+              )
+              as Map<String, Object?>;
+      expect(result['ok'], true);
+      expect(result['command'], 'yoloit play board-1');
+    },
+  );
+
   test('executor keeps note:create board/title argument order', () async {
     final executor = YoloitCliToolExecutor(execute: false);
     final result =

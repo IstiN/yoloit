@@ -56,16 +56,17 @@ class _SlashCommand {
 Widget _buildProviderBadge(String providerName) {
   final label = switch (providerName.toLowerCase()) {
     'openrouter' => 'OR',
-    'opencode'   => 'OC',
+    'opencode' => 'OC',
     'siliconflow' => 'SF',
-    'anthropic'  => 'ANT',
-    'openai'     => 'OAI',
-    'google'     => 'GGL',
-    'mistral'    => 'MST',
-    'groq'       => 'GRQ',
-    _ => providerName.length > 6
-        ? providerName.substring(0, 2).toUpperCase()
-        : providerName,
+    'anthropic' => 'ANT',
+    'openai' => 'OAI',
+    'google' => 'GGL',
+    'mistral' => 'MST',
+    'groq' => 'GRQ',
+    _ =>
+      providerName.length > 6
+          ? providerName.substring(0, 2).toUpperCase()
+          : providerName,
   };
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
@@ -182,9 +183,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     // If opencode provider, refresh models and rebuild setup view once loaded.
     if (_provider is OpencodeProvider) {
-      (_provider as OpencodeProvider)
-          .refreshModelsFromModelsDev()
-          .then((_) {
+      (_provider as OpencodeProvider).refreshModelsFromModelsDev().then((_) {
         if (mounted) setState(() {});
       });
     }
@@ -213,9 +212,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       final savedMessages = widget.panel.state['messages'];
       if (savedMessages is List) {
         _session!.restoreMessages(
-          savedMessages.whereType<Map>().map(
-            (m) => Map<String, dynamic>.from(m),
-          ).toList(),
+          savedMessages
+              .whereType<Map>()
+              .map((m) => Map<String, dynamic>.from(m))
+              .toList(),
         );
       }
       final savedUsage = widget.panel.state['lastUsage'];
@@ -455,10 +455,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _opencodeSessionId = sid;
-        widget.onUpdateState({
-          ...widget.panel.state,
-          'opencodeSessionId': sid,
-        });
+        widget.onUpdateState({...widget.panel.state, 'opencodeSessionId': sid});
       }
     }
     // Persist current messages to board state
@@ -608,7 +605,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final board = _currentBoardForPanel();
     if (board == null) return;
 
-    final agentName = (arguments['name'] as String?)?.trim() ??
+    final agentName =
+        (arguments['name'] as String?)?.trim() ??
         (arguments['description'] as String?)?.trim() ??
         toolName;
     final agentType = (arguments['agent_type'] as String?)?.trim() ?? '';
@@ -629,8 +627,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     buf.write(content);
 
     final noteContent = buf.toString();
-    final cwd =
-        _config.workingDir.isNotEmpty ? _config.workingDir : null;
+    final cwd = _config.workingDir.isNotEmpty ? _config.workingDir : null;
 
     try {
       await Process.run(
@@ -768,6 +765,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     return state.activeBoard;
   }
 
+  String _availableBoardsSummary() {
+    final boards = context.read<BoardCubit>().state.boards;
+    final current = _currentBoardForPanel();
+    return boards
+        .map((board) {
+          final marker = board.id == current?.id ? ' (current)' : '';
+          return '- ${board.name} [${board.id}]$marker';
+        })
+        .join('\n');
+  }
+
+  String _currentBoardPanelsSummary(BoardDocument? board) {
+    if (board == null) return '';
+    final panels = [...board.panels]
+      ..sort((a, b) => b.zIndex.compareTo(a.zIndex));
+    return panels
+        .map((panel) => '- ${panel.title} [${panel.type}] (${panel.id})')
+        .join('\n');
+  }
+
   Future<void> _sendMessage({
     String? overrideText,
     List<String> overrideAttachments = const [],
@@ -815,6 +832,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         boardName: board?.name,
         panelId: widget.panel.id,
         panelTitle: widget.panel.title,
+        panelType: widget.panel.type,
+        availableBoardsSummary: _availableBoardsSummary(),
+        currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
       ),
       onEvent: _handleEvent,
       onError: (Object error) {
@@ -895,10 +915,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _opencodeSessionId = sid;
-        widget.onUpdateState({
-          ...widget.panel.state,
-          'opencodeSessionId': sid,
-        });
+        widget.onUpdateState({...widget.panel.state, 'opencodeSessionId': sid});
       }
     }
 
@@ -1134,11 +1151,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final state = _subAgents[agentId];
         if (state == null) break;
         setState(() {
-          state.events.add(_SubAgentEvent(
-            type: 'tool_start',
-            toolName: event.toolName ?? '',
-            timestamp: event.timestamp ?? DateTime.now(),
-          ));
+          state.events.add(
+            _SubAgentEvent(
+              type: 'tool_start',
+              toolName: event.toolName ?? '',
+              timestamp: event.timestamp ?? DateTime.now(),
+            ),
+          );
         });
         unawaited(_updateAgentPanel(agentId));
         break;
@@ -1152,14 +1171,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final success = event.data['success'] as bool? ?? true;
         final resultContent = event.toolResultContent ?? '';
         setState(() {
-          state.events.add(_SubAgentEvent(
-            type: success ? 'tool_complete' : 'tool_error',
-            toolName: toolName,
-            content: resultContent.length > 120
-                ? '${resultContent.substring(0, 120)}…'
-                : resultContent,
-            timestamp: event.timestamp ?? DateTime.now(),
-          ));
+          state.events.add(
+            _SubAgentEvent(
+              type: success ? 'tool_complete' : 'tool_error',
+              toolName: toolName,
+              content:
+                  resultContent.length > 120
+                      ? '${resultContent.substring(0, 120)}…'
+                      : resultContent,
+              timestamp: event.timestamp ?? DateTime.now(),
+            ),
+          );
         });
         unawaited(_updateAgentPanel(agentId));
         break;
@@ -1171,12 +1193,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final content = event.messageContent ?? '';
         if (content.isEmpty) break;
         setState(() {
-          state.events.add(_SubAgentEvent(
-            type: 'message',
-            content:
-                content.length > 300 ? '${content.substring(0, 300)}…' : content,
-            timestamp: event.timestamp ?? DateTime.now(),
-          ));
+          state.events.add(
+            _SubAgentEvent(
+              type: 'message',
+              content:
+                  content.length > 300
+                      ? '${content.substring(0, 300)}…'
+                      : content,
+              timestamp: event.timestamp ?? DateTime.now(),
+            ),
+          );
         });
         unawaited(_updateAgentPanel(agentId));
         break;
@@ -1213,11 +1239,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     if (createPanel == null) return;
     final title = '🤖 $agentName';
     final markdown = _buildAgentMarkdown(agentId);
-    final panelId = await createPanel(
-      'board.note.markdown',
-      {'markdown': markdown, 'autoScroll': true},
-      title,
-    );
+    final panelId = await createPanel('board.note.markdown', {
+      'markdown': markdown,
+      'autoScroll': true,
+    }, title);
     if (panelId != null) {
       _subAgentPanels[agentId] = panelId;
       // Don't re-focus on every event update — just open once
@@ -1276,9 +1301,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
     buf.writeln('```');
     buf.writeln();
-    buf.writeln(
-      state.isRunning ? '*Running…*' : '*Completed.*',
-    );
+    buf.writeln(state.isRunning ? '*Running…*' : '*Completed.*');
     return buf.toString();
   }
 
@@ -1818,21 +1841,23 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           content: message.content,
           success:
               _activeToolCalls[message.toolCallId]?.success ?? persistedSuccess,
-          onSendToPanel: message.content.isNotEmpty
-              ? () => unawaited(
+          onSendToPanel:
+              message.content.isNotEmpty
+                  ? () => unawaited(
                     _sendToolResultToPanel(
                       toolName: resolvedToolName,
                       arguments: toolArgs,
                       content: message.content,
                     ),
                   )
-              : null,
-          onOpenAgentPanel: _isSubAgentToolCall(resolvedToolName) &&
-                  _subAgentPanels.containsKey(message.toolCallId)
-              ? () => context
-                  .read<BoardCubit>()
-                  .focusPanel(_subAgentPanels[message.toolCallId]!)
-              : null,
+                  : null,
+          onOpenAgentPanel:
+              _isSubAgentToolCall(resolvedToolName) &&
+                      _subAgentPanels.containsKey(message.toolCallId)
+                  ? () => context.read<BoardCubit>().focusPanel(
+                    _subAgentPanels[message.toolCallId]!,
+                  )
+                  : null,
         );
       case ChatRole.system:
         final meta = message.metadata;
@@ -1855,112 +1880,120 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: tools.map((tool) {
-          final isAgent = _isSubAgentToolCall(tool.toolName);
-          final agentDesc =
-              (tool.arguments['description'] as String?)?.trim() ??
-              (tool.arguments['name'] as String?)?.trim();
-          final color =
-              isAgent ? const Color(0xFF818CF8) : const Color(0xFFFBBF24);
-          final subAgent = isAgent ? _subAgents[tool.toolCallId] : null;
-          final panelId = isAgent ? _subAgentPanels[tool.toolCallId] : null;
+        children:
+            tools.map((tool) {
+              final isAgent = _isSubAgentToolCall(tool.toolName);
+              final agentDesc =
+                  (tool.arguments['description'] as String?)?.trim() ??
+                  (tool.arguments['name'] as String?)?.trim();
+              final color =
+                  isAgent ? const Color(0xFF818CF8) : const Color(0xFFFBBF24);
+              final subAgent = isAgent ? _subAgents[tool.toolCallId] : null;
+              final panelId = isAgent ? _subAgentPanels[tool.toolCallId] : null;
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: color.withAlpha(22),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withAlpha(60)),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    color: color,
-                  ),
+              return Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  isAgent ? Icons.smart_toy_outlined : Icons.build_outlined,
-                  size: 14,
-                  color: color,
+                decoration: BoxDecoration(
+                  color: color.withAlpha(22),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withAlpha(60)),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        isAgent
-                            ? (subAgent != null
-                                ? subAgent.agentName
-                                : 'Running sub-agent\u2026')
-                            : tool.toolName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: color,
-                          fontWeight: FontWeight.w500,
-                        ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: color,
                       ),
-                      if (isAgent && agentDesc != null)
-                        Text(
-                          agentDesc,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: color.withAlpha(180),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      if (subAgent != null && subAgent.events.isNotEmpty)
-                        Text(
-                          '${subAgent.events.length} events',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: color.withAlpha(140),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                // Focus the agent panel on the board
-                if (panelId != null)
-                  GestureDetector(
-                    onTap: () => context.read<BoardCubit>().focusPanel(panelId),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: color.withAlpha(40),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: color.withAlpha(80)),
-                      ),
-                      child: Row(
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      isAgent ? Icons.smart_toy_outlined : Icons.build_outlined,
+                      size: 14,
+                      color: color,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Open',
+                            isAgent
+                                ? (subAgent != null
+                                    ? subAgent.agentName
+                                    : 'Running sub-agent\u2026')
+                                : tool.toolName,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               color: color,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(width: 3),
-                          Icon(Icons.open_in_new, size: 10, color: color),
+                          if (isAgent && agentDesc != null)
+                            Text(
+                              agentDesc,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: color.withAlpha(180),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          if (subAgent != null && subAgent.events.isNotEmpty)
+                            Text(
+                              '${subAgent.events.length} events',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: color.withAlpha(140),
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                  ),
-              ],
-            ),
-          );
-        }).toList(),
+                    // Focus the agent panel on the board
+                    if (panelId != null)
+                      GestureDetector(
+                        onTap:
+                            () =>
+                                context.read<BoardCubit>().focusPanel(panelId),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withAlpha(40),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: color.withAlpha(80)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Open',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: color,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Icon(Icons.open_in_new, size: 10, color: color),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }).toList(),
       ),
     );
   }
@@ -2117,20 +2150,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     }
 
                     if (_isModelSlash) {
-                      final isUp = event.logicalKey ==
-                          LogicalKeyboardKey.arrowUp;
-                      final isDown = event.logicalKey ==
-                          LogicalKeyboardKey.arrowDown;
+                      final isUp =
+                          event.logicalKey == LogicalKeyboardKey.arrowUp;
+                      final isDown =
+                          event.logicalKey == LogicalKeyboardKey.arrowDown;
                       final isEnter =
-                          event.logicalKey ==
-                                  LogicalKeyboardKey.enter ||
-                              event.logicalKey ==
-                                  LogicalKeyboardKey.numpadEnter;
+                          event.logicalKey == LogicalKeyboardKey.enter ||
+                          event.logicalKey == LogicalKeyboardKey.numpadEnter;
                       final isEscape =
-                          event.logicalKey ==
-                              LogicalKeyboardKey.escape;
-                      final isTab = event.logicalKey ==
-                          LogicalKeyboardKey.tab;
+                          event.logicalKey == LogicalKeyboardKey.escape;
+                      final isTab = event.logicalKey == LogicalKeyboardKey.tab;
 
                       if (isTab && _filteredModels.isNotEmpty) {
                         // Tab: select highlighted model
@@ -2142,8 +2171,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
                       if (isUp || isDown) {
                         final delta = isDown ? 1 : -1;
-                        final next = (_modelSelectedIndex + delta)
-                            .clamp(0, _filteredModels.length - 1);
+                        final next = (_modelSelectedIndex + delta).clamp(
+                          0,
+                          _filteredModels.length - 1,
+                        );
                         if (next == _modelSelectedIndex) {
                           return KeyEventResult.handled;
                         }
@@ -2172,8 +2203,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     }
 
                     if (_isPlainSlash) {
-                      final isTab = event.logicalKey ==
-                          LogicalKeyboardKey.tab;
+                      final isTab = event.logicalKey == LogicalKeyboardKey.tab;
                       if (isTab) {
                         _autoCompleteSlash();
                         return KeyEventResult.handled;
@@ -2186,22 +2216,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
                     // Enter (without Shift) → send
                     final isEnter =
-                        event.logicalKey ==
-                                LogicalKeyboardKey.enter ||
-                            event.logicalKey ==
-                                LogicalKeyboardKey.numpadEnter;
-                    if (isEnter &&
-                        !HardwareKeyboard.instance.isShiftPressed) {
+                        event.logicalKey == LogicalKeyboardKey.enter ||
+                        event.logicalKey == LogicalKeyboardKey.numpadEnter;
+                    if (isEnter && !HardwareKeyboard.instance.isShiftPressed) {
                       _sendMessage();
                       return KeyEventResult.handled;
                     }
                     // Cmd+V (macOS) or Ctrl+V → smart paste
-                    final isCmd =
-                        HardwareKeyboard.instance.isMetaPressed;
-                    final isCtrl =
-                        HardwareKeyboard.instance.isControlPressed;
-                    if (event.logicalKey ==
-                            LogicalKeyboardKey.keyV &&
+                    final isCmd = HardwareKeyboard.instance.isMetaPressed;
+                    final isCtrl = HardwareKeyboard.instance.isControlPressed;
+                    if (event.logicalKey == LogicalKeyboardKey.keyV &&
                         (isCmd || isCtrl)) {
                       _handleSmartPaste();
                       return KeyEventResult.handled;
@@ -2218,13 +2242,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                       height: 1.4,
                     ),
                     decoration: InputDecoration(
-                      hintText: _isProcessing
-                          ? 'Agent working…'
-                          : 'Message…',
-                      hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: hintColor,
-                      ),
+                      hintText: _isProcessing ? 'Agent working…' : 'Message…',
+                      hintStyle: TextStyle(fontSize: 13, color: hintColor),
                       filled: true,
                       fillColor: colors.surfaceElevated,
                       border: OutlineInputBorder(
@@ -2286,9 +2305,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   height: 28,
                   margin: const EdgeInsets.only(bottom: 2),
                   decoration: BoxDecoration(
-                    color: _isSending
-                        ? Theme.of(context).colorScheme.error
-                        : colors.terminalPrompt,
+                    color:
+                        _isSending
+                            ? Theme.of(context).colorScheme.error
+                            : colors.terminalPrompt,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
@@ -2639,11 +2659,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final models = _provider.availableModels;
     if (_modelQuery.isEmpty) return models;
     final q = _modelQuery.toLowerCase();
-    return models.where((m) =>
-      m.displayName.toLowerCase().contains(q) ||
-      m.id.toLowerCase().contains(q) ||
-      (m.providerGroup?.toLowerCase().contains(q) ?? false)
-    ).toList();
+    return models
+        .where(
+          (m) =>
+              m.displayName.toLowerCase().contains(q) ||
+              m.id.toLowerCase().contains(q) ||
+              (m.providerGroup?.toLowerCase().contains(q) ?? false),
+        )
+        .toList();
   }
 
   /// Small grey provider badge shown next to model name in pickers.
@@ -2673,9 +2696,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     setState(() {
       if (cmd != null) {
         final trigger = cmd.triggers.firstWhere(value.startsWith);
-        _modelQuery = value.length > trigger.length
-            ? value.substring(trigger.length).trimLeft()
-            : '';
+        _modelQuery =
+            value.length > trigger.length
+                ? value.substring(trigger.length).trimLeft()
+                : '';
         _modelSelectedIndex = 0;
         _isModelSlash = cmd.id == 'model';
       } else {
@@ -2730,7 +2754,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final query = text.substring(1).toLowerCase();
     return _slashCommands.where((cmd) {
       return cmd.displayName.toLowerCase().startsWith(query) ||
-          cmd.triggers.any((t) => t.substring(1).toLowerCase().startsWith(query));
+          cmd.triggers.any(
+            (t) => t.substring(1).toLowerCase().startsWith(query),
+          );
     }).toList();
   }
 
@@ -2786,14 +2812,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: isActive
-                    ? colors.terminalPrompt.withValues(alpha: 0.2)
-                    : colors.surfaceElevated,
+                color:
+                    isActive
+                        ? colors.terminalPrompt.withValues(alpha: 0.2)
+                        : colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isActive
-                      ? colors.terminalPrompt.withValues(alpha: 0.5)
-                      : colors.border,
+                  color:
+                      isActive
+                          ? colors.terminalPrompt.withValues(alpha: 0.5)
+                          : colors.border,
                 ),
               ),
               child: Row(
@@ -2803,7 +2831,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     cmd.displayName,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.normal,
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
@@ -2812,7 +2841,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     cmd.description,
                     style: TextStyle(
                       fontSize: 10,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -2860,7 +2891,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 'No models found',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             )
@@ -2875,13 +2908,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 child: Container(
                   height: 32,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  color: isHighlighted
-                      ? colors.surfaceHighlight
-                      : Colors.transparent,
+                  color:
+                      isHighlighted
+                          ? colors.surfaceHighlight
+                          : Colors.transparent,
                   child: Row(
                     children: [
                       if (isActive)
-                        const Icon(Icons.check, size: 14, color: Color(0xFF34D399))
+                        const Icon(
+                          Icons.check,
+                          size: 14,
+                          color: Color(0xFF34D399),
+                        )
                       else
                         const SizedBox(width: 14),
                       const SizedBox(width: 6),
@@ -2898,9 +2936,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: isActive
-                                      ? const Color(0xFF34D399)
-                                      : Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      isActive
+                                          ? const Color(0xFF34D399)
+                                          : Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                 ),
                               ),
                             ),
@@ -2921,10 +2962,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
                           style: TextStyle(
                             fontSize: 9,
-                            color: m.inputCostPerMillion! > 10
-                                ? const Color(0xFFF87171)
-                                : Theme.of(context).textTheme.bodySmall?.color ??
-                                    Theme.of(context).colorScheme.onSurface,
+                            color:
+                                m.inputCostPerMillion! > 10
+                                    ? const Color(0xFFF87171)
+                                    : Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall?.color ??
+                                        Theme.of(context).colorScheme.onSurface,
                           ),
                         )
                       else if (m.costMultiplier != null)
@@ -2932,12 +2976,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           '${m.costMultiplier}x',
                           style: TextStyle(
                             fontSize: 10,
-                            color: m.costMultiplier == 0
-                                ? const Color(0xFF34D399)
-                                : m.costMultiplier! > 3
-                                ? const Color(0xFFF87171)
-                                : Theme.of(context).textTheme.bodySmall?.color ??
-                                    Theme.of(context).colorScheme.onSurface,
+                            color:
+                                m.costMultiplier == 0
+                                    ? const Color(0xFF34D399)
+                                    : m.costMultiplier! > 3
+                                    ? const Color(0xFFF87171)
+                                    : Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall?.color ??
+                                        Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                     ],
@@ -3289,9 +3336,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
       final configuredProviders =
           await OpenCodeAuthService.instance.configuredProviderIds();
       final models = await ModelsDevCatalogService.instance
-          .opencodeModelsWithAuth(
-            configuredProviderIds: configuredProviders,
-          );
+          .opencodeModelsWithAuth(configuredProviderIds: configuredProviders);
       if (models.isNotEmpty && mounted) {
         setState(() {
           _opencodeModels = models;
@@ -3483,21 +3528,37 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.orange,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       '${_providerLabel(_selectedProvider)} is not installed',
-                      style: const TextStyle(fontSize: 12, color: Colors.orange),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange,
+                      ),
                     ),
                   ),
                   TextButton(
                     onPressed: () => SetupGuidePage.show(context),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       foregroundColor: Colors.orange,
                     ),
-                    child: const Text('Install', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    child: const Text(
+                      'Install',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -3609,10 +3670,12 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
               child: Row(
                 children: [
                   () {
-                    final m = _modelsForProvider.cast<ChatModelInfo?>().firstWhere(
-                      (m) => m!.id == _selectedModel,
-                      orElse: () => null,
-                    );
+                    final m = _modelsForProvider
+                        .cast<ChatModelInfo?>()
+                        .firstWhere(
+                          (m) => m!.id == _selectedModel,
+                          orElse: () => null,
+                        );
                     if (m != null && m.providerGroup != null) {
                       return Padding(
                         padding: const EdgeInsets.only(right: 4),
@@ -3624,12 +3687,12 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                   Expanded(
                     child: Text(
                       _modelsForProvider
-                          .cast<ChatModelInfo?>()
-                          .firstWhere(
-                            (m) => m!.id == _selectedModel,
-                            orElse: () => null,
-                          )
-                          ?.displayName ??
+                              .cast<ChatModelInfo?>()
+                              .firstWhere(
+                                (m) => m!.id == _selectedModel,
+                                orElse: () => null,
+                              )
+                              ?.displayName ??
                           _selectedModel,
                       style: inputTextStyle,
                       overflow: TextOverflow.ellipsis,
@@ -3648,7 +3711,10 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
           const Spacer(),
 
           FilledButton(
-            onPressed: (_dirCtrl.text.trim().isEmpty || _providerInstalled == false) ? null : _start,
+            onPressed:
+                (_dirCtrl.text.trim().isEmpty || _providerInstalled == false)
+                    ? null
+                    : _start,
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF34D399),
               foregroundColor: const Color(0xFF0F172A),
@@ -3658,7 +3724,9 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
               ),
             ),
             child: Text(
-              _providerInstalled == false ? 'Install provider first' : 'Start Chat',
+              _providerInstalled == false
+                  ? 'Install provider first'
+                  : 'Start Chat',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
@@ -4343,6 +4411,7 @@ class _ToolResultCard extends StatefulWidget {
   final String content;
   final bool? success;
   final VoidCallback? onSendToPanel;
+
   /// If set, shows a "View Agent Log →" button that opens the agent's board panel.
   final VoidCallback? onOpenAgentPanel;
 
@@ -4944,11 +5013,12 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
       if (q.isEmpty) {
         _filtered = widget.models;
       } else {
-        _filtered = widget.models.where((m) {
-          return m.displayName.toLowerCase().contains(q) ||
-              m.id.toLowerCase().contains(q) ||
-              (m.providerGroup?.toLowerCase().contains(q) ?? false);
-        }).toList();
+        _filtered =
+            widget.models.where((m) {
+              return m.displayName.toLowerCase().contains(q) ||
+                  m.id.toLowerCase().contains(q) ||
+                  (m.providerGroup?.toLowerCase().contains(q) ?? false);
+            }).toList();
       }
     });
   }
@@ -5002,100 +5072,104 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
             const SizedBox(height: 8),
             // Results
             Flexible(
-              child: _filtered.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'No models found',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurface.withOpacity(0.5),
+              child:
+                  _filtered.isEmpty
+                      ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'No models found',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurface.withOpacity(0.5),
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      itemCount: _filtered.length,
-                      itemExtent: 34,
-                      itemBuilder: (ctx, i) {
-                        final m = _filtered[i];
-                        final isSelected = m.id == widget.selectedId;
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () => Navigator.of(context).pop(m.id),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            child: Row(
-                              children: [
-                                if (isSelected)
-                                  const Icon(
-                                    Icons.check,
-                                    size: 14,
-                                    color: Color(0xFF34D399),
-                                  )
-                                else
-                                  const SizedBox(width: 14),
-                                const SizedBox(width: 6),
-                                if (m.providerGroup != null) ...[
-                                  _buildProviderBadge(m.providerGroup!),
-                                  const SizedBox(width: 4),
+                      )
+                      : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        itemCount: _filtered.length,
+                        itemExtent: 34,
+                        itemBuilder: (ctx, i) {
+                          final m = _filtered[i];
+                          final isSelected = m.id == widget.selectedId;
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => Navigator.of(context).pop(m.id),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              child: Row(
+                                children: [
+                                  if (isSelected)
+                                    const Icon(
+                                      Icons.check,
+                                      size: 14,
+                                      color: Color(0xFF34D399),
+                                    )
+                                  else
+                                    const SizedBox(width: 14),
+                                  const SizedBox(width: 6),
+                                  if (m.providerGroup != null) ...[
+                                    _buildProviderBadge(m.providerGroup!),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      m.displayName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color:
+                                            isSelected
+                                                ? const Color(0xFF34D399)
+                                                : colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                  if (m.isFree)
+                                    Text(
+                                      'FREE',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF34D399),
+                                      ),
+                                    )
+                                  else if (m.inputCostPerMillion != null)
+                                    Text(
+                                      '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color:
+                                            m.inputCostPerMillion! > 10
+                                                ? const Color(0xFFF87171)
+                                                : colorScheme.onSurface
+                                                    .withOpacity(0.6),
+                                      ),
+                                    )
+                                  else if (m.costMultiplier != null)
+                                    Text(
+                                      '${m.costMultiplier}x',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color:
+                                            m.costMultiplier == 0
+                                                ? const Color(0xFF34D399)
+                                                : m.costMultiplier! > 3
+                                                ? const Color(0xFFF87171)
+                                                : colorScheme.onSurface
+                                                    .withOpacity(0.6),
+                                      ),
+                                    ),
                                 ],
-                                Expanded(
-                                  child: Text(
-                                    m.displayName,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isSelected
-                                          ? const Color(0xFF34D399)
-                                          : colorScheme.onSurface,
-                                    ),
-                                  ),
-                                ),
-                                if (m.isFree)
-                                  Text(
-                                    'FREE',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF34D399),
-                                    ),
-                                  )
-                                else if (m.inputCostPerMillion != null)
-                                  Text(
-                                    '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: m.inputCostPerMillion! > 10
-                                          ? const Color(0xFFF87171)
-                                          : colorScheme.onSurface
-                                              .withOpacity(0.6),
-                                    ),
-                                  )
-                                else if (m.costMultiplier != null)
-                                  Text(
-                                    '${m.costMultiplier}x',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: m.costMultiplier == 0
-                                          ? const Color(0xFF34D399)
-                                          : m.costMultiplier! > 3
-                                              ? const Color(0xFFF87171)
-                                              : colorScheme.onSurface
-                                                  .withOpacity(0.6),
-                                    ),
-                                  ),
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
+                          );
+                        },
+                      ),
             ),
             const SizedBox(height: 8),
           ],

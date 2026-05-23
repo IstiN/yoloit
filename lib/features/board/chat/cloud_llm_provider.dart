@@ -142,27 +142,51 @@ class CloudLlmProvider extends ChatProvider {
           'iteration=$iteration msgs=${messages.length}',
         );
 
-        final response = await _callApi(
-          config: cfg,
-          messages: messages,
-          tools: tools,
-          onDelta: (delta) {
-            if (_cancelRequested[session] == true) return;
-            if (firstTokenMs < 0 && delta.trim().isNotEmpty) {
-              firstTokenMs = stopwatch.elapsedMilliseconds;
-            }
-            streamedChunks++;
-            emitted += delta;
-            controller.add(
-              ChatEvent(
-                type: ChatEventType.assistantDelta,
-                rawType: 'assistant.message_delta',
-                timestamp: DateTime.now(),
-                data: {'deltaContent': delta},
-              ),
-            );
-          },
-        );
+        final response =
+            iteration == 0
+                ? (_tryDeterministicShortcut(message, runtimeContext) ??
+                    await _callApi(
+                      config: cfg,
+                      messages: messages,
+                      tools: tools,
+                      onDelta: (delta) {
+                        if (_cancelRequested[session] == true) return;
+                        if (firstTokenMs < 0 && delta.trim().isNotEmpty) {
+                          firstTokenMs = stopwatch.elapsedMilliseconds;
+                        }
+                        streamedChunks++;
+                        emitted += delta;
+                        controller.add(
+                          ChatEvent(
+                            type: ChatEventType.assistantDelta,
+                            rawType: 'assistant.message_delta',
+                            timestamp: DateTime.now(),
+                            data: {'deltaContent': delta},
+                          ),
+                        );
+                      },
+                    ))
+                : await _callApi(
+                  config: cfg,
+                  messages: messages,
+                  tools: tools,
+                  onDelta: (delta) {
+                    if (_cancelRequested[session] == true) return;
+                    if (firstTokenMs < 0 && delta.trim().isNotEmpty) {
+                      firstTokenMs = stopwatch.elapsedMilliseconds;
+                    }
+                    streamedChunks++;
+                    emitted += delta;
+                    controller.add(
+                      ChatEvent(
+                        type: ChatEventType.assistantDelta,
+                        rawType: 'assistant.message_delta',
+                        timestamp: DateTime.now(),
+                        data: {'deltaContent': delta},
+                      ),
+                    );
+                  },
+                );
 
         final toolCalls = response.toolCalls;
         if (toolCalls.isNotEmpty) {
@@ -239,6 +263,11 @@ class CloudLlmProvider extends ChatProvider {
               'tool_call_id': toolCallId,
               'content': result,
             });
+          }
+          if (response.directReply != null &&
+              response.directReply!.isNotEmpty) {
+            emitted = response.directReply!;
+            break;
           }
           continue;
         }
@@ -340,6 +369,9 @@ class CloudLlmProvider extends ChatProvider {
     final boardName = runtimeContext?.boardName?.trim();
     final panelId = runtimeContext?.panelId?.trim();
     final panelTitle = runtimeContext?.panelTitle?.trim();
+    final panelType = runtimeContext?.panelType?.trim();
+    final boardsSummary = runtimeContext?.availableBoardsSummary?.trim();
+    final panelsSummary = runtimeContext?.currentBoardPanelsSummary?.trim();
 
     final systemBuf = StringBuffer();
     systemBuf.writeln(
@@ -354,8 +386,25 @@ class CloudLlmProvider extends ChatProvider {
       if (panelId != null && panelId.isNotEmpty) {
         systemBuf.writeln('- Panel: ${panelTitle ?? panelId} (id: $panelId)');
       }
+      if (panelType != null && panelType.isNotEmpty) {
+        systemBuf.writeln('- Panel type: $panelType');
+      }
       systemBuf.writeln(
         'Use this board/panel as default when a tool argument is omitted.',
+      );
+    }
+    if (boardsSummary != null && boardsSummary.isNotEmpty) {
+      systemBuf.writeln('\nAvailable boards:');
+      systemBuf.writeln(boardsSummary);
+      systemBuf.writeln(
+        'When the user asks to open/switch/go to a board, prefer board:focus instead of claiming no access.',
+      );
+    }
+    if (panelsSummary != null && panelsSummary.isNotEmpty) {
+      systemBuf.writeln('\nCurrent board panels:');
+      systemBuf.writeln(panelsSummary);
+      systemBuf.writeln(
+        'When the user asks to open/focus/play something that already exists here, use the matching panel/tool instead of asking for a new URL or file.',
       );
     }
 
@@ -406,6 +455,156 @@ class CloudLlmProvider extends ChatProvider {
       });
     }
     return tools;
+  }
+
+  _ApiResponse? _tryDeterministicShortcut(
+    String userMessage,
+    ChatRuntimeContext? runtimeContext,
+  ) {
+    final text = userMessage.toLowerCase().trim();
+    final boardMatch = _matchBoardNavigationShortcut(text, runtimeContext);
+    if (boardMatch != null) {
+      return _ApiResponse(
+        toolCalls: <_ParsedToolCall>[
+          _ParsedToolCall(
+            functionName: 'yoloit_board_focus',
+            arguments: <String, Object?>{'id_or_name': boardMatch.$1},
+          ),
+        ],
+        directReply: boardMatch.$2,
+      );
+    }
+
+    final playlistMatch = _matchPlaylistPlayShortcut(text, runtimeContext);
+    if (playlistMatch != null) {
+      return _ApiResponse(
+        toolCalls: <_ParsedToolCall>[
+          _ParsedToolCall(
+            functionName: 'yoloit_play',
+            arguments: <String, Object?>{
+              if (runtimeContext?.boardId?.trim().isNotEmpty == true)
+                'board': runtimeContext!.boardId!.trim(),
+              'panel': playlistMatch.$1,
+            },
+          ),
+        ],
+        directReply: playlistMatch.$2,
+      );
+    }
+    return null;
+  }
+
+  (String, String)? _matchBoardNavigationShortcut(
+    String text,
+    ChatRuntimeContext? runtimeContext,
+  ) {
+    final asksToNavigate =
+        text.contains('перейд') ||
+        text.contains('переди') ||
+        text.contains('переключ') ||
+        text.contains('открой') ||
+        text.contains('switch') ||
+        text.contains('go to') ||
+        text.contains('open board');
+    if (!asksToNavigate) return null;
+    final boardsSummary = runtimeContext?.availableBoardsSummary?.trim();
+    if (boardsSummary == null || boardsSummary.isEmpty) return null;
+    final entries = _parseSummaryEntries(
+      boardsSummary,
+      RegExp(r'^-\s+(.+?)\s+\[(.+?)\](?:\s+\(current\))?$'),
+    );
+    if (entries.isEmpty) return null;
+    final normalizedMessage = _normalizeLookupText(text);
+    ({String id, String name, int score})? best;
+    for (final entry in entries) {
+      final name = entry.$1;
+      final id = entry.$2;
+      final score = _lookupScore(normalizedMessage, name);
+      if (score <= 0) continue;
+      if (best == null || score > best.score) {
+        best = (id: id, name: name, score: score);
+      }
+    }
+    if (best == null) return null;
+    return (
+      best.id,
+      _looksCyrillic(text)
+          ? 'Переключился на доску **"${best.name}"**.'
+          : 'Switched to board "${best.name}".',
+    );
+  }
+
+  (String, String)? _matchPlaylistPlayShortcut(
+    String text,
+    ChatRuntimeContext? runtimeContext,
+  ) {
+    final asksToPlay =
+        text.contains('включ') ||
+        text.contains('музык') ||
+        text.contains('плейлист') ||
+        text.contains('play music') ||
+        text.contains('start playlist') ||
+        text.contains('resume playlist') ||
+        text.contains('continue playback');
+    if (!asksToPlay) return null;
+    final panelsSummary = runtimeContext?.currentBoardPanelsSummary?.trim();
+    if (panelsSummary == null || panelsSummary.isEmpty) return null;
+    final entries = _parseSummaryEntries(
+      panelsSummary,
+      RegExp(r'^-\s+(.+?)\s+\[(.+?)\]\s+\((.+?)\)$'),
+    );
+    for (final entry in entries) {
+      final title = entry.$1;
+      final type = entry.$2;
+      final id = entry.$3;
+      if (type != 'board.playlist') continue;
+      return (
+        id,
+        _looksCyrillic(text)
+            ? 'Запустил плейлист **"$title"**.'
+            : 'Started playlist "$title".',
+      );
+    }
+    return null;
+  }
+
+  List<(String, String, String)> _parseSummaryEntries(
+    String summary,
+    RegExp pattern,
+  ) {
+    final out = <(String, String, String)>[];
+    for (final raw in summary.split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty) continue;
+      final match = pattern.firstMatch(line);
+      if (match == null) continue;
+      final a = match.group(1)?.trim() ?? '';
+      final b = match.group(2)?.trim() ?? '';
+      final c = match.groupCount >= 3 ? (match.group(3)?.trim() ?? '') : '';
+      out.add((a, b, c));
+    }
+    return out;
+  }
+
+  String _normalizeLookupText(String text) =>
+      text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9а-я]+'), ' ').trim();
+
+  int _lookupScore(String normalizedMessage, String candidate) {
+    final normalizedCandidate = _normalizeLookupText(candidate);
+    if (normalizedCandidate.isEmpty) return 0;
+    if (normalizedMessage.contains(normalizedCandidate)) {
+      return normalizedCandidate.length + 10;
+    }
+    final words = normalizedMessage.split(RegExp(r'\s+'));
+    var best = 0;
+    for (final word in words) {
+      if (word.isEmpty) continue;
+      if (normalizedCandidate.contains(word) ||
+          word.contains(normalizedCandidate)) {
+        best = word.length > best ? word.length : best;
+      }
+    }
+    return best;
   }
 
   Future<_ApiResponse> _callApi({
@@ -497,7 +696,17 @@ class CloudLlmProvider extends ChatProvider {
               final tc = tcList[i];
               final tcMap = tc as Map<String, dynamic>;
               final index = tcMap['index'] as int? ?? i;
-              final acc = toolCalls.firstWhere(
+              final toolId = tcMap['id'] as String?;
+              _ToolCallAccumulator? acc;
+              if (toolId != null && toolId.isNotEmpty) {
+                for (final existing in toolCalls) {
+                  if (existing.id == toolId) {
+                    acc = existing;
+                    break;
+                  }
+                }
+              }
+              acc ??= toolCalls.firstWhere(
                 (a) => a.index == index,
                 orElse: () {
                   final a = _ToolCallAccumulator(index: index);
@@ -505,11 +714,25 @@ class CloudLlmProvider extends ChatProvider {
                   return a;
                 },
               );
-              if (tcMap['id'] != null) acc.id = tcMap['id'] as String;
+              if (toolId != null && toolId.isNotEmpty) acc.id = toolId;
               final fn = tcMap['function'] as Map<String, dynamic>?;
               if (fn != null) {
                 if (fn['name'] != null) {
-                  acc.name = _appendStreamFragment(acc.name, fn['name'] as String);
+                  final incomingName = fn['name'] as String;
+                  // Some providers emit consecutive tool calls without a stable
+                  // index/id in streaming chunks. If two complete yoloit names
+                  // are non-prefix-compatible, start a new accumulator instead
+                  // of concatenating into a broken name.
+                  if (_isCompleteYoloitName(acc.name) &&
+                      _isCompleteYoloitName(incomingName) &&
+                      !incomingName.startsWith(acc.name) &&
+                      !acc.name.startsWith(incomingName)) {
+                    final next = _ToolCallAccumulator(index: toolCalls.length);
+                    if (toolId != null && toolId.isNotEmpty) next.id = toolId;
+                    toolCalls.add(next);
+                    acc = next;
+                  }
+                  acc.name = _appendStreamFragment(acc.name, incomingName);
                 }
                 if (fn['arguments'] != null) {
                   acc.arguments = _appendStreamFragment(
@@ -597,6 +820,12 @@ class CloudLlmProvider extends ChatProvider {
     return '$current$incoming';
   }
 
+  bool _isCompleteYoloitName(String value) {
+    final v = value.trim();
+    if (!v.startsWith('yoloit_')) return false;
+    return RegExp(r'^yoloit_[a-z0-9_]+$').hasMatch(v);
+  }
+
   @override
   Future<void> stop(String sessionName) async {
     _cancelRequested[sessionName] = true;
@@ -610,9 +839,14 @@ class CloudLlmProvider extends ChatProvider {
 }
 
 class _ApiResponse {
-  const _ApiResponse({this.content, this.toolCalls = const []});
+  const _ApiResponse({
+    this.content,
+    this.toolCalls = const [],
+    this.directReply,
+  });
   final String? content;
   final List<_ParsedToolCall> toolCalls;
+  final String? directReply;
 }
 
 class _ParsedToolCall {

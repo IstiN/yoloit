@@ -18,12 +18,18 @@ class ChatRuntimeContext {
     this.boardName,
     this.panelId,
     this.panelTitle,
+    this.panelType,
+    this.availableBoardsSummary,
+    this.currentBoardPanelsSummary,
   });
 
   final String? boardId;
   final String? boardName;
   final String? panelId;
   final String? panelTitle;
+  final String? panelType;
+  final String? availableBoardsSummary;
+  final String? currentBoardPanelsSummary;
 }
 
 /// Abstract interface for chat backends.

@@ -479,7 +479,9 @@ class YoloitCliToolArgumentNormalizer {
   ) {
     if (tool == null) return;
     final g = tool.group;
-    if (g != 'note' && g != 'checklist' && g != 'kanban') return;
+    if (g != 'note' && g != 'checklist' && g != 'kanban' && g != 'playlist') {
+      return;
+    }
     for (final key in const [
       'panel',
       'panel_id',
@@ -1096,7 +1098,10 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
   Object? _panelDefault(ChatRuntimeContext? ctx, YoloitCliTool tool) {
     final id = _firstNotEmpty(ctx?.panelId, ctx?.panelTitle);
     if (id == null) return null;
-    if (_cliAutoResolvesPanel(tool.group) && _isChatPanel('$id')) return null;
+    if (_cliAutoResolvesPanel(tool.group) &&
+        (_isChatPanel('$id') || _isChatLikePanelType(ctx?.panelType))) {
+      return null;
+    }
     return id;
   }
 
@@ -1106,10 +1111,18 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
         id.contains('yolochat');
   }
 
+  static bool _isChatLikePanelType(String? type) {
+    final value = type?.trim();
+    return value == 'board.chat' || value == 'board.yolo_assistant';
+  }
+
   /// Tool groups where the CLI auto-resolves the panel by type and the chat
   /// panel should NOT be injected as a fallback.
   static bool _cliAutoResolvesPanel(String group) {
-    return group == 'note' || group == 'checklist' || group == 'kanban';
+    return group == 'note' ||
+        group == 'checklist' ||
+        group == 'kanban' ||
+        group == 'playlist';
   }
 
   bool _isMissing(Object? value) {
@@ -2584,15 +2597,30 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'play',
     alias: 'play',
-    description: 'Add media and start playback',
+    description:
+        'Start playlist playback. Optionally add media first via file_or_url.',
     group: 'playlist',
+    humanVariants: const {
+      'ru': [
+        'включи музыку',
+        'воспроизведи плейлист',
+        'продолжи музыку',
+        'запусти плейлист',
+      ],
+      'en': [
+        'play music',
+        'start playlist',
+        'resume playlist',
+        'continue playback',
+      ],
+    },
     params: <YoloitCliToolParam>[
       _boardParam(),
       _panelParam(),
       _p(
         'file_or_url',
         'Media file path or URL',
-        required: true,
+        required: false,
         aliases: const ['path', 'url'],
         shortKey: 'u',
       ),
