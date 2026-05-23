@@ -27,6 +27,7 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.waveAmplitude = 0.85,
     this.waveSpeed = 1400,
     this.waveWidth = 160,
+    this.waveSpread = 0.50,
     this.particleScale = 1.0,
     this.responseFontSize = 17.0,
   });
@@ -50,6 +51,7 @@ class YoloVoiceOverlay extends StatefulWidget {
   final double waveAmplitude;
   final int waveSpeed;
   final double waveWidth;
+  final double waveSpread;
   final double particleScale;
   final double responseFontSize;
 
@@ -265,7 +267,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                 opacity: _isListening ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 600),
                 child: Align(
-                  alignment: const Alignment(-0.50, -0.08),
+                  alignment: Alignment(-widget.waveSpread, -0.08),
                   child: SizedBox(
                     width: widget.waveWidth,
                     height: 80,
@@ -285,7 +287,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                 opacity: _isListening ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 600),
                 child: Align(
-                  alignment: const Alignment(0.50, -0.08),
+                  alignment: Alignment(widget.waveSpread, -0.08),
                   child: SizedBox(
                     width: widget.waveWidth,
                     height: 80,
@@ -640,7 +642,7 @@ class _ResponseCardState extends State<_ResponseCard>
         AnimatedBuilder(
           animation: _borderAnim,
           builder: (ctx, child) => CustomPaint(
-            foregroundPainter: widget.streaming
+            painter: widget.streaming
                 ? _RunningBorderPainter(
                     progress: _borderAnim.value,
                     radius: 28,
@@ -710,41 +712,52 @@ class _RunningBorderPainter extends CustomPainter {
     final metrics = path.computeMetrics().first;
     final totalLen = metrics.length;
 
-    // Bright head + fading tail
-    final headLen = totalLen * 0.25;
+    final headLen = totalLen * 0.30;
     final startDist = progress * totalLen;
 
-    // Draw the running segment
-    final extractStart = startDist;
-    final extractEnd = startDist + headLen;
+    // Draw multiple sub-segments with fading opacity for gradient trail effect
+    const segments = 12;
+    for (var s = 0; s < segments; s++) {
+      final segFrac = s / segments;
+      final segStart = (startDist + headLen * segFrac) % totalLen;
+      final segEnd = (startDist + headLen * (segFrac + 1.0 / segments)) % totalLen;
 
-    Path segment;
-    if (extractEnd <= totalLen) {
-      segment = metrics.extractPath(extractStart, extractEnd);
-    } else {
-      // Wrap around
-      segment = metrics.extractPath(extractStart, totalLen);
-      segment.addPath(metrics.extractPath(0, extractEnd - totalLen), Offset.zero);
+      Path sub;
+      if (segEnd > segStart) {
+        sub = metrics.extractPath(segStart, segEnd);
+      } else {
+        sub = metrics.extractPath(segStart, totalLen);
+        sub.addPath(metrics.extractPath(0, segEnd), Offset.zero);
+      }
+
+      // Color transitions along the trail: head bright, tail fading
+      final t = segFrac;
+      final color = Color.lerp(
+        const Color(0xFFFF60DD), // tail: pink
+        const Color(0xFF64DFFF), // head: cyan
+        t,
+      )!;
+      final alpha = (0.15 + t * 0.85).clamp(0.0, 1.0);
+
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0 + t * 0.5
+        ..strokeCap = StrokeCap.round
+        ..color = color.withValues(alpha: alpha);
+
+      canvas.drawPath(sub, paint);
     }
 
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round
-      ..shader = SweepGradient(
-        center: Alignment.center,
-        startAngle: 0,
-        endAngle: math.pi * 2,
-        colors: const [
-          Color(0xFF64DFFF),
-          Color(0xFFB980FF),
-          Color(0xFFFF60DD),
-          Color(0xFF64DFFF),
-        ],
-        transform: GradientRotation(progress * math.pi * 2),
-      ).createShader(rect);
-
-    canvas.drawPath(segment, paint);
+    // Bright glow at head position
+    final headPos = metrics.getTangentForOffset(
+      (startDist + headLen) % totalLen,
+    );
+    if (headPos != null) {
+      final glowPaint = Paint()
+        ..color = const Color(0xFF64DFFF).withValues(alpha: 0.6)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawCircle(headPos.position, 3, glowPaint);
+    }
   }
 
   @override

@@ -2842,6 +2842,7 @@ class _DebugUISectionState extends State<_DebugUISection> {
   double _waveAmplitude = 0.85;
   int _waveSpeed = 1400;
   double _waveWidth = 160;
+  double _waveSpread = 0.50;
   double _particleScale = 1.0;
   double _responseFontSize = 17.0;
   String _voiceResponse = 'This is a sample response from the LLM model. '
@@ -3099,6 +3100,8 @@ class _DebugUISectionState extends State<_DebugUISection> {
             (v) => setState(() => _waveSpeed = v.round())),
         ..._debugSlider('Wave Width', _waveWidth, 60, 300, 48,
             (v) => setState(() => _waveWidth = v)),
+        ..._debugSlider('Wave Spread', _waveSpread, 0.0, 1.0, 20,
+            (v) => setState(() => _waveSpread = v)),
         ..._debugSlider('Particle Scale', _particleScale, 0.3, 3.0, 27,
             (v) => setState(() => _particleScale = v)),
         ..._debugSlider('Resp. Font', _responseFontSize, 10, 30, 20,
@@ -3130,6 +3133,7 @@ class _DebugUISectionState extends State<_DebugUISection> {
               waveAmplitude: _waveAmplitude,
               waveSpeed: _waveSpeed,
               waveWidth: _waveWidth,
+              waveSpread: _waveSpread,
               particleScale: _particleScale,
               responseFontSize: _responseFontSize,
               onHide: () => setState(() => _voiceStatus = 'idle'),
