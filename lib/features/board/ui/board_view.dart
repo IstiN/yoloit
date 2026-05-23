@@ -5946,7 +5946,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+                padding: EdgeInsets.zero,
                 child: _buildVoiceOverlay(context),
               ),
             ),

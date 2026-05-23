@@ -81,6 +81,7 @@ enum _VS {
   int get minMs => switch (this) {
         processing => 1800,
         thinking => 1400,
+        responding => 3000,
         _ => 0,
       };
 }
