@@ -699,47 +699,41 @@ class _BlobOrbPainter extends CustomPainter {
     for (var i = 0; i < 5; i++) {
       final cfg = _blobConfigs[i];
       final t = progress * 2 * math.pi + cfg.phase;
-      // Slow orbital movement — integer multiplier for seamless loop, small radius
-      final blobAngle = cfg.angle + t;  // t = progress*2π, full cycle = seamless
+      // Slow orbital movement — integer multiplier for seamless loop
+      final blobAngle = cfg.angle + t;
 
-      // Small orbit so movement is gentle despite full 2π cycle
-      final dx = math.cos(blobAngle) * r * 0.22;
-      final dy = math.sin(blobAngle * 1.0) * r * 0.18;
+      // Larger offset so individual shapes are clearly visible
+      final dx = math.cos(blobAngle) * r * 0.32;
+      final dy = math.sin(blobAngle) * r * 0.26;
       final blobCenter = Offset(center.dx + dx, center.dy + dy);
 
-      final blobW = r * 2 * cfg.scale * (0.82 + math.sin(t * 1.0) * 0.04);
+      final blobW = r * 2 * cfg.scale * (0.82 + math.sin(t) * 0.04);
       final blobH = blobW * cfg.aspect;
 
       final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
 
-      // Fill: radial gradient — opaque center → transparent at boundary
-      final blobRect = path.getBounds();
+      // Fill: radial gradient from blob center — visible in center, transparent at edge
       final fillPaint = Paint()
         ..shader = RadialGradient(
           colors: [
-            colors[i].withValues(alpha: 0.22 + 0.12 * intensity),
-            colors[i].withValues(alpha: 0.10 + 0.06 * intensity),
+            colors[i].withValues(alpha: 0.30 + 0.14 * intensity),
+            colors[i].withValues(alpha: 0.12 + 0.06 * intensity),
             colors[i].withValues(alpha: 0.0),
           ],
-          stops: const [0.0, 0.6, 1.0],
-        ).createShader(blobRect)
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(Rect.fromCircle(
+          center: blobCenter,
+          radius: blobW * 0.52,
+        ))
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, fillPaint);
 
-      // Edge: soft glowing border — fades out at boundary
-      final edgePaint = Paint()
-        ..color = colors[i].withValues(alpha: 0.20 + 0.14 * intensity)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
-      canvas.drawPath(path, edgePaint);
-
-      // Wide halo glow — very soft, transparent at outer edge
+      // Wide halo glow — very soft, creates the glowing aura
       final glowEdge = Paint()
-        ..color = colors[i].withValues(alpha: 0.04 + 0.03 * intensity)
+        ..color = colors[i].withValues(alpha: 0.05 + 0.04 * intensity)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 12
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14)
+        ..strokeWidth = 14
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16)
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, glowEdge);
     }
