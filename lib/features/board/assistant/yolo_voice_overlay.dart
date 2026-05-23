@@ -378,7 +378,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
           'YoLo',
           style: TextStyle(
             color: Colors.white,
-            fontSize: sz * 0.20,
+            fontSize: sz * 0.15,
             fontWeight: FontWeight.w300,
             letterSpacing: -0.8,
             shadows: const [
@@ -671,10 +671,10 @@ void _paintPlectrum(
       gradStart,
       gradEnd,
       [
-        color.withValues(alpha: 0.45 * intensity),   // wide end: fully visible
-        color.withValues(alpha: 0.40 * intensity),   // still visible
-        color.withValues(alpha: 0.15 * intensity),   // ~50%: fading
-        color.withValues(alpha: 0.04 * intensity),   // ~80%: almost gone
+        color.withValues(alpha: 0.55 * intensity),   // wide end: fully visible
+        color.withValues(alpha: 0.45 * intensity),   // still visible
+        color.withValues(alpha: 0.18 * intensity),   // ~55%: fading
+        color.withValues(alpha: 0.05 * intensity),   // ~80%: almost gone
         color.withValues(alpha: 0.0),                // tip: fully transparent
       ],
       [0.0, 0.3, 0.55, 0.8, 1.0],
@@ -797,9 +797,9 @@ class _BlobOrbPainter extends CustomPainter {
     }
 
     // Center overlay: horizontal oval in theme color
-    // Wider than tall, soft radial gradient fade
-    final ovalW = r * 0.85;
-    final ovalH = r * 0.55;
+    // Much wider than tall for proper oval feel, smoother fade
+    final ovalW = r * 1.0;
+    final ovalH = r * 0.45;
     final ovalRect = Rect.fromCenter(
       center: center,
       width: ovalW * 2,
@@ -811,11 +811,12 @@ class _BlobOrbPainter extends CustomPainter {
         colors: [
           bgColor,
           bgColor,
-          bgColor.withValues(alpha: 0.85),
-          bgColor.withValues(alpha: 0.35),
+          bgColor.withValues(alpha: 0.70),
+          bgColor.withValues(alpha: 0.25),
+          bgColor.withValues(alpha: 0.05),
           bgColor.withValues(alpha: 0.0),
         ],
-        stops: const [0.0, 0.30, 0.55, 0.78, 1.0],
+        stops: const [0.0, 0.25, 0.45, 0.65, 0.85, 1.0],
       ).createShader(ovalRect);
 
     // Draw as oval path
