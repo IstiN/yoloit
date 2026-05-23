@@ -2682,8 +2682,8 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     // Retarget note tools to last known note panel.
     _retargetNoteToolIfNeeded(toolCommand, mutableArgs);
 
-    // Guard: fail if note tool targets the assistant panel itself.
-    _ensureNoteToolHasRealPanel(toolCommand, mutableArgs);
+    // Guard: if note tool points to assistant panel, retarget to a real note panel.
+    await _ensureNoteToolHasRealPanel(toolCommand, mutableArgs, runtimeContext);
 
     final result = await delegate.invoke(
       functionName,
@@ -2729,10 +2729,11 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     }
   }
 
-  void _ensureNoteToolHasRealPanel(
+  Future<void> _ensureNoteToolHasRealPanel(
     String toolCommand,
     Map<String, Object?> arguments,
-  ) {
+    ChatRuntimeContext? runtimeContext,
+  ) async {
     if (toolCommand != 'note' && !toolCommand.startsWith('note:')) return;
     if (toolCommand == 'note:create') return;
     final panel = '${arguments['panel'] ?? ''}'.trim();
@@ -2744,12 +2745,56 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
         arguments['panel'] = lastPanelId;
         return;
       }
-      throw StateError(
-        'Cannot run $toolCommand against the YoLo Assistant panel '
-        '(id: $assistantPanelId). '
-        'First call panel:create with type=board.note.markdown to create a note '
-        'panel, then use the returned panel id.',
+      final resolved = await _resolveLatestNotePanel(runtimeContext);
+      if (resolved != null && resolved.isNotEmpty) {
+        arguments['panel'] = resolved;
+      }
+    }
+  }
+
+  Future<String?> _resolveLatestNotePanel(ChatRuntimeContext? runtimeContext) async {
+    final board =
+        '${runtimeContext?.boardId ?? runtimeContext?.boardName ?? ''}'.trim();
+    if (board.isEmpty) return null;
+    try {
+      final raw = await delegate.invoke(
+        'yoloit_panels',
+        {'id_or_name': board},
+        runtimeContext: runtimeContext,
       );
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      final list = decoded['panels'];
+      if (list is! List) return null;
+      final notes =
+          list
+              .whereType<Map>()
+              .map((e) => Map<String, Object?>.from(e.cast<String, Object?>()))
+              .where(
+                (panel) =>
+                    panel['type'] == 'board.note.markdown' &&
+                    panel['hidden'] != true &&
+                    '${panel['id'] ?? ''}'.trim().isNotEmpty,
+              )
+              .toList();
+      if (notes.isEmpty) return null;
+      notes.sort((a, b) {
+        final az = (a['zIndex'] as num?) ?? 0;
+        final bz = (b['zIndex'] as num?) ?? 0;
+        return bz.compareTo(az);
+      });
+      final diagramPreferred = notes.firstWhere(
+        (panel) {
+          final title = '${panel['title'] ?? ''}'.toLowerCase();
+          return title.contains('mermaid') ||
+              title.contains('диаграм') ||
+              title.contains('diagram');
+        },
+        orElse: () => notes.first,
+      );
+      return '${diagramPreferred['id']}'.trim();
+    } catch (_) {
+      return null;
     }
   }
 
