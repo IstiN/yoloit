@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -721,19 +722,30 @@ class _BlobOrbPainter extends CustomPainter {
 
       final path = _blobPath(blobCenter, blobW, blobH, t, i * 42 + 7);
 
-      // Fill: radial gradient — TRANSPARENT at center → OPAQUE at edge
+      // Fill: linear gradient — OPAQUE at far edge → TRANSPARENT toward orb center
+      // Direction: from blob's far side to orb center
+      final dirX = blobCenter.dx - center.dx;
+      final dirY = blobCenter.dy - center.dy;
+      final dirLen = math.sqrt(dirX * dirX + dirY * dirY).clamp(1.0, double.infinity);
+      final normX = dirX / dirLen;
+      final normY = dirY / dirLen;
+      final gradRadius = blobW * 0.50;
+      final gradFrom = Offset(blobCenter.dx + normX * gradRadius,
+                               blobCenter.dy + normY * gradRadius);
+      final gradTo = Offset(blobCenter.dx - normX * gradRadius,
+                             blobCenter.dy - normY * gradRadius);
+
       final fillPaint = Paint()
-        ..shader = RadialGradient(
-          colors: [
+        ..shader = ui.Gradient.linear(
+          gradFrom,
+          gradTo,
+          [
+            colors[i].withValues(alpha: 0.28 + 0.14 * intensity),
+            colors[i].withValues(alpha: 0.10 + 0.06 * intensity),
             colors[i].withValues(alpha: 0.0),
-            colors[i].withValues(alpha: 0.04 + 0.02 * intensity),
-            colors[i].withValues(alpha: 0.22 + 0.14 * intensity),
           ],
-          stops: const [0.0, 0.45, 1.0],
-        ).createShader(Rect.fromCircle(
-          center: blobCenter,
-          radius: blobW * 0.52,
-        ))
+          [0.0, 0.5, 1.0],
+        )
         ..blendMode = BlendMode.plus;
       canvas.drawPath(path, fillPaint);
 
