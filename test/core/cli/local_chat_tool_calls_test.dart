@@ -401,6 +401,30 @@ void main() {
     );
     expect(
       YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_panel_focus',
+        arguments: const <String, Object?>{'panel': 'panel-chat'},
+        userMessage: 'Сделай фокус на заметку с mermaid диаграммой.',
+        runtimeContext: const ChatRuntimeContext(
+          panelId: 'panel-chat',
+          panelTitle: '__SMOKE_CHAT__',
+        ),
+      ),
+      containsPair('panel', 'mermaid'),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_panel_focus',
+        arguments: const <String, Object?>{'panel': 'p-1779529932268'},
+        userMessage: 'Сделай фокус на заметку с mermaid диаграммой.',
+        runtimeContext: const ChatRuntimeContext(
+          panelId: '__SMOKE_CHAT__',
+          panelTitle: '__SMOKE_CHAT__',
+        ),
+      ),
+      containsPair('panel', 'mermaid'),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
         functionName: 'yoloit_panel_create',
         arguments: const <String, Object?>{},
         userMessage:

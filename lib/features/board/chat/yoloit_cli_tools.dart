@@ -682,6 +682,32 @@ class YoloitCliToolArgumentNormalizer {
         _looselySameIdentifier(panelValue, runtimeContext.panelTitle)) {
       normalized['panel'] = panelId;
     }
+    if ((command == 'panel' || command == 'panel:focus') &&
+        _mentionsNoteLookupIntent(userMessage)) {
+      final currentPanelValue = '${normalized['panel'] ?? ''}'.trim();
+      final query = _inferNoteLookupPanelQuery(userMessage);
+      if (query != null &&
+          query.isNotEmpty &&
+          _looksLikeOpaquePanelId(currentPanelValue)) {
+        normalized['panel'] = query;
+        return;
+      }
+      final targetsCurrentChatPanel =
+          currentPanelValue.isEmpty ||
+          _looselySameIdentifier(currentPanelValue, panelId) ||
+          _looselySameIdentifier(
+            currentPanelValue,
+            runtimeContext.panelTitle,
+          ) ||
+          _isChatPanelId(currentPanelValue);
+      if (targetsCurrentChatPanel) {
+        if (query != null && query.isNotEmpty) {
+          normalized['panel'] = query;
+        } else {
+          normalized.remove('panel');
+        }
+      }
+    }
   }
 
   static bool _usesPanelArgument(String command) {
@@ -862,6 +888,34 @@ class YoloitCliToolArgumentNormalizer {
         (text.contains('this') && text.contains('panel')) ||
         text.contains('this panel');
   }
+
+  static bool _mentionsNoteLookupIntent(String userMessage) {
+    final text = userMessage.toLowerCase();
+    final asksToShowOrFocus =
+        text.contains('show') ||
+        text.contains('open') ||
+        text.contains('focus') ||
+        text.contains('покажи') ||
+        text.contains('открой') ||
+        text.contains('фокус');
+    final mentionsNote =
+        text.contains('note') ||
+        text.contains('замет') ||
+        text.contains('mermaid') ||
+        text.contains('diagram') ||
+        text.contains('диаграм');
+    return asksToShowOrFocus && mentionsNote;
+  }
+
+  static String? _inferNoteLookupPanelQuery(String userMessage) {
+    final lower = userMessage.toLowerCase();
+    if (lower.contains('mermaid')) return 'mermaid';
+    if (lower.contains('диаграм')) return 'диаграмма';
+    return null;
+  }
+
+  static bool _looksLikeOpaquePanelId(String value) =>
+      RegExp(r'^p-\d+$').hasMatch(value.trim());
 
   static bool _mentionsCurrentBoard(String userMessage) {
     final text = userMessage.toLowerCase();
