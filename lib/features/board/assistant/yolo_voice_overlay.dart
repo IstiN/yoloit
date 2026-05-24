@@ -674,101 +674,116 @@ class _ResponseCardState extends State<_ResponseCard>
     final hasMermaid = displayText.contains('```mermaid');
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Column(mainAxisSize.max) fills the bounded height given by parent ConstrainedBox.
-        // Flexible(tight) gives SingleChildScrollView exact bounded height → it scrolls.
+        // Total available height (bounded by parent ConstrainedBox, e.g. 170px).
+        // Subtract label row + gap to get max body height.
+        const labelRowHeight = 34.0;
+        final maxH =
+            constraints.maxHeight.isFinite ? constraints.maxHeight : 250.0;
+        final contentMaxH = (maxH - labelRowHeight - 40).clamp(40.0, 600.0);
+        // ↑ 40 = AnimatedContainer padding (20 top + 20 bottom)
+
+        // Column(mainAxisSize.min) shrinks to content.
+        // AnimatedContainer contains ConstrainedBox(maxH=contentMaxH) + CustomScrollView(shrinkWrap).
+        // This achieves: short text → small card; long text → capped + scrollable.
         return Column(
-          mainAxisSize: MainAxisSize.max,
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Flexible(
-              fit: FlexFit.tight,
-              child: AnimatedBuilder(
-                animation: _borderAnim,
-                builder:
-                    (ctx, child) => CustomPaint(
-                      painter:
-                          widget.streaming
-                              ? _RunningBorderPainter(
-                                progress: _borderAnim.value,
-                                radius: 28,
-                              )
-                              : null,
-                      child: child,
-                    ),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 620),
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xF2181A24),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(
-                          0xFF9B6BFF,
-                        ).withValues(alpha: widget.streaming ? 0.30 : 0.08),
-                        blurRadius: widget.streaming ? 40 : 18,
-                        spreadRadius: -6,
-                      ),
-                    ],
+            AnimatedBuilder(
+              animation: _borderAnim,
+              builder:
+                  (ctx, child) => CustomPaint(
+                    painter:
+                        widget.streaming
+                            ? _RunningBorderPainter(
+                              progress: _borderAnim.value,
+                              radius: 28,
+                            )
+                            : null,
+                    child: child,
                   ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 620),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+                decoration: BoxDecoration(
+                  color: const Color(0xF2181A24),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(
+                        0xFF9B6BFF,
+                      ).withValues(alpha: widget.streaming ? 0.30 : 0.08),
+                      blurRadius: widget.streaming ? 40 : 18,
+                      spreadRadius: -6,
+                    ),
+                  ],
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: contentMaxH),
                   child: hasMermaid
                       ? MarkdownDocumentPreview(content: displayText)
-                      : SingleChildScrollView(
-                        child: MarkdownBody(
-                          data: displayText,
-                          softLineBreak: true,
-                          selectable: false,
-                          styleSheet: MarkdownStyleSheet(
-                            p: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.95),
-                              fontSize: widget.fontSize,
-                              height: 1.52,
-                              fontWeight: FontWeight.w500,
-                              shadows:
-                                  widget.streaming
-                                      ? const [
-                                        Shadow(
-                                          color: Color(0x889B6BFF),
-                                          blurRadius: 14,
-                                        ),
-                                      ]
-                                      : const [],
-                            ),
-                            h1: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.98),
-                              fontSize: widget.fontSize + 5,
-                              height: 1.25,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            h2: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.98),
-                              fontSize: widget.fontSize + 3,
-                              height: 1.3,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            h3: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.98),
-                              fontSize: widget.fontSize + 1,
-                              height: 1.35,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            a: TextStyle(
-                              color: const Color(0xFF8BD8FF),
-                              fontSize: widget.fontSize,
-                              decoration: TextDecoration.underline,
-                            ),
-                            code: TextStyle(
-                              color: const Color(0xFF8BD8FF),
-                              fontSize: widget.fontSize - 1,
-                              backgroundColor: const Color(0x66101420),
-                            ),
-                            codeblockPadding: const EdgeInsets.all(10),
-                            codeblockDecoration: BoxDecoration(
-                              color: const Color(0xAA101420),
-                              borderRadius: BorderRadius.circular(10),
+                      : CustomScrollView(
+                        shrinkWrap: true,
+                        physics: const ClampingScrollPhysics(),
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: MarkdownBody(
+                              data: displayText,
+                              softLineBreak: true,
+                              selectable: false,
+                              styleSheet: MarkdownStyleSheet(
+                                p: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  fontSize: widget.fontSize,
+                                  height: 1.52,
+                                  fontWeight: FontWeight.w500,
+                                  shadows:
+                                      widget.streaming
+                                          ? const [
+                                            Shadow(
+                                              color: Color(0x889B6BFF),
+                                              blurRadius: 14,
+                                            ),
+                                          ]
+                                          : const [],
+                                ),
+                                h1: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.98),
+                                  fontSize: widget.fontSize + 5,
+                                  height: 1.25,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                h2: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.98),
+                                  fontSize: widget.fontSize + 3,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                h3: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.98),
+                                  fontSize: widget.fontSize + 1,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                a: TextStyle(
+                                  color: const Color(0xFF8BD8FF),
+                                  fontSize: widget.fontSize,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                code: TextStyle(
+                                  color: const Color(0xFF8BD8FF),
+                                  fontSize: widget.fontSize - 1,
+                                  backgroundColor: const Color(0x66101420),
+                                ),
+                                codeblockPadding: const EdgeInsets.all(10),
+                                codeblockDecoration: BoxDecoration(
+                                  color: const Color(0xAA101420),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                 ),
               ),
@@ -779,7 +794,7 @@ class _ResponseCardState extends State<_ResponseCard>
               child: _GlowText(
                 widget.actionLabel,
                 size: 14,
-                color: Color(0xFF8C8D9E),
+                color: const Color(0xFF8C8D9E),
               ),
             ),
           ],

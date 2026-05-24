@@ -61,6 +61,10 @@ class CloudLlmProvider extends ChatProvider {
     required bool isFirstMessage,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
+    // When set, the user message is sent as multimodal content (e.g. audio)
+    // instead of the plain [message] string. The list entries are OpenAI-style
+    // content items: [{'type':'input_audio','input_audio':{'data':...,'format':'wav'}}].
+    List<Map<String, Object?>>? audioContentOverride,
   }) {
     final controller = StreamController<ChatEvent>();
     _run(
@@ -69,6 +73,7 @@ class CloudLlmProvider extends ChatProvider {
       isFirstMessage: isFirstMessage,
       controller: controller,
       runtimeContext: runtimeContext,
+      audioContentOverride: audioContentOverride,
     );
     return controller.stream;
   }
@@ -81,6 +86,7 @@ class CloudLlmProvider extends ChatProvider {
     required bool isFirstMessage,
     required StreamController<ChatEvent> controller,
     required ChatRuntimeContext? runtimeContext,
+    List<Map<String, Object?>>? audioContentOverride,
   }) async {
     final session = config.sessionName;
     _running[session] = true;
@@ -133,7 +139,12 @@ class CloudLlmProvider extends ChatProvider {
       var retriedAfterEmptyResponse = false;
 
       final tools = _buildToolDefinitions(config.disabledLocalToolNames);
-      final messages = _buildMessages(sessionHistory, message, runtimeContext);
+      final messages = _buildMessages(
+        sessionHistory,
+        message,
+        runtimeContext,
+        audioContentOverride: audioContentOverride,
+      );
 
       // Agentic loop — keep calling if the model requests tool calls.
       for (var iteration = 0; iteration < _maxIterations; iteration++) {
@@ -384,8 +395,9 @@ class CloudLlmProvider extends ChatProvider {
   List<Map<String, Object?>> _buildMessages(
     List<Map<String, Object?>> history,
     String userMessage,
-    ChatRuntimeContext? runtimeContext,
-  ) {
+    ChatRuntimeContext? runtimeContext, {
+    List<Map<String, Object?>>? audioContentOverride,
+  }) {
     final boardId = runtimeContext?.boardId?.trim();
     final boardName = runtimeContext?.boardName?.trim();
     final panelId = runtimeContext?.panelId?.trim();
@@ -437,7 +449,12 @@ class CloudLlmProvider extends ChatProvider {
       messages.add(Map<String, Object?>.from(msg));
     }
 
-    messages.add({'role': 'user', 'content': userMessage});
+    if (audioContentOverride != null && audioContentOverride.isNotEmpty) {
+      // Multimodal user message: send audio content directly to the LLM.
+      messages.add({'role': 'user', 'content': audioContentOverride});
+    } else {
+      messages.add({'role': 'user', 'content': userMessage});
+    }
     return messages;
   }
 

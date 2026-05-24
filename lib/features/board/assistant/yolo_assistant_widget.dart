@@ -104,6 +104,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   bool _receivedAssistantToken = false;
   List<Map<String, dynamic>>? _messageDraft;
 
+  // When non-null, the next _sendMessage call will pass audio content directly
+  // to the cloud LLM instead of sending the text in _inputController.
+  List<Map<String, Object?>>? _pendingAudioContent;
+
   // In-memory ring buffer of raw LLM debug sessions (last 20, not persisted).
   final List<Map<String, dynamic>> _debugSessions = [];
   Map<String, dynamic>? _activeDebugSession;
@@ -266,15 +270,30 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   Future<void> _sendMessage({bool mirrorToOverlay = false}) async {
     if (_isGeneratingReply) return;
     final rawText = _inputController.text.trim();
-    if (rawText.isEmpty) return;
+    // Allow empty rawText only when audio content is pending.
+    final audioContent = _pendingAudioContent;
+    _pendingAudioContent = null;
+    if (rawText.isEmpty && audioContent == null) return;
     _inputController.clear();
 
-    // For voice messages, prepend context about ASR origin
-    final text =
-        mirrorToOverlay
-            ? '[Voice message — transcribed via speech recognition, '
-                'may contain recognition errors]\n$rawText'
-            : rawText;
+    // When sending audio directly to LLM: no voice-prefix, show mic icon in chat.
+    // For transcribed voice: prepend ASR context for the LLM.
+    final String text;
+    final String displayContent;
+    if (audioContent != null) {
+      // Audio sent directly — display mic icon, no prefix for LLM history
+      // (audio IS the content).
+      displayContent = '🎤 Voice message';
+      text = displayContent; // stored in history for display only
+    } else if (mirrorToOverlay) {
+      text =
+          '[Voice message — transcribed via speech recognition, '
+          'may contain recognition errors]\n$rawText';
+      displayContent = text;
+    } else {
+      text = rawText;
+      displayContent = text;
+    }
 
     final msgs = _messages;
     final userMessageId = 'msg-${DateTime.now().millisecondsSinceEpoch}';
@@ -283,7 +302,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     msgs.add({
       'id': userMessageId,
       'role': 'user',
-      'content': text,
+      'content': displayContent,
       'timestamp': DateTime.now().toIso8601String(),
     });
     msgs.add({
@@ -293,11 +312,14 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       'timestamp': DateTime.now().toIso8601String(),
     });
     _receivedAssistantToken = false;
+    // For overlay display: show mic icon when audio sent directly.
+    final overlayPrompt =
+        audioContent != null ? '🎤 Voice message' : rawText;
     _updateState({
       'messages': msgs,
       if (mirrorToOverlay) ...{
         'voiceDraft': '',
-        'voicePrompt': rawText,
+        'voicePrompt': overlayPrompt,
         'voiceResponse': '',
         'assistantStatus': 'processing',
         'voiceOverlayHidden': false,
@@ -314,7 +336,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         draftOverride: '',
         forcedStatus: 'processing',
         responseOverride: '',
-        promptOverride: rawText,
+        promptOverride: overlayPrompt,
         hiddenOverride: false,
       );
     }
@@ -423,7 +445,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           draftOverride: '',
           forcedStatus: 'thinking',
           responseOverride: '',
-          promptOverride: rawText,
+          promptOverride: overlayPrompt,
           hiddenOverride: false,
         );
       }
@@ -433,6 +455,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         config: config,
         isFirstMessage: msgs.where((m) => m['role'] == 'user').length <= 1,
         runtimeContext: runtimeContext,
+        audioContentOverride: audioContent,
       )) {
         if (_isCancelled) break;
 
@@ -518,7 +541,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           draftOverride: '',
           forcedStatus: 'output',
           responseOverride: cleanedFinal,
-          promptOverride: rawText,
+          promptOverride: overlayPrompt,
           hiddenOverride: false,
         );
       }
@@ -536,7 +559,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           draftOverride: '',
           forcedStatus: 'output',
           responseOverride: _formatAssistantError(e),
-          promptOverride: rawText,
+          promptOverride: overlayPrompt,
           hiddenOverride: false,
         );
       }
@@ -2148,28 +2171,47 @@ $messagesJson
     try {
       if (path == null || path.isEmpty) return;
 
-      String transcript;
       if (voiceSettings.useCloudAsr) {
-        transcript = await _transcribeWithCloudLlm(
+        // ── Cloud direct: send audio to LLM without transcription ───────────
+        // Prepare audio content, set a placeholder display text, and let
+        // _sendMessage forward the audio directly to the cloud LLM.
+        final (audioContent, cleanedPath) = await _prepareAudioContent(
           path,
           voiceSettings.convertWavToMp3,
         );
+        if (audioContent != null) {
+          if (!mounted) return;
+          _pendingAudioContent = audioContent;
+          // Display text shown in chat UI (no voice prefix needed — audio goes direct).
+          _inputController.text = '🎤';
+          _inputController.selection = TextSelection.collapsed(offset: 1);
+          shouldSend = sendAfterTranscription;
+        }
+        // Clean up converted file (original is cleaned in finally block).
+        if (cleanedPath != null &&
+            cleanedPath != path &&
+            File(cleanedPath).existsSync()) {
+          try {
+            await File(cleanedPath).delete();
+          } catch (_) {}
+        }
       } else {
-        transcript = await LocalAiModelsService.instance
+        // ── Local ASR: transcribe locally then send text ─────────────────
+        final transcript = await LocalAiModelsService.instance
             .transcribeWithSelectedAsr(path);
-      }
 
-      if (!mounted) return;
-      final text = transcript.trim();
-      if (text.isNotEmpty) {
-        final current = _inputController.text.trim();
-        _inputController.text =
-            current.isEmpty ? text : '$current ${text.trim()}';
-        _inputController.selection = TextSelection.collapsed(
-          offset: _inputController.text.length,
-        );
-        _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
-        shouldSend = sendAfterTranscription;
+        if (!mounted) return;
+        final text = transcript.trim();
+        if (text.isNotEmpty) {
+          final current = _inputController.text.trim();
+          _inputController.text =
+              current.isEmpty ? text : '$current ${text.trim()}';
+          _inputController.selection = TextSelection.collapsed(
+            offset: _inputController.text.length,
+          );
+          _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
+          shouldSend = sendAfterTranscription;
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -2193,18 +2235,22 @@ $messagesJson
         _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
       }
     }
-    if (shouldSend && mounted && _inputController.text.trim().isNotEmpty) {
-      if (mirrorToOverlay) {
-        await Future<void>.delayed(const Duration(milliseconds: 850));
-        if (!mounted) return;
+    if (shouldSend && mounted) {
+      if (_pendingAudioContent != null ||
+          _inputController.text.trim().isNotEmpty) {
+        if (mirrorToOverlay) {
+          await Future<void>.delayed(const Duration(milliseconds: 850));
+          if (!mounted) return;
+        }
+        await _sendMessage(mirrorToOverlay: mirrorToOverlay);
       }
-      await _sendMessage(mirrorToOverlay: mirrorToOverlay);
     }
   }
 
-  /// Sends audio file to the active cloud LLM for transcription.
-  /// Returns the transcribed text.
-  Future<String> _transcribeWithCloudLlm(
+  /// Reads the audio file, optionally converts WAV→MP3 via ffmpeg,
+  /// and returns (OpenAI-style content list, path-of-encoded-file).
+  /// Returns (null, null) on failure.
+  Future<(List<Map<String, Object?>>?, String?)> _prepareAudioContent(
     String audioPath,
     bool convertToMp3,
   ) async {
@@ -2215,90 +2261,27 @@ $messagesJson
       try {
         final mp3Path = audioPath.replaceAll('.wav', '.mp3');
         final result = await Process.run('ffmpeg', [
-          '-i',
-          audioPath,
-          '-codec:a',
-          'libmp3lame',
-          '-qscale:a',
-          '4',
-          '-y',
-          mp3Path,
+          '-i', audioPath, '-codec:a', 'libmp3lame', '-qscale:a', '4', '-y', mp3Path,
         ]);
         if (result.exitCode == 0 && File(mp3Path).existsSync()) {
           filePath = mp3Path;
           format = 'mp3';
         }
-      } catch (_) {
-        // ffmpeg not available, use WAV
-      }
+      } catch (_) {}
     }
 
     try {
-      final config = await CloudLlmSettingsService.instance.loadActiveConfig();
-      if (config == null || !config.isValid) {
-        throw StateError(
-          'No active cloud provider configured. Go to Settings → Cloud Providers to add one.',
-        );
-      }
-
       final audioBytes = await File(filePath).readAsBytes();
       final audioBase64 = base64Encode(audioBytes);
-
-      final url =
-          '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
-
-      final body = jsonEncode({
-        'model': config.model,
-        'messages': [
-          {
-            'role': 'user',
-            'content': [
-              {
-                'type': 'input_audio',
-                'input_audio': {'data': audioBase64, 'format': format},
-              },
-              {
-                'type': 'text',
-                'text':
-                    'Transcribe this audio. Output only the transcribed text, nothing else. No timestamps, no speaker labels.',
-              },
-            ],
-          },
-        ],
-        'max_tokens': 512,
-        'temperature': 0.0,
-      });
-
-      final request = await HttpClient().postUrl(Uri.parse(url));
-      request.headers.set('Authorization', 'Bearer ${config.apiKey}');
-      request.headers.set('Content-Type', 'application/json; charset=utf-8');
-      for (final entry in config.extraHeaders.entries) {
-        request.headers.set(entry.key, entry.value);
-      }
-      request.add(utf8.encode(body));
-
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
-
-      if (response.statusCode != 200) {
-        throw StateError(
-          'Cloud ASR error (${response.statusCode}): $responseBody',
-        );
-      }
-
-      final json = jsonDecode(responseBody) as Map<String, dynamic>;
-      final choices = json['choices'] as List?;
-      if (choices == null || choices.isEmpty) return '';
-      final message =
-          (choices[0] as Map<String, dynamic>)['message']
-              as Map<String, dynamic>?;
-      return (message?['content'] as String? ?? '').trim();
-    } finally {
-      if (filePath != audioPath && File(filePath).existsSync()) {
-        try {
-          await File(filePath).delete();
-        } catch (_) {}
-      }
+      final content = <Map<String, Object?>>[
+        {
+          'type': 'input_audio',
+          'input_audio': {'data': audioBase64, 'format': format},
+        },
+      ];
+      return (content, filePath);
+    } catch (e) {
+      return (null, null);
     }
   }
 

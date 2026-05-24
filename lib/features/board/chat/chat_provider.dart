@@ -77,6 +77,7 @@ abstract class ChatProvider {
     required bool isFirstMessage,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
+    List<Map<String, Object?>>? audioContentOverride,
   });
 
   /// Stop any running process for [sessionName].

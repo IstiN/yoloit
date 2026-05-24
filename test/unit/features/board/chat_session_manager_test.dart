@@ -48,6 +48,7 @@ class FakeChatProvider extends ChatProvider {
     required bool isFirstMessage,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
+    List<Map<String, Object?>>? audioContentOverride,
   }) {
     sentMessages.add(message);
     sentAttachments.add(List<String>.from(attachments));

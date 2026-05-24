@@ -89,6 +89,7 @@ class OpencodeProvider extends ChatProvider {
     required bool isFirstMessage,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
+    List<Map<String, Object?>>? audioContentOverride, // ignored
   }) {
     final controller = StreamController<ChatEvent>();
 
