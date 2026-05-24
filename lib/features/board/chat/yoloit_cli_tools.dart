@@ -1711,15 +1711,17 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     command: 'panel:focus',
     alias: 'pfc',
     description:
-        'Focus a panel. For requests like "show/open/focus note", first find the note panel then call this.',
+        'Focus/scroll-to/zoom a panel to bring it into view. Use for "сделай фокус на", "фокус на", "покажи", "открой" any panel — notes, playlists, kanban, etc. Examples: "сделай фокус на плейлист", "focus playlist", "show note", "открой заметку".',
     group: 'panel',
     humanVariants: const {
       'ru': [
         'сфокусируйся на панели {panel}',
         'покажи заметку {panel}',
         'открой заметку {panel}',
+        'сделай фокус на плейлист',
+        'перейди к плейлисту',
       ],
-      'en': ['focus panel {panel}', 'show note {panel}', 'open note {panel}'],
+      'en': ['focus panel {panel}', 'show note {panel}', 'open note {panel}', 'focus playlist'],
     },
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
@@ -2719,7 +2721,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     command: 'play',
     alias: 'play',
     description:
-        'Start playlist playback. Optionally add media first via file_or_url.',
+        'START or RESUME music/audio playback in a playlist panel. Use ONLY when the user wants to START playing — not for pause, stop, listing tracks, or showing the panel. Examples: "включи музыку", "play music", "resume", "продолжи воспроизведение".',
     group: 'playlist',
     humanVariants: const {
       'ru': [
@@ -2750,13 +2752,14 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'pause',
     alias: 'pause',
-    description: 'Pause playlist playback',
+    description: 'PAUSE music playback (temporary stop, can be resumed). Use for "пауза", "поставь на паузу", "поставь музыку на паузу", "pause music", "приостанови". NOT for stopping completely or showing playlist.',
     group: 'playlist',
     humanVariants: const {
       'ru': [
         'поставь на паузу',
         'пауза музыка',
         'приостанови воспроизведение',
+        'поставь музыку на паузу',
       ],
       'en': [
         'pause music',
@@ -2769,7 +2772,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'stop',
     alias: 'stop',
-    description: 'Stop playlist playback',
+    description: 'STOP music playback completely (resets to beginning). Use for "останови", "выключи музыку", "стоп", "stop music". NOT for pause or listing tracks.',
     group: 'playlist',
     humanVariants: const {
       'ru': ['останови музыку', 'стоп музыка', 'выключи музыку'],
@@ -2802,7 +2805,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'playlist:list',
     alias: 'pll',
-    description: 'List tracks in a playlist panel',
+    description: 'SHOW/LIST tracks in a playlist panel. Use for "покажи плейлист", "что в плейлисте", "список треков", "show playlist", "list tracks". NOT for playing music.',
     group: 'playlist',
     humanVariants: const {
       'ru': ['покажи плейлист', 'что в плейлисте', 'список треков'],
