@@ -8,36 +8,10 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 
-// ─── Player registry ──────────────────────────────────────────────────────────
-
-/// Keeps [Player] instances alive across board switches so playback is
-/// not interrupted when the user navigates away from the board containing
-/// a playlist panel.
-///
-/// Players are keyed by panel ID and persist until [release] is called
-/// explicitly (e.g. when the panel is deleted).
-class PlaylistPlayerRegistry {
-  PlaylistPlayerRegistry._();
-  static final PlaylistPlayerRegistry instance = PlaylistPlayerRegistry._();
-
-  final Map<String, Player> _players = {};
-
-  /// Returns the existing player for [panelId] or creates a new one.
-  Player acquire(String panelId) {
-    return _players.putIfAbsent(panelId, Player.new);
-  }
-
-  /// Releases and disposes the player for [panelId].
-  /// Call this when the panel itself is deleted (not just hidden).
-  void release(String panelId) {
-    final p = _players.remove(panelId);
-    p?.dispose();
-  }
-
-  /// Whether a player exists for [panelId] and is currently playing.
-  bool isPlaying(String panelId) => _players[panelId]?.state.playing ?? false;
-}
+export 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart'
+    show PlaylistPlayerRegistry;
 
 
 /// Board panel plugin: media playlist player (audio + video).
@@ -247,6 +221,8 @@ class _PlaylistContentState extends State<_PlaylistContent> {
       _videoCtrl = null;
     }
     if (mounted) setState(() => _videoVisible = isVideo);
+    // Sync the registry's path tracker so CLI resume works correctly.
+    PlaylistPlayerRegistry.instance.notifyOpened(widget.panel.id, path);
     _player.open(Media(path), play: autoPlay);
   }
 

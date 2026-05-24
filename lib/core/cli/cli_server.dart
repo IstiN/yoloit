@@ -21,6 +21,7 @@ import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
@@ -1693,6 +1694,14 @@ class CliServer {
           TimerManager.instance.stop(panel.id);
         }
       }
+      // Directly control playlist player via registry — needed when the widget
+      // is not mounted (user is on a different board) and didUpdateWidget won't fire.
+      if (panel.type == 'board.playlist') {
+        await PlaylistPlayerRegistry.instance.applyPlaybackCommand(
+          panel.id,
+          mergedState,
+        );
+      }
       if (panel.type == 'board.note.markdown' &&
           mergedState['autoHeight'] == true) {
         final markdown = mergedState['markdown'] as String? ?? '';
@@ -2568,6 +2577,12 @@ class CliServer {
         (p) => p.copyWith(state: mergedState),
         boardId: board.id,
       );
+      if (panel.type == 'board.playlist') {
+        await PlaylistPlayerRegistry.instance.applyPlaybackCommand(
+          panel.id,
+          mergedState,
+        );
+      }
       if (panel.type == 'board.note.markdown' &&
           mergedState['autoHeight'] == true) {
         final markdown = mergedState['markdown'] as String? ?? '';
