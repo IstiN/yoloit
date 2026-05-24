@@ -17,7 +17,6 @@ import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
-import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
@@ -244,10 +243,6 @@ class _SettingsPageState extends State<SettingsPage> {
             const _SectionHeader(title: 'Chat Context'),
             const SizedBox(height: 12),
             const _ChatContextSection(),
-            const SizedBox(height: 24),
-            const _SectionHeader(title: 'Local Models'),
-            const SizedBox(height: 12),
-            const AiModelsSection(),
           ],
         ),
         2 => const Column(

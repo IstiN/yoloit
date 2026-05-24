@@ -2243,7 +2243,10 @@ $messagesJson
     VoiceSettings voiceSettings,
   ) async {
     final settingsService = CloudLlmSettingsService.instance;
-    final explicitConfigId = voiceSettings.cloudAsrConfigId?.trim();
+    final explicitConfigId =
+        voiceSettings.useChatModelForCloudAsr
+            ? null
+            : voiceSettings.cloudAsrConfigId?.trim();
     CloudLlmConfig? config;
     if (explicitConfigId != null && explicitConfigId.isNotEmpty) {
       config = await settingsService.loadConfigById(explicitConfigId);
@@ -2257,7 +2260,8 @@ $messagesJson
     }
 
     final model =
-        voiceSettings.cloudAsrModel?.trim().isNotEmpty == true
+        !voiceSettings.useChatModelForCloudAsr &&
+                voiceSettings.cloudAsrModel?.trim().isNotEmpty == true
             ? voiceSettings.cloudAsrModel!.trim()
             : config.model.trim();
     if (model.isEmpty) {

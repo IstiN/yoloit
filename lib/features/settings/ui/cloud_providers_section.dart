@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
+import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 
 /// Settings section for managing cloud LLM provider configs.
 ///
@@ -17,7 +18,6 @@ class CloudProvidersSection extends StatefulWidget {
 class _CloudProvidersSectionState extends State<CloudProvidersSection> {
   List<CloudLlmConfig> _configs = [];
   String? _activeConfigId;
-  String _assistantProviderType = 'local';
   VoiceSettings _voiceSettings = const VoiceSettings();
   bool _loading = true;
 
@@ -31,29 +31,31 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     final configs = await CloudLlmSettingsService.instance.loadConfigs();
     final activeId =
         await CloudLlmSettingsService.instance.loadActiveConfigId();
-    final providerType =
-        await CloudLlmSettingsService.instance.loadAssistantProviderType();
     final vs = await CloudLlmSettingsService.instance.loadVoiceSettings();
     if (!mounted) return;
     setState(() {
       _configs = configs;
       _activeConfigId = activeId;
-      _assistantProviderType = providerType;
       _voiceSettings = vs;
       _loading = false;
     });
   }
 
-  Future<void> _setAssistantProviderType(String type) async {
-    await CloudLlmSettingsService.instance.saveAssistantProviderType(type);
-    if (!mounted) return;
-    setState(() => _assistantProviderType = type);
-  }
-
   Future<void> _setActiveConfig(String? id) async {
     await CloudLlmSettingsService.instance.saveActiveConfigId(id);
+    await CloudLlmSettingsService.instance.saveAssistantProviderType(
+      id == null ? 'local' : 'cloud',
+    );
     if (!mounted) return;
     setState(() => _activeConfigId = id);
+  }
+
+  Future<void> _setProviderModel(String configId, String modelId) async {
+    final config = _configById(configId);
+    if (config == null) return;
+    final updated = config.copyWith(model: modelId);
+    await CloudLlmSettingsService.instance.upsertConfig(updated);
+    await _load();
   }
 
   Future<void> _setVoiceSettings(VoiceSettings s) async {
@@ -79,9 +81,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     return _configs.isNotEmpty ? _configs.first.id : null;
   }
 
-  List<({String id, String label})> _asrModelOptionsForConfig(
-    String? configId,
-  ) {
+  List<({String id, String label})> _modelOptionsForConfig(String? configId) {
     final cfg = _configById(configId);
     if (cfg == null) return const [];
     final preset = _presetById(cfg.id);
@@ -91,10 +91,6 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
       for (final model in preset.models) {
         byId[model.id] = model.name;
       }
-    }
-    final selected = _voiceSettings.cloudAsrModel;
-    if (selected != null && selected.trim().isNotEmpty) {
-      byId.putIfAbsent(selected.trim(), () => selected.trim());
     }
     return byId.entries.map((e) => (id: e.key, label: e.value)).toList();
   }
@@ -351,23 +347,6 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Assistant provider toggle
-        Text(
-          'Assistant Provider',
-          style: textStyle?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'local', label: Text('Local Model')),
-            ButtonSegment(value: 'cloud', label: Text('Cloud API')),
-          ],
-          selected: {_assistantProviderType},
-          onSelectionChanged: (v) => _setAssistantProviderType(v.first),
-        ),
-        const SizedBox(height: 20),
-
-        // Cloud providers list
         Row(
           children: [
             Text(
@@ -419,11 +398,6 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
               child: ListTile(
                 dense: true,
-                leading: Radio<String>(
-                  value: config.id,
-                  groupValue: _activeConfigId,
-                  onChanged: (v) => _setActiveConfig(v),
-                ),
                 title: Text(
                   config.name,
                   style: const TextStyle(fontWeight: FontWeight.w600),
@@ -459,21 +433,85 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           style: textStyle?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'Chat model',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            _configById(_activeConfigId)?.model ??
-                'Select an active provider above',
-            style: const TextStyle(fontSize: 12),
-          ),
-          trailing: const Icon(Icons.chat_bubble_outline, size: 16),
-        ),
-        const SizedBox(height: 8),
+        ...(() {
+          final chatProviderId =
+              _configById(_activeConfigId)?.id ??
+              (_configs.isNotEmpty ? _configs.first.id : null);
+          final chatConfig = _configById(chatProviderId);
+          final chatModelOptions = _modelOptionsForConfig(chatProviderId);
+          final chatModelValue =
+              chatModelOptions.any((m) => m.id == chatConfig?.model)
+                  ? chatConfig?.model
+                  : null;
+          return <Widget>[
+            DropdownButtonFormField<String>(
+              value: chatProviderId,
+              decoration: const InputDecoration(
+                labelText: 'Chat provider',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              items:
+                  _configs
+                      .map(
+                        (c) => DropdownMenuItem<String>(
+                          value: c.id,
+                          child: Text(
+                            c.name,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      )
+                      .toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                _setActiveConfig(v);
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: chatModelValue,
+                    hint: const Text('Select chat model'),
+                    decoration: const InputDecoration(
+                      labelText: 'Chat model',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    items:
+                        chatModelOptions
+                            .map(
+                              (m) => DropdownMenuItem<String>(
+                                value: m.id,
+                                child: Text(
+                                  m.label,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: (v) {
+                      if (v == null || chatProviderId == null) return;
+                      _setProviderModel(chatProviderId, v);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  tooltip: 'Chat provider settings',
+                  onPressed:
+                      chatConfig == null
+                          ? null
+                          : () => _showEditConfigDialog(chatConfig),
+                ),
+              ],
+            ),
+          ];
+        })(),
+        const SizedBox(height: 12),
         Text(
           'Voice / ASR Settings',
           style: textStyle?.copyWith(fontWeight: FontWeight.w600),
@@ -483,11 +521,11 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           dense: true,
           contentPadding: EdgeInsets.zero,
           title: const Text(
-            'Use cloud LLM for voice transcription',
+            'Use cloud provider for ASR',
             style: TextStyle(fontSize: 13),
           ),
           subtitle: const Text(
-            'Sends audio directly to the active cloud LLM model instead of local Whisper. Requires a multimodal model that accepts audio (e.g. Voxtral, Gemini).',
+            'When off, local ASR model is used.',
             style: TextStyle(fontSize: 11),
           ),
           value: _voiceSettings.useCloudAsr,
@@ -497,44 +535,75 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
         ),
         if (_voiceSettings.useCloudAsr) ...[
+          CheckboxListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Use the same provider/model as chat',
+              style: TextStyle(fontSize: 13),
+            ),
+            value: _voiceSettings.useChatModelForCloudAsr,
+            onChanged:
+                (v) => _setVoiceSettings(
+                  _voiceSettings.copyWith(useChatModelForCloudAsr: v ?? true),
+                ),
+          ),
           ...(() {
-            final asrConfigId = _effectiveAsrConfigId();
-            final asrOptions = _asrModelOptionsForConfig(asrConfigId);
+            final asrConfigId =
+                _voiceSettings.useChatModelForCloudAsr
+                    ? (_configById(_activeConfigId)?.id ??
+                        (_configs.isNotEmpty ? _configs.first.id : null))
+                    : _effectiveAsrConfigId();
+            final asrOptions = _modelOptionsForConfig(asrConfigId);
+            final asrOptionsWithSelected = <({String id, String label})>[
+              ...asrOptions,
+              if (_voiceSettings.cloudAsrModel != null &&
+                  _voiceSettings.cloudAsrModel!.trim().isNotEmpty &&
+                  !asrOptions.any((m) => m.id == _voiceSettings.cloudAsrModel))
+                (
+                  id: _voiceSettings.cloudAsrModel!.trim(),
+                  label: _voiceSettings.cloudAsrModel!.trim(),
+                ),
+            ];
             final asrValue =
-                asrOptions.any((m) => m.id == _voiceSettings.cloudAsrModel)
+                asrOptionsWithSelected.any(
+                      (m) => m.id == _voiceSettings.cloudAsrModel,
+                    )
                     ? _voiceSettings.cloudAsrModel
                     : null;
             return <Widget>[
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: asrConfigId,
-                decoration: const InputDecoration(
-                  labelText: 'ASR provider',
-                  isDense: true,
-                  border: OutlineInputBorder(),
-                ),
-                items:
-                    _configs
-                        .map(
-                          (c) => DropdownMenuItem<String>(
-                            value: c.id,
-                            child: Text(
-                              c.name,
-                              style: const TextStyle(fontSize: 13),
+              if (!_voiceSettings.useChatModelForCloudAsr) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: asrConfigId,
+                  decoration: const InputDecoration(
+                    labelText: 'ASR provider',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  items:
+                      _configs
+                          .map(
+                            (c) => DropdownMenuItem<String>(
+                              value: c.id,
+                              child: Text(
+                                c.name,
+                                style: const TextStyle(fontSize: 13),
+                              ),
                             ),
-                          ),
-                        )
-                        .toList(),
-                onChanged: (v) {
-                  if (v == null) return;
-                  _setVoiceSettings(
-                    _voiceSettings.copyWith(
-                      cloudAsrConfigId: v,
-                      cloudAsrModel: _voiceSettings.cloudAsrModel,
-                    ),
-                  );
-                },
-              ),
+                          )
+                          .toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    _setVoiceSettings(
+                      _voiceSettings.copyWith(
+                        cloudAsrConfigId: v,
+                        cloudAsrModel: _voiceSettings.cloudAsrModel,
+                      ),
+                    );
+                  },
+                ),
+              ],
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: asrValue,
@@ -548,7 +617,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                   border: OutlineInputBorder(),
                 ),
                 items:
-                    asrOptions
+                    asrOptionsWithSelected
                         .map(
                           (m) => DropdownMenuItem<String>(
                             value: m.id,
@@ -566,7 +635,9 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
               const SizedBox(height: 6),
               Text(
-                'ASR uses the selected provider/model above. If model is not set, provider default model is used.',
+                _voiceSettings.useChatModelForCloudAsr
+                    ? 'ASR will use the same provider/model as chat.'
+                    : 'ASR uses provider/model selected above.',
                 style: TextStyle(
                   fontSize: 11,
                   color: colors.onSurface.withAlpha(160),
@@ -574,24 +645,31 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
             ];
           })(),
+          CheckboxListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Convert WAV → MP3 before sending',
+              style: TextStyle(fontSize: 13),
+            ),
+            subtitle: const Text(
+              'Requires ffmpeg on PATH. Reduces file size for cloud ASR.',
+              style: TextStyle(fontSize: 11),
+            ),
+            value: _voiceSettings.convertWavToMp3,
+            onChanged:
+                (v) => _setVoiceSettings(
+                  _voiceSettings.copyWith(convertWavToMp3: v ?? false),
+                ),
+          ),
         ],
-        CheckboxListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'Convert WAV → MP3 before sending',
-            style: TextStyle(fontSize: 13),
-          ),
-          subtitle: const Text(
-            'Requires ffmpeg on PATH. Reduces file size (may lower token cost for cloud ASR). Falls back to WAV if conversion fails.',
-            style: TextStyle(fontSize: 11),
-          ),
-          value: _voiceSettings.convertWavToMp3,
-          onChanged:
-              (v) => _setVoiceSettings(
-                _voiceSettings.copyWith(convertWavToMp3: v ?? false),
-              ),
+        const SizedBox(height: 20),
+        Text(
+          'Local Provider',
+          style: textStyle?.copyWith(fontWeight: FontWeight.w600),
         ),
+        const SizedBox(height: 8),
+        const AiModelsSection(),
       ],
     );
   }

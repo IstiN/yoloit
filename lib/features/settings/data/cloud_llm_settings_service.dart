@@ -385,22 +385,27 @@ class VoiceSettings {
   const VoiceSettings({
     this.useCloudAsr = false,
     this.convertWavToMp3 = false,
+    this.useChatModelForCloudAsr = true,
     this.cloudAsrConfigId,
     this.cloudAsrModel,
   });
   final bool useCloudAsr;
   final bool convertWavToMp3;
+  final bool useChatModelForCloudAsr;
   final String? cloudAsrConfigId;
   final String? cloudAsrModel;
 
   VoiceSettings copyWith({
     bool? useCloudAsr,
     bool? convertWavToMp3,
+    bool? useChatModelForCloudAsr,
     Object? cloudAsrConfigId = _voiceSentinel,
     Object? cloudAsrModel = _voiceSentinel,
   }) => VoiceSettings(
     useCloudAsr: useCloudAsr ?? this.useCloudAsr,
     convertWavToMp3: convertWavToMp3 ?? this.convertWavToMp3,
+    useChatModelForCloudAsr:
+        useChatModelForCloudAsr ?? this.useChatModelForCloudAsr,
     cloudAsrConfigId:
         cloudAsrConfigId == _voiceSentinel
             ? this.cloudAsrConfigId
@@ -414,6 +419,7 @@ class VoiceSettings {
   Map<String, Object?> toJson() => {
     'useCloudAsr': useCloudAsr,
     'convertWavToMp3': convertWavToMp3,
+    'useChatModelForCloudAsr': useChatModelForCloudAsr,
     if (cloudAsrConfigId != null) 'cloudAsrConfigId': cloudAsrConfigId,
     if (cloudAsrModel != null) 'cloudAsrModel': cloudAsrModel,
   };
@@ -421,6 +427,7 @@ class VoiceSettings {
   factory VoiceSettings.fromJson(Map<String, dynamic> json) => VoiceSettings(
     useCloudAsr: json['useCloudAsr'] as bool? ?? false,
     convertWavToMp3: json['convertWavToMp3'] as bool? ?? false,
+    useChatModelForCloudAsr: json['useChatModelForCloudAsr'] as bool? ?? true,
     cloudAsrConfigId: json['cloudAsrConfigId'] as String?,
     cloudAsrModel: json['cloudAsrModel'] as String?,
   );

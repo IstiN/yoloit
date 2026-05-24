@@ -541,6 +541,7 @@ class CliServer {
         'ok': true,
         'useCloudAsr': settings.useCloudAsr,
         'convertWavToMp3': settings.convertWavToMp3,
+        'useChatModelForCloudAsr': settings.useChatModelForCloudAsr,
         'cloudAsrConfigId': settings.cloudAsrConfigId,
         'cloudAsrModel': settings.cloudAsrModel,
       });
@@ -554,6 +555,9 @@ class CliServer {
         useCloudAsr: body['useCloudAsr'] as bool? ?? current.useCloudAsr,
         convertWavToMp3:
             body['convertWavToMp3'] as bool? ?? current.convertWavToMp3,
+        useChatModelForCloudAsr:
+            body['useChatModelForCloudAsr'] as bool? ??
+            current.useChatModelForCloudAsr,
         cloudAsrConfigId:
             body.containsKey('cloudAsrConfigId')
                 ? body['cloudAsrConfigId'] as String?
@@ -568,6 +572,7 @@ class CliServer {
         'ok': true,
         'useCloudAsr': updated.useCloudAsr,
         'convertWavToMp3': updated.convertWavToMp3,
+        'useChatModelForCloudAsr': updated.useChatModelForCloudAsr,
         'cloudAsrConfigId': updated.cloudAsrConfigId,
         'cloudAsrModel': updated.cloudAsrModel,
       });
