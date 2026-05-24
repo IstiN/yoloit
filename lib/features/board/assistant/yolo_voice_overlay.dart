@@ -227,9 +227,15 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
           : Alignment(0.0, widget.orbAlignY);
 
   // Keep listening waves and status text visually coupled to the orb position.
-  double get _particleAlignY => (_orbAlign.y - 0.12).clamp(-0.95, 0.95);
+  double get _particleAlignY => (_orbAlign.y + 0.03).clamp(-0.9, 0.98);
   double get _waveAlignY => (_orbAlign.y - 0.06).clamp(-0.9, 0.95);
   double get _textAlignY => (_orbAlign.y + 0.34).clamp(-0.2, 0.95);
+  double get _responseCardBottomPadding {
+    final orbCenterY = ((_orbAlign.y + 1) * 0.5) * _kH;
+    final orbRadius = (_orbSize * widget.orbScale) * 0.5;
+    final cardBottomY = orbCenterY - orbRadius + 6;
+    return (_kH - cardBottomY).clamp(44.0, 180.0);
+  }
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -367,7 +373,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
-                        padding: const EdgeInsets.only(bottom: 152),
+                        padding: EdgeInsets.only(
+                          bottom: _responseCardBottomPadding,
+                        ),
                         child: GestureDetector(
                           behavior: HitTestBehavior.translucent,
                           onTap: widget.onPrimaryAction,
@@ -409,8 +417,21 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                           switchInCurve: Curves.easeOut,
                           switchOutCurve: Curves.easeIn,
                           transitionBuilder:
-                              (child, anim) =>
-                                  FadeTransition(opacity: anim, child: child),
+                              (child, anim) => FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.10),
+                                    end: Offset.zero,
+                                  ).animate(
+                                    CurvedAnimation(
+                                      parent: anim,
+                                      curve: Curves.easeOutCubic,
+                                    ),
+                                  ),
+                                  child: child,
+                                ),
+                              ),
                           child: _textContent(),
                         ),
                       ],
@@ -1524,8 +1545,8 @@ class _ScatteredParticlesPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Center shifted up so particles orbit above vertical midpoint
-    final center = Offset(size.width / 2, size.height * 0.42);
+    // Keep particles close to and slightly above the orb, not near top edge.
+    final center = Offset(size.width / 2, size.height * 0.60);
     final halfW = size.width / 2;
     final paint = Paint();
 
@@ -1534,7 +1555,7 @@ class _ScatteredParticlesPainter extends CustomPainter {
       final orbitR = halfW * p.radiusBase;
       // Slightly elliptical
       final x = center.dx + math.cos(angle) * orbitR;
-      final y = center.dy + math.sin(angle) * orbitR * 0.72;
+      final y = center.dy + math.sin(angle) * orbitR * 0.56;
 
       final color =
           Color.lerp(
