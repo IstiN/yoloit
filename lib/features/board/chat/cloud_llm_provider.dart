@@ -408,12 +408,12 @@ flowchart TD
     MV -->|"стоп / stop / останови / выключи музыку"| T_STOP[stop]
     MV -->|"следующий / next / след трек"| T_NEXT[next]
     MV -->|"предыдущий / prev / назад / прошлый трек"| T_PREV[prev]
-    MV -->|"покажи плейлист / список треков / list / что в плейлисте"| T_PLL[playlist:list]
+    MV -->|"список треков / что в плейлисте / перечисли треки"| T_PLL[playlist:list]
 
     WHAT --> VIEW[👁 View / Navigation]
     VIEW --> VT{Target}
-    VT -->|"доска / board name → switch board"| T_BF[board:focus]
-    VT -->|"панель / note / заметка / checklist → show it"| T_PFC[panel:focus]
+    VT -->|"перейди на доску / switch board / открой доску"| T_BF[board:focus]
+    VT -->|"покажи / фокус / открой / show / focus → ANY panel\n(note, playlist, checklist, kanban…)\nIf panel not on current board — board:focus first, then panel:focus"| T_PFC[panel:focus]
     VT -->|"zoom in / увеличь зум / приблизь"| T_BZI["board:zoom scale×1.5$scaleNote"]
     VT -->|"zoom out / уменьши зум / отдали"| T_BZO["board:zoom scale×0.67$scaleNote"]
     VT -->|"fit / по экрану / вместить"| T_BFT[board:fit]

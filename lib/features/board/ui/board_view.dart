@@ -68,6 +68,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   double _interactionStartScale = 1.0;
   Offset? _lastPanelDragBoardPointer;
   String? _syncedBoardId;
+  BoardViewport? _syncedViewport;
   String? _autoFitKey;
   String? _focusedPanelVisibilityKey;
   bool _showMinimap = true;
@@ -1013,11 +1014,25 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   void _syncViewport(BoardDocument board) {
-    if (_syncedBoardId == board.id) return;
+    final vp = board.viewport;
+    final boardSwitched = _syncedBoardId != board.id;
+    // Also re-apply when viewport changed externally (e.g. via CLI board:zoom)
+    // while the user is not actively interacting.
+    final externalChange =
+        !boardSwitched &&
+        _syncedViewport != null &&
+        !_isViewportInteracting &&
+        !_isPanelDragging &&
+        (_syncedViewport!.scale != vp.scale ||
+            _syncedViewport!.translation != vp.translation);
+
+    if (!boardSwitched && !externalChange) return;
     _syncedBoardId = board.id;
+    _syncedViewport = vp;
     _boardDebugLog(
-      'syncViewport board=${board.id} scale=${_fmt(board.viewport.scale)} '
-      'translation=${_fmtOffset(board.viewport.translation)}',
+      'syncViewport board=${board.id} scale=${_fmt(vp.scale)} '
+      'translation=${_fmtOffset(vp.translation)} '
+      '${externalChange ? "(external)" : "(board switch)"}',
     );
     if (_shouldAutoFit(board)) {
       _boardDebugLog('syncViewport.scheduleAutoFit board=${board.id}');
@@ -1025,7 +1040,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       return;
     }
     _stopPanAnimation();
-    _transformController.value = _matrixFromViewport(board.viewport);
+    _transformController.value = _matrixFromViewport(vp);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _syncedBoardId != board.id) return;
       if (_shouldAutoFit(board)) return;
@@ -1048,10 +1063,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'translation=${_fmtOffset(translation)} matrixT=${_fmtOffset(Offset(matrix[12], matrix[13]))} '
       'origin=${_fmtOffset(_canvasOrigin)} dragging=$_isPanelDragging viewportInteracting=$_isViewportInteracting',
     );
-    return context.read<BoardCubit>().updateViewport(
-      board.viewport.copyWith(scale: scale, translation: translation),
-      boardId: board.id,
-    );
+    final newVp = board.viewport.copyWith(scale: scale, translation: translation);
+    _syncedViewport = newVp; // track so external changes are detected correctly
+    return context.read<BoardCubit>().updateViewport(newVp, boardId: board.id);
   }
 
   Matrix4 _matrixFromViewport(BoardViewport viewport) {
