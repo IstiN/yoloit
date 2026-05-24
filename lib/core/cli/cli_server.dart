@@ -249,6 +249,11 @@ class CliServer {
       return _handleCloudProviders(method, path.sublist(1), request);
     }
 
+    // /api/voice-settings/...
+    if (path.isNotEmpty && path[0] == 'voice-settings') {
+      return _handleVoiceSettings(method, path.sublist(1), request);
+    }
+
     if (path.isNotEmpty && path[0] == 'agents') {
       return _handleAgents(method, path.sublist(1), request);
     }
@@ -517,6 +522,45 @@ class CliServer {
     }
 
     return _notFound('Unknown cloud-providers route');
+  }
+
+  // ── Voice settings routes ──────────────────────────────────────────────
+
+  Future<shelf.Response> _handleVoiceSettings(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+  ) async {
+    final service = CloudLlmSettingsService.instance;
+
+    // GET /api/voice-settings → current voice settings
+    if (sub.isEmpty && method == 'GET') {
+      final settings = await service.loadVoiceSettings();
+      return _json({
+        'ok': true,
+        'useCloudAsr': settings.useCloudAsr,
+        'convertWavToMp3': settings.convertWavToMp3,
+      });
+    }
+
+    // POST /api/voice-settings { useCloudAsr?, convertWavToMp3? }
+    if (sub.isEmpty && method == 'POST') {
+      final body = await _body(request);
+      final current = await service.loadVoiceSettings();
+      final updated = current.copyWith(
+        useCloudAsr: body['useCloudAsr'] as bool? ?? current.useCloudAsr,
+        convertWavToMp3:
+            body['convertWavToMp3'] as bool? ?? current.convertWavToMp3,
+      );
+      await service.saveVoiceSettings(updated);
+      return _json({
+        'ok': true,
+        'useCloudAsr': updated.useCloudAsr,
+        'convertWavToMp3': updated.convertWavToMp3,
+      });
+    }
+
+    return _notFound('Unknown voice-settings route');
   }
 
   Future<shelf.Response> _handleAgents(

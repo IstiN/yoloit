@@ -18,6 +18,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
   List<CloudLlmConfig> _configs = [];
   String? _activeConfigId;
   String _assistantProviderType = 'local';
+  VoiceSettings _voiceSettings = const VoiceSettings();
   bool _loading = true;
 
   @override
@@ -28,14 +29,17 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
 
   Future<void> _load() async {
     final configs = await CloudLlmSettingsService.instance.loadConfigs();
-    final activeId = await CloudLlmSettingsService.instance.loadActiveConfigId();
+    final activeId =
+        await CloudLlmSettingsService.instance.loadActiveConfigId();
     final providerType =
         await CloudLlmSettingsService.instance.loadAssistantProviderType();
+    final vs = await CloudLlmSettingsService.instance.loadVoiceSettings();
     if (!mounted) return;
     setState(() {
       _configs = configs;
       _activeConfigId = activeId;
       _assistantProviderType = providerType;
+      _voiceSettings = vs;
       _loading = false;
     });
   }
@@ -50,6 +54,12 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     await CloudLlmSettingsService.instance.saveActiveConfigId(id);
     if (!mounted) return;
     setState(() => _activeConfigId = id);
+  }
+
+  Future<void> _setVoiceSettings(VoiceSettings s) async {
+    await CloudLlmSettingsService.instance.saveVoiceSettings(s);
+    if (!mounted) return;
+    setState(() => _voiceSettings = s);
   }
 
   Future<void> _deleteConfig(String id) async {
@@ -84,7 +94,10 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                 for (final preset in available)
                   ListTile(
                     title: Text(preset.name),
-                    subtitle: Text(preset.defaultModel, style: const TextStyle(fontSize: 12)),
+                    subtitle: Text(
+                      preset.defaultModel,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     trailing: const Icon(Icons.add, size: 18),
                     onTap: () {
                       Navigator.of(ctx).pop();
@@ -94,7 +107,10 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                 const Divider(),
                 ListTile(
                   title: const Text('Custom endpoint'),
-                  subtitle: const Text('Any OpenAI-compatible API', style: TextStyle(fontSize: 12)),
+                  subtitle: const Text(
+                    'Any OpenAI-compatible API',
+                    style: TextStyle(fontSize: 12),
+                  ),
                   trailing: const Icon(Icons.edit, size: 18),
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -116,20 +132,19 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
   }
 
   void _showEditConfigDialog(CloudLlmConfig? initial) {
-    final isNew = initial == null ||
-        initial.apiKey.isEmpty;
+    final isNew = initial == null || initial.apiKey.isEmpty;
     final idCtrl = TextEditingController(text: initial?.id ?? '');
     final nameCtrl = TextEditingController(text: initial?.name ?? '');
     final urlCtrl = TextEditingController(text: initial?.baseUrl ?? '');
     final keyCtrl = TextEditingController(text: initial?.apiKey ?? '');
     final modelCtrl = TextEditingController(text: initial?.model ?? '');
+    final initialName = initial?.name ?? '';
 
     // Find preset for model dropdown.
-    final preset = initial != null
-        ? kCloudLlmPresets
-              .where((p) => p.id == initial.id)
-              .firstOrNull
-        : null;
+    final preset =
+        initial != null
+            ? kCloudLlmPresets.where((p) => p.id == initial.id).firstOrNull
+            : null;
 
     showDialog<void>(
       context: context,
@@ -137,7 +152,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              title: Text(isNew ? 'Add Cloud Provider' : 'Edit ${initial?.name}'),
+              title: Text(isNew ? 'Add Cloud Provider' : 'Edit $initialName'),
               content: SizedBox(
                 width: 400,
                 child: SingleChildScrollView(
@@ -150,44 +165,69 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                         const SizedBox(height: 12),
                         _field('Name', nameCtrl, hint: 'My Provider'),
                         const SizedBox(height: 12),
-                        _field('Base URL', urlCtrl,
-                            hint: 'https://api.example.com/v1'),
+                        _field(
+                          'Base URL',
+                          urlCtrl,
+                          hint: 'https://api.example.com/v1',
+                        ),
                         const SizedBox(height: 12),
                       ],
-                      _field('API Key', keyCtrl,
-                          hint: 'sk-...', obscure: true),
+                      _field('API Key', keyCtrl, hint: 'sk-...', obscure: true),
                       const SizedBox(height: 12),
                       if (preset != null && preset.models.isNotEmpty) ...[
-                        const Text('Model',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        const Text(
+                          'Model',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         DropdownButtonFormField<String>(
-                          value: preset.models.any((m) => m.id == modelCtrl.text)
-                              ? modelCtrl.text
-                              : preset.defaultModel,
+                          value:
+                              preset.models.any((m) => m.id == modelCtrl.text)
+                                  ? modelCtrl.text
+                                  : null,
+                          hint: const Text(
+                            'Select preset model…',
+                            style: TextStyle(fontSize: 13),
+                          ),
                           decoration: InputDecoration(
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                          items: preset.models
-                              .map((m) => DropdownMenuItem(
-                                    value: m.id,
-                                    child: Text(m.name,
-                                        style: const TextStyle(fontSize: 13)),
-                                  ))
-                              .toList(),
+                          items:
+                              preset.models
+                                  .map(
+                                    (m) => DropdownMenuItem(
+                                      value: m.id,
+                                      child: Text(
+                                        m.name,
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
                           onChanged: (v) {
                             if (v != null) {
                               setDialogState(() => modelCtrl.text = v);
                             }
                           },
                         ),
+                        const SizedBox(height: 8),
+                        _field(
+                          'Custom model ID (overrides selection above)',
+                          modelCtrl,
+                          hint: 'e.g. google/gemini-2.5-pro',
+                        ),
                       ] else
-                        _field('Model', modelCtrl,
-                            hint: 'model-name'),
+                        _field('Model', modelCtrl, hint: 'model-name'),
                     ],
                   ),
                 ),
@@ -223,13 +263,19 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     );
   }
 
-  Widget _field(String label, TextEditingController ctrl,
-      {String? hint, bool obscure = false}) {
+  Widget _field(
+    String label,
+    TextEditingController ctrl, {
+    String? hint,
+    bool obscure = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 4),
         TextField(
           controller: ctrl,
@@ -242,10 +288,11 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               color: Theme.of(context).colorScheme.onSurface.withAlpha(80),
             ),
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ],
@@ -324,14 +371,13 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: isActive
-                    ? colors.primary.withAlpha(16)
-                    : colors.surface,
+                color: isActive ? colors.primary.withAlpha(16) : colors.surface,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isActive
-                      ? colors.primary.withAlpha(100)
-                      : colors.outline.withAlpha(40),
+                  color:
+                      isActive
+                          ? colors.primary.withAlpha(100)
+                          : colors.outline.withAlpha(40),
                 ),
               ),
               child: ListTile(
@@ -341,11 +387,16 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                   groupValue: _activeConfigId,
                   onChanged: (v) => _setActiveConfig(v),
                 ),
-                title: Text(config.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                title: Text(
+                  config.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 subtitle: Text(
                   '${config.model} • ${config.apiKey.isNotEmpty ? "key ✓" : "no key"}',
-                  style: TextStyle(fontSize: 12, color: colors.onSurface.withAlpha(160)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.onSurface.withAlpha(160),
+                  ),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -356,8 +407,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                       onPressed: () => _showEditConfigDialog(config),
                     ),
                     IconButton(
-                      icon: Icon(Icons.delete, size: 16,
-                          color: colors.error),
+                      icon: Icon(Icons.delete, size: 16, color: colors.error),
                       tooltip: 'Remove',
                       onPressed: () => _deleteConfig(config.id),
                     ),
@@ -366,6 +416,46 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
             );
           }),
+        const SizedBox(height: 24),
+        Text(
+          'Voice / ASR Settings',
+          style: textStyle?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        CheckboxListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Use cloud LLM for voice transcription',
+            style: TextStyle(fontSize: 13),
+          ),
+          subtitle: const Text(
+            'Sends audio directly to the active cloud LLM model instead of local Whisper. Requires a multimodal model that accepts audio (e.g. Voxtral, Gemini).',
+            style: TextStyle(fontSize: 11),
+          ),
+          value: _voiceSettings.useCloudAsr,
+          onChanged:
+              (v) => _setVoiceSettings(
+                _voiceSettings.copyWith(useCloudAsr: v ?? false),
+              ),
+        ),
+        CheckboxListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Convert WAV → MP3 before sending',
+            style: TextStyle(fontSize: 13),
+          ),
+          subtitle: const Text(
+            'Requires ffmpeg on PATH. Reduces file size (may lower token cost for cloud ASR). Falls back to WAV if conversion fails.',
+            style: TextStyle(fontSize: 11),
+          ),
+          value: _voiceSettings.convertWavToMp3,
+          onChanged:
+              (v) => _setVoiceSettings(
+                _voiceSettings.copyWith(convertWavToMp3: v ?? false),
+              ),
+        ),
       ],
     );
   }

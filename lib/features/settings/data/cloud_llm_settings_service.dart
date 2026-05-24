@@ -124,6 +124,10 @@ const _openRouterRecommendedModelIds = <String>[
   'google/gemma-4-26b-a4b-it',
   'mistralai/mistral-small-3.2-24b-instruct',
   'qwen/qwen3.6-35b-a3b',
+  'google/gemini-3-flash-preview',
+  'google/gemini-3.1-flash-lite-preview',
+  'mistralai/voxtral-small-24b-2507',
+  'xiaomi/mimo-v2.5',
 ];
 
 const _openRouterDefaultModel = 'google/gemma-4-31b-it';
@@ -148,6 +152,16 @@ const kCloudLlmPresets = <CloudLlmPreset>[
         name: 'Mistral Small 3.2 24B',
       ),
       (id: 'qwen/qwen3.6-35b-a3b', name: 'Qwen 3.6 35B A3B'),
+      (id: 'google/gemini-3-flash-preview', name: 'Gemini 3 Flash Preview'),
+      (
+        id: 'google/gemini-3.1-flash-lite-preview',
+        name: 'Gemini 3.1 Flash Lite Preview',
+      ),
+      (
+        id: 'mistralai/voxtral-small-24b-2507',
+        name: 'Voxtral Small 24B (Audio)',
+      ),
+      (id: 'xiaomi/mimo-v2.5', name: 'MiMo v2.5'),
     ],
   ),
   CloudLlmPreset(
@@ -202,6 +216,7 @@ class CloudLlmSettingsService {
   static const _prefsFallbackKey = 'cloud_llm_configs_fallback_v1';
   static const _activeConfigPrefKey = 'cloud_llm_active_config_v1';
   static const _assistantProviderPrefKey = 'assistant_provider_type_v1';
+  static const _voiceSettingsPrefKey = 'voice_settings_v1';
 
   static FlutterSecureStorage _buildStorage() {
     if (Platform.isMacOS) {
@@ -270,10 +285,8 @@ class CloudLlmSettingsService {
   }
 
   CloudLlmConfig _normalizeConfig(CloudLlmConfig config) {
-    if (config.id != 'openrouter') return config;
-    final model = config.model.trim();
-    if (_openRouterRecommendedModelIds.contains(model)) return config;
-    return config.copyWith(model: _openRouterDefaultModel);
+    if (_openRouterRecommendedModelIds.isEmpty) return config;
+    return config;
   }
 
   /// Remove a config by id.
@@ -332,4 +345,44 @@ class CloudLlmSettingsService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_assistantProviderPrefKey, type);
   }
+
+  Future<VoiceSettings> loadVoiceSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_voiceSettingsPrefKey);
+    if (raw == null || raw.isEmpty) return const VoiceSettings();
+    try {
+      return VoiceSettings.fromJson(
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
+    } catch (_) {
+      return const VoiceSettings();
+    }
+  }
+
+  Future<void> saveVoiceSettings(VoiceSettings settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_voiceSettingsPrefKey, jsonEncode(settings.toJson()));
+  }
+}
+
+class VoiceSettings {
+  const VoiceSettings({this.useCloudAsr = false, this.convertWavToMp3 = false});
+  final bool useCloudAsr;
+  final bool convertWavToMp3;
+
+  VoiceSettings copyWith({bool? useCloudAsr, bool? convertWavToMp3}) =>
+      VoiceSettings(
+        useCloudAsr: useCloudAsr ?? this.useCloudAsr,
+        convertWavToMp3: convertWavToMp3 ?? this.convertWavToMp3,
+      );
+
+  Map<String, Object?> toJson() => {
+    'useCloudAsr': useCloudAsr,
+    'convertWavToMp3': convertWavToMp3,
+  };
+
+  factory VoiceSettings.fromJson(Map<String, dynamic> json) => VoiceSettings(
+    useCloudAsr: json['useCloudAsr'] as bool? ?? false,
+    convertWavToMp3: json['convertWavToMp3'] as bool? ?? false,
+  );
 }

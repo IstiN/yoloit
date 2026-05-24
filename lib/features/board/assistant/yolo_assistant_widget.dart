@@ -270,10 +270,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _inputController.clear();
 
     // For voice messages, prepend context about ASR origin
-    final text = mirrorToOverlay
-        ? '[Voice message — transcribed via speech recognition, '
-            'may contain recognition errors]\n$rawText'
-        : rawText;
+    final text =
+        mirrorToOverlay
+            ? '[Voice message — transcribed via speech recognition, '
+                'may contain recognition errors]\n$rawText'
+            : rawText;
 
     final msgs = _messages;
     final userMessageId = 'msg-${DateTime.now().millisecondsSinceEpoch}';
@@ -2140,11 +2141,24 @@ $messagesJson
     });
     _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
 
+    final voiceSettings =
+        await CloudLlmSettingsService.instance.loadVoiceSettings();
+
     var shouldSend = false;
     try {
       if (path == null || path.isEmpty) return;
-      final transcript = await LocalAiModelsService.instance
-          .transcribeWithSelectedAsr(path);
+
+      String transcript;
+      if (voiceSettings.useCloudAsr) {
+        transcript = await _transcribeWithCloudLlm(
+          path,
+          voiceSettings.convertWavToMp3,
+        );
+      } else {
+        transcript = await LocalAiModelsService.instance
+            .transcribeWithSelectedAsr(path);
+      }
+
       if (!mounted) return;
       final text = transcript.trim();
       if (text.isNotEmpty) {
@@ -2170,7 +2184,7 @@ $messagesJson
           try {
             await f.delete();
           } on FileSystemException {
-            // ignore cleanup failure for temp recording
+            // ignore
           }
         }
       }
@@ -2185,6 +2199,106 @@ $messagesJson
         if (!mounted) return;
       }
       await _sendMessage(mirrorToOverlay: mirrorToOverlay);
+    }
+  }
+
+  /// Sends audio file to the active cloud LLM for transcription.
+  /// Returns the transcribed text.
+  Future<String> _transcribeWithCloudLlm(
+    String audioPath,
+    bool convertToMp3,
+  ) async {
+    String filePath = audioPath;
+    var format = 'wav';
+
+    if (convertToMp3) {
+      try {
+        final mp3Path = audioPath.replaceAll('.wav', '.mp3');
+        final result = await Process.run('ffmpeg', [
+          '-i',
+          audioPath,
+          '-codec:a',
+          'libmp3lame',
+          '-qscale:a',
+          '4',
+          '-y',
+          mp3Path,
+        ]);
+        if (result.exitCode == 0 && File(mp3Path).existsSync()) {
+          filePath = mp3Path;
+          format = 'mp3';
+        }
+      } catch (_) {
+        // ffmpeg not available, use WAV
+      }
+    }
+
+    try {
+      final config = await CloudLlmSettingsService.instance.loadActiveConfig();
+      if (config == null || !config.isValid) {
+        throw StateError(
+          'No active cloud provider configured. Go to Settings → Cloud Providers to add one.',
+        );
+      }
+
+      final audioBytes = await File(filePath).readAsBytes();
+      final audioBase64 = base64Encode(audioBytes);
+
+      final url =
+          '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+
+      final body = jsonEncode({
+        'model': config.model,
+        'messages': [
+          {
+            'role': 'user',
+            'content': [
+              {
+                'type': 'input_audio',
+                'input_audio': {'data': audioBase64, 'format': format},
+              },
+              {
+                'type': 'text',
+                'text':
+                    'Transcribe this audio. Output only the transcribed text, nothing else. No timestamps, no speaker labels.',
+              },
+            ],
+          },
+        ],
+        'max_tokens': 512,
+        'temperature': 0.0,
+      });
+
+      final request = await HttpClient().postUrl(Uri.parse(url));
+      request.headers.set('Authorization', 'Bearer ${config.apiKey}');
+      request.headers.set('Content-Type', 'application/json; charset=utf-8');
+      for (final entry in config.extraHeaders.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
+      request.add(utf8.encode(body));
+
+      final response = await request.close();
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode != 200) {
+        throw StateError(
+          'Cloud ASR error (${response.statusCode}): $responseBody',
+        );
+      }
+
+      final json = jsonDecode(responseBody) as Map<String, dynamic>;
+      final choices = json['choices'] as List?;
+      if (choices == null || choices.isEmpty) return '';
+      final message =
+          (choices[0] as Map<String, dynamic>)['message']
+              as Map<String, dynamic>?;
+      return (message?['content'] as String? ?? '').trim();
+    } finally {
+      if (filePath != audioPath && File(filePath).existsSync()) {
+        try {
+          await File(filePath).delete();
+        } catch (_) {}
+      }
     }
   }
 
