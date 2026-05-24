@@ -995,6 +995,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             Positioned(
                               left: 0,
                               right: 0,
+                              top: 0,
                               bottom: 22,
                               child: _YoloBadgeWithChat(),
                             ),
@@ -5939,17 +5940,16 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       },
       child: SizedBox(
         width: double.infinity,
-        height: 540,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 40),
-                child: _buildVoiceOverlay(context),
-              ),
+            // ── Voice overlay (top-right, near minimap/fit buttons) ──
+            Positioned(
+              top: 60,
+              right: 12,
+              child: _buildVoiceOverlay(context),
             ),
+            // ── Chat tab + panel (bottom-right) ──
             Align(
               alignment: Alignment.bottomRight,
               child: Row(
@@ -6086,6 +6086,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       particleScale: 0.80,
       responseFontSize: 15.0,
       borderSpeed: 1700,
+      showIdleHint: false,
     );
   }
 

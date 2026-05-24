@@ -31,6 +31,7 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.particleScale = 0.3,
     this.responseFontSize = 18.0,
     this.borderSpeed = 1200,
+    this.showIdleHint = true,
   });
 
   final String status;
@@ -56,6 +57,7 @@ class YoloVoiceOverlay extends StatefulWidget {
   final double particleScale;
   final double responseFontSize;
   final int borderSpeed;
+  final bool showIdleHint;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -79,8 +81,8 @@ enum _VS {
       };
 
   int get minMs => switch (this) {
-        processing => 1800,
-        thinking => 1400,
+        processing => 600,
+        thinking => 500,
         responding => 3000,
         _ => 0,
       };
@@ -345,7 +347,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         right: 18,
                         left: 200,
                         top: 20,
-                        bottom: 56,
+                      bottom: 36,
                       ),
                       child: _ResponseCard(
                         response: widget.response,
@@ -415,11 +417,13 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   Widget _textContent() => KeyedSubtree(
         key: ValueKey(_shown),
         child: switch (_shown) {
-          _VS.idle => const _TextBlock(
-              primary: 'Click or speak to start',
-              primaryColor: Color(0xFFB5B6C8),
-              primarySize: 17,
-            ),
+          _VS.idle => widget.showIdleHint
+              ? const _TextBlock(
+                  primary: 'Click or speak to start',
+                  primaryColor: Color(0xFFB5B6C8),
+                  primarySize: 17,
+                )
+              : const SizedBox.shrink(),
           _VS.listening => const _TextBlock(
               primary: 'Recording...',
               primaryColor: Color(0xFFCCCCE0),
@@ -646,9 +650,9 @@ class _ResponseCardState extends State<_ResponseCard>
         : fullText;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
       children: [
-        AnimatedBuilder(
+        Expanded(
+          child: AnimatedBuilder(
           animation: _borderAnim,
           builder: (ctx, child) => CustomPaint(
             painter: widget.streaming
@@ -692,7 +696,8 @@ class _ResponseCardState extends State<_ResponseCard>
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        ),
+        const SizedBox(height: 8),
         const Padding(
           padding: EdgeInsets.only(left: 18),
           child: _GlowText(
