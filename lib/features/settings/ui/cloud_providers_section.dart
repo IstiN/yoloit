@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
+import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 
 /// Settings section for managing cloud LLM provider configs.
@@ -18,6 +19,7 @@ class CloudProvidersSection extends StatefulWidget {
 class _CloudProvidersSectionState extends State<CloudProvidersSection> {
   List<CloudLlmConfig> _configs = [];
   String? _activeConfigId;
+  String _assistantProviderType = 'local';
   VoiceSettings _voiceSettings = const VoiceSettings();
   bool _loading = true;
 
@@ -31,11 +33,14 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     final configs = await CloudLlmSettingsService.instance.loadConfigs();
     final activeId =
         await CloudLlmSettingsService.instance.loadActiveConfigId();
+    final providerType =
+        await CloudLlmSettingsService.instance.loadAssistantProviderType();
     final vs = await CloudLlmSettingsService.instance.loadVoiceSettings();
     if (!mounted) return;
     setState(() {
       _configs = configs;
       _activeConfigId = activeId;
+      _assistantProviderType = providerType;
       _voiceSettings = vs;
       _loading = false;
     });
@@ -48,6 +53,18 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     );
     if (!mounted) return;
     setState(() => _activeConfigId = id);
+  }
+
+  Future<void> _setChatProvider(String providerId) async {
+    if (providerId == 'local') {
+      await CloudLlmSettingsService.instance.saveAssistantProviderType('local');
+      if (!mounted) return;
+      setState(() => _assistantProviderType = 'local');
+      return;
+    }
+    await _setActiveConfig(providerId);
+    if (!mounted) return;
+    setState(() => _assistantProviderType = 'cloud');
   }
 
   Future<void> _setProviderModel(String configId, String modelId) async {
@@ -99,8 +116,24 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     await CloudLlmSettingsService.instance.removeConfig(id);
     if (id == _activeConfigId) {
       await CloudLlmSettingsService.instance.saveActiveConfigId(null);
+      if (_assistantProviderType == 'cloud') {
+        await CloudLlmSettingsService.instance.saveAssistantProviderType(
+          'local',
+        );
+      }
     }
     await _load();
+  }
+
+  String _localModelLabel(LocalAiModelKind kind) {
+    final service = LocalAiModelsService.instance;
+    final selectedId =
+        kind == LocalAiModelKind.chat
+            ? service.selectedChatModelId
+            : service.selectedAsrModelId;
+    final definition =
+        service.supportedModels.where((m) => m.id == selectedId).firstOrNull;
+    return definition?.displayName ?? selectedId;
   }
 
   void _showAddPresetDialog() {
@@ -427,6 +460,13 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
             );
           }),
+        const SizedBox(height: 20),
+        Text(
+          'Local Provider',
+          style: textStyle?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        const AiModelsSection(),
         const SizedBox(height: 24),
         Text(
           'Model Routing',
@@ -434,9 +474,11 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
         ),
         const SizedBox(height: 8),
         ...(() {
-          final chatProviderId =
+          final cloudChatProviderId =
               _configById(_activeConfigId)?.id ??
               (_configs.isNotEmpty ? _configs.first.id : null);
+          final chatProviderId =
+              _assistantProviderType == 'local' ? 'local' : cloudChatProviderId;
           final chatConfig = _configById(chatProviderId);
           final chatModelOptions = _modelOptionsForConfig(chatProviderId);
           final chatModelValue =
@@ -451,59 +493,72 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                 isDense: true,
                 border: OutlineInputBorder(),
               ),
-              items:
-                  _configs
-                      .map(
-                        (c) => DropdownMenuItem<String>(
-                          value: c.id,
-                          child: Text(
-                            c.name,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      )
-                      .toList(),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: 'local',
+                  child: Text('Local Provider', style: TextStyle(fontSize: 13)),
+                ),
+                ..._configs.map(
+                  (c) => DropdownMenuItem<String>(
+                    value: c.id,
+                    child: Text(c.name, style: const TextStyle(fontSize: 13)),
+                  ),
+                ),
+              ],
               onChanged: (v) {
                 if (v == null) return;
-                _setActiveConfig(v);
+                _setChatProvider(v);
               },
             ),
             const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: chatModelValue,
-                    hint: const Text('Select chat model'),
-                    decoration: const InputDecoration(
-                      labelText: 'Chat model',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    items:
-                        chatModelOptions
-                            .map(
-                              (m) => DropdownMenuItem<String>(
-                                value: m.id,
-                                child: Text(
-                                  m.label,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                    onChanged: (v) {
-                      if (v == null || chatProviderId == null) return;
-                      _setProviderModel(chatProviderId, v);
-                    },
-                  ),
+                  child:
+                      chatProviderId == 'local'
+                          ? InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Chat model',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(
+                              _localModelLabel(LocalAiModelKind.chat),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          )
+                          : DropdownButtonFormField<String>(
+                            value: chatModelValue,
+                            hint: const Text('Select chat model'),
+                            decoration: const InputDecoration(
+                              labelText: 'Chat model',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                            ),
+                            items:
+                                chatModelOptions
+                                    .map(
+                                      (m) => DropdownMenuItem<String>(
+                                        value: m.id,
+                                        child: Text(
+                                          m.label,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                            onChanged: (v) {
+                              if (v == null || chatProviderId == null) return;
+                              _setProviderModel(chatProviderId, v);
+                            },
+                          ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined, size: 18),
                   tooltip: 'Chat provider settings',
                   onPressed:
-                      chatConfig == null
+                      chatConfig == null || chatProviderId == 'local'
                           ? null
                           : () => _showEditConfigDialog(chatConfig),
                 ),
@@ -517,23 +572,64 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           style: textStyle?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        CheckboxListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          title: const Text(
-            'Use cloud provider for ASR',
-            style: TextStyle(fontSize: 13),
-          ),
-          subtitle: const Text(
-            'When off, local ASR model is used.',
-            style: TextStyle(fontSize: 11),
-          ),
-          value: _voiceSettings.useCloudAsr,
-          onChanged:
-              (v) => _setVoiceSettings(
-                _voiceSettings.copyWith(useCloudAsr: v ?? false),
+        ...(() {
+          final asrProviderValue =
+              _voiceSettings.useCloudAsr ? _effectiveAsrConfigId() : 'local';
+          return <Widget>[
+            DropdownButtonFormField<String>(
+              value: asrProviderValue,
+              decoration: const InputDecoration(
+                labelText: 'ASR provider',
+                isDense: true,
+                border: OutlineInputBorder(),
               ),
-        ),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: 'local',
+                  child: Text('Local Provider', style: TextStyle(fontSize: 13)),
+                ),
+                ..._configs.map(
+                  (c) => DropdownMenuItem<String>(
+                    value: c.id,
+                    child: Text(c.name, style: const TextStyle(fontSize: 13)),
+                  ),
+                ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                if (v == 'local') {
+                  _setVoiceSettings(
+                    _voiceSettings.copyWith(
+                      useCloudAsr: false,
+                      useChatModelForCloudAsr: true,
+                    ),
+                  );
+                } else {
+                  _setVoiceSettings(
+                    _voiceSettings.copyWith(
+                      useCloudAsr: true,
+                      useChatModelForCloudAsr: false,
+                      cloudAsrConfigId: v,
+                    ),
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            if (!_voiceSettings.useCloudAsr)
+              InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'ASR model',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                child: Text(
+                  _localModelLabel(LocalAiModelKind.asr),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+          ];
+        })(),
         if (_voiceSettings.useCloudAsr) ...[
           CheckboxListTile(
             dense: true,
@@ -551,8 +647,10 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           ...(() {
             final asrConfigId =
                 _voiceSettings.useChatModelForCloudAsr
-                    ? (_configById(_activeConfigId)?.id ??
-                        (_configs.isNotEmpty ? _configs.first.id : null))
+                    ? (_assistantProviderType == 'local'
+                        ? null
+                        : (_configById(_activeConfigId)?.id ??
+                            (_configs.isNotEmpty ? _configs.first.id : null)))
                     : _effectiveAsrConfigId();
             final asrOptions = _modelOptionsForConfig(asrConfigId);
             final asrOptionsWithSelected = <({String id, String label})>[
@@ -572,43 +670,14 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                     ? _voiceSettings.cloudAsrModel
                     : null;
             return <Widget>[
-              if (!_voiceSettings.useChatModelForCloudAsr) ...[
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: asrConfigId,
-                  decoration: const InputDecoration(
-                    labelText: 'ASR provider',
-                    isDense: true,
-                    border: OutlineInputBorder(),
-                  ),
-                  items:
-                      _configs
-                          .map(
-                            (c) => DropdownMenuItem<String>(
-                              value: c.id,
-                              child: Text(
-                                c.name,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    _setVoiceSettings(
-                      _voiceSettings.copyWith(
-                        cloudAsrConfigId: v,
-                        cloudAsrModel: _voiceSettings.cloudAsrModel,
-                      ),
-                    );
-                  },
-                ),
-              ],
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: asrValue,
                 hint: Text(
-                  _configById(asrConfigId)?.model ?? 'Select ASR model',
+                  _configById(asrConfigId)?.model ??
+                      (_assistantProviderType == 'local'
+                          ? _localModelLabel(LocalAiModelKind.chat)
+                          : 'Select ASR model'),
                   style: const TextStyle(fontSize: 13),
                 ),
                 decoration: const InputDecoration(
@@ -663,13 +732,6 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                 ),
           ),
         ],
-        const SizedBox(height: 20),
-        Text(
-          'Local Provider',
-          style: textStyle?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        const AiModelsSection(),
       ],
     );
   }
