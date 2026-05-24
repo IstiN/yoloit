@@ -216,7 +216,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   };
 
   Alignment get _orbAlign =>
-      _isResponse ? const Alignment(-0.48, 0.44) : const Alignment(0.0, -0.10);
+      _isResponse ? const Alignment(0.0, 0.58) : const Alignment(0.0, -0.10);
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -348,21 +348,20 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     child: IgnorePointer(
                       ignoring: !_isResponse,
                       child: Align(
-                        alignment: const Alignment(0.18, -0.42),
+                        alignment: Alignment.topCenter,
                         child: Padding(
-                          padding: const EdgeInsets.only(
-                            right: 58,
-                            left: 112,
-                            top: 16,
-                            bottom: 118,
-                          ),
-                          child: _ResponseCard(
-                            response: widget.response,
-                            streaming: widget.status == 'responding',
-                            animate: widget.animate,
-                            fontSize: widget.responseFontSize,
-                            borderSpeed: widget.borderSpeed,
-                            actionLabel: widget.responseActionLabel,
+                          padding: const EdgeInsets.only(top: 34),
+                          child: SizedBox(
+                            width: 470,
+                            height: 250,
+                            child: _ResponseCard(
+                              response: widget.response,
+                              streaming: widget.status == 'responding',
+                              animate: widget.animate,
+                              fontSize: widget.responseFontSize,
+                              borderSpeed: widget.borderSpeed,
+                              actionLabel: widget.responseActionLabel,
+                            ),
                           ),
                         ),
                       ),

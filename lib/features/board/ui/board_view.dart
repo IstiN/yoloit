@@ -5945,13 +5945,10 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // ── Voice overlay (left of YOLO tab, chat overlaps when open) ──
+            // ── Voice overlay (bottom center, chat overlaps when open) ──
             Align(
-              alignment: Alignment.bottomRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 0, bottom: 0),
-                child: _buildVoiceOverlay(context),
-              ),
+              alignment: Alignment.bottomCenter,
+              child: _buildVoiceOverlay(context),
             ),
             // ── Chat tab + panel (bottom-right, on top of overlay) ──
             Align(
