@@ -233,7 +233,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   double get _responseCardBottomPadding {
     final orbCenterY = ((_orbAlign.y + 1) * 0.5) * _kH;
     final orbRadius = (_orbSize * widget.orbScale) * 0.5;
-    final cardBottomY = orbCenterY - orbRadius + 16;
+    final cardBottomY = orbCenterY - orbRadius + 26;
     return (_kH - cardBottomY).clamp(44.0, 180.0);
   }
 
@@ -729,13 +729,10 @@ class _ResponseCardState extends State<_ResponseCard>
               animation: _borderAnim,
               builder:
                   (ctx, child) => CustomPaint(
-                    painter:
-                        widget.streaming
-                            ? _RunningBorderPainter(
-                              progress: _borderAnim.value,
-                              radius: 28,
-                            )
-                            : null,
+                    painter: _RunningBorderPainter(
+                      progress: widget.streaming ? _borderAnim.value : 0.68,
+                      radius: 28,
+                    ),
                     child: child,
                   ),
               child: AnimatedContainer(

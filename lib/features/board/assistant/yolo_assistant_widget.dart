@@ -97,6 +97,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   _AssistantToolExecutor? _wrappedExecutor;
   ChatProvider? _chatProvider;
   String? _chatProviderType; // tracks current provider type for re-creation
+  Map<String, dynamic>? _pendingAsrDebug;
   bool _isRecordingMic = false;
   bool _isStartingMic = false;
   bool _stopMicAfterStart = false;
@@ -269,14 +270,6 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     widget.onUpdateState(merged);
   }
 
-  Map<String, dynamic>? _takePendingAsrDebug() {
-    final raw = widget.panel.state['lastAsrDebug'];
-    if (raw is! Map) return null;
-    final asr = Map<String, dynamic>.from(raw);
-    _updateState({'lastAsrDebug': null});
-    return asr;
-  }
-
   Future<void> _sendMessage({bool mirrorToOverlay = false}) async {
     if (_isGeneratingReply) return;
     final rawText = _inputController.text.trim();
@@ -350,7 +343,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       );
     }
 
-    final asrDebug = mirrorToOverlay ? _takePendingAsrDebug() : null;
+    final asrDebug = mirrorToOverlay ? _pendingAsrDebug : null;
+    _pendingAsrDebug = null;
 
     // ── Debug session ──────────────────────────────────────────────────────
     final dbg = <String, dynamic>{
@@ -366,6 +360,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       _messageDraft = msgs;
       final runtimeContext = _runtimeContext();
       final calledTools = <String>[];
+      final overlayToolLogs = <String>[];
 
       // Create or reuse the wrapped executor (persistent across messages).
       _wrappedExecutor ??= _AssistantToolExecutor(
@@ -390,6 +385,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         bool success,
       ) {
         calledTools.add(toolCommand);
+        final short = _compactToolResult(toolCommand, result, success);
+        overlayToolLogs.add(short);
         final statePatch = _toolTargetPatchIfNeeded(
           toolCommand: toolCommand,
           arguments: arguments,
@@ -397,6 +394,15 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         );
         if (statePatch.isNotEmpty) {
           _updateState(statePatch);
+        }
+        if (mirrorToOverlay && mounted) {
+          _syncOverlayState(
+            draftOverride: '',
+            forcedStatus: 'responding',
+            responseOverride: _composeOverlayResponse('', overlayToolLogs),
+            promptOverride: overlayPrompt,
+            hiddenOverride: false,
+          );
         }
         (dbg['toolCalls'] as List<Map<String, dynamic>>).add({
           'name': toolCommand,
@@ -485,6 +491,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
                 assistantMessageId: assistantMessageId,
                 content: emitted.trim(),
                 mirrorToOverlay: mirrorToOverlay,
+                overlayToolLogs: overlayToolLogs,
               );
             }
           case ChatEventType.toolStart:
@@ -522,6 +529,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
                   assistantMessageId: assistantMessageId,
                   content: cleaned,
                   mirrorToOverlay: mirrorToOverlay,
+                  overlayToolLogs: overlayToolLogs,
                 );
               }
             }
@@ -546,13 +554,17 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           assistantMessageId: assistantMessageId,
           content: cleanedFinal,
           mirrorToOverlay: mirrorToOverlay,
+          overlayToolLogs: overlayToolLogs,
         );
       }
       if (mirrorToOverlay) {
         _syncOverlayState(
           draftOverride: '',
           forcedStatus: 'output',
-          responseOverride: cleanedFinal,
+          responseOverride: _composeOverlayResponse(
+            cleanedFinal,
+            overlayToolLogs,
+          ),
           promptOverride: overlayPrompt,
           hiddenOverride: false,
         );
@@ -565,6 +577,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         assistantMessageId: assistantMessageId,
         content: _formatAssistantError(e),
         mirrorToOverlay: mirrorToOverlay,
+        overlayToolLogs: const [],
       );
       if (mirrorToOverlay) {
         _syncOverlayState(
@@ -600,6 +613,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     required String assistantMessageId,
     required String content,
     bool mirrorToOverlay = false,
+    List<String> overlayToolLogs = const [],
   }) {
     final current = _messageDraft ?? _messages;
     final idx = current.indexWhere((m) => m['id'] == assistantMessageId);
@@ -612,11 +626,23 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _updateState({
       'messages': current,
       if (mirrorToOverlay && !_voiceOverlayHidden) ...{
-        'voiceResponse': content,
+        'voiceResponse': _composeOverlayResponse(content, overlayToolLogs),
         'assistantStatus': _isGeneratingReply ? 'responding' : 'output',
       },
     });
     _scrollToBottom();
+  }
+
+  String _composeOverlayResponse(
+    String assistantContent,
+    List<String> toolLogs,
+  ) {
+    final text = assistantContent.trim();
+    if (toolLogs.isEmpty) return text;
+    final lines = toolLogs.map((t) => '- $t').join('\n');
+    final toolsSection = '### Tools\n$lines';
+    if (text.isEmpty) return toolsSection;
+    return '$text\n\n$toolsSection';
   }
 
   BoardDocument? _currentBoard() =>
@@ -2241,17 +2267,15 @@ $messagesJson
       );
     } finally {
       asrStopwatch.stop();
-      _updateState({
-        'lastAsrDebug': {
-          'mode': asrMode,
-          'status': asrStatus,
-          'startedAt': asrStartedAt,
-          'completedAt': DateTime.now().toIso8601String(),
-          'durationMs': asrStopwatch.elapsedMilliseconds,
-          'transcriptChars': asrTranscriptChars,
-          if (asrError != null) 'error': asrError,
-        },
-      });
+      _pendingAsrDebug = {
+        'mode': asrMode,
+        'status': asrStatus,
+        'startedAt': asrStartedAt,
+        'completedAt': DateTime.now().toIso8601String(),
+        'durationMs': asrStopwatch.elapsedMilliseconds,
+        'transcriptChars': asrTranscriptChars,
+        if (asrError != null) 'error': asrError,
+      };
       if (path != null && path.isNotEmpty) {
         final f = File(path);
         if (f.existsSync()) {
