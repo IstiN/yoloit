@@ -5938,8 +5938,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           child: Opacity(opacity: _entranceFade.value, child: child),
         );
       },
-      child: SizedBox(
-        width: double.infinity,
+      child: SizedBox.expand(
         child: Stack(
           clipBehavior: Clip.none,
           children: [
