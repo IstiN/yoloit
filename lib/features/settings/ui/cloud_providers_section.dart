@@ -62,6 +62,43 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     setState(() => _voiceSettings = s);
   }
 
+  CloudLlmConfig? _configById(String? id) {
+    if (id == null || id.isEmpty) return null;
+    return _configs.where((c) => c.id == id).firstOrNull;
+  }
+
+  CloudLlmPreset? _presetById(String? id) {
+    if (id == null || id.isEmpty) return null;
+    return kCloudLlmPresets.where((p) => p.id == id).firstOrNull;
+  }
+
+  String? _effectiveAsrConfigId() {
+    final fromVoice = _voiceSettings.cloudAsrConfigId;
+    if (_configById(fromVoice) != null) return fromVoice;
+    if (_configById(_activeConfigId) != null) return _activeConfigId;
+    return _configs.isNotEmpty ? _configs.first.id : null;
+  }
+
+  List<({String id, String label})> _asrModelOptionsForConfig(
+    String? configId,
+  ) {
+    final cfg = _configById(configId);
+    if (cfg == null) return const [];
+    final preset = _presetById(cfg.id);
+    final byId = <String, String>{};
+    byId[cfg.model] = cfg.model;
+    if (preset != null) {
+      for (final model in preset.models) {
+        byId[model.id] = model.name;
+      }
+    }
+    final selected = _voiceSettings.cloudAsrModel;
+    if (selected != null && selected.trim().isNotEmpty) {
+      byId.putIfAbsent(selected.trim(), () => selected.trim());
+    }
+    return byId.entries.map((e) => (id: e.key, label: e.value)).toList();
+  }
+
   Future<void> _deleteConfig(String id) async {
     await CloudLlmSettingsService.instance.removeConfig(id);
     if (id == _activeConfigId) {
@@ -402,8 +439,8 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.edit, size: 16),
-                      tooltip: 'Edit',
+                      icon: const Icon(Icons.settings_outlined, size: 16),
+                      tooltip: 'Provider settings',
                       onPressed: () => _showEditConfigDialog(config),
                     ),
                     IconButton(
@@ -417,6 +454,26 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
             );
           }),
         const SizedBox(height: 24),
+        Text(
+          'Model Routing',
+          style: textStyle?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
+            'Chat model',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            _configById(_activeConfigId)?.model ??
+                'Select an active provider above',
+            style: const TextStyle(fontSize: 12),
+          ),
+          trailing: const Icon(Icons.chat_bubble_outline, size: 16),
+        ),
+        const SizedBox(height: 8),
         Text(
           'Voice / ASR Settings',
           style: textStyle?.copyWith(fontWeight: FontWeight.w600),
@@ -439,6 +496,85 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                 _voiceSettings.copyWith(useCloudAsr: v ?? false),
               ),
         ),
+        if (_voiceSettings.useCloudAsr) ...[
+          ...(() {
+            final asrConfigId = _effectiveAsrConfigId();
+            final asrOptions = _asrModelOptionsForConfig(asrConfigId);
+            final asrValue =
+                asrOptions.any((m) => m.id == _voiceSettings.cloudAsrModel)
+                    ? _voiceSettings.cloudAsrModel
+                    : null;
+            return <Widget>[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: asrConfigId,
+                decoration: const InputDecoration(
+                  labelText: 'ASR provider',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                items:
+                    _configs
+                        .map(
+                          (c) => DropdownMenuItem<String>(
+                            value: c.id,
+                            child: Text(
+                              c.name,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  _setVoiceSettings(
+                    _voiceSettings.copyWith(
+                      cloudAsrConfigId: v,
+                      cloudAsrModel: _voiceSettings.cloudAsrModel,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: asrValue,
+                hint: Text(
+                  _configById(asrConfigId)?.model ?? 'Select ASR model',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'ASR model',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                items:
+                    asrOptions
+                        .map(
+                          (m) => DropdownMenuItem<String>(
+                            value: m.id,
+                            child: Text(
+                              m.label,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                onChanged:
+                    (v) => _setVoiceSettings(
+                      _voiceSettings.copyWith(cloudAsrModel: v),
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'ASR uses the selected provider/model above. If model is not set, provider default model is used.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colors.onSurface.withAlpha(160),
+                ),
+              ),
+            ];
+          })(),
+        ],
         CheckboxListTile(
           dense: true,
           contentPadding: EdgeInsets.zero,

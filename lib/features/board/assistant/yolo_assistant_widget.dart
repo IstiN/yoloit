@@ -313,8 +313,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     });
     _receivedAssistantToken = false;
     // For overlay display: show mic icon when audio sent directly.
-    final overlayPrompt =
-        audioContent != null ? '🎤 Voice message' : rawText;
+    final overlayPrompt = audioContent != null ? '🎤 Voice message' : rawText;
     _updateState({
       'messages': msgs,
       if (mirrorToOverlay) ...{
@@ -2173,28 +2172,19 @@ $messagesJson
       if (path == null || path.isEmpty) return;
 
       if (voiceSettings.useCloudAsr) {
-        // ── Cloud direct: send audio to LLM without transcription ───────────
-        // Prepare audio content, set a placeholder display text, and let
-        // _sendMessage forward the audio directly to the cloud LLM.
-        final (audioContent, cleanedPath) = await _prepareAudioContent(
-          path,
-          voiceSettings.convertWavToMp3,
-        );
-        if (audioContent != null) {
-          if (!mounted) return;
-          _pendingAudioContent = audioContent;
-          // Display text shown in chat UI (no voice prefix needed — audio goes direct).
-          _inputController.text = '🎤';
-          _inputController.selection = TextSelection.collapsed(offset: 1);
+        // ── Cloud ASR: transcribe with configured cloud provider/model ───────
+        final transcript = await _transcribeWithCloudAsr(path, voiceSettings);
+        if (!mounted) return;
+        final text = transcript.trim();
+        if (text.isNotEmpty) {
+          final current = _inputController.text.trim();
+          _inputController.text =
+              current.isEmpty ? text : '$current ${text.trim()}';
+          _inputController.selection = TextSelection.collapsed(
+            offset: _inputController.text.length,
+          );
+          _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
           shouldSend = sendAfterTranscription;
-        }
-        // Clean up converted file (original is cleaned in finally block).
-        if (cleanedPath != null &&
-            cleanedPath != path &&
-            File(cleanedPath).existsSync()) {
-          try {
-            await File(cleanedPath).delete();
-          } catch (_) {}
         }
       } else {
         // ── Local ASR: transcribe locally then send text ─────────────────
@@ -2248,41 +2238,147 @@ $messagesJson
     }
   }
 
-  /// Reads the audio file, optionally converts WAV→MP3 via ffmpeg,
-  /// and returns (OpenAI-style content list, path-of-encoded-file).
-  /// Returns (null, null) on failure.
-  Future<(List<Map<String, Object?>>?, String?)> _prepareAudioContent(
+  Future<String> _transcribeWithCloudAsr(
+    String audioPath,
+    VoiceSettings voiceSettings,
+  ) async {
+    final settingsService = CloudLlmSettingsService.instance;
+    final explicitConfigId = voiceSettings.cloudAsrConfigId?.trim();
+    CloudLlmConfig? config;
+    if (explicitConfigId != null && explicitConfigId.isNotEmpty) {
+      config = await settingsService.loadConfigById(explicitConfigId);
+    }
+    config ??= await settingsService.loadActiveConfig();
+    if (config == null || !config.isValid) {
+      throw StateError(
+        'Cloud ASR is enabled but cloud provider is not configured. '
+        'Open Settings → Cloud Providers.',
+      );
+    }
+
+    final model =
+        voiceSettings.cloudAsrModel?.trim().isNotEmpty == true
+            ? voiceSettings.cloudAsrModel!.trim()
+            : config.model.trim();
+    if (model.isEmpty) {
+      throw StateError('Cloud ASR model is empty.');
+    }
+
+    final (uploadPath, mimeType) = await _prepareTranscriptionUpload(
+      audioPath,
+      voiceSettings.convertWavToMp3,
+    );
+    try {
+      return await _transcribeViaCloudEndpoint(
+        config: config,
+        model: model,
+        filePath: uploadPath,
+        mimeType: mimeType,
+      );
+    } finally {
+      if (uploadPath != audioPath && File(uploadPath).existsSync()) {
+        try {
+          await File(uploadPath).delete();
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<(String, String)> _prepareTranscriptionUpload(
     String audioPath,
     bool convertToMp3,
   ) async {
     String filePath = audioPath;
-    var format = 'wav';
+    var mimeType = 'audio/wav';
 
     if (convertToMp3) {
       try {
         final mp3Path = audioPath.replaceAll('.wav', '.mp3');
         final result = await Process.run('ffmpeg', [
-          '-i', audioPath, '-codec:a', 'libmp3lame', '-qscale:a', '4', '-y', mp3Path,
+          '-i',
+          audioPath,
+          '-codec:a',
+          'libmp3lame',
+          '-qscale:a',
+          '4',
+          '-y',
+          mp3Path,
         ]);
         if (result.exitCode == 0 && File(mp3Path).existsSync()) {
           filePath = mp3Path;
-          format = 'mp3';
+          mimeType = 'audio/mpeg';
         }
       } catch (_) {}
     }
 
+    if (!File(filePath).existsSync()) {
+      throw StateError('Recorded audio file not found: $filePath');
+    }
+    return (filePath, mimeType);
+  }
+
+  Future<String> _transcribeViaCloudEndpoint({
+    required CloudLlmConfig config,
+    required String model,
+    required String filePath,
+    required String mimeType,
+  }) async {
+    final normalizedBase = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    final uri = Uri.parse('$normalizedBase/audio/transcriptions');
+    final boundary = '----yoloit-${DateTime.now().microsecondsSinceEpoch}';
+    final fileName = filePath.split(Platform.pathSeparator).last;
+    final fileBytes = await File(filePath).readAsBytes();
+    final client = HttpClient();
     try {
-      final audioBytes = await File(filePath).readAsBytes();
-      final audioBase64 = base64Encode(audioBytes);
-      final content = <Map<String, Object?>>[
-        {
-          'type': 'input_audio',
-          'input_audio': {'data': audioBase64, 'format': format},
-        },
-      ];
-      return (content, filePath);
-    } catch (e) {
-      return (null, null);
+      final request = await client.postUrl(uri);
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'multipart/form-data; boundary=$boundary',
+      );
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer ${config.apiKey}',
+      );
+      for (final entry in config.extraHeaders.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
+
+      void writeString(String value) => request.add(utf8.encode(value));
+
+      writeString('--$boundary\r\n');
+      writeString('Content-Disposition: form-data; name="model"\r\n\r\n');
+      writeString('$model\r\n');
+
+      writeString('--$boundary\r\n');
+      writeString(
+        'Content-Disposition: form-data; name="file"; filename="$fileName"\r\n',
+      );
+      writeString('Content-Type: $mimeType\r\n\r\n');
+      request.add(fileBytes);
+      writeString('\r\n');
+
+      writeString('--$boundary--\r\n');
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError(
+          'Cloud ASR failed (${response.statusCode}): '
+          '${body.length > 600 ? '${body.substring(0, 600)}…' : body}',
+        );
+      }
+
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        final text =
+            (decoded['text'] as String?) ??
+            (decoded['transcript'] as String?) ??
+            (decoded['output_text'] as String?);
+        if (text != null && text.trim().isNotEmpty) return text.trim();
+      }
+      throw StateError('Cloud ASR returned unexpected response: $body');
+    } finally {
+      client.close(force: true);
     }
   }
 

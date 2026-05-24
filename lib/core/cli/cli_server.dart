@@ -541,10 +541,12 @@ class CliServer {
         'ok': true,
         'useCloudAsr': settings.useCloudAsr,
         'convertWavToMp3': settings.convertWavToMp3,
+        'cloudAsrConfigId': settings.cloudAsrConfigId,
+        'cloudAsrModel': settings.cloudAsrModel,
       });
     }
 
-    // POST /api/voice-settings { useCloudAsr?, convertWavToMp3? }
+    // POST /api/voice-settings { useCloudAsr?, convertWavToMp3?, cloudAsrConfigId?, cloudAsrModel? }
     if (sub.isEmpty && method == 'POST') {
       final body = await _body(request);
       final current = await service.loadVoiceSettings();
@@ -552,12 +554,22 @@ class CliServer {
         useCloudAsr: body['useCloudAsr'] as bool? ?? current.useCloudAsr,
         convertWavToMp3:
             body['convertWavToMp3'] as bool? ?? current.convertWavToMp3,
+        cloudAsrConfigId:
+            body.containsKey('cloudAsrConfigId')
+                ? body['cloudAsrConfigId'] as String?
+                : current.cloudAsrConfigId,
+        cloudAsrModel:
+            body.containsKey('cloudAsrModel')
+                ? body['cloudAsrModel'] as String?
+                : current.cloudAsrModel,
       );
       await service.saveVoiceSettings(updated);
       return _json({
         'ok': true,
         'useCloudAsr': updated.useCloudAsr,
         'convertWavToMp3': updated.convertWavToMp3,
+        'cloudAsrConfigId': updated.cloudAsrConfigId,
+        'cloudAsrModel': updated.cloudAsrModel,
       });
     }
 

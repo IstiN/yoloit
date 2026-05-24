@@ -128,6 +128,11 @@ const _openRouterRecommendedModelIds = <String>[
   'google/gemini-3.1-flash-lite-preview',
   'mistralai/voxtral-small-24b-2507',
   'xiaomi/mimo-v2.5',
+  'google/chirp-3',
+  'qwen/qwen3-asr-flash-2026-02-10',
+  'mistralai/voxtral-mini-transcribe',
+  'openai/whisper-large-v3-turbo',
+  'openai/whisper-large-v3',
 ];
 
 const _openRouterDefaultModel = 'google/gemma-4-31b-it';
@@ -162,6 +167,17 @@ const kCloudLlmPresets = <CloudLlmPreset>[
         name: 'Voxtral Small 24B (Audio)',
       ),
       (id: 'xiaomi/mimo-v2.5', name: 'MiMo v2.5'),
+      (id: 'google/chirp-3', name: 'Google Chirp 3 (ASR)'),
+      (
+        id: 'qwen/qwen3-asr-flash-2026-02-10',
+        name: 'Qwen 3 ASR Flash (2026-02-10)',
+      ),
+      (
+        id: 'mistralai/voxtral-mini-transcribe',
+        name: 'Voxtral Mini Transcribe',
+      ),
+      (id: 'openai/whisper-large-v3-turbo', name: 'Whisper Large v3 Turbo'),
+      (id: 'openai/whisper-large-v3', name: 'Whisper Large v3'),
     ],
   ),
   CloudLlmPreset(
@@ -366,23 +382,48 @@ class CloudLlmSettingsService {
 }
 
 class VoiceSettings {
-  const VoiceSettings({this.useCloudAsr = false, this.convertWavToMp3 = false});
+  const VoiceSettings({
+    this.useCloudAsr = false,
+    this.convertWavToMp3 = false,
+    this.cloudAsrConfigId,
+    this.cloudAsrModel,
+  });
   final bool useCloudAsr;
   final bool convertWavToMp3;
+  final String? cloudAsrConfigId;
+  final String? cloudAsrModel;
 
-  VoiceSettings copyWith({bool? useCloudAsr, bool? convertWavToMp3}) =>
-      VoiceSettings(
-        useCloudAsr: useCloudAsr ?? this.useCloudAsr,
-        convertWavToMp3: convertWavToMp3 ?? this.convertWavToMp3,
-      );
+  VoiceSettings copyWith({
+    bool? useCloudAsr,
+    bool? convertWavToMp3,
+    Object? cloudAsrConfigId = _voiceSentinel,
+    Object? cloudAsrModel = _voiceSentinel,
+  }) => VoiceSettings(
+    useCloudAsr: useCloudAsr ?? this.useCloudAsr,
+    convertWavToMp3: convertWavToMp3 ?? this.convertWavToMp3,
+    cloudAsrConfigId:
+        cloudAsrConfigId == _voiceSentinel
+            ? this.cloudAsrConfigId
+            : cloudAsrConfigId as String?,
+    cloudAsrModel:
+        cloudAsrModel == _voiceSentinel
+            ? this.cloudAsrModel
+            : cloudAsrModel as String?,
+  );
 
   Map<String, Object?> toJson() => {
     'useCloudAsr': useCloudAsr,
     'convertWavToMp3': convertWavToMp3,
+    if (cloudAsrConfigId != null) 'cloudAsrConfigId': cloudAsrConfigId,
+    if (cloudAsrModel != null) 'cloudAsrModel': cloudAsrModel,
   };
 
   factory VoiceSettings.fromJson(Map<String, dynamic> json) => VoiceSettings(
     useCloudAsr: json['useCloudAsr'] as bool? ?? false,
     convertWavToMp3: json['convertWavToMp3'] as bool? ?? false,
+    cloudAsrConfigId: json['cloudAsrConfigId'] as String?,
+    cloudAsrModel: json['cloudAsrModel'] as String?,
   );
 }
+
+const _voiceSentinel = Object();
