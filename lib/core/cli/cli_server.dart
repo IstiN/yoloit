@@ -1017,13 +1017,34 @@ class CliServer {
     // POST /yolochat/stop
     if (sub.length == 1 && sub[0] == 'stop' && method == 'POST') {
       final body = await _body(request);
+      final boardHint = body['board'] as String?;
+      final panelHint = body['panel'] as String?;
+      final hasExplicitTarget =
+          (boardHint?.trim().isNotEmpty ?? false) ||
+          (panelHint?.trim().isNotEmpty ?? false);
+
+      if (!hasExplicitTarget) {
+        final stopped = await _stopAllActiveYoloChats();
+        if (stopped > 0) {
+          return _json({
+            'ok': true,
+            'message': 'Stopped $stopped active chat stream(s)',
+            'stopped': stopped,
+          });
+        }
+      }
+
       final target = _resolveYoloChatTarget(
         cubit,
-        boardHint: body['board'] as String?,
-        panelHint: body['panel'] as String?,
+        boardHint: boardHint,
+        panelHint: panelHint,
       );
       if (target == null) {
-        return _error('No board.chat panel found (or target not found)');
+        return _error(
+          hasExplicitTarget
+              ? 'No board.chat panel found (or target not found)'
+              : 'No active chat stream to stop',
+        );
       }
       return _panelAction(cubit, target.board, target.panel, {
         'action': 'stop',
@@ -1070,6 +1091,18 @@ class CliServer {
     }
 
     return _notFound('Unknown yolochat route');
+  }
+
+  Future<int> _stopAllActiveYoloChats() async {
+    var stopped = 0;
+    final ids = ChatSessionManager.instance.activeSessionIds;
+    for (final id in ids) {
+      final session = ChatSessionManager.instance.get(id);
+      if (session == null || !session.isProcessing) continue;
+      await session.stopStreaming();
+      stopped++;
+    }
+    return stopped;
   }
 
   ({BoardDocument board, BoardPanelInstance panel})? _resolveYoloChatTarget(

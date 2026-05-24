@@ -227,6 +227,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
           : Alignment(0.0, widget.orbAlignY);
 
   // Keep listening waves and status text visually coupled to the orb position.
+  double get _particleAlignY => (_orbAlign.y - 0.12).clamp(-0.95, 0.95);
   double get _waveAlignY => (_orbAlign.y - 0.06).clamp(-0.9, 0.95);
   double get _textAlignY => (_orbAlign.y + 0.34).clamp(-0.2, 0.95);
 
@@ -262,61 +263,64 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                  // ── orbit particles (thinking + processing) ────────────
-                  AnimatedOpacity(
-                    opacity: (_isThinking || _isSending) ? 1.0 : 0.0,
+                // ── orbit particles (thinking + processing) ────────────
+                AnimatedOpacity(
+                  opacity: (_isThinking || _isSending) ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 700),
+                  child: AnimatedAlign(
+                    alignment: Alignment(0, _particleAlignY),
                     duration: const Duration(milliseconds: 700),
-                    child: Center(
-                      child: _OrbitParticles(
-                        animate: (_isThinking || _isSending) && widget.animate,
-                        scale: widget.particleScale,
+                    curve: Curves.easeOutCubic,
+                    child: _OrbitParticles(
+                      animate: (_isThinking || _isSending) && widget.animate,
+                      scale: widget.particleScale,
+                    ),
+                  ),
+                ),
+
+                // ── upload beam (sending) — hidden, processing uses orb ──
+                const SizedBox.shrink(),
+
+                // ── waveform left (listening) ───────────────────────────
+                AnimatedOpacity(
+                  opacity: _isListening ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 600),
+                  child: Align(
+                    alignment: Alignment(-widget.waveSpread, _waveAlignY),
+                    child: SizedBox(
+                      width: widget.waveWidth,
+                      height: 80,
+                      child: _Waveform(
+                        animate: _isListening && widget.animate,
+                        flip: true,
+                        barCount: widget.waveBarCount,
+                        amplitude: widget.waveAmplitude,
+                        speed: widget.waveSpeed,
                       ),
                     ),
                   ),
+                ),
 
-                  // ── upload beam (sending) — hidden, processing uses orb ──
-                  const SizedBox.shrink(),
-
-                  // ── waveform left (listening) ───────────────────────────
-                  AnimatedOpacity(
-                    opacity: _isListening ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 600),
-                    child: Align(
-                      alignment: Alignment(-widget.waveSpread, _waveAlignY),
-                      child: SizedBox(
-                        width: widget.waveWidth,
-                        height: 80,
-                        child: _Waveform(
-                          animate: _isListening && widget.animate,
-                          flip: true,
-                          barCount: widget.waveBarCount,
-                          amplitude: widget.waveAmplitude,
-                          speed: widget.waveSpeed,
-                        ),
+                // ── waveform right (listening) ─────────────────────────
+                AnimatedOpacity(
+                  opacity: _isListening ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 600),
+                  child: Align(
+                    alignment: Alignment(widget.waveSpread, _waveAlignY),
+                    child: SizedBox(
+                      width: widget.waveWidth,
+                      height: 80,
+                      child: _Waveform(
+                        animate: _isListening && widget.animate,
+                        barCount: widget.waveBarCount,
+                        amplitude: widget.waveAmplitude,
+                        speed: widget.waveSpeed,
                       ),
                     ),
                   ),
+                ),
 
-                  // ── waveform right (listening) ─────────────────────────
-                  AnimatedOpacity(
-                    opacity: _isListening ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 600),
-                    child: Align(
-                      alignment: Alignment(widget.waveSpread, _waveAlignY),
-                      child: SizedBox(
-                        width: widget.waveWidth,
-                        height: 80,
-                        child: _Waveform(
-                          animate: _isListening && widget.animate,
-                          barCount: widget.waveBarCount,
-                          amplitude: widget.waveAmplitude,
-                          speed: widget.waveSpeed,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ── THE ORB — persistent, smooth position + size ───────
+                // ── THE ORB — persistent, smooth position + size ───────
                 AnimatedAlign(
                   alignment: _orbAlign,
                   duration: const Duration(milliseconds: 900),
@@ -354,7 +358,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                   ),
                 ),
 
-                  // ── response card (above the orb) ─────────────────────
+                // ── response card (above the orb) ─────────────────────
                 AnimatedOpacity(
                   opacity: _isResponse ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 900),
@@ -389,32 +393,30 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                   ),
                 ),
 
-                  // ── bottom text (non-response states) ──────────────────
-                  AnimatedOpacity(
-                    opacity: _isResponse ? 0.0 : 1.0,
-                    duration: const Duration(milliseconds: 600),
-                    child: AnimatedAlign(
-                      alignment: Alignment(0, _textAlignY),
-                      duration: const Duration(milliseconds: 700),
-                      curve: Curves.easeOutCubic,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 650),
-                            switchInCurve: Curves.easeOut,
-                            switchOutCurve: Curves.easeIn,
-                            transitionBuilder:
-                                (child, anim) => FadeTransition(
-                                  opacity: anim,
-                                  child: child,
-                                ),
-                            child: _textContent(),
-                          ),
-                        ],
-                      ),
+                // ── bottom text (non-response states) ──────────────────
+                AnimatedOpacity(
+                  opacity: _isResponse ? 0.0 : 1.0,
+                  duration: const Duration(milliseconds: 600),
+                  child: AnimatedAlign(
+                    alignment: Alignment(0, _textAlignY),
+                    duration: const Duration(milliseconds: 700),
+                    curve: Curves.easeOutCubic,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 650),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder:
+                              (child, anim) =>
+                                  FadeTransition(opacity: anim, child: child),
+                          child: _textContent(),
+                        ),
+                      ],
                     ),
                   ),
+                ),
               ],
             ),
           ),
@@ -451,34 +453,34 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
             ? const _TextBlock(
               primary: 'Click or speak to start',
               primaryColor: Color(0xFFB5B6C8),
-              primarySize: 17,
+              primarySize: 15,
             )
             : const SizedBox.shrink(),
       _VS.listening => const _TextBlock(
         primary: 'Recording...',
         primaryColor: Color(0xFFCCCCE0),
-        primarySize: 17,
+        primarySize: 15,
         secondary: 'Esc to cancel  •  Space to send',
         secondaryColor: Color(0xFF9293A6),
-        secondarySize: 14,
+        secondarySize: 12,
       ),
       _VS.processing => const _TextBlock(
         primary: 'Processing...',
         primaryColor: Color(0xFF62C9FF),
-        primarySize: 18,
+        primarySize: 16,
         primaryBold: true,
         secondary: 'Please wait',
         secondaryColor: Color(0xFF9A9BAD),
-        secondarySize: 15,
+        secondarySize: 12,
       ),
       _VS.thinking => const _TextBlock(
         primary: 'Thinking...',
         primaryColor: Color(0xFFD58BFF),
-        primarySize: 18,
+        primarySize: 16,
         primaryBold: true,
         secondary: 'Waiting for response...',
         secondaryColor: Color(0xFF9A9BAD),
-        secondarySize: 15,
+        secondarySize: 12,
       ),
       _VS.responding => const SizedBox.shrink(),
     },
@@ -733,71 +735,80 @@ class _ResponseCardState extends State<_ResponseCard>
                 ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxHeight: contentMaxH),
-                  child: hasMermaid
-                      ? MarkdownDocumentPreview(content: displayText)
-                      : CustomScrollView(
-                        shrinkWrap: true,
-                        physics: const ClampingScrollPhysics(),
-                        slivers: [
-                          SliverToBoxAdapter(
-                            child: MarkdownBody(
-                              data: displayText,
-                              softLineBreak: true,
-                              selectable: false,
-                              styleSheet: MarkdownStyleSheet(
-                                p: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.95),
-                                  fontSize: widget.fontSize,
-                                  height: 1.52,
-                                  fontWeight: FontWeight.w500,
-                                  shadows:
-                                      widget.streaming
-                                          ? const [
-                                            Shadow(
-                                              color: Color(0x889B6BFF),
-                                              blurRadius: 14,
-                                            ),
-                                          ]
-                                          : const [],
-                                ),
-                                h1: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.98),
-                                  fontSize: widget.fontSize + 5,
-                                  height: 1.25,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                                h2: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.98),
-                                  fontSize: widget.fontSize + 3,
-                                  height: 1.3,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                                h3: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.98),
-                                  fontSize: widget.fontSize + 1,
-                                  height: 1.35,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                a: TextStyle(
-                                  color: const Color(0xFF8BD8FF),
-                                  fontSize: widget.fontSize,
-                                  decoration: TextDecoration.underline,
-                                ),
-                                code: TextStyle(
-                                  color: const Color(0xFF8BD8FF),
-                                  fontSize: widget.fontSize - 1,
-                                  backgroundColor: const Color(0x66101420),
-                                ),
-                                codeblockPadding: const EdgeInsets.all(10),
-                                codeblockDecoration: BoxDecoration(
-                                  color: const Color(0xAA101420),
-                                  borderRadius: BorderRadius.circular(10),
+                  child:
+                      hasMermaid
+                          ? MarkdownDocumentPreview(content: displayText)
+                          : CustomScrollView(
+                            shrinkWrap: true,
+                            physics: const ClampingScrollPhysics(),
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: MarkdownBody(
+                                  data: displayText,
+                                  softLineBreak: true,
+                                  selectable: false,
+                                  styleSheet: MarkdownStyleSheet(
+                                    p: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.95,
+                                      ),
+                                      fontSize: widget.fontSize,
+                                      height: 1.52,
+                                      fontWeight: FontWeight.w500,
+                                      shadows:
+                                          widget.streaming
+                                              ? const [
+                                                Shadow(
+                                                  color: Color(0x889B6BFF),
+                                                  blurRadius: 14,
+                                                ),
+                                              ]
+                                              : const [],
+                                    ),
+                                    h1: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.98,
+                                      ),
+                                      fontSize: widget.fontSize + 5,
+                                      height: 1.25,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    h2: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.98,
+                                      ),
+                                      fontSize: widget.fontSize + 3,
+                                      height: 1.3,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    h3: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.98,
+                                      ),
+                                      fontSize: widget.fontSize + 1,
+                                      height: 1.35,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    a: TextStyle(
+                                      color: const Color(0xFF8BD8FF),
+                                      fontSize: widget.fontSize,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    code: TextStyle(
+                                      color: const Color(0xFF8BD8FF),
+                                      fontSize: widget.fontSize - 1,
+                                      backgroundColor: const Color(0x66101420),
+                                    ),
+                                    codeblockPadding: const EdgeInsets.all(10),
+                                    codeblockDecoration: BoxDecoration(
+                                      color: const Color(0xAA101420),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
                 ),
               ),
             ),

@@ -1522,11 +1522,25 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'board:zoom',
     alias: 'bzm',
-    description: 'Set board zoom/scale level. Use for "уменьши зум", "увеличь зум", "zoom in", "zoom out", "приблизь", "отдали". Pass absolute scale: 0.5 = 50%, 1.0 = 100%, 2.0 = 200%.',
+    description:
+        'Set board zoom/scale level. Use for "уменьши зум", "увеличь зум", "zoom in", "zoom out", "приблизь", "отдали". Pass absolute scale: 0.5 = 50%, 1.0 = 100%, 2.0 = 200%.',
     group: 'board',
     humanVariants: const {
-      'ru': ['уменьши зум', 'увеличь зум', 'zoom out', 'zoom in', 'приблизь', 'отдали'],
-      'en': ['zoom in', 'zoom out', 'set zoom', 'increase zoom', 'decrease zoom'],
+      'ru': [
+        'уменьши зум',
+        'увеличь зум',
+        'zoom out',
+        'zoom in',
+        'приблизь',
+        'отдали',
+      ],
+      'en': [
+        'zoom in',
+        'zoom out',
+        'set zoom',
+        'increase zoom',
+        'decrease zoom',
+      ],
     },
     params: <YoloitCliToolParam>[
       _boardParam('id_or_name'),
@@ -1766,7 +1780,12 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         'сделай фокус на плейлист',
         'перейди к плейлисту',
       ],
-      'en': ['focus panel {panel}', 'show note {panel}', 'open note {panel}', 'focus playlist'],
+      'en': [
+        'focus panel {panel}',
+        'show note {panel}',
+        'open note {panel}',
+        'focus playlist',
+      ],
     },
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
@@ -2200,21 +2219,14 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'yolochat:stop',
     alias: 'csp',
-    description: 'Stop active YoLo chat streaming',
+    description: 'Stop active YoLo chat streaming (target panel or any active)',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
-      _p(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
+      _p('board', 'Target board (optional)', flag: '--board', shortKey: 'b'),
       _p(
         'panel',
-        'Target chat panel',
+        'Target chat panel (optional)',
         flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
         shortKey: 'p',
       ),
     ],
@@ -2275,8 +2287,18 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     group: 'files',
     params: <YoloitCliToolParam>[
       _boardParam(),
-      _p('path', 'Absolute file path to preview', required: true, shortKey: 'p'),
-      _p('title', 'Panel title (default: filename)', flag: '--title', shortKey: 't'),
+      _p(
+        'path',
+        'Absolute file path to preview',
+        required: true,
+        shortKey: 'p',
+      ),
+      _p(
+        'title',
+        'Panel title (default: filename)',
+        flag: '--title',
+        shortKey: 't',
+      ),
     ],
     humanVariants: const {
       'ru': [
@@ -2840,7 +2862,8 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'pause',
     alias: 'pause',
-    description: 'PAUSE music playback (temporary stop, can be resumed). Use for "пауза", "поставь на паузу", "поставь музыку на паузу", "pause music", "приостанови". NOT for stopping completely or showing playlist.',
+    description:
+        'PAUSE music playback (temporary stop, can be resumed). Use for "пауза", "поставь на паузу", "поставь музыку на паузу", "pause music", "приостанови". NOT for stopping completely or showing playlist.',
     group: 'playlist',
     humanVariants: const {
       'ru': [
@@ -2849,18 +2872,15 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         'приостанови воспроизведение',
         'поставь музыку на паузу',
       ],
-      'en': [
-        'pause music',
-        'pause playback',
-        'pause playlist',
-      ],
+      'en': ['pause music', 'pause playback', 'pause playlist'],
     },
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
   YoloitCliTool(
     command: 'stop',
     alias: 'stop',
-    description: 'STOP music playback completely (resets to beginning). Use for "останови", "выключи музыку", "стоп", "stop music". NOT for pause or listing tracks.',
+    description:
+        'STOP music playback completely (resets to beginning). Use for "останови", "выключи музыку", "стоп", "stop music". NOT for pause or listing tracks.',
     group: 'playlist',
     humanVariants: const {
       'ru': ['останови музыку', 'стоп музыка', 'выключи музыку'],
@@ -2893,7 +2913,8 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'playlist:list',
     alias: 'pll',
-    description: 'SHOW/LIST tracks in a playlist panel. Use for "покажи плейлист", "что в плейлисте", "список треков", "show playlist", "list tracks". NOT for playing music.',
+    description:
+        'SHOW/LIST tracks in a playlist panel. Use for "покажи плейлист", "что в плейлисте", "список треков", "show playlist", "list tracks". NOT for playing music.',
     group: 'playlist',
     humanVariants: const {
       'ru': ['покажи плейлист', 'что в плейлисте', 'список треков'],
