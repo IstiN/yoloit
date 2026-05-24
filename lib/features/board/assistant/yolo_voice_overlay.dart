@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
 
 // ─────────────────────────── public API ──────────────────────────────────────
@@ -216,7 +217,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   };
 
   Alignment get _orbAlign =>
-      _isResponse ? const Alignment(0.0, 0.58) : const Alignment(0.0, -0.10);
+      _isResponse ? const Alignment(0.0, 0.62) : const Alignment(0.0, -0.10);
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -350,10 +351,10 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                       child: Align(
                         alignment: Alignment.topCenter,
                         child: Padding(
-                          padding: const EdgeInsets.only(top: 34),
+                          padding: const EdgeInsets.only(top: 8),
                           child: SizedBox(
                             width: 470,
-                            height: 250,
+                            height: 228,
                             child: _ResponseCard(
                               response: widget.response,
                               streaming: widget.status == 'responding',
@@ -698,21 +699,61 @@ class _ResponseCardState extends State<_ResponseCard>
                   ),
                 ],
               ),
-              child: Text(
-                displayText,
-                maxLines: 8,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.95),
-                  fontSize: widget.fontSize,
-                  height: 1.52,
-                  fontWeight: FontWeight.w500,
-                  shadows:
-                      widget.streaming
-                          ? const [
-                            Shadow(color: Color(0x889B6BFF), blurRadius: 14),
-                          ]
-                          : const [],
+              child: SingleChildScrollView(
+                child: MarkdownBody(
+                  data: displayText,
+                  softLineBreak: true,
+                  selectable: false,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      fontSize: widget.fontSize,
+                      height: 1.52,
+                      fontWeight: FontWeight.w500,
+                      shadows:
+                          widget.streaming
+                              ? const [
+                                Shadow(
+                                  color: Color(0x889B6BFF),
+                                  blurRadius: 14,
+                                ),
+                              ]
+                              : const [],
+                    ),
+                    h1: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.98),
+                      fontSize: widget.fontSize + 5,
+                      height: 1.25,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    h2: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.98),
+                      fontSize: widget.fontSize + 3,
+                      height: 1.3,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    h3: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.98),
+                      fontSize: widget.fontSize + 1,
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    a: TextStyle(
+                      color: const Color(0xFF8BD8FF),
+                      fontSize: widget.fontSize,
+                      decoration: TextDecoration.underline,
+                    ),
+                    code: TextStyle(
+                      color: const Color(0xFF8BD8FF),
+                      fontSize: widget.fontSize - 1,
+                      backgroundColor: const Color(0x66101420),
+                    ),
+                    codeblockPadding: const EdgeInsets.all(10),
+                    codeblockDecoration: BoxDecoration(
+                      color: const Color(0xAA101420),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
                 ),
               ),
             ),
