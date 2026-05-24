@@ -35,6 +35,8 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.borderSpeed = 1200,
     this.responseActionLabel = 'Tap to close',
     this.showIdleHint = true,
+    this.orbAlignY = -0.10,
+    this.responseOrbAlignY = 0.62,
   });
 
   final String status;
@@ -62,6 +64,8 @@ class YoloVoiceOverlay extends StatefulWidget {
   final int borderSpeed;
   final String responseActionLabel;
   final bool showIdleHint;
+  final double orbAlignY;
+  final double responseOrbAlignY;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -218,7 +222,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   };
 
   Alignment get _orbAlign =>
-      _isResponse ? const Alignment(0.0, 0.62) : const Alignment(0.0, -0.10);
+      _isResponse
+          ? Alignment(0.0, widget.responseOrbAlignY)
+          : Alignment(0.0, widget.orbAlignY);
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -241,20 +247,17 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
         }
         return KeyEventResult.ignored;
       },
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: widget.onPrimaryAction,
-        child: SizedBox(
-          width: _kW * widget.scale,
-          height: _kH * widget.scale,
-          child: Transform.scale(
-            scale: widget.scale,
-            child: SizedBox(
-              width: _kW,
-              height: _kH,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
+      child: SizedBox(
+        width: _kW * widget.scale,
+        height: _kH * widget.scale,
+        child: Transform.scale(
+          scale: widget.scale,
+          child: SizedBox(
+            width: _kW,
+            height: _kH,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
                   // ── orbit particles (thinking + processing) ────────────
                   AnimatedOpacity(
                     opacity: (_isThinking || _isSending) ? 1.0 : 0.0,
@@ -310,19 +313,22 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                   ),
 
                   // ── THE ORB — persistent, smooth position + size ───────
-                  AnimatedAlign(
-                    alignment: _orbAlign,
+                AnimatedAlign(
+                  alignment: _orbAlign,
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutCubic,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: _orbSize),
                     duration: const Duration(milliseconds: 900),
                     curve: Curves.easeOutCubic,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween<double>(end: _orbSize),
-                      duration: const Duration(milliseconds: 900),
-                      curve: Curves.easeOutCubic,
-                      builder:
-                          (ctx, sz, _) => AnimatedBuilder(
-                            animation: _orbAnim,
-                            builder:
-                                (ctx, _) => SizedBox.square(
+                    builder:
+                        (ctx, sz, _) => AnimatedBuilder(
+                          animation: _orbAnim,
+                          builder:
+                              (ctx, _) => GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: widget.onPrimaryAction,
+                                child: SizedBox.square(
                                   dimension: sz * widget.orbScale,
                                   child: CustomPaint(
                                     painter: _BlobOrbPainter(
@@ -339,20 +345,24 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                                     child: Center(child: _orbLabel(sz)),
                                   ),
                                 ),
-                          ),
-                    ),
+                              ),
+                        ),
                   ),
+                ),
 
                   // ── response card (above the orb) ─────────────────────
-                  AnimatedOpacity(
-                    opacity: _isResponse ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 900),
-                    child: IgnorePointer(
-                      ignoring: !_isResponse,
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 152),
+                AnimatedOpacity(
+                  opacity: _isResponse ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 900),
+                  child: IgnorePointer(
+                    ignoring: !_isResponse,
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 152),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onTap: widget.onPrimaryAction,
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(
                               minWidth: 200,
@@ -373,6 +383,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                       ),
                     ),
                   ),
+                ),
 
                   // ── bottom text (non-response states) ──────────────────
                   AnimatedOpacity(
@@ -401,8 +412,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                       ),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         ),

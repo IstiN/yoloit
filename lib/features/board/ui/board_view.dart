@@ -6145,6 +6145,8 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       borderSpeed: 1700,
       responseActionLabel: 'Tap YoLo to speak',
       showIdleHint: false,
+      orbAlignY: 0.82,
+      responseOrbAlignY: 0.86,
     );
   }
 
