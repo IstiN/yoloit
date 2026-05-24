@@ -2905,6 +2905,10 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       final genMs = completedAt.difference(firstTokenAt).inMilliseconds;
       buf.writeln('  → generation: ${genMs}ms');
     }
+    if (promptSentAt != null && completedAt != null) {
+      final llmResponseMs = completedAt.difference(promptSentAt).inMilliseconds;
+      buf.writeln('  → LLM response total: ${llmResponseMs}ms');
+    }
     if (requestAt != null && completedAt != null) {
       final totalMs = completedAt.difference(requestAt).inMilliseconds;
       buf.writeln('  → total: ${totalMs}ms');
@@ -2920,6 +2924,11 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       buf.writeln('  completedAt:  ${asr['completedAt'] ?? '-'}');
       final asrMs = asr['durationMs'];
       buf.writeln('  total:        ${asrMs != null ? '${asrMs}ms' : '-'}');
+      if (asrMs is num && promptSentAt != null && completedAt != null) {
+        final llmResponseMs =
+            completedAt.difference(promptSentAt).inMilliseconds;
+        buf.writeln('  ASR→LLM total:${asrMs.toInt() + llmResponseMs}ms');
+      }
       final chars = asr['transcriptChars'];
       if (chars != null) {
         buf.writeln('  transcript:   ${chars} chars');
