@@ -413,6 +413,23 @@ class CloudLlmProvider extends ChatProvider {
       'For greetings or casual chat, respond with brief friendly text — no tool call. '
       'Keep answers concise. Respond in the user\'s language.',
     );
+    // Tool routing disambiguation rules for weaker models.
+    systemBuf.writeln('\nTool routing rules:');
+    systemBuf.writeln(
+      '- "включи музыку", "play music", "запусти", "resume" → use `play`',
+    );
+    systemBuf.writeln(
+      '- "пауза", "поставь на паузу", "поставь музыку на паузу", "pause" → use `pause` (NOT play)',
+    );
+    systemBuf.writeln(
+      '- "стоп", "останови музыку", "stop" → use `stop` (NOT pause or play)',
+    );
+    systemBuf.writeln(
+      '- "покажи плейлист", "список треков", "что в плейлисте", "show playlist" → use `playlist:list` (NOT play)',
+    );
+    systemBuf.writeln(
+      '- "фокус на", "переведи фокус", "сделай фокус", "открой", "покажи панель", "focus" → use `panel:focus` (NOT play)',
+    );
     if (boardId != null && boardId.isNotEmpty) {
       systemBuf.writeln('\nCurrent context:');
       systemBuf.writeln('- Board: ${boardName ?? boardId} (id: $boardId)');
