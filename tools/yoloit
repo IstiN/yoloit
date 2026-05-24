@@ -541,6 +541,17 @@ commands = [
     "example": "yoloit files:read ~/ai.m/README.md --lines 120",
   },
   {
+    "group": "files",
+    "name": "files:preview",
+    "description": "Open a file as a preview panel on the board (image, markdown, text, etc.)",
+    "params": [
+      ["board", "Board id or name", True],
+      ["path", "Absolute file path to preview", True],
+      ["--title TITLE", "Optional panel title (default: filename)", False]
+    ],
+    "example": "yoloit files:preview \"My Board\" ~/ai.m/README.md",
+  },
+  {
     "group": "cloud",
     "name": "cloud:provider",
     "description": "Get or set assistant provider type (local or cloud)",
@@ -1878,7 +1889,7 @@ PY
   panel:resize)
     [[ $# -lt 4 ]] && { echo "Usage: yoloit panel:resize <board> <panel> <w> <h>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    _put "/boards/${bid}/panels/${pid}" "{\"width\":$3,\"height\":$4}" | python3 -m json.tool 2>/dev/null
+    _put "/boards/${bid}/panels/${pid}" "{\"width\":$3,\"height\":$4,\"focus\":true}" | python3 -m json.tool 2>/dev/null
     ;;
   panel:delete)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:delete <board> <panel>" >&2; exit 1; }
@@ -2413,6 +2424,25 @@ PY
         echo "Usage: yoloit cloud:provider <local|cloud>" >&2; exit 1
       fi
       _post "/cloud-providers/provider-type" "{\"type\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$ptype")}" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  files:preview)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit files:preview <board> <path> [--title TITLE]" >&2; exit 1; }
+    bid_raw="$1"; shift
+    filepath="$1"; shift
+    title=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in --title) title="$2"; shift 2 ;; *) shift ;; esac
+    done
+    [[ "$filepath" == ~* ]] && filepath="${filepath/#\~/$HOME}"
+    [[ -z "$title" ]] && title="$(basename "$filepath")"
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    payload=$(python3 -c "import json,sys; print(json.dumps({'type':'board.file.preview','title':sys.argv[1],'state':{'path':sys.argv[2],'title':sys.argv[1]}}))" "$title" "$filepath")
+    result=$(_post "/boards/${bid}/panels" "$payload")
+    pid=$(echo "$result" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('panel',{}).get('id',''))" 2>/dev/null)
+    echo "$result" | python3 -m json.tool 2>/dev/null
+    if [[ -n "$pid" ]]; then
+      _put "/boards/${bid}/panels/$(_encode "$pid")" '{"focus":true}' >/dev/null 2>&1
     fi
     ;;
   files:search)

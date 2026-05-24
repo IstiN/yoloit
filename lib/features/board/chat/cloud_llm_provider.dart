@@ -414,6 +414,7 @@ flowchart TD
     VIEW --> VT{Target}
     VT -->|"перейди на доску / switch board / открой доску"| T_BF[board:focus]
     VT -->|"покажи / фокус / открой / show / focus → ANY panel\n(note, playlist, checklist, kanban…)\nIf panel not on current board — board:focus first, then panel:focus"| T_PFC[panel:focus]
+    VT -->|"открой файл / покажи файл / preview file / открой README\n→ files:search to find path (use --root if folder is specified), then files:preview"| T_FPV[files:preview]
     VT -->|"zoom in / увеличь зум / приблизь"| T_BZI["board:zoom scale×1.5$scaleNote"]
     VT -->|"zoom out / уменьши зум / отдали"| T_BZO["board:zoom scale×0.67$scaleNote"]
     VT -->|"fit / по экрану / вместить"| T_BFT[board:fit]
@@ -425,6 +426,7 @@ flowchart TD
     ET -->|"добавь пункт / checklist item"| T_CIA[checklist:item:add]
     ET -->|"добавь карточку / kanban card"| T_KCA[kanban:card:add]
     ET -->|"новая панель / new panel"| T_PC[panel:create]
+    ET -->|"увеличь размер / increase size / resize panel\n→ panel:resize, then panel:focus auto-scrolls"| T_PSZ[panel:resize]
 
     WHAT --> BOARD_OP[🗂 Board ops]
     BOARD_OP --> BO{Action}

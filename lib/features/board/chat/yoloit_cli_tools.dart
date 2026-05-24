@@ -2225,10 +2225,41 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     ],
   ),
   YoloitCliTool(
+    command: 'files:preview',
+    alias: 'fpv',
+    description:
+        'Open a file as a preview panel on the board (supports markdown, images, text, code). '
+        'Use this when user asks to "открой", "покажи", "preview" a file. '
+        'Do NOT use note:create — use files:preview to show the actual file.',
+    group: 'files',
+    params: <YoloitCliToolParam>[
+      _boardParam(),
+      _p('path', 'Absolute file path to preview', required: true, shortKey: 'p'),
+      _p('title', 'Panel title (default: filename)', flag: '--title', shortKey: 't'),
+    ],
+    humanVariants: const {
+      'ru': [
+        'открой файл {path}',
+        'покажи файл {path}',
+        'открой превью {path}',
+        'preview {path}',
+        'открой readme',
+        'покажи readme',
+      ],
+      'en': [
+        'open file {path}',
+        'preview file {path}',
+        'show file {path}',
+        'open preview {path}',
+      ],
+    },
+  ),
+  YoloitCliTool(
     command: 'files:search',
     alias: 'fsh',
     description:
-        'Read-only search for files and folders on the local file system (default root: home)',
+        'Read-only search for files and folders on the local file system. '
+        'If user names a folder/scope ("в папке ai.m", "in ~/project"), pass it via --root to restrict results.',
     group: 'files',
     params: <YoloitCliToolParam>[
       _p('query', 'File or folder name query', required: true, shortKey: 'q'),
@@ -2242,6 +2273,18 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         shortKey: 'lim',
       ),
     ],
+    humanVariants: const {
+      'ru': [
+        'найди файл {query}',
+        'найди {query} в папке {root}',
+        'поиск файла {query} в {root}',
+      ],
+      'en': [
+        'find file {query}',
+        'search {query} in folder {root}',
+        'find {query} under {root}',
+      ],
+    },
   ),
   YoloitCliTool(
     command: 'files:list',
