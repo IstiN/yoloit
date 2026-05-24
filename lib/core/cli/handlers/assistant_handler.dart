@@ -34,9 +34,15 @@ class AssistantCliHandler extends PanelCliHandler {
       'messages':
           messages.map((m) {
             final msg = m as Map<String, dynamic>;
+            var content = msg['content'] as String? ?? '';
+            // Strip voice prefix from display (kept in LLM context but hidden in UI)
+            if (content.startsWith('[Voice message')) {
+              final nl = content.indexOf('\n');
+              if (nl != -1) content = content.substring(nl + 1).trim();
+            }
             return {
               'role': msg['role'] ?? 'unknown',
-              'content': _truncate(msg['content'] as String? ?? '', 200),
+              'content': _truncate(content, 200),
             };
           }).toList(),
     };
