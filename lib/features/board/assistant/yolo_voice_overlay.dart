@@ -674,29 +674,27 @@ class _ResponseCardState extends State<_ResponseCard>
     final hasMermaid = displayText.contains('```mermaid');
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Reserve ~34px for the action label row below the card body
-        const labelRowHeight = 34.0;
-        final bodyMaxH =
-            (constraints.maxHeight - labelRowHeight).clamp(40.0, 800.0);
+        // Column(mainAxisSize.max) fills the bounded height given by parent ConstrainedBox.
+        // Flexible(tight) gives SingleChildScrollView exact bounded height → it scrolls.
         return Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AnimatedBuilder(
-              animation: _borderAnim,
-              builder:
-                  (ctx, child) => CustomPaint(
-                    painter:
-                        widget.streaming
-                            ? _RunningBorderPainter(
-                              progress: _borderAnim.value,
-                              radius: 28,
-                            )
-                            : null,
-                    child: child,
-                  ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: bodyMaxH),
+            Flexible(
+              fit: FlexFit.tight,
+              child: AnimatedBuilder(
+                animation: _borderAnim,
+                builder:
+                    (ctx, child) => CustomPaint(
+                      painter:
+                          widget.streaming
+                              ? _RunningBorderPainter(
+                                progress: _borderAnim.value,
+                                radius: 28,
+                              )
+                              : null,
+                      child: child,
+                    ),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 620),
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
@@ -714,10 +712,7 @@ class _ResponseCardState extends State<_ResponseCard>
                     ],
                   ),
                   child: hasMermaid
-                      ? SizedBox(
-                        height: 200,
-                        child: MarkdownDocumentPreview(content: displayText),
-                      )
+                      ? MarkdownDocumentPreview(content: displayText)
                       : SingleChildScrollView(
                         child: MarkdownBody(
                           data: displayText,
