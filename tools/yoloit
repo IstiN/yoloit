@@ -885,6 +885,46 @@ commands = [
     "example": "yoloit play \"My Board\" \"Playlist\" video.mp4",
   },
   {
+    "group": "playlist",
+    "name": "pause",
+    "description": "Pause playlist playback",
+    "params": [["board", "Board id or name", False], ["panel", "Playlist panel id or title", False]],
+    "example": "yoloit pause music",
+    "aliases": ["pause"],
+  },
+  {
+    "group": "playlist",
+    "name": "stop",
+    "description": "Stop playlist playback",
+    "params": [["board", "Board id or name", False], ["panel", "Playlist panel id or title", False]],
+    "example": "yoloit stop music",
+    "aliases": ["stop"],
+  },
+  {
+    "group": "playlist",
+    "name": "next",
+    "description": "Skip to the next track in the playlist",
+    "params": [["board", "Board id or name", False], ["panel", "Playlist panel id or title", False]],
+    "example": "yoloit next music",
+    "aliases": ["next"],
+  },
+  {
+    "group": "playlist",
+    "name": "prev",
+    "description": "Go to the previous track in the playlist",
+    "params": [["board", "Board id or name", False], ["panel", "Playlist panel id or title", False]],
+    "example": "yoloit prev music",
+    "aliases": ["prev"],
+  },
+  {
+    "group": "playlist",
+    "name": "playlist:list",
+    "description": "List tracks in a playlist panel",
+    "params": [["board", "Board id or name", False], ["panel", "Playlist panel id or title", False]],
+    "example": "yoloit playlist:list music",
+    "aliases": ["pll"],
+  },
+  {
     "group": "webpage",
     "name": "web:open",
     "description": "Open URL in webpage panel",
@@ -2793,6 +2833,41 @@ PYEOF
       sleep 0.1
     fi
     _post "/boards/${bid}/panels/${pid}/action" '{"action":"play"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  pause)
+    local bid_raw="${1:-}" panel_hint="${2:-}"
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.playlist" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"pause"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  stop)
+    local bid_raw="${1:-}" panel_hint="${2:-}"
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.playlist" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"stop"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  next)
+    local bid_raw="${1:-}" panel_hint="${2:-}"
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.playlist" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"next"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  prev)
+    local bid_raw="${1:-}" panel_hint="${2:-}"
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.playlist" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"prev"}' | python3 -m json.tool 2>/dev/null
+    ;;
+  playlist:list|pll)
+    local bid_raw="${1:-}" panel_hint="${2:-}"
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    pid=$(_smart_panel "$bid" "board.playlist" "$panel_hint"); pid=$(_encode "$pid")
+    _post "/boards/${bid}/panels/${pid}/action" '{"action":"list"}' | python3 -m json.tool 2>/dev/null
     ;;
   web:open)
     [[ $# -lt 3 ]] && { echo "Usage: yoloit web:open <board> <panel> <url>" >&2; exit 1; }

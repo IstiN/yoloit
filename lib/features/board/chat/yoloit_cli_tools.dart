@@ -740,6 +740,11 @@ class YoloitCliToolArgumentNormalizer {
         command.startsWith('kanban:') ||
         command.startsWith('run:') ||
         command == 'play' ||
+        command == 'pause' ||
+        command == 'stop' ||
+        command == 'next' ||
+        command == 'prev' ||
+        command == 'playlist:list' ||
         command == 'web:open';
   }
 
@@ -2741,6 +2746,69 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         shortKey: 'u',
       ),
     ],
+  ),
+  YoloitCliTool(
+    command: 'pause',
+    alias: 'pause',
+    description: 'Pause playlist playback',
+    group: 'playlist',
+    humanVariants: const {
+      'ru': [
+        'поставь на паузу',
+        'пауза музыка',
+        'приостанови воспроизведение',
+      ],
+      'en': [
+        'pause music',
+        'pause playback',
+        'pause playlist',
+      ],
+    },
+    params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
+  ),
+  YoloitCliTool(
+    command: 'stop',
+    alias: 'stop',
+    description: 'Stop playlist playback',
+    group: 'playlist',
+    humanVariants: const {
+      'ru': ['останови музыку', 'стоп музыка', 'выключи музыку'],
+      'en': ['stop music', 'stop playback', 'stop playlist'],
+    },
+    params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
+  ),
+  YoloitCliTool(
+    command: 'next',
+    alias: 'next',
+    description: 'Skip to the next track in the playlist',
+    group: 'playlist',
+    humanVariants: const {
+      'ru': ['следующая песня', 'следующий трек', 'переключи на следующую'],
+      'en': ['next song', 'next track', 'skip to next'],
+    },
+    params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
+  ),
+  YoloitCliTool(
+    command: 'prev',
+    alias: 'prev',
+    description: 'Go to the previous track in the playlist',
+    group: 'playlist',
+    humanVariants: const {
+      'ru': ['предыдущая песня', 'предыдущий трек', 'переключи на предыдущую'],
+      'en': ['previous song', 'previous track', 'go back a song'],
+    },
+    params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
+  ),
+  YoloitCliTool(
+    command: 'playlist:list',
+    alias: 'pll',
+    description: 'List tracks in a playlist panel',
+    group: 'playlist',
+    humanVariants: const {
+      'ru': ['покажи плейлист', 'что в плейлисте', 'список треков'],
+      'en': ['show playlist', 'list playlist', 'what is in playlist'],
+    },
+    params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
   YoloitCliTool(
     command: 'web:open',

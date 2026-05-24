@@ -11,12 +11,28 @@ class PlaylistCliHandler extends PanelCliHandler {
   @override
   List<String> get supportedActions => ['list', 'add', 'remove', 'play', 'pause', 'stop', 'next', 'prev'];
 
+  /// Returns the `tracks` list from panel state (key used by the widget).
+  List<dynamic> _tracks(BoardPanelInstance panel) =>
+      panel.state['tracks'] as List<dynamic>? ?? <dynamic>[];
+
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
+    final tracks = _tracks(panel);
+    final currentIndex = panel.state['currentIndex'] as int? ?? -1;
     return {
-      'playlist': panel.state['playlist'] as List<dynamic>? ?? <dynamic>[],
-      'currentIndex': panel.state['currentIndex'] ?? -1,
+      'tracks': tracks
+          .asMap()
+          .entries
+          .map((e) => {
+                'index': e.key,
+                'title': (e.value as Map?)?['title'] ?? e.value,
+                'path': (e.value as Map?)?['path'] ?? '',
+                'current': e.key == currentIndex,
+              })
+          .toList(),
+      'currentIndex': currentIndex,
       'playing': panel.state['playing'] ?? false,
+      'count': tracks.length,
     };
   }
 
@@ -29,67 +45,87 @@ class PlaylistCliHandler extends PanelCliHandler {
     switch (action) {
       case 'list':
         return CliActionResult(data: getContent(panel));
+
       case 'add':
         final path = args['path'] as String? ?? args['url'] as String?;
         if (path == null) {
           return const CliActionResult(ok: false, message: 'Missing "path" or "url"');
         }
-        final playlist = List<dynamic>.from(
-          (panel.state['playlist'] as List<dynamic>?) ?? <dynamic>[],
-        );
-        playlist.add({'path': path, 'title': args['title'] ?? path.split('/').last});
+        final tracks = List<dynamic>.from(_tracks(panel));
+        tracks.add({'path': path, 'title': args['title'] ?? path.split('/').last});
         return CliActionResult(
-          message: 'Added to playlist',
-          stateUpdate: {'playlist': playlist},
+          message: 'Added "${args['title'] ?? path.split('/').last}" to playlist (${tracks.length} tracks total)',
+          stateUpdate: {'tracks': tracks},
         );
+
       case 'remove':
         final index = args['index'] as int?;
         if (index == null) {
           return const CliActionResult(ok: false, message: 'Missing "index"');
         }
-        final playlist = List<dynamic>.from(
-          (panel.state['playlist'] as List<dynamic>?) ?? <dynamic>[],
-        );
-        if (index < 0 || index >= playlist.length) {
-          return const CliActionResult(ok: false, message: 'Index out of range');
+        final tracks = List<dynamic>.from(_tracks(panel));
+        if (index < 0 || index >= tracks.length) {
+          return CliActionResult(ok: false, message: 'Index $index out of range (0–${tracks.length - 1})');
         }
-        playlist.removeAt(index);
+        final removed = (tracks[index] as Map?)?['title'] ?? 'track $index';
+        tracks.removeAt(index);
+        final newIndex = (panel.state['currentIndex'] as int? ?? 0).clamp(0, tracks.isEmpty ? 0 : tracks.length - 1);
         return CliActionResult(
-          message: 'Removed from playlist',
-          stateUpdate: {'playlist': playlist},
+          message: 'Removed "$removed"',
+          stateUpdate: {'tracks': tracks, 'currentIndex': newIndex},
         );
+
       case 'play':
-        final index = args['index'] as int? ?? panel.state['currentIndex'] ?? 0;
+        final tracks = _tracks(panel);
+        if (tracks.isEmpty) {
+          return const CliActionResult(ok: false, message: 'Playlist is empty. Add tracks first with the "add" action.');
+        }
+        final index = (args['index'] as int? ?? panel.state['currentIndex'] as int? ?? 0)
+            .clamp(0, tracks.length - 1);
+        final title = (tracks[index] as Map?)?['title'] ?? 'track $index';
         return CliActionResult(
-          message: 'Playing track $index',
+          message: 'Playing "$title" (track $index)',
           stateUpdate: {'currentIndex': index, 'playing': true},
         );
+
       case 'pause':
-        return CliActionResult(
+        return const CliActionResult(
           message: 'Paused',
           stateUpdate: {'playing': false},
         );
+
       case 'stop':
-        return CliActionResult(
+        return const CliActionResult(
           message: 'Stopped',
-          stateUpdate: {'playing': false, 'currentIndex': -1},
+          stateUpdate: {'playing': false, 'currentIndex': 0},
         );
+
       case 'next':
-        final playlist = panel.state['playlist'] as List<dynamic>? ?? [];
+        final tracks = _tracks(panel);
+        if (tracks.isEmpty) {
+          return const CliActionResult(ok: false, message: 'Playlist is empty');
+        }
         final current = panel.state['currentIndex'] as int? ?? 0;
-        final next = (current + 1) % playlist.length;
+        final next = (current + 1) % tracks.length;
+        final title = (tracks[next] as Map?)?['title'] ?? 'track $next';
         return CliActionResult(
-          message: 'Next track: $next',
+          message: 'Next: "$title" (track $next)',
           stateUpdate: {'currentIndex': next, 'playing': true},
         );
+
       case 'prev':
-        final playlist = panel.state['playlist'] as List<dynamic>? ?? [];
+        final tracks = _tracks(panel);
+        if (tracks.isEmpty) {
+          return const CliActionResult(ok: false, message: 'Playlist is empty');
+        }
         final current = panel.state['currentIndex'] as int? ?? 0;
-        final prev = current > 0 ? current - 1 : playlist.length - 1;
+        final prev = current > 0 ? current - 1 : tracks.length - 1;
+        final title = (tracks[prev] as Map?)?['title'] ?? 'track $prev';
         return CliActionResult(
-          message: 'Previous track: $prev',
+          message: 'Previous: "$title" (track $prev)',
           stateUpdate: {'currentIndex': prev, 'playing': true},
         );
+
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }

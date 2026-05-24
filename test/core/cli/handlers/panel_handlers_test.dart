@@ -44,12 +44,12 @@ void main() {
     test('add track', () async {
       final r = await h.handleAction('add', {'path': '/music/a.mp3'}, _panel('board.playlist'));
       expect(r.ok, isTrue);
-      expect((r.stateUpdate!['playlist'] as List).length, 1);
+      expect((r.stateUpdate!['tracks'] as List).length, 1);
     });
 
     test('play', () async {
       final p = _panel('board.playlist', state: {
-        'playlist': [{'path': '/a.mp3', 'title': 'a'}]
+        'tracks': [{'path': '/a.mp3', 'title': 'a'}]
       });
       final r = await h.handleAction('play', {'index': 0}, p);
       expect(r.stateUpdate!['playing'], true);
@@ -63,16 +63,16 @@ void main() {
 
     test('remove', () async {
       final p = _panel('board.playlist', state: {
-        'playlist': [{'path': '/a.mp3', 'title': 'a'}]
+        'tracks': [{'path': '/a.mp3', 'title': 'a'}]
       });
       final r = await h.handleAction('remove', {'index': 0}, p);
-      expect((r.stateUpdate!['playlist'] as List), isEmpty);
+      expect((r.stateUpdate!['tracks'] as List), isEmpty);
     });
 
     test('list returns playlist', () async {
       final r = await h.handleAction('list', {}, _panel('board.playlist'));
       expect(r.ok, isTrue);
-      expect(r.data!['playlist'], isA<List>());
+      expect(r.data!['tracks'], isA<List>());
     });
   });
 
