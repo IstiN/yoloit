@@ -190,10 +190,23 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     final newTracks = _tracks;
     final oldIndex = old.panel.state['currentIndex'] as int? ?? 0;
     final newIndex = widget.panel.state['currentIndex'] as int? ?? 0;
-    if (oldIndex != newIndex ||
-        _trackPathAt(oldTracks, oldIndex) != _trackPathAt(newTracks, newIndex)) {
-      _openCurrentTrack(autoPlay: _userInitiated);
+    final oldPlaying = old.panel.state['playing'] as bool? ?? false;
+    final newPlaying = widget.panel.state['playing'] as bool? ?? false;
+
+    final trackChanged = oldIndex != newIndex ||
+        _trackPathAt(oldTracks, oldIndex) != _trackPathAt(newTracks, newIndex);
+
+    if (trackChanged) {
+      // Track changed — open it. Respect _userInitiated for autoPlay.
+      _openCurrentTrack(autoPlay: _userInitiated || newPlaying);
       _userInitiated = false;
+    } else if (!trackChanged && newPlaying != oldPlaying) {
+      // Only play/pause state changed via CLI or external state update.
+      if (newPlaying && !_player.state.playing) {
+        _player.play();
+      } else if (!newPlaying && _player.state.playing) {
+        _player.pause();
+      }
     }
   }
 
