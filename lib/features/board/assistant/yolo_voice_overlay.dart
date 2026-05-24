@@ -31,6 +31,8 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.particleScale = 0.3,
     this.responseFontSize = 18.0,
     this.borderSpeed = 1200,
+    this.restOrbAlignment = const Alignment(0.0, -0.10),
+    this.responseActionLabel = 'Tap to close',
     this.showIdleHint = true,
   });
 
@@ -57,6 +59,8 @@ class YoloVoiceOverlay extends StatefulWidget {
   final double particleScale;
   final double responseFontSize;
   final int borderSpeed;
+  final Alignment restOrbAlignment;
+  final String responseActionLabel;
   final bool showIdleHint;
 
   @override
@@ -73,19 +77,19 @@ enum _VS {
   responding;
 
   static _VS from(String s) => switch (s) {
-        'listening' => listening,
-        'processing' => processing,
-        'thinking' => thinking,
-        'responding' || 'output' => responding,
-        _ => idle,
-      };
+    'listening' => listening,
+    'processing' => processing,
+    'thinking' => thinking,
+    'responding' || 'output' => responding,
+    _ => idle,
+  };
 
   int get minMs => switch (this) {
-        processing => 600,
-        thinking => 500,
-        responding => 3000,
-        _ => 0,
-      };
+    processing => 600,
+    thinking => 500,
+    responding => 3000,
+    _ => 0,
+  };
 }
 
 // ─────────────────────────── main state ──────────────────────────────────────
@@ -172,8 +176,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
       // No min time required — but still step sequentially for forward moves
       final curIdx = _order.indexOf(_shown);
       final targetIdx = _order.indexOf(target);
-      final nextState =
-          (targetIdx > curIdx + 1) ? _order[curIdx + 1] : target;
+      final nextState = (targetIdx > curIdx + 1) ? _order[curIdx + 1] : target;
 
       setState(() {
         _shown = nextState;
@@ -199,23 +202,23 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   bool get _isResponse => _shown == _VS.responding;
 
   double get _orbSize => switch (_shown) {
-        _VS.listening => 260,
-        _VS.thinking => 250,
-        _VS.processing => 250,
-        _VS.responding => 220,
-        _VS.idle => 220,
-      };
+    _VS.listening => 260,
+    _VS.thinking => 250,
+    _VS.processing => 250,
+    _VS.responding => 220,
+    _VS.idle => 220,
+  };
 
   _OrbMode get _orbMode => switch (_shown) {
-        _VS.listening => _OrbMode.recording,
-        _VS.processing => _OrbMode.sending,
-        _VS.thinking => _OrbMode.thinking,
-        _VS.responding => _OrbMode.response,
-        _VS.idle => _OrbMode.ready,
-      };
+    _VS.listening => _OrbMode.recording,
+    _VS.processing => _OrbMode.sending,
+    _VS.thinking => _OrbMode.thinking,
+    _VS.responding => _OrbMode.response,
+    _VS.idle => _OrbMode.ready,
+  };
 
   Alignment get _orbAlign =>
-      _isResponse ? const Alignment(-0.40, -0.06) : const Alignment(0.0, -0.10);
+      _isResponse ? const Alignment(-0.40, -0.06) : widget.restOrbAlignment;
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -240,7 +243,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
       },
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: _isResponse ? widget.onHide : widget.onPrimaryAction,
+        onTap: widget.onPrimaryAction,
         child: SizedBox(
           width: _kW * widget.scale,
           height: _kH * widget.scale,
@@ -250,143 +253,153 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
               width: _kW,
               height: _kH,
               child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // ── orbit particles (thinking + processing) ────────────
-              AnimatedOpacity(
-                opacity: (_isThinking || _isSending) ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 700),
-                child: Center(
-                  child: _OrbitParticles(
-                    animate: (_isThinking || _isSending) && widget.animate,
-                    scale: widget.particleScale,
-                  ),
-                ),
-              ),
-
-              // ── upload beam (sending) — hidden, processing uses orb ──
-              const SizedBox.shrink(),
-
-              // ── waveform left (listening) ───────────────────────────
-              AnimatedOpacity(
-                opacity: _isListening ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 600),
-                child: Align(
-                  alignment: Alignment(-widget.waveSpread, -0.08),
-                  child: SizedBox(
-                    width: widget.waveWidth,
-                    height: 80,
-                    child: _Waveform(
-                      animate: _isListening && widget.animate,
-                      flip: true,
-                      barCount: widget.waveBarCount,
-                      amplitude: widget.waveAmplitude,
-                      speed: widget.waveSpeed,
+                fit: StackFit.expand,
+                children: [
+                  // ── orbit particles (thinking + processing) ────────────
+                  AnimatedOpacity(
+                    opacity: (_isThinking || _isSending) ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 700),
+                    child: Center(
+                      child: _OrbitParticles(
+                        animate: (_isThinking || _isSending) && widget.animate,
+                        scale: widget.particleScale,
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              // ── waveform right (listening) ─────────────────────────
-              AnimatedOpacity(
-                opacity: _isListening ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 600),
-                child: Align(
-                  alignment: Alignment(widget.waveSpread, -0.08),
-                  child: SizedBox(
-                    width: widget.waveWidth,
-                    height: 80,
-                    child: _Waveform(
-                      animate: _isListening && widget.animate,
-                      barCount: widget.waveBarCount,
-                      amplitude: widget.waveAmplitude,
-                      speed: widget.waveSpeed,
-                    ),
-                  ),
-                ),
-              ),
+                  // ── upload beam (sending) — hidden, processing uses orb ──
+                  const SizedBox.shrink(),
 
-              // ── THE ORB — persistent, smooth position + size ───────
-              AnimatedAlign(
-                alignment: _orbAlign,
-                duration: const Duration(milliseconds: 900),
-                curve: Curves.easeOutCubic,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: _orbSize),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutCubic,
-                  builder: (ctx, sz, _) => AnimatedBuilder(
-                    animation: _orbAnim,
-                    builder: (ctx, _) => SizedBox.square(
-                      dimension: sz * widget.orbScale,
-                      child: CustomPaint(
-                        painter: _BlobOrbPainter(
-                          progress: widget.animate ? _orbAnim.value : 0.23,
-                          mode: _orbMode,
-                          bgColor: Theme.of(ctx).scaffoldBackgroundColor,
-                          ovalWidth: widget.ovalWidth,
-                          ovalHeight: widget.ovalHeight,
+                  // ── waveform left (listening) ───────────────────────────
+                  AnimatedOpacity(
+                    opacity: _isListening ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 600),
+                    child: Align(
+                      alignment: Alignment(-widget.waveSpread, -0.08),
+                      child: SizedBox(
+                        width: widget.waveWidth,
+                        height: 80,
+                        child: _Waveform(
+                          animate: _isListening && widget.animate,
+                          flip: true,
+                          barCount: widget.waveBarCount,
+                          amplitude: widget.waveAmplitude,
+                          speed: widget.waveSpeed,
                         ),
-                        child: Center(child: _orbLabel(sz)),
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              // ── response card (slides in from right) ──────────────
-              AnimatedOpacity(
-                opacity: _isResponse ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 900),
-                child: IgnorePointer(
-                  ignoring: !_isResponse,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                        right: 18,
-                        left: 200,
-                        top: 20,
-                      bottom: 36,
-                      ),
-                      child: _ResponseCard(
-                        response: widget.response,
-                        streaming: widget.status == 'responding',
-                        animate: widget.animate,
-                        fontSize: widget.responseFontSize,
-                        borderSpeed: widget.borderSpeed,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // ── bottom text (non-response states) ──────────────────
-              AnimatedOpacity(
-                opacity: _isResponse ? 0.0 : 1.0,
-                duration: const Duration(milliseconds: 600),
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 650),
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeIn,
-                          transitionBuilder: (child, anim) =>
-                              FadeTransition(opacity: anim, child: child),
-                          child: _textContent(),
+                  // ── waveform right (listening) ─────────────────────────
+                  AnimatedOpacity(
+                    opacity: _isListening ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 600),
+                    child: Align(
+                      alignment: Alignment(widget.waveSpread, -0.08),
+                      child: SizedBox(
+                        width: widget.waveWidth,
+                        height: 80,
+                        child: _Waveform(
+                          animate: _isListening && widget.animate,
+                          barCount: widget.waveBarCount,
+                          amplitude: widget.waveAmplitude,
+                          speed: widget.waveSpeed,
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+
+                  // ── THE ORB — persistent, smooth position + size ───────
+                  AnimatedAlign(
+                    alignment: _orbAlign,
+                    duration: const Duration(milliseconds: 900),
+                    curve: Curves.easeOutCubic,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(end: _orbSize),
+                      duration: const Duration(milliseconds: 900),
+                      curve: Curves.easeOutCubic,
+                      builder:
+                          (ctx, sz, _) => AnimatedBuilder(
+                            animation: _orbAnim,
+                            builder:
+                                (ctx, _) => SizedBox.square(
+                                  dimension: sz * widget.orbScale,
+                                  child: CustomPaint(
+                                    painter: _BlobOrbPainter(
+                                      progress:
+                                          widget.animate
+                                              ? _orbAnim.value
+                                              : 0.23,
+                                      mode: _orbMode,
+                                      bgColor:
+                                          Theme.of(ctx).scaffoldBackgroundColor,
+                                      ovalWidth: widget.ovalWidth,
+                                      ovalHeight: widget.ovalHeight,
+                                    ),
+                                    child: Center(child: _orbLabel(sz)),
+                                  ),
+                                ),
+                          ),
+                    ),
+                  ),
+
+                  // ── response card (slides in from right) ──────────────
+                  AnimatedOpacity(
+                    opacity: _isResponse ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 900),
+                    child: IgnorePointer(
+                      ignoring: !_isResponse,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                            right: 18,
+                            left: 200,
+                            top: 20,
+                            bottom: 36,
+                          ),
+                          child: _ResponseCard(
+                            response: widget.response,
+                            streaming: widget.status == 'responding',
+                            animate: widget.animate,
+                            fontSize: widget.responseFontSize,
+                            borderSpeed: widget.borderSpeed,
+                            actionLabel: widget.responseActionLabel,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ── bottom text (non-response states) ──────────────────
+                  AnimatedOpacity(
+                    opacity: _isResponse ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 600),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 650),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder:
+                                  (child, anim) => FadeTransition(
+                                    opacity: anim,
+                                    child: child,
+                                  ),
+                              child: _textContent(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
             ),
           ),
         ),
@@ -395,64 +408,65 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   }
 
   Widget _orbLabel(double sz) => ShaderMask(
-        shaderCallback: (b) => LinearGradient(
-          colors: widget.titleColor != null
-              ? [widget.titleColor!, widget.titleColor!]
-              : const [Color(0xFF64DFFF), Color(0xFFB980FF)],
+    shaderCallback:
+        (b) => LinearGradient(
+          colors:
+              widget.titleColor != null
+                  ? [widget.titleColor!, widget.titleColor!]
+                  : const [Color(0xFF64DFFF), Color(0xFFB980FF)],
         ).createShader(b),
-        child: Text(
-          'YoLo',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: widget.titleFontSize ?? sz * 0.15,
-            fontWeight: FontWeight.w300,
-            letterSpacing: -0.8,
-            shadows: const [
-              Shadow(color: Color(0xAA63B8FF), blurRadius: 16),
-            ],
-          ),
-        ),
-      );
+    child: Text(
+      'YoLo',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: widget.titleFontSize ?? sz * 0.15,
+        fontWeight: FontWeight.w300,
+        letterSpacing: -0.8,
+        shadows: const [Shadow(color: Color(0xAA63B8FF), blurRadius: 16)],
+      ),
+    ),
+  );
 
   Widget _textContent() => KeyedSubtree(
-        key: ValueKey(_shown),
-        child: switch (_shown) {
-          _VS.idle => widget.showIdleHint
-              ? const _TextBlock(
-                  primary: 'Click or speak to start',
-                  primaryColor: Color(0xFFB5B6C8),
-                  primarySize: 17,
-                )
-              : const SizedBox.shrink(),
-          _VS.listening => const _TextBlock(
-              primary: 'Recording...',
-              primaryColor: Color(0xFFCCCCE0),
+    key: ValueKey(_shown),
+    child: switch (_shown) {
+      _VS.idle =>
+        widget.showIdleHint
+            ? const _TextBlock(
+              primary: 'Click or speak to start',
+              primaryColor: Color(0xFFB5B6C8),
               primarySize: 17,
-              secondary: 'Esc to cancel  •  Space to send',
-              secondaryColor: Color(0xFF9293A6),
-              secondarySize: 14,
-            ),
-          _VS.processing => const _TextBlock(
-              primary: 'Processing...',
-              primaryColor: Color(0xFF62C9FF),
-              primarySize: 18,
-              primaryBold: true,
-              secondary: 'Please wait',
-              secondaryColor: Color(0xFF9A9BAD),
-              secondarySize: 15,
-            ),
-          _VS.thinking => const _TextBlock(
-              primary: 'Thinking...',
-              primaryColor: Color(0xFFD58BFF),
-              primarySize: 18,
-              primaryBold: true,
-              secondary: 'Waiting for response...',
-              secondaryColor: Color(0xFF9A9BAD),
-              secondarySize: 15,
-            ),
-          _VS.responding => const SizedBox.shrink(),
-        },
-      );
+            )
+            : const SizedBox.shrink(),
+      _VS.listening => const _TextBlock(
+        primary: 'Recording...',
+        primaryColor: Color(0xFFCCCCE0),
+        primarySize: 17,
+        secondary: 'Esc to cancel  •  Space to send',
+        secondaryColor: Color(0xFF9293A6),
+        secondarySize: 14,
+      ),
+      _VS.processing => const _TextBlock(
+        primary: 'Processing...',
+        primaryColor: Color(0xFF62C9FF),
+        primarySize: 18,
+        primaryBold: true,
+        secondary: 'Please wait',
+        secondaryColor: Color(0xFF9A9BAD),
+        secondarySize: 15,
+      ),
+      _VS.thinking => const _TextBlock(
+        primary: 'Thinking...',
+        primaryColor: Color(0xFFD58BFF),
+        primarySize: 18,
+        primaryBold: true,
+        secondary: 'Waiting for response...',
+        secondaryColor: Color(0xFF9A9BAD),
+        secondarySize: 15,
+      ),
+      _VS.responding => const SizedBox.shrink(),
+    },
+  );
 }
 
 // ─────────────────────────── text block ──────────────────────────────────────
@@ -545,6 +559,7 @@ class _ResponseCard extends StatefulWidget {
     this.animate = true,
     this.fontSize = 18.0,
     this.borderSpeed = 1200,
+    this.actionLabel = 'Tap to close',
   });
 
   final String response;
@@ -552,6 +567,7 @@ class _ResponseCard extends StatefulWidget {
   final bool animate;
   final double fontSize;
   final int borderSpeed;
+  final String actionLabel;
 
   @override
   State<_ResponseCard> createState() => _ResponseCardState();
@@ -617,8 +633,10 @@ class _ResponseCardState extends State<_ResponseCard>
         _typingAnim = AnimationController(
           vsync: this,
           duration: Duration(
-            milliseconds:
-                ((widget.response.length - oldLen) * 30).clamp(100, 4000),
+            milliseconds: ((widget.response.length - oldLen) * 30).clamp(
+              100,
+              4000,
+            ),
           ),
           lowerBound: oldLen / widget.response.length.clamp(1, 99999),
         );
@@ -642,66 +660,72 @@ class _ResponseCardState extends State<_ResponseCard>
 
   @override
   Widget build(BuildContext context) {
-    final fullText = widget.response.trim().isEmpty
-        ? 'YoLo! Here is what I found for you...'
-        : widget.response.trim();
-    final displayText = widget.streaming
-        ? fullText.substring(0, _visibleChars.clamp(0, fullText.length))
-        : fullText;
+    final fullText =
+        widget.response.trim().isEmpty
+            ? 'YoLo! Here is what I found for you...'
+            : widget.response.trim();
+    final displayText =
+        widget.streaming
+            ? fullText.substring(0, _visibleChars.clamp(0, fullText.length))
+            : fullText;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: AnimatedBuilder(
-          animation: _borderAnim,
-          builder: (ctx, child) => CustomPaint(
-            painter: widget.streaming
-                ? _RunningBorderPainter(
-                    progress: _borderAnim.value,
-                    radius: 28,
-                  )
-                : null,
-            child: child,
-          ),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 620),
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-            decoration: BoxDecoration(
-              color: const Color(0xF2181A24),
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF9B6BFF)
-                      .withValues(alpha: widget.streaming ? 0.30 : 0.08),
-                  blurRadius: widget.streaming ? 40 : 18,
-                  spreadRadius: -6,
+            animation: _borderAnim,
+            builder:
+                (ctx, child) => CustomPaint(
+                  painter:
+                      widget.streaming
+                          ? _RunningBorderPainter(
+                            progress: _borderAnim.value,
+                            radius: 28,
+                          )
+                          : null,
+                  child: child,
                 ),
-              ],
-            ),
-            child: Text(
-              displayText,
-              maxLines: 8,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.95),
-                fontSize: widget.fontSize,
-                height: 1.52,
-                fontWeight: FontWeight.w500,
-                shadows: widget.streaming
-                    ? const [
-                        Shadow(color: Color(0x889B6BFF), blurRadius: 14),
-                      ]
-                    : const [],
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 620),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+              decoration: BoxDecoration(
+                color: const Color(0xF2181A24),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(
+                      0xFF9B6BFF,
+                    ).withValues(alpha: widget.streaming ? 0.30 : 0.08),
+                    blurRadius: widget.streaming ? 40 : 18,
+                    spreadRadius: -6,
+                  ),
+                ],
+              ),
+              child: Text(
+                displayText,
+                maxLines: 8,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  fontSize: widget.fontSize,
+                  height: 1.52,
+                  fontWeight: FontWeight.w500,
+                  shadows:
+                      widget.streaming
+                          ? const [
+                            Shadow(color: Color(0x889B6BFF), blurRadius: 14),
+                          ]
+                          : const [],
+                ),
               ),
             ),
           ),
         ),
-        ),
         const SizedBox(height: 8),
-        const Padding(
-          padding: EdgeInsets.only(left: 18),
+        Padding(
+          padding: const EdgeInsets.only(left: 18),
           child: _GlowText(
-            'Tap to close',
+            widget.actionLabel,
             size: 14,
             color: Color(0xFF8C8D9E),
           ),
@@ -734,7 +758,8 @@ class _RunningBorderPainter extends CustomPainter {
     for (var s = 0; s < segments; s++) {
       final segFrac = s / segments;
       final segStart = (startDist + headLen * segFrac) % totalLen;
-      final segEnd = (startDist + headLen * (segFrac + 1.0 / segments)) % totalLen;
+      final segEnd =
+          (startDist + headLen * (segFrac + 1.0 / segments)) % totalLen;
 
       Path sub;
       if (segEnd > segStart) {
@@ -746,18 +771,20 @@ class _RunningBorderPainter extends CustomPainter {
 
       // Color transitions along the trail: head bright, tail fading
       final t = segFrac;
-      final color = Color.lerp(
-        const Color(0xFFFF60DD), // tail: pink
-        const Color(0xFF64DFFF), // head: cyan
-        t,
-      )!;
+      final color =
+          Color.lerp(
+            const Color(0xFFFF60DD), // tail: pink
+            const Color(0xFF64DFFF), // head: cyan
+            t,
+          )!;
       final alpha = (0.15 + t * 0.85).clamp(0.0, 1.0);
 
-      final paint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0 + t * 0.5
-        ..strokeCap = StrokeCap.round
-        ..color = color.withValues(alpha: alpha);
+      final paint =
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.0 + t * 0.5
+            ..strokeCap = StrokeCap.round
+            ..color = color.withValues(alpha: alpha);
 
       canvas.drawPath(sub, paint);
     }
@@ -767,9 +794,10 @@ class _RunningBorderPainter extends CustomPainter {
       (startDist + headLen) % totalLen,
     );
     if (headPos != null) {
-      final glowPaint = Paint()
-        ..color = const Color(0xFF64DFFF).withValues(alpha: 0.6)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      final glowPaint =
+          Paint()
+            ..color = const Color(0xFF64DFFF).withValues(alpha: 0.6)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
       canvas.drawCircle(headPos.position, 3, glowPaint);
     }
   }
@@ -810,9 +838,9 @@ Path _buildPlectrumPath({
   ];
 
   Offset rotate(Offset p) => Offset(
-        center.dx + p.dx * cosR - p.dy * sinR,
-        center.dy + p.dx * sinR + p.dy * cosR,
-      );
+    center.dx + p.dx * cosR - p.dy * sinR,
+    center.dy + p.dx * sinR + p.dy * cosR,
+  );
   final rPts = pts.map(rotate).toList();
 
   // Smooth Catmull-Rom cubic spline (divisor 5)
@@ -850,9 +878,10 @@ void _paintPlectrum(
   double intensity = 1.0,
 }) {
   // Shadow
-  final shadowPaint = Paint()
-    ..color = color.withValues(alpha: 0.12 * intensity)
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+  final shadowPaint =
+      Paint()
+        ..color = color.withValues(alpha: 0.12 * intensity)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
   canvas.drawPath(path, shadowPaint);
 
   // Gradient endpoints match exactly the shape's top/bottom after rotation.
@@ -864,28 +893,31 @@ void _paintPlectrum(
 
   // Wide end (top of unrotated shape) → OPAQUE
   final gradStart = Offset(
-    center.dx + 0 * cosR - (-halfH) * sinR,   // = center.dx + halfH * sinR
-    center.dy + 0 * sinR + (-halfH) * cosR,   // = center.dy - halfH * cosR
+    center.dx + 0 * cosR - (-halfH) * sinR, // = center.dx + halfH * sinR
+    center.dy + 0 * sinR + (-halfH) * cosR, // = center.dy - halfH * cosR
   );
   // Narrow tip (bottom of unrotated shape) → TRANSPARENT
   final gradEnd = Offset(
-    center.dx + 0 * cosR - halfH * sinR,       // = center.dx - halfH * sinR
-    center.dy + 0 * sinR + halfH * cosR,       // = center.dy + halfH * cosR
+    center.dx + 0 * cosR - halfH * sinR, // = center.dx - halfH * sinR
+    center.dy + 0 * sinR + halfH * cosR, // = center.dy + halfH * cosR
   );
 
-  final fillPaint = Paint()
-    ..shader = ui.Gradient.linear(
-      gradStart,
-      gradEnd,
-      [
-        color.withValues(alpha: 0.55 * intensity),   // wide end: fully visible
-        color.withValues(alpha: 0.45 * intensity),   // still visible
-        color.withValues(alpha: 0.18 * intensity),   // ~55%: fading
-        color.withValues(alpha: 0.05 * intensity),   // ~80%: almost gone
-        color.withValues(alpha: 0.0),                // tip: fully transparent
-      ],
-      [0.0, 0.3, 0.55, 0.8, 1.0],
-    );
+  final fillPaint =
+      Paint()
+        ..shader = ui.Gradient.linear(
+          gradStart,
+          gradEnd,
+          [
+            color.withValues(
+              alpha: 0.55 * intensity,
+            ), // wide end: fully visible
+            color.withValues(alpha: 0.45 * intensity), // still visible
+            color.withValues(alpha: 0.18 * intensity), // ~55%: fading
+            color.withValues(alpha: 0.05 * intensity), // ~80%: almost gone
+            color.withValues(alpha: 0.0), // tip: fully transparent
+          ],
+          [0.0, 0.3, 0.55, 0.8, 1.0],
+        );
   canvas.drawPath(path, fillPaint);
 }
 
@@ -965,15 +997,16 @@ class _BlobOrbPainter extends CustomPainter {
     };
 
     // Soft ambient glow behind everything
-    final glowPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          colors[0].withValues(alpha: 0.10 * intensity),
-          colors[2].withValues(alpha: 0.06 * intensity),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: r * 1.35))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+    final glowPaint =
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              colors[0].withValues(alpha: 0.10 * intensity),
+              colors[2].withValues(alpha: 0.06 * intensity),
+              Colors.transparent,
+            ],
+          ).createShader(Rect.fromCircle(center: center, radius: r * 1.35))
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
     canvas.drawCircle(center, r * 1.2, glowPaint);
 
     // Draw 5 plectrum blobs using shared painter
@@ -990,7 +1023,8 @@ class _BlobOrbPainter extends CustomPainter {
       final blobH = blobW * cfg.aspect;
 
       final rng = math.Random(i * 42 + 7);
-      final wobble = 1.0 +
+      final wobble =
+          1.0 +
           math.sin(t * 2 + rng.nextDouble() * 0.3) * 0.03 +
           math.cos(t * 1 + rng.nextDouble() * 0.2) * 0.02;
       final rw = blobW / 2 * wobble;
@@ -1003,8 +1037,15 @@ class _BlobOrbPainter extends CustomPainter {
         rh: rh,
         rotation: rot,
       );
-      _paintPlectrum(canvas, path, rot, colors[i], blobCenter, rh * 2,
-          intensity: intensity);
+      _paintPlectrum(
+        canvas,
+        path,
+        rot,
+        colors[i],
+        blobCenter,
+        rh * 2,
+        intensity: intensity,
+      );
     }
 
     // Center overlay: horizontal oval in theme color
@@ -1016,18 +1057,19 @@ class _BlobOrbPainter extends CustomPainter {
       height: ovalH * 2,
     );
 
-    final centerPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          bgColor,
-          bgColor,
-          bgColor.withValues(alpha: 0.70),
-          bgColor.withValues(alpha: 0.25),
-          bgColor.withValues(alpha: 0.05),
-          bgColor.withValues(alpha: 0.0),
-        ],
-        stops: const [0.0, 0.25, 0.45, 0.65, 0.85, 1.0],
-      ).createShader(ovalRect);
+    final centerPaint =
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              bgColor,
+              bgColor,
+              bgColor.withValues(alpha: 0.70),
+              bgColor.withValues(alpha: 0.25),
+              bgColor.withValues(alpha: 0.05),
+              bgColor.withValues(alpha: 0.0),
+            ],
+            stops: const [0.0, 0.25, 0.45, 0.65, 0.85, 1.0],
+          ).createShader(ovalRect);
 
     // Draw as oval path
     final centerPath = Path()..addOval(ovalRect);
@@ -1064,8 +1106,7 @@ class _Waveform extends StatefulWidget {
   State<_Waveform> createState() => _WaveformState();
 }
 
-class _WaveformState extends State<_Waveform>
-    with TickerProviderStateMixin {
+class _WaveformState extends State<_Waveform> with TickerProviderStateMixin {
   late AnimationController _c;
 
   @override
@@ -1109,8 +1150,9 @@ class _WaveformState extends State<_Waveform>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _c,
-        builder: (ctx, _) => CustomPaint(
+    animation: _c,
+    builder:
+        (ctx, _) => CustomPaint(
           painter: _WaveformPainter(
             progress: widget.animate ? _c.value : 0.42,
             flip: widget.flip,
@@ -1118,7 +1160,7 @@ class _WaveformState extends State<_Waveform>
             amplitude: widget.amplitude,
           ),
         ),
-      );
+  );
 }
 
 class _WaveformPainter extends CustomPainter {
@@ -1152,12 +1194,12 @@ class _WaveformPainter extends CustomPainter {
         final frac = i / count;
         final x = frac * size.width;
         // Multi-frequency organic wave (all t multipliers must be integers for seamless loop)
-        final wave = math.sin(t + frac * 8 + phaseShift) * 0.5 +
+        final wave =
+            math.sin(t + frac * 8 + phaseShift) * 0.5 +
             math.sin(t * 2 + frac * 12 + phaseShift * 1.5) * 0.3 +
             math.cos(t * 3 + frac * 5 + phaseShift * 0.7) * 0.2;
         // Taper at edges
-        final envelope =
-            math.sin(frac * math.pi).clamp(0.0, 1.0);
+        final envelope = math.sin(frac * math.pi).clamp(0.0, 1.0);
         final y = cy + wave * size.height * 0.4 * ampScale * envelope;
         points.add(Offset(flip ? size.width - x : x, y));
       }
@@ -1175,25 +1217,28 @@ class _WaveformPainter extends CustomPainter {
       path.lineTo(points.last.dx, cy);
       path.close();
 
-      final colorStart = Color.lerp(
-        const Color(0xFF66D4FF),
-        const Color(0xFFFF6EE0),
-        layer / 2.0,
-      )!;
-      final colorEnd = Color.lerp(
-        const Color(0xFFB980FF),
-        const Color(0xFF4066FF),
-        layer / 2.0,
-      )!;
+      final colorStart =
+          Color.lerp(
+            const Color(0xFF66D4FF),
+            const Color(0xFFFF6EE0),
+            layer / 2.0,
+          )!;
+      final colorEnd =
+          Color.lerp(
+            const Color(0xFFB980FF),
+            const Color(0xFF4066FF),
+            layer / 2.0,
+          )!;
 
-      final paint = Paint()
-        ..style = PaintingStyle.fill
-        ..shader = LinearGradient(
-          colors: [
-            colorStart.withValues(alpha: 0.45 - layer * 0.10),
-            colorEnd.withValues(alpha: 0.45 - layer * 0.10),
-          ],
-        ).createShader(Offset.zero & size);
+      final paint =
+          Paint()
+            ..style = PaintingStyle.fill
+            ..shader = LinearGradient(
+              colors: [
+                colorStart.withValues(alpha: 0.45 - layer * 0.10),
+                colorEnd.withValues(alpha: 0.45 - layer * 0.10),
+              ],
+            ).createShader(Offset.zero & size);
 
       canvas.drawPath(path, paint);
     }
@@ -1201,8 +1246,10 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _WaveformPainter old) =>
-      old.progress != progress || old.flip != flip ||
-      old.barCount != barCount || old.amplitude != amplitude;
+      old.progress != progress ||
+      old.flip != flip ||
+      old.barCount != barCount ||
+      old.amplitude != amplitude;
 }
 
 // ─────────────────────────── upload beam ─────────────────────────────────────
@@ -1242,17 +1289,18 @@ class _UploadBeamState extends State<_UploadBeam>
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 80,
-        height: 120,
-        child: AnimatedBuilder(
-          animation: _c,
-          builder: (ctx, _) => CustomPaint(
+    width: 80,
+    height: 120,
+    child: AnimatedBuilder(
+      animation: _c,
+      builder:
+          (ctx, _) => CustomPaint(
             painter: _UploadBeamPainter(
               progress: widget.animate ? _c.value : 0.3,
             ),
           ),
-        ),
-      );
+    ),
+  );
 }
 
 class _UploadBeamPainter extends CustomPainter {
@@ -1264,15 +1312,17 @@ class _UploadBeamPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
     // Arrow head
-    final arrow = Paint()
-      ..color = const Color(0xFFC081FF)
-      ..strokeWidth = 3.5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final path = Path()
-      ..moveTo(cx - 14, 26)
-      ..lineTo(cx, 8)
-      ..lineTo(cx + 14, 26);
+    final arrow =
+        Paint()
+          ..color = const Color(0xFFC081FF)
+          ..strokeWidth = 3.5
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke;
+    final path =
+        Path()
+          ..moveTo(cx - 14, 26)
+          ..lineTo(cx, 8)
+          ..lineTo(cx + 14, 26);
     canvas.drawPath(path, arrow);
 
     // Dotted beam
@@ -1350,14 +1400,15 @@ class _OrbitParticlesState extends State<_OrbitParticles>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _c,
-        builder: (ctx, _) => CustomPaint(
+    animation: _c,
+    builder:
+        (ctx, _) => CustomPaint(
           size: Size(320 * widget.scale, 320 * widget.scale),
           painter: _ScatteredParticlesPainter(
             progress: widget.animate ? _c.value : 0.2,
           ),
         ),
-      );
+  );
 }
 
 class _ScatteredParticlesPainter extends CustomPainter {
@@ -1386,18 +1437,18 @@ class _ScatteredParticlesPainter extends CustomPainter {
     final paint = Paint();
 
     for (final p in _particles) {
-      final angle =
-          progress * 2 * math.pi * p.speed + p.angleOffset;
+      final angle = progress * 2 * math.pi * p.speed + p.angleOffset;
       final orbitR = halfW * p.radiusBase;
       // Slightly elliptical
       final x = center.dx + math.cos(angle) * orbitR;
       final y = center.dy + math.sin(angle) * orbitR * 0.72;
 
-      final color = Color.lerp(
-        const Color(0xFF4FAAFF),
-        const Color(0xFFD868FF),
-        p.colorT,
-      )!;
+      final color =
+          Color.lerp(
+            const Color(0xFF4FAAFF),
+            const Color(0xFFD868FF),
+            p.colorT,
+          )!;
 
       if (p.bright) {
         paint
@@ -1455,16 +1506,18 @@ class _ThinkingDotsState extends State<_ThinkingDots>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _c,
-        builder: (ctx, _) => Row(
+    animation: _c,
+    builder:
+        (ctx, _) => Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(4, (i) {
             final w = math.sin(_c.value * 2 * math.pi + i * 0.7);
-            final color = Color.lerp(
-              const Color(0xFFFF73F6),
-              const Color(0xFF5B5DFF),
-              i / 3,
-            )!;
+            final color =
+                Color.lerp(
+                  const Color(0xFFFF73F6),
+                  const Color(0xFF5B5DFF),
+                  i / 3,
+                )!;
             final d = 12.0 + w * 2.0;
             return Container(
               width: d,
@@ -1483,7 +1536,7 @@ class _ThinkingDotsState extends State<_ThinkingDots>
             );
           }),
         ),
-      );
+  );
 }
 
 // ─────────────────────────── single plectrum preview ─────────────────────────
@@ -1526,8 +1579,9 @@ class _SinglePlectrumPreviewState extends State<SinglePlectrumPreview>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _anim,
-        builder: (ctx, _) => CustomPaint(
+    animation: _anim,
+    builder:
+        (ctx, _) => CustomPaint(
           size: Size(widget.size, widget.size),
           painter: _SinglePlectrumPainter(
             color: widget.color,
@@ -1535,7 +1589,7 @@ class _SinglePlectrumPreviewState extends State<SinglePlectrumPreview>
             progress: _anim.value,
           ),
         ),
-      );
+  );
 }
 
 class _SinglePlectrumPainter extends CustomPainter {
@@ -1571,5 +1625,7 @@ class _SinglePlectrumPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SinglePlectrumPainter old) =>
-      old.progress != progress || old.color != color || old.rotation != rotation;
+      old.progress != progress ||
+      old.color != color ||
+      old.rotation != rotation;
 }

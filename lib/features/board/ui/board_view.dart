@@ -995,7 +995,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             Positioned(
                               left: 0,
                               right: 0,
-                              top: 0,
                               bottom: 22,
                               child: _YoloBadgeWithChat(),
                             ),
@@ -5846,8 +5845,10 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       case 'processing':
       case 'thinking':
       case 'responding':
-      case 'output':
         return;
+      case 'output':
+        await _activateVoiceOverlay();
+        break;
       case 'ready':
         if (_voiceDraft.trim().isNotEmpty) {
           await _assistantController.sendDraft();
@@ -5938,7 +5939,9 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           child: Opacity(opacity: _entranceFade.value, child: child),
         );
       },
-      child: SizedBox.expand(
+      child: SizedBox(
+        width: double.infinity,
+        height: 540,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -6087,6 +6090,8 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       particleScale: 0.80,
       responseFontSize: 15.0,
       borderSpeed: 1700,
+      restOrbAlignment: const Alignment(0.78, -0.10),
+      responseActionLabel: 'Tap YoLo to speak',
       showIdleHint: false,
     );
   }
