@@ -398,7 +398,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         if (mirrorToOverlay && mounted) {
           _syncOverlayState(
             draftOverride: '',
-            forcedStatus: 'responding',
+            forcedStatus: 'processing',
             responseOverride: _composeOverlayResponse('', overlayToolLogs),
             promptOverride: overlayPrompt,
             hiddenOverride: false,
@@ -457,11 +457,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       var emitted = '';
       var firstTokenReceived = false;
 
-      // Transition overlay from 'processing' to 'thinking' — request is sent
+      // Keep overlay in processing until first assistant tokens start streaming.
       if (mirrorToOverlay && mounted) {
         _syncOverlayState(
           draftOverride: '',
-          forcedStatus: 'thinking',
+          forcedStatus: 'processing',
           responseOverride: '',
           promptOverride: overlayPrompt,
           hiddenOverride: false,
@@ -497,6 +497,16 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           case ChatEventType.toolStart:
             final toolName = event.data['toolName'] as String? ?? '';
             final args = event.data['arguments'] as Map<String, Object?>? ?? {};
+            overlayToolLogs.add('⏳ running: $toolName');
+            if (mirrorToOverlay && mounted) {
+              _syncOverlayState(
+                draftOverride: '',
+                forcedStatus: 'processing',
+                responseOverride: _composeOverlayResponse('', overlayToolLogs),
+                promptOverride: overlayPrompt,
+                hiddenOverride: false,
+              );
+            }
             _appendToolMessage(
               callId:
                   event.data['toolCallId'] as String? ??
@@ -627,7 +637,12 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       'messages': current,
       if (mirrorToOverlay && !_voiceOverlayHidden) ...{
         'voiceResponse': _composeOverlayResponse(content, overlayToolLogs),
-        'assistantStatus': _isGeneratingReply ? 'responding' : 'output',
+        'assistantStatus':
+            _isGeneratingReply && content.trim().isEmpty
+                ? 'processing'
+                : _isGeneratingReply
+                ? 'responding'
+                : 'output',
       },
     });
     _scrollToBottom();
