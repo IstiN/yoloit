@@ -269,6 +269,14 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     widget.onUpdateState(merged);
   }
 
+  Map<String, dynamic>? _takePendingAsrDebug() {
+    final raw = widget.panel.state['lastAsrDebug'];
+    if (raw is! Map) return null;
+    final asr = Map<String, dynamic>.from(raw);
+    _updateState({'lastAsrDebug': null});
+    return asr;
+  }
+
   Future<void> _sendMessage({bool mirrorToOverlay = false}) async {
     if (_isGeneratingReply) return;
     final rawText = _inputController.text.trim();
@@ -342,12 +350,15 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       );
     }
 
+    final asrDebug = mirrorToOverlay ? _takePendingAsrDebug() : null;
+
     // ── Debug session ──────────────────────────────────────────────────────
     final dbg = <String, dynamic>{
       'id': 'dbg-${DateTime.now().millisecondsSinceEpoch}',
       'userMessage': text,
       'requestAt': DateTime.now().toIso8601String(),
       'toolCalls': <Map<String, dynamic>>[],
+      if (asrDebug != null) 'asr': asrDebug,
     };
     _activeDebugSession = dbg;
 
@@ -2168,10 +2179,19 @@ $messagesJson
 
     final voiceSettings =
         await CloudLlmSettingsService.instance.loadVoiceSettings();
+    final asrMode = voiceSettings.useCloudAsr ? 'cloud' : 'local';
+    final asrStartedAt = DateTime.now().toIso8601String();
+    final asrStopwatch = Stopwatch()..start();
+    var asrStatus = 'ok';
+    var asrTranscriptChars = 0;
+    String? asrError;
 
     var shouldSend = false;
     try {
-      if (path == null || path.isEmpty) return;
+      if (path == null || path.isEmpty) {
+        asrStatus = 'no_audio';
+        return;
+      }
 
       if (voiceSettings.useCloudAsr) {
         // ── Cloud ASR: transcribe with configured cloud provider/model ───────
@@ -2181,6 +2201,7 @@ $messagesJson
         );
         if (!mounted) return;
         final text = transcript.trim();
+        asrTranscriptChars = text.length;
         if (text.isNotEmpty) {
           final current = _inputController.text.trim();
           _inputController.text =
@@ -2198,6 +2219,7 @@ $messagesJson
 
         if (!mounted) return;
         final text = transcript.trim();
+        asrTranscriptChars = text.length;
         if (text.isNotEmpty) {
           final current = _inputController.text.trim();
           _inputController.text =
@@ -2210,12 +2232,26 @@ $messagesJson
         }
       }
     } catch (e) {
+      asrStatus = 'error';
+      asrError = '$e';
       if (!mounted) return;
       await _showCopyableErrorDialog(
         title: 'ASR error',
         message: 'ASR failed:\n$e',
       );
     } finally {
+      asrStopwatch.stop();
+      _updateState({
+        'lastAsrDebug': {
+          'mode': asrMode,
+          'status': asrStatus,
+          'startedAt': asrStartedAt,
+          'completedAt': DateTime.now().toIso8601String(),
+          'durationMs': asrStopwatch.elapsedMilliseconds,
+          'transcriptChars': asrTranscriptChars,
+          if (asrError != null) 'error': asrError,
+        },
+      });
       if (path != null && path.isNotEmpty) {
         final f = File(path);
         if (f.existsSync()) {
@@ -2850,6 +2886,25 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       buf.writeln('  → total: ${totalMs}ms');
     }
     buf.writeln();
+
+    final asr = s['asr'] as Map?;
+    if (asr != null) {
+      buf.writeln('ASR timings:');
+      buf.writeln('  mode:         ${asr['mode'] ?? '-'}');
+      buf.writeln('  status:       ${asr['status'] ?? '-'}');
+      buf.writeln('  startedAt:    ${asr['startedAt'] ?? '-'}');
+      buf.writeln('  completedAt:  ${asr['completedAt'] ?? '-'}');
+      final asrMs = asr['durationMs'];
+      buf.writeln('  total:        ${asrMs != null ? '${asrMs}ms' : '-'}');
+      final chars = asr['transcriptChars'];
+      if (chars != null) {
+        buf.writeln('  transcript:   ${chars} chars');
+      }
+      if (asr['error'] != null) {
+        buf.writeln('  error:        ${asr['error']}');
+      }
+      buf.writeln();
+    }
 
     if (s['error'] != null) {
       buf.writeln('ERROR: ${s['error']}');

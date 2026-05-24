@@ -233,7 +233,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   double get _responseCardBottomPadding {
     final orbCenterY = ((_orbAlign.y + 1) * 0.5) * _kH;
     final orbRadius = (_orbSize * widget.orbScale) * 0.5;
-    final cardBottomY = orbCenterY - orbRadius + 6;
+    final cardBottomY = orbCenterY - orbRadius + 16;
     return (_kH - cardBottomY).clamp(44.0, 180.0);
   }
 
@@ -748,8 +748,8 @@ class _ResponseCardState extends State<_ResponseCard>
                     BoxShadow(
                       color: const Color(
                         0xFF9B6BFF,
-                      ).withValues(alpha: widget.streaming ? 0.30 : 0.08),
-                      blurRadius: widget.streaming ? 40 : 18,
+                      ).withValues(alpha: widget.streaming ? 0.30 : 0.16),
+                      blurRadius: widget.streaming ? 40 : 24,
                       spreadRadius: -6,
                     ),
                   ],
@@ -776,15 +776,12 @@ class _ResponseCardState extends State<_ResponseCard>
                                       fontSize: widget.fontSize,
                                       height: 1.52,
                                       fontWeight: FontWeight.w500,
-                                      shadows:
-                                          widget.streaming
-                                              ? const [
-                                                Shadow(
-                                                  color: Color(0x889B6BFF),
-                                                  blurRadius: 14,
-                                                ),
-                                              ]
-                                              : const [],
+                                      shadows: const [
+                                        Shadow(
+                                          color: Color(0x889B6BFF),
+                                          blurRadius: 14,
+                                        ),
+                                      ],
                                     ),
                                     h1: TextStyle(
                                       color: Colors.white.withValues(
