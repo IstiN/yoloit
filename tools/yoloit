@@ -1780,7 +1780,7 @@ PYEOF
     bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
     w=1280; h=800
     if [[ -n "${1:-}" ]]; then w="${1%%x*}"; h="${1##*x}"; fi
-    _put "/boards/${bid}" "{\"fit\":true,\"viewportWidth\":${w},\"viewportHeight\":${h}}" | python3 -m json.tool 2>/dev/null
+    _post "/boards/${bid}/fit" "{\"viewportWidth\":${w},\"viewportHeight\":${h}}" | python3 -m json.tool 2>/dev/null
     ;;
   board:arrange)
     # board:arrange <board> [direction:right|down] [hSpacing] [vSpacing]
