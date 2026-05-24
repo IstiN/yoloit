@@ -1498,8 +1498,12 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'board:zoom',
     alias: 'bzm',
-    description: 'Set board zoom scale',
+    description: 'Set board zoom/scale level. Use for "уменьши зум", "увеличь зум", "zoom in", "zoom out", "приблизь", "отдали". Pass absolute scale: 0.5 = 50%, 1.0 = 100%, 2.0 = 200%.',
     group: 'board',
+    humanVariants: const {
+      'ru': ['уменьши зум', 'увеличь зум', 'zoom out', 'zoom in', 'приблизь', 'отдали'],
+      'en': ['zoom in', 'zoom out', 'set zoom', 'increase zoom', 'decrease zoom'],
+    },
     params: <YoloitCliToolParam>[
       _boardParam('id_or_name'),
       _p(

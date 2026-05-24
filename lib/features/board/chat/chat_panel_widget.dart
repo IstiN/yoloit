@@ -835,6 +835,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         panelType: widget.panel.type,
         availableBoardsSummary: _availableBoardsSummary(),
         currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
+        viewportScale: board?.viewport.scale,
       ),
       onEvent: _handleEvent,
       onError: (Object error) {

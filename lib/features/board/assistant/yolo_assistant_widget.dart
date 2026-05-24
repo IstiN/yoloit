@@ -640,6 +640,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       panelType: widget.panel.type,
       availableBoardsSummary: _availableBoardsSummary(),
       currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
+      viewportScale: board?.viewport.scale,
     );
   }
 

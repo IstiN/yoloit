@@ -430,6 +430,18 @@ class CloudLlmProvider extends ChatProvider {
     systemBuf.writeln(
       '- "фокус на", "переведи фокус", "сделай фокус", "открой", "покажи панель", "focus" → use `panel:focus` (NOT play)',
     );
+    systemBuf.writeln(
+      '- "уменьши зум", "zoom out", "отдали" → use `board:zoom` with smaller scale',
+    );
+    systemBuf.writeln(
+      '- "увеличь зум", "zoom in", "приблизь" → use `board:zoom` with larger scale',
+    );
+    final scale = runtimeContext?.viewportScale;
+    if (scale != null) {
+      systemBuf.writeln(
+        '- Current viewport zoom: ${(scale * 100).round()}% (scale=$scale). Zoom in → ×1.5, zoom out → ×0.67.',
+      );
+    }
     if (boardId != null && boardId.isNotEmpty) {
       systemBuf.writeln('\nCurrent context:');
       systemBuf.writeln('- Board: ${boardName ?? boardId} (id: $boardId)');
@@ -609,6 +621,9 @@ class CloudLlmProvider extends ChatProvider {
       );
     }
 
+    final zoomMatch = _matchZoomShortcut(text, runtimeContext);
+    if (zoomMatch != null) return zoomMatch;
+
     final playlistMatch = _matchPlaylistPlayShortcut(text, runtimeContext);
     if (playlistMatch != null) {
       final callId = 'shortcut-${_toolCallSequence++}';
@@ -674,15 +689,34 @@ class CloudLlmProvider extends ChatProvider {
     String text,
     ChatRuntimeContext? runtimeContext,
   ) {
+    // Only trigger for explicit PLAY/START/RESUME verbs.
+    // Do NOT trigger for pause/stop/show/focus/list verbs — those need the LLM.
     final asksToPlay =
         text.contains('включ') ||
-        text.contains('музык') ||
-        text.contains('плейлист') ||
         text.contains('play music') ||
         text.contains('start playlist') ||
         text.contains('resume playlist') ||
-        text.contains('continue playback');
+        text.contains('continue playback') ||
+        text.contains('запусти') ||
+        text.contains('воспроизвед');
     if (!asksToPlay) return null;
+
+    // Exclude messages with stop/pause/show/focus/list signals.
+    final isNegated =
+        text.contains('пауз') ||
+        text.contains('стоп') ||
+        text.contains('останов') ||
+        text.contains('выключ') ||
+        text.contains('фокус') ||
+        text.contains('покажи') ||
+        text.contains('список') ||
+        text.contains('pause') ||
+        text.contains('stop') ||
+        text.contains('focus') ||
+        text.contains('show') ||
+        text.contains('list');
+    if (isNegated) return null;
+
     final panelsSummary = runtimeContext?.currentBoardPanelsSummary?.trim();
     if (panelsSummary == null || panelsSummary.isEmpty) return null;
     final entries = _parseSummaryEntries(
@@ -702,6 +736,69 @@ class CloudLlmProvider extends ChatProvider {
       );
     }
     return null;
+  }
+
+  /// Shortcut for zoom in/out commands — avoids sending to LLM when intent is clear.
+  _ApiResponse? _matchZoomShortcut(
+    String text,
+    ChatRuntimeContext? runtimeContext,
+  ) {
+    final boardId = runtimeContext?.boardId?.trim();
+    if (boardId == null || boardId.isEmpty) return null;
+
+    final currentScale = runtimeContext?.viewportScale ?? 1.0;
+    double? targetScale;
+    String? reply;
+
+    final isZoomIn =
+        text.contains('увеличь зум') ||
+        text.contains('увеличи зум') ||
+        text.contains('zoom in') ||
+        text.contains('зум больше') ||
+        text.contains('приблизь');
+    final isZoomOut =
+        text.contains('уменьши зум') ||
+        text.contains('zoom out') ||
+        text.contains('зум меньше') ||
+        text.contains('отдали') ||
+        text.contains('уменьши масштаб');
+    final isZoomReset =
+        text.contains('сброс зума') ||
+        text.contains('reset zoom') ||
+        text.contains('зум 100') ||
+        text.contains('original zoom');
+
+    if (isZoomIn) {
+      targetScale = (currentScale * 1.5).clamp(0.1, 10.0);
+      reply = _looksCyrillic(text)
+          ? 'Увеличил зум до ${(targetScale * 100).round()}%.'
+          : 'Zoomed in to ${(targetScale * 100).round()}%.';
+    } else if (isZoomOut) {
+      targetScale = (currentScale * 0.67).clamp(0.1, 10.0);
+      reply = _looksCyrillic(text)
+          ? 'Уменьшил зум до ${(targetScale * 100).round()}%.'
+          : 'Zoomed out to ${(targetScale * 100).round()}%.';
+    } else if (isZoomReset) {
+      targetScale = 1.0;
+      reply = _looksCyrillic(text) ? 'Сброс зума до 100%.' : 'Zoom reset to 100%.';
+    }
+
+    if (targetScale == null) return null;
+
+    final callId = 'shortcut-${_toolCallSequence++}';
+    return _ApiResponse(
+      toolCalls: <_ParsedToolCall>[
+        _ParsedToolCall(
+          id: callId,
+          functionName: 'yoloit_board_zoom',
+          arguments: <String, Object?>{
+            'board': boardId,
+            'scale': targetScale,
+          },
+        ),
+      ],
+      directReply: reply,
+    );
   }
 
   List<(String, String, String)> _parseSummaryEntries(

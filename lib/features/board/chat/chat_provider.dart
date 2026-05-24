@@ -21,6 +21,7 @@ class ChatRuntimeContext {
     this.panelType,
     this.availableBoardsSummary,
     this.currentBoardPanelsSummary,
+    this.viewportScale,
   });
 
   final String? boardId;
@@ -30,6 +31,8 @@ class ChatRuntimeContext {
   final String? panelType;
   final String? availableBoardsSummary;
   final String? currentBoardPanelsSummary;
+  /// Current board viewport zoom scale (e.g. 1.0 = 100%).
+  final double? viewportScale;
 }
 
 /// Abstract interface for chat backends.
