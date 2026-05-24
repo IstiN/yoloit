@@ -350,15 +350,15 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     child: IgnorePointer(
                       ignoring: !_isResponse,
                       child: Align(
-                        alignment: Alignment.topCenter,
+                        alignment: Alignment.bottomCenter,
                         child: Padding(
-                          padding: const EdgeInsets.only(top: 8),
+                          padding: const EdgeInsets.only(bottom: 152),
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(
                               minWidth: 200,
                               maxWidth: 470,
                               minHeight: 60,
-                              maxHeight: 260,
+                              maxHeight: 250,
                             ),
                             child: _ResponseCard(
                               response: widget.response,
@@ -706,7 +706,10 @@ class _ResponseCardState extends State<_ResponseCard>
               ],
             ),
             child: hasMermaid
-                ? MarkdownDocumentPreview(content: displayText)
+                ? SizedBox(
+                  height: 200,
+                  child: MarkdownDocumentPreview(content: displayText),
+                )
                 : SingleChildScrollView(
                   child: MarkdownBody(
                     data: displayText,
