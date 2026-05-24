@@ -226,6 +226,10 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
           ? Alignment(0.0, widget.responseOrbAlignY)
           : Alignment(0.0, widget.orbAlignY);
 
+  // Keep listening waves and status text visually coupled to the orb position.
+  double get _waveAlignY => (_orbAlign.y - 0.06).clamp(-0.9, 0.95);
+  double get _textAlignY => (_orbAlign.y + 0.34).clamp(-0.2, 0.95);
+
   // ── build ─────────────────────────────────────────────────────────────────
 
   static const _kW = 720.0;
@@ -278,7 +282,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     opacity: _isListening ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 600),
                     child: Align(
-                      alignment: Alignment(-widget.waveSpread, -0.08),
+                      alignment: Alignment(-widget.waveSpread, _waveAlignY),
                       child: SizedBox(
                         width: widget.waveWidth,
                         height: 80,
@@ -298,7 +302,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     opacity: _isListening ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 600),
                     child: Align(
-                      alignment: Alignment(widget.waveSpread, -0.08),
+                      alignment: Alignment(widget.waveSpread, _waveAlignY),
                       child: SizedBox(
                         width: widget.waveWidth,
                         height: 80,
@@ -389,26 +393,25 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                   AnimatedOpacity(
                     opacity: _isResponse ? 0.0 : 1.0,
                     duration: const Duration(milliseconds: 600),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 650),
-                              switchInCurve: Curves.easeOut,
-                              switchOutCurve: Curves.easeIn,
-                              transitionBuilder:
-                                  (child, anim) => FadeTransition(
-                                    opacity: anim,
-                                    child: child,
-                                  ),
-                              child: _textContent(),
-                            ),
-                          ],
-                        ),
+                    child: AnimatedAlign(
+                      alignment: Alignment(0, _textAlignY),
+                      duration: const Duration(milliseconds: 700),
+                      curve: Curves.easeOutCubic,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 650),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            transitionBuilder:
+                                (child, anim) => FadeTransition(
+                                  opacity: anim,
+                                  child: child,
+                                ),
+                            child: _textContent(),
+                          ),
+                        ],
                       ),
                     ),
                   ),
