@@ -437,6 +437,24 @@ void main() {
     );
     expect(
       YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_panel_resize',
+        arguments: const <String, Object?>{},
+        userMessage: 'Увеличь панель до desktop.',
+        runtimeContext: const ChatRuntimeContext(panelId: 'panel-chat'),
+      ),
+      allOf(containsPair('width', 1200), containsPair('height', 800)),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
+        functionName: 'yoloit_panel_resize',
+        arguments: const <String, Object?>{},
+        userMessage: 'Set panel to mobile size.',
+        runtimeContext: const ChatRuntimeContext(panelId: 'panel-chat'),
+      ),
+      allOf(containsPair('width', 390), containsPair('height', 844)),
+    );
+    expect(
+      YoloitCliToolArgumentNormalizer.normalize(
         functionName: 'yoloit_panel_focus',
         arguments: const <String, Object?>{'panel': 'panel-chat'},
         userMessage: 'Сделай фокус на заметку с mermaid диаграммой.',

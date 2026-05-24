@@ -426,7 +426,7 @@ flowchart TD
     ET -->|"добавь пункт / checklist item"| T_CIA[checklist:item:add]
     ET -->|"добавь карточку / kanban card"| T_KCA[kanban:card:add]
     ET -->|"новая панель / new panel"| T_PC[panel:create]
-    ET -->|"увеличь размер / increase size / resize panel\n→ panel:resize, then panel:focus auto-scrolls"| T_PSZ[panel:resize]
+    ET -->|"увеличь размер / increase size / resize panel\nalso supports presets: small / medium / desktop / large / mobile / tablet\n→ panel:resize, then panel:focus auto-scrolls"| T_PSZ[panel:resize]
 
     WHAT --> BOARD_OP[🗂 Board ops]
     BOARD_OP --> BO{Action}

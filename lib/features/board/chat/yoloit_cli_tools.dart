@@ -605,6 +605,11 @@ class YoloitCliToolArgumentNormalizer {
       }
     }
     if (command == 'panel:resize') {
+      final preset = _extractResizePreset(userMessage);
+      if (preset != null) {
+        if (_isMissing(normalized['width'])) normalized['width'] = preset.$1;
+        if (_isMissing(normalized['height'])) normalized['height'] = preset.$2;
+      }
       final sizePair = _extractSizePair(userMessage);
       if (sizePair != null) {
         if (_isMissing(normalized['width'])) normalized['width'] = sizePair.$1;
@@ -854,6 +859,25 @@ class YoloitCliToolArgumentNormalizer {
         text.contains('larger') ||
         text.contains('увелич') ||
         text.contains('больше');
+  }
+
+  static (num, num)? _extractResizePreset(String userMessage) {
+    final text = userMessage.toLowerCase();
+    if (RegExp(r'\bsmall\b|\bsm\b|маленьк').hasMatch(text)) return (420, 300);
+    if (RegExp(r'\bmedium\b|\bmd\b|средн').hasMatch(text)) return (720, 480);
+    if (RegExp(r'\bdesktop\b|\bdesk\b|десктоп').hasMatch(text)) {
+      return (1200, 800);
+    }
+    if (RegExp(r'\blarge\b|\blg\b|\bxl\b|больш').hasMatch(text)) {
+      return (1400, 900);
+    }
+    if (RegExp(r'\bmobile\b|\bphone\b|мобил').hasMatch(text)) {
+      return (390, 844);
+    }
+    if (RegExp(r'\btablet\b|\btab\b|планшет').hasMatch(text)) {
+      return (768, 1024);
+    }
+    return null;
   }
 
   static String? _extractAfterPhrase(String userMessage, RegExp phrase) {
@@ -1667,7 +1691,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'panel:resize',
     alias: 'psz',
-    description: 'Resize a panel',
+    description:
+        'Resize a panel. Supports explicit width/height or presets: '
+        'small(420x300), medium(720x480), desktop(1200x800), '
+        'large(1400x900), mobile(390x844), tablet(768x1024).',
     group: 'panel',
     params: <YoloitCliToolParam>[
       _boardParam(),
@@ -1687,6 +1714,20 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         shortKey: 'h',
       ),
     ],
+    humanVariants: const {
+      'ru': [
+        'увеличь панель до desktop',
+        'сделай панель small',
+        'resize panel to desktop',
+        'сделай мобильный размер панели',
+      ],
+      'en': [
+        'resize panel to desktop',
+        'set panel size to small',
+        'set panel to mobile size',
+        'resize panel to tablet',
+      ],
+    },
   ),
   YoloitCliTool(
     command: 'panel:delete',

@@ -652,9 +652,9 @@ commands = [
   {
     "group": "panel",
     "name": "panel:resize",
-    "description": "Resize a panel",
-    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True], ["w", "New width", True], ["h", "New height", True]],
-    "example": "yoloit panel:resize \"My Board\" \"Notes\" 420 300",
+    "description": "Resize a panel (numeric w h OR preset alias)",
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True], ["w|preset", "Width or preset: small|medium|desktop|large|mobile|tablet", True], ["h", "Height (omit when using preset)", False]],
+    "example": "yoloit panel:resize \"My Board\" \"Notes\" desktop",
   },
   {
     "group": "panel",
@@ -1887,9 +1887,26 @@ PY
     _put "/boards/${bid}/panels/${pid}" "{\"x\":$3,\"y\":$4}" | python3 -m json.tool 2>/dev/null
     ;;
   panel:resize)
-    [[ $# -lt 4 ]] && { echo "Usage: yoloit panel:resize <board> <panel> <w> <h>" >&2; exit 1; }
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit panel:resize <board> <panel> <w> <h> | <preset>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
-    _put "/boards/${bid}/panels/${pid}" "{\"width\":$3,\"height\":$4,\"focus\":true}" | python3 -m json.tool 2>/dev/null
+    w="$3"; h="${4:-}"
+    if [[ -z "$h" ]]; then
+      preset=$(printf "%s" "$w" | tr '[:upper:]' '[:lower:]')
+      case "$preset" in
+        small|sm) w=420; h=300 ;;
+        medium|md) w=720; h=480 ;;
+        desktop|desk) w=1200; h=800 ;;
+        large|lg|xl) w=1400; h=900 ;;
+        mobile|phone) w=390; h=844 ;;
+        tablet|tab) w=768; h=1024 ;;
+        *)
+          echo "Unknown resize preset: $preset" >&2
+          echo "Allowed: small, medium, desktop, large, mobile, tablet" >&2
+          exit 1
+          ;;
+      esac
+    fi
+    _put "/boards/${bid}/panels/${pid}" "{\"width\":$w,\"height\":$h,\"focus\":true}" | python3 -m json.tool 2>/dev/null
     ;;
   panel:delete)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:delete <board> <panel>" >&2; exit 1; }
