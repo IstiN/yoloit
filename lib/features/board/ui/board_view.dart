@@ -5944,9 +5944,9 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           clipBehavior: Clip.none,
           children: [
             Align(
-              alignment: Alignment.bottomCenter,
+              alignment: Alignment.bottomRight,
               child: Padding(
-                padding: EdgeInsets.zero,
+                padding: const EdgeInsets.only(right: 40),
                 child: _buildVoiceOverlay(context),
               ),
             ),
@@ -6072,6 +6072,20 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       focusNode: _voiceOverlayFocusNode,
       onHide: () => unawaited(_hideVoiceOverlay()),
       onPrimaryAction: () => unawaited(_handleVoiceOverlayPrimaryAction()),
+      scale: 0.70,
+      orbScale: 0.30,
+      ovalWidth: 2.00,
+      ovalHeight: 1.10,
+      titleFontSize: 9.0,
+      titleColor: const Color(0xFF3CE8FF),
+      waveBarCount: 22,
+      waveAmplitude: 0.85,
+      waveSpeed: 1400,
+      waveWidth: 160.0,
+      waveSpread: 0.50,
+      particleScale: 0.80,
+      responseFontSize: 15.0,
+      borderSpeed: 1700,
     );
   }
 
