@@ -2332,13 +2332,11 @@ $messagesJson
     final boundary = '----yoloit-${DateTime.now().microsecondsSinceEpoch}';
     final fileName = filePath.split(Platform.pathSeparator).last;
     final fileBytes = await File(filePath).readAsBytes();
+    final isOpenRouter =
+        normalizedBase.contains('openrouter.ai') || config.id == 'openrouter';
     final client = HttpClient();
     try {
       final request = await client.postUrl(uri);
-      request.headers.set(
-        HttpHeaders.contentTypeHeader,
-        'multipart/form-data; boundary=$boundary',
-      );
       request.headers.set(
         HttpHeaders.authorizationHeader,
         'Bearer ${config.apiKey}',
@@ -2347,21 +2345,36 @@ $messagesJson
         request.headers.set(entry.key, entry.value);
       }
 
-      void writeString(String value) => request.add(utf8.encode(value));
+      if (isOpenRouter) {
+        request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+        final format = mimeType == 'audio/mpeg' ? 'mp3' : 'wav';
+        final payload = jsonEncode({
+          'model': model,
+          'input_audio': {'data': base64Encode(fileBytes), 'format': format},
+        });
+        request.add(utf8.encode(payload));
+      } else {
+        request.headers.set(
+          HttpHeaders.contentTypeHeader,
+          'multipart/form-data; boundary=$boundary',
+        );
 
-      writeString('--$boundary\r\n');
-      writeString('Content-Disposition: form-data; name="model"\r\n\r\n');
-      writeString('$model\r\n');
+        void writeString(String value) => request.add(utf8.encode(value));
 
-      writeString('--$boundary\r\n');
-      writeString(
-        'Content-Disposition: form-data; name="file"; filename="$fileName"\r\n',
-      );
-      writeString('Content-Type: $mimeType\r\n\r\n');
-      request.add(fileBytes);
-      writeString('\r\n');
+        writeString('--$boundary\r\n');
+        writeString('Content-Disposition: form-data; name="model"\r\n\r\n');
+        writeString('$model\r\n');
 
-      writeString('--$boundary--\r\n');
+        writeString('--$boundary\r\n');
+        writeString(
+          'Content-Disposition: form-data; name="file"; filename="$fileName"\r\n',
+        );
+        writeString('Content-Type: $mimeType\r\n\r\n');
+        request.add(fileBytes);
+        writeString('\r\n');
+
+        writeString('--$boundary--\r\n');
+      }
 
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
