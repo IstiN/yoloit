@@ -534,8 +534,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           _isGeneratingReply = false;
           _isCancelled = false;
         });
-        if (!mirrorToOverlay ||
-            ((widget.panel.state['assistantStatus'] as String?) != 'output')) {
+        // When mirrorToOverlay, the try/catch already set the overlay to
+        // 'output' + hidden=false.  Do NOT call _syncOverlayState here —
+        // widget.panel still holds the STALE state (pre-_updateState rebuild),
+        // so re-computing the status would overwrite 'output' with 'idle'.
+        if (!mirrorToOverlay) {
           _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
         }
       }

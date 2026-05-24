@@ -3112,7 +3112,7 @@ class _DebugUISectionState extends State<_DebugUISection> {
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
-          height: 500,
+          height: 600,
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
             borderRadius: BorderRadius.circular(16),
