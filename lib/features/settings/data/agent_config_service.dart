@@ -73,19 +73,26 @@ class AgentConfigService {
   List<AgentConfig> _cached = [];
   String? _defaultAgentId;
 
-  static List<AgentConfig> get _defaults =>
-      AgentType.values
-          .map(
-            (t) => AgentConfig(
-              id: t.name,
-              displayName: t.displayName,
-              iconLabel: t.iconLabel,
-              launchCommand: t.launchCommand,
-              visible: true,
-              isBuiltIn: true,
-            ),
-          )
-          .toList();
+  static List<AgentConfig> get _defaults => [
+    ...AgentType.values.map(
+      (t) => AgentConfig(
+        id: t.name,
+        displayName: t.displayName,
+        iconLabel: t.iconLabel,
+        launchCommand: t.launchCommand,
+        visible: true,
+        isBuiltIn: true,
+      ),
+    ),
+    const AgentConfig(
+      id: 'opencode',
+      displayName: 'OpenCode',
+      iconLabel: 'OC',
+      launchCommand: 'opencode',
+      visible: true,
+      isBuiltIn: true,
+    ),
+  ];
 
   String get _configPath =>
       p.join(PlatformDirs.instance.configDir, 'agent_configs.json');

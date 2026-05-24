@@ -20,7 +20,6 @@ import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/ai_models_section.dart';
 import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
-import 'package:yoloit/features/settings/ui/provider_models_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/settings/ui/sync_section.dart';
 import 'package:yoloit/features/settings/ui/widget_permissions_section.dart';
@@ -45,10 +44,7 @@ const _kCategories = [
   'About',
 ];
 
-const _kDebugCategories = [
-  ..._kCategories,
-  'Debug UI',
-];
+const _kDebugCategories = [..._kCategories, 'Debug UI'];
 
 const _kSkillsCategoryIndex = 6;
 
@@ -168,8 +164,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  List<String> get _categories =>
-      kDebugMode ? _kDebugCategories : _kCategories;
+  List<String> get _categories => kDebugMode ? _kDebugCategories : _kCategories;
 
   Widget _buildSidebar(BuildContext context) {
     final colors = context.appColors;
@@ -253,10 +248,6 @@ class _SettingsPageState extends State<SettingsPage> {
             const _SectionHeader(title: 'Local Models'),
             const SizedBox(height: 12),
             const AiModelsSection(),
-            const SizedBox(height: 24),
-            const _SectionHeader(title: 'Provider Models'),
-            const SizedBox(height: 12),
-            const ProviderModelsSection(),
           ],
         ),
         2 => const Column(
@@ -316,9 +307,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _AboutSection(),
           ],
         ),
-        _ => kDebugMode
-            ? const _DebugUISection()
-            : const SizedBox.shrink(),
+        _ => kDebugMode ? const _DebugUISection() : const SizedBox.shrink(),
       },
     );
   }
@@ -352,9 +341,11 @@ class _AgentSettingsSection extends StatefulWidget {
 
 class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
   final _service = AgentConfigService.instance;
+  final _catalogService = ProviderModelCatalogService.instance;
   List<AgentConfig>? _configs;
   bool _loading = true;
   String? _defaultAgentId;
+  static const _boardChatAgentIds = {'copilot', 'cursor', 'opencode'};
 
   @override
   void initState() {
@@ -363,6 +354,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
   }
 
   Future<void> _loadConfigs() async {
+    await _catalogService.load();
     final configs = await _service.load();
     if (mounted)
       setState(() {
@@ -381,27 +373,9 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
     _saveConfigs();
   }
 
-  void _deleteConfig(int index) {
-    setState(() => _configs!.removeAt(index));
-    _saveConfigs();
-  }
-
   Future<void> _setDefault(String? id) async {
     setState(() => _defaultAgentId = id);
     await _service.setDefaultAgentId(id);
-  }
-
-  void _addCustomAgent() {
-    final newConfig = AgentConfig(
-      id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
-      displayName: 'Custom Agent',
-      iconLabel: '◈',
-      launchCommand: '',
-      visible: true,
-      isBuiltIn: false,
-    );
-    setState(() => _configs!.add(newConfig));
-    _saveConfigs();
   }
 
   @override
@@ -411,6 +385,11 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
     }
     final colors = context.appColors;
     final configs = _configs!;
+    final visibleEntries = <({int index, AgentConfig config})>[
+      for (var i = 0; i < configs.length; i++)
+        if (_boardChatAgentIds.contains(configs[i].id))
+          (index: i, config: configs[i]),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,7 +397,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
-            'Star (★) an agent to make it open automatically for new workspaces.',
+            'Use only board-chat agents below, pick their models, and mark one as favorite (★).',
             style: TextStyle(
               color:
                   Theme.of(context).textTheme.bodySmall?.color ??
@@ -433,38 +412,31 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
             border: Border.all(color: colors.border),
           ),
           child: Column(
-            children:
-                configs.indexed.map(((int, AgentConfig) e) {
-                  final (index, config) = e;
-                  final isLast = index == configs.length - 1;
-                  final isDefault = config.id == _defaultAgentId;
-                  return Column(
-                    children: [
-                      _AgentRow(
-                        config: config,
-                        isDefault: isDefault,
-                        onChanged: (updated) => _updateConfig(index, updated),
-                        onDelete:
-                            config.isBuiltIn
-                                ? null
-                                : () => _deleteConfig(index),
-                        onSetDefault:
-                            () => _setDefault(isDefault ? null : config.id),
-                      ),
-                      if (!isLast) Divider(height: 1, color: colors.border),
-                    ],
-                  );
-                }).toList(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: _addCustomAgent,
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('Add Custom Agent'),
-          style: TextButton.styleFrom(
-            foregroundColor: colors.primary,
-            textStyle: const TextStyle(fontSize: 13),
+            children: [
+              for (
+                var visibleIndex = 0;
+                visibleIndex < visibleEntries.length;
+                visibleIndex++
+              ) ...[
+                Builder(
+                  builder: (context) {
+                    final visibleEntry = visibleEntries[visibleIndex];
+                    final index = visibleEntry.index;
+                    final config = visibleEntry.config;
+                    final isDefault = config.id == _defaultAgentId;
+                    return _AgentRow(
+                      config: config,
+                      isDefault: isDefault,
+                      onChanged: (updated) => _updateConfig(index, updated),
+                      onSetDefault:
+                          () => _setDefault(isDefault ? null : config.id),
+                    );
+                  },
+                ),
+                if (visibleIndex != visibleEntries.length - 1)
+                  Divider(height: 1, color: colors.border),
+              ],
+            ],
           ),
         ),
       ],
@@ -635,14 +607,12 @@ class _AgentRow extends StatefulWidget {
     required this.config,
     required this.isDefault,
     required this.onChanged,
-    required this.onDelete,
     required this.onSetDefault,
   });
 
   final AgentConfig config;
   final bool isDefault;
   final ValueChanged<AgentConfig> onChanged;
-  final VoidCallback? onDelete;
   final VoidCallback onSetDefault;
 
   @override
@@ -706,225 +676,183 @@ class _AgentRowState extends State<_AgentRow> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-          // Visibility toggle
-          Switch(
-            value: widget.config.visible,
-            onChanged:
-                (v) => widget.onChanged(widget.config.copyWith(visible: v)),
-            activeColor: colors.primary,
-          ),
-          const SizedBox(width: 8),
-          // Icon label
-          SizedBox(
-            width: 48,
-            child: TextField(
-              controller: _iconCtrl,
-              readOnly: widget.config.isBuiltIn,
-              onChanged: (_) => _emit(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 16,
-                fontFamily: 'monospace',
+              // Visibility toggle
+              Switch(
+                value: widget.config.visible,
+                onChanged:
+                    (v) => widget.onChanged(widget.config.copyWith(visible: v)),
+                activeColor: colors.primary,
               ),
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 6,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Name
-          SizedBox(
-            width: 100,
-            child: TextField(
-              controller: _nameCtrl,
-              onChanged: (_) => _emit(),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 13,
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Name',
-                hintStyle: TextStyle(
-                  color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
-                  fontSize: 13,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 6,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Launch command
-          Expanded(
-            child: TextField(
-              controller: _cmdCtrl,
-              onChanged: (_) => _emit(),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 12,
-                fontFamily: 'monospace',
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'launch command (empty = plain shell)',
-                hintStyle: TextStyle(
-                  color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
-                  fontSize: 12,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 6,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-              ),
-            ),
-          ),
-          // Default star button
-          const SizedBox(width: 4),
-          Tooltip(
-            message:
-                widget.isDefault
-                    ? 'Default agent (click to unset)'
-                    : 'Set as default agent',
-            child: GestureDetector(
-              onTap: widget.onSetDefault,
-              child: Icon(
-                widget.isDefault ? Icons.star : Icons.star_border,
-                size: 18,
-                color:
-                    widget.isDefault
-                        ? Colors.amber
-                        : Theme.of(context).textTheme.bodySmall?.color ??
-                            Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-          ),
-          // Delete button (custom only)
-          if (widget.onDelete != null) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline,
-                size: 18,
-                color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
-              ),
-              onPressed: widget.onDelete,
-              tooltip: 'Delete agent',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            ),
-          ] else
-            const SizedBox(width: 36),
-        ],
-      ),
-      // Model picker for catalog-backed providers (copilot, cursor, opencode).
-      if (hasCatalog) ...[
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            const SizedBox(width: 8),
-            Text(
-              'Default model:',
-              style: TextStyle(
-                color: Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: catalogModels.any(
-                        (m) => m.id == widget.config.defaultModel)
-                    ? widget.config.defaultModel
-                    : null,
-                hint: Text(
-                  catalogModels.firstWhere(
-                    (m) => m.isDefault,
-                    orElse: () => catalogModels.first,
-                  ).displayName,
+              const SizedBox(width: 8),
+              // Icon label
+              SizedBox(
+                width: 48,
+                child: TextField(
+                  controller: _iconCtrl,
+                  readOnly: widget.config.isBuiltIn,
+                  onChanged: (_) => _emit(),
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16,
+                    fontFamily: 'monospace',
                   ),
-                ),
-                items: catalogModels
-                    .map(
-                      (m) => DropdownMenuItem<String>(
-                        value: m.id,
-                        child: Text(
-                          m.displayName,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => widget.onChanged(
-                  widget.config.copyWith(defaultModel: v),
-                ),
-                dropdownColor: colors.surfaceElevated,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 12,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: BorderSide(color: colors.border),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 6,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+              // Name
+              SizedBox(
+                width: 100,
+                child: TextField(
+                  controller: _nameCtrl,
+                  readOnly: widget.config.isBuiltIn,
+                  onChanged: (_) => _emit(),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 13,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Name',
+                    hintStyle: TextStyle(
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                      fontSize: 13,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Spacer(),
+              // Default star button
+              const SizedBox(width: 4),
+              Tooltip(
+                message:
+                    widget.isDefault
+                        ? 'Favorite agent (click to unset)'
+                        : 'Set as favorite agent',
+                child: GestureDetector(
+                  onTap: widget.onSetDefault,
+                  child: Icon(
+                    widget.isDefault ? Icons.star : Icons.star_border,
+                    size: 18,
+                    color:
+                        widget.isDefault
+                            ? Colors.amber
+                            : Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          // Model picker for catalog-backed providers (copilot, cursor, opencode).
+          if (hasCatalog) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const SizedBox(width: 8),
+                Text(
+                  'Default model:',
+                  style: TextStyle(
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value:
+                        catalogModels.any(
+                              (m) => m.id == widget.config.defaultModel,
+                            )
+                            ? widget.config.defaultModel
+                            : null,
+                    hint: Text(
+                      catalogModels
+                          .firstWhere(
+                            (m) => m.isDefault,
+                            orElse: () => catalogModels.first,
+                          )
+                          .displayName,
+                      style: TextStyle(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                        fontSize: 12,
+                      ),
+                    ),
+                    items:
+                        catalogModels
+                            .map(
+                              (m) => DropdownMenuItem<String>(
+                                value: m.id,
+                                child: Text(
+                                  m.displayName,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                    onChanged:
+                        (v) => widget.onChanged(
+                          widget.config.copyWith(defaultModel: v),
+                        ),
+                    dropdownColor: colors.surfaceElevated,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: colors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: colors.border),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
             ),
-            const SizedBox(width: 44), // align with star+delete space
           ],
-        ),
-      ],
         ],
       ),
     );
@@ -2846,7 +2774,8 @@ class _DebugUISectionState extends State<_DebugUISection> {
   double _particleScale = 0.3;
   double _responseFontSize = 18.0;
   int _borderSpeed = 1200;
-  String _voiceResponse = 'This is a sample response from the LLM model. '
+  String _voiceResponse =
+      'This is a sample response from the LLM model. '
       'It demonstrates how text appears in the response card.';
   String _voiceTranscript = 'Show me the weather today';
 
@@ -2867,29 +2796,29 @@ class _DebugUISectionState extends State<_DebugUISection> {
     int divisions,
     ValueChanged<double> onChanged,
   ) => [
-        Row(
-          children: [
-            Text(
-              '$label: ${value.toStringAsFixed(2)}',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Expanded(
-              child: Slider(
-                value: value,
-                min: min,
-                max: max,
-                divisions: divisions,
-                onChanged: onChanged,
-                activeColor: const Color(0xFF6644FF),
-              ),
-            ),
-          ],
+    Row(
+      children: [
+        Text(
+          '$label: ${value.toStringAsFixed(2)}',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ];
+        Expanded(
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+            activeColor: const Color(0xFF6644FF),
+          ),
+        ),
+      ],
+    ),
+  ];
 
   Widget _colorChip(String label, Color c) {
     final active = _plectrumColor.value == c.value;
@@ -2898,7 +2827,10 @@ class _DebugUISectionState extends State<_DebugUISection> {
       selected: active,
       onSelected: (_) => setState(() => _plectrumColor = c),
       selectedColor: c.withValues(alpha: 0.6),
-      labelStyle: TextStyle(color: active ? Colors.white : Colors.white70, fontSize: 11),
+      labelStyle: TextStyle(
+        color: active ? Colors.white : Colors.white70,
+        fontSize: 11,
+      ),
       backgroundColor: const Color(0xFF2A2C3A),
       side: BorderSide(color: active ? c : const Color(0xFF3A3C4E)),
     );
@@ -2936,8 +2868,13 @@ class _DebugUISectionState extends State<_DebugUISection> {
         const SizedBox(height: 8),
         Row(
           children: [
-            Text('Rotation: ${(_plectrumRotation * 180 / 3.14159).toStringAsFixed(0)}°',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+            Text(
+              'Rotation: ${(_plectrumRotation * 180 / 3.14159).toStringAsFixed(0)}°',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
+              ),
+            ),
             Expanded(
               child: Slider(
                 value: _plectrumRotation,
@@ -2951,8 +2888,13 @@ class _DebugUISectionState extends State<_DebugUISection> {
         ),
         Row(
           children: [
-            Text('Size: ${_plectrumSize.toStringAsFixed(0)}',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+            Text(
+              'Size: ${_plectrumSize.toStringAsFixed(0)}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
+              ),
+            ),
             Expanded(
               child: Slider(
                 value: _plectrumSize,
@@ -2995,25 +2937,27 @@ class _DebugUISectionState extends State<_DebugUISection> {
         Wrap(
           spacing: 8,
           runSpacing: 6,
-          children: _statuses.map((s) {
-            final active = s == _voiceStatus;
-            return ChoiceChip(
-              label: Text(s),
-              selected: active,
-              onSelected: (_) => setState(() => _voiceStatus = s),
-              selectedColor: const Color(0xFF6644FF),
-              labelStyle: TextStyle(
-                color: active ? Colors.white : Colors.white70,
-                fontSize: 12,
-              ),
-              backgroundColor: const Color(0xFF2A2C3A),
-              side: BorderSide(
-                color: active
-                    ? const Color(0xFF6644FF)
-                    : const Color(0xFF3A3C4E),
-              ),
-            );
-          }).toList(),
+          children:
+              _statuses.map((s) {
+                final active = s == _voiceStatus;
+                return ChoiceChip(
+                  label: Text(s),
+                  selected: active,
+                  onSelected: (_) => setState(() => _voiceStatus = s),
+                  selectedColor: const Color(0xFF6644FF),
+                  labelStyle: TextStyle(
+                    color: active ? Colors.white : Colors.white70,
+                    fontSize: 12,
+                  ),
+                  backgroundColor: const Color(0xFF2A2C3A),
+                  side: BorderSide(
+                    color:
+                        active
+                            ? const Color(0xFF6644FF)
+                            : const Color(0xFF3A3C4E),
+                  ),
+                );
+              }).toList(),
         ),
         const SizedBox(height: 12),
         Row(
@@ -3040,17 +2984,41 @@ class _DebugUISectionState extends State<_DebugUISection> {
         ),
         const SizedBox(height: 8),
         // Orb scale (animation only, not text)
-        ..._debugSlider('Orb Scale', _orbScale, 0.3, 2.0, 34,
-            (v) => setState(() => _orbScale = v)),
+        ..._debugSlider(
+          'Orb Scale',
+          _orbScale,
+          0.3,
+          2.0,
+          34,
+          (v) => setState(() => _orbScale = v),
+        ),
         // Center oval width
-        ..._debugSlider('Oval Width', _ovalWidth, 0.3, 2.0, 34,
-            (v) => setState(() => _ovalWidth = v)),
+        ..._debugSlider(
+          'Oval Width',
+          _ovalWidth,
+          0.3,
+          2.0,
+          34,
+          (v) => setState(() => _ovalWidth = v),
+        ),
         // Center oval height
-        ..._debugSlider('Oval Height', _ovalHeight, 0.1, 1.5, 28,
-            (v) => setState(() => _ovalHeight = v)),
+        ..._debugSlider(
+          'Oval Height',
+          _ovalHeight,
+          0.1,
+          1.5,
+          28,
+          (v) => setState(() => _ovalHeight = v),
+        ),
         // YoLo font size
-        ..._debugSlider('YoLo Size', _titleFontSize, 8, 60, 52,
-            (v) => setState(() => _titleFontSize = v)),
+        ..._debugSlider(
+          'YoLo Size',
+          _titleFontSize,
+          8,
+          60,
+          52,
+          (v) => setState(() => _titleFontSize = v),
+        ),
         // YoLo color picker
         Row(
           children: [
@@ -3081,9 +3049,8 @@ class _DebugUISectionState extends State<_DebugUISection> {
                     color: c,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: _titleColor == c
-                          ? Colors.white
-                          : Colors.transparent,
+                      color:
+                          _titleColor == c ? Colors.white : Colors.transparent,
                       width: 2,
                     ),
                   ),
@@ -3093,22 +3060,70 @@ class _DebugUISectionState extends State<_DebugUISection> {
         ),
         const SizedBox(height: 8),
         // Waveform controls (listening state)
-        ..._debugSlider('Wave Bars', _waveBarCount.toDouble(), 4, 60, 56,
-            (v) => setState(() => _waveBarCount = v.round())),
-        ..._debugSlider('Wave Amp', _waveAmplitude, 0.1, 2.0, 38,
-            (v) => setState(() => _waveAmplitude = v)),
-        ..._debugSlider('Wave Speed', _waveSpeed.toDouble(), 400, 4000, 36,
-            (v) => setState(() => _waveSpeed = v.round())),
-        ..._debugSlider('Wave Width', _waveWidth, 60, 300, 48,
-            (v) => setState(() => _waveWidth = v)),
-        ..._debugSlider('Wave Spread', _waveSpread, 0.0, 1.0, 20,
-            (v) => setState(() => _waveSpread = v)),
-        ..._debugSlider('Particle Scale', _particleScale, 0.3, 3.0, 27,
-            (v) => setState(() => _particleScale = v)),
-        ..._debugSlider('Resp. Font', _responseFontSize, 10, 30, 20,
-            (v) => setState(() => _responseFontSize = v)),
-        ..._debugSlider('Border Speed', _borderSpeed.toDouble(), 400, 4000, 36,
-            (v) => setState(() => _borderSpeed = v.round())),
+        ..._debugSlider(
+          'Wave Bars',
+          _waveBarCount.toDouble(),
+          4,
+          60,
+          56,
+          (v) => setState(() => _waveBarCount = v.round()),
+        ),
+        ..._debugSlider(
+          'Wave Amp',
+          _waveAmplitude,
+          0.1,
+          2.0,
+          38,
+          (v) => setState(() => _waveAmplitude = v),
+        ),
+        ..._debugSlider(
+          'Wave Speed',
+          _waveSpeed.toDouble(),
+          400,
+          4000,
+          36,
+          (v) => setState(() => _waveSpeed = v.round()),
+        ),
+        ..._debugSlider(
+          'Wave Width',
+          _waveWidth,
+          60,
+          300,
+          48,
+          (v) => setState(() => _waveWidth = v),
+        ),
+        ..._debugSlider(
+          'Wave Spread',
+          _waveSpread,
+          0.0,
+          1.0,
+          20,
+          (v) => setState(() => _waveSpread = v),
+        ),
+        ..._debugSlider(
+          'Particle Scale',
+          _particleScale,
+          0.3,
+          3.0,
+          27,
+          (v) => setState(() => _particleScale = v),
+        ),
+        ..._debugSlider(
+          'Resp. Font',
+          _responseFontSize,
+          10,
+          30,
+          20,
+          (v) => setState(() => _responseFontSize = v),
+        ),
+        ..._debugSlider(
+          'Border Speed',
+          _borderSpeed.toDouble(),
+          400,
+          4000,
+          36,
+          (v) => setState(() => _borderSpeed = v.round()),
+        ),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
