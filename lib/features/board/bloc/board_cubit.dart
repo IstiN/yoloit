@@ -136,7 +136,11 @@ class BoardCubit extends Cubit<BoardState> {
     await _updateBoard(targetId, (board) => board.copyWith(viewport: viewport));
   }
 
-  Future<void> focusPanel(String panelId, {String? boardId}) async {
+  Future<void> focusPanel(
+    String panelId, {
+    String? boardId,
+    bool zoomOnFocus = false,
+  }) async {
     final targetId = boardId ?? state.activeBoard?.id;
     if (targetId == null) return;
     await _updateBoard(targetId, (board) {
@@ -154,7 +158,8 @@ class BoardCubit extends Cubit<BoardState> {
       final alreadyTopAndFocused =
           board.viewport.focusedPanelId == panelId &&
           focusedPanel != null &&
-          focusedPanel.zIndex >= maxZ;
+          focusedPanel.zIndex >= maxZ &&
+          !zoomOnFocus; // always re-focus if zoom requested
       if (alreadyTopAndFocused) {
         return board;
       }
@@ -169,7 +174,22 @@ class BoardCubit extends Cubit<BoardState> {
               .toList();
       return board.copyWith(
         panels: updatedPanels,
-        viewport: board.viewport.copyWith(focusedPanelId: panelId),
+        viewport: board.viewport.copyWith(
+          focusedPanelId: panelId,
+          zoomOnFocus: zoomOnFocus,
+        ),
+      );
+    });
+  }
+
+  /// Clears the zoom-on-focus flag after it has been consumed by the view.
+  Future<void> clearZoomFocus({String? boardId}) async {
+    final targetId = boardId ?? state.activeBoard?.id;
+    if (targetId == null) return;
+    await _updateBoard(targetId, (board) {
+      if (!board.viewport.zoomOnFocus) return board;
+      return board.copyWith(
+        viewport: board.viewport.copyWith(zoomOnFocus: false),
       );
     });
   }

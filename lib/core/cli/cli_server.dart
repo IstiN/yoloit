@@ -1616,7 +1616,7 @@ class CliServer {
       _scheduleRebuild();
     }
     if (body['focus'] == true) {
-      await cubit.focusPanel(panel.id, boardId: board.id);
+      await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
       _scheduleRebuild();
     }
     if (body.containsKey('color')) {
@@ -2222,7 +2222,7 @@ class CliServer {
     await cubit.addPanel(panel, boardId: board.id);
     pendingPanels[panel.id] = panel;
     if (_bool(raw['focus']) == true) {
-      await cubit.focusPanel(panel.id, boardId: board.id);
+      await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
     }
     if ((panel.type == 'board.note.markdown') &&
         (panel.state['autoHeight'] == true)) {
@@ -2304,7 +2304,7 @@ class CliServer {
       await _applyYamlPanelUpdates(cubit, board, panel, updates);
     }
     if (_bool(raw['focus']) == true) {
-      await cubit.focusPanel(panel.id, boardId: board.id);
+      await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
     }
     return {'ok': true, 'panelId': panel.id};
   }
@@ -2476,7 +2476,7 @@ class CliServer {
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
     if (panel == null) return {'ok': false, 'error': 'Panel not found'};
-    await cubit.focusPanel(panel.id, boardId: board.id);
+    await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
     return {'ok': true, 'panelId': panel.id};
   }
 

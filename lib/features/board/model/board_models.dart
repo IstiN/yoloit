@@ -169,23 +169,29 @@ class BoardViewport extends Equatable {
     this.scale = 1.0,
     this.translation = Offset.zero,
     this.focusedPanelId,
+    this.zoomOnFocus = false,
   });
 
   final double scale;
   final Offset translation;
   final String? focusedPanelId;
+  /// Transient flag — set by CLI/assistant focus commands to trigger zoom-to-panel.
+  /// Cleared after the zoom animation is applied. Not persisted across restarts.
+  final bool zoomOnFocus;
 
   BoardViewport copyWith({
     double? scale,
     Offset? translation,
     String? focusedPanelId,
     bool clearFocusedPanelId = false,
+    bool? zoomOnFocus,
   }) {
     return BoardViewport(
       scale: scale ?? this.scale,
       translation: translation ?? this.translation,
       focusedPanelId:
           clearFocusedPanelId ? null : (focusedPanelId ?? this.focusedPanelId),
+      zoomOnFocus: zoomOnFocus ?? this.zoomOnFocus,
     );
   }
 
@@ -193,6 +199,7 @@ class BoardViewport extends Equatable {
     'scale': scale,
     'translation': [translation.dx, translation.dy],
     'focusedPanelId': focusedPanelId,
+    // zoomOnFocus is transient — not persisted
   };
 
   factory BoardViewport.fromJson(Map<String, dynamic> json) {
@@ -206,11 +213,12 @@ class BoardViewport extends Equatable {
               ? Offset(values[0].toDouble(), values[1].toDouble())
               : Offset.zero,
       focusedPanelId: json['focusedPanelId'] as String?,
+      // zoomOnFocus always starts false on load
     );
   }
 
   @override
-  List<Object?> get props => [scale, translation, focusedPanelId];
+  List<Object?> get props => [scale, translation, focusedPanelId, zoomOnFocus];
 }
 
 class BoardPanelBounds extends Equatable {

@@ -1113,15 +1113,21 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
     if (panel == null || panel.hidden) return;
     final resolvedPanel = panel;
+    final shouldZoom = board.viewport.zoomOnFocus;
     final key =
-        '${board.id}:${resolvedPanel.id}:${resolvedPanel.bounds.x}:${resolvedPanel.bounds.y}:${resolvedPanel.bounds.width}:${resolvedPanel.bounds.height}:${size.width}:${size.height}';
+        '${board.id}:${resolvedPanel.id}:${resolvedPanel.bounds.x}:${resolvedPanel.bounds.y}:${resolvedPanel.bounds.width}:${resolvedPanel.bounds.height}:${size.width}:${size.height}:z$shouldZoom';
     if (_focusedPanelVisibilityKey == key) return;
     _focusedPanelVisibilityKey = key;
-    _boardDebugLog('focusVisibility.scheduled key=$key');
+    _boardDebugLog('focusVisibility.scheduled key=$key zoom=$shouldZoom');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_isPanelDragging || _isViewportInteracting) {
         _boardDebugLog('focusVisibility.cancelledByInteraction');
+        return;
+      }
+      if (shouldZoom) {
+        _boardDebugLog('focusVisibility.zoomToPanel panel=${resolvedPanel.id}');
+        _zoomToPanel(board, resolvedPanel.bounds.rect);
         return;
       }
       if (_isPanelComfortablyVisible(resolvedPanel.bounds.rect)) {
@@ -1200,6 +1206,39 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       board: board,
       persist: persist,
     );
+  }
+
+  /// Zooms the viewport so [panelRect] fills ~70% of the screen width,
+  /// then centers it. Used when focus is triggered via CLI/voice commands.
+  void _zoomToPanel(BoardDocument board, Rect panelRect) {
+    final screen = _viewportSize ?? MediaQuery.sizeOf(context);
+    if (screen.isEmpty) return;
+
+    const targetFill = 0.70; // panel should occupy ~70% of screen width
+    const minScale = 0.40;
+    const maxScale = 2.0;
+
+    final scaleX = screen.width * targetFill / panelRect.width;
+    final scaleY = screen.height * targetFill / panelRect.height;
+    // Use the smaller scale so the whole panel is visible, but don't exceed max
+    final targetScale = math.min(scaleX, scaleY).clamp(minScale, maxScale);
+
+    final centerX = panelRect.center.dx;
+    final centerY = panelRect.center.dy;
+    final tx = centerX - screen.width / (2 * targetScale);
+    final ty = centerY - screen.height / (2 * targetScale);
+
+    _boardDebugLog(
+      'zoomToPanel panelRect=${panelRect.shortestSide.toStringAsFixed(0)} '
+      'scale=${_fmt(targetScale)} center=${_fmtOffset(panelRect.center)} persist=true',
+    );
+    _animateToMatrix(
+      _matrixForBoardTopLeft(scale: targetScale, topLeft: Offset(tx, ty)),
+      board: board,
+      persist: true,
+    );
+    // Clear the zoom-on-focus flag so we don't re-zoom on next rebuild.
+    context.read<BoardCubit>().clearZoomFocus();
   }
 
   Matrix4 _matrixForBoardTopLeft({
