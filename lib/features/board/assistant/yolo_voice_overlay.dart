@@ -31,7 +31,6 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.particleScale = 0.3,
     this.responseFontSize = 18.0,
     this.borderSpeed = 1200,
-    this.restOrbAlignment = const Alignment(0.0, -0.10),
     this.responseActionLabel = 'Tap to close',
     this.showIdleHint = true,
   });
@@ -59,7 +58,6 @@ class YoloVoiceOverlay extends StatefulWidget {
   final double particleScale;
   final double responseFontSize;
   final int borderSpeed;
-  final Alignment restOrbAlignment;
   final String responseActionLabel;
   final bool showIdleHint;
 
@@ -218,7 +216,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   };
 
   Alignment get _orbAlign =>
-      _isResponse ? const Alignment(-0.40, -0.06) : widget.restOrbAlignment;
+      _isResponse ? const Alignment(-0.48, 0.44) : const Alignment(0.0, -0.10);
 
   // ── build ─────────────────────────────────────────────────────────────────
 
@@ -343,20 +341,20 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     ),
                   ),
 
-                  // ── response card (slides in from right) ──────────────
+                  // ── response card (above the orb) ─────────────────────
                   AnimatedOpacity(
                     opacity: _isResponse ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 900),
                     child: IgnorePointer(
                       ignoring: !_isResponse,
                       child: Align(
-                        alignment: Alignment.centerRight,
+                        alignment: const Alignment(0.18, -0.42),
                         child: Padding(
                           padding: const EdgeInsets.only(
-                            right: 18,
-                            left: 200,
-                            top: 20,
-                            bottom: 36,
+                            right: 58,
+                            left: 112,
+                            top: 16,
+                            bottom: 118,
                           ),
                           child: _ResponseCard(
                             response: widget.response,
