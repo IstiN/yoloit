@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 
 // ─────────────────────────── public API ──────────────────────────────────────
 
@@ -352,9 +353,13 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         alignment: Alignment.topCenter,
                         child: Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: SizedBox(
-                            width: 470,
-                            height: 228,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minWidth: 200,
+                              maxWidth: 470,
+                              minHeight: 60,
+                              maxHeight: 260,
+                            ),
                             child: _ResponseCard(
                               response: widget.response,
                               streaming: widget.status == 'responding',
@@ -666,97 +671,99 @@ class _ResponseCardState extends State<_ResponseCard>
         widget.streaming
             ? fullText.substring(0, _visibleChars.clamp(0, fullText.length))
             : fullText;
+    final hasMermaid = displayText.contains('```mermaid');
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: AnimatedBuilder(
-            animation: _borderAnim,
-            builder:
-                (ctx, child) => CustomPaint(
-                  painter:
-                      widget.streaming
-                          ? _RunningBorderPainter(
-                            progress: _borderAnim.value,
-                            radius: 28,
-                          )
-                          : null,
-                  child: child,
-                ),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 620),
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-              decoration: BoxDecoration(
-                color: const Color(0xF2181A24),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(
-                      0xFF9B6BFF,
-                    ).withValues(alpha: widget.streaming ? 0.30 : 0.08),
-                    blurRadius: widget.streaming ? 40 : 18,
-                    spreadRadius: -6,
-                  ),
-                ],
+        AnimatedBuilder(
+          animation: _borderAnim,
+          builder:
+              (ctx, child) => CustomPaint(
+                painter:
+                    widget.streaming
+                        ? _RunningBorderPainter(
+                          progress: _borderAnim.value,
+                          radius: 28,
+                        )
+                        : null,
+                child: child,
               ),
-              child: SingleChildScrollView(
-                child: MarkdownBody(
-                  data: displayText,
-                  softLineBreak: true,
-                  selectable: false,
-                  styleSheet: MarkdownStyleSheet(
-                    p: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.95),
-                      fontSize: widget.fontSize,
-                      height: 1.52,
-                      fontWeight: FontWeight.w500,
-                      shadows:
-                          widget.streaming
-                              ? const [
-                                Shadow(
-                                  color: Color(0x889B6BFF),
-                                  blurRadius: 14,
-                                ),
-                              ]
-                              : const [],
-                    ),
-                    h1: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.98),
-                      fontSize: widget.fontSize + 5,
-                      height: 1.25,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    h2: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.98),
-                      fontSize: widget.fontSize + 3,
-                      height: 1.3,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    h3: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.98),
-                      fontSize: widget.fontSize + 1,
-                      height: 1.35,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    a: TextStyle(
-                      color: const Color(0xFF8BD8FF),
-                      fontSize: widget.fontSize,
-                      decoration: TextDecoration.underline,
-                    ),
-                    code: TextStyle(
-                      color: const Color(0xFF8BD8FF),
-                      fontSize: widget.fontSize - 1,
-                      backgroundColor: const Color(0x66101420),
-                    ),
-                    codeblockPadding: const EdgeInsets.all(10),
-                    codeblockDecoration: BoxDecoration(
-                      color: const Color(0xAA101420),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 620),
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xF2181A24),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(
+                    0xFF9B6BFF,
+                  ).withValues(alpha: widget.streaming ? 0.30 : 0.08),
+                  blurRadius: widget.streaming ? 40 : 18,
+                  spreadRadius: -6,
                 ),
-              ),
+              ],
             ),
+            child: hasMermaid
+                ? MarkdownDocumentPreview(content: displayText)
+                : SingleChildScrollView(
+                  child: MarkdownBody(
+                    data: displayText,
+                    softLineBreak: true,
+                    selectable: false,
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontSize: widget.fontSize,
+                        height: 1.52,
+                        fontWeight: FontWeight.w500,
+                        shadows:
+                            widget.streaming
+                                ? const [
+                                  Shadow(
+                                    color: Color(0x889B6BFF),
+                                    blurRadius: 14,
+                                  ),
+                                ]
+                                : const [],
+                      ),
+                      h1: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.98),
+                        fontSize: widget.fontSize + 5,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      h2: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.98),
+                        fontSize: widget.fontSize + 3,
+                        height: 1.3,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      h3: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.98),
+                        fontSize: widget.fontSize + 1,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      a: TextStyle(
+                        color: const Color(0xFF8BD8FF),
+                        fontSize: widget.fontSize,
+                        decoration: TextDecoration.underline,
+                      ),
+                      code: TextStyle(
+                        color: const Color(0xFF8BD8FF),
+                        fontSize: widget.fontSize - 1,
+                        backgroundColor: const Color(0x66101420),
+                      ),
+                      codeblockPadding: const EdgeInsets.all(10),
+                      codeblockDecoration: BoxDecoration(
+                        color: const Color(0xAA101420),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
           ),
         ),
         const SizedBox(height: 8),

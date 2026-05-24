@@ -1569,6 +1569,11 @@ $messagesJson
     final isUser = msg['role'] == 'user';
     final isTool = msg['role'] == 'tool';
     final content = (msg['content'] as String? ?? '').trim();
+    // Strip voice prefix from display (prefix is kept in LLM context but hidden in UI)
+    final displayContent =
+        isUser && content.startsWith('[Voice message')
+            ? content.substring(content.indexOf('\n') + 1).trim()
+            : content;
     final showThinking = !isUser && content.isEmpty && _isGeneratingReply;
     final containsMermaid = content.contains('```mermaid');
     final textColor =
@@ -1678,7 +1683,7 @@ $messagesJson
                     )
                     : isUser
                     ? SelectableText(
-                      content,
+                      displayContent,
                       style: const TextStyle(
                         fontSize: 13,
                         color: Colors.white,
