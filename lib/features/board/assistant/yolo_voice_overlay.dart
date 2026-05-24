@@ -729,25 +729,44 @@ class _ResponseCardState extends State<_ResponseCard>
               animation: _borderAnim,
               builder:
                   (ctx, child) => CustomPaint(
-                    painter: _RunningBorderPainter(
-                      progress: widget.streaming ? _borderAnim.value : 0.68,
-                      radius: 28,
-                    ),
+                    painter:
+                        widget.streaming
+                            ? _RunningBorderPainter(
+                              progress: _borderAnim.value,
+                              radius: 28,
+                            )
+                            : null,
                     child: child,
                   ),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 620),
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
                 decoration: BoxDecoration(
-                  color: const Color(0xF2181A24),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xF21B1F2A),
+                      Color(0xD91B1F2A),
+                      Color(0x6E1B1F2A),
+                      Color(0x1A1B1F2A),
+                    ],
+                    stops: [0.0, 0.45, 0.78, 1.0],
+                  ),
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
                       color: const Color(
                         0xFF9B6BFF,
-                      ).withValues(alpha: widget.streaming ? 0.30 : 0.16),
+                      ).withValues(alpha: widget.streaming ? 0.30 : 0.20),
                       blurRadius: widget.streaming ? 40 : 24,
                       spreadRadius: -6,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF64DFFF).withValues(alpha: 0.14),
+                      blurRadius: 26,
+                      spreadRadius: -14,
+                      offset: const Offset(0, 16),
                     ),
                   ],
                 ),
