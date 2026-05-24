@@ -265,9 +265,15 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
   Future<void> _sendMessage({bool mirrorToOverlay = false}) async {
     if (_isGeneratingReply) return;
-    final text = _inputController.text.trim();
-    if (text.isEmpty) return;
+    final rawText = _inputController.text.trim();
+    if (rawText.isEmpty) return;
     _inputController.clear();
+
+    // For voice messages, prepend context about ASR origin
+    final text = mirrorToOverlay
+        ? '[Voice message — transcribed via speech recognition, '
+            'may contain recognition errors]\n$rawText'
+        : rawText;
 
     final msgs = _messages;
     final userMessageId = 'msg-${DateTime.now().millisecondsSinceEpoch}';
@@ -290,9 +296,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       'messages': msgs,
       if (mirrorToOverlay) ...{
         'voiceDraft': '',
-        'voicePrompt': text,
+        'voicePrompt': rawText,
         'voiceResponse': '',
-        'assistantStatus': 'thinking',
+        'assistantStatus': 'processing',
         'voiceOverlayHidden': false,
       },
     });
@@ -305,13 +311,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     if (mirrorToOverlay) {
       _syncOverlayState(
         draftOverride: '',
-        forcedStatus: 'thinking',
+        forcedStatus: 'processing',
         responseOverride: '',
-        promptOverride: text,
+        promptOverride: rawText,
         hiddenOverride: false,
       );
-      await Future<void>.delayed(const Duration(milliseconds: 850));
-      if (!mounted || _isCancelled) return;
     }
 
     // ── Debug session ──────────────────────────────────────────────────────
@@ -412,6 +416,17 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       var emitted = '';
       var firstTokenReceived = false;
 
+      // Transition overlay from 'processing' to 'thinking' — request is sent
+      if (mirrorToOverlay && mounted) {
+        _syncOverlayState(
+          draftOverride: '',
+          forcedStatus: 'thinking',
+          responseOverride: '',
+          promptOverride: rawText,
+          hiddenOverride: false,
+        );
+      }
+
       await for (final event in provider.sendMessage(
         message: text,
         config: config,
@@ -502,7 +517,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           draftOverride: '',
           forcedStatus: 'output',
           responseOverride: cleanedFinal,
-          promptOverride: text,
+          promptOverride: rawText,
           hiddenOverride: false,
         );
       }
@@ -520,7 +535,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           draftOverride: '',
           forcedStatus: 'output',
           responseOverride: _formatAssistantError(e),
-          promptOverride: text,
+          promptOverride: rawText,
           hiddenOverride: false,
         );
       }
