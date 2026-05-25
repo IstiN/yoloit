@@ -698,6 +698,10 @@ class CliServer {
 
       return _json({
         'ok': true,
+        'taskSent': task != null && task.trim().isNotEmpty,
+        'note': task != null && task.trim().isNotEmpty
+            ? 'Agent launched and task already sent — no further action needed.'
+            : 'Agent launched. Use the terminal panel to interact.',
         'session': {
           'id': session.id,
           'agent': session.type.name,

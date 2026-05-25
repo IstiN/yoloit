@@ -2118,12 +2118,12 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     command: 'agent:run',
     alias: 'agr',
     description:
-        'Launch an agent session in a folder and optionally send an initial task',
+        'Launch an agent session and send it an initial task. The task is automatically typed into the agent terminal — do NOT call any other command to send the task; it is already sent.',
     group: 'agents',
     params: <YoloitCliToolParam>[
       _p('agent', 'Agent id', shortKey: 'a'),
       _p('path', 'Workspace or folder path', required: true, shortKey: 'pth'),
-      _p('task', 'Optional initial task/prompt', shortKey: 'tsk'),
+      _p('task', 'Initial task/prompt — typed into the agent automatically', shortKey: 'tsk'),
       _p('name', 'Optional session name', flag: '--name', shortKey: 'n'),
     ],
   ),

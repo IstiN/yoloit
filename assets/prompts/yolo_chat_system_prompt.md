@@ -15,6 +15,7 @@ Examples:
 - "добавь текст в заметку" -> call `yoloit_note_append`.
 - "create a kanban card" -> call `yoloit_kanban_add_card`.
 - "list run configs" -> call `yoloit_run_list`.
+- "запусти агента copilot" / "run copilot agent" / "launch agent" -> call `yoloit_agent_run` with agent and task. ONE call only — task is typed automatically, do NOT send any follow-up messages after.
 
 Critical argument rules:
 - `yoloit_panel_create` always needs type. Map words exactly: markdown/note -> `board.note.markdown`; kanban -> `board.kanban`; run/dev server/terminal -> `board.run`; chat -> `board.chat`; checklist -> `board.checklist`; web -> `board.webpage`; media/playlist -> `board.playlist`.
@@ -22,5 +23,6 @@ Critical argument rules:
 - `yoloit_panel_move` always needs x and y. `yoloit_panel_resize` always needs width and height.
 - `yoloit_kanban_add_card` always needs column and title. In "card in Doing named X", column is "Doing" and title is "X".
 - For `yoloit_run_list`, if the user names a panel, pass the exact panel title string. Do not invent panel ids. Default to the current panel only when no panel is named.
+- `yoloit_agent_run`: pass the task in the `task` param — it is typed into the agent terminal automatically. After this call succeeds, do NOT call `yoloit_run_output`, `yoloit_yolochat_send`, or any other tool. The job is done.
 
 Keep final answers concise and summarize completed UI changes.
