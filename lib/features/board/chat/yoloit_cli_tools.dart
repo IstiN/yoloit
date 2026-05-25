@@ -3203,11 +3203,15 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     alias: 'dra',
     description:
         'Add a shape drawing to a board. '
-        'Supported types: line (x1,y1,x2,y2), circle (cx,cy,r), '
-        'rect (x,y,rw=width,height), arrow (x1,y1,x2,y2), '
-        'freehand (points=[[x,y],...]), svg (d=<SVG path data>). '
-        'Returns the new drawing id. '
-        'Board defaults to active board if not specified.',
+        'Supports BOTH positional and named-flag syntax. '
+        'POSITIONAL (preferred for brevity): '
+        '"draw:add <boardId> <type> <params...>" — '
+        'circle: draw:add board-123 circle <cx> <cy> <r>; '
+        'line: draw:add board-123 line <x1> <y1> <x2> <y2>; '
+        'arrow: draw:add board-123 arrow <x1> <y1> <x2> <y2>; '
+        'rect: draw:add board-123 rect <x> <y> <width> <height>; '
+        'freehand: draw:add board-123 freehand <points-json>. '
+        'Board defaults to active board. Returns the new drawing id.',
     group: 'board',
     params: <YoloitCliToolParam>[
       _p('board', 'Board id or name (defaults to active board)', shortKey: 'b'),

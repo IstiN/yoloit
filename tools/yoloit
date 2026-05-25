@@ -3480,6 +3480,8 @@ print(json.dumps({
     cx=""; cy=""; r=""
     pos_x=""; pos_y=""; rw=""; height=""
     points=""; d_path=""; svg_path=""
+    _pn0=""; _pn1=""; _pn2=""; _pn3=""
+    _pos_nums=0
     while [[ $# -gt 0 ]]; do
       case $1 in
         --board|-b) board="$2"; shift 2 ;;
@@ -3500,9 +3502,41 @@ print(json.dumps({
         --points) points="$2"; shift 2 ;;
         --d|--path) d_path="$2"; shift 2 ;;
         --svg) svg_path="$2"; shift 2 ;;
-        *) shift ;;
+        # Positional args: board-id, shape keyword, then numeric/json params
+        circle|line|arrow|freehand|rect|text|svg|dot|cross) shape="$1"; shift ;;
+        board-*) board="$1"; shift ;;
+        *)
+          case $_pos_nums in
+            0) _pn0="$1" ;;
+            1) _pn1="$1" ;;
+            2) _pn2="$1" ;;
+            3) _pn3="$1" ;;
+          esac
+          _pos_nums=$((_pos_nums+1)); shift ;;
       esac
     done
+    # Apply positional numeric args if named args were not set
+    case "$shape" in
+      circle)
+        [[ -z "$cx" && -n "$_pn0" ]] && cx="$_pn0"
+        [[ -z "$cy" && -n "$_pn1" ]] && cy="$_pn1"
+        [[ -z "$r"  && -n "$_pn2" ]] && r="$_pn2" ;;
+      line|arrow)
+        [[ -z "$x1" && -n "$_pn0" ]] && x1="$_pn0"
+        [[ -z "$y1" && -n "$_pn1" ]] && y1="$_pn1"
+        [[ -z "$x2" && -n "$_pn2" ]] && x2="$_pn2"
+        [[ -z "$y2" && -n "$_pn3" ]] && y2="$_pn3" ;;
+      rect)
+        [[ -z "$pos_x"  && -n "$_pn0" ]] && pos_x="$_pn0"
+        [[ -z "$pos_y"  && -n "$_pn1" ]] && pos_y="$_pn1"
+        [[ -z "$rw"     && -n "$_pn2" ]] && rw="$_pn2"
+        [[ -z "$height" && -n "$_pn3" ]] && height="$_pn3" ;;
+      text)
+        [[ -z "$pos_x" && -n "$_pn0" ]] && pos_x="$_pn0"
+        [[ -z "$pos_y" && -n "$_pn1" ]] && pos_y="$_pn1" ;;
+      freehand)
+        [[ -z "$points" && -n "$_pn0" ]] && points="$_pn0" ;;
+    esac
     json=$(python3 - \
       "$board" "$shape" "$color" "$width" \
       "$x1" "$y1" "$x2" "$y2" \

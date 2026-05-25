@@ -661,6 +661,7 @@ class _ResponseCardState extends State<_ResponseCard>
   late AnimationController _typingAnim;
   /// Fade-in controller: animates 0→1 when streaming stops.
   late final AnimationController _crossfadeAnim;
+  late final ScrollController _scrollCtrl;
   int _visibleChars = 0;
   String _lastResponse = '';
   bool _isCrossfading = false;
@@ -668,6 +669,7 @@ class _ResponseCardState extends State<_ResponseCard>
   @override
   void initState() {
     super.initState();
+    _scrollCtrl = ScrollController();
     _borderAnim = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: widget.borderSpeed),
@@ -757,6 +759,19 @@ class _ResponseCardState extends State<_ResponseCard>
     if (!widget.streaming) {
       _visibleChars = widget.response.length;
     }
+    // Auto-scroll to bottom when new tool log lines are added
+    if (widget.response.length > old.response.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollCtrl.hasClients &&
+            _scrollCtrl.position.maxScrollExtent > 0) {
+          _scrollCtrl.animateTo(
+            _scrollCtrl.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -764,6 +779,7 @@ class _ResponseCardState extends State<_ResponseCard>
     _borderAnim.dispose();
     _typingAnim.dispose();
     _crossfadeAnim.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -888,71 +904,148 @@ class _ResponseCardState extends State<_ResponseCard>
   }
 
   Widget _buildContentBody(String text, bool hasMermaid, double maxH) {
+    if (hasMermaid) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: MarkdownDocumentPreview(content: text),
+      );
+    }
+
+    // Split tool log lines (✅/❌/⚙️ prefix) from regular assistant text
+    final allLines = text.split('\n');
+    final toolLines = <String>[];
+    var nonToolStart = 0;
+    for (var i = 0; i < allLines.length; i++) {
+      final l = allLines[i].trimLeft();
+      if (l.startsWith('✅') || l.startsWith('❌') || l.startsWith('⚙️')) {
+        toolLines.add(allLines[i]);
+        nonToolStart = i + 1;
+      } else if (l.isEmpty) {
+        nonToolStart = i + 1; // skip blank separator lines
+      } else {
+        nonToolStart = i;
+        break;
+      }
+    }
+    final restText =
+        nonToolStart < allLines.length
+            ? allLines.sublist(nonToolStart).join('\n').trim()
+            : '';
+
+    final mdStyle = MarkdownStyleSheet(
+      p: TextStyle(
+        color: Colors.white.withValues(alpha: 0.95),
+        fontSize: widget.fontSize,
+        height: 1.52,
+        fontWeight: FontWeight.w500,
+        shadows: const [
+          Shadow(
+            color: Color(0x889B6BFF),
+            blurRadius: 14,
+          ),
+        ],
+      ),
+      h1: TextStyle(
+        color: Colors.white.withValues(alpha: 0.98),
+        fontSize: widget.fontSize + 5,
+        height: 1.25,
+        fontWeight: FontWeight.w800,
+      ),
+      h2: TextStyle(
+        color: Colors.white.withValues(alpha: 0.98),
+        fontSize: widget.fontSize + 3,
+        height: 1.3,
+        fontWeight: FontWeight.w800,
+      ),
+      h3: TextStyle(
+        color: Colors.white.withValues(alpha: 0.98),
+        fontSize: widget.fontSize + 1,
+        height: 1.35,
+        fontWeight: FontWeight.w700,
+      ),
+      a: TextStyle(
+        color: const Color(0xFF8BD8FF),
+        fontSize: widget.fontSize,
+        decoration: TextDecoration.underline,
+      ),
+      code: TextStyle(
+        color: const Color(0xFF8BD8FF),
+        fontSize: widget.fontSize - 1,
+        backgroundColor: const Color(0x66101420),
+      ),
+      codeblockPadding: const EdgeInsets.all(10),
+      codeblockDecoration: BoxDecoration(
+        color: const Color(0xAA101420),
+        borderRadius: BorderRadius.circular(10),
+      ),
+    );
+
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxH),
-      child:
-          hasMermaid
-              ? MarkdownDocumentPreview(content: text)
-              : CustomScrollView(
-                shrinkWrap: true,
-                physics: const ClampingScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: MarkdownBody(
-                      data: text,
-                      softLineBreak: true,
-                      selectable: false,
-                      styleSheet: MarkdownStyleSheet(
-                        p: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          fontSize: widget.fontSize,
-                          height: 1.52,
-                          fontWeight: FontWeight.w500,
-                          shadows: const [
-                            Shadow(
-                              color: Color(0x889B6BFF),
-                              blurRadius: 14,
-                            ),
-                          ],
-                        ),
-                        h1: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.98),
-                          fontSize: widget.fontSize + 5,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        h2: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.98),
-                          fontSize: widget.fontSize + 3,
-                          height: 1.3,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        h3: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.98),
-                          fontSize: widget.fontSize + 1,
-                          height: 1.35,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        a: TextStyle(
-                          color: const Color(0xFF8BD8FF),
-                          fontSize: widget.fontSize,
-                          decoration: TextDecoration.underline,
-                        ),
-                        code: TextStyle(
-                          color: const Color(0xFF8BD8FF),
-                          fontSize: widget.fontSize - 1,
-                          backgroundColor: const Color(0x66101420),
-                        ),
-                        codeblockPadding: const EdgeInsets.all(10),
-                        codeblockDecoration: BoxDecoration(
-                          color: const Color(0xAA101420),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+      child: CustomScrollView(
+        controller: _scrollCtrl,
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        slivers: [
+          if (toolLines.isNotEmpty)
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (ctx, i) => _buildToolLogRow(toolLines[i]),
+                childCount: toolLines.length,
               ),
+            ),
+          if (restText.isNotEmpty)
+            SliverPadding(
+              padding: EdgeInsets.only(top: toolLines.isNotEmpty ? 10 : 0),
+              sliver: SliverToBoxAdapter(
+                child: MarkdownBody(
+                  data: restText,
+                  softLineBreak: true,
+                  selectable: false,
+                  styleSheet: mdStyle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolLogRow(String line) {
+    final l = line.trimLeft();
+    final isDone = l.startsWith('✅');
+    final isFailed = l.startsWith('❌');
+    final state =
+        isDone
+            ? _ToolState.done
+            : isFailed
+            ? _ToolState.failed
+            : _ToolState.running;
+    final text = l.replaceFirst(RegExp(r'^[✅❌⚙️]\s*'), '');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 15,
+            child: CustomPaint(painter: _ToolStateIconPainter(state: state)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.75),
+                fontSize: 12.5,
+                fontFamily: 'monospace',
+                height: 1.4,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1028,7 +1121,88 @@ class _RunningBorderPainter extends CustomPainter {
   bool shouldRepaint(_RunningBorderPainter old) => old.progress != progress;
 }
 
-// ─────────────────────────── BLOB ORB PAINTER ───────────────────────────────
+// ─────────────────────────── tool state icon ──────────────────────────────────
+
+enum _ToolState { done, failed, running }
+
+/// Custom painted icon for tool log rows: circle with check/x/dot.
+class _ToolStateIconPainter extends CustomPainter {
+  const _ToolStateIconPainter({required this.state});
+
+  final _ToolState state;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2;
+
+    final color = switch (state) {
+      _ToolState.done => const Color(0xFF4FFFB0),
+      _ToolState.failed => const Color(0xFFFF6B6B),
+      _ToolState.running => const Color(0xFF9B6BFF),
+    };
+
+    // Background fill
+    canvas.drawCircle(
+      center,
+      r,
+      Paint()
+        ..color = color.withValues(alpha: 0.18)
+        ..style = PaintingStyle.fill,
+    );
+    // Border
+    canvas.drawCircle(
+      center,
+      r - 0.8,
+      Paint()
+        ..color = color.withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3,
+    );
+
+    final icon =
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+
+    if (state == _ToolState.done) {
+      final path =
+          Path()
+            ..moveTo(center.dx - r * 0.33, center.dy + r * 0.02)
+            ..lineTo(center.dx - r * 0.05, center.dy + r * 0.38)
+            ..lineTo(center.dx + r * 0.40, center.dy - r * 0.32);
+      canvas.drawPath(path, icon);
+    } else if (state == _ToolState.failed) {
+      canvas.drawLine(
+        Offset(center.dx - r * 0.28, center.dy - r * 0.28),
+        Offset(center.dx + r * 0.28, center.dy + r * 0.28),
+        icon,
+      );
+      canvas.drawLine(
+        Offset(center.dx + r * 0.28, center.dy - r * 0.28),
+        Offset(center.dx - r * 0.28, center.dy + r * 0.28),
+        icon,
+      );
+    } else {
+      // Running: filled dot
+      canvas.drawCircle(
+        center,
+        r * 0.3,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ToolStateIconPainter old) => old.state != state;
+}
+
+
 // Draws 5 large overlapping irregular translucent blobs with visible edges,
 // matching the reference: organic shapes, NOT circles.
 
