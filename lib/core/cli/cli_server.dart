@@ -808,142 +808,12 @@ class CliServer {
     }
 
     if (method == 'POST') {
-      final body = await _body(request);
-      final boardId =
-          (body['board'] as String?) ??
-          request.url.queryParameters['board'];
-      final board =
-          boardId != null ? _findBoard(cubit, boardId) : cubit.state.activeBoard;
-      if (board == null) return _error('Board not found');
-
-      final type = (body['type'] as String? ?? 'freehand').toLowerCase();
-      final colorStr = body['color'] as String? ?? '#FFFFFF';
-      final color = _parseColor(colorStr) ?? const Color(0xFFFFFFFF);
-      final strokeWidth = (body['width'] as num?)?.toDouble() ?? 3.0;
-      final posX = (body['x'] as num?)?.toDouble() ?? 100.0;
-      final posY = (body['y'] as num?)?.toDouble() ?? 100.0;
-
-      List<List<Offset>> strokes;
-      Size size;
-
-      switch (type) {
-        case 'line':
-          final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
-          final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
-          final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
-          final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
-          final result = _lineToElement(x1, y1, x2, y2, strokeWidth);
-          strokes = result.$1;
-          size = result.$2;
-
-        case 'arrow':
-          final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
-          final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
-          final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
-          final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
-          final result = _arrowToElement(x1, y1, x2, y2, strokeWidth);
-          strokes = result.$1;
-          size = result.$2;
-
-        case 'circle':
-          final cx = (body['cx'] as num?)?.toDouble() ??
-              (body['x'] as num?)?.toDouble() ?? posX;
-          final cy = (body['cy'] as num?)?.toDouble() ??
-              (body['y'] as num?)?.toDouble() ?? posY;
-          final r = (body['r'] as num?)?.toDouble() ??
-              (body['radius'] as num?)?.toDouble() ?? 50.0;
-          final result = _circleToElement(cx, cy, r, strokeWidth);
-          strokes = result.$1;
-          size = result.$2;
-
-        case 'rect':
-        case 'rectangle':
-          final rx = (body['x'] as num?)?.toDouble() ?? posX;
-          final ry = (body['y'] as num?)?.toDouble() ?? posY;
-          final w = (body['width'] as num?)?.toDouble() ?? 200.0;
-          final h = (body['height'] as num?)?.toDouble() ?? 100.0;
-          final result = _rectToElement(rx, ry, w, h, strokeWidth);
-          strokes = result.$1;
-          size = result.$2;
-
-        case 'svg':
-          final pathD = body['d'] as String? ?? body['path'] as String? ?? '';
-          final svgStr = body['svg'] as String?;
-          final dStr = pathD.isNotEmpty ? pathD : (svgStr != null ? _extractSvgPathD(svgStr) : '');
-          if (dStr.isEmpty) return _error('Missing "d" (SVG path data) or "svg" field');
-          final result = _svgPathToElement(dStr, posX, posY, strokeWidth);
-          if (result == null) return _error('Failed to parse SVG path');
-          strokes = result.$1;
-          size = result.$2;
-
-        case 'freehand':
-        default:
-          final rawPoints = body['points'] as List?;
-          if (rawPoints == null || rawPoints.isEmpty) {
-            return _error('Missing "points" for freehand. Provide [[x,y],...]');
-          }
-          final points = rawPoints
-              .map((p) => Offset(
-                    (p as List)[0] is num ? (p[0] as num).toDouble() : 0,
-                    p[1] is num ? (p[1] as num).toDouble() : 0,
-                  ))
-              .toList();
-          final result = _freehandToElement(points, strokeWidth);
-          strokes = result.$1;
-          size = result.$2;
+      try {
+        return await _handleDrawingsPost(request, cubit, sub);
+      } catch (e, st) {
+        developer.log('[Drawings] POST error: $e\n$st');
+        return _json({'ok': false, 'error': e.toString()});
       }
-
-      // Top-left position: for shapes that specify absolute coords,
-      // position is already baked into strokes (relative to bounding box).
-      // We store the absolute position here.
-      final absPos = switch (type) {
-        'line' || 'arrow' => Offset(
-            math.min(
-              (body['x1'] as num?)?.toDouble() ?? posX,
-              (body['x2'] as num?)?.toDouble() ?? posX + 200,
-            ) - strokeWidth,
-            math.min(
-              (body['y1'] as num?)?.toDouble() ?? posY,
-              (body['y2'] as num?)?.toDouble() ?? posY,
-            ) - strokeWidth,
-          ),
-        'circle' => Offset(
-            ((body['cx'] as num?)?.toDouble() ?? posX) -
-                ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
-            ((body['cy'] as num?)?.toDouble() ?? posY) -
-                ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
-          ),
-        'rect' || 'rectangle' => Offset(
-            (body['x'] as num?)?.toDouble() ?? posX,
-            (body['y'] as num?)?.toDouble() ?? posY,
-          ),
-        'svg' || 'freehand' => Offset(posX, posY),
-        _ => Offset(posX, posY),
-      };
-
-      final maxZ = board.drawings.fold<int>(
-        0,
-        (v, d) => d.zIndex > v ? d.zIndex : v,
-      );
-      final drawing = BoardDrawingElement(
-        id: 'drawing-${DateTime.now().millisecondsSinceEpoch}',
-        strokes: strokes,
-        position: absPos,
-        size: size,
-        strokeColor: color,
-        strokeWidth: strokeWidth,
-        zIndex: maxZ + 1,
-      );
-      await cubit.addDrawing(drawing, boardId: board.id);
-      _scheduleRebuild();
-      return _json({
-        'ok': true,
-        'id': drawing.id,
-        'boardId': board.id,
-        'type': type,
-        'strokeCount': strokes.length,
-        'pointCount': strokes.fold<int>(0, (s, st) => s + st.length),
-      });
     }
 
     if (method == 'DELETE') {
@@ -972,6 +842,180 @@ class CliServer {
   }
 
   // ── Drawing shape helpers ─────────────────────────────────────────────────
+
+  Future<shelf.Response> _handleDrawingsPost(
+    shelf.Request request,
+    BoardCubit cubit,
+    List<String> sub,
+  ) async {
+    final body = await _body(request);
+    final boardId =
+        (body['board'] as String?) ??
+        request.url.queryParameters['board'];
+    final board =
+        boardId != null ? _findBoard(cubit, boardId) : cubit.state.activeBoard;
+    if (board == null) return _error('Board not found');
+
+    final type = (body['type'] as String? ?? 'freehand').toLowerCase();
+    final colorStr = body['color'] as String? ?? '#FFFFFF';
+    final color = _parseColor(colorStr) ?? const Color(0xFFFFFFFF);
+    final strokeWidth = (body['width'] as num?)?.toDouble() ?? 3.0;
+    final posX = (body['x'] as num?)?.toDouble() ?? 100.0;
+    final posY = (body['y'] as num?)?.toDouble() ?? 100.0;
+
+    List<List<Offset>> strokes;
+    Size size;
+
+    switch (type) {
+      case 'line':
+        final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
+        final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
+        final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
+        final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
+        final result = _lineToElement(x1, y1, x2, y2, strokeWidth);
+        strokes = result.$1; size = result.$2;
+
+      case 'arrow':
+        final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
+        final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
+        final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
+        final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
+        final result = _arrowToElement(x1, y1, x2, y2, strokeWidth);
+        strokes = result.$1; size = result.$2;
+
+      case 'circle':
+        final cx = (body['cx'] as num?)?.toDouble() ?? posX;
+        final cy = (body['cy'] as num?)?.toDouble() ?? posY;
+        final r = (body['r'] as num?)?.toDouble() ??
+            (body['radius'] as num?)?.toDouble() ?? 50.0;
+        final result = _circleToElement(cx, cy, r, strokeWidth);
+        strokes = result.$1; size = result.$2;
+
+      case 'rect':
+      case 'rectangle':
+        final rx = (body['x'] as num?)?.toDouble() ?? posX;
+        final ry = (body['y'] as num?)?.toDouble() ?? posY;
+        final w = (body['width'] as num?)?.toDouble() ?? 200.0;
+        final h = (body['height'] as num?)?.toDouble() ?? 100.0;
+        final result = _rectToElement(rx, ry, w, h, strokeWidth);
+        strokes = result.$1; size = result.$2;
+
+      case 'svg':
+        final pathD = body['d'] as String? ?? body['path'] as String? ?? '';
+        final svgStr = body['svg'] as String?;
+        final dStr = pathD.isNotEmpty
+            ? pathD
+            : (svgStr != null ? _extractSvgPathD(svgStr) : '');
+        if (dStr.isEmpty) {
+          return _json({'ok': false, 'error': 'Missing "d" (SVG path data) or "svg" field'});
+        }
+        final result = _svgPathToElement(dStr, posX, posY, strokeWidth);
+        if (result == null) {
+          return _json({'ok': false, 'error': 'Failed to parse SVG path — check "d" syntax (M/L/C/Q/Z commands)'});
+        }
+        strokes = result.$1; size = result.$2;
+
+      case 'file':
+        // Render all paths from an SVG file as a single drawing element
+        final filePath = body['file'] as String? ?? body['path'] as String? ?? '';
+        if (filePath.isEmpty) {
+          return _json({'ok': false, 'error': 'Missing "file" — provide path to SVG file'});
+        }
+        final svgFile = File(filePath);
+        if (!svgFile.existsSync()) {
+          return _json({'ok': false, 'error': 'SVG file not found: $filePath'});
+        }
+        final svgContent = await svgFile.readAsString();
+        // Extract all d="" attributes and combine into one element per path
+        final dMatches = RegExp(r'd="([^"]*)"').allMatches(svgContent);
+        final allStrokes = <List<Offset>>[];
+        var maxW = 0.0, maxH = 0.0;
+        for (final m in dMatches) {
+          final d = m.group(1) ?? '';
+          if (d.isEmpty) continue;
+          final r = _svgPathToElement(d, 0, 0, strokeWidth);
+          if (r != null) {
+            allStrokes.addAll(r.$1);
+            if (r.$2.width > maxW) maxW = r.$2.width;
+            if (r.$2.height > maxH) maxH = r.$2.height;
+          }
+        }
+        if (allStrokes.isEmpty) {
+          return _json({'ok': false, 'error': 'No drawable paths found in SVG file'});
+        }
+        strokes = allStrokes;
+        size = Size(maxW, maxH);
+
+      case 'freehand':
+      default:
+        final rawPointsVal = body['points'];
+        final rawPoints = rawPointsVal is List
+            ? rawPointsVal
+            : rawPointsVal is String
+                ? (jsonDecode(rawPointsVal) as List?)
+                : null;
+        if (rawPoints == null || rawPoints.isEmpty) {
+          return _json({'ok': false, 'error': 'Missing "points" for freehand — provide [[x,y],...]'});
+        }
+        final points = rawPoints.map((p) {
+          final pt = p as List;
+          return Offset(
+            pt[0] is num ? (pt[0] as num).toDouble() : 0,
+            pt[1] is num ? (pt[1] as num).toDouble() : 0,
+          );
+        }).toList();
+        final result = _freehandToElement(points, strokeWidth);
+        strokes = result.$1; size = result.$2;
+    }
+
+    final absPos = switch (type) {
+      'line' || 'arrow' => Offset(
+          math.min(
+            (body['x1'] as num?)?.toDouble() ?? posX,
+            (body['x2'] as num?)?.toDouble() ?? posX + 200,
+          ) - strokeWidth,
+          math.min(
+            (body['y1'] as num?)?.toDouble() ?? posY,
+            (body['y2'] as num?)?.toDouble() ?? posY,
+          ) - strokeWidth,
+        ),
+      'circle' => Offset(
+          ((body['cx'] as num?)?.toDouble() ?? posX) -
+              ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
+          ((body['cy'] as num?)?.toDouble() ?? posY) -
+              ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
+        ),
+      'rect' || 'rectangle' => Offset(
+          (body['x'] as num?)?.toDouble() ?? posX,
+          (body['y'] as num?)?.toDouble() ?? posY,
+        ),
+      _ => Offset(posX, posY),
+    };
+
+    final maxZ = board.drawings.fold<int>(
+      0,
+      (v, d) => d.zIndex > v ? d.zIndex : v,
+    );
+    final drawing = BoardDrawingElement(
+      id: 'drawing-${DateTime.now().millisecondsSinceEpoch}',
+      strokes: strokes,
+      position: absPos,
+      size: size,
+      strokeColor: color,
+      strokeWidth: strokeWidth,
+      zIndex: maxZ + 1,
+    );
+    await cubit.addDrawing(drawing, boardId: board.id);
+    _scheduleRebuild();
+    return _json({
+      'ok': true,
+      'id': drawing.id,
+      'boardId': board.id,
+      'type': type,
+      'strokeCount': strokes.length,
+      'pointCount': strokes.fold<int>(0, (s, st) => s + st.length),
+    });
+  }
 
   Map<String, dynamic> _drawingToJson(BoardDrawingElement d) => {
     'id': d.id,
@@ -1086,8 +1130,15 @@ class CliServer {
     while (i < tokens.length) {
       final t = tokens[i];
       if (RegExp(r'[MLHVCSQTAZmlhvcsqtaz]').hasMatch(t)) {
-        cmd = t;
         i++;
+        // Z/z need no arguments — handle immediately
+        if (t == 'Z' || t == 'z') {
+          if (current.length > 1) current.add(current.first);
+          if (current.isNotEmpty) strokes.add(current);
+          current = [];
+        } else {
+          cmd = t;
+        }
         continue;
       }
       double num() {
@@ -1167,11 +1218,6 @@ class CliServer {
             ));
           }
           cx = ex; cy = ey;
-        case 'Z':
-        case 'z':
-          if (current.length > 1) current.add(current.first);
-          strokes.add(current);
-          current = [];
         default:
           i++; // skip unknown
       }

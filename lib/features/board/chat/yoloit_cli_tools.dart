@@ -3273,4 +3273,21 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('out', 'Output file path (stdout if omitted)', shortKey: 'o'),
     ],
   ),
+  YoloitCliTool(
+    command: 'draw:file',
+    alias: 'drf',
+    description:
+        'Render an SVG file as drawings on a board. '
+        'All path elements in the SVG file are drawn as strokes. '
+        'Use to import diagrams, icons, or illustrations from .svg files.',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name', required: true, shortKey: 'b'),
+      _p('file', 'Path to SVG file', required: true, shortKey: 'f'),
+      _p('x', 'X position offset (default 100)'),
+      _p('y', 'Y position offset (default 100)'),
+      _p('color', 'Stroke color override as #RRGGBB hex', shortKey: 'c'),
+      _p('width', 'Stroke width in pixels', shortKey: 'w'),
+    ],
+  ),
 ];

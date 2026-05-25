@@ -1120,6 +1120,21 @@ commands = [
     "example": "yoloit draw:export board-123 --out drawings.svg",
     "aliases": ["drex"],
   },
+  {
+    "name": "draw:file",
+    "group": "board",
+    "description": "Render an SVG file as drawings on a board. All paths in the SVG file are drawn as strokes.",
+    "params": [
+      ["board", "Board id or name", True],
+      ["file", "Path to SVG file", True],
+      ["x", "X position offset (default 100)", False],
+      ["y", "Y position offset (default 100)", False],
+      ["color", "Stroke color override #RRGGBB", False],
+      ["width", "Stroke width px (default 3)", False],
+    ],
+    "example": "yoloit draw:file board-123 diagram.svg",
+    "aliases": ["drf"],
+  },
 ]
 
 # ── Registry: namespace prefixes (one definition per namespace) ───────
@@ -3553,6 +3568,25 @@ print(json.dumps({
     else
       curl -sf "http://127.0.0.1:$(_port)/api/drawings/svg$q"
     fi
+    ;;
+
+  draw:file|drf)
+    board=""; file=""; posX=100; posY=100; color="#FFFFFF"; width=3
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) board="$2"; shift 2 ;;
+        --file|-f) file="$2"; shift 2 ;;
+        --x) posX="$2"; shift 2 ;;
+        --y) posY="$2"; shift 2 ;;
+        --color|-c) color="$2"; shift 2 ;;
+        --width|-w) width="$2"; shift 2 ;;
+        *) [[ -z "$board" ]] && board="$1" || file="$1"; shift ;;
+      esac
+    done
+    [[ -z "$file" ]] && { echo "Usage: yoloit draw:file <board> <file.svg>" >&2; exit 1; }
+    file=$(python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$file")
+    json="{\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), \"type\": \"file\", \"file\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$file"), \"x\": $posX, \"y\": $posY, \"color\": \"$color\", \"width\": $width}"
+    _curl POST "/drawings" "$json"
     ;;
 
   validate)

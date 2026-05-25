@@ -102,11 +102,12 @@ class CopilotCliProvider extends ChatProvider {
       args.addAll(['--mode', config.mode!]);
     }
 
-    // Session name/resume
+    // Session name/resume — copilot binary rejects double quotes in --name
+    final safeSessionName = config.sessionName.replaceAll('"', "'");
     if (isFirstMessage) {
-      args.addAll(['--name', config.sessionName]);
+      args.addAll(['--name', safeSessionName]);
     } else {
-      args.addAll(['--resume', config.sessionName]);
+      args.addAll(['--resume', safeSessionName]);
     }
 
     // Attachments
