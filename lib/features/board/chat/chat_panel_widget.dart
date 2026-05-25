@@ -152,6 +152,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   /// Persisted opencode session ID (survives widget rebuilds).
   String? _opencodeSessionId;
+  String? _copilotSessionId;
 
   /// Notifier for panel border animation.
   final ValueNotifier<bool> processingNotifier = ValueNotifier(false);
@@ -203,6 +204,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (_session!.opencodeSessionId != null) {
         _opencodeSessionId = _session!.opencodeSessionId;
       }
+      if (_session!.copilotSessionId != null) {
+        _copilotSessionId = _session!.copilotSessionId;
+      }
       // If the session finished processing while we were away, update UI
       if (_isProcessing) {
         _setProcessing(true);
@@ -234,6 +238,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _session!.restoreOpencodeSessionId(_opencodeSessionId);
       }
     }
+    if (_config.provider == 'copilot') {
+      if (_session!.copilotSessionId != null) {
+        _copilotSessionId = _session!.copilotSessionId;
+      }
+      if (_copilotSessionId != null) {
+        _provider.setSessionId(_config.sessionName, _copilotSessionId!);
+        _session!.restoreCopilotSessionId(_copilotSessionId);
+      }
+    }
 
     // Re-attach UI callbacks if the session is still processing
     // (e.g. widget disposed mid-stream, now re-mounting)
@@ -263,6 +276,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               widget.onUpdateState({
                 ...widget.panel.state,
                 'opencodeSessionId': sid,
+              });
+            }
+          }
+          if (_config.provider == 'copilot') {
+            final sid = _provider.getSessionId(_config.sessionName);
+            if (sid != null && sid != _copilotSessionId) {
+              _copilotSessionId = sid;
+              widget.onUpdateState({
+                ...widget.panel.state,
+                'copilotSessionId': sid,
               });
             }
           }
@@ -413,6 +436,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _opencodeSessionId = savedSessionId;
       }
     }
+    if (_config.provider == 'copilot') {
+      final savedSessionId = widget.panel.state['copilotSessionId'];
+      if (savedSessionId is String && savedSessionId.isNotEmpty) {
+        _copilotSessionId = savedSessionId;
+      }
+    }
   }
 
   static const _maxSavedMessages = 100;
@@ -428,6 +457,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       'config': _config.toJson(),
       'messages': messagesJson,
       'lastUsage': _lastUsage?.toJson(),
+      if (_opencodeSessionId != null) 'opencodeSessionId': _opencodeSessionId,
+      if (_copilotSessionId != null) 'copilotSessionId': _copilotSessionId,
     });
     // Update session history registry (metadata + messages on disk)
     ChatSessionHistory.instance.upsert(
@@ -460,6 +491,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (sid != null) {
         _opencodeSessionId = sid;
         widget.onUpdateState({...widget.panel.state, 'opencodeSessionId': sid});
+      }
+    }
+    if (_config.provider == 'copilot' && _copilotSessionId == null) {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null) {
+        _copilotSessionId = sid;
+        widget.onUpdateState({...widget.panel.state, 'copilotSessionId': sid});
       }
     }
     // Persist current messages to board state
@@ -919,6 +957,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             });
           }
         }
+        if (_config.provider == 'copilot') {
+          final sid = _provider.getSessionId(_config.sessionName);
+          if (sid != null && sid != _copilotSessionId) {
+            _copilotSessionId = sid;
+            widget.onUpdateState({
+              ...widget.panel.state,
+              'copilotSessionId': sid,
+            });
+          }
+        }
         setState(() {
           _isSending = false;
           _setProcessing(false);
@@ -965,7 +1013,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   void _handleEvent(ChatEvent event) {
-    // Persist the opencode session ID as soon as the provider captures it
+    // Persist provider session IDs as soon as the provider captures them
     // (which happens on the first event). Doing it here — rather than only in
     // onDone — means the ID survives a board switch that happens mid-message.
     if (_config.provider == 'opencode' && _opencodeSessionId == null) {
@@ -973,6 +1021,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (sid != null) {
         _opencodeSessionId = sid;
         widget.onUpdateState({...widget.panel.state, 'opencodeSessionId': sid});
+      }
+    }
+    if (_config.provider == 'copilot' && _copilotSessionId == null) {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null) {
+        _copilotSessionId = sid;
+        widget.onUpdateState({...widget.panel.state, 'copilotSessionId': sid});
       }
     }
 

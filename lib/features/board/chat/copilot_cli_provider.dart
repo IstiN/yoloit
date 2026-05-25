@@ -19,6 +19,7 @@ class CopilotCliProvider extends ChatProvider {
   CopilotCliProvider();
 
   final Map<String, Process> _processes = {};
+  final Map<String, String> _sessionIds = {};
   String? _cachedYoloitBin;
 
   @override
@@ -75,18 +76,6 @@ class CopilotCliProvider extends ChatProvider {
     // Kill any existing process for this session
     await stop(config.sessionName);
 
-    // Safety guard: Copilot CLI can hard-fail (and poison resume state) when
-    // a prompt contains raw API keys/secrets. Surface a clear local error and
-    // do not send such prompt to Copilot.
-    if (_looksLikeSensitiveInput(message)) {
-      controller.addError(
-        'Refusing to send sensitive key-like content to Copilot CLI. '
-        'Remove/redact secrets (e.g. sk-...) and try again.',
-      );
-      await controller.close();
-      return;
-    }
-
     final args = <String>[
       '--output-format',
       'json',
@@ -120,11 +109,12 @@ class CopilotCliProvider extends ChatProvider {
       RegExp(r'["“”]'),
       "'",
     );
+    final resumeKey = _sessionIds[config.sessionName] ?? safeSessionName;
     final useResume = !isFirstMessage;
     if (!useResume) {
       args.addAll(['--name', safeSessionName]);
     } else {
-      args.addAll(['--resume', safeSessionName]);
+      args.addAll(['--resume', resumeKey]);
     }
 
     // Attachments
@@ -207,6 +197,9 @@ class CopilotCliProvider extends ChatProvider {
                 if (trimmed.isEmpty) continue;
                 try {
                   final json = jsonDecode(trimmed) as Map<String, dynamic>;
+                  if (json['type'] == 'result' && json['sessionId'] is String) {
+                    _sessionIds[config.sessionName] = json['sessionId'] as String;
+                  }
                   final event = ChatEvent.fromJson(json);
                   controller.add(event);
                 } catch (e) {
@@ -235,6 +228,9 @@ class CopilotCliProvider extends ChatProvider {
       if (remaining.isNotEmpty) {
         try {
           final json = jsonDecode(remaining) as Map<String, dynamic>;
+          if (json['type'] == 'result' && json['sessionId'] is String) {
+            _sessionIds[config.sessionName] = json['sessionId'] as String;
+          }
           controller.add(ChatEvent.fromJson(json));
         } catch (_) {}
       }
@@ -285,6 +281,7 @@ class CopilotCliProvider extends ChatProvider {
       process.kill(ProcessSignal.sigterm);
     }
     _processes.clear();
+    _sessionIds.clear();
   }
 
   /// Drop process references without killing them.
@@ -361,21 +358,13 @@ class CopilotCliProvider extends ChatProvider {
     return null;
   }
 
-  bool _looksLikeSensitiveInput(String text) {
-    final t = text.trim();
-    if (t.isEmpty) return false;
-    final lower = t.toLowerCase();
-    final keyLike = RegExp(
-      r'\b(sk-[A-Za-z0-9\-_]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|AIza[0-9A-Za-z\-_]{20,})\b',
-    );
-    if (keyLike.hasMatch(t)) return true;
-    // Common explicit "ключ/key/token/api key" requests with inline values.
-    if ((lower.contains('api key') ||
-            lower.contains('token') ||
-            lower.contains('ключ')) &&
-        RegExp(r'[:=]\s*[A-Za-z0-9\-_]{12,}').hasMatch(t)) {
-      return true;
-    }
-    return false;
+  @override
+  void setSessionId(String sessionName, String sessionId) {
+    _sessionIds[sessionName] = sessionId;
+  }
+
+  @override
+  String? getSessionId(String sessionName) {
+    return _sessionIds[sessionName];
   }
 }
