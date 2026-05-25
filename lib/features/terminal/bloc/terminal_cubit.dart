@@ -247,11 +247,13 @@ class TerminalCubit extends Cubit<TerminalState> {
       }
     }
 
+    final effectiveWorkspaceId = workspaceId ?? _activeWorkspaceId;
+
     final session = AgentSession(
       id: sessionId,
       type: type,
       workspacePath: effectivePath,
-      workspaceId: workspaceId,
+      workspaceId: effectiveWorkspaceId,
       status: AgentStatus.live,
       sessionId: _generateSessionId(),
       worktreeContexts: worktreeContexts,
@@ -259,8 +261,8 @@ class TerminalCubit extends Cubit<TerminalState> {
     );
 
     final secrets =
-        workspaceId != null
-            ? await WorkspaceSecretsService.instance.load(workspaceId)
+        effectiveWorkspaceId != null
+            ? await WorkspaceSecretsService.instance.load(effectiveWorkspaceId)
             : <String, String>{};
     final extraEnv = secrets.isEmpty ? null : secrets;
 
@@ -296,7 +298,6 @@ class TerminalCubit extends Cubit<TerminalState> {
     final visible = _workspaceSessions;
     _emitLoaded(visible, visible.length - 1, requestOpenPanel: requestOpenPanel);
 
-    final effectiveWorkspaceId = workspaceId ?? _activeWorkspaceId;
     if (effectiveWorkspaceId != null) {
       unawaited(
         _persistence.save(
