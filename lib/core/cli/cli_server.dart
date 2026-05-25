@@ -16,10 +16,12 @@ import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
@@ -659,56 +661,115 @@ class CliServer {
           (body['path'] as String?) ??
           (body['workspacePath'] as String?) ??
           Directory.current.path;
-      final customName = body['name'] as String?;
       final task = body['task'] as String?;
+      final sessionName =
+          (body['name'] as String?) ??
+          (task != null && task.trim().isNotEmpty
+              ? task.trim().length > 40
+                  ? '${task.trim().substring(0, 37)}…'
+                  : task.trim()
+              : null);
 
-      late final AgentType type;
-      try {
-        type = AgentType.values.firstWhere((value) => value.name == agentId);
-      } catch (_) {
-        return _error('Unknown agent id: $agentId');
-      }
+      // Map agent id to board.chat provider string.
+      // copilot → 'copilot', opencode → 'opencode', claude → 'claude', etc.
+      final provider = agentId; // agent id matches chat provider naming
 
-      final beforeState = terminalCubit.state;
-      final beforeIds =
-          beforeState is TerminalLoaded
-              ? beforeState.allSessions.map((session) => session.id).toSet()
-              : <String>{};
+      // Look up default model from agent config
+      final configs = await AgentConfigService.instance.load();
+      final agentConfig = configs.firstWhere(
+        (c) => c.id == agentId,
+        orElse: () => AgentConfig(
+          id: agentId,
+          displayName: agentId,
+          iconLabel: agentId[0].toUpperCase(),
+          launchCommand: agentId,
+          visible: true,
+          isBuiltIn: false,
+        ),
+      );
+      final model = agentConfig.defaultModel ?? 'gpt-5-mini';
 
-      await terminalCubit.spawnSession(
-        type: type,
-        workspacePath: workspacePath,
-        customName: customName,
-        requestOpenPanel: true,
+      // Build ChatSessionConfig state for the board.chat panel
+      final config = ChatSessionConfig(
+        sessionName: sessionName ?? '',
+        workingDir: workspacePath,
+        provider: provider,
+        model: model,
+        autopilot: false,
       );
 
-      final afterState = terminalCubit.state;
-      if (afterState is! TerminalLoaded) {
-        return _error('Terminal sessions are not ready');
-      }
-      final session = afterState.allSessions.lastWhere(
-        (candidate) => !beforeIds.contains(candidate.id),
-        orElse: () => afterState.allSessions.last,
-      );
+      // Create board.chat panel on active board
+      final cubit = _cubit;
+      if (cubit == null) return _error('Board cubit not available');
+      final board =
+          cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
+      if (board == null) return _error('No active board');
 
+      const plugin = ChatPanelPlugin();
+      final panelId = 'chat-${DateTime.now().millisecondsSinceEpoch}';
+      final bounds = _nextAvailableBoundsFor(
+        board,
+        preferredWidth: plugin.defaultSize.width,
+        preferredHeight: plugin.defaultSize.height,
+      );
+      final panel = BoardPanelInstance(
+        id: panelId,
+        type: ChatPanelPlugin.kTypeId,
+        title: sessionName ?? panelId,
+        bounds: bounds,
+        state: {
+          'config': config.toJson(),
+          'configured': true,
+        },
+        zIndex:
+            board.panels.fold<int>(
+              0,
+              (value, p) => p.zIndex > value ? p.zIndex : value,
+            ) +
+            1,
+      );
+      await cubit.addPanel(panel, boardId: board.id);
+      // Focus the newly created panel
+      await cubit.focusPanel(panel.id, boardId: board.id);
+      _scheduleRebuild();
+
+      // Send the initial task as the first message (small delay for panel to mount)
+      String? sendError;
       if (task != null && task.trim().isNotEmpty) {
-        await Future<void>.delayed(const Duration(milliseconds: 1400));
-        terminalCubit.sendInput(session.id, '${task.trim()}\n');
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        final updatedBoard =
+            cubit.state.boards
+                .firstWhere((b) => b.id == board.id, orElse: () => board);
+        final updatedPanel = updatedBoard.panels
+            .where((p) => p.id == panelId)
+            .firstOrNull;
+        if (updatedPanel != null) {
+          final sendResult = await _panelAction(cubit, updatedBoard, updatedPanel, {
+            'action': 'send',
+            'text': task.trim(),
+          });
+          if (sendResult.statusCode >= 400) {
+            sendError = 'Task send failed';
+          }
+        }
       }
 
       return _json({
         'ok': true,
-        'taskSent': task != null && task.trim().isNotEmpty,
-        'note': task != null && task.trim().isNotEmpty
-            ? 'Agent launched and task already sent — no further action needed.'
-            : 'Agent launched. Use the terminal panel to interact.',
-        'session': {
-          'id': session.id,
-          'agent': session.type.name,
-          'displayName': session.customName ?? session.type.displayName,
-          'workspacePath': session.workspacePath,
-          'workspaceId': session.workspaceId,
-          'status': session.status.name,
+        'taskSent': task != null && task.trim().isNotEmpty && sendError == null,
+        'note': 'Agent chat panel created and focused. '
+            '${task != null && task.trim().isNotEmpty ? 'Task sent — no further action needed.' : 'Use yolochat:send to interact.'}'
+            ' For follow-ups: yolochat:send --board ${board.id} --panel $panelId',
+        if (sendError != null) 'sendError': sendError,
+        'panel': {
+          'id': panelId,
+          'title': sessionName ?? panelId,
+          'boardId': board.id,
+          'boardName': board.name,
+          'type': ChatPanelPlugin.kTypeId,
+          'provider': provider,
+          'model': model,
+          'workingDir': workspacePath,
         },
       });
     }
