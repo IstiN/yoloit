@@ -662,13 +662,14 @@ class CliServer {
           (body['workspacePath'] as String?) ??
           Directory.current.path;
       final task = body['task'] as String?;
+      final rawName = (body['name'] as String?)?.trim();
       final sessionName =
-          (body['name'] as String?) ??
+          (rawName != null && rawName.isNotEmpty ? rawName : null) ??
           (task != null && task.trim().isNotEmpty
               ? task.trim().length > 40
                   ? '${task.trim().substring(0, 37)}…'
                   : task.trim()
-              : null);
+              : 'agent-${DateTime.now().millisecondsSinceEpoch}');
 
       // Map agent id to board.chat provider string.
       // copilot → 'copilot', opencode → 'opencode', claude → 'claude', etc.
@@ -691,7 +692,7 @@ class CliServer {
 
       // Build ChatSessionConfig state for the board.chat panel
       final config = ChatSessionConfig(
-        sessionName: sessionName ?? '',
+        sessionName: sessionName,
         workingDir: workspacePath,
         provider: provider,
         model: model,
@@ -715,7 +716,7 @@ class CliServer {
       final panel = BoardPanelInstance(
         id: panelId,
         type: ChatPanelPlugin.kTypeId,
-        title: sessionName ?? panelId,
+        title: sessionName,
         bounds: bounds,
         state: {
           'config': config.toJson(),
