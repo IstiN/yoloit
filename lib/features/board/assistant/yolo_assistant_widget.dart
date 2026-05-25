@@ -115,10 +115,21 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   final List<Map<String, dynamic>> _debugSessions = [];
   Map<String, dynamic>? _activeDebugSession;
 
+  // Pending state overrides — prevents stale widget.panel.state reads from
+  // overwriting state changes made between board rebuilds. Each _updateState
+  // call accumulates here; acknowledged keys are cleared in didUpdateWidget.
+  final Map<String, dynamic> _pendingStateOverrides = {};
+
   static const _kAccent = Color(0xFF8B5CF6);
 
   bool get _voiceOverlayHidden =>
-      widget.panel.state['voiceOverlayHidden'] as bool? ?? true;
+      (_pendingStateOverrides['voiceOverlayHidden'] ??
+          widget.panel.state['voiceOverlayHidden']) as bool? ??
+      true;
+
+  // Effective state: pending overrides layered on top of last-known panel state.
+  Map<String, dynamic> get _effectiveState =>
+      Map<String, dynamic>.from(widget.panel.state)..addAll(_pendingStateOverrides);
 
   void _syncOverlayState({
     String? draftOverride,
@@ -141,15 +152,14 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             : 'idle');
     // ignore: avoid_print
     print('[YoloAssistant] _syncOverlayState: forced=$forcedStatus → status=$status (isGenerating=$_isGeneratingReply, hasToken=$_receivedAssistantToken)');
+    final effective = _effectiveState;
     _updateState({
       'voiceDraft': draft,
       'assistantStatus': status,
       'voiceResponse':
-          responseOverride ??
-          (widget.panel.state['voiceResponse'] as String? ?? ''),
+          responseOverride ?? (effective['voiceResponse'] as String? ?? ''),
       'voicePrompt':
-          promptOverride ??
-          (widget.panel.state['voicePrompt'] as String? ?? ''),
+          promptOverride ?? (effective['voicePrompt'] as String? ?? ''),
       'voiceOverlayHidden': hiddenOverride ?? _voiceOverlayHidden,
     });
   }
@@ -237,6 +247,12 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   @override
   void didUpdateWidget(covariant YoloAssistantWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Remove overrides the board has now acknowledged (its state matches our value).
+    if (!identical(oldWidget.panel.state, widget.panel.state)) {
+      _pendingStateOverrides.removeWhere(
+        (key, value) => widget.panel.state[key] == value,
+      );
+    }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller?._detach();
       widget.controller?._attach(
@@ -268,7 +284,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   // ── State helpers ─────────────────────────────────────────────────────────
 
   void _updateState(Map<String, dynamic> patch) {
-    final merged = Map<String, dynamic>.from(widget.panel.state)..addAll(patch);
+    // Accumulate patch into overrides so that rapid back-to-back _updateState
+    // calls don't lose earlier changes via stale widget.panel.state reads.
+    _pendingStateOverrides.addAll(patch);
+    final merged = Map<String, dynamic>.from(widget.panel.state)
+      ..addAll(_pendingStateOverrides);
     widget.onUpdateState(merged);
   }
 
