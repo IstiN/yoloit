@@ -1421,69 +1421,98 @@ class _WaveformPainter extends CustomPainter {
   final bool flip;
   final double amplitude;
 
+  // Catmull-Rom → cubic bezier smooth path through sampled points
+  static Path _smoothPath(List<Offset> pts) {
+    final path = Path();
+    if (pts.isEmpty) return path;
+    path.moveTo(pts[0].dx, pts[0].dy);
+    for (int i = 0; i < pts.length - 1; i++) {
+      final p0 = pts[i > 0 ? i - 1 : 0];
+      final p1 = pts[i];
+      final p2 = pts[i + 1];
+      final p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+      path.cubicTo(
+        p1.dx + (p2.dx - p0.dx) / 6, p1.dy + (p2.dy - p0.dy) / 6,
+        p2.dx - (p3.dx - p1.dx) / 6, p2.dy - (p3.dy - p1.dy) / 6,
+        p2.dx, p2.dy,
+      );
+    }
+    return path;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final cy = size.height / 2;
     final t = progress * 2 * math.pi;
 
-    // 4 wave layers: (amplitudeCoeff, color, baseAlpha, phaseOffset)
-    final layers = <(double, Color, double, double)>[
-      (1.00, const Color(0xFF7B5CF6), 0.55, 0.00),  // purple  — full reactive
-      (0.70, const Color(0xFF4D9FFF), 0.42, 1.57),  // blue    — mid
-      (0.45, const Color(0xFFE060C0), 0.32, 3.14),  // pink    — less
-      (0.25, const Color(0xFFC47AFF), 0.22, 4.71),  // lavender — subtle
+    // Wave lines: (amplCoeff, color, strokeW, glowW, alpha, phase)
+    // Multiple overlapping lines at different phases create the layered glowing look.
+    const waveDefs = [
+      (1.00, Color(0xFF6366F1), 1.6, 14.0, 0.65, 0.00),  // indigo  — dominant
+      (0.90, Color(0xFF818CF8), 1.2, 11.0, 0.55, 0.90),  // soft indigo
+      (0.78, Color(0xFF60A5FA), 1.0, 9.0,  0.50, 1.80),  // blue
+      (0.65, Color(0xFFC084FC), 0.9, 8.0,  0.45, 2.75),  // violet
+      (0.52, Color(0xFFEC4899), 0.8, 7.0,  0.40, 3.70),  // pink
+      (0.40, Color(0xFF67E8F9), 0.7, 6.0,  0.35, 4.70),  // cyan
+      (0.28, Color(0xFFF0ABFC), 0.6, 5.0,  0.28, 5.60),  // lavender
     ];
 
-    // Dense sampling for continuous glow — 48 overlapping micro-blobs per layer
-    const steps = 48;
+    const steps = 80; // ~2 px spacing on 160 px canvas → perfectly smooth
 
-    for (final (coeff, color, baseAlpha, phase) in layers) {
+    for (final (coeff, color, strokeW, glowW, alpha, phase) in waveDefs) {
+      final pts = <Offset>[];
       for (int i = 0; i <= steps; i++) {
         final frac = i / steps;
 
-        // Gaussian envelope — peaks at arm centre, tapers at both ends
-        final env = math.exp(-math.pow((frac - 0.50) * 2.6, 2));
+        // Gaussian envelope — tall at arm midpoint, zero at both ends
+        final env = math.exp(-math.pow((frac - 0.50) * 2.8, 2));
 
-        // Sine Y displacement
-        final wave = math.sin(t + frac * math.pi * 3.0 + phase);
-        final yOff = wave * size.height * 0.40 * amplitude * coeff * env;
+        // Two harmonics for organic, non-mechanical feel
+        final wave = math.sin(t + frac * math.pi * 2.5 + phase) * 0.65 +
+            math.sin(t * 1.7 + frac * math.pi * 4.5 + phase * 1.3) * 0.35;
 
-        // Canvas x (flip=true → left arm)
+        final yOff = wave * size.height * 0.46 * amplitude * coeff * env;
         final x = frac * size.width;
         final px = flip ? size.width - x : x;
-        final py = cy + yOff;
-
-        // Blob radius: small at tips, wide in centre — radius > step spacing → no gaps
-        final blobR = (3.0 + 18.0 * env * amplitude).clamp(3.0, 22.0);
-
-        // Tint along arm: blue near orb → pink at tip
-        final colorT = flip ? (1.0 - frac) : frac;
-        final c =
-            colorT < 0.5
-                ? Color.lerp(
-                    color,
-                    const Color(0xFF4D9FFF),
-                    (0.5 - colorT) * 0.7,
-                  )!
-                : Color.lerp(
-                    color,
-                    const Color(0xFFE060C0),
-                    (colorT - 0.5) * 0.7,
-                  )!;
-
-        final center = Offset(px, py);
-        canvas.drawCircle(
-          center,
-          blobR,
-          Paint()
-            ..shader = ui.Gradient.radial(
-              center,
-              blobR,
-              [c.withValues(alpha: baseAlpha), c.withValues(alpha: 0.0)],
-              [0.0, 1.0],
-            ),
-        );
+        pts.add(Offset(px, cy + yOff));
       }
+
+      final path = _smoothPath(pts);
+
+      // 1. Wide outer glow — creates the soft halo
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = glowW
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..color = color.withValues(alpha: alpha * 0.20)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+      );
+
+      // 2. Mid glow — fills the body with colour
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = glowW * 0.45
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..color = color.withValues(alpha: alpha * 0.45)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+
+      // 3. Sharp core line — bright highlight along the crest
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeW
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..color = color.withValues(alpha: alpha),
+      );
     }
   }
 
