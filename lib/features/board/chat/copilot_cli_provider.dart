@@ -71,6 +71,7 @@ class CopilotCliProvider extends ChatProvider {
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
     required StreamController<ChatEvent> controller,
+    bool forceNewSession = false,
   }) async {
     // Kill any existing process for this session
     await stop(config.sessionName);
@@ -102,9 +103,14 @@ class CopilotCliProvider extends ChatProvider {
       args.addAll(['--mode', config.mode!]);
     }
 
-    // Session name/resume — copilot binary rejects double quotes in --name
-    final safeSessionName = config.sessionName.replaceAll('"', "'");
-    if (isFirstMessage) {
+    // Session name/resume — copilot binary rejects double quotes in --name.
+    // Also normalize typographic quotes to avoid provider-side validation errors.
+    final safeSessionName = config.sessionName.replaceAll(
+      RegExp(r'["“”]'),
+      "'",
+    );
+    final useResume = !isFirstMessage && !forceNewSession;
+    if (!useResume) {
       args.addAll(['--name', safeSessionName]);
     } else {
       args.addAll(['--resume', safeSessionName]);
@@ -130,7 +136,11 @@ class CopilotCliProvider extends ChatProvider {
     // Prompt
     args.addAll(['-p', effectiveMessage]);
 
-    debugPrint('[CopilotCli] Running: copilot ${args.join(' ')}');
+    debugPrint(
+      '[CopilotCli] Running: copilot --output-format json --yolo --model '
+      '${config.model} ${useResume ? '--resume' : '--name'} '
+      '$safeSessionName -p <omitted>',
+    );
     debugPrint('[CopilotCli] cwd: $workingDir');
 
     try {
@@ -216,6 +226,32 @@ class CopilotCliProvider extends ChatProvider {
           final json = jsonDecode(remaining) as Map<String, dynamic>;
           controller.add(ChatEvent.fromJson(json));
         } catch (_) {}
+      }
+
+      // Resume can fail after app/hot-restart if the copilot session cannot be
+      // restored by name. Retry once as a fresh named session to keep chat usable.
+      if (exitCode != 0 && useResume && !controller.isClosed) {
+        final errText = stderrBuf.toString().trim();
+        debugPrint(
+          '[CopilotCli] Resume failed for "$safeSessionName" '
+          '(exit=$exitCode${errText.isNotEmpty ? ', stderr: $errText' : ''}), '
+          'retrying with --name',
+        );
+        if (_processes[config.sessionName] == process) {
+          _processes.remove(config.sessionName);
+        }
+        await subAgentSub.cancel();
+        await subAgentWatcher.dispose();
+        await _runProcess(
+          message: message,
+          config: config,
+          isFirstMessage: isFirstMessage,
+          attachments: attachments,
+          runtimeContext: runtimeContext,
+          controller: controller,
+          forceNewSession: true,
+        );
+        return;
       }
 
       // If process exited with error and no events were emitted, surface stderr
