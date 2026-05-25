@@ -713,6 +713,7 @@ class CliServer {
         preferredWidth: plugin.defaultSize.width,
         preferredHeight: plugin.defaultSize.height,
       );
+      final trimmedTask = task?.trim();
       final panel = BoardPanelInstance(
         id: panelId,
         type: ChatPanelPlugin.kTypeId,
@@ -721,6 +722,10 @@ class CliServer {
         state: {
           'config': config.toJson(),
           'configured': true,
+          // _cliPendingMessage is picked up by ChatPanelWidget.initState
+          // via _consumeCliPendingMessage() → auto-sends on first mount.
+          if (trimmedTask != null && trimmedTask.isNotEmpty)
+            '_cliPendingMessage': trimmedTask,
         },
         zIndex:
             board.panels.fold<int>(
@@ -730,41 +735,18 @@ class CliServer {
             1,
       );
       await cubit.addPanel(panel, boardId: board.id);
-      // Focus the newly created panel
       await cubit.focusPanel(panel.id, boardId: board.id);
       _scheduleRebuild();
 
-      // Send the initial task as the first message (small delay for panel to mount)
-      String? sendError;
-      if (task != null && task.trim().isNotEmpty) {
-        await Future<void>.delayed(const Duration(milliseconds: 600));
-        final updatedBoard =
-            cubit.state.boards
-                .firstWhere((b) => b.id == board.id, orElse: () => board);
-        final updatedPanel = updatedBoard.panels
-            .where((p) => p.id == panelId)
-            .firstOrNull;
-        if (updatedPanel != null) {
-          final sendResult = await _panelAction(cubit, updatedBoard, updatedPanel, {
-            'action': 'send',
-            'text': task.trim(),
-          });
-          if (sendResult.statusCode >= 400) {
-            sendError = 'Task send failed';
-          }
-        }
-      }
-
       return _json({
         'ok': true,
-        'taskSent': task != null && task.trim().isNotEmpty && sendError == null,
+        'taskSent': trimmedTask != null && trimmedTask.isNotEmpty,
         'note': 'Agent chat panel created and focused. '
-            '${task != null && task.trim().isNotEmpty ? 'Task sent — no further action needed.' : 'Use yolochat:send to interact.'}'
+            '${trimmedTask != null && trimmedTask.isNotEmpty ? 'Task will be sent automatically — no further action needed.' : 'Use yolochat:send to interact.'}'
             ' For follow-ups: yolochat:send --board ${board.id} --panel $panelId',
-        if (sendError != null) 'sendError': sendError,
         'panel': {
           'id': panelId,
-          'title': sessionName ?? panelId,
+          'title': sessionName,
           'boardId': board.id,
           'boardName': board.name,
           'type': ChatPanelPlugin.kTypeId,
