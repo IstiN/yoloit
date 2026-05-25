@@ -2301,7 +2301,12 @@ $messagesJson
       }
       if (mounted) {
         setState(() => _isTranscribingMic = false);
-        _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
+        // If we are about to send the message, keep the overlay in 'processing'
+        // to avoid a visual bounce: processing → idle → processing.
+        _syncOverlayState(
+          forcedStatus: shouldSend ? 'processing' : null,
+          hiddenOverride: _voiceOverlayHidden,
+        );
       }
     }
     if (shouldSend && mounted) {

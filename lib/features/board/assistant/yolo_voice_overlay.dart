@@ -131,7 +131,11 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
         _orbAnim.value = 0.23;
       }
     }
-    if (old.status != widget.status) _maybeTransition();
+    if (old.status != widget.status) {
+      // ignore: avoid_print
+      print('[VoiceOverlay] status widget: ${old.status} → ${widget.status} (shown=${_shown.name})');
+      _maybeTransition();
+    }
   }
 
   // Natural state order — enforce sequential transitions
@@ -144,7 +148,6 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   ];
 
   void _maybeTransition() {
-    if (_pendingTransition) return;
     final target = _VS.from(widget.status);
     if (target == _shown) return;
 
@@ -153,15 +156,20 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
 
     // Tool/text streaming should surface immediately in the response card
     // instead of walking through intermediate processing/thinking states.
+    // This bypass must come BEFORE the _pendingTransition guard so that a
+    // delayed transition never blocks the responding state from showing.
     if (target == _VS.responding) {
       // ignore: avoid_print
-      print('[VoiceOverlay] immediate → responding');
+      print('[VoiceOverlay] immediate → responding (cancelled pending=$_pendingTransition)');
+      _pendingTransition = false; // cancel any pending delayed transition
       setState(() {
         _shown = target;
         _shownAt = DateTime.now();
       });
       return;
     }
+
+    if (_pendingTransition) return;
 
     final elapsed = DateTime.now().difference(_shownAt).inMilliseconds;
     final wait = _shown.minMs - elapsed;
@@ -490,46 +498,50 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     ),
   );
 
-  Widget _textContent() => KeyedSubtree(
-    key: ValueKey(_shown),
-    child: switch (_shown) {
-      _VS.idle =>
-        widget.showIdleHint
-            ? const _TextBlock(
-              primary: 'Click or speak to start',
-              primaryColor: Color(0xFFB5B6C8),
-              primarySize: 15,
-            )
-            : const SizedBox.shrink(),
-      _VS.listening => const _TextBlock(
-        primary: 'Recording...',
-        primaryColor: Color(0xFFCCCCE0),
-        primarySize: 15,
-        secondary: 'Esc to cancel  •  Space to send',
-        secondaryColor: Color(0xFF9293A6),
-        secondarySize: 12,
-      ),
-      _VS.processing => const _TextBlock(
-        primary: 'Processing...',
-        primaryColor: Color(0xFF62C9FF),
-        primarySize: 16,
-        primaryBold: true,
-        secondary: 'Please wait',
-        secondaryColor: Color(0xFF9A9BAD),
-        secondarySize: 12,
-      ),
-      _VS.thinking => const _TextBlock(
-        primary: 'Thinking...',
-        primaryColor: Color(0xFFD58BFF),
-        primarySize: 16,
-        primaryBold: true,
-        secondary: 'Waiting for response...',
-        secondaryColor: Color(0xFF9A9BAD),
-        secondarySize: 12,
-      ),
-      _VS.responding => const SizedBox.shrink(),
-    },
-  );
+  Widget _textContent() {
+    // ignore: avoid_print
+    print('[VoiceOverlay] render: _shown=${_shown.name} widget.status=${widget.status}');
+    return KeyedSubtree(
+      key: ValueKey(_shown),
+      child: switch (_shown) {
+        _VS.idle =>
+          widget.showIdleHint
+              ? const _TextBlock(
+                primary: 'Click or speak to start',
+                primaryColor: Color(0xFFB5B6C8),
+                primarySize: 15,
+              )
+              : const SizedBox.shrink(),
+        _VS.listening => const _TextBlock(
+          primary: 'Recording...',
+          primaryColor: Color(0xFFCCCCE0),
+          primarySize: 15,
+          secondary: 'Esc to cancel  •  Space to send',
+          secondaryColor: Color(0xFF9293A6),
+          secondarySize: 12,
+        ),
+        _VS.processing => const _TextBlock(
+          primary: 'Processing...',
+          primaryColor: Color(0xFF62C9FF),
+          primarySize: 16,
+          primaryBold: true,
+          secondary: 'Please wait',
+          secondaryColor: Color(0xFF9A9BAD),
+          secondarySize: 12,
+        ),
+        _VS.thinking => const _TextBlock(
+          primary: 'Thinking...',
+          primaryColor: Color(0xFFD58BFF),
+          primarySize: 16,
+          primaryBold: true,
+          secondary: 'Waiting for response...',
+          secondaryColor: Color(0xFF9A9BAD),
+          secondarySize: 12,
+        ),
+        _VS.responding => const SizedBox.shrink(),
+      },
+    );
+  }
 }
 
 // ─────────────────────────── text block ──────────────────────────────────────
