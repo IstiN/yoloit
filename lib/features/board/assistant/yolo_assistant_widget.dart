@@ -2390,7 +2390,12 @@ $messagesJson
 
     final voiceSettings =
         await CloudLlmSettingsService.instance.loadVoiceSettings();
-    final asrMode = voiceSettings.useCloudAsr ? 'cloud' : 'local';
+    final asrMode =
+        !voiceSettings.useCloudAsr
+            ? 'local'
+            : voiceSettings.useChatModelForCloudAsr
+            ? 'direct_audio'
+            : 'cloud';
     // Resolve the effective ASR model for debug display (mirrors CloudAsrService logic).
     String? asrResolvedModel;
     String? asrProviderName;
@@ -2435,8 +2440,22 @@ $messagesJson
         return;
       }
 
-      if (voiceSettings.useCloudAsr) {
-        // ── Cloud ASR: send bytes directly (no disk read needed) ────────────
+      if (voiceSettings.useCloudAsr && voiceSettings.useChatModelForCloudAsr) {
+        // ── Direct audio → chat model: attach audio as message content ──────
+        // No transcription — audio bytes go straight into the user message.
+        _pendingAudioContent = [
+          {
+            'type': 'input_audio',
+            'input_audio': {'data': base64Encode(wavBytes), 'format': 'wav'},
+          },
+        ];
+        if (!mounted) return;
+        _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
+        shouldSend = sendAfterTranscription;
+        asrStatus = 'ok';
+        asrTranscriptChars = -1; // sentinel: audio sent directly
+      } else if (voiceSettings.useCloudAsr) {
+        // ── Cloud ASR: transcribe with ASR model, then put text in field ────
         final transcript = await _cloudAsrService.transcribeFromBytes(
           audioBytes: wavBytes,
           voiceSettings: voiceSettings,

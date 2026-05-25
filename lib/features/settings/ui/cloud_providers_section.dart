@@ -591,7 +591,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           if (_voiceSettings.useChatModelForCloudAsr) ...[
             const SizedBox(height: 4),
             Text(
-              'Audio will be sent directly to the chat model for transcription.',
+              'Audio will be sent directly to the chat model as a voice attachment.',
               style: TextStyle(
                 fontSize: 11,
                 color: colors.onSurface.withAlpha(160),
