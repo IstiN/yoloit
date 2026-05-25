@@ -65,8 +65,9 @@ class CliActionResult {
 
   Map<String, dynamic> toJson() => {
     'ok': ok,
-    if (message != null) 'message': message,
-    if (data != null) 'data': data,
+    if (!ok && message != null) 'error': message,
+    if (ok && message != null) 'message': message,
+    if (ok && data != null) 'data': data,
   };
 }
 

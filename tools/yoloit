@@ -30,26 +30,36 @@ open(f, 'w').write(json.dumps(d))
 }
 
 _resolve_base() {
-  if [[ -n "$BASE" ]]; then return; fi
+  if [[ -n "$BASE" ]]; then return 0; fi
   if [[ -n "${YOLOIT_CLI_PORT:-}" ]]; then
     BASE="http://127.0.0.1:${YOLOIT_CLI_PORT}/api"
-    return
+    return 0
   fi
   if [[ ! -f "$PORT_FILE" ]]; then
-    echo "Error: YoLoIT is not running (no port file at $PORT_FILE)" >&2
-    exit 1
+    return 1
   fi
   local port
   port=$(cat "$PORT_FILE")
   BASE="http://127.0.0.1:${port}/api"
+  return 0
 }
 
 _curl() {
-  _resolve_base
+  if ! _resolve_base; then
+    echo "{\"ok\":false,\"error\":\"CLI server not reachable — is the YoLoIT app running?\"}"
+    return 1
+  fi
   local method=$1 path=$2
   shift 2
-  curl -s -X "$method" "${BASE}${path}" \
-    -H "Content-Type: application/json" "$@"
+  local out ec
+  out=$(curl -s --max-time 30 -X "$method" "${BASE}${path}" \
+    -H "Content-Type: application/json" "$@" 2>/dev/null)
+  ec=$?
+  if [[ $ec -ne 0 ]] || [[ -z "$out" ]]; then
+    echo "{\"ok\":false,\"error\":\"CLI server not reachable — is the YoLoIT app running?\"}"
+    return 1
+  fi
+  echo "$out"
 }
 
 _get()    { _curl GET    "$1"; }
@@ -1588,7 +1598,9 @@ PYEOF
     [[ $# -lt 1 ]] && { echo "Usage: yoloit board:apply <id|name> [file|-]" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"
     yaml_source="${2:--}"
-    _resolve_base
+    if ! _resolve_base; then
+      echo '{"ok":false,"error":"CLI server not reachable — is the YoLoIT app running?"}'; exit 1
+    fi
     if [[ "$yaml_source" == "-" ]]; then
       curl -s -X POST "${BASE}/boards/${bid}/apply" \
         -H "Content-Type: application/yaml" \
@@ -3463,54 +3475,69 @@ print(json.dumps({
     done
     q=""
     [[ -n "$board" ]] && q="?board=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$board")"
-    _curl GET "/drawings$q"
+    _get "/drawings$q"
     ;;
 
   draw:add|dra)
     board=""; shape="freehand"; color="#FFFFFF"; width=3
-    declare -A extras
+    x1=""; y1=""; x2=""; y2=""
+    cx=""; cy=""; r=""
+    pos_x=""; pos_y=""; rw=""; height=""
+    points=""; d_path=""; svg_path=""
     while [[ $# -gt 0 ]]; do
       case $1 in
         --board|-b) board="$2"; shift 2 ;;
         --shape|-s|--type) shape="$2"; shift 2 ;;
         --color|-c) color="$2"; shift 2 ;;
         --width|-w) width="$2"; shift 2 ;;
-        --x1) extras[x1]="$2"; shift 2 ;;
-        --y1) extras[y1]="$2"; shift 2 ;;
-        --x2) extras[x2]="$2"; shift 2 ;;
-        --y2) extras[y2]="$2"; shift 2 ;;
-        --cx) extras[cx]="$2"; shift 2 ;;
-        --cy) extras[cy]="$2"; shift 2 ;;
-        --r|--radius) extras[r]="$2"; shift 2 ;;
-        --x) extras[x]="$2"; shift 2 ;;
-        --y) extras[y]="$2"; shift 2 ;;
-        --rw|--rect-width) extras[rw]="$2"; shift 2 ;;  # rect shape width (separate from stroke width)
-        --height) extras[height]="$2"; shift 2 ;;
-        --points) extras[points]="$2"; shift 2 ;;
-        --d|--path) extras[d]="$2"; shift 2 ;;
-        --svg) extras[svg]="$2"; shift 2 ;;
+        --x1) x1="$2"; shift 2 ;;
+        --y1) y1="$2"; shift 2 ;;
+        --x2) x2="$2"; shift 2 ;;
+        --y2) y2="$2"; shift 2 ;;
+        --cx) cx="$2"; shift 2 ;;
+        --cy) cy="$2"; shift 2 ;;
+        --r|--radius) r="$2"; shift 2 ;;
+        --x) pos_x="$2"; shift 2 ;;
+        --y) pos_y="$2"; shift 2 ;;
+        --rw|--rect-width) rw="$2"; shift 2 ;;
+        --height) height="$2"; shift 2 ;;
+        --points) points="$2"; shift 2 ;;
+        --d|--path) d_path="$2"; shift 2 ;;
+        --svg) svg_path="$2"; shift 2 ;;
         *) shift ;;
       esac
     done
-    extra_json=""
-    for key in "${!extras[@]}"; do
-      val="${extras[$key]}"
-      if [[ "$val" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
-        extra_json="$extra_json, \"$key\": $val"
-      elif [[ "$val" =~ ^\[ ]]; then
-        extra_json="$extra_json, \"$key\": $val"
-      else
-        extra_json="$extra_json, \"$key\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$val")"
-      fi
-    done
-    # Omit board key if empty so server uses active board
-    if [[ -n "$board" ]]; then
-      board_json="\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), "
-    else
-      board_json=""
-    fi
-    json="{${board_json}\"type\": \"$shape\", \"color\": \"$color\", \"width\": $width$extra_json}"
-    _curl POST "/drawings" "$json"
+    json=$(python3 - \
+      "$board" "$shape" "$color" "$width" \
+      "$x1" "$y1" "$x2" "$y2" \
+      "$cx" "$cy" "$r" \
+      "$pos_x" "$pos_y" "$rw" "$height" \
+      "$points" "$d_path" "$svg_path" <<'PY'
+import json, sys
+board, shape, color, width, x1, y1, x2, y2, cx, cy, r, pos_x, pos_y, rw, height, points, d_path, svg_path = sys.argv[1:20]
+def num(v): return float(v) if v else None
+body = {"type": shape, "color": color, "width": num(width) or 3}
+if board: body["board"] = board
+if num(x1) is not None: body["x1"] = num(x1)
+if num(y1) is not None: body["y1"] = num(y1)
+if num(x2) is not None: body["x2"] = num(x2)
+if num(y2) is not None: body["y2"] = num(y2)
+if num(cx) is not None: body["cx"] = num(cx)
+if num(cy) is not None: body["cy"] = num(cy)
+if num(r) is not None: body["r"] = num(r)
+if num(pos_x) is not None: body["x"] = num(pos_x)
+if num(pos_y) is not None: body["y"] = num(pos_y)
+if num(rw) is not None: body["rw"] = num(rw)
+if num(height) is not None: body["height"] = num(height)
+if points:
+    try: body["points"] = json.loads(points)
+    except: body["points"] = points
+if d_path: body["d"] = d_path
+if svg_path: body["svg"] = svg_path
+print(json.dumps(body))
+PY
+)
+    _post "/drawings" "$json"
     ;;
 
   draw:remove|drr)
@@ -3526,9 +3553,9 @@ print(json.dumps({
     enc_board=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$board")
     if [[ -n "$drawing_id" ]]; then
       enc_id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$drawing_id")
-      _curl DELETE "/drawings/$enc_board/$enc_id"
+      _delete "/drawings/$enc_board/$enc_id"
     else
-      _curl DELETE "/drawings/$enc_board"
+      _delete "/drawings/$enc_board"
     fi
     ;;
 
@@ -3542,7 +3569,7 @@ print(json.dumps({
     done
     [[ -z "$board" ]] && { echo "Usage: yoloit draw:clear <board>" >&2; exit 1; }
     enc_board=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$board")
-    _curl DELETE "/drawings/$enc_board"
+    _delete "/drawings/$enc_board"
     ;;
 
   draw:svg|drsvg)
@@ -3560,7 +3587,7 @@ print(json.dumps({
     done
     [[ -z "$path_d" ]] && { echo "Usage: yoloit draw:svg <board> <svg-path-d>" >&2; exit 1; }
     json="{\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), \"type\": \"svg\", \"d\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$path_d"), \"x\": $posX, \"y\": $posY, \"color\": \"$color\", \"width\": $width}"
-    _curl POST "/drawings" "$json"
+    _post "/drawings" "$json"
     ;;
 
   draw:export|drex)
@@ -3597,7 +3624,7 @@ print(json.dumps({
     [[ -z "$file" ]] && { echo "Usage: yoloit draw:file <board> <file.svg>" >&2; exit 1; }
     file=$(python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$file")
     json="{\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), \"type\": \"file\", \"file\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$file"), \"x\": $posX, \"y\": $posY, \"color\": \"$color\", \"width\": $width}"
-    _curl POST "/drawings" "$json"
+    _post "/drawings" "$json"
     ;;
 
   validate)
