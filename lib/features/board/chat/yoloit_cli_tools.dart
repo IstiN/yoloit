@@ -1371,7 +1371,22 @@ YoloitCliToolParam _panelParam([String key = 'panel']) {
 YoloitCliToolParam _panelTypeParam() {
   return _p(
     'type',
-    'Required panel type id. Use exactly: board.note.markdown for markdown/note panels, board.kanban for kanban panels, board.run for Run/dev-server/terminal panels, board.chat for chat panels, board.checklist for checklist panels, board.webpage for web panels, board.playlist for media panels.',
+    'Required panel type id. '
+        'board.note.markdown = markdown note; '
+        'board.kanban = kanban board; '
+        'board.run = terminal/run configs; '
+        'board.chat = AI chat panel; '
+        'board.checklist = checklist; '
+        'board.webpage = web browser; '
+        'board.playlist = media playlist; '
+        'board.filetree = FILE TREE BROWSER (use this when user asks for file tree, directory tree, folder browser, or "дерево файлов"); '
+        'board.code.snippet = code snippet viewer; '
+        'board.files = file attachments panel; '
+        'board.file.preview = file/image/video preview; '
+        'board.timer = countdown timer; '
+        'board.yolo_assistant = YoLo voice assistant; '
+        'board.run_configs = run configurations; '
+        'board.widget.custom = custom JS widget.',
     required: true,
     aliases: const <String>['panel_type', 'kind'],
     enumValues: const <String>[
@@ -1382,6 +1397,14 @@ YoloitCliToolParam _panelTypeParam() {
       'board.checklist',
       'board.webpage',
       'board.playlist',
+      'board.filetree',
+      'board.code.snippet',
+      'board.files',
+      'board.file.preview',
+      'board.timer',
+      'board.yolo_assistant',
+      'board.run_configs',
+      'board.widget.custom',
     ],
     shortKey: 'tp',
   );
@@ -1723,7 +1746,9 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     command: 'panel:create',
     alias: 'pmk',
     description:
-        'Create a panel. Always include the exact panel type id in `type`.',
+        'Create a panel. Always include the exact panel type id in `type`. '
+        'If unsure, call `panel:types` first. '
+        'For file trees/folder browser use type `board.filetree` (or `filetree:create`).',
     group: 'panel',
     humanVariants: const {
       'ru': [
@@ -1887,7 +1912,9 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'panel:types',
     alias: 'ptp',
-    description: 'List available panel types',
+    description:
+        'List all available panel/widget type ids on the board. '
+        'Use this before panel:create when user asks for a specific widget type.',
     group: 'panel',
     params: <YoloitCliToolParam>[_boardParam()],
   ),
@@ -3183,6 +3210,48 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         required: true,
         shortKey: 'i',
       ),
+    ],
+  ),
+
+  // ─── File Tree ─────────────────────────────────────────────────────────────
+  YoloitCliTool(
+    command: 'filetree:create',
+    alias: 'ftc',
+    description:
+        'Create a File Tree panel on a board and set its root directory. '
+        'Use this when the user asks to show a file tree, directory tree, folder browser, '
+        'or "дерево файлов". The panel shows an interactive expandable file browser.',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      _boardParam(),
+      _p('path', 'Root directory path to display', required: true, shortKey: 'p'),
+      _p('title', 'Panel title (default: folder name)', shortKey: 't'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'filetree:set-root',
+    alias: 'ftsr',
+    description:
+        'Set the root directory path of an existing File Tree panel.',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      _boardParam(),
+      _panelParam(),
+      _p('path', 'New root directory path', required: true, shortKey: 'p'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'filetree:read',
+    alias: 'ftr',
+    description:
+        'Read and print a directory tree as text (no panel required). '
+        'Useful for agents to understand folder structure without creating a UI panel. '
+        'Use this for "what files are in X", "show me the structure of X".',
+    group: 'files',
+    params: <YoloitCliToolParam>[
+      _p('path', 'Directory path to read', required: true, shortKey: 'p'),
+      _p('depth', 'Max depth (default 3)', shortKey: 'd'),
+      _p('all', 'Show hidden files too', kind: YoloitCliToolParamKind.boolean, shortKey: 'a'),
     ],
   ),
 

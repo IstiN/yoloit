@@ -205,7 +205,7 @@ commands = [
   {
     "group": "panel",
     "name": "panel:create",
-    "description": "Create a panel",
+    "description": "Create a panel. Use exact panel type id; call panel:types first if unsure.",
     "params": [["board", "Board id or name", True], ["type", "Panel type id", True], ["title", "Panel title", True]],
     "example": "yoloit panel:create \"My Board\" board.note.markdown \"Notes\"",
   },
@@ -704,9 +704,33 @@ commands = [
   {
     "group": "panel",
     "name": "panel:types",
-    "description": "List available panel types",
+    "description": "List available panel/widget type ids",
     "params": [["board", "Board id or name", True]],
     "example": "yoloit panel:types \"My Board\"",
+  },
+  {
+    "group": "panel",
+    "name": "filetree:create",
+    "description": "Create a File Tree panel bound to a root path (for file tree / directory tree requests).",
+    "params": [["board", "Board id or name (defaults to active board)", False], ["path", "Root directory path", True], ["title", "Panel title (optional)", False]],
+    "example": "yoloit filetree:create \"My Board\" ~/git/project \"Project Tree\"",
+    "aliases": ["ftc"],
+  },
+  {
+    "group": "panel",
+    "name": "filetree:set-root",
+    "description": "Change root path of an existing File Tree panel.",
+    "params": [["board", "Board id or name", True], ["panel", "File Tree panel id or title", True], ["path", "New root directory path", True]],
+    "example": "yoloit filetree:set-root \"My Board\" \"Project Tree\" ~/git/project",
+    "aliases": ["ftsr"],
+  },
+  {
+    "group": "files",
+    "name": "filetree:read",
+    "description": "Read directory structure as text tree (no panel required).",
+    "params": [["path", "Directory path", True], ["--depth N", "Max depth (default 3)", False], ["--all", "Include hidden files", False]],
+    "example": "yoloit filetree:read ~/git/project --depth 3",
+    "aliases": ["ftr"],
   },
   {
     "group": "run",
@@ -1220,7 +1244,25 @@ by_group = defaultdict(list)
 for c in commands:
     by_group[c["group"]].append(c)
 
-group_order = ["app", "board", "panel", "run", "timer", "models", "cloud", "yolochat", "link", "note", "checklist", "kanban", "playlist", "webpage"]
+group_order = [
+    "app",
+    "board",
+    "panel",
+    "run",
+    "timer",
+    "models",
+    "cloud",
+    "agents",
+    "yolochat",
+    "files",
+    "search",
+    "link",
+    "note",
+    "checklist",
+    "kanban",
+    "playlist",
+    "webpage",
+]
 
 def params_inline(c):
     if not c["params"]:
@@ -3655,6 +3697,101 @@ PY
     file=$(python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$file")
     json="{\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), \"type\": \"file\", \"file\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$file"), \"x\": $posX, \"y\": $posY, \"color\": \"$color\", \"width\": $width}"
     _post "/drawings" "$json"
+    ;;
+
+  filetree:create|ftc)
+    bid=""; path=""; title=""
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) bid="$2"; shift 2 ;;
+        --path|-p) path="$2"; shift 2 ;;
+        --title|-t) title="$2"; shift 2 ;;
+        *) [[ -z "$bid" ]] && bid="$1" || [[ -z "$path" ]] && path="$1" || true; shift ;;
+      esac
+    done
+    [[ -z "$bid" ]] && bid=$(_active_board 2>/dev/null || echo "")
+    [[ -z "$bid" ]] && { echo '{"ok":false,"error":"No board specified and no active board"}'; exit 1; }
+    [[ -z "$path" ]] && { echo '{"ok":false,"error":"Missing path argument"}'; exit 1; }
+    abs_path=$(python3 -c "import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))" "$path")
+    [[ -z "$title" ]] && title=$(python3 -c "import os,sys; print(os.path.basename(sys.argv[1]) or sys.argv[1])" "$abs_path")
+    enc_bid=$(_encode "$bid")
+    state_json=$(python3 -c "import json,sys; print(json.dumps({'rootPath':sys.argv[1],'expandedDirs':[],'selectedFile':''}))" "$abs_path")
+    payload=$(python3 -c "import json,sys; print(json.dumps({'type':'board.filetree','title':sys.argv[1],'state':json.loads(sys.argv[2])}))" "$title" "$state_json")
+    _post "/boards/${enc_bid}/panels" "$payload"
+    ;;
+
+  filetree:set-root|ftsr)
+    bid=""; pid=""; path=""
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) bid="$2"; shift 2 ;;
+        --panel|-p) pid="$2"; shift 2 ;;
+        --path) path="$2"; shift 2 ;;
+        *) [[ -z "$bid" ]] && bid="$1" || [[ -z "$pid" ]] && pid="$1" || path="$1"; shift ;;
+      esac
+    done
+    [[ -z "$bid" || -z "$pid" || -z "$path" ]] && { echo '{"ok":false,"error":"Usage: filetree:set-root <board> <panel> <path>"}'; exit 1; }
+    abs_path=$(python3 -c "import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))" "$path")
+    enc_bid=$(_encode "$bid"); enc_pid=$(_encode "$pid")
+    action_json=$(python3 -c "import json,sys; print(json.dumps({'action':'set-root','path':sys.argv[1]}))" "$abs_path")
+    _post "/boards/${enc_bid}/panels/${enc_pid}/action" "$action_json"
+    ;;
+
+  filetree:read|ftr)
+    path=""; depth=3; show_hidden=0
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --depth|-d) depth="$2"; shift 2 ;;
+        --all|-a) show_hidden=1; shift ;;
+        *) [[ -z "$path" ]] && path="$1"; shift ;;
+      esac
+    done
+    [[ -z "$path" ]] && path="."
+    abs_path=$(python3 -c "import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))" "$path")
+    python3 - "$abs_path" "$depth" "$show_hidden" <<'PY'
+import os, sys, json
+
+root = sys.argv[1]
+max_depth = int(sys.argv[2])
+show_hidden = sys.argv[3] == '1'
+
+if not os.path.isdir(root):
+    print(json.dumps({"ok": False, "error": f"Not a directory: {root}"}))
+    sys.exit(0)
+
+lines = [os.path.basename(root) + "/"]
+entry_count = 0
+
+def walk(directory, prefix, depth):
+    global entry_count
+    if depth > max_depth:
+        return
+    try:
+        entries = sorted(os.listdir(directory))
+    except PermissionError:
+        return
+    if not show_hidden:
+        entries = [e for e in entries if not e.startswith('.')]
+    dirs = [e for e in entries if os.path.isdir(os.path.join(directory, e))]
+    files = [e for e in entries if not os.path.isdir(os.path.join(directory, e))]
+    all_entries = dirs + files
+    for i, name in enumerate(all_entries):
+        is_last = i == len(all_entries) - 1
+        connector = "└── " if is_last else "├── "
+        full = os.path.join(directory, name)
+        suffix = "/" if os.path.isdir(full) else ""
+        lines.append(f"{prefix}{connector}{name}{suffix}")
+        entry_count += 1
+        if entry_count >= 500:
+            lines.append(f"{prefix}    ... (truncated, too many entries)")
+            return
+        if os.path.isdir(full):
+            extension = "    " if is_last else "│   "
+            walk(full, prefix + extension, depth + 1)
+
+walk(root, "", 1)
+print(json.dumps({"ok": True, "path": root, "tree": "\n".join(lines), "entries": entry_count}))
+PY
     ;;
 
   validate)
