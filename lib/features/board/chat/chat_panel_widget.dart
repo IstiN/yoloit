@@ -287,10 +287,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
     // Register processing notifier for board-level glow
     ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
-    // Consume any CLI-injected pending message after first frame renders
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _consumeCliPendingMessage();
-    });
+    _consumeCliPendingMessage();
   }
 
   static ChatProvider _providerForId(String id) {

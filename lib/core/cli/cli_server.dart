@@ -722,10 +722,6 @@ class CliServer {
         state: {
           'config': config.toJson(),
           'configured': true,
-          // _cliPendingMessage is picked up by ChatPanelWidget.initState
-          // via _consumeCliPendingMessage() → auto-sends on first mount.
-          if (trimmedTask != null && trimmedTask.isNotEmpty)
-            '_cliPendingMessage': trimmedTask,
         },
         zIndex:
             board.panels.fold<int>(
@@ -738,11 +734,19 @@ class CliServer {
       await cubit.focusPanel(panel.id, boardId: board.id);
       _scheduleRebuild();
 
+      // Send initial task directly via ChatSessionManager — no UI dependency.
+      // When the panel widget mounts it picks up this existing session.
+      var taskSent = false;
+      if (trimmedTask != null && trimmedTask.isNotEmpty) {
+        final session = ChatSessionManager.instance.getOrCreate(panelId, config);
+        taskSent = session.sendMessage(text: trimmedTask);
+      }
+
       return _json({
         'ok': true,
-        'taskSent': trimmedTask != null && trimmedTask.isNotEmpty,
+        'taskSent': taskSent,
         'note': 'Agent chat panel created and focused. '
-            '${trimmedTask != null && trimmedTask.isNotEmpty ? 'Task will be sent automatically — no further action needed.' : 'Use yolochat:send to interact.'}'
+            '${taskSent ? 'Task sent — agent is running.' : 'Use yolochat:send to interact.'}'
             ' For follow-ups: yolochat:send --board ${board.id} --panel $panelId',
         'panel': {
           'id': panelId,
