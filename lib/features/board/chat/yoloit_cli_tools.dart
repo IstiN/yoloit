@@ -3202,12 +3202,13 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     description:
         'Add a shape drawing to a board. '
         'Supported types: line (x1,y1,x2,y2), circle (cx,cy,r), '
-        'rect (x,y,width,height), arrow (x1,y1,x2,y2), '
+        'rect (x,y,rw=width,height), arrow (x1,y1,x2,y2), '
         'freehand (points=[[x,y],...]), svg (d=<SVG path data>). '
-        'Returns the new drawing id.',
+        'Returns the new drawing id. '
+        'Board defaults to active board if not specified.',
     group: 'board',
     params: <YoloitCliToolParam>[
-      _p('board', 'Board id or name', shortKey: 'b'),
+      _p('board', 'Board id or name (defaults to active board)', shortKey: 'b'),
       _p('type', 'Shape type: line | circle | rect | arrow | freehand | svg', shortKey: 's'),
       _p('color', 'Stroke color as #RRGGBB hex (default #FFFFFF)', shortKey: 'c'),
       _p('width', 'Stroke width in pixels (default 3)', shortKey: 'w'),
@@ -3220,7 +3221,8 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('r', 'Radius (circle)'),
       _p('x', 'Top-left X (rect/freehand/svg origin)'),
       _p('y', 'Top-left Y (rect/freehand/svg origin)'),
-      _p('height', 'Height (rect)'),
+      _p('rw', 'Shape width for rect (default 200). Use "rw" not "width" to avoid conflict with stroke width.'),
+      _p('height', 'Height (rect, default 100)'),
       _p('points', 'JSON array of [x,y] pairs for freehand'),
       _p('d', 'SVG path data string (for svg type)'),
     ],

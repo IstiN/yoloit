@@ -788,7 +788,9 @@ class CliServer {
           request.url.queryParameters['board'] ??
           (isSvgExport ? sub.elementAtOrNull(1) : sub.firstOrNull);
       final board =
-          boardId != null ? _findBoard(cubit, boardId) : cubit.state.activeBoard;
+          (boardId != null && boardId.isNotEmpty)
+              ? _findBoard(cubit, boardId)
+              : cubit.state.activeBoard;
       if (board == null) return _error('Board not found');
 
       if (isSvgExport) {
@@ -853,7 +855,9 @@ class CliServer {
         (body['board'] as String?) ??
         request.url.queryParameters['board'];
     final board =
-        boardId != null ? _findBoard(cubit, boardId) : cubit.state.activeBoard;
+        (boardId != null && boardId.isNotEmpty)
+            ? _findBoard(cubit, boardId)
+            : cubit.state.activeBoard;
     if (board == null) return _error('Board not found');
 
     final type = (body['type'] as String? ?? 'freehand').toLowerCase();
@@ -895,7 +899,11 @@ class CliServer {
       case 'rectangle':
         final rx = (body['x'] as num?)?.toDouble() ?? posX;
         final ry = (body['y'] as num?)?.toDouble() ?? posY;
-        final w = (body['width'] as num?)?.toDouble() ?? 200.0;
+        // Use 'rw' or 'rectWidth' for shape width; fall back to 'width' only if
+        // no stroke-width was explicitly provided (to avoid conflict).
+        final w = (body['rw'] as num?)?.toDouble() ??
+            (body['rectWidth'] as num?)?.toDouble() ??
+            (body['w'] as num?)?.toDouble() ?? 200.0;
         final h = (body['height'] as num?)?.toDouble() ?? 100.0;
         final result = _rectToElement(rx, ry, w, h, strokeWidth);
         strokes = result.$1; size = result.$2;

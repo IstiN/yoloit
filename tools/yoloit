@@ -2316,7 +2316,11 @@ if provider:
 print(json.dumps(body))
 PY
 )
-    _post "/yolochat/send" "$payload" | python3 -m json.tool 2>/dev/null
+    # Use a 5-minute max-time; agent sessions can take a while but should not
+    # block the shell indefinitely.
+    _resolve_base
+    curl -s --max-time 300 -X POST "${BASE}/yolochat/send" \
+      -H "Content-Type: application/json" -d "$payload" | python3 -m json.tool 2>/dev/null
     ;;
   yolochat:messages)
     board=""
@@ -3480,6 +3484,7 @@ print(json.dumps({
         --r|--radius) extras[r]="$2"; shift 2 ;;
         --x) extras[x]="$2"; shift 2 ;;
         --y) extras[y]="$2"; shift 2 ;;
+        --rw|--rect-width) extras[rw]="$2"; shift 2 ;;  # rect shape width (separate from stroke width)
         --height) extras[height]="$2"; shift 2 ;;
         --points) extras[points]="$2"; shift 2 ;;
         --d|--path) extras[d]="$2"; shift 2 ;;
@@ -3498,7 +3503,13 @@ print(json.dumps({
         extra_json="$extra_json, \"$key\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$val")"
       fi
     done
-    json="{\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), \"type\": \"$shape\", \"color\": \"$color\", \"width\": $width$extra_json}"
+    # Omit board key if empty so server uses active board
+    if [[ -n "$board" ]]; then
+      board_json="\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), "
+    else
+      board_json=""
+    fi
+    json="{${board_json}\"type\": \"$shape\", \"color\": \"$color\", \"width\": $width$extra_json}"
     _curl POST "/drawings" "$json"
     ;;
 
