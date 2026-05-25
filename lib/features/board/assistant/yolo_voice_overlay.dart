@@ -1427,34 +1427,36 @@ class _WaveformPainter extends CustomPainter {
     final t = progress * 2 * math.pi;
 
     // 4 wave layers: (amplitudeCoeff, color, baseAlpha, phaseOffset)
-    // Each layer reacts to mic amplitude with a different coefficient.
     final layers = <(double, Color, double, double)>[
-      (1.00, const Color(0xFF7B5CF6), 0.58, 0.00),  // purple  — full reactive
-      (0.70, const Color(0xFF4D9FFF), 0.46, 1.57),  // blue    — mid
-      (0.45, const Color(0xFFE060C0), 0.36, 3.14),  // pink    — less
-      (0.25, const Color(0xFFC47AFF), 0.24, 4.71),  // lavender — subtle
+      (1.00, const Color(0xFF7B5CF6), 0.55, 0.00),  // purple  — full reactive
+      (0.70, const Color(0xFF4D9FFF), 0.42, 1.57),  // blue    — mid
+      (0.45, const Color(0xFFE060C0), 0.32, 3.14),  // pink    — less
+      (0.25, const Color(0xFFC47AFF), 0.22, 4.71),  // lavender — subtle
     ];
-    // Blob x-positions as fraction of arm width (0 = near orb, 1 = tip)
-    const fracs = [0.12, 0.36, 0.63, 0.87];
+
+    // Dense sampling for continuous glow — 48 overlapping micro-blobs per layer
+    const steps = 48;
 
     for (final (coeff, color, baseAlpha, phase) in layers) {
-      for (final frac in fracs) {
-        // Gaussian envelope — peak near arm centre, small at both ends
+      for (int i = 0; i <= steps; i++) {
+        final frac = i / steps;
+
+        // Gaussian envelope — peaks at arm centre, tapers at both ends
         final env = math.exp(-math.pow((frac - 0.50) * 2.6, 2));
 
-        // Sine Y offset, scaled per layer coefficient and envelope
+        // Sine Y displacement
         final wave = math.sin(t + frac * math.pi * 3.0 + phase);
         final yOff = wave * size.height * 0.40 * amplitude * coeff * env;
 
-        // Canvas coordinates (flip=true → left arm)
+        // Canvas x (flip=true → left arm)
         final x = frac * size.width;
         final px = flip ? size.width - x : x;
         final py = cy + yOff;
 
-        // Blob radius follows Gaussian envelope: 4–28 px
-        final blobR = (4.0 + 24.0 * env * amplitude).clamp(4.0, 30.0);
+        // Blob radius: small at tips, wide in centre — radius > step spacing → no gaps
+        final blobR = (3.0 + 18.0 * env * amplitude).clamp(3.0, 22.0);
 
-        // Tint color along the arm: blue near orb → pink at tip
+        // Tint along arm: blue near orb → pink at tip
         final colorT = flip ? (1.0 - frac) : frac;
         final c =
             colorT < 0.5
