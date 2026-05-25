@@ -398,7 +398,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         if (mirrorToOverlay && mounted) {
           _syncOverlayState(
             draftOverride: '',
-            forcedStatus: 'processing',
+            forcedStatus: 'responding',
             responseOverride: _composeOverlayResponse('', overlayToolLogs),
             promptOverride: overlayPrompt,
             hiddenOverride: false,
@@ -457,17 +457,6 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       var emitted = '';
       var firstTokenReceived = false;
 
-      // Keep overlay in processing until first assistant tokens start streaming.
-      if (mirrorToOverlay && mounted) {
-        _syncOverlayState(
-          draftOverride: '',
-          forcedStatus: 'processing',
-          responseOverride: '',
-          promptOverride: overlayPrompt,
-          hiddenOverride: false,
-        );
-      }
-
       await for (final event in provider.sendMessage(
         message: text,
         config: config,
@@ -501,7 +490,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             if (mirrorToOverlay && mounted) {
               _syncOverlayState(
                 draftOverride: '',
-                forcedStatus: 'processing',
+                forcedStatus: 'responding',
                 responseOverride: _composeOverlayResponse('', overlayToolLogs),
                 promptOverride: overlayPrompt,
                 hiddenOverride: false,
@@ -638,7 +627,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       if (mirrorToOverlay && !_voiceOverlayHidden) ...{
         'voiceResponse': _composeOverlayResponse(content, overlayToolLogs),
         'assistantStatus':
-            _isGeneratingReply && content.trim().isEmpty
+            _isGeneratingReply &&
+                    content.trim().isEmpty &&
+                    overlayToolLogs.isEmpty
                 ? 'processing'
                 : _isGeneratingReply
                 ? 'responding'
