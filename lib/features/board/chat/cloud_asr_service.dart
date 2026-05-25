@@ -148,7 +148,8 @@ class CloudAsrService {
             (decoded['text'] as String?) ??
             (decoded['transcript'] as String?) ??
             (decoded['output_text'] as String?);
-        if (text != null && text.trim().isNotEmpty) return text.trim();
+        // text="" is a valid "no speech detected" response — return empty string.
+        if (text != null) return text.trim();
       }
       throw StateError('Cloud ASR returned unexpected response: $body');
     } finally {
