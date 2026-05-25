@@ -589,13 +589,12 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
         );
       }
       if (mirrorToOverlay) {
+        // Use clean text only (no tool logs) so the card crossfades from
+        // the tools-call view to the final answer without duplicating the logs.
         _syncOverlayState(
           draftOverride: '',
           forcedStatus: 'output',
-          responseOverride: _composeOverlayResponse(
-            cleanedFinal,
-            overlayToolLogs,
-          ),
+          responseOverride: cleanedFinal,
           promptOverride: overlayPrompt,
           hiddenOverride: false,
         );

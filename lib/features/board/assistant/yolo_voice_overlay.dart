@@ -652,8 +652,13 @@ class _ResponseCardState extends State<_ResponseCard>
     with TickerProviderStateMixin {
   late final AnimationController _borderAnim;
   late AnimationController _typingAnim;
+  // Crossfade controller: animates 0→1 when streaming stops, transitioning
+  // from the frozen tool-call view to the clean final answer.
+  late final AnimationController _crossfadeAnim;
   int _visibleChars = 0;
   String _lastResponse = '';
+  String _frozenContent = ''; // tools content captured at streaming→false
+  bool _isCrossfading = false;
 
   @override
   void initState() {
@@ -663,6 +668,17 @@ class _ResponseCardState extends State<_ResponseCard>
       duration: Duration(milliseconds: widget.borderSpeed),
     );
     if (widget.streaming && widget.animate) _borderAnim.repeat();
+
+    _crossfadeAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+    _crossfadeAnim.addListener(() => setState(() {}));
+    _crossfadeAnim.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        setState(() => _isCrossfading = false);
+      }
+    });
 
     _lastResponse = widget.response;
     _visibleChars = widget.streaming ? 0 : widget.response.length;
@@ -699,6 +715,19 @@ class _ResponseCardState extends State<_ResponseCard>
     } else if (!shouldAnimate && wasAnimating) {
       _borderAnim.stop();
     }
+
+    // Streaming just stopped → crossfade from tool-call content to final answer.
+    if (old.streaming && !widget.streaming && widget.animate) {
+      _frozenContent = _displayText(
+        old.response,
+        streaming: true,
+        visibleChars: _visibleChars,
+      );
+      _isCrossfading = true;
+      _crossfadeAnim.value = 0.0;
+      _crossfadeAnim.forward();
+    }
+
     // Typing animation — when response text changes (new chars)
     if (widget.response != old.response) {
       _lastResponse = widget.response;
@@ -734,19 +763,27 @@ class _ResponseCardState extends State<_ResponseCard>
   void dispose() {
     _borderAnim.dispose();
     _typingAnim.dispose();
+    _crossfadeAnim.dispose();
     super.dispose();
+  }
+
+  String _displayText(String response, {bool streaming = false, int visibleChars = 0}) {
+    final full =
+        response.trim().isEmpty
+            ? 'YoLo! Here is what I found for you...'
+            : response.trim();
+    return streaming
+        ? full.substring(0, visibleChars.clamp(0, full.length))
+        : full;
   }
 
   @override
   Widget build(BuildContext context) {
-    final fullText =
-        widget.response.trim().isEmpty
-            ? 'YoLo! Here is what I found for you...'
-            : widget.response.trim();
-    final displayText =
-        widget.streaming
-            ? fullText.substring(0, _visibleChars.clamp(0, fullText.length))
-            : fullText;
+    final displayText = _displayText(
+      widget.response,
+      streaming: widget.streaming,
+      visibleChars: _visibleChars,
+    );
     final hasMermaid = displayText.contains('```mermaid');
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -757,6 +794,37 @@ class _ResponseCardState extends State<_ResponseCard>
             constraints.maxHeight.isFinite ? constraints.maxHeight : 250.0;
         final contentMaxH = (maxH - labelRowHeight - 40).clamp(40.0, 600.0);
         // ↑ 40 = AnimatedContainer padding (20 top + 20 bottom)
+
+        // Build the content body, optionally crossfading from frozen tools view.
+        final newBody = _buildContentBody(displayText, hasMermaid, contentMaxH);
+        final body = _isCrossfading
+            ? Stack(
+                children: [
+                  // New (final answer) fades in and slides up.
+                  Opacity(
+                    opacity: Curves.easeOut.transform(_crossfadeAnim.value),
+                    child: Transform.translate(
+                      offset: Offset(
+                        0,
+                        (1.0 - _crossfadeAnim.value) * 14,
+                      ),
+                      child: newBody,
+                    ),
+                  ),
+                  // Old (tools) fades out.
+                  Opacity(
+                    opacity: Curves.easeIn.transform(
+                      1.0 - _crossfadeAnim.value,
+                    ),
+                    child: _buildContentBody(
+                      _frozenContent,
+                      _frozenContent.contains('```mermaid'),
+                      contentMaxH,
+                    ),
+                  ),
+                ],
+              )
+            : newBody;
 
         // Column(mainAxisSize.min) shrinks to content.
         // AnimatedContainer contains ConstrainedBox(maxH=contentMaxH) + CustomScrollView(shrinkWrap).
@@ -810,80 +878,7 @@ class _ResponseCardState extends State<_ResponseCard>
                     ),
                   ],
                 ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: contentMaxH),
-                  child:
-                      hasMermaid
-                          ? MarkdownDocumentPreview(content: displayText)
-                          : CustomScrollView(
-                            shrinkWrap: true,
-                            physics: const ClampingScrollPhysics(),
-                            slivers: [
-                              SliverToBoxAdapter(
-                                child: MarkdownBody(
-                                  data: displayText,
-                                  softLineBreak: true,
-                                  selectable: false,
-                                  styleSheet: MarkdownStyleSheet(
-                                    p: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.95,
-                                      ),
-                                      fontSize: widget.fontSize,
-                                      height: 1.52,
-                                      fontWeight: FontWeight.w500,
-                                      shadows: const [
-                                        Shadow(
-                                          color: Color(0x889B6BFF),
-                                          blurRadius: 14,
-                                        ),
-                                      ],
-                                    ),
-                                    h1: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.98,
-                                      ),
-                                      fontSize: widget.fontSize + 5,
-                                      height: 1.25,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                    h2: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.98,
-                                      ),
-                                      fontSize: widget.fontSize + 3,
-                                      height: 1.3,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                    h3: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.98,
-                                      ),
-                                      fontSize: widget.fontSize + 1,
-                                      height: 1.35,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    a: TextStyle(
-                                      color: const Color(0xFF8BD8FF),
-                                      fontSize: widget.fontSize,
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                    code: TextStyle(
-                                      color: const Color(0xFF8BD8FF),
-                                      fontSize: widget.fontSize - 1,
-                                      backgroundColor: const Color(0x66101420),
-                                    ),
-                                    codeblockPadding: const EdgeInsets.all(10),
-                                    codeblockDecoration: BoxDecoration(
-                                      color: const Color(0xAA101420),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                ),
+                child: body,
               ),
             ),
             const SizedBox(height: 8),
@@ -898,6 +893,75 @@ class _ResponseCardState extends State<_ResponseCard>
           ],
         );
       },
+    );
+  }
+
+  Widget _buildContentBody(String text, bool hasMermaid, double maxH) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxH),
+      child:
+          hasMermaid
+              ? MarkdownDocumentPreview(content: text)
+              : CustomScrollView(
+                shrinkWrap: true,
+                physics: const ClampingScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: MarkdownBody(
+                      data: text,
+                      softLineBreak: true,
+                      selectable: false,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          fontSize: widget.fontSize,
+                          height: 1.52,
+                          fontWeight: FontWeight.w500,
+                          shadows: const [
+                            Shadow(
+                              color: Color(0x889B6BFF),
+                              blurRadius: 14,
+                            ),
+                          ],
+                        ),
+                        h1: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.98),
+                          fontSize: widget.fontSize + 5,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        h2: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.98),
+                          fontSize: widget.fontSize + 3,
+                          height: 1.3,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        h3: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.98),
+                          fontSize: widget.fontSize + 1,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        a: TextStyle(
+                          color: const Color(0xFF8BD8FF),
+                          fontSize: widget.fontSize,
+                          decoration: TextDecoration.underline,
+                        ),
+                        code: TextStyle(
+                          color: const Color(0xFF8BD8FF),
+                          fontSize: widget.fontSize - 1,
+                          backgroundColor: const Color(0x66101420),
+                        ),
+                        codeblockPadding: const EdgeInsets.all(10),
+                        codeblockDecoration: BoxDecoration(
+                          color: const Color(0xAA101420),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
     );
   }
 }
