@@ -1425,93 +1425,61 @@ class _WaveformPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final cy = size.height / 2;
     final t = progress * 2 * math.pi;
-    const steps = 48;
 
-    // Two interleaved sine curves — opposite phases → bead-chain / double-helix look.
-    // The "front" curve uses full alpha; the "back" curve is slightly dimmer.
-    const curves = [
-      // [phaseShift, alphaFactor]
-      [0.0,        1.0 ],  // front curve
-      [math.pi,    0.65],  // back curve (opposite phase = visually behind)
+    // 4 wave layers: (amplitudeCoeff, color, baseAlpha, phaseOffset)
+    // Each layer reacts to mic amplitude with a different coefficient.
+    final layers = <(double, Color, double, double)>[
+      (1.00, const Color(0xFF7B5CF6), 0.58, 0.00),  // purple  — full reactive
+      (0.70, const Color(0xFF4D9FFF), 0.46, 1.57),  // blue    — mid
+      (0.45, const Color(0xFFE060C0), 0.36, 3.14),  // pink    — less
+      (0.25, const Color(0xFFC47AFF), 0.24, 4.71),  // lavender — subtle
     ];
+    // Blob x-positions as fraction of arm width (0 = near orb, 1 = tip)
+    const fracs = [0.12, 0.36, 0.63, 0.87];
 
-    for (final cfg in curves) {
-      final phaseShift = cfg[0];
-      final alphaFactor = cfg[1];
+    for (final (coeff, color, baseAlpha, phase) in layers) {
+      for (final frac in fracs) {
+        // Gaussian envelope — peak near arm centre, small at both ends
+        final env = math.exp(-math.pow((frac - 0.50) * 2.6, 2));
 
-      final points = <Offset>[];
-      for (var i = 0; i <= steps; i++) {
-        final frac = i / steps;
+        // Sine Y offset, scaled per layer coefficient and envelope
+        final wave = math.sin(t + frac * math.pi * 3.0 + phase);
+        final yOff = wave * size.height * 0.40 * amplitude * coeff * env;
+
+        // Canvas coordinates (flip=true → left arm)
         final x = frac * size.width;
-        // Single-frequency sine: clean and readable like reference image.
-        // The amplitude envelope narrows towards the far end (tip).
-        final tipEnv = 1.0 - frac * 0.35;           // slightly narrower at tip
-        final wave = math.sin(t + frac * 2 * math.pi * 1.5 + phaseShift);
-        final y = cy + wave * size.height * 0.40 * amplitude * tipEnv;
-        points.add(Offset(flip ? size.width - x : x, y));
-      }
+        final px = flip ? size.width - x : x;
+        final py = cy + yOff;
 
-      // ── subtle connecting line ─────────────────────────────────────────────
-      final path = Path();
-      path.moveTo(points.first.dx, points.first.dy);
-      for (var i = 0; i < points.length - 1; i++) {
-        final cp = Offset(
-          (points[i].dx + points[i + 1].dx) / 2,
-          (points[i].dy + points[i + 1].dy) / 2,
-        );
-        path.quadraticBezierTo(points[i].dx, points[i].dy, cp.dx, cp.dy);
-      }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0
-          ..color = const Color(0xFF7B55FF).withValues(alpha: 0.25 * alphaFactor),
-      );
+        // Blob radius follows Gaussian envelope: 4–28 px
+        final blobR = (4.0 + 24.0 * env * amplitude).clamp(4.0, 30.0);
 
-      // ── beaded nodes — color gradient: blue (near orb) → pink (tip) ───────
-      const dotEvery = 3;
-      for (var i = 0; i <= steps; i += dotEvery) {
-        final p = points[i];
-        // colorT: 0 = near the origin (orb side), 1 = far tip
-        final frac = i / steps;
+        // Tint color along the arm: blue near orb → pink at tip
         final colorT = flip ? (1.0 - frac) : frac;
+        final c =
+            colorT < 0.5
+                ? Color.lerp(
+                    color,
+                    const Color(0xFF4D9FFF),
+                    (0.5 - colorT) * 0.7,
+                  )!
+                : Color.lerp(
+                    color,
+                    const Color(0xFFE060C0),
+                    (colorT - 0.5) * 0.7,
+                  )!;
 
-        // Blue #4D9FFF → Purple #9B5CF6 → Pink #FF6B9D
-        final Color nodeColor;
-        if (colorT < 0.5) {
-          nodeColor = Color.lerp(
-            const Color(0xFF4D9FFF),
-            const Color(0xFF9B5CF6),
-            colorT * 2,
-          )!;
-        } else {
-          nodeColor = Color.lerp(
-            const Color(0xFF9B5CF6),
-            const Color(0xFFE060C0),
-            (colorT - 0.5) * 2,
-          )!;
-        }
-
-        // Node size: constant with a slight pulse from the wave amplitude
-        final waveAmp = (math.sin(t + frac * 2 * math.pi * 1.5 + phaseShift)).abs();
-        final radius = 2.4 + waveAmp * 1.2 * amplitude;
-
-        // Soft outer halo (no MaskFilter — cheaper, less harsh)
+        final center = Offset(px, py);
         canvas.drawCircle(
-          p,
-          radius + 2.5,
+          center,
+          blobR,
           Paint()
-            ..style = PaintingStyle.fill
-            ..color = nodeColor.withValues(alpha: 0.18 * alphaFactor),
-        );
-        // Solid colored dot — matches reference image style
-        canvas.drawCircle(
-          p,
-          radius,
-          Paint()
-            ..style = PaintingStyle.fill
-            ..color = nodeColor.withValues(alpha: 0.85 * alphaFactor),
+            ..shader = ui.Gradient.radial(
+              center,
+              blobR,
+              [c.withValues(alpha: baseAlpha), c.withValues(alpha: 0.0)],
+              [0.0, 1.0],
+            ),
         );
       }
     }

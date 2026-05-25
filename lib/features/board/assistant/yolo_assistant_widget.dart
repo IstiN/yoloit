@@ -710,9 +710,26 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     String assistantContent,
     List<String> toolLogs,
   ) {
-    // Show only the assistant text — no tool logs in the overlay card.
-    // Tool calls are visualized via the orb/processing state, not as text.
-    return assistantContent.trim();
+    final text = assistantContent.trim();
+
+    // Show up to 5 recent tool calls as compact lines (⚙️ tool:name).
+    if (toolLogs.isEmpty) return text;
+    final recent = toolLogs.length > 5 ? toolLogs.sublist(toolLogs.length - 5) : toolLogs;
+    final toolText = recent
+        .map((entry) {
+          // Normalize: strip leading emoji/status prefixes, keep just tool name
+          final clean = entry
+              .replaceAll(RegExp(r'^[⏳✅❌]\s*running:\s*'), '')
+              .replaceAll(RegExp(r'^[⏳✅❌]\s*'), '')
+              .trim();
+          final isDone = entry.startsWith('✅') || entry.startsWith('❌');
+          final icon = entry.startsWith('❌') ? '❌' : isDone ? '✅' : '⚙️';
+          return '$icon $clean';
+        })
+        .join('\n');
+
+    if (text.isEmpty) return toolText;
+    return '$toolText\n\n$text';
   }
 
   BoardDocument? _currentBoard() =>
@@ -1289,6 +1306,72 @@ $messagesJson
                           ),
                 ),
                 actions: [
+                  TextButton(
+                    onPressed: () {
+                      // Insert a fake simulation session with 5 tool calls
+                      final now = DateTime.now();
+                      final fake = <String, dynamic>{
+                        'id': 'sim_${now.millisecondsSinceEpoch}',
+                        'userMessage': '[Simulation] Show weather + open browser',
+                        'modelId': 'google/gemini-3.1-flash-lite-preview',
+                        'modelProvider': 'openrouter',
+                        'requestAt': now.subtract(const Duration(seconds: 8)).toIso8601String(),
+                        'promptSentAt': now.subtract(const Duration(seconds: 8)).toIso8601String(),
+                        'firstTokenAt': now.subtract(const Duration(milliseconds: 4800)).toIso8601String(),
+                        'completedAt': now.subtract(const Duration(milliseconds: 400)).toIso8601String(),
+                        'asr': {
+                          'durationMs': 1240,
+                          'status': 'ok',
+                          'mode': 'cloud',
+                          'transcriptChars': 34,
+                          'model': 'google/chirp-3',
+                          'provider': 'openrouter',
+                        },
+                        'maxTokens': null,
+                        'temperature': null,
+                        'toolCalls': [
+                          {
+                            'name': 'panel:focus',
+                            'arguments': {'board': 'board-1778878703064560', 'panel': 'Список покупок'},
+                            'startAt': now.subtract(const Duration(milliseconds: 7200)).toIso8601String(),
+                            'endAt': now.subtract(const Duration(milliseconds: 6800)).toIso8601String(),
+                            'success': true,
+                          },
+                          {
+                            'name': 'web:open',
+                            'arguments': {'board': 'board-1778878703064560', 'panel': '__yolo_badge__', 'url': 'https://www.google.com/search?q=weather+in+Grodno'},
+                            'startAt': now.subtract(const Duration(milliseconds: 6600)).toIso8601String(),
+                            'endAt': now.subtract(const Duration(milliseconds: 5900)).toIso8601String(),
+                            'success': true,
+                          },
+                          {
+                            'name': 'panels',
+                            'arguments': {'board': 'board-1778878703064560'},
+                            'startAt': now.subtract(const Duration(milliseconds: 5700)).toIso8601String(),
+                            'endAt': now.subtract(const Duration(milliseconds: 5200)).toIso8601String(),
+                            'success': true,
+                          },
+                          {
+                            'name': 'panel:create',
+                            'arguments': {'board': 'board-1778878703064560', 'type': 'board.webpage', 'title': 'Weather in Grodno'},
+                            'startAt': now.subtract(const Duration(milliseconds: 5000)).toIso8601String(),
+                            'endAt': now.subtract(const Duration(milliseconds: 3800)).toIso8601String(),
+                            'success': true,
+                          },
+                          {
+                            'name': 'agent:run',
+                            'arguments': {'agent': 'copilot', 'path': '.', 'task': 'Write a Hello World program'},
+                            'startAt': now.subtract(const Duration(milliseconds: 3600)).toIso8601String(),
+                            'endAt': now.subtract(const Duration(milliseconds: 1200)).toIso8601String(),
+                            'success': true,
+                          },
+                        ],
+                      };
+                      _debugSessions.add(fake);
+                      setDialogState(() {});
+                    },
+                    child: const Text('Simulate'),
+                  ),
                   TextButton(
                     onPressed: () {
                       _debugSessions.clear();
@@ -3100,6 +3183,18 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       final ok = tc['success'] as bool? ?? true;
       final name = tc['name'] as String? ?? '?';
       buf.writeln(row('[TOOL]', '↳ $name', '${ms(durMs)}  ${ok ? '✅' : '❌'}'));
+      // Show up to 3 argument key=value pairs inline
+      final args = tc['arguments'];
+      if (args is Map && args.isNotEmpty) {
+        var shown = 0;
+        for (final entry in args.entries) {
+          if (shown >= 3) break;
+          final val = '${entry.value}';
+          final truncVal = val.length > 40 ? '${val.substring(0, 37)}…' : val;
+          buf.writeln(row('     ', '  ${entry.key}', truncVal));
+          shown++;
+        }
+      }
       if (toolEnd != null) lastToolEnd = toolEnd;
     }
 
