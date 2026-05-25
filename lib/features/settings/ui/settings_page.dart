@@ -32,6 +32,7 @@ import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 const _kCategories = [
   'Appearance',
   'AI & Models',
+  'Prompts',
   'Environment',
   'Notifications',
   'Sessions',
@@ -45,7 +46,7 @@ const _kCategories = [
 
 const _kDebugCategories = [..._kCategories, 'Debug UI'];
 
-const _kSkillsCategoryIndex = 6;
+const _kSkillsCategoryIndex = 7;
 
 /// Settings overlay shown as a modal dialog with sidebar navigation.
 class SettingsPage extends StatefulWidget {
@@ -245,7 +246,8 @@ class _SettingsPageState extends State<SettingsPage> {
             const _ChatContextSection(),
           ],
         ),
-        2 => const Column(
+        2 => const _PromptsSection(),
+        3 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Environment'),
@@ -253,7 +255,7 @@ class _SettingsPageState extends State<SettingsPage> {
             GlobalEnvGroupsSection(),
           ],
         ),
-        3 => const Column(
+        4 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Notifications'),
@@ -261,7 +263,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _NotificationsSection(),
           ],
         ),
-        4 => Column(
+        5 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Sessions'),
@@ -269,7 +271,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _SessionSettings(),
           ],
         ),
-        5 => Column(
+        6 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'Keyboard Shortcuts'),
@@ -277,7 +279,7 @@ class _SettingsPageState extends State<SettingsPage> {
             _ShortcutsTable(),
           ],
         ),
-        7 => const Column(
+        8 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Sync'),
@@ -285,8 +287,8 @@ class _SettingsPageState extends State<SettingsPage> {
             SyncSection(),
           ],
         ),
-        8 => const SetupGuideEmbedded(),
-        9 => const Column(
+        9 => const SetupGuideEmbedded(),
+        10 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _SectionHeader(title: 'Widget API Permissions'),
@@ -294,7 +296,7 @@ class _SettingsPageState extends State<SettingsPage> {
             WidgetPermissionsSection(),
           ],
         ),
-        10 => Column(
+        11 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'About'),
@@ -327,7 +329,158 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ─── AI Agents Settings ───────────────────────────────────────────────────────
+// ─── Prompts ─────────────────────────────────────────────────────────────────
+
+class _PromptsSection extends StatefulWidget {
+  const _PromptsSection();
+
+  @override
+  State<_PromptsSection> createState() => _PromptsSectionState();
+}
+
+class _PromptsSectionState extends State<_PromptsSection> {
+  late Future<Map<String, String>> _promptsFuture;
+
+  static const _yoloChatAsset = 'assets/prompts/yolo_chat_system_prompt.md';
+  static const _cliGuidanceAsset = 'assets/prompts/cli_agent_guidance.md';
+
+  @override
+  void initState() {
+    super.initState();
+    _promptsFuture = _loadPrompts();
+  }
+
+  Future<Map<String, String>> _loadPrompts() async {
+    final chat = await rootBundle.loadString(_yoloChatAsset);
+    final guidance = await rootBundle.loadString(_cliGuidanceAsset);
+    return {'yolochat': chat.trim(), 'agents': guidance.trim()};
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, String>>(
+      future: _promptsFuture,
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final prompts = snap.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'YoloChat System Prompt'),
+            const SizedBox(height: 4),
+            const Text(
+              'Injected as the system prompt for every YoloChat LLM session.',
+              style: TextStyle(color: Color(0xFF8C8D9E), fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            _PromptCard(
+              label: 'assets/prompts/yolo_chat_system_prompt.md',
+              content: prompts['yolochat']!,
+            ),
+            const SizedBox(height: 28),
+            const _SectionHeader(title: 'CLI Agent Guidance'),
+            const SizedBox(height: 4),
+            const Text(
+              'Prepended to every user message sent to Copilot, Cursor, and OpenCode agents.',
+              style: TextStyle(color: Color(0xFF8C8D9E), fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            _PromptCard(
+              label: 'assets/prompts/cli_agent_guidance.md',
+              content: prompts['agents']!,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PromptCard extends StatelessWidget {
+  const _PromptCard({required this.label, required this.content});
+
+  final String label;
+  final String content;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colors.border.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header bar with filename + copy button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.40),
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.copy_outlined, size: 15),
+                  tooltip: 'Copy to clipboard',
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(4),
+                    minimumSize: const Size(28, 28),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: content));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: colors.border.withValues(alpha: 0.25),
+          ),
+          // Scrollable content
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(14),
+              child: SelectableText(
+                content,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.88),
+                  fontSize: 12.5,
+                  fontFamily: 'monospace',
+                  height: 1.55,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
 
 class _AgentSettingsSection extends StatefulWidget {
   @override
