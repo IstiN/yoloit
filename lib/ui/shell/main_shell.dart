@@ -306,11 +306,22 @@ class _MainShellState extends State<MainShell> with WindowListener {
                   onInvoke: (_) => _openFileSearch(),
                 ),
               },
-              child: Focus(
-                autofocus: true,
-                child: Scaffold(
-                  backgroundColor: colors.background,
-                  body: Column(
+              child: BlocListener<TerminalCubit, TerminalState>(
+                listenWhen: (prev, curr) {
+                  if (curr is! TerminalLoaded) return false;
+                  return curr.requestOpenPanel;
+                },
+                listener: (context, state) {
+                  if (state is! TerminalLoaded || !state.requestOpenPanel) {
+                    return;
+                  }
+                  _setPanelVis('agents', PanelVisibility.open);
+                },
+                child: Focus(
+                  autofocus: true,
+                  child: Scaffold(
+                    backgroundColor: colors.background,
+                    body: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _TitleBar(
@@ -374,6 +385,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
                                 ),
                       ),
                     ],
+                  ),
                   ),
                 ),
               ),
@@ -615,12 +627,7 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                                       'agents',
                                       PanelVisibility.closed,
                                     ),
-                                child: _AgentsContent(
-                                  onOpenAgentsPanel: () => widget.onSetPanelVis(
-                                    'agents',
-                                    PanelVisibility.open,
-                                  ),
-                                ),
+                                child: _AgentsContent(),
                               ),
                             ),
                             _HorizontalDivider(
@@ -847,9 +854,7 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
 
 /// Content of the Agents panel: listens to workspace changes and hosts TerminalPanel.
 class _AgentsContent extends StatelessWidget {
-  const _AgentsContent({this.onOpenAgentsPanel});
-
-  final VoidCallback? onOpenAgentsPanel;
+  const _AgentsContent();
 
   @override
   Widget build(BuildContext context) {
@@ -889,16 +894,10 @@ class _AgentsContent extends StatelessWidget {
           listenWhen: (prev, curr) {
             if (curr is! TerminalLoaded) return false;
             if (prev is! TerminalLoaded) return true;
-            if (curr.requestOpenPanel) return true;
             return prev.activeSession?.id != curr.activeSession?.id;
           },
           listener: (context, state) {
             if (state is! TerminalLoaded) return;
-            // Auto-open agents panel when a session was spawned via agent:run.
-            if (state.requestOpenPanel) {
-              onOpenAgentsPanel?.call();
-              SessionPrefs.savePanelVis('agents', PanelVisibility.open);
-            }
             final session = state.activeSession;
             if (session == null) return;
             final wsState = context.read<WorkspaceCubit>().state;
