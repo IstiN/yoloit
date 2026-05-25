@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
@@ -2329,11 +2330,12 @@ $messagesJson
       );
     } finally {
       asrStopwatch.stop();
+      final completedAt = DateTime.now().toIso8601String();
       _pendingAsrDebug = {
         'mode': asrMode,
         'status': asrStatus,
         'startedAt': asrStartedAt,
-        'completedAt': DateTime.now().toIso8601String(),
+        'completedAt': completedAt,
         'durationMs': asrStopwatch.elapsedMilliseconds,
         'transcriptChars': asrTranscriptChars,
         if (asrError != null) 'error': asrError,
@@ -2341,6 +2343,38 @@ $messagesJson
       if (path != null && path.isNotEmpty) {
         final f = File(path);
         if (f.existsSync()) {
+          // Save a persistent copy for ASR benchmarking before deleting temp.
+          try {
+            final samplesDir = Directory(
+              '${PlatformDirs.instance.dataDir}/asr_samples',
+            );
+            if (!samplesDir.existsSync()) {
+              samplesDir.createSync(recursive: true);
+            }
+            final ts = DateTime.now().millisecondsSinceEpoch;
+            final sampleWav = '${samplesDir.path}/$ts.wav';
+            await f.copy(sampleWav);
+            // Companion metadata JSON — useful for replay benchmarks.
+            final transcript =
+                asrTranscriptChars > 0
+                    ? (_inputController.text.trim())
+                    : '';
+            final meta = {
+              'recordedAt': asrStartedAt,
+              'completedAt': completedAt,
+              'durationMs': asrStopwatch.elapsedMilliseconds,
+              'asrMode': asrMode,
+              'asrStatus': asrStatus,
+              'transcript': transcript,
+              'transcriptChars': asrTranscriptChars,
+              if (asrError != null) 'error': asrError,
+            };
+            await File('${samplesDir.path}/$ts.json').writeAsString(
+              const JsonEncoder.withIndent('  ').convert(meta),
+            );
+          } on Exception {
+            // Best-effort — never block the main flow.
+          }
           try {
             await f.delete();
           } on FileSystemException {
