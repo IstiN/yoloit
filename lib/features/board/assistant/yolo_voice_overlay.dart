@@ -1446,30 +1446,35 @@ class _WaveformPainter extends CustomPainter {
     final t = progress * 2 * math.pi;
 
     // Wave lines: (amplCoeff, color, strokeW, glowW, alpha, phase)
-    // Multiple overlapping lines at different phases create the layered glowing look.
     const waveDefs = [
-      (1.00, Color(0xFF6366F1), 1.6, 14.0, 0.65, 0.00),  // indigo  — dominant
+      (1.00, Color(0xFF6366F1), 1.6, 14.0, 0.65, 0.00),  // indigo
       (0.90, Color(0xFF818CF8), 1.2, 11.0, 0.55, 0.90),  // soft indigo
-      (0.78, Color(0xFF60A5FA), 1.0, 9.0,  0.50, 1.80),  // blue
-      (0.65, Color(0xFFC084FC), 0.9, 8.0,  0.45, 2.75),  // violet
-      (0.52, Color(0xFFEC4899), 0.8, 7.0,  0.40, 3.70),  // pink
-      (0.40, Color(0xFF67E8F9), 0.7, 6.0,  0.35, 4.70),  // cyan
-      (0.28, Color(0xFFF0ABFC), 0.6, 5.0,  0.28, 5.60),  // lavender
+      (0.78, Color(0xFF60A5FA), 1.0,  9.0, 0.50, 1.80),  // blue
+      (0.65, Color(0xFFC084FC), 0.9,  8.0, 0.45, 2.75),  // violet
+      (0.52, Color(0xFFEC4899), 0.8,  7.0, 0.40, 3.70),  // pink
+      (0.40, Color(0xFF67E8F9), 0.7,  6.0, 0.35, 4.70),  // cyan
+      (0.28, Color(0xFFF0ABFC), 0.6,  5.0, 0.28, 5.60),  // lavender
     ];
 
-    const steps = 80; // ~2 px spacing on 160 px canvas → perfectly smooth
+    const steps = 80;
+
+    // Gradient direction: full color at orb side (frac=0), transparent at tip (frac=1).
+    // flip=false (right arm): orb is at x=0, tip at x=width.
+    // flip=true  (left  arm): orb is at x=width, tip at x=0.
+    final gradOrbEnd  = flip ? Offset(size.width, cy) : Offset(0, cy);
+    final gradTipEnd  = flip ? Offset(0, cy)          : Offset(size.width, cy);
 
     for (final (coeff, color, strokeW, glowW, alpha, phase) in waveDefs) {
       final pts = <Offset>[];
       for (int i = 0; i <= steps; i++) {
         final frac = i / steps;
 
-        // Gaussian envelope — tall at arm midpoint, zero at both ends
-        final env = math.exp(-math.pow((frac - 0.50) * 2.8, 2));
+        // Cosine taper: full at orb (frac=0), zero at tip (frac=1) — no seam artefacts.
+        final env = math.cos(frac * math.pi / 2);
 
-        // Two harmonics for organic, non-mechanical feel
+        // Two harmonics, BOTH with integer multipliers → perfect loop seam.
         final wave = math.sin(t + frac * math.pi * 2.5 + phase) * 0.65 +
-            math.sin(t * 1.7 + frac * math.pi * 4.5 + phase * 1.3) * 0.35;
+            math.sin(t * 2.0 + frac * math.pi * 4.5 + phase * 1.3) * 0.35;
 
         final yOff = wave * size.height * 0.46 * amplitude * coeff * env;
         final x = frac * size.width;
@@ -1479,7 +1484,13 @@ class _WaveformPainter extends CustomPainter {
 
       final path = _smoothPath(pts);
 
-      // 1. Wide outer glow — creates the soft halo
+      // Gradient shaders fade wave to transparent at the tip.
+      ui.Shader gradShader(double a) => ui.Gradient.linear(
+            gradOrbEnd, gradTipEnd,
+            [color.withValues(alpha: a), color.withValues(alpha: 0.0)],
+          );
+
+      // 1. Wide outer glow
       canvas.drawPath(
         path,
         Paint()
@@ -1487,11 +1498,11 @@ class _WaveformPainter extends CustomPainter {
           ..strokeWidth = glowW
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round
-          ..color = color.withValues(alpha: alpha * 0.20)
+          ..shader = gradShader(alpha * 0.20)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
       );
 
-      // 2. Mid glow — fills the body with colour
+      // 2. Mid fill
       canvas.drawPath(
         path,
         Paint()
@@ -1499,11 +1510,11 @@ class _WaveformPainter extends CustomPainter {
           ..strokeWidth = glowW * 0.45
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round
-          ..color = color.withValues(alpha: alpha * 0.45)
+          ..shader = gradShader(alpha * 0.45)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
       );
 
-      // 3. Sharp core line — bright highlight along the crest
+      // 3. Sharp core line
       canvas.drawPath(
         path,
         Paint()
@@ -1511,7 +1522,7 @@ class _WaveformPainter extends CustomPainter {
           ..strokeWidth = strokeW
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round
-          ..color = color.withValues(alpha: alpha),
+          ..shader = gradShader(alpha),
       );
     }
   }
