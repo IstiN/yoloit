@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -37,6 +38,7 @@ class YoloVoiceOverlay extends StatefulWidget {
     this.showIdleHint = true,
     this.orbAlignY = -0.10,
     this.responseOrbAlignY = 0.62,
+    this.micAmplitudeStream,
   });
 
   final String status;
@@ -66,6 +68,9 @@ class YoloVoiceOverlay extends StatefulWidget {
   final bool showIdleHint;
   final double orbAlignY;
   final double responseOrbAlignY;
+  /// Real-time mic amplitude stream (0.0–1.0). When provided, the waveform
+  /// reacts to the actual microphone input instead of animating freely.
+  final Stream<double>? micAmplitudeStream;
 
   @override
   State<YoloVoiceOverlay> createState() => _YoloVoiceOverlayState();
@@ -334,6 +339,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         barCount: widget.waveBarCount,
                         amplitude: widget.waveAmplitude,
                         speed: widget.waveSpeed,
+                        micAmplitudeStream: widget.micAmplitudeStream,
                       ),
                     ),
                   ),
@@ -353,6 +359,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         barCount: widget.waveBarCount,
                         amplitude: widget.waveAmplitude,
                         speed: widget.waveSpeed,
+                        micAmplitudeStream: widget.micAmplitudeStream,
                       ),
                     ),
                   ),
@@ -652,12 +659,10 @@ class _ResponseCardState extends State<_ResponseCard>
     with TickerProviderStateMixin {
   late final AnimationController _borderAnim;
   late AnimationController _typingAnim;
-  // Crossfade controller: animates 0→1 when streaming stops, transitioning
-  // from the frozen tool-call view to the clean final answer.
+  /// Fade-in controller: animates 0→1 when streaming stops.
   late final AnimationController _crossfadeAnim;
   int _visibleChars = 0;
   String _lastResponse = '';
-  String _frozenContent = ''; // tools content captured at streaming→false
   bool _isCrossfading = false;
 
   @override
@@ -716,13 +721,8 @@ class _ResponseCardState extends State<_ResponseCard>
       _borderAnim.stop();
     }
 
-    // Streaming just stopped → crossfade from tool-call content to final answer.
+    // Streaming just stopped → simple fade-in of final answer (no frozen tools content).
     if (old.streaming && !widget.streaming && widget.animate) {
-      _frozenContent = _displayText(
-        old.response,
-        streaming: true,
-        visibleChars: _visibleChars,
-      );
       _isCrossfading = true;
       _crossfadeAnim.value = 0.0;
       _crossfadeAnim.forward();
@@ -795,34 +795,15 @@ class _ResponseCardState extends State<_ResponseCard>
         final contentMaxH = (maxH - labelRowHeight - 40).clamp(40.0, 600.0);
         // ↑ 40 = AnimatedContainer padding (20 top + 20 bottom)
 
-        // Build the content body, optionally crossfading from frozen tools view.
+        // Build the content body, optionally with fade-in animation on final answer.
         final newBody = _buildContentBody(displayText, hasMermaid, contentMaxH);
         final body = _isCrossfading
-            ? Stack(
-                children: [
-                  // New (final answer) fades in and slides up.
-                  Opacity(
-                    opacity: Curves.easeOut.transform(_crossfadeAnim.value),
-                    child: Transform.translate(
-                      offset: Offset(
-                        0,
-                        (1.0 - _crossfadeAnim.value) * 14,
-                      ),
-                      child: newBody,
-                    ),
-                  ),
-                  // Old (tools) fades out.
-                  Opacity(
-                    opacity: Curves.easeIn.transform(
-                      1.0 - _crossfadeAnim.value,
-                    ),
-                    child: _buildContentBody(
-                      _frozenContent,
-                      _frozenContent.contains('```mermaid'),
-                      contentMaxH,
-                    ),
-                  ),
-                ],
+            ? Opacity(
+                opacity: Curves.easeOut.transform(_crossfadeAnim.value),
+                child: Transform.translate(
+                  offset: Offset(0, (1.0 - _crossfadeAnim.value) * 12),
+                  child: newBody,
+                ),
               )
             : newBody;
 
@@ -835,50 +816,60 @@ class _ResponseCardState extends State<_ResponseCard>
           children: [
             AnimatedBuilder(
               animation: _borderAnim,
-              builder:
-                  (ctx, child) => CustomPaint(
-                    painter:
-                        widget.streaming
-                            ? _RunningBorderPainter(
-                              progress: _borderAnim.value,
-                              radius: 28,
-                            )
-                            : null,
-                    child: child,
-                  ),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 620),
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xF21B1F2A),
-                      Color(0xD91B1F2A),
-                      Color(0x6E1B1F2A),
-                      Color(0x1A1B1F2A),
-                    ],
-                    stops: [0.0, 0.45, 0.78, 1.0],
-                  ),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(
-                        0xFF9B6BFF,
-                      ).withValues(alpha: widget.streaming ? 0.30 : 0.20),
-                      blurRadius: widget.streaming ? 40 : 24,
-                      spreadRadius: -6,
+              builder: (ctx, child) => CustomPaint(
+                painter: widget.streaming
+                    ? _RunningBorderPainter(
+                        progress: _borderAnim.value,
+                        radius: 28,
+                      )
+                    : null,
+                child: child,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Stack(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 620),
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xF21B1F2A),
+                            Color(0xD91B1F2A),
+                            Color(0x6E1B1F2A),
+                            Color(0x1A1B1F2A),
+                          ],
+                          stops: [0.0, 0.45, 0.78, 1.0],
+                        ),
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF9B6BFF).withValues(
+                              alpha: widget.streaming ? 0.30 : 0.20,
+                            ),
+                            blurRadius: widget.streaming ? 40 : 24,
+                            spreadRadius: -6,
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFF64DFFF).withValues(alpha: 0.14),
+                            blurRadius: 26,
+                            spreadRadius: -14,
+                            offset: const Offset(0, 16),
+                          ),
+                        ],
+                      ),
+                      child: body,
                     ),
-                    BoxShadow(
-                      color: const Color(0xFF64DFFF).withValues(alpha: 0.14),
-                      blurRadius: 26,
-                      spreadRadius: -14,
-                      offset: const Offset(0, 16),
-                    ),
+                    // Shimmer sweep overlay while streaming.
+                    if (widget.streaming)
+                      Positioned.fill(
+                        child: _ShimmerSweep(animate: widget.animate),
+                      ),
                   ],
                 ),
-                child: body,
               ),
             ),
             const SizedBox(height: 8),
@@ -1325,6 +1316,7 @@ class _Waveform extends StatefulWidget {
     this.barCount = 22,
     this.amplitude = 0.85,
     this.speed = 1400,
+    this.micAmplitudeStream,
   });
 
   final bool animate;
@@ -1332,6 +1324,7 @@ class _Waveform extends StatefulWidget {
   final int barCount;
   final double amplitude;
   final int speed;
+  final Stream<double>? micAmplitudeStream;
 
   @override
   State<_Waveform> createState() => _WaveformState();
@@ -1339,6 +1332,10 @@ class _Waveform extends StatefulWidget {
 
 class _WaveformState extends State<_Waveform> with TickerProviderStateMixin {
   late AnimationController _c;
+  // Smoothed real mic amplitude (0-1). Decays toward target at 0.15/frame.
+  double _smoothAmplitude = 0.35;
+  double _targetAmplitude = 0.35;
+  StreamSubscription<double>? _ampSub;
 
   @override
   void initState() {
@@ -1352,11 +1349,23 @@ class _WaveformState extends State<_Waveform> with TickerProviderStateMixin {
     } else {
       _c.value = 0.42;
     }
+    _subscribeAmplitude();
+  }
+
+  void _subscribeAmplitude() {
+    _ampSub?.cancel();
+    _ampSub = widget.micAmplitudeStream?.listen((v) {
+      _targetAmplitude = v.clamp(0.0, 1.0);
+    });
   }
 
   @override
   void didUpdateWidget(_Waveform old) {
     super.didUpdateWidget(old);
+    if (widget.micAmplitudeStream != old.micAmplitudeStream) {
+      _subscribeAmplitude();
+      if (widget.micAmplitudeStream == null) _targetAmplitude = 0.35;
+    }
     if (widget.speed != old.speed) {
       _c.dispose();
       _c = AnimationController(
@@ -1375,6 +1384,7 @@ class _WaveformState extends State<_Waveform> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _ampSub?.cancel();
     _c.dispose();
     super.dispose();
   }
@@ -1382,15 +1392,21 @@ class _WaveformState extends State<_Waveform> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _c,
-    builder:
-        (ctx, _) => CustomPaint(
-          painter: _WaveformPainter(
-            progress: widget.animate ? _c.value : 0.42,
-            flip: widget.flip,
-            barCount: widget.barCount,
-            amplitude: widget.amplitude,
-          ),
+    builder: (ctx, _) {
+      // Smooth amplitude toward target each frame.
+      _smoothAmplitude += (_targetAmplitude - _smoothAmplitude) * 0.18;
+      final effectiveAmplitude =
+          widget.micAmplitudeStream != null
+              ? (_smoothAmplitude * 0.85 + 0.15) // never fully silent
+              : widget.amplitude;
+      return CustomPaint(
+        painter: _WaveformPainter(
+          progress: widget.animate ? _c.value : 0.42,
+          flip: widget.flip,
+          amplitude: effectiveAmplitude,
         ),
+      );
+    },
   );
 }
 
@@ -1398,80 +1414,104 @@ class _WaveformPainter extends CustomPainter {
   const _WaveformPainter({
     required this.progress,
     required this.flip,
-    this.barCount = 22,
     this.amplitude = 0.85,
   });
 
   final double progress;
   final bool flip;
-  final int barCount;
   final double amplitude;
+
+  // Wave configs: [frequencyMult, phaseOffset, ampFraction, colorFraction]
+  static const _waves = [
+    [1.0, 0.0,  1.0,  0.0],
+    [1.5, 2.1,  0.7,  0.5],
+    [0.8, 4.3,  0.55, 1.0],
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
     final cy = size.height / 2;
-    final count = barCount.clamp(6, 60);
     final t = progress * 2 * math.pi;
+    final steps = 60;
 
-    // Build smooth organic wave path (filled curves, not bars)
-    for (var layer = 0; layer < 3; layer++) {
-      final phaseShift = layer * 1.2;
-      final ampScale = amplitude * (1.0 - layer * 0.25);
-      final path = Path();
-      path.moveTo(flip ? size.width : 0, cy);
+    for (final cfg in _waves) {
+      final freqMult = cfg[0];
+      final phaseOff = cfg[1];
+      final ampFrac  = cfg[2];
+      final colorT   = cfg[3];
+
+      // Color interpolation: blue → indigo → violet
+      final waveColor = Color.lerp(
+        const Color(0xFF4488FF),
+        const Color(0xFFCC66FF),
+        colorT,
+      )!;
 
       final points = <Offset>[];
-      for (var i = 0; i <= count; i++) {
-        final frac = i / count;
-        final x = frac * size.width;
-        // Multi-frequency organic wave (all t multipliers must be integers for seamless loop)
+      for (var i = 0; i <= steps; i++) {
+        final frac = i / steps;
+        final x    = frac * size.width;
+        final env  = math.sin(frac * math.pi);          // taper at edges
         final wave =
-            math.sin(t + frac * 8 + phaseShift) * 0.5 +
-            math.sin(t * 2 + frac * 12 + phaseShift * 1.5) * 0.3 +
-            math.cos(t * 3 + frac * 5 + phaseShift * 0.7) * 0.2;
-        // Taper at edges
-        final envelope = math.sin(frac * math.pi).clamp(0.0, 1.0);
-        final y = cy + wave * size.height * 0.4 * ampScale * envelope;
+            math.sin(t * freqMult + frac * 7.0 + phaseOff) * 0.55 +
+            math.sin(t * freqMult * 2 + frac * 11.0 + phaseOff * 1.3) * 0.30 +
+            math.cos(t * freqMult * 3 + frac * 4.5 + phaseOff * 0.6) * 0.15;
+        final y = cy + wave * size.height * 0.42 * ampFrac * amplitude * env;
         points.add(Offset(flip ? size.width - x : x, y));
       }
 
-      // Draw smooth curve through points
-      path.moveTo(points.first.dx, cy);
-      path.lineTo(points.first.dx, points.first.dy);
+      // ── glowing stroke ────────────────────────────────────────────────────
+      final path = Path();
+      path.moveTo(points.first.dx, points.first.dy);
       for (var i = 0; i < points.length - 1; i++) {
-        final p0 = points[i];
-        final p1 = points[i + 1];
-        final cpx = (p0.dx + p1.dx) / 2;
-        path.cubicTo(cpx, p0.dy, cpx, p1.dy, p1.dx, p1.dy);
+        final cp = Offset((points[i].dx + points[i + 1].dx) / 2,
+                          (points[i].dy + points[i + 1].dy) / 2);
+        path.quadraticBezierTo(points[i].dx, points[i].dy, cp.dx, cp.dy);
       }
-      // Close back to center line
-      path.lineTo(points.last.dx, cy);
-      path.close();
 
-      final colorStart =
-          Color.lerp(
-            const Color(0xFF66D4FF),
-            const Color(0xFFFF6EE0),
-            layer / 2.0,
-          )!;
-      final colorEnd =
-          Color.lerp(
-            const Color(0xFFB980FF),
-            const Color(0xFF4066FF),
-            layer / 2.0,
-          )!;
+      // soft glow behind the line
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4.0
+          ..color = waveColor.withValues(alpha: 0.18)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+      // crisp line on top
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = waveColor.withValues(alpha: 0.70),
+      );
 
-      final paint =
-          Paint()
-            ..style = PaintingStyle.fill
-            ..shader = LinearGradient(
-              colors: [
-                colorStart.withValues(alpha: 0.45 - layer * 0.10),
-                colorEnd.withValues(alpha: 0.45 - layer * 0.10),
-              ],
-            ).createShader(Offset.zero & size);
+      // ── glowing dots ─────────────────────────────────────────────────────
+      const dotEvery = 5; // place a dot every N steps
+      for (var i = 0; i <= steps; i += dotEvery) {
+        final p = points[i];
+        // intensity: bright near peaks, dim near center
+        final frac = i / steps;
+        final env = math.sin(frac * math.pi);
+        final bright = (env * ampFrac * amplitude).clamp(0.15, 1.0);
+        final radius = 1.8 + bright * 2.2;
 
-      canvas.drawPath(path, paint);
+        // outer glow
+        canvas.drawCircle(
+          p,
+          radius * 2.4,
+          Paint()..color = waveColor.withValues(alpha: bright * 0.22)
+               ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        );
+        // bright core
+        canvas.drawCircle(
+          p,
+          radius,
+          Paint()..color = Color.lerp(waveColor, Colors.white, bright * 0.6)!
+               ..style = PaintingStyle.fill,
+        );
+      }
     }
   }
 
@@ -1479,8 +1519,74 @@ class _WaveformPainter extends CustomPainter {
   bool shouldRepaint(covariant _WaveformPainter old) =>
       old.progress != progress ||
       old.flip != flip ||
-      old.barCount != barCount ||
       old.amplitude != amplitude;
+}
+
+// ─────────────────────────── shimmer sweep ────────────────────────────────────
+// Translucent gradient that sweeps left-to-right over the response card
+// while LLM is streaming to indicate live generation.
+
+class _ShimmerSweep extends StatefulWidget {
+  const _ShimmerSweep({required this.animate});
+  final bool animate;
+
+  @override
+  State<_ShimmerSweep> createState() => _ShimmerSweepState();
+}
+
+class _ShimmerSweepState extends State<_ShimmerSweep>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    if (widget.animate) _c.repeat();
+  }
+
+  @override
+  void didUpdateWidget(_ShimmerSweep old) {
+    super.didUpdateWidget(old);
+    if (widget.animate && !old.animate) _c.repeat();
+    if (!widget.animate && old.animate) _c.stop();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _c,
+    builder: (_, __) {
+      final t = _c.value;
+      // Sweep band: left-edge from -0.4 to 1.0, width=0.35
+      final left = Alignment(-1.8 + t * 3.6, 0);
+      final right = Alignment(-1.8 + t * 3.6 + 0.8, 0);
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: left,
+            end: right,
+            colors: [
+              Colors.transparent,
+              const Color(0xFFAA88FF).withValues(alpha: 0.08),
+              const Color(0xFF88DDFF).withValues(alpha: 0.14),
+              const Color(0xFFAA88FF).withValues(alpha: 0.08),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 // ─────────────────────────── upload beam ─────────────────────────────────────

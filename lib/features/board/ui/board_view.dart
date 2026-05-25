@@ -6147,6 +6147,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       showIdleHint: false,
       orbAlignY: 0.82,
       responseOrbAlignY: 0.86,
+      micAmplitudeStream: _assistantController.micAmplitudeStream,
     );
   }
 

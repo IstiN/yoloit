@@ -34,6 +34,12 @@ class YoloAssistantController {
   Future<void> Function()? _sendDraft;
   VoidCallback? _resetOverlay;
 
+  /// Broadcast stream of normalized mic amplitude (0.0 = silence, 1.0 = max).
+  /// Active only while the microphone is recording.
+  final StreamController<double> _micAmplitudeCtrl =
+      StreamController<double>.broadcast();
+  Stream<double> get micAmplitudeStream => _micAmplitudeCtrl.stream;
+
   void _attach({
     required Future<void> Function() startMic,
     required Future<void> Function({bool sendAfterTranscription}) stopMic,
@@ -67,6 +73,8 @@ class YoloAssistantController {
   Future<void> sendDraft() => _sendDraft?.call() ?? Future<void>.value();
 
   void resetOverlay() => _resetOverlay?.call();
+
+  void dispose() => _micAmplitudeCtrl.close();
 }
 
 /// Main widget for the YoLo Assistant panel.
@@ -93,6 +101,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   final _scrollController = ScrollController();
   final _inputFocusNode = FocusNode();
   final AudioRecorder _micRecorder = AudioRecorder();
+  StreamSubscription<dynamic>? _amplitudeSub;
   final YoloitToolExecutor _toolExecutor = YoloitCliToolExecutor();
   final CloudAsrService _cloudAsrService = CloudAsrService();
   _AssistantToolExecutor? _wrappedExecutor;
@@ -278,6 +287,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _scrollController.dispose();
     _inputFocusNode.dispose();
     _chatProvider?.dispose();
+    _amplitudeSub?.cancel();
     unawaited(_micRecorder.dispose());
     super.dispose();
   }
@@ -700,12 +710,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     String assistantContent,
     List<String> toolLogs,
   ) {
-    final text = assistantContent.trim();
-    if (toolLogs.isEmpty) return text;
-    final lines = toolLogs.map((t) => '- $t').join('\n');
-    final toolsSection = '### Tools\n$lines';
-    if (text.isEmpty) return toolsSection;
-    return '$text\n\n$toolsSection';
+    // Show only the assistant text — no tool logs in the overlay card.
+    // Tool calls are visualized via the orb/processing state, not as text.
+    return assistantContent.trim();
   }
 
   BoardDocument? _currentBoard() =>
@@ -2251,6 +2258,15 @@ $messagesJson
     }
     if (!mounted) return;
     setState(() => _isRecordingMic = true);
+    // Stream real mic amplitude to the overlay waveform.
+    _amplitudeSub?.cancel();
+    _amplitudeSub = _micRecorder
+        .onAmplitudeChanged(const Duration(milliseconds: 60))
+        .listen((amp) {
+      // dBFS: 0 = max, ~-50 = silence for speech. Normalize to 0..1.
+      final normalized = ((amp.current + 50.0) / 50.0).clamp(0.0, 1.0);
+      widget.controller?._micAmplitudeCtrl.add(normalized);
+    });
     _syncOverlayState(hiddenOverride: false);
   }
 
@@ -2258,6 +2274,8 @@ $messagesJson
     bool sendAfterTranscription = false,
     bool mirrorToOverlay = false,
   }) async {
+    _amplitudeSub?.cancel();
+    _amplitudeSub = null;
     final path = await _micRecorder.stop();
     if (!mounted) return;
     setState(() {
@@ -2432,6 +2450,8 @@ $messagesJson
   }
 
   Future<void> _cancelRecordingFromMic() async {
+    _amplitudeSub?.cancel();
+    _amplitudeSub = null;
     if (!_isRecordingMic) {
       _resetVoiceOverlay();
       return;
