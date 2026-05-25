@@ -388,7 +388,17 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       ) {
         calledTools.add(toolCommand);
         final short = _compactToolResult(toolCommand, result, success);
-        overlayToolLogs.add(short);
+        // Replace the matching ⏳ running entry instead of appending, so the
+        // overlay shows ✅/❌ in-place rather than showing both states at once.
+        final runningIdx = overlayToolLogs.lastIndexWhere(
+          (e) => e.startsWith('⏳ running:'),
+        );
+        final doneEntry = success ? '✅ $short' : '❌ $short';
+        if (runningIdx >= 0) {
+          overlayToolLogs[runningIdx] = doneEntry;
+        } else {
+          overlayToolLogs.add(doneEntry);
+        }
         final statePatch = _toolTargetPatchIfNeeded(
           toolCommand: toolCommand,
           arguments: arguments,
