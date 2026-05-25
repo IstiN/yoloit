@@ -3183,4 +3183,81 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       ),
     ],
   ),
+
+  // ─── Drawing ───────────────────────────────────────────────────────────────
+  YoloitCliTool(
+    command: 'draw:list',
+    alias: 'drl',
+    description:
+        'List all drawings (freehand strokes / shapes) on a board. '
+        'Returns id, position, size, strokeColor, zIndex for each element.',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name (defaults to active board)', shortKey: 'b'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'draw:add',
+    alias: 'dra',
+    description:
+        'Add a shape drawing to a board. '
+        'Supported types: line (x1,y1,x2,y2), circle (cx,cy,r), '
+        'rect (x,y,width,height), arrow (x1,y1,x2,y2), '
+        'freehand (points=[[x,y],...]), svg (d=<SVG path data>). '
+        'Returns the new drawing id.',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name', shortKey: 'b'),
+      _p('type', 'Shape type: line | circle | rect | arrow | freehand | svg', shortKey: 's'),
+      _p('color', 'Stroke color as #RRGGBB hex (default #FFFFFF)', shortKey: 'c'),
+      _p('width', 'Stroke width in pixels (default 3)', shortKey: 'w'),
+      _p('x1', 'Start X (line/arrow)'),
+      _p('y1', 'Start Y (line/arrow)'),
+      _p('x2', 'End X (line/arrow)'),
+      _p('y2', 'End Y (line/arrow)'),
+      _p('cx', 'Center X (circle)'),
+      _p('cy', 'Center Y (circle)'),
+      _p('r', 'Radius (circle)'),
+      _p('x', 'Top-left X (rect/freehand/svg origin)'),
+      _p('y', 'Top-left Y (rect/freehand/svg origin)'),
+      _p('height', 'Height (rect)'),
+      _p('points', 'JSON array of [x,y] pairs for freehand'),
+      _p('d', 'SVG path data string (for svg type)'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'draw:remove',
+    alias: 'drr',
+    description: 'Remove a specific drawing from a board by its id.',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name', required: true, shortKey: 'b'),
+      _p('id', 'Drawing id (from draw:list)', required: true),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'draw:clear',
+    alias: 'drc',
+    description: 'Remove ALL drawings from a board.',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name', required: true, shortKey: 'b'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'draw:svg',
+    alias: 'drsvg',
+    description:
+        'Draw an SVG path on a board using SVG path data (M, L, C, Q, Z commands). '
+        'Useful for complex shapes, icons, or agent-generated diagrams.',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name', required: true, shortKey: 'b'),
+      _p('d', 'SVG path data (e.g. "M 10 10 L 100 100 Z")', required: true),
+      _p('x', 'X origin offset for the path (default 100)'),
+      _p('y', 'Y origin offset for the path (default 100)'),
+      _p('color', 'Stroke color as #RRGGBB hex', shortKey: 'c'),
+      _p('width', 'Stroke width in pixels', shortKey: 'w'),
+    ],
+  ),
 ];

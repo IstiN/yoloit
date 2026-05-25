@@ -1054,6 +1054,61 @@ commands = [
     "example": "yoloit app:demo-view calculator",
     "aliases": [],
   },
+  {
+    "name": "draw:list",
+    "group": "board",
+    "description": "List all drawings on a board.",
+    "params": [["board", "Board id or name (defaults to active board)", False]],
+    "example": "yoloit draw:list board-123",
+    "aliases": ["drl"],
+  },
+  {
+    "name": "draw:add",
+    "group": "board",
+    "description": "Add a shape drawing to a board. Types: line, circle, rect, arrow, freehand, svg.",
+    "params": [
+      ["board", "Board id or name", False],
+      ["type", "Shape type: line|circle|rect|arrow|freehand|svg", False],
+      ["color", "Stroke color #RRGGBB (default #FFFFFF)", False],
+      ["width", "Stroke width px (default 3)", False],
+    ],
+    "example": "yoloit draw:add --board board-123 --shape line --x1 100 --y1 100 --x2 300 --y2 200 --color '#FF0000'",
+    "aliases": ["dra"],
+  },
+  {
+    "name": "draw:remove",
+    "group": "board",
+    "description": "Remove a specific drawing by id from a board.",
+    "params": [
+      ["board", "Board id or name", True],
+      ["id", "Drawing id (from draw:list)", True],
+    ],
+    "example": "yoloit draw:remove --board board-123 --id drawing-456",
+    "aliases": ["drr"],
+  },
+  {
+    "name": "draw:clear",
+    "group": "board",
+    "description": "Remove ALL drawings from a board.",
+    "params": [["board", "Board id or name", True]],
+    "example": "yoloit draw:clear board-123",
+    "aliases": ["drc"],
+  },
+  {
+    "name": "draw:svg",
+    "group": "board",
+    "description": "Draw using SVG path data (M, L, C, Q, Z commands). Great for complex shapes and agent-generated diagrams.",
+    "params": [
+      ["board", "Board id or name", True],
+      ["d", "SVG path data string", True],
+      ["x", "X origin offset (default 100)", False],
+      ["y", "Y origin offset (default 100)", False],
+      ["color", "Stroke color #RRGGBB", False],
+      ["width", "Stroke width px", False],
+    ],
+    "example": "yoloit draw:svg board-123 'M 10 10 L 200 200 Z'",
+    "aliases": ["drsvg"],
+  },
 ]
 
 # ── Registry: namespace prefixes (one definition per namespace) ───────
@@ -3366,6 +3421,111 @@ print(json.dumps({
     fmt=$(_parse_help_format "$@")
     usage "$fmt"
     ;;
+  # ─── Drawing commands ─────────────────────────────────────────────────────
+
+  draw:list|drl)
+    board=""
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) board="$2"; shift 2 ;;
+        *) board="$1"; shift ;;
+      esac
+    done
+    q=""
+    [[ -n "$board" ]] && q="?board=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$board")"
+    _curl GET "/drawings$q"
+    ;;
+
+  draw:add|dra)
+    board=""; shape="freehand"; color="#FFFFFF"; width=3
+    declare -A extras
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) board="$2"; shift 2 ;;
+        --shape|-s|--type) shape="$2"; shift 2 ;;
+        --color|-c) color="$2"; shift 2 ;;
+        --width|-w) width="$2"; shift 2 ;;
+        --x1) extras[x1]="$2"; shift 2 ;;
+        --y1) extras[y1]="$2"; shift 2 ;;
+        --x2) extras[x2]="$2"; shift 2 ;;
+        --y2) extras[y2]="$2"; shift 2 ;;
+        --cx) extras[cx]="$2"; shift 2 ;;
+        --cy) extras[cy]="$2"; shift 2 ;;
+        --r|--radius) extras[r]="$2"; shift 2 ;;
+        --x) extras[x]="$2"; shift 2 ;;
+        --y) extras[y]="$2"; shift 2 ;;
+        --height) extras[height]="$2"; shift 2 ;;
+        --points) extras[points]="$2"; shift 2 ;;
+        --d|--path) extras[d]="$2"; shift 2 ;;
+        --svg) extras[svg]="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    extra_json=""
+    for key in "${!extras[@]}"; do
+      val="${extras[$key]}"
+      if [[ "$val" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+        extra_json="$extra_json, \"$key\": $val"
+      elif [[ "$val" =~ ^\[ ]]; then
+        extra_json="$extra_json, \"$key\": $val"
+      else
+        extra_json="$extra_json, \"$key\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$val")"
+      fi
+    done
+    json="{\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), \"type\": \"$shape\", \"color\": \"$color\", \"width\": $width$extra_json}"
+    _curl POST "/drawings" "$json"
+    ;;
+
+  draw:remove|drr)
+    board=""; drawing_id=""
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) board="$2"; shift 2 ;;
+        --id) drawing_id="$2"; shift 2 ;;
+        *) [[ -z "$board" ]] && board="$1" || drawing_id="$1"; shift ;;
+      esac
+    done
+    [[ -z "$board" ]] && { echo "Usage: yoloit draw:remove --board <id> --id <drawing-id>" >&2; exit 1; }
+    enc_board=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$board")
+    if [[ -n "$drawing_id" ]]; then
+      enc_id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$drawing_id")
+      _curl DELETE "/drawings/$enc_board/$enc_id"
+    else
+      _curl DELETE "/drawings/$enc_board"
+    fi
+    ;;
+
+  draw:clear|drc)
+    board=""
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) board="$2"; shift 2 ;;
+        *) board="$1"; shift ;;
+      esac
+    done
+    [[ -z "$board" ]] && { echo "Usage: yoloit draw:clear <board>" >&2; exit 1; }
+    enc_board=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$board")
+    _curl DELETE "/drawings/$enc_board"
+    ;;
+
+  draw:svg|drsvg)
+    board=""; path_d=""; posX=100; posY=100; color="#FFFFFF"; width=3
+    while [[ $# -gt 0 ]]; do
+      case $1 in
+        --board|-b) board="$2"; shift 2 ;;
+        --d|--path) path_d="$2"; shift 2 ;;
+        --x) posX="$2"; shift 2 ;;
+        --y) posY="$2"; shift 2 ;;
+        --color|-c) color="$2"; shift 2 ;;
+        --width|-w) width="$2"; shift 2 ;;
+        *) [[ -z "$board" ]] && board="$1" || path_d="$1"; shift ;;
+      esac
+    done
+    [[ -z "$path_d" ]] && { echo "Usage: yoloit draw:svg <board> <svg-path-d>" >&2; exit 1; }
+    json="{\"board\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$board"), \"type\": \"svg\", \"d\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$path_d"), \"x\": $posX, \"y\": $posY, \"color\": \"$color\", \"width\": $width}"
+    _curl POST "/drawings" "$json"
+    ;;
+
   validate)
     # Validate that the command registry matches bash case handlers.
     # Run: yoloit validate
@@ -3471,7 +3631,8 @@ else:
     sys.exit(1)
 PYEOF
     ;;
-  *)
+
+    *)
     echo "Unknown command: $cmd" >&2
     echo "Run 'yoloit help' for usage." >&2
     exit 1

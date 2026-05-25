@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Colors;
@@ -260,6 +261,10 @@ class CliServer {
 
     if (path.isNotEmpty && path[0] == 'agents') {
       return _handleAgents(method, path.sublist(1), request);
+    }
+
+    if (path.isNotEmpty && path[0] == 'drawings') {
+      return _handleDrawings(method, path.sublist(1), request, cubit);
     }
 
     if (path.isNotEmpty && path[0] == 'search') {
@@ -762,6 +767,432 @@ class CliServer {
     }
 
     return _notFound('Unknown agents route');
+  }
+
+  // ── /api/drawings ─────────────────────────────────────────────────────────
+  // GET  /api/drawings?board=<id>          → list drawings
+  // POST /api/drawings                     → add drawing (shape or svg)
+  // DELETE /api/drawings/<board>/<id>      → remove drawing
+  // DELETE /api/drawings/<board>           → clear all drawings
+
+  Future<shelf.Response> _handleDrawings(
+    String method,
+    List<String> sub,
+    shelf.Request request,
+    BoardCubit cubit,
+  ) async {
+    if (method == 'GET') {
+      final boardId =
+          request.url.queryParameters['board'] ??
+          sub.firstOrNull;
+      final board =
+          boardId != null ? _findBoard(cubit, boardId) : cubit.state.activeBoard;
+      if (board == null) return _error('Board not found');
+      return _json({
+        'ok': true,
+        'boardId': board.id,
+        'boardName': board.name,
+        'count': board.drawings.length,
+        'drawings': board.drawings.map(_drawingToJson).toList(),
+      });
+    }
+
+    if (method == 'POST') {
+      final body = await _body(request);
+      final boardId =
+          (body['board'] as String?) ??
+          request.url.queryParameters['board'];
+      final board =
+          boardId != null ? _findBoard(cubit, boardId) : cubit.state.activeBoard;
+      if (board == null) return _error('Board not found');
+
+      final type = (body['type'] as String? ?? 'freehand').toLowerCase();
+      final colorStr = body['color'] as String? ?? '#FFFFFF';
+      final color = _parseColor(colorStr) ?? const Color(0xFFFFFFFF);
+      final strokeWidth = (body['width'] as num?)?.toDouble() ?? 3.0;
+      final posX = (body['x'] as num?)?.toDouble() ?? 100.0;
+      final posY = (body['y'] as num?)?.toDouble() ?? 100.0;
+
+      List<List<Offset>> strokes;
+      Size size;
+
+      switch (type) {
+        case 'line':
+          final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
+          final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
+          final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
+          final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
+          final result = _lineToElement(x1, y1, x2, y2, strokeWidth);
+          strokes = result.$1;
+          size = result.$2;
+
+        case 'arrow':
+          final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
+          final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
+          final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
+          final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
+          final result = _arrowToElement(x1, y1, x2, y2, strokeWidth);
+          strokes = result.$1;
+          size = result.$2;
+
+        case 'circle':
+          final cx = (body['cx'] as num?)?.toDouble() ??
+              (body['x'] as num?)?.toDouble() ?? posX;
+          final cy = (body['cy'] as num?)?.toDouble() ??
+              (body['y'] as num?)?.toDouble() ?? posY;
+          final r = (body['r'] as num?)?.toDouble() ??
+              (body['radius'] as num?)?.toDouble() ?? 50.0;
+          final result = _circleToElement(cx, cy, r, strokeWidth);
+          strokes = result.$1;
+          size = result.$2;
+
+        case 'rect':
+        case 'rectangle':
+          final rx = (body['x'] as num?)?.toDouble() ?? posX;
+          final ry = (body['y'] as num?)?.toDouble() ?? posY;
+          final w = (body['width'] as num?)?.toDouble() ?? 200.0;
+          final h = (body['height'] as num?)?.toDouble() ?? 100.0;
+          final result = _rectToElement(rx, ry, w, h, strokeWidth);
+          strokes = result.$1;
+          size = result.$2;
+
+        case 'svg':
+          final pathD = body['d'] as String? ?? body['path'] as String? ?? '';
+          final svgStr = body['svg'] as String?;
+          final dStr = pathD.isNotEmpty ? pathD : (svgStr != null ? _extractSvgPathD(svgStr) : '');
+          if (dStr.isEmpty) return _error('Missing "d" (SVG path data) or "svg" field');
+          final result = _svgPathToElement(dStr, posX, posY, strokeWidth);
+          if (result == null) return _error('Failed to parse SVG path');
+          strokes = result.$1;
+          size = result.$2;
+
+        case 'freehand':
+        default:
+          final rawPoints = body['points'] as List?;
+          if (rawPoints == null || rawPoints.isEmpty) {
+            return _error('Missing "points" for freehand. Provide [[x,y],...]');
+          }
+          final points = rawPoints
+              .map((p) => Offset(
+                    (p as List)[0] is num ? (p[0] as num).toDouble() : 0,
+                    p[1] is num ? (p[1] as num).toDouble() : 0,
+                  ))
+              .toList();
+          final result = _freehandToElement(points, strokeWidth);
+          strokes = result.$1;
+          size = result.$2;
+      }
+
+      // Top-left position: for shapes that specify absolute coords,
+      // position is already baked into strokes (relative to bounding box).
+      // We store the absolute position here.
+      final absPos = switch (type) {
+        'line' || 'arrow' => Offset(
+            math.min(
+              (body['x1'] as num?)?.toDouble() ?? posX,
+              (body['x2'] as num?)?.toDouble() ?? posX + 200,
+            ) - strokeWidth,
+            math.min(
+              (body['y1'] as num?)?.toDouble() ?? posY,
+              (body['y2'] as num?)?.toDouble() ?? posY,
+            ) - strokeWidth,
+          ),
+        'circle' => Offset(
+            ((body['cx'] as num?)?.toDouble() ?? posX) -
+                ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
+            ((body['cy'] as num?)?.toDouble() ?? posY) -
+                ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
+          ),
+        'rect' || 'rectangle' => Offset(
+            (body['x'] as num?)?.toDouble() ?? posX,
+            (body['y'] as num?)?.toDouble() ?? posY,
+          ),
+        'svg' || 'freehand' => Offset(posX, posY),
+        _ => Offset(posX, posY),
+      };
+
+      final maxZ = board.drawings.fold<int>(
+        0,
+        (v, d) => d.zIndex > v ? d.zIndex : v,
+      );
+      final drawing = BoardDrawingElement(
+        id: 'drawing-${DateTime.now().millisecondsSinceEpoch}',
+        strokes: strokes,
+        position: absPos,
+        size: size,
+        strokeColor: color,
+        strokeWidth: strokeWidth,
+        zIndex: maxZ + 1,
+      );
+      await cubit.addDrawing(drawing, boardId: board.id);
+      _scheduleRebuild();
+      return _json({
+        'ok': true,
+        'id': drawing.id,
+        'boardId': board.id,
+        'type': type,
+        'strokeCount': strokes.length,
+        'pointCount': strokes.fold<int>(0, (s, st) => s + st.length),
+      });
+    }
+
+    if (method == 'DELETE') {
+      // DELETE /api/drawings/<board>/<id>  or  /api/drawings/<board>
+      final boardId = sub.firstOrNull;
+      if (boardId == null) return _error('Missing board ID in path');
+      final board = _findBoard(cubit, boardId);
+      if (board == null) return _error('Board not found: $boardId');
+
+      final drawingId = sub.length >= 2 ? sub[1] : null;
+      if (drawingId != null) {
+        await cubit.removeDrawing(drawingId, boardId: board.id);
+        _scheduleRebuild();
+        return _json({'ok': true, 'removed': drawingId});
+      } else {
+        // Clear all drawings
+        for (final d in board.drawings) {
+          await cubit.removeDrawing(d.id, boardId: board.id);
+        }
+        _scheduleRebuild();
+        return _json({'ok': true, 'cleared': board.drawings.length});
+      }
+    }
+
+    return _notFound('Unknown drawings route');
+  }
+
+  // ── Drawing shape helpers ─────────────────────────────────────────────────
+
+  Map<String, dynamic> _drawingToJson(BoardDrawingElement d) => {
+    'id': d.id,
+    'position': [d.position.dx, d.position.dy],
+    'size': [d.size.width, d.size.height],
+    'strokeCount': d.strokes.length,
+    'pointCount': d.strokes.fold<int>(0, (s, st) => s + st.length),
+    'strokeColor': '#${d.strokeColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
+    'strokeWidth': d.strokeWidth,
+    'zIndex': d.zIndex,
+    'hidden': d.hidden,
+  };
+
+  (List<List<Offset>>, Size) _lineToElement(
+    double x1, double y1, double x2, double y2, double sw) {
+    final minX = math.min(x1, x2) - sw;
+    final minY = math.min(y1, y2) - sw;
+    final origin = Offset(minX, minY);
+    final pts = [Offset(x1, y1) - origin, Offset(x2, y2) - origin];
+    final size = Size(
+      (x2 - x1).abs() + sw * 2,
+      (y2 - y1).abs() + sw * 2,
+    );
+    return ([pts], size);
+  }
+
+  (List<List<Offset>>, Size) _arrowToElement(
+    double x1, double y1, double x2, double y2, double sw) {
+    final angle = math.atan2(y2 - y1, x2 - x1);
+    const headLen = 20.0;
+    const headAngle = 0.4; // radians
+    final hx1 = x2 - headLen * math.cos(angle - headAngle);
+    final hy1 = y2 - headLen * math.sin(angle - headAngle);
+    final hx2 = x2 - headLen * math.cos(angle + headAngle);
+    final hy2 = y2 - headLen * math.sin(angle + headAngle);
+    final minX = [x1, x2, hx1, hx2].reduce(math.min) - sw;
+    final minY = [y1, y2, hy1, hy2].reduce(math.min) - sw;
+    final maxX = [x1, x2, hx1, hx2].reduce(math.max) + sw;
+    final maxY = [y1, y2, hy1, hy2].reduce(math.max) + sw;
+    final origin = Offset(minX, minY);
+    final shaft = [Offset(x1, y1) - origin, Offset(x2, y2) - origin];
+    final head1 = [Offset(hx1, hy1) - origin, Offset(x2, y2) - origin];
+    final head2 = [Offset(hx2, hy2) - origin, Offset(x2, y2) - origin];
+    return ([shaft, head1, head2], Size(maxX - minX, maxY - minY));
+  }
+
+  (List<List<Offset>>, Size) _circleToElement(
+    double cx, double cy, double r, double sw) {
+    const steps = 64;
+    final minX = cx - r - sw;
+    final minY = cy - r - sw;
+    final origin = Offset(minX, minY);
+    final pts = List.generate(steps + 1, (i) {
+      final angle = 2 * math.pi * i / steps;
+      return Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)) - origin;
+    });
+    final size = Size((r + sw) * 2, (r + sw) * 2);
+    return ([pts], size);
+  }
+
+  (List<List<Offset>>, Size) _rectToElement(
+    double rx, double ry, double w, double h, double sw) {
+    final origin = Offset(rx - sw, ry - sw);
+    final pts = [
+      Offset(rx, ry) - origin,
+      Offset(rx + w, ry) - origin,
+      Offset(rx + w, ry + h) - origin,
+      Offset(rx, ry + h) - origin,
+      Offset(rx, ry) - origin,
+    ];
+    return ([pts], Size(w + sw * 2, h + sw * 2));
+  }
+
+  (List<List<Offset>>, Size) _freehandToElement(
+    List<Offset> points, double sw) {
+    if (points.isEmpty) return ([<Offset>[]], Size(sw * 2, sw * 2));
+    double minX = points.first.dx, minY = points.first.dy;
+    double maxX = minX, maxY = minY;
+    for (final p in points) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+    final origin = Offset(minX - sw, minY - sw);
+    final rel = points.map((p) => p - origin).toList();
+    return ([rel], Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
+  }
+
+  /// Extract the `d` attribute from a simple SVG string.
+  String _extractSvgPathD(String svg) {
+    final match = RegExp(r'd="([^"]*)"').firstMatch(svg);
+    return match?.group(1) ?? '';
+  }
+
+  /// Parse a subset of SVG path commands into strokes.
+  /// Supports: M, L, H, V, C (cubic bezier), Q (quadratic), Z, and lowercase variants.
+  (List<List<Offset>>, Size)? _svgPathToElement(
+    String d, double baseX, double baseY, double sw) {
+    final strokes = <List<Offset>>[];
+    List<Offset> current = [];
+    double cx = 0, cy = 0;
+
+    // Tokenize: split on command letters, keeping the letter
+    final tokens = RegExp(r'[MLHVCSQTAZmlhvcsqtaz]|[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?')
+        .allMatches(d)
+        .map((m) => m.group(0)!)
+        .toList();
+
+    int i = 0;
+    String cmd = 'M';
+    while (i < tokens.length) {
+      final t = tokens[i];
+      if (RegExp(r'[MLHVCSQTAZmlhvcsqtaz]').hasMatch(t)) {
+        cmd = t;
+        i++;
+        continue;
+      }
+      double num() {
+        final v = double.tryParse(tokens[i]) ?? 0;
+        i++;
+        return v;
+      }
+      switch (cmd) {
+        case 'M':
+          if (current.isNotEmpty) strokes.add(current);
+          cx = num(); cy = num();
+          current = [Offset(cx, cy)];
+          cmd = 'L';
+        case 'm':
+          if (current.isNotEmpty) strokes.add(current);
+          cx += num(); cy += num();
+          current = [Offset(cx, cy)];
+          cmd = 'l';
+        case 'L':
+          cx = num(); cy = num();
+          current.add(Offset(cx, cy));
+        case 'l':
+          cx += num(); cy += num();
+          current.add(Offset(cx, cy));
+        case 'H':
+          cx = num();
+          current.add(Offset(cx, cy));
+        case 'h':
+          cx += num();
+          current.add(Offset(cx, cy));
+        case 'V':
+          cy = num();
+          current.add(Offset(cx, cy));
+        case 'v':
+          cy += num();
+          current.add(Offset(cx, cy));
+        case 'C': // cubic bezier — approximate with 10 points
+          final x1 = num(), y1 = num(), x2 = num(), y2 = num();
+          final ex = num(), ey = num();
+          for (int s = 1; s <= 10; s++) {
+            final tt = s / 10;
+            final bx = _cubicBezier(cx, x1, x2, ex, tt);
+            final by = _cubicBezier(cy, y1, y2, ey, tt);
+            current.add(Offset(bx, by));
+          }
+          cx = ex; cy = ey;
+        case 'c':
+          final x1 = cx + num(), y1 = cy + num();
+          final x2 = cx + num(), y2 = cy + num();
+          final ex = cx + num(), ey = cy + num();
+          for (int s = 1; s <= 10; s++) {
+            final tt = s / 10;
+            current.add(Offset(
+              _cubicBezier(cx, x1, x2, ex, tt),
+              _cubicBezier(cy, y1, y2, ey, tt),
+            ));
+          }
+          cx = ex; cy = ey;
+        case 'Q': // quadratic bezier
+          final x1 = num(), y1 = num(), ex = num(), ey = num();
+          for (int s = 1; s <= 10; s++) {
+            final tt = s / 10;
+            current.add(Offset(
+              _quadBezier(cx, x1, ex, tt),
+              _quadBezier(cy, y1, ey, tt),
+            ));
+          }
+          cx = ex; cy = ey;
+        case 'q':
+          final x1 = cx + num(), y1 = cy + num();
+          final ex = cx + num(), ey = cy + num();
+          for (int s = 1; s <= 10; s++) {
+            final tt = s / 10;
+            current.add(Offset(
+              _quadBezier(cx, x1, ex, tt),
+              _quadBezier(cy, y1, ey, tt),
+            ));
+          }
+          cx = ex; cy = ey;
+        case 'Z':
+        case 'z':
+          if (current.length > 1) current.add(current.first);
+          strokes.add(current);
+          current = [];
+        default:
+          i++; // skip unknown
+      }
+    }
+    if (current.isNotEmpty) strokes.add(current);
+    if (strokes.isEmpty) return null;
+
+    // Compute bounding box of all points
+    final allPts = strokes.expand((s) => s).toList();
+    double minX = allPts.first.dx, minY = allPts.first.dy;
+    double maxX = minX, maxY = minY;
+    for (final p in allPts) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+    final origin = Offset(minX - sw, minY - sw);
+    final relStrokes = strokes.map((s) => s.map((p) => p - origin).toList()).toList();
+    return (relStrokes, Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
+  }
+
+  double _cubicBezier(double p0, double p1, double p2, double p3, double t) {
+    final mt = 1 - t;
+    return mt * mt * mt * p0 + 3 * mt * mt * t * p1 +
+           3 * mt * t * t * p2 + t * t * t * p3;
+  }
+
+  double _quadBezier(double p0, double p1, double p2, double t) {
+    final mt = 1 - t;
+    return mt * mt * p0 + 2 * mt * t * p1 + t * t * p2;
   }
 
   Future<shelf.Response> _handleSearch(

@@ -394,6 +394,80 @@ fi
 
 echo ""
 
+# ── Drawing API ────────────────────────────────────────────────────────
+
+echo "── Drawing API ──"
+
+# list: empty (or non-zero count — board may already have drawings)
+DRAW_LIST=$(_get "/drawings?board=${BID}")
+_assert_ok "$DRAW_LIST" "GET /drawings returns ok"
+DRAW_BEFORE=$(echo "$DRAW_LIST" | python3 -c "import json,sys; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "0")
+echo "  ℹ️  Drawings before: $DRAW_BEFORE"
+
+# add line
+LINE_JSON=$(_post "/drawings" "{\"board\":\"${BID}\",\"type\":\"line\",\"x1\":100,\"y1\":100,\"x2\":300,\"y2\":200,\"color\":\"#FF4444\",\"width\":4}")
+_assert_ok "$LINE_JSON" "POST /drawings line"
+LINE_ID=$(echo "$LINE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+if [[ -n "$LINE_ID" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ draw:add line returned id: $LINE_ID"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ draw:add line: no id returned\n"; echo "  ❌ draw:add line: no id"
+fi
+
+# add circle
+CIRC_JSON=$(_post "/drawings" "{\"board\":\"${BID}\",\"type\":\"circle\",\"cx\":400,\"cy\":300,\"r\":80,\"color\":\"#44FF88\",\"width\":3}")
+_assert_ok "$CIRC_JSON" "POST /drawings circle"
+CIRC_ID=$(echo "$CIRC_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+
+# add rect
+RECT_JSON=$(_post "/drawings" "{\"board\":\"${BID}\",\"type\":\"rect\",\"x\":50,\"y\":50,\"width\":200,\"height\":100,\"color\":\"#4488FF\",\"width\":2}")
+_assert_ok "$RECT_JSON" "POST /drawings rect"
+
+# add arrow
+ARROW_JSON=$(_post "/drawings" "{\"board\":\"${BID}\",\"type\":\"arrow\",\"x1\":500,\"y1\":100,\"x2\":600,\"y2\":300,\"color\":\"#FFDD44\",\"width\":3}")
+_assert_ok "$ARROW_JSON" "POST /drawings arrow"
+
+# add freehand
+FREE_JSON=$(_post "/drawings" "{\"board\":\"${BID}\",\"type\":\"freehand\",\"points\":[[10,10],[50,50],[100,30],[150,80]],\"color\":\"#FF88FF\",\"width\":3}")
+_assert_ok "$FREE_JSON" "POST /drawings freehand"
+
+# add svg path
+SVG_JSON=$(_post "/drawings" "{\"board\":\"${BID}\",\"type\":\"svg\",\"d\":\"M 0 0 L 100 0 L 100 100 L 0 100 Z\",\"x\":200,\"y\":200,\"color\":\"#88FFFF\",\"width\":2}")
+_assert_ok "$SVG_JSON" "POST /drawings svg path"
+
+# verify list count increased
+DRAW_LIST2=$(_get "/drawings?board=${BID}")
+DRAW_AFTER=$(echo "$DRAW_LIST2" | python3 -c "import json,sys; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "0")
+ADDED=$((DRAW_AFTER - DRAW_BEFORE))
+if [[ $ADDED -ge 6 ]]; then
+  PASS=$((PASS+1)); echo "  ✅ draw:list count increased by $ADDED (≥6)"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ draw:list count: expected ≥6 new, got $ADDED (before=$DRAW_BEFORE, after=$DRAW_AFTER)\n"
+  echo "  ❌ draw:list count: expected ≥6 new drawings, got $ADDED"
+fi
+
+# remove specific drawing (the circle)
+if [[ -n "$CIRC_ID" ]]; then
+  RM_JSON=$(_delete "/drawings/${BID}/${CIRC_ID}")
+  _assert_ok "$RM_JSON" "DELETE /drawings/board/id (remove circle)"
+fi
+
+# clear all drawings
+CLR_JSON=$(_delete "/drawings/${BID}")
+_assert_ok "$CLR_JSON" "DELETE /drawings/board (clear all)"
+
+# verify list is now empty
+DRAW_LIST3=$(_get "/drawings?board=${BID}")
+DRAW_FINAL=$(echo "$DRAW_LIST3" | python3 -c "import json,sys; print(json.load(sys.stdin).get('count',0))" 2>/dev/null || echo "-1")
+if [[ "$DRAW_FINAL" == "0" ]]; then
+  PASS=$((PASS+1)); echo "  ✅ draw:clear → count is 0"
+else
+  FAIL=$((FAIL+1)); ERRORS+="  ❌ draw:clear: expected count=0, got $DRAW_FINAL\n"
+  echo "  ❌ draw:clear: expected count=0, got $DRAW_FINAL"
+fi
+
+echo ""
+
 # ── 6. Cleanup ────────────────────────────────────────────────────────
 
 echo "── Cleanup ──"
