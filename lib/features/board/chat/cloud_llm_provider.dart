@@ -39,6 +39,9 @@ class CloudLlmProvider extends ChatProvider {
   @override
   String get providerId => 'cloud:${_config?.id ?? _deferredConfigId ?? '?'}';
 
+  /// Exposes the active config for debug/telemetry use.
+  CloudLlmConfig? get config => _config;
+
   @override
   String get displayName => _config?.name ?? 'Cloud (loading…)';
 

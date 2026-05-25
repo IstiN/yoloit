@@ -490,6 +490,18 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       );
 
       dbg['promptSentAt'] = DateTime.now().toIso8601String();
+      // Record model info for display in debug timings.
+      if (providerType.startsWith('cloud:')) {
+        final cfg = (_chatProvider as CloudLlmProvider).config;
+        if (cfg != null) {
+          dbg['modelId'] = cfg.model;
+          dbg['modelProvider'] = cfg.name;
+          dbg['modelBaseUrl'] = cfg.baseUrl;
+        }
+      } else {
+        dbg['modelId'] = 'local (MLX)';
+        dbg['modelProvider'] = 'local';
+      }
       var emitted = '';
       var firstTokenReceived = false;
 
@@ -2954,6 +2966,14 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
     // ── header ───────────────────────────────────────────────────────────────
     buf.writeln('User: ${s['userMessage'] ?? ''}');
     buf.writeln();
+    // Model info line
+    final modelId = s['modelId'] as String?;
+    final modelProvider = s['modelProvider'] as String?;
+    if (modelId != null) {
+      final providerLabel = modelProvider != null ? '[$modelProvider]' : '';
+      buf.writeln('Model: $modelId  $providerLabel'.trim());
+      buf.writeln();
+    }
     buf.writeln('══ Timeline ══════════════════════════════════');
 
     // ── [ASR] phase ──────────────────────────────────────────────────────────
