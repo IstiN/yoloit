@@ -2269,6 +2269,29 @@ $messagesJson
     final voiceSettings =
         await CloudLlmSettingsService.instance.loadVoiceSettings();
     final asrMode = voiceSettings.useCloudAsr ? 'cloud' : 'local';
+    // Resolve the effective ASR model for debug display (mirrors CloudAsrService logic).
+    String? asrResolvedModel;
+    String? asrProviderName;
+    if (voiceSettings.useCloudAsr) {
+      if (!voiceSettings.useChatModelForCloudAsr &&
+          voiceSettings.cloudAsrModel?.trim().isNotEmpty == true) {
+        asrResolvedModel = voiceSettings.cloudAsrModel!.trim();
+      }
+      // Load config to get provider name + fallback model.
+      final explicitId =
+          voiceSettings.useChatModelForCloudAsr
+              ? null
+              : voiceSettings.cloudAsrConfigId?.trim();
+      final asrCfg =
+          (explicitId != null && explicitId.isNotEmpty
+              ? await CloudLlmSettingsService.instance.loadConfigById(
+                  explicitId,
+                )
+              : null) ??
+          await CloudLlmSettingsService.instance.loadActiveConfig();
+      asrResolvedModel ??= asrCfg?.model.trim();
+      asrProviderName = asrCfg?.name;
+    }
     final asrStartedAt = DateTime.now().toIso8601String();
     final asrStopwatch = Stopwatch()..start();
     var asrStatus = 'ok';
@@ -2338,6 +2361,8 @@ $messagesJson
         'completedAt': completedAt,
         'durationMs': asrStopwatch.elapsedMilliseconds,
         'transcriptChars': asrTranscriptChars,
+        if (asrResolvedModel != null) 'model': asrResolvedModel,
+        if (asrProviderName != null) 'provider': asrProviderName,
         if (asrError != null) 'error': asrError,
       };
       if (path != null && path.isNotEmpty) {
@@ -2365,6 +2390,8 @@ $messagesJson
               'durationMs': asrStopwatch.elapsedMilliseconds,
               'asrMode': asrMode,
               'asrStatus': asrStatus,
+              if (asrResolvedModel != null) 'asrModel': asrResolvedModel,
+              if (asrProviderName != null) 'asrProvider': asrProviderName,
               'transcript': transcript,
               'transcriptChars': asrTranscriptChars,
               if (asrError != null) 'error': asrError,
@@ -3016,12 +3043,18 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       final asrStatus = asr['status'] as String? ?? '';
       final chars = asr['transcriptChars'] as num?;
       final mode = asr['mode'] as String? ?? '';
+      final asrModel = asr['model'] as String?;
+      final asrProvider = asr['provider'] as String?;
       final suffix = [
         if (asrStatus.isNotEmpty && asrStatus != 'ok') '($asrStatus)',
         if (mode.isNotEmpty) '[$mode]',
         if (chars != null) '$chars chars',
       ].join('  ');
       buf.writeln(row('[ASR]', 'audio → text', '${ms(asrMs)}  $suffix'.trim()));
+      if (asrModel != null) {
+        final provLabel = asrProvider != null ? '  [$asrProvider]' : '';
+        buf.writeln(row('     ', '↳ model', '$asrModel$provLabel'));
+      }
     }
 
     // ── [LLM] text → first token (TTFT) ──────────────────────────────────────
