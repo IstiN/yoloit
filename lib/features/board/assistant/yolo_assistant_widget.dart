@@ -383,6 +383,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       final runtimeContext = _runtimeContext();
       final calledTools = <String>[];
       final overlayToolLogs = <String>[];
+      // Maps toolCallId → startAt ISO string for accurate per-tool timing.
+      final pendingToolStarts = <String, String>{};
 
       // Create or reuse the wrapped executor (persistent across messages).
       _wrappedExecutor ??= _AssistantToolExecutor(
@@ -440,7 +442,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           'name': toolCommand,
           'arguments': arguments,
           'result': result,
-          'startAt': DateTime.now().toIso8601String(),
+          'success': success,
+          'startAt': pendingToolStarts.remove(toolCommand) ?? DateTime.now().toIso8601String(),
+          'endAt': DateTime.now().toIso8601String(),
         });
       };
 
@@ -517,7 +521,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             }
           case ChatEventType.toolStart:
             final toolName = event.data['toolName'] as String? ?? '';
+            final toolCallId = event.data['toolCallId'] as String? ?? toolName;
             final args = event.data['arguments'] as Map<String, Object?>? ?? {};
+            // Record start time so onToolCompleted can compute accurate duration.
+            pendingToolStarts[toolName] = DateTime.now().toIso8601String();
+            pendingToolStarts[toolCallId] = pendingToolStarts[toolName]!;
             overlayToolLogs.add('⏳ running: $toolName');
             if (mirrorToOverlay && mounted) {
               _syncOverlayState(
@@ -2926,121 +2934,131 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
 
   String _buildTimingsText(Map<String, dynamic> s) {
     final buf = StringBuffer();
-    buf.writeln('=== LLM Session Timings ===');
-    buf.writeln();
-    buf.writeln('User message: ${s['userMessage'] ?? ''}');
-    buf.writeln();
 
+    final asr = s['asr'] as Map?;
     final requestAt = _parseTs(s['requestAt']);
     final promptSentAt = _parseTs(s['promptSentAt']);
     final firstTokenAt = _parseTs(s['firstTokenAt']);
     final completedAt = _parseTs(s['completedAt']);
+    final toolCalls = (s['toolCalls'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
 
-    buf.writeln('requestAt:    ${s['requestAt'] ?? '-'}');
-    buf.writeln('promptSentAt: ${s['promptSentAt'] ?? '-'}');
-    if (requestAt != null && promptSentAt != null) {
-      final initMs = promptSentAt.difference(requestAt).inMilliseconds;
-      buf.writeln('  → init+build: ${initMs}ms');
+    // ── helpers ──────────────────────────────────────────────────────────────
+    String ms(int? v) => v != null ? '${v}ms' : '?';
+    // Right-align a label/value row in a fixed 40-char line
+    String row(String tag, String label, String? value) {
+      final pad = (30 - label.length).clamp(1, 30);
+      final dots = '.' * pad;
+      return '$tag  $label$dots  ${value ?? '?'}';
     }
-    buf.writeln('firstTokenAt: ${s['firstTokenAt'] ?? '-'}');
-    if (promptSentAt != null && firstTokenAt != null) {
-      final ttftMs = firstTokenAt.difference(promptSentAt).inMilliseconds;
-      buf.writeln('  → TTFT (time to first token): ${ttftMs}ms');
+
+    // ── header ───────────────────────────────────────────────────────────────
+    buf.writeln('User: ${s['userMessage'] ?? ''}');
+    buf.writeln();
+    buf.writeln('══ Timeline ══════════════════════════════════');
+
+    // ── [ASR] phase ──────────────────────────────────────────────────────────
+    if (asr != null) {
+      final asrMs = (asr['durationMs'] as num?)?.toInt();
+      final asrStatus = asr['status'] as String? ?? '';
+      final chars = asr['transcriptChars'] as num?;
+      final mode = asr['mode'] as String? ?? '';
+      final suffix = [
+        if (asrStatus.isNotEmpty && asrStatus != 'ok') '($asrStatus)',
+        if (mode.isNotEmpty) '[$mode]',
+        if (chars != null) '$chars chars',
+      ].join('  ');
+      buf.writeln(row('[ASR]', 'audio → text', '${ms(asrMs)}  $suffix'.trim()));
     }
-    buf.writeln('completedAt:  ${s['completedAt'] ?? '-'}');
-    if (firstTokenAt != null && completedAt != null) {
+
+    // ── [LLM] text → first token (TTFT) ──────────────────────────────────────
+    final ttftMs =
+        (promptSentAt != null && firstTokenAt != null)
+            ? firstTokenAt.difference(promptSentAt).inMilliseconds
+            : null;
+    if (toolCalls.isNotEmpty) {
+      buf.writeln(row('[LLM]', 'text → tools (TTFT)', ms(ttftMs)));
+    } else {
+      buf.writeln(row('[LLM]', 'text → first token (TTFT)', ms(ttftMs)));
+    }
+
+    // ── per-tool lines ────────────────────────────────────────────────────────
+    DateTime? lastToolEnd;
+    for (final tc in toolCalls) {
+      final toolStart = _parseTs(tc['startAt'] as String?);
+      final toolEnd = _parseTs(tc['endAt'] as String?);
+      final durMs =
+          (toolStart != null && toolEnd != null)
+              ? toolEnd.difference(toolStart).inMilliseconds
+              : null;
+      final ok = tc['success'] as bool? ?? true;
+      final name = tc['name'] as String? ?? '?';
+      buf.writeln(row('[TOOL]', '↳ $name', '${ms(durMs)}  ${ok ? '✅' : '❌'}'));
+      if (toolEnd != null) lastToolEnd = toolEnd;
+    }
+
+    // ── [LLM] tools → final response ─────────────────────────────────────────
+    if (toolCalls.isNotEmpty && lastToolEnd != null && completedAt != null) {
+      final finalMs = completedAt.difference(lastToolEnd).inMilliseconds;
+      buf.writeln(row('[LLM]', 'tools → final message', ms(finalMs)));
+    } else if (toolCalls.isEmpty && firstTokenAt != null && completedAt != null) {
       final genMs = completedAt.difference(firstTokenAt).inMilliseconds;
-      buf.writeln('  → generation: ${genMs}ms');
+      buf.writeln(row('[LLM]', 'streaming response', ms(genMs)));
     }
-    if (promptSentAt != null && completedAt != null) {
-      final llmResponseMs = completedAt.difference(promptSentAt).inMilliseconds;
-      buf.writeln('  → LLM response total: ${llmResponseMs}ms');
+
+    // ── totals ────────────────────────────────────────────────────────────────
+    buf.writeln('──────────────────────────────────────────────');
+    final asrMs = (asr?['durationMs'] as num?)?.toInt();
+    if (asrMs != null && completedAt != null && promptSentAt != null) {
+      final llmMs = completedAt.difference(promptSentAt).inMilliseconds;
+      buf.writeln(row('     ', 'ASR + LLM total', ms(asrMs + llmMs)));
     }
     if (requestAt != null && completedAt != null) {
       final totalMs = completedAt.difference(requestAt).inMilliseconds;
-      buf.writeln('  → total: ${totalMs}ms');
-    }
-    buf.writeln();
-
-    final asr = s['asr'] as Map?;
-    if (asr != null) {
-      buf.writeln('ASR timings:');
-      buf.writeln('  mode:         ${asr['mode'] ?? '-'}');
-      buf.writeln('  status:       ${asr['status'] ?? '-'}');
-      buf.writeln('  startedAt:    ${asr['startedAt'] ?? '-'}');
-      buf.writeln('  completedAt:  ${asr['completedAt'] ?? '-'}');
-      final asrMs = asr['durationMs'];
-      buf.writeln('  total:        ${asrMs != null ? '${asrMs}ms' : '-'}');
-      if (asrMs is num && promptSentAt != null && completedAt != null) {
-        final llmResponseMs =
-            completedAt.difference(promptSentAt).inMilliseconds;
-        buf.writeln('  ASR→LLM total:${asrMs.toInt() + llmResponseMs}ms');
-      }
-      final chars = asr['transcriptChars'];
-      if (chars != null) {
-        buf.writeln('  transcript:   ${chars} chars');
-      }
-      if (asr['error'] != null) {
-        buf.writeln('  error:        ${asr['error']}');
-      }
-      buf.writeln();
+      buf.writeln(row('     ', 'Wall time (total)', ms(totalMs)));
     }
 
+    // ── error ─────────────────────────────────────────────────────────────────
     if (s['error'] != null) {
-      buf.writeln('ERROR: ${s['error']}');
       buf.writeln();
+      buf.writeln('❌ ERROR: ${s['error']}');
     }
 
-    buf.writeln('Model settings:');
-    buf.writeln('  maxTokens:   ${s['maxTokens'] ?? '-'}');
-    buf.writeln('  temperature: ${s['temperature'] ?? '-'}');
-    buf.writeln();
-
-    // Swift-level timing from the native MLX backend
+    // ── Swift (MLX) section ───────────────────────────────────────────────────
     final swift = s['swiftTimings'] as Map?;
     if (swift != null) {
-      buf.writeln('Swift (MLX native) timings:');
+      buf.writeln();
+      buf.writeln('══ MLX (Swift) ═══════════════════════════════');
       final cacheHit = swift['swiftCacheHit'];
       buf.writeln(
-        '  model cache:    ${cacheHit == true
-            ? 'HIT ✓'
-            : cacheHit == false
-            ? 'MISS (loaded from disk)'
-            : '-'}',
+        row(
+          '     ',
+          'model cache',
+          cacheHit == true
+              ? 'HIT ✓'
+              : cacheHit == false
+              ? 'MISS (loaded)'
+              : '-',
+        ),
       );
-      final loadMs = swift['swiftLoadMs'];
-      if (loadMs != null) buf.writeln('  load time:      ${loadMs}ms');
-      final ttft = swift['swiftFirstTokenMs'];
-      if (ttft != null) {
-        buf.writeln('  first token:    ${ttft}ms  (TTFT inside Swift)');
-      }
-      final genMs = swift['swiftGenerateMs'];
-      if (genMs != null) buf.writeln('  generation:     ${genMs}ms');
-      final totalMs = swift['swiftTotalMs'];
-      if (totalMs != null) buf.writeln('  swift total:    ${totalMs}ms');
-      buf.writeln();
+      final loadMs = swift['swiftLoadMs'] as num?;
+      if (loadMs != null) buf.writeln(row('     ', 'load time', ms(loadMs.toInt())));
+      final ttft = swift['swiftFirstTokenMs'] as num?;
+      if (ttft != null) buf.writeln(row('     ', 'first token (TTFT)', ms(ttft.toInt())));
+      final genMs = swift['swiftGenerateMs'] as num?;
+      if (genMs != null) buf.writeln(row('     ', 'generation', ms(genMs.toInt())));
+      final totalMs = swift['swiftTotalMs'] as num?;
+      if (totalMs != null) buf.writeln(row('     ', 'swift total', ms(totalMs.toInt())));
     }
 
-    final toolCalls = s['toolCalls'] as List?;
-    if (toolCalls != null && toolCalls.isNotEmpty) {
-      buf.writeln('Tool calls: ${toolCalls.length}');
-      for (final tc in toolCalls) {
-        if (tc is Map) {
-          final start = _parseTs(tc['startAt']);
-          final end = _parseTs(tc['endAt']);
-          final durMs =
-              (start != null && end != null)
-                  ? end.difference(start).inMilliseconds
-                  : null;
-          buf.writeln(
-            '  ${tc['name']} → ${durMs != null ? '${durMs}ms' : '?'}',
-          );
-        }
-      }
-    }
+    // ── model settings ────────────────────────────────────────────────────────
+    buf.writeln();
+    buf.writeln('══ Settings ══════════════════════════════════');
+    buf.writeln(row('     ', 'maxTokens', '${s['maxTokens'] ?? '-'}'));
+    buf.writeln(row('     ', 'temperature', '${s['temperature'] ?? '-'}'));
 
     return buf.toString();
   }
+
 
   String _buildToolsText(Map<String, dynamic> s) {
     final buf = StringBuffer();
