@@ -552,9 +552,20 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             final toolName = event.data['toolName'] as String? ?? '';
             final toolCallId = event.data['toolCallId'] as String? ?? toolName;
             final args = event.data['arguments'] as Map<String, Object?>? ?? {};
+            // Capture TTFT from prompt to first LLM response (text OR tool call).
+            if (!firstTokenReceived) {
+              firstTokenReceived = true;
+              dbg['firstTokenAt'] = DateTime.now().toIso8601String();
+            }
             // Record start time so onToolCompleted can compute accurate duration.
-            pendingToolStarts[toolName] = DateTime.now().toIso8601String();
-            pendingToolStarts[toolCallId] = pendingToolStarts[toolName]!;
+            // Store under function name, toolCallId, AND CLI command so the
+            // lookup in onToolCompleted (keyed by CLI command) succeeds.
+            final now = DateTime.now().toIso8601String();
+            pendingToolStarts[toolName] = now;
+            pendingToolStarts[toolCallId] = now;
+            final cliCmd =
+                YoloitCliToolCatalog.byFunctionName(toolName)?.command;
+            if (cliCmd != null) pendingToolStarts[cliCmd] = now;
             overlayToolLogs.add('⏳ running: $toolName');
             if (mirrorToOverlay && mounted) {
               _syncOverlayState(
