@@ -2752,6 +2752,7 @@ class _DebugUISection extends StatefulWidget {
 
 class _DebugUISectionState extends State<_DebugUISection> {
   String _voiceStatus = 'idle';
+  bool _simulateToolsInProcessing = false;
   double _scale = 0.7;
   double _orbScale = 0.30;
   double _ovalWidth = 2.0;
@@ -2773,6 +2774,22 @@ class _DebugUISectionState extends State<_DebugUISection> {
       'This is a sample response from the LLM model. '
       'It demonstrates how text appears in the response card.';
   String _voiceTranscript = 'Show me the weather today';
+
+  String get _debugPreviewStatus =>
+      _simulateToolsInProcessing && _voiceStatus == 'processing'
+          ? 'responding'
+          : _voiceStatus;
+
+  String get _debugPreviewResponse {
+    if (_simulateToolsInProcessing && _voiceStatus == 'processing') {
+      return '''
+### Tools
+- ⏳ running: yoloit_panel_focus
+- yoloit panel:focus music 'Список покупок'
+''';
+    }
+    return _voiceResponse;
+  }
 
   static const _statuses = [
     'idle',
@@ -2954,6 +2971,25 @@ class _DebugUISectionState extends State<_DebugUISection> {
                 );
               }).toList(),
         ),
+        const SizedBox(height: 10),
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          value: _simulateToolsInProcessing,
+          onChanged:
+              (value) =>
+                  setState(() => _simulateToolsInProcessing = value ?? false),
+          activeColor: const Color(0xFF6644FF),
+          title: const Text(
+            'Simulate tool calls in processing',
+            style: TextStyle(fontSize: 13, color: Colors.white),
+          ),
+          subtitle: const Text(
+            'When enabled, processing preview shows the tool-stream bubble state.',
+            style: TextStyle(fontSize: 11, color: Colors.white70),
+          ),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -3130,11 +3166,11 @@ class _DebugUISectionState extends State<_DebugUISection> {
           ),
           child: Center(
             child: YoloVoiceOverlay(
-              status: _voiceStatus,
+              status: _debugPreviewStatus,
               title: 'YoLo',
               hint: 'Esc to cancel  •  Space to send',
               transcript: _voiceTranscript,
-              response: _voiceResponse,
+              response: _debugPreviewResponse,
               animate: true,
               scale: _scale,
               orbScale: _orbScale,
