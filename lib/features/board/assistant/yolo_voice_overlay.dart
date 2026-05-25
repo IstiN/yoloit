@@ -148,6 +148,16 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     final target = _VS.from(widget.status);
     if (target == _shown) return;
 
+    // Tool/text streaming should surface immediately in the response card
+    // instead of walking through intermediate processing/thinking states.
+    if (target == _VS.responding) {
+      setState(() {
+        _shown = target;
+        _shownAt = DateTime.now();
+      });
+      return;
+    }
+
     final elapsed = DateTime.now().difference(_shownAt).inMilliseconds;
     final wait = _shown.minMs - elapsed;
 
