@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -102,6 +103,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   final _inputFocusNode = FocusNode();
   final AudioRecorder _micRecorder = AudioRecorder();
   StreamSubscription<dynamic>? _amplitudeSub;
+  /// Accumulates raw PCM bytes from the mic stream (avoids disk roundtrip).
+  BytesBuilder? _micStreamBytes;
+  StreamSubscription<Uint8List>? _micStreamSub;
   final YoloitToolExecutor _toolExecutor = YoloitCliToolExecutor();
   final CloudAsrService _cloudAsrService = CloudAsrService();
   _AssistantToolExecutor? _wrappedExecutor;
@@ -288,6 +292,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     _inputFocusNode.dispose();
     _chatProvider?.dispose();
     _amplitudeSub?.cancel();
+    _micStreamSub?.cancel();
+    _micStreamBytes = null;
     unawaited(_micRecorder.dispose());
     super.dispose();
   }
@@ -2314,16 +2320,19 @@ $messagesJson
       return;
     }
 
-    final outputPath =
-        '${Directory.systemTemp.path}/yoloit_asr_${DateTime.now().millisecondsSinceEpoch}.wav';
     try {
-      await _micRecorder.start(
+      _micStreamBytes = BytesBuilder(copy: false);
+      final stream = await _micRecorder.startStream(
         const RecordConfig(
-          encoder: AudioEncoder.wav,
+          encoder: AudioEncoder.pcm16bits,
           sampleRate: 16000,
           numChannels: 1,
         ),
-        path: outputPath,
+      );
+      _micStreamSub = stream.listen(
+        (chunk) => _micStreamBytes?.add(chunk),
+        onError: (_) {},
+        cancelOnError: false,
       );
     } on Exception catch (e) {
       if (!mounted) return;
@@ -2359,7 +2368,19 @@ $messagesJson
   }) async {
     _amplitudeSub?.cancel();
     _amplitudeSub = null;
-    final path = await _micRecorder.stop();
+    // Stop stream recording and collect buffered PCM bytes.
+    await _micRecorder.stop();
+    await _micStreamSub?.cancel();
+    _micStreamSub = null;
+    final pcmBytes = _micStreamBytes?.takeBytes();
+    _micStreamBytes = null;
+
+    // Build WAV from raw PCM (16-bit mono 16 kHz).
+    final wavBytes =
+        pcmBytes != null && pcmBytes.isNotEmpty
+            ? _buildWavFromPcm(pcmBytes)
+            : null;
+
     if (!mounted) return;
     setState(() {
       _isRecordingMic = false;
@@ -2399,17 +2420,25 @@ $messagesJson
     var asrTranscriptChars = 0;
     String? asrError;
 
+    // For local ASR we still need a temp file path (local ASR reads from disk).
+    // Cloud ASR uses bytes directly.
+    String? tempPath;
+    if (wavBytes != null && !voiceSettings.useCloudAsr) {
+      tempPath =
+          '${Directory.systemTemp.path}/yoloit_asr_${DateTime.now().millisecondsSinceEpoch}.wav';
+    }
+
     var shouldSend = false;
     try {
-      if (path == null || path.isEmpty) {
+      if (wavBytes == null || wavBytes.isEmpty) {
         asrStatus = 'no_audio';
         return;
       }
 
       if (voiceSettings.useCloudAsr) {
-        // ── Cloud ASR: transcribe with configured cloud provider/model ───────
-        final transcript = await _cloudAsrService.transcribeFromFile(
-          audioPath: path,
+        // ── Cloud ASR: send bytes directly (no disk read needed) ────────────
+        final transcript = await _cloudAsrService.transcribeFromBytes(
+          audioBytes: wavBytes,
           voiceSettings: voiceSettings,
         );
         if (!mounted) return;
@@ -2426,9 +2455,12 @@ $messagesJson
           shouldSend = sendAfterTranscription;
         }
       } else {
-        // ── Local ASR: transcribe locally then send text ─────────────────
+        // ── Local ASR: needs a file on disk — write WAV once ─────────────────
+        if (tempPath != null) {
+          await File(tempPath).writeAsBytes(wavBytes, flush: true);
+        }
         final transcript = await LocalAiModelsService.instance
-            .transcribeWithSelectedAsr(path);
+            .transcribeWithSelectedAsr(tempPath ?? '');
 
         if (!mounted) return;
         final text = transcript.trim();
@@ -2466,48 +2498,54 @@ $messagesJson
         if (asrProviderName != null) 'provider': asrProviderName,
         if (asrError != null) 'error': asrError,
       };
-      if (path != null && path.isNotEmpty) {
-        final f = File(path);
-        if (f.existsSync()) {
-          // Save a persistent copy for ASR benchmarking before deleting temp.
-          try {
-            final samplesDir = Directory(
-              '${PlatformDirs.instance.dataDir}/asr_samples',
-            );
-            if (!samplesDir.existsSync()) {
-              samplesDir.createSync(recursive: true);
-            }
-            final ts = DateTime.now().millisecondsSinceEpoch;
-            final sampleWav = '${samplesDir.path}/$ts.wav';
-            await f.copy(sampleWav);
-            // Companion metadata JSON — useful for replay benchmarks.
-            final transcript =
-                asrTranscriptChars > 0
-                    ? (_inputController.text.trim())
-                    : '';
-            final meta = {
-              'recordedAt': asrStartedAt,
-              'completedAt': completedAt,
-              'durationMs': asrStopwatch.elapsedMilliseconds,
-              'asrMode': asrMode,
-              'asrStatus': asrStatus,
-              if (asrResolvedModel != null) 'asrModel': asrResolvedModel,
-              if (asrProviderName != null) 'asrProvider': asrProviderName,
-              'transcript': transcript,
-              'transcriptChars': asrTranscriptChars,
-              if (asrError != null) 'error': asrError,
-            };
-            await File('${samplesDir.path}/$ts.json').writeAsString(
-              const JsonEncoder.withIndent('  ').convert(meta),
-            );
-          } on Exception {
-            // Best-effort — never block the main flow.
+      // Save a persistent copy for ASR benchmarking.
+      if (wavBytes != null && wavBytes.isNotEmpty) {
+        try {
+          final samplesDir = Directory(
+            '${PlatformDirs.instance.dataDir}/asr_samples',
+          );
+          if (!samplesDir.existsSync()) {
+            samplesDir.createSync(recursive: true);
           }
-          try {
-            await f.delete();
-          } on FileSystemException {
-            // ignore
+          final ts = DateTime.now().millisecondsSinceEpoch;
+          final sampleWav = '${samplesDir.path}/$ts.wav';
+          // Reuse already-written temp file if available, otherwise write from bytes.
+          if (tempPath != null && File(tempPath).existsSync()) {
+            await File(tempPath).copy(sampleWav);
+          } else {
+            await File(sampleWav).writeAsBytes(wavBytes, flush: true);
           }
+          // Companion metadata JSON — useful for replay benchmarks.
+          final transcript =
+              asrTranscriptChars > 0
+                  ? (_inputController.text.trim())
+                  : '';
+          final meta = {
+            'recordedAt': asrStartedAt,
+            'completedAt': completedAt,
+            'durationMs': asrStopwatch.elapsedMilliseconds,
+            'asrMode': asrMode,
+            'asrStatus': asrStatus,
+            if (asrResolvedModel != null) 'asrModel': asrResolvedModel,
+            if (asrProviderName != null) 'asrProvider': asrProviderName,
+            'transcript': transcript,
+            'transcriptChars': asrTranscriptChars,
+            if (asrError != null) 'error': asrError,
+          };
+          await File('${samplesDir.path}/$ts.json').writeAsString(
+            const JsonEncoder.withIndent('  ').convert(meta),
+          );
+        } on Exception {
+          // Best-effort — never block the main flow.
+        }
+      }
+      // Delete the temp file used for local ASR (if written).
+      if (tempPath != null) {
+        try {
+          final f = File(tempPath);
+          if (f.existsSync()) await f.delete();
+        } on FileSystemException {
+          // ignore
         }
       }
       if (mounted) {
@@ -2539,17 +2577,10 @@ $messagesJson
       _resetVoiceOverlay();
       return;
     }
-    final path = await _micRecorder.stop();
-    if (path != null && path.isNotEmpty) {
-      final file = File(path);
-      if (file.existsSync()) {
-        try {
-          await file.delete();
-        } on FileSystemException {
-          // ignore temp cleanup failure
-        }
-      }
-    }
+    await _micRecorder.stop();
+    await _micStreamSub?.cancel();
+    _micStreamSub = null;
+    _micStreamBytes = null;
     if (!mounted) return;
     setState(() {
       _isRecordingMic = false;
@@ -2557,6 +2588,52 @@ $messagesJson
     });
     _inputController.clear();
     _resetVoiceOverlay();
+  }
+
+  /// Builds a standard WAV file from raw PCM-16bit mono 16kHz bytes.
+  static Uint8List _buildWavFromPcm(Uint8List pcm) {
+    const sampleRate = 16000;
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * bitsPerSample ~/ 8;
+    const blockAlign = numChannels * bitsPerSample ~/ 8;
+    final dataSize = pcm.length;
+    final fileSize = 36 + dataSize; // RIFF chunk size
+
+    final header = ByteData(44);
+    // RIFF chunk
+    header.setUint8(0, 0x52); // R
+    header.setUint8(1, 0x49); // I
+    header.setUint8(2, 0x46); // F
+    header.setUint8(3, 0x46); // F
+    header.setUint32(4, fileSize, Endian.little);
+    header.setUint8(8, 0x57); // W
+    header.setUint8(9, 0x41); // A
+    header.setUint8(10, 0x56); // V
+    header.setUint8(11, 0x45); // E
+    // fmt chunk
+    header.setUint8(12, 0x66); // f
+    header.setUint8(13, 0x6D); // m
+    header.setUint8(14, 0x74); // t
+    header.setUint8(15, 0x20); // (space)
+    header.setUint32(16, 16, Endian.little); // chunk size = 16 for PCM
+    header.setUint16(20, 1, Endian.little); // PCM = 1
+    header.setUint16(22, numChannels, Endian.little);
+    header.setUint32(24, sampleRate, Endian.little);
+    header.setUint32(28, byteRate, Endian.little);
+    header.setUint16(32, blockAlign, Endian.little);
+    header.setUint16(34, bitsPerSample, Endian.little);
+    // data chunk
+    header.setUint8(36, 0x64); // d
+    header.setUint8(37, 0x61); // a
+    header.setUint8(38, 0x74); // t
+    header.setUint8(39, 0x61); // a
+    header.setUint32(40, dataSize, Endian.little);
+
+    final wav = Uint8List(44 + dataSize);
+    wav.setRange(0, 44, header.buffer.asUint8List());
+    wav.setRange(44, 44 + dataSize, pcm);
+    return wav;
   }
 
   Future<void> _copyMessageToClipboard(String text) async {
