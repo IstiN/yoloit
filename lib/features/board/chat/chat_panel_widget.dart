@@ -287,6 +287,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
     // Register processing notifier for board-level glow
     ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
+    // Subscribe to session ChangeNotifier so CLI-driven changes
+    // (sendMessage called headlessly) update the UI automatically.
+    _session?.addListener(_onSessionChanged);
     _consumeCliPendingMessage();
   }
 
@@ -448,6 +451,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ToolCallSettingsService.instance.ignoredToolsListenable.removeListener(
       _handleIgnoredToolsChanged,
     );
+    _session?.removeListener(_onSessionChanged);
     // Safety net: if the board is switched before the first opencode event
     // arrives (so _handleEvent never had a chance to run), persist the session
     // ID now so the next mount can resume the session correctly.
@@ -486,6 +490,58 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         );
       }
     });
+  }
+
+  /// Called when the session changes via ChangeNotifier (e.g. CLI-driven
+  /// sendMessage while the widget is mounted but not actively sending).
+  void _onSessionChanged() {
+    if (!mounted) return;
+    final session = _session;
+    if (session == null) return;
+    setState(() {
+      _messages
+        ..clear()
+        ..addAll(session.messages);
+      _isProcessing = session.isProcessing;
+      _streamingContent = session.streamingContent;
+      _streamingMessageId = session.streamingMessageId;
+    });
+    if (session.messages.isNotEmpty) {
+      _scrollToBottom();
+    }
+    // Re-attach UI callbacks if session started processing externally
+    if (session.isProcessing && !_isSending) {
+      _isSending = true;
+      _setProcessing(true);
+      session.attachUI(
+        onEvent: _handleEvent,
+        onError: (Object error) {
+          if (!mounted) return;
+          setState(() {
+            _isSending = false;
+            _setProcessing(false);
+            _messages
+              ..clear()
+              ..addAll(session.messages);
+          });
+        },
+        onDone: () {
+          if (!mounted) return;
+          setState(() {
+            _isSending = false;
+            _setProcessing(false);
+            _messages
+              ..clear()
+              ..addAll(session.messages);
+            _streamingContent = '';
+            _streamingMessageId = null;
+          });
+          _persistMessages();
+          _scrollToBottom();
+          _playCompletionSound();
+        },
+      );
+    }
   }
 
   void _handleIgnoredToolsChanged() {

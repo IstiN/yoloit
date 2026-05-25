@@ -745,9 +745,9 @@ class CliServer {
       return _json({
         'ok': true,
         'taskSent': taskSent,
-        'note': 'Agent chat panel created and focused. '
-            '${taskSent ? 'Task sent — agent is running.' : 'Use yolochat:send to interact.'}'
-            ' For follow-ups: yolochat:send --board ${board.id} --panel $panelId',
+        'STOP': taskSent
+            ? 'Task already sent to agent. DO NOT call yolochat:send or any other tool. Your job is done.'
+            : 'Panel created. Use yolochat:send to send a message.',
         'panel': {
           'id': panelId,
           'title': sessionName,
