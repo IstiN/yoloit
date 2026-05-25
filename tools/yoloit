@@ -2328,11 +2328,7 @@ if provider:
 print(json.dumps(body))
 PY
 )
-    # Use a 5-minute max-time; agent sessions can take a while but should not
-    # block the shell indefinitely.
-    _resolve_base
-    curl -s --max-time 300 -X POST "${BASE}/yolochat/send" \
-      -H "Content-Type: application/json" -d "$payload" | python3 -m json.tool 2>/dev/null
+    _post "/yolochat/send" "$payload"
     ;;
   yolochat:messages)
     board=""

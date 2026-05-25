@@ -277,15 +277,12 @@ class ChatSession extends ChangeNotifier {
   }
 
   /// Send a message and wait for all events to complete. Returns the final
-  /// messages list. Useful for CLI where we need synchronous completion.
-  ///
-  /// [timeout] defaults to 5 minutes. If the stream doesn't complete within
-  /// that time, returns current messages (the session continues in background).
+  /// messages list. Used internally when synchronous completion is required
+  /// (e.g. agent:run initial task dispatch).
   Future<List<ChatMessage>> sendAndWait({
     required String text,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
-    Duration timeout = const Duration(minutes: 5),
   }) {
     final completer = Completer<List<ChatMessage>>();
 
@@ -308,13 +305,6 @@ class ChatSession extends ChangeNotifier {
     if (!ok) {
       return Future.value(List.unmodifiable(_messages));
     }
-
-    // Safety net: resolve after timeout so the HTTP connection isn't held forever.
-    Future.delayed(timeout, () {
-      if (!completer.isCompleted) {
-        completer.complete(List.unmodifiable(_messages));
-      }
-    });
 
     return completer.future;
   }

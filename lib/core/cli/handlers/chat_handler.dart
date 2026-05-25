@@ -1,5 +1,4 @@
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
-import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -119,70 +118,10 @@ class ChatCliHandler extends PanelCliHandler {
 
     final attachments =
         (args['attachments'] as List<dynamic>?)?.cast<String>() ?? [];
-    final wait = args['wait'] as bool? ?? true;
 
-    if (!wait && _isUiMounted(panel)) {
-      final messages = List<Map<String, dynamic>>.from(
-        (panel.state['messages'] as List<dynamic>?) ?? [],
-      );
-      messages.add({
-        'id': 'cli-${DateTime.now().millisecondsSinceEpoch}',
-        'role': 'user',
-        'content': text,
-        if (attachments.isNotEmpty) 'attachments': attachments,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
-      return CliActionResult(
-        message: 'Message queued for mounted UI compatibility',
-        data: {'totalMessages': messages.length},
-        stateUpdate: {
-          'config': mergedConfig,
-          'configured': true,
-          'messages': messages,
-          '_cliPendingMessage': text,
-          if (attachments.isNotEmpty) '_cliPendingAttachments': attachments,
-        },
-      );
-    }
-
-    if (wait) {
-      final messages = await session.sendAndWait(
-        text: text,
-        attachments: attachments,
-        runtimeContext: ChatRuntimeContext(
-          boardId: args['_boardId'] as String?,
-          boardName: args['_boardName'] as String?,
-          panelId: panel.id,
-          panelTitle: panel.title,
-          panelType: args['_panelType'] as String?,
-          availableBoardsSummary: args['_availableBoardsSummary'] as String?,
-          currentBoardPanelsSummary:
-              args['_currentBoardPanelsSummary'] as String?,
-        ),
-      );
-
-      final stateUpdate = session.serializeState();
-      stateUpdate['configured'] = true;
-
-      ChatMessage? lastAssistant;
-      for (final message in messages.reversed) {
-        if (message.role == ChatRole.assistant) {
-          lastAssistant = message;
-          break;
-        }
-      }
-
-      return CliActionResult(
-        message: 'Message sent and response received',
-        data: {
-          'responseContent': lastAssistant?.content ?? '',
-          'totalMessages': messages.length,
-        },
-        stateUpdate: stateUpdate,
-      );
-    }
-
-    session.sendMessage(
+    // Always fire-and-forget — the CLI server never blocks on LLM completion.
+    // Use yolochat:messages or yolochat:status to poll for results.
+    final accepted = session.sendMessage(
       text: text,
       attachments: attachments,
       runtimeContext: ChatRuntimeContext(
@@ -196,10 +135,25 @@ class ChatCliHandler extends PanelCliHandler {
             args['_currentBoardPanelsSummary'] as String?,
       ),
     );
+
+    if (!accepted) {
+      return CliActionResult(
+        ok: false,
+        message: 'Already processing a previous message — wait or call yolochat:stop first',
+      );
+    }
+
+    // Persist config so the panel remembers provider/model on next open.
     return CliActionResult(
-      message: 'Message sent (not waiting for response)',
-      data: {'totalMessages': session.messages.length},
-      stateUpdate: session.serializeState()..['configured'] = true,
+      data: {
+        'status': 'processing',
+        'totalMessages': session.messages.length,
+        'panelId': panel.id,
+        'NEXT':
+            'Use yolochat:messages to read the response when ready, '
+            'or yolochat:status to check progress.',
+      },
+      stateUpdate: {'config': mergedConfig, 'configured': true},
     );
   }
 
@@ -380,19 +334,15 @@ class ChatCliHandler extends PanelCliHandler {
     return value;
   }
 
-  bool _isUiMounted(BoardPanelInstance panel) {
-    return ChatPanelWidget.processingNotifiers.containsKey(panel.id);
-  }
-
   @override
   Map<String, CliActionHelp> get actionHelp => {
     'send': const CliActionHelp(
-      description: 'Send a message to the chat and receive response',
+      description:
+          'Send a message to the chat — non-blocking, returns immediately. '
+          'Use yolochat:messages to read the response when ready.',
       params: {
         'text': 'Message text (required)',
         'attachments': 'Optional file paths',
-        'wait':
-            'Wait for response (default: true). Set false for fire-and-forget',
         'config': 'Optional config override map for this panel/session',
         'provider': 'Shortcut for config.provider',
         'model': 'Shortcut for config.model',

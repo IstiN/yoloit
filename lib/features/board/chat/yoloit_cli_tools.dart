@@ -2152,7 +2152,9 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'yolochat:send',
     alias: 'csd',
-    description: 'Send a message to a YoLo chat panel',
+    description:
+        'Send a message to a YoLo chat panel — non-blocking, returns immediately '
+        'with status:processing. Use yolochat:messages to read the response.',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
       _p('text', 'Message text', required: true, shortKey: 'tx'),
