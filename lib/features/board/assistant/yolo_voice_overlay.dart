@@ -148,9 +148,14 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     final target = _VS.from(widget.status);
     if (target == _shown) return;
 
+    // ignore: avoid_print
+    print('[VoiceOverlay] _maybeTransition: ${_shown.name} → ${target.name} (pending=$_pendingTransition)');
+
     // Tool/text streaming should surface immediately in the response card
     // instead of walking through intermediate processing/thinking states.
     if (target == _VS.responding) {
+      // ignore: avoid_print
+      print('[VoiceOverlay] immediate → responding');
       setState(() {
         _shown = target;
         _shownAt = DateTime.now();
@@ -161,12 +166,17 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     final elapsed = DateTime.now().difference(_shownAt).inMilliseconds;
     final wait = _shown.minMs - elapsed;
 
+    // ignore: avoid_print
+    print('[VoiceOverlay] minMs=${_shown.minMs} elapsed=$elapsed wait=$wait');
+
     if (wait > 0) {
       _pendingTransition = true;
       Future.delayed(Duration(milliseconds: wait), () {
         _pendingTransition = false;
         if (!mounted) return;
         final latest = _VS.from(widget.status);
+        // ignore: avoid_print
+        print('[VoiceOverlay] delayed fired: _shown=${_shown.name} latest=${latest.name}');
         if (latest == _shown) return;
 
         // Step to next sequential state, not jump to latest
@@ -175,6 +185,8 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
         final nextState =
             (latestIdx > curIdx + 1) ? _order[curIdx + 1] : latest;
 
+        // ignore: avoid_print
+        print('[VoiceOverlay] delayed step: ${_shown.name} → ${nextState.name}');
         setState(() {
           _shown = nextState;
           _shownAt = DateTime.now();
@@ -192,6 +204,8 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
       final targetIdx = _order.indexOf(target);
       final nextState = (targetIdx > curIdx + 1) ? _order[curIdx + 1] : target;
 
+      // ignore: avoid_print
+      print('[VoiceOverlay] immediate step: ${_shown.name} → ${nextState.name}');
       setState(() {
         _shown = nextState;
         _shownAt = DateTime.now();
@@ -687,7 +701,11 @@ class _ResponseCardState extends State<_ResponseCard>
               4000,
             ),
           ),
-          lowerBound: oldLen / widget.response.length.clamp(1, 99999),
+          lowerBound:
+              (oldLen / widget.response.length.clamp(1, 99999)).clamp(
+                0.0,
+                0.99,
+              ),
         );
         _typingAnim.addListener(_updateVisibleChars);
         _typingAnim.forward();

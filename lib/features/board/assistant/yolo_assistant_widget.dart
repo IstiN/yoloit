@@ -139,6 +139,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             : draft.isNotEmpty
             ? 'ready'
             : 'idle');
+    // ignore: avoid_print
+    print('[YoloAssistant] _syncOverlayState: forced=$forcedStatus → status=$status (isGenerating=$_isGeneratingReply, hasToken=$_receivedAssistantToken)');
     _updateState({
       'voiceDraft': draft,
       'assistantStatus': status,
@@ -622,18 +624,23 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     }
     current[idx] = {...current[idx], 'content': content};
     _messageDraft = current;
+    final newStatus =
+        _isGeneratingReply &&
+                content.trim().isEmpty &&
+                overlayToolLogs.isEmpty
+            ? 'processing'
+            : _isGeneratingReply
+            ? 'responding'
+            : 'output';
+    // ignore: avoid_print
+    if (mirrorToOverlay && !_voiceOverlayHidden) {
+      print('[YoloAssistant] _replaceContent → status=$newStatus content="${content.length}ch" tools=${overlayToolLogs.length}');
+    }
     _updateState({
       'messages': current,
       if (mirrorToOverlay && !_voiceOverlayHidden) ...{
         'voiceResponse': _composeOverlayResponse(content, overlayToolLogs),
-        'assistantStatus':
-            _isGeneratingReply &&
-                    content.trim().isEmpty &&
-                    overlayToolLogs.isEmpty
-                ? 'processing'
-                : _isGeneratingReply
-                ? 'responding'
-                : 'output',
+        'assistantStatus': newStatus,
       },
     });
     _scrollToBottom();
