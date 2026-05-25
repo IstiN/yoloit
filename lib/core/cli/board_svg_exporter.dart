@@ -94,15 +94,72 @@ class BoardSvgExporter {
       buf.writeln('</g>');
     }
 
+    // Drawings (rendered on top of panels)
+    _renderDrawings(buf, board.drawings, minX, minY);
+
     return _wrap(width, height, buf.toString(), minX: minX, minY: minY);
   }
 
+  /// Generate an SVG containing ONLY the drawings on a board.
+  /// Useful for agents to visually inspect what has been drawn.
+  static String exportDrawings(BoardDocument board) {
+    if (board.drawings.isEmpty) {
+      return _wrap(800, 600, '<!-- no drawings -->', viewBox: '0 0 800 600');
+    }
+    double minX = double.infinity, minY = double.infinity;
+    double maxX = double.negativeInfinity, maxY = double.negativeInfinity;
+    for (final d in board.drawings) {
+      if (d.hidden) continue;
+      final b = d.bounds;
+      if (b.left < minX) minX = b.left;
+      if (b.top < minY) minY = b.top;
+      if (b.right > maxX) maxX = b.right;
+      if (b.bottom > maxY) maxY = b.bottom;
+    }
+    const padding = 20.0;
+    minX -= padding; minY -= padding;
+    maxX += padding; maxY += padding;
+    final w = maxX - minX;
+    final h = maxY - minY;
+    final buf = StringBuffer();
+    _renderDrawings(buf, board.drawings, minX, minY);
+    return _wrap(w, h, buf.toString(), minX: minX, minY: minY);
+  }
+
+  static void _renderDrawings(
+    StringBuffer buf,
+    List<BoardDrawingElement> drawings,
+    double minX,
+    double minY,
+  ) {
+    if (drawings.isEmpty) return;
+    final sorted = [...drawings]..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+    for (final d in sorted) {
+      if (d.hidden || d.strokes.isEmpty) continue;
+      final color = '#${d.strokeColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
+      final opacity = ((d.strokeColor.toARGB32() >> 24) & 0xFF) / 255.0;
+      final px = d.position.dx - minX;
+      final py = d.position.dy - minY;
+      buf.writeln('<g opacity="${opacity.toStringAsFixed(2)}">');
+      for (final stroke in d.strokes) {
+        if (stroke.isEmpty) continue;
+        final pathD = StringBuffer('M ${(px + stroke[0].dx).toStringAsFixed(1)} ${(py + stroke[0].dy).toStringAsFixed(1)}');
+        for (int i = 1; i < stroke.length; i++) {
+          pathD.write(' L ${(px + stroke[i].dx).toStringAsFixed(1)} ${(py + stroke[i].dy).toStringAsFixed(1)}');
+        }
+        buf.writeln('  <path d="$pathD" stroke="$color" stroke-width="${d.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>');
+      }
+      buf.writeln('</g>');
+    }
+  }
+
   static String _wrap(double width, double height, String body,
-      {double minX = 0, double minY = 0}) {
+      {double minX = 0, double minY = 0, String? viewBox}) {
+    final vb = viewBox ?? '0 0 ${width.ceil()} ${height.ceil()}';
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
      width="${width.ceil()}" height="${height.ceil()}"
-     viewBox="0 0 ${width.ceil()} ${height.ceil()}">
+     viewBox="$vb">
 <rect width="100%" height="100%" fill="#11111b"/>
 $body
 </svg>''';

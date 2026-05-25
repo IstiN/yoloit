@@ -782,12 +782,22 @@ class CliServer {
     BoardCubit cubit,
   ) async {
     if (method == 'GET') {
+      // GET /api/drawings/svg?board=<id>  → SVG of drawings only
+      final isSvgExport = sub.firstOrNull == 'svg';
       final boardId =
           request.url.queryParameters['board'] ??
-          sub.firstOrNull;
+          (isSvgExport ? sub.elementAtOrNull(1) : sub.firstOrNull);
       final board =
           boardId != null ? _findBoard(cubit, boardId) : cubit.state.activeBoard;
       if (board == null) return _error('Board not found');
+
+      if (isSvgExport) {
+        final svg = BoardSvgExporter.exportDrawings(board);
+        return shelf.Response.ok(
+          svg,
+          headers: {'content-type': 'image/svg+xml; charset=utf-8'},
+        );
+      }
       return _json({
         'ok': true,
         'boardId': board.id,

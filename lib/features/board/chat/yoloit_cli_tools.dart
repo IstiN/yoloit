@@ -3260,4 +3260,17 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('width', 'Stroke width in pixels', shortKey: 'w'),
     ],
   ),
+  YoloitCliTool(
+    command: 'draw:export',
+    alias: 'drex',
+    description:
+        'Export all drawings on a board as SVG. '
+        'Prints SVG to stdout or saves to a file. '
+        'Agents can read this to understand what has been drawn.',
+    group: 'board',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name (defaults to active board)', shortKey: 'b'),
+      _p('out', 'Output file path (stdout if omitted)', shortKey: 'o'),
+    ],
+  ),
 ];
