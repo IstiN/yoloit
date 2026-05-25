@@ -48,6 +48,16 @@ class CloudAsrService {
       convertToMp3: voiceSettings.convertWavToMp3,
     );
     try {
+      // When using the chat model for ASR, send audio inline to the LLM
+      // chat endpoint instead of the dedicated /audio/transcriptions endpoint.
+      if (voiceSettings.useChatModelForCloudAsr) {
+        return await _transcribeViaLlmChatEndpoint(
+          config: config,
+          model: model,
+          filePath: uploadPath,
+          mimeType: mimeType,
+        );
+      }
       return await _transcribeViaCloudEndpoint(
         config: config,
         model: model,
@@ -62,6 +72,78 @@ class CloudAsrService {
           // ignore temp cleanup failure
         }
       }
+    }
+  }
+
+  /// Sends audio inline to the LLM chat completion endpoint and extracts
+  /// the transcription from the response. Used when [VoiceSettings.useChatModelForCloudAsr] is true.
+  Future<String> _transcribeViaLlmChatEndpoint({
+    required CloudLlmConfig config,
+    required String model,
+    required String filePath,
+    required String mimeType,
+  }) async {
+    final normalizedBase = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    final uri = Uri.parse('$normalizedBase/chat/completions');
+    final fileBytes = await File(filePath).readAsBytes();
+    final format = mimeType == 'audio/mpeg' ? 'mp3' : 'wav';
+
+    final payload = jsonEncode({
+      'model': model,
+      'messages': [
+        {
+          'role': 'user',
+          'content': [
+            {
+              'type': 'input_audio',
+              'input_audio': {'data': base64Encode(fileBytes), 'format': format},
+            },
+            {
+              'type': 'text',
+              'text':
+                  'Transcribe this audio exactly as spoken. '
+                  'Output only the transcription text, nothing else.',
+            },
+          ],
+        },
+      ],
+    });
+
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.set(
+        HttpHeaders.authorizationHeader,
+        'Bearer ${config.apiKey}',
+      );
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      for (final entry in config.extraHeaders.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
+      request.add(utf8.encode(payload));
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError(
+          'Cloud ASR (LLM) failed (${response.statusCode}): '
+          '${body.length > 600 ? '${body.substring(0, 600)}…' : body}',
+        );
+      }
+
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        final choices = decoded['choices'];
+        if (choices is List && choices.isNotEmpty) {
+          final content = choices.first['message']?['content'];
+          if (content is String) return content.trim();
+        }
+      }
+      throw StateError(
+        'Cloud ASR (LLM) returned unexpected response: $body',
+      );
+    } finally {
+      client.close(force: true);
     }
   }
 

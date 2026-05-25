@@ -572,9 +572,42 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
           style: textStyle?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
+        // "Use same as chat" checkbox comes first so users see it before the
+        // provider/model dropdowns that are irrelevant when it is enabled.
+        if (_voiceSettings.useCloudAsr) ...[
+          CheckboxListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'Use the same provider/model as chat',
+              style: TextStyle(fontSize: 13),
+            ),
+            value: _voiceSettings.useChatModelForCloudAsr,
+            onChanged:
+                (v) => _setVoiceSettings(
+                  _voiceSettings.copyWith(useChatModelForCloudAsr: v ?? true),
+                ),
+          ),
+          if (_voiceSettings.useChatModelForCloudAsr) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Audio will be sent directly to the chat model for transcription.',
+              style: TextStyle(
+                fontSize: 11,
+                color: colors.onSurface.withAlpha(160),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ],
         ...(() {
           final asrProviderValue =
               _voiceSettings.useCloudAsr ? _effectiveAsrConfigId() : 'local';
+          // Hide provider/model pickers when "use same as chat" is active.
+          if (_voiceSettings.useCloudAsr &&
+              _voiceSettings.useChatModelForCloudAsr) {
+            return <Widget>[];
+          }
           return <Widget>[
             DropdownButtonFormField<String>(
               value: asrProviderValue,
@@ -630,28 +663,10 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
           ];
         })(),
-        if (_voiceSettings.useCloudAsr) ...[
-          CheckboxListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: const Text(
-              'Use the same provider/model as chat',
-              style: TextStyle(fontSize: 13),
-            ),
-            value: _voiceSettings.useChatModelForCloudAsr,
-            onChanged:
-                (v) => _setVoiceSettings(
-                  _voiceSettings.copyWith(useChatModelForCloudAsr: v ?? true),
-                ),
-          ),
+        if (_voiceSettings.useCloudAsr &&
+            !_voiceSettings.useChatModelForCloudAsr) ...[
           ...(() {
-            final asrConfigId =
-                _voiceSettings.useChatModelForCloudAsr
-                    ? (_assistantProviderType == 'local'
-                        ? null
-                        : (_configById(_activeConfigId)?.id ??
-                            (_configs.isNotEmpty ? _configs.first.id : null)))
-                    : _effectiveAsrConfigId();
+            final asrConfigId = _effectiveAsrConfigId();
             final asrOptions = _modelOptionsForConfig(asrConfigId);
             final asrOptionsWithSelected = <({String id, String label})>[
               ...asrOptions,
@@ -704,9 +719,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
               const SizedBox(height: 6),
               Text(
-                _voiceSettings.useChatModelForCloudAsr
-                    ? 'ASR will use the same provider/model as chat.'
-                    : 'ASR uses provider/model selected above.',
+                'ASR uses the provider/model selected above.',
                 style: TextStyle(
                   fontSize: 11,
                   color: colors.onSurface.withAlpha(160),
