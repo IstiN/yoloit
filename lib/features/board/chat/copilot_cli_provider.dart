@@ -71,10 +71,21 @@ class CopilotCliProvider extends ChatProvider {
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
     required StreamController<ChatEvent> controller,
-    bool forceNewSession = false,
   }) async {
     // Kill any existing process for this session
     await stop(config.sessionName);
+
+    // Safety guard: Copilot CLI can hard-fail (and poison resume state) when
+    // a prompt contains raw API keys/secrets. Surface a clear local error and
+    // do not send such prompt to Copilot.
+    if (_looksLikeSensitiveInput(message)) {
+      controller.addError(
+        'Refusing to send sensitive key-like content to Copilot CLI. '
+        'Remove/redact secrets (e.g. sk-...) and try again.',
+      );
+      await controller.close();
+      return;
+    }
 
     final args = <String>[
       '--output-format',
@@ -109,7 +120,7 @@ class CopilotCliProvider extends ChatProvider {
       RegExp(r'["“”]'),
       "'",
     );
-    final useResume = !isFirstMessage && !forceNewSession;
+    final useResume = !isFirstMessage;
     if (!useResume) {
       args.addAll(['--name', safeSessionName]);
     } else {
@@ -228,37 +239,14 @@ class CopilotCliProvider extends ChatProvider {
         } catch (_) {}
       }
 
-      // Resume can fail after app/hot-restart if the copilot session cannot be
-      // restored by name. Retry once as a fresh named session to keep chat usable.
-      if (exitCode != 0 && useResume && !controller.isClosed) {
-        final errText = stderrBuf.toString().trim();
-        debugPrint(
-          '[CopilotCli] Resume failed for "$safeSessionName" '
-          '(exit=$exitCode${errText.isNotEmpty ? ', stderr: $errText' : ''}), '
-          'retrying with --name',
-        );
-        if (_processes[config.sessionName] == process) {
-          _processes.remove(config.sessionName);
-        }
-        await subAgentSub.cancel();
-        await subAgentWatcher.dispose();
-        await _runProcess(
-          message: message,
-          config: config,
-          isFirstMessage: isFirstMessage,
-          attachments: attachments,
-          runtimeContext: runtimeContext,
-          controller: controller,
-          forceNewSession: true,
-        );
-        return;
-      }
-
       // If process exited with error and no events were emitted, surface stderr
       if (exitCode != 0) {
         final errText = stderrBuf.toString().trim();
         controller.addError(
-          errText.isNotEmpty ? errText : 'Process exited with code $exitCode',
+          errText.isNotEmpty
+              ? errText
+              : 'Copilot session resume failed (exit code $exitCode). '
+                    'Start a new session if this one is no longer restorable.',
         );
       }
 
@@ -341,6 +329,7 @@ class CopilotCliProvider extends ChatProvider {
         _cachedYoloitBin = installed.path;
         return installed.path;
       }
+
     }
 
     final roots = <Directory>[];
@@ -370,5 +359,23 @@ class CopilotCliProvider extends ChatProvider {
       }
     }
     return null;
+  }
+
+  bool _looksLikeSensitiveInput(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return false;
+    final lower = t.toLowerCase();
+    final keyLike = RegExp(
+      r'\b(sk-[A-Za-z0-9\-_]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{8,}|AIza[0-9A-Za-z\-_]{20,})\b',
+    );
+    if (keyLike.hasMatch(t)) return true;
+    // Common explicit "ключ/key/token/api key" requests with inline values.
+    if ((lower.contains('api key') ||
+            lower.contains('token') ||
+            lower.contains('ключ')) &&
+        RegExp(r'[:=]\s*[A-Za-z0-9\-_]{12,}').hasMatch(t)) {
+      return true;
+    }
+    return false;
   }
 }
