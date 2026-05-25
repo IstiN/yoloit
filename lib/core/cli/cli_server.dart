@@ -221,8 +221,9 @@ class CliServer {
 
     // GET /api/catalog → command catalog with humanVariants for router model
     if (path.length == 1 && path[0] == 'catalog' && method == 'GET') {
+      final yamlVariants = await YoloitCliToolCatalog.loadYamlVariants();
       return shelf.Response.ok(
-        YoloitCliToolCatalog.catalogJson(),
+        YoloitCliToolCatalog.catalogJson(yamlVariants),
         headers: {'content-type': 'application/json'},
       );
     }

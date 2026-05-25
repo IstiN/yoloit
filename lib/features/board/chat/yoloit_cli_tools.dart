@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 
@@ -299,13 +301,24 @@ class YoloitCliToolCatalog {
 
   /// Generate training catalog JSON for command-router model fine-tuning.
   /// Only includes commands that have humanVariants defined.
+  /// Also merges any extra human variants loaded from YAML assets.
   /// Output format: { commands: [...], coverage: { total, withVariants, missing } }
-  static String catalogJson() {
+  static String catalogJson([Map<String, Map<String, List<String>>>? yamlVariants]) {
     final withVariants = <Map<String, Object?>>[];
     final missing = <String>[];
     for (final tool in _tools) {
-      if (tool.humanVariants.isNotEmpty) {
-        withVariants.add(tool.toCatalogJson());
+      final extras = yamlVariants?[tool.command] ?? {};
+      final merged = <String, List<String>>{...tool.humanVariants};
+      for (final entry in extras.entries) {
+        merged.update(
+          entry.key,
+          (existing) => [...existing, ...entry.value],
+          ifAbsent: () => entry.value,
+        );
+      }
+      if (merged.isNotEmpty) {
+        final json = tool.toCatalogJson();
+        withVariants.add({...json, 'human': merged});
       } else {
         missing.add(tool.command);
       }
@@ -318,6 +331,63 @@ class YoloitCliToolCatalog {
         'missing': missing,
       },
     });
+  }
+
+  /// Load human variants from bundled YAML assets asynchronously.
+  /// Returns a map of command-id → {locale → [phrases]}.
+  static Future<Map<String, Map<String, List<String>>>> loadYamlVariants() async {
+    final result = <String, Map<String, List<String>>>{};
+    const yamlFiles = [
+      'assets/command_catalog/note.yaml',
+      'assets/command_catalog/panel.yaml',
+      'assets/command_catalog/board.yaml',
+      'assets/command_catalog/app.yaml',
+      'assets/command_catalog/checklist.yaml',
+      'assets/command_catalog/kanban.yaml',
+      'assets/command_catalog/misc.yaml',
+    ];
+    for (final assetPath in yamlFiles) {
+      try {
+        final raw = await rootBundle.loadString(assetPath);
+        final doc = loadYaml(raw);
+        final commands = doc['commands'] as YamlList?;
+        if (commands == null) continue;
+        for (final cmd in commands) {
+          final id = cmd['id'] as String?;
+          if (id == null) continue;
+          final human = cmd['human'];
+          if (human == null) continue;
+          final locales = <String, List<String>>{};
+          if (human is YamlMap) {
+            for (final entry in human.entries) {
+              final locale = entry.key as String;
+              final phrases = entry.value;
+              if (phrases is YamlList) {
+                locales[locale] = phrases
+                    .whereType<String>()
+                    .toList();
+              }
+            }
+          } else if (human is YamlList) {
+            // Flat list without locale — put under 'en'
+            locales['en'] = human.whereType<String>().toList();
+          }
+          if (locales.isNotEmpty) {
+            result.putIfAbsent(id, () => {});
+            for (final e in locales.entries) {
+              result[id]!.update(
+                e.key,
+                (existing) => [...existing, ...e.value],
+                ifAbsent: () => e.value,
+              );
+            }
+          }
+        }
+      } catch (_) {
+        // Skip missing/malformed YAML files
+      }
+    }
+    return result;
   }
 }
 

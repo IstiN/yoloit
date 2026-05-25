@@ -101,6 +101,7 @@ flutter:
     - assets/icon/
     - assets/prompts/
     - assets/config/
+    - assets/command_catalog/
     - tools/yoloit
     - tools/widgets/weather/manifest.json
     - tools/widgets/weather/widget.js
