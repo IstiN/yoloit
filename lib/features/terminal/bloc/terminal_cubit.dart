@@ -58,12 +58,14 @@ class TerminalCubit extends Cubit<TerminalState> {
       _allSessions.where((s) => s.workspaceId == _activeWorkspaceId).toList();
 
   /// Emits a TerminalLoaded with both visible (workspace) sessions and allSessions.
-  void _emitLoaded(List<AgentSession> visible, int activeIndex) {
+  void _emitLoaded(List<AgentSession> visible, int activeIndex,
+      {bool requestOpenPanel = false}) {
     emit(
       TerminalLoaded(
         sessions: visible,
         activeIndex: activeIndex,
         allSessions: List.unmodifiable(_allSessions),
+        requestOpenPanel: requestOpenPanel,
       ),
     );
   }
@@ -217,6 +219,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     String? workspaceId,
     String? savedSessionId,
     bool isRestore = false,
+    bool requestOpenPanel = false,
     Map<String, String>? worktreeContexts,
     List<String> enabledSkills = const [],
     String? customName,
@@ -291,7 +294,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     _allSessions.removeWhere((s) => s.id == sessionId);
     _allSessions.add(session);
     final visible = _workspaceSessions;
-    _emitLoaded(visible, visible.length - 1);
+    _emitLoaded(visible, visible.length - 1, requestOpenPanel: requestOpenPanel);
 
     final effectiveWorkspaceId = workspaceId ?? _activeWorkspaceId;
     if (effectiveWorkspaceId != null) {

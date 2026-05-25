@@ -678,6 +678,7 @@ class CliServer {
         type: type,
         workspacePath: workspacePath,
         customName: customName,
+        requestOpenPanel: true,
       );
 
       final afterState = terminalCubit.state;

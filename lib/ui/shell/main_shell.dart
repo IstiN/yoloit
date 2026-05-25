@@ -615,7 +615,12 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                                       'agents',
                                       PanelVisibility.closed,
                                     ),
-                                child: const _AgentsContent(),
+                                child: _AgentsContent(
+                                  onOpenAgentsPanel: () => widget.onSetPanelVis(
+                                    'agents',
+                                    PanelVisibility.open,
+                                  ),
+                                ),
                               ),
                             ),
                             _HorizontalDivider(
@@ -842,7 +847,9 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
 
 /// Content of the Agents panel: listens to workspace changes and hosts TerminalPanel.
 class _AgentsContent extends StatelessWidget {
-  const _AgentsContent();
+  const _AgentsContent({this.onOpenAgentsPanel});
+
+  final VoidCallback? onOpenAgentsPanel;
 
   @override
   Widget build(BuildContext context) {
@@ -882,10 +889,16 @@ class _AgentsContent extends StatelessWidget {
           listenWhen: (prev, curr) {
             if (curr is! TerminalLoaded) return false;
             if (prev is! TerminalLoaded) return true;
+            if (curr.requestOpenPanel) return true;
             return prev.activeSession?.id != curr.activeSession?.id;
           },
           listener: (context, state) {
             if (state is! TerminalLoaded) return;
+            // Auto-open agents panel when a session was spawned via agent:run.
+            if (state.requestOpenPanel) {
+              onOpenAgentsPanel?.call();
+              SessionPrefs.savePanelVis('agents', PanelVisibility.open);
+            }
             final session = state.activeSession;
             if (session == null) return;
             final wsState = context.read<WorkspaceCubit>().state;
