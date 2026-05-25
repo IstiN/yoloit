@@ -124,6 +124,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   // When non-null, the next _sendMessage call will pass audio content directly
   // to the cloud LLM instead of sending the text in _inputController.
   List<Map<String, Object?>>? _pendingAudioContent;
+  int? _pendingAsrConversionMs; // MP3 conversion duration for timeline
 
   // In-memory ring buffer of raw LLM debug sessions (last 20, not persisted).
   final List<Map<String, dynamic>> _debugSessions = [];
@@ -384,6 +385,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
     final asrDebug = mirrorToOverlay ? _pendingAsrDebug : null;
     _pendingAsrDebug = null;
+    final asrConversionMs = _pendingAsrConversionMs;
+    _pendingAsrConversionMs = null;
 
     // ── Debug session ──────────────────────────────────────────────────────
     final dbg = <String, dynamic>{
@@ -391,7 +394,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       'userMessage': text,
       'requestAt': DateTime.now().toIso8601String(),
       'toolCalls': <Map<String, dynamic>>[],
-      if (asrDebug != null) 'asr': asrDebug,
+      if (asrDebug != null) 'asr': {
+        ...asrDebug,
+        if (asrConversionMs != null) 'conversionMs': asrConversionMs,
+      },
     };
     _activeDebugSession = dbg;
 
@@ -2453,13 +2459,42 @@ $messagesJson
 
       if (voiceSettings.useCloudAsr && voiceSettings.useChatModelForCloudAsr) {
         // ── Direct audio → chat model: attach audio as message content ──────
-        // No transcription — audio bytes go straight into the user message.
+        // Optionally convert WAV → MP3 to reduce payload size.
+        var audioBytes = wavBytes;
+        var audioFormat = 'wav';
+        int? conversionMs;
+        if (voiceSettings.convertWavToMp3) {
+          try {
+            final convSw = Stopwatch()..start();
+            final tmpWav =
+                '${Directory.systemTemp.path}/yoloit_direct_${DateTime.now().millisecondsSinceEpoch}.wav';
+            final tmpMp3 = tmpWav.replaceAll('.wav', '.mp3');
+            await File(tmpWav).writeAsBytes(wavBytes, flush: true);
+            final result = await Process.run('ffmpeg', [
+              '-i', tmpWav, '-codec:a', 'libmp3lame', '-qscale:a', '4', '-y', tmpMp3,
+            ]);
+            convSw.stop();
+            conversionMs = convSw.elapsedMilliseconds;
+            if (result.exitCode == 0 && File(tmpMp3).existsSync()) {
+              audioBytes = await File(tmpMp3).readAsBytes();
+              audioFormat = 'mp3';
+            }
+            // Clean up temp files
+            try { File(tmpWav).deleteSync(); } catch (_) {}
+            try { File(tmpMp3).deleteSync(); } catch (_) {}
+          } on ProcessException {
+            // ffmpeg not available — fall back to WAV
+          }
+        }
         _pendingAudioContent = [
           {
             'type': 'input_audio',
-            'input_audio': {'data': base64Encode(wavBytes), 'format': 'wav'},
+            'input_audio': {'data': base64Encode(audioBytes), 'format': audioFormat},
           },
         ];
+        if (conversionMs != null) {
+          _pendingAsrConversionMs = conversionMs;
+        }
         if (!mounted) return;
         _syncOverlayState(hiddenOverride: _voiceOverlayHidden);
         shouldSend = sendAfterTranscription;
@@ -3255,12 +3290,16 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
       final mode = asr['mode'] as String? ?? '';
       final asrModel = asr['model'] as String?;
       final asrProvider = asr['provider'] as String?;
+      final convMs = (asr['conversionMs'] as num?)?.toInt();
       final suffix = [
         if (asrStatus.isNotEmpty && asrStatus != 'ok') '($asrStatus)',
         if (mode.isNotEmpty) '[$mode]',
         if (chars != null) '$chars chars',
       ].join('  ');
       buf.writeln(row('[ASR]', 'audio → text', '${ms(asrMs)}  $suffix'.trim()));
+      if (convMs != null) {
+        buf.writeln(row('     ', '↳ wav→mp3 convert', ms(convMs)));
+      }
       if (asrModel != null) {
         final provLabel = asrProvider != null ? '  [$asrProvider]' : '';
         buf.writeln(row('     ', '↳ model', '$asrModel$provLabel'));

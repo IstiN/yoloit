@@ -727,6 +727,8 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               ),
             ];
           })(),
+        ],
+        if (_voiceSettings.useCloudAsr) ...[
           CheckboxListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -735,7 +737,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
               style: TextStyle(fontSize: 13),
             ),
             subtitle: const Text(
-              'Requires ffmpeg on PATH. Reduces file size for cloud ASR.',
+              'Requires ffmpeg on PATH. Reduces file size.',
               style: TextStyle(fontSize: 11),
             ),
             value: _voiceSettings.convertWavToMp3,
