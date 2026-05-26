@@ -1045,89 +1045,200 @@ class _AgentRowState extends State<_AgentRow> {
       ),
     );
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    // Find catalog models for the currently selected cloud provider.
+    final selectedCfg = isCloud
+        ? _cloudConfigs
+            .where((c) => c.id == widget.config.asrCloudConfigId)
+            .firstOrNull
+        : null;
+    final catalogModels = selectedCfg != null
+        ? (kCloudLlmPresets
+                .where((p) => p.id == selectedCfg.id)
+                .firstOrNull
+                ?.models ??
+            const [])
+        : const <({String id, String name})>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(width: 8),
-        Text('ASR:', style: labelStyle),
-        const SizedBox(width: 8),
-        // Local / Cloud toggle
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'local', label: Text('Local')),
-            ButtonSegment(value: 'cloud', label: Text('Cloud')),
-          ],
-          selected: {widget.config.asrMode},
-          onSelectionChanged:
-              (v) => widget.onChanged(
-                widget.config.copyWith(asrMode: v.first),
-              ),
-          style: ButtonStyle(
-            textStyle: WidgetStateProperty.all(
-              const TextStyle(fontSize: 11),
-            ),
-            visualDensity: VisualDensity.compact,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ),
-        if (isCloud) ...[
-          const SizedBox(width: 8),
-          // Provider dropdown
-          SizedBox(
-            width: 140,
-            child: DropdownButtonFormField<String>(
-              value:
-                  _cloudConfigs.any(
-                        (c) => c.id == widget.config.asrCloudConfigId,
-                      )
-                      ? widget.config.asrCloudConfigId
-                      : null,
-              hint: Text('Provider', style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color)),
-              items:
-                  _cloudConfigs
-                      .map(
-                        (c) => DropdownMenuItem<String>(
-                          value: c.id,
-                          child: Text(c.name, style: const TextStyle(fontSize: 12)),
-                        ),
-                      )
-                      .toList(),
-              onChanged:
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(width: 8),
+            Text('ASR:', style: labelStyle),
+            const SizedBox(width: 8),
+            // Local / Cloud toggle
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'local', label: Text('Local')),
+                ButtonSegment(value: 'cloud', label: Text('Cloud')),
+              ],
+              selected: {widget.config.asrMode},
+              onSelectionChanged:
                   (v) => widget.onChanged(
-                    widget.config.copyWith(asrCloudConfigId: v),
+                    widget.config.copyWith(asrMode: v.first),
                   ),
-              dropdownColor: colors.surfaceElevated,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 12,
+              style: ButtonStyle(
+                textStyle: WidgetStateProperty.all(
+                  const TextStyle(fontSize: 11),
+                ),
+                visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              decoration: inputDecoration,
             ),
-          ),
-          const SizedBox(width: 8),
-          // Model text field (e.g. whisper-1)
-          SizedBox(
-            width: 110,
-            child: TextField(
-              controller: _asrModelCtrl,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 12,
-              ),
-              decoration: inputDecoration.copyWith(hintText: 'Model (e.g. whisper-1)'),
-              onChanged:
-                  (_) => widget.onChanged(
-                    widget.config.copyWith(
-                      asrCloudModel:
-                          _asrModelCtrl.text.trim().isEmpty
-                              ? null
-                              : _asrModelCtrl.text.trim(),
+            if (isCloud) ...[
+              const SizedBox(width: 8),
+              // Provider dropdown
+              SizedBox(
+                width: 140,
+                child: DropdownButtonFormField<String>(
+                  value:
+                      _cloudConfigs.any(
+                            (c) => c.id == widget.config.asrCloudConfigId,
+                          )
+                          ? widget.config.asrCloudConfigId
+                          : null,
+                  hint: Text(
+                    'Provider',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
                   ),
+                  items:
+                      _cloudConfigs
+                          .map(
+                            (c) => DropdownMenuItem<String>(
+                              value: c.id,
+                              child: Text(
+                                c.name,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged:
+                      (v) => widget.onChanged(
+                        widget.config.copyWith(
+                          asrCloudConfigId: v,
+                          asrCloudModel: null,
+                        ),
+                      ),
+                  dropdownColor: colors.surfaceElevated,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 12,
+                  ),
+                  decoration: inputDecoration,
+                ),
+              ),
+              if (catalogModels.isEmpty) ...[
+                const SizedBox(width: 8),
+                // No catalog — free-text model field
+                SizedBox(
+                  width: 140,
+                  child: TextField(
+                    controller: _asrModelCtrl,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
+                    decoration: inputDecoration.copyWith(
+                      hintText: 'Model (e.g. whisper-1)',
+                    ),
+                    onChanged:
+                        (_) => widget.onChanged(
+                          widget.config.copyWith(
+                            asrCloudModel:
+                                _asrModelCtrl.text.trim().isEmpty
+                                    ? null
+                                    : _asrModelCtrl.text.trim(),
+                          ),
+                        ),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(width: 8),
+                // Catalog model dropdown
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField<String>(
+                    value:
+                        catalogModels.any(
+                              (m) => m.id == widget.config.asrCloudModel,
+                            )
+                            ? widget.config.asrCloudModel
+                            : null,
+                    hint: Text(
+                      'Model',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                    ),
+                    items:
+                        catalogModels
+                            .map(
+                              (m) => DropdownMenuItem<String>(
+                                value: m.id,
+                                child: Text(
+                                  m.name,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        _asrModelCtrl.text = v;
+                        widget.onChanged(
+                          widget.config.copyWith(asrCloudModel: v),
+                        );
+                      }
+                    },
+                    dropdownColor: colors.surfaceElevated,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
+                    decoration: inputDecoration,
+                  ),
+                ),
+              ],
+            ],
+            const SizedBox(width: 16),
+          ],
+        ),
+        // Custom model ID text field (shown below when catalog models exist)
+        if (isCloud && catalogModels.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: SizedBox(
+              width: 400,
+              child: TextField(
+                controller: _asrModelCtrl,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+                decoration: inputDecoration.copyWith(
+                  hintText: 'Custom model ID (overrides selection above)',
+                ),
+                onChanged:
+                    (_) => widget.onChanged(
+                      widget.config.copyWith(
+                        asrCloudModel:
+                            _asrModelCtrl.text.trim().isEmpty
+                                ? null
+                                : _asrModelCtrl.text.trim(),
+                      ),
+                    ),
+              ),
             ),
           ),
         ],
-        const SizedBox(width: 16),
       ],
     );
   }
