@@ -577,8 +577,8 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   }
 
   Widget _buildSearchResults(Directory rootDir) {
-    final matches = <File>[];
-    _collectMatchingFiles(rootDir, matches);
+    final matches = <FileSystemEntity>[];
+    _collectMatchingEntries(rootDir, matches);
     if (matches.isEmpty) {
       return const Center(
         child: Padding(
@@ -594,28 +594,51 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: matches.length,
       itemBuilder: (context, index) {
-        final file = matches[index];
-        final name = p.basename(file.path);
-        final relPath = p.relative(file.path, from: _rootPath);
+        final entity = matches[index];
+        final name = p.basename(entity.path);
+        final relPath = p.relative(entity.path, from: _rootPath);
+        final isDir = entity is Directory;
         return GestureDetector(
           onSecondaryTapDown: (d) =>
-              _showContextMenu(context, d.globalPosition, file),
+              _showContextMenu(context, d.globalPosition, entity),
           child: InkWell(
-            onTap: () => _selectFile(file.path, name),
+            onTap: isDir
+                ? () {
+                    final expanded = _expandedDirs;
+                    expanded.add(entity.path);
+                    // Also expand parents so the folder is visible in tree
+                    var parent = entity.parent;
+                    while (parent.path != _rootPath &&
+                        parent.path.startsWith(_rootPath)) {
+                      expanded.add(parent.path);
+                      parent = parent.parent;
+                    }
+                    _updateState({'expandedDirs': expanded.toList()});
+                    setState(() {
+                      _showSearch = false;
+                      _searchController.clear();
+                      _searchQuery = '';
+                    });
+                  }
+                : () => _selectFile(entity.path, name),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
                 height: 28,
                 child: Row(
                   children: [
-                    Icon(_iconForFile(name), size: 15, color: const Color(0xFF94A3B8)),
+                    Icon(
+                      isDir ? Icons.folder_outlined : _iconForFile(name),
+                      size: 15,
+                      color: isDir ? const Color(0xFFE2B86B) : const Color(0xFF94A3B8),
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         relPath,
                         style: TextStyle(
                           fontSize: 12,
-                          color: _selectedFile == file.path
+                          color: _selectedFile == entity.path
                               ? Colors.white
                               : const Color(0xFFCBD5E1),
                         ),
@@ -632,17 +655,25 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     );
   }
 
-  void _collectMatchingFiles(Directory dir, List<File> results, {int maxResults = 200}) {
+  void _collectMatchingEntries(Directory dir, List<FileSystemEntity> results, {int maxResults = 200}) {
     if (results.length >= maxResults) return;
     try {
-      final contents = dir.listSync()..sort((a, b) =>
-          p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase()));
+      final contents = dir.listSync()..sort((a, b) {
+        final aIsDir = a is Directory;
+        final bIsDir = b is Directory;
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+        return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
+      });
       for (final entity in contents) {
         if (results.length >= maxResults) return;
         final name = p.basename(entity.path);
         if (name.startsWith('.')) continue;
         if (entity is Directory) {
-          _collectMatchingFiles(entity, results, maxResults: maxResults);
+          if (name.toLowerCase().contains(_searchQuery)) {
+            results.add(entity);
+          }
+          _collectMatchingEntries(entity, results, maxResults: maxResults);
         } else if (entity is File) {
           if (name.toLowerCase().contains(_searchQuery)) {
             results.add(entity);
