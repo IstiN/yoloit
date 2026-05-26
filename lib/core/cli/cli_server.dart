@@ -3555,9 +3555,25 @@ class CliServer {
   List<Map<String, Object?>> _searchBoards(BoardCubit cubit, String query) {
     final items = <Map<String, Object?>>[];
     for (final board in cubit.state.boards) {
+      // Also search board name itself.
+      final boardSnippet = _matchSnippet(board.name, query);
+      if (boardSnippet != null) {
+        items.add({
+          'scope': 'board',
+          'boardId': board.id,
+          'boardName': board.name,
+          'panelId': null,
+          'panelTitle': null,
+          'panelType': null,
+          'snippet': boardSnippet,
+        });
+      }
       for (final panel in board.panels) {
+        // Include panel ID as a searchable field so queries like
+        // "demo_copilot" or "demo copilot" match a panel named demo_copilot.
         final texts = <String>[
           if ((panel.title ?? '').trim().isNotEmpty) panel.title!.trim(),
+          panel.id,
           ..._collectSearchStrings(panel.state),
         ];
         for (final text in texts) {
@@ -3652,13 +3668,59 @@ class CliServer {
     return const [];
   }
 
+  /// Returns a snippet of [text] if it matches [query], or null if no match.
+  ///
+  /// Matching strategy (most-specific first):
+  /// 1. Exact substring (case-insensitive) — highest fidelity, returns a
+  ///    centred snippet.
+  /// 2. Separator-normalised substring — spaces, underscores, hyphens and dots
+  ///    are treated as equivalent (e.g. "demo copilot" matches "demo_copilot").
+  /// 3. All-words anywhere — every whitespace-token in the query appears
+  ///    somewhere in the normalised text (order-independent).
   String? _matchSnippet(String text, String query) {
     final haystack = text.toLowerCase();
-    final needle = query.toLowerCase();
-    final index = haystack.indexOf(needle);
-    if (index < 0) return null;
-    final start = (index - 48).clamp(0, text.length);
-    final end = (index + query.length + 72).clamp(0, text.length);
+    final needle = query.toLowerCase().trim();
+
+    // 1. Exact substring match.
+    final exactIdx = haystack.indexOf(needle);
+    if (exactIdx >= 0) {
+      return _buildSnippet(text, exactIdx, needle.length);
+    }
+
+    // Normalise both sides: replace _, -, . with space.
+    final normHaystack = haystack.replaceAll(RegExp(r'[_\-.]'), ' ');
+    final normNeedle = needle.replaceAll(RegExp(r'[_\-.]'), ' ');
+
+    // 2. Separator-normalised substring match.
+    final normIdx = normHaystack.indexOf(normNeedle);
+    if (normIdx >= 0) {
+      return _buildSnippet(text, normIdx, normNeedle.length);
+    }
+
+    // 3. All query words present anywhere (order-independent).
+    final queryWords =
+        normNeedle.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    if (queryWords.length > 1) {
+      final allMatch = queryWords.every(
+        (w) => normHaystack.contains(w),
+      );
+      if (allMatch) {
+        // Find the first word match to anchor the snippet.
+        final firstIdx = normHaystack.indexOf(queryWords.first);
+        return _buildSnippet(
+          text,
+          firstIdx < 0 ? 0 : firstIdx,
+          queryWords.first.length,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  String _buildSnippet(String text, int matchIdx, int matchLen) {
+    final start = (matchIdx - 48).clamp(0, text.length);
+    final end = (matchIdx + matchLen + 72).clamp(0, text.length);
     final prefix = start > 0 ? '…' : '';
     final suffix = end < text.length ? '…' : '';
     return '$prefix${text.substring(start, end).replaceAll('\n', ' ')}$suffix';
