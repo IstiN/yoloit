@@ -14,6 +14,8 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
+import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
+import 'package:yoloit/features/board/chat/chat_session_naming.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
@@ -153,6 +155,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   /// Persisted opencode session ID (survives widget rebuilds).
   String? _opencodeSessionId;
   String? _copilotSessionId;
+  String? _cursorSessionId;
 
   /// Notifier for panel border animation.
   final ValueNotifier<bool> processingNotifier = ValueNotifier(false);
@@ -207,6 +210,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (_session!.copilotSessionId != null) {
         _copilotSessionId = _session!.copilotSessionId;
       }
+      if (_session!.cursorSessionId != null) {
+        _cursorSessionId = _session!.cursorSessionId;
+      }
       // If the session finished processing while we were away, update UI
       if (_isProcessing) {
         _setProcessing(true);
@@ -245,6 +251,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (_copilotSessionId != null) {
         _provider.setSessionId(_config.sessionName, _copilotSessionId!);
         _session!.restoreCopilotSessionId(_copilotSessionId);
+      }
+    }
+    if (_config.provider == 'cursor') {
+      if (_session!.cursorSessionId != null) {
+        _cursorSessionId = _session!.cursorSessionId;
+      }
+      if (_cursorSessionId != null) {
+        _provider.setSessionId(_config.sessionName, _cursorSessionId!);
+        _session!.restoreCursorSessionId(_cursorSessionId);
       }
     }
 
@@ -286,6 +301,16 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               widget.onUpdateState({
                 ...widget.panel.state,
                 'copilotSessionId': sid,
+              });
+            }
+          }
+          if (_config.provider == 'cursor') {
+            final sid = _provider.getSessionId(_config.sessionName);
+            if (sid != null && sid != _cursorSessionId) {
+              _cursorSessionId = sid;
+              widget.onUpdateState({
+                ...widget.panel.state,
+                'cursorSessionId': sid,
               });
             }
           }
@@ -356,6 +381,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 nextConfig.sessionName,
                 _opencodeSessionId!,
               );
+            }
+            if (nextConfig.provider == 'cursor' && _cursorSessionId != null) {
+              _provider.setSessionId(nextConfig.sessionName, _cursorSessionId!);
             }
           } else {
             _session?.updateConfig(nextConfig);
@@ -431,15 +459,27 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
     // Restore opencode session ID
     if (_config.provider == 'opencode') {
-      final savedSessionId = widget.panel.state['opencodeSessionId'];
+      final savedSessionId =
+          widget.panel.state['opencodeSessionId'] ??
+          (raw is Map ? raw['opencodeSessionId'] : null);
       if (savedSessionId is String && savedSessionId.isNotEmpty) {
         _opencodeSessionId = savedSessionId;
       }
     }
     if (_config.provider == 'copilot') {
-      final savedSessionId = widget.panel.state['copilotSessionId'];
+      final savedSessionId =
+          widget.panel.state['copilotSessionId'] ??
+          (raw is Map ? raw['copilotSessionId'] : null);
       if (savedSessionId is String && savedSessionId.isNotEmpty) {
         _copilotSessionId = savedSessionId;
+      }
+    }
+    if (_config.provider == 'cursor') {
+      final savedSessionId =
+          widget.panel.state['cursorSessionId'] ??
+          (raw is Map ? raw['cursorSessionId'] : null);
+      if (savedSessionId is String && savedSessionId.isNotEmpty) {
+        _cursorSessionId = savedSessionId;
       }
     }
   }
@@ -452,13 +492,24 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ? _messages.sublist(_messages.length - _maxSavedMessages)
             : _messages;
     final messagesJson = trimmed.map((m) => m.toJson()).toList();
+    final configJson = _config.toJson();
+    if (_opencodeSessionId != null) {
+      configJson['opencodeSessionId'] = _opencodeSessionId;
+    }
+    if (_copilotSessionId != null) {
+      configJson['copilotSessionId'] = _copilotSessionId;
+    }
+    if (_cursorSessionId != null) {
+      configJson['cursorSessionId'] = _cursorSessionId;
+    }
     widget.onUpdateState({
       ...widget.panel.state,
-      'config': _config.toJson(),
+      'config': configJson,
       'messages': messagesJson,
       'lastUsage': _lastUsage?.toJson(),
       if (_opencodeSessionId != null) 'opencodeSessionId': _opencodeSessionId,
       if (_copilotSessionId != null) 'copilotSessionId': _copilotSessionId,
+      if (_cursorSessionId != null) 'cursorSessionId': _cursorSessionId,
     });
     // Update session history registry (metadata + messages on disk)
     ChatSessionHistory.instance.upsert(
@@ -498,6 +549,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (sid != null) {
         _copilotSessionId = sid;
         widget.onUpdateState({...widget.panel.state, 'copilotSessionId': sid});
+      }
+    }
+    if (_config.provider == 'cursor' && _cursorSessionId == null) {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null) {
+        _cursorSessionId = sid;
+        widget.onUpdateState({...widget.panel.state, 'cursorSessionId': sid});
       }
     }
     // Persist current messages to board state
@@ -1030,6 +1088,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         widget.onUpdateState({...widget.panel.state, 'copilotSessionId': sid});
       }
     }
+    if (_config.provider == 'cursor' && _cursorSessionId == null) {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null) {
+        _cursorSessionId = sid;
+        widget.onUpdateState({...widget.panel.state, 'cursorSessionId': sid});
+      }
+    }
 
     switch (event.type) {
       case ChatEventType.assistantMessageStart:
@@ -1458,6 +1523,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildSetupView() {
     return _ChatSetupView(
+      panelId: widget.panel.id,
       config: _config,
       models: _provider.availableModels,
       onStart: (config) {
@@ -3378,11 +3444,13 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
 
 class _ChatSetupView extends StatefulWidget {
   const _ChatSetupView({
+    required this.panelId,
     required this.config,
     required this.models,
     required this.onStart,
   });
 
+  final String panelId;
   final ChatSessionConfig config;
   final List<ChatModelInfo> models;
   final ValueChanged<ChatSessionConfig> onStart;
@@ -3511,6 +3579,29 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     var sessionName = _sessionCtrl.text.trim();
     if (sessionName.isEmpty) {
       sessionName = 'chat-${DateTime.now().millisecondsSinceEpoch}';
+    }
+    final boardState = context.read<BoardCubit>().state;
+    final board = boardState.activeBoard ?? boardState.boards.firstOrNull;
+    if (board != null) {
+      sessionName = makeUniqueChatSessionName(
+        sessionName,
+        board.panels
+            .where(
+              (panel) =>
+                  panel.id != widget.panelId &&
+                  panel.type == ChatPanelPlugin.kTypeId,
+            )
+            .map(
+              (panel) =>
+                  (panel.state['config'] is Map
+                      ? (Map<String, dynamic>.from(
+                            panel.state['config'] as Map,
+                          ))['sessionName']
+                          as String?
+                      : null) ??
+                  panel.title,
+            ),
+      );
     }
     // Ensure selected model is valid for the chosen provider
     final validModels = _modelsForProvider;

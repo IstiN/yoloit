@@ -11,15 +11,87 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
+typedef CopilotProcessStarter =
+    Future<Process> Function(
+      String executable,
+      List<String> arguments, {
+      String? workingDirectory,
+      Map<String, String>? environment,
+    });
+
+final _multiSessionIdRe = RegExp(
+  r'^\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*$',
+  caseSensitive: false,
+  multiLine: true,
+);
+
+List<String> extractCopilotMultiSessionIds(String errorText) {
+  return _multiSessionIdRe
+      .allMatches(errorText)
+      .map((match) => match.group(1)!)
+      .toList(growable: false);
+}
+
+String? pickMostRecentCopilotSessionId(
+  Iterable<String> sessionIds, {
+  required String sessionStateRoot,
+}) {
+  String? latestId;
+  DateTime? latestModifiedAt;
+  final ids = sessionIds.toList(growable: false);
+  for (final sessionId in ids) {
+    final sessionDir = Directory('$sessionStateRoot/$sessionId');
+    if (!sessionDir.existsSync()) continue;
+    final modifiedAt = _copilotSessionModifiedAt(sessionDir);
+    if (latestModifiedAt == null ||
+        modifiedAt.isAfter(latestModifiedAt) ||
+        modifiedAt.isAtSameMomentAs(latestModifiedAt)) {
+      latestId = sessionId;
+      latestModifiedAt = modifiedAt;
+    }
+  }
+  if (latestId != null) return latestId;
+  return ids.isNotEmpty ? ids.last : null;
+}
+
+DateTime _copilotSessionModifiedAt(Directory sessionDir) {
+  final fileCandidates = [
+    File('${sessionDir.path}/session.db'),
+    File('${sessionDir.path}/events.jsonl'),
+    File('${sessionDir.path}/workspace.yaml'),
+  ];
+  DateTime latest = sessionDir.statSync().modified;
+  for (final candidate in fileCandidates) {
+    if (!candidate.existsSync()) continue;
+    final modifiedAt = candidate.statSync().modified;
+    if (modifiedAt.isAfter(latest)) {
+      latest = modifiedAt;
+    }
+  }
+  return latest;
+}
+
 /// [ChatProvider] implementation that wraps the GitHub Copilot CLI.
 ///
 /// Runs `copilot` with `--output-format json --yolo` and parses
 /// the NDJSON output into [ChatEvent] objects.
 class CopilotCliProvider extends ChatProvider {
-  CopilotCliProvider();
+  CopilotCliProvider({
+    CopilotProcessStarter? processStarter,
+    String? homeDirectory,
+    String? sessionStateRoot,
+    bool enableSubAgentWatcher = true,
+  }) : _processStarter = processStarter ?? _defaultProcessStarter,
+       _homeDirectory = homeDirectory ?? (Platform.environment['HOME'] ?? ''),
+       _sessionStateRoot = sessionStateRoot,
+       _enableSubAgentWatcher = enableSubAgentWatcher;
 
   final Map<String, Process> _processes = {};
   final Map<String, String> _sessionIds = {};
+  final CopilotProcessStarter _processStarter;
+  final String _homeDirectory;
+  final String? _sessionStateRoot;
+  final bool _enableSubAgentWatcher;
   String? _cachedYoloitBin;
 
   @override
@@ -72,6 +144,8 @@ class CopilotCliProvider extends ChatProvider {
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
     required StreamController<ChatEvent> controller,
+    String? resumeOverrideId,
+    bool recoveryAttempted = false,
   }) async {
     // Kill any existing process for this session
     await stop(config.sessionName);
@@ -109,7 +183,8 @@ class CopilotCliProvider extends ChatProvider {
       RegExp(r'["“”]'),
       "'",
     );
-    final resumeKey = _sessionIds[config.sessionName] ?? safeSessionName;
+    final resumeKey =
+        resumeOverrideId ?? _sessionIds[config.sessionName] ?? safeSessionName;
     final useResume = !isFirstMessage;
     if (!useResume) {
       args.addAll(['--name', safeSessionName]);
@@ -140,7 +215,7 @@ class CopilotCliProvider extends ChatProvider {
     debugPrint(
       '[CopilotCli] Running: copilot --output-format json --yolo --model '
       '${config.model} ${useResume ? '--resume' : '--name'} '
-      '$safeSessionName -p <omitted>',
+      '${useResume ? resumeKey : safeSessionName} -p <omitted>',
     );
     debugPrint('[CopilotCli] cwd: $workingDir');
 
@@ -153,7 +228,7 @@ class CopilotCliProvider extends ChatProvider {
         baseEnv['PATH'] ?? '',
         yoloitBin: yoloitBin,
       );
-      final process = await Process.start(
+      final process = await _processStarter(
         'copilot',
         args,
         workingDirectory: workingDir,
@@ -171,17 +246,18 @@ class CopilotCliProvider extends ChatProvider {
       // Other providers (OpenCode, Cursor) should implement their own watcher
       // and merge into their controller the same way — the ChatPanelWidget
       // only depends on the subagent* ChatEventType values.
-      final subAgentWatcher = SubAgentEventWatcher(pid: process.pid);
-      final subAgentSub = subAgentWatcher.events.listen(
-        (event) {
-          if (!controller.isClosed) controller.add(event);
-        },
-        onError: (_) {},
-      );
+      final subAgentWatcher =
+          _enableSubAgentWatcher
+              ? SubAgentEventWatcher(pid: process.pid)
+              : null;
+      final subAgentSub = subAgentWatcher?.events.listen((event) {
+        if (!controller.isClosed) controller.add(event);
+      }, onError: (_) {});
 
       // Buffer for incomplete JSON lines
       final buffer = StringBuffer();
 
+      final stdoutDone = Completer<void>();
       process.stdout
           .transform(utf8.decoder)
           .listen(
@@ -198,7 +274,8 @@ class CopilotCliProvider extends ChatProvider {
                 try {
                   final json = jsonDecode(trimmed) as Map<String, dynamic>;
                   if (json['type'] == 'result' && json['sessionId'] is String) {
-                    _sessionIds[config.sessionName] = json['sessionId'] as String;
+                    _sessionIds[config.sessionName] =
+                        json['sessionId'] as String;
                   }
                   final event = ChatEvent.fromJson(json);
                   controller.add(event);
@@ -210,17 +287,44 @@ class CopilotCliProvider extends ChatProvider {
             },
             onError: (Object error) {
               debugPrint('[CopilotCli] stdout error: $error');
-              controller.addError(error);
+              if (!controller.isClosed) {
+                controller.addError(error);
+              }
+              if (!stdoutDone.isCompleted) {
+                stdoutDone.complete();
+              }
+            },
+            onDone: () {
+              if (!stdoutDone.isCompleted) {
+                stdoutDone.complete();
+              }
             },
           );
 
       final stderrBuf = StringBuffer();
-      process.stderr.transform(utf8.decoder).listen((chunk) {
-        debugPrint('[CopilotCli] stderr: $chunk');
-        stderrBuf.write(chunk);
-      });
+      final stderrDone = Completer<void>();
+      process.stderr
+          .transform(utf8.decoder)
+          .listen(
+            (chunk) {
+              debugPrint('[CopilotCli] stderr: $chunk');
+              stderrBuf.write(chunk);
+            },
+            onError: (_) {
+              if (!stderrDone.isCompleted) {
+                stderrDone.complete();
+              }
+            },
+            onDone: () {
+              if (!stderrDone.isCompleted) {
+                stderrDone.complete();
+              }
+            },
+          );
 
       final exitCode = await process.exitCode;
+      await stdoutDone.future;
+      await stderrDone.future;
       debugPrint('[CopilotCli] Process exited with code: $exitCode');
 
       // Flush remaining buffer
@@ -238,11 +342,36 @@ class CopilotCliProvider extends ChatProvider {
       // If process exited with error and no events were emitted, surface stderr
       if (exitCode != 0) {
         final errText = stderrBuf.toString().trim();
+        final recoveredSessionId =
+            recoveryAttempted ? null : _recoverLatestSessionId(errText);
+        if (recoveredSessionId != null) {
+          _sessionIds[config.sessionName] = recoveredSessionId;
+          debugPrint(
+            '[CopilotCli] Recovering ambiguous session name '
+            '"${config.sessionName}" with session ID $recoveredSessionId',
+          );
+          if (_processes[config.sessionName] == process) {
+            _processes.remove(config.sessionName);
+          }
+          await subAgentSub?.cancel();
+          await subAgentWatcher?.dispose();
+          await _runProcess(
+            message: message,
+            config: config,
+            isFirstMessage: isFirstMessage,
+            attachments: attachments,
+            runtimeContext: runtimeContext,
+            controller: controller,
+            resumeOverrideId: recoveredSessionId,
+            recoveryAttempted: true,
+          );
+          return;
+        }
         controller.addError(
           errText.isNotEmpty
               ? errText
               : 'Copilot session resume failed (exit code $exitCode). '
-                    'Start a new session if this one is no longer restorable.',
+                  'Start a new session if this one is no longer restorable.',
         );
       }
 
@@ -250,8 +379,8 @@ class CopilotCliProvider extends ChatProvider {
       if (_processes[config.sessionName] == process) {
         _processes.remove(config.sessionName);
       }
-      await subAgentSub.cancel();
-      await subAgentWatcher.dispose();
+      await subAgentSub?.cancel();
+      await subAgentWatcher?.dispose();
       await controller.close();
     } catch (e, st) {
       debugPrint('[CopilotCli] Failed to start process: $e');
@@ -319,14 +448,13 @@ class CopilotCliProvider extends ChatProvider {
     if (cached != null && File(cached).existsSync()) return cached;
 
     // Check the installed location first — written by CliServer on startup.
-    final home = Platform.environment['HOME'] ?? '';
+    final home = _homeDirectory;
     if (home.isNotEmpty) {
       final installed = File('$home/.config/yoloit/yoloit');
       if (installed.existsSync()) {
         _cachedYoloitBin = installed.path;
         return installed.path;
       }
-
     }
 
     final roots = <Directory>[];
@@ -366,5 +494,35 @@ class CopilotCliProvider extends ChatProvider {
   @override
   String? getSessionId(String sessionName) {
     return _sessionIds[sessionName];
+  }
+
+  String? _recoverLatestSessionId(String errorText) {
+    if (!errorText.contains('Multiple sessions match the name')) return null;
+    final matches = extractCopilotMultiSessionIds(errorText);
+    if (matches.isEmpty) return null;
+    final sessionStateRoot =
+        _sessionStateRoot ??
+        (_homeDirectory.isNotEmpty
+            ? '$_homeDirectory/.copilot/session-state'
+            : '');
+    if (sessionStateRoot.isEmpty) return null;
+    return pickMostRecentCopilotSessionId(
+      matches,
+      sessionStateRoot: sessionStateRoot,
+    );
+  }
+
+  static Future<Process> _defaultProcessStarter(
+    String executable,
+    List<String> arguments, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  }) {
+    return Process.start(
+      executable,
+      arguments,
+      workingDirectory: workingDirectory,
+      environment: environment,
+    );
   }
 }

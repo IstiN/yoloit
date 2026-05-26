@@ -40,6 +40,7 @@ class ChatSession extends ChangeNotifier {
   StreamSubscription<ChatEvent>? _eventSub;
   String? _opencodeSessionId;
   String? _copilotSessionId;
+  String? _cursorSessionId;
 
   // Mutable UI callbacks — nullified on detach, set on sendMessage.
   // This allows the session to keep processing events from the provider
@@ -61,11 +62,13 @@ class ChatSession extends ChangeNotifier {
   ChatTokenUsage? get lastUsage => _lastUsage;
   String? get opencodeSessionId => _opencodeSessionId;
   String? get copilotSessionId => _copilotSessionId;
+  String? get cursorSessionId => _cursorSessionId;
 
   // ── Configuration ───────────────────────────────────────────────────────
 
   void updateConfig(ChatSessionConfig newConfig) {
     if (newConfig == _config) return;
+    final previousSessionName = _config.sessionName;
     if (newConfig.provider != _config.provider) {
       _provider.dispose();
       _provider = _createProviderFor(newConfig.provider);
@@ -74,6 +77,19 @@ class ChatSession extends ChangeNotifier {
       }
       if (newConfig.provider == 'copilot' && _copilotSessionId != null) {
         _provider.setSessionId(newConfig.sessionName, _copilotSessionId!);
+      }
+      if (newConfig.provider == 'cursor' && _cursorSessionId != null) {
+        _provider.setSessionId(newConfig.sessionName, _cursorSessionId!);
+      }
+    } else if (newConfig.sessionName != previousSessionName) {
+      if (_config.provider == 'opencode' && _opencodeSessionId != null) {
+        _provider.setSessionId(newConfig.sessionName, _opencodeSessionId!);
+      }
+      if (_config.provider == 'copilot' && _copilotSessionId != null) {
+        _provider.setSessionId(newConfig.sessionName, _copilotSessionId!);
+      }
+      if (_config.provider == 'cursor' && _cursorSessionId != null) {
+        _provider.setSessionId(newConfig.sessionName, _cursorSessionId!);
       }
     }
     _config = newConfig;
@@ -123,6 +139,15 @@ class ChatSession extends ChangeNotifier {
     }
   }
 
+  void restoreCursorSessionId(String? sessionId) {
+    if (sessionId != null && sessionId.isNotEmpty) {
+      _cursorSessionId = sessionId;
+      if (_config.provider == 'cursor') {
+        _provider.setSessionId(_config.sessionName, sessionId);
+      }
+    }
+  }
+
   /// Sync the widget's current messages/state into this session.
   ///
   /// Called by the widget before detaching so the session holds the latest
@@ -137,6 +162,7 @@ class ChatSession extends ChangeNotifier {
     ChatTokenUsage? lastUsage,
     String? opencodeSessionId,
     String? copilotSessionId,
+    String? cursorSessionId,
   }) {
     _messages
       ..clear()
@@ -152,6 +178,9 @@ class ChatSession extends ChangeNotifier {
     }
     if (copilotSessionId != null) {
       _copilotSessionId = copilotSessionId;
+    }
+    if (cursorSessionId != null) {
+      _cursorSessionId = cursorSessionId;
     }
   }
 
@@ -242,6 +271,16 @@ class ChatSession extends ChangeNotifier {
     final imageAttachments =
         allAttachments.where((t) => imageExtRe.hasMatch(t)).toList();
 
+    if (_config.provider == 'opencode' && _opencodeSessionId != null) {
+      _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
+    }
+    if (_config.provider == 'copilot' && _copilotSessionId != null) {
+      _provider.setSessionId(_config.sessionName, _copilotSessionId!);
+    }
+    if (_config.provider == 'cursor' && _cursorSessionId != null) {
+      _provider.setSessionId(_config.sessionName, _cursorSessionId!);
+    }
+
     final stream = _provider.sendMessage(
       message: promptText.isNotEmpty ? promptText : text,
       config: _config,
@@ -285,6 +324,12 @@ class ChatSession extends ChangeNotifier {
           final sid = _provider.getSessionId(_config.sessionName);
           if (sid != null && sid != _copilotSessionId) {
             _copilotSessionId = sid;
+          }
+        }
+        if (_config.provider == 'cursor') {
+          final sid = _provider.getSessionId(_config.sessionName);
+          if (sid != null && sid != _cursorSessionId) {
+            _cursorSessionId = sid;
           }
         }
         _isProcessing = false;
@@ -361,6 +406,12 @@ class ChatSession extends ChangeNotifier {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _copilotSessionId = sid;
+      }
+    }
+    if (_config.provider == 'cursor' && _cursorSessionId == null) {
+      final sid = _provider.getSessionId(_config.sessionName);
+      if (sid != null) {
+        _cursorSessionId = sid;
       }
     }
 
@@ -527,12 +578,23 @@ class ChatSession extends ChangeNotifier {
 
   /// Get full state map for board panel persistence.
   Map<String, dynamic> serializeState() {
+    final configJson = _config.toJson();
+    if (_opencodeSessionId != null) {
+      configJson['opencodeSessionId'] = _opencodeSessionId;
+    }
+    if (_copilotSessionId != null) {
+      configJson['copilotSessionId'] = _copilotSessionId;
+    }
+    if (_cursorSessionId != null) {
+      configJson['cursorSessionId'] = _cursorSessionId;
+    }
     return {
-      'config': _config.toJson(),
+      'config': configJson,
       'messages': serializeMessages(),
       if (_lastUsage != null) 'lastUsage': _lastUsage!.toJson(),
       if (_opencodeSessionId != null) 'opencodeSessionId': _opencodeSessionId,
       if (_copilotSessionId != null) 'copilotSessionId': _copilotSessionId,
+      if (_cursorSessionId != null) 'cursorSessionId': _cursorSessionId,
     };
   }
 

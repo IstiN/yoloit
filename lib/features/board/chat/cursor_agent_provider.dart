@@ -10,17 +10,27 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
+typedef CursorProcessStarter =
+    Future<Process> Function(
+      String executable,
+      List<String> arguments, {
+      String? workingDirectory,
+      Map<String, String>? environment,
+    });
+
 /// [ChatProvider] implementation that wraps the Cursor Agent CLI.
 ///
 /// Runs `cursor-agent --print --output-format stream-json` and translates
 /// the cursor-specific NDJSON events into [ChatEvent] objects understood
 /// by the common chat panel.
 class CursorAgentProvider extends ChatProvider {
-  CursorAgentProvider();
+  CursorAgentProvider({CursorProcessStarter? processStarter})
+    : _processStarter = processStarter ?? _defaultProcessStarter;
 
   /// sessionName → cursor session_id (UUID captured from the init event).
   final Map<String, String> _sessionIds = {};
   final Map<String, Process> _processes = {};
+  final CursorProcessStarter _processStarter;
 
   /// The generated id of the currently streaming assistant message.
   /// Non-null means we are mid-stream; null means the stream is idle.
@@ -133,7 +143,7 @@ class CursorAgentProvider extends ChatProvider {
       final enrichedPath = PlatformShell.instance.enrichedPath(
         baseEnv['PATH'] ?? '',
       );
-      final process = await Process.start(
+      final process = await _processStarter(
         'cursor-agent',
         args,
         workingDirectory:
@@ -144,6 +154,7 @@ class CursorAgentProvider extends ChatProvider {
 
       final buffer = StringBuffer();
 
+      final stdoutDone = Completer<void>();
       process.stdout
           .transform(utf8.decoder)
           .listen(
@@ -183,16 +194,41 @@ class CursorAgentProvider extends ChatProvider {
             onError: (Object error) {
               debugPrint('[CursorAgent] stdout error: $error');
               controller.addError(error);
+              if (!stdoutDone.isCompleted) {
+                stdoutDone.complete();
+              }
+            },
+            onDone: () {
+              if (!stdoutDone.isCompleted) {
+                stdoutDone.complete();
+              }
             },
           );
 
       final stderrBuf = StringBuffer();
-      process.stderr.transform(utf8.decoder).listen((chunk) {
-        debugPrint('[CursorAgent] stderr: $chunk');
-        stderrBuf.write(chunk);
-      });
+      final stderrDone = Completer<void>();
+      process.stderr
+          .transform(utf8.decoder)
+          .listen(
+            (chunk) {
+              debugPrint('[CursorAgent] stderr: $chunk');
+              stderrBuf.write(chunk);
+            },
+            onError: (_) {
+              if (!stderrDone.isCompleted) {
+                stderrDone.complete();
+              }
+            },
+            onDone: () {
+              if (!stderrDone.isCompleted) {
+                stderrDone.complete();
+              }
+            },
+          );
 
       final exitCode = await process.exitCode;
+      await stdoutDone.future;
+      await stderrDone.future;
       debugPrint('[CursorAgent] Process exited: $exitCode');
 
       // Flush remaining buffer
@@ -474,5 +510,27 @@ class CursorAgentProvider extends ChatProvider {
   @override
   void detach() {
     _processes.clear();
+  }
+
+  @override
+  void setSessionId(String sessionName, String sessionId) {
+    _sessionIds[sessionName] = sessionId;
+  }
+
+  @override
+  String? getSessionId(String sessionName) => _sessionIds[sessionName];
+
+  static Future<Process> _defaultProcessStarter(
+    String executable,
+    List<String> arguments, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  }) {
+    return Process.start(
+      executable,
+      arguments,
+      workingDirectory: workingDirectory,
+      environment: environment,
+    );
   }
 }

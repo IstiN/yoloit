@@ -6,7 +6,10 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 
 /// CLI handler for Chat panels (`board.chat`).
 class ChatCliHandler extends PanelCliHandler {
-  const ChatCliHandler();
+  ChatCliHandler({ChatSessionManager? sessionManager})
+    : _sessionManager = sessionManager ?? ChatSessionManager.instance;
+
+  final ChatSessionManager _sessionManager;
 
   @override
   String get typeId => 'board.chat';
@@ -24,7 +27,7 @@ class ChatCliHandler extends PanelCliHandler {
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
-    final session = ChatSessionManager.instance.get(panel.id);
+    final session = _sessionManager.get(panel.id);
     if (session != null) {
       final messages = session.messages;
       return {
@@ -99,9 +102,13 @@ class ChatCliHandler extends PanelCliHandler {
 
     final mergedConfig = _mergeConfig(panel, args);
     final config = ChatSessionConfig.fromJson(mergedConfig);
-    final session = ChatSessionManager.instance.getOrCreate(panel.id, config);
+    final session = _sessionManager.getOrCreate(panel.id, config);
 
     if (session.messages.isEmpty) {
+      final savedConfig =
+          panel.state['config'] is Map
+              ? Map<String, dynamic>.from(panel.state['config'] as Map)
+              : const <String, dynamic>{};
       final savedMessages = panel.state['messages'] as List<dynamic>?;
       if (savedMessages != null && savedMessages.isNotEmpty) {
         session.restoreMessages(savedMessages.cast<Map<String, dynamic>>());
@@ -112,7 +119,16 @@ class ChatCliHandler extends PanelCliHandler {
             : null,
       );
       session.restoreOpencodeSessionId(
-        panel.state['opencodeSessionId'] as String?,
+        (panel.state['opencodeSessionId'] as String?) ??
+            (savedConfig['opencodeSessionId'] as String?),
+      );
+      session.restoreCopilotSessionId(
+        (panel.state['copilotSessionId'] as String?) ??
+            (savedConfig['copilotSessionId'] as String?),
+      );
+      session.restoreCursorSessionId(
+        (panel.state['cursorSessionId'] as String?) ??
+            (savedConfig['cursorSessionId'] as String?),
       );
     }
 
@@ -139,7 +155,8 @@ class ChatCliHandler extends PanelCliHandler {
     if (!accepted) {
       return CliActionResult(
         ok: false,
-        message: 'Already processing a previous message — wait or call yolochat:stop first',
+        message:
+            'Already processing a previous message — wait or call yolochat:stop first',
       );
     }
 
@@ -161,7 +178,7 @@ class ChatCliHandler extends PanelCliHandler {
     Map<String, dynamic> args,
     BoardPanelInstance panel,
   ) {
-    final session = ChatSessionManager.instance.get(panel.id);
+    final session = _sessionManager.get(panel.id);
     if (session != null) {
       final msgs = session.messages;
       final limit = args['limit'] as int? ?? msgs.length;
@@ -189,7 +206,7 @@ class ChatCliHandler extends PanelCliHandler {
     final configPatch = _extractConfigPatch(args);
     if (configPatch.isNotEmpty) {
       final merged = _mergeConfig(panel, args);
-      final session = ChatSessionManager.instance.get(panel.id);
+      final session = _sessionManager.get(panel.id);
       if (session != null) {
         session.updateConfig(ChatSessionConfig.fromJson(merged));
       }
@@ -201,7 +218,7 @@ class ChatCliHandler extends PanelCliHandler {
       );
     }
 
-    final session = ChatSessionManager.instance.get(panel.id);
+    final session = _sessionManager.get(panel.id);
     final config =
         session?.config.toJson() ??
         panel.state['config'] ??
@@ -210,7 +227,7 @@ class ChatCliHandler extends PanelCliHandler {
   }
 
   CliActionResult _handleClear(BoardPanelInstance panel) {
-    final session = ChatSessionManager.instance.get(panel.id);
+    final session = _sessionManager.get(panel.id);
     session?.clearMessages();
     return CliActionResult(
       message: 'Chat cleared',
@@ -219,7 +236,7 @@ class ChatCliHandler extends PanelCliHandler {
   }
 
   CliActionResult _handleStatus(BoardPanelInstance panel) {
-    final session = ChatSessionManager.instance.get(panel.id);
+    final session = _sessionManager.get(panel.id);
     if (session == null) {
       return const CliActionResult(
         data: {'hasSession': false, 'isProcessing': false},
@@ -253,10 +270,10 @@ class ChatCliHandler extends PanelCliHandler {
   }
 
   CliActionResult _handleSessions() {
-    final ids = ChatSessionManager.instance.activeSessionIds;
+    final ids = _sessionManager.activeSessionIds;
     final sessions = <Map<String, dynamic>>[];
     for (final id in ids) {
-      final session = ChatSessionManager.instance.get(id);
+      final session = _sessionManager.get(id);
       if (session != null) {
         sessions.add({
           'panelId': id,

@@ -391,13 +391,15 @@ void main() {
     });
 
     test(
-      'serializeState includes config messages usage and opencode session id',
+      'serializeState includes config messages usage and provider session ids',
       () {
         session.restoreMessages([
           {'id': 'msg-1', 'role': 'user', 'content': 'hello'},
         ]);
         session.restoreLastUsage({'outputTokens': 9});
         session.restoreOpencodeSessionId('oc-session-123');
+        session.restoreCopilotSessionId('copilot-session-123');
+        session.restoreCursorSessionId('cursor-session-123');
 
         final state = session.serializeState();
 
@@ -406,6 +408,11 @@ void main() {
         expect((state['messages'] as List).length, 1);
         expect(state['lastUsage'], isA<Map<String, dynamic>>());
         expect(state['opencodeSessionId'], 'oc-session-123');
+        expect(state['copilotSessionId'], 'copilot-session-123');
+        expect(state['cursorSessionId'], 'cursor-session-123');
+        expect(state['config']['opencodeSessionId'], 'oc-session-123');
+        expect(state['config']['copilotSessionId'], 'copilot-session-123');
+        expect(state['config']['cursorSessionId'], 'cursor-session-123');
       },
     );
 
@@ -423,6 +430,85 @@ void main() {
       expect(opencodeSession.opencodeSessionId, 'oc-session-123');
       expect(opencodeProvider.getSessionId('test-session'), 'oc-session-123');
     });
+
+    test('restoreCopilotSessionId stores id on copilot provider', () {
+      final copilotProvider = FakeChatProvider(id: 'copilot');
+      final copilotSession = ChatSession(
+        panelId: 'p1',
+        config: _config(provider: 'copilot'),
+        providerFactory: (_) => copilotProvider,
+      );
+      addTearDown(copilotSession.dispose);
+
+      copilotSession.restoreCopilotSessionId('copilot-session-123');
+
+      expect(copilotSession.copilotSessionId, 'copilot-session-123');
+      expect(
+        copilotProvider.getSessionId('test-session'),
+        'copilot-session-123',
+      );
+    });
+
+    test('restoreCursorSessionId stores id on cursor provider', () {
+      final cursorProvider = FakeChatProvider(id: 'cursor');
+      final cursorSession = ChatSession(
+        panelId: 'p1',
+        config: _config(provider: 'cursor'),
+        providerFactory: (_) => cursorProvider,
+      );
+      addTearDown(cursorSession.dispose);
+
+      cursorSession.restoreCursorSessionId('cursor-session-123');
+
+      expect(cursorSession.cursorSessionId, 'cursor-session-123');
+      expect(cursorProvider.getSessionId('test-session'), 'cursor-session-123');
+    });
+
+    test(
+      'updateConfig rebinds copilot session id when session name changes',
+      () {
+        final copilotProvider = FakeChatProvider(id: 'copilot');
+        final copilotSession = ChatSession(
+          panelId: 'p1',
+          config: _config(provider: 'copilot'),
+          providerFactory: (_) => copilotProvider,
+        );
+        addTearDown(copilotSession.dispose);
+        copilotSession.restoreCopilotSessionId('copilot-session-123');
+
+        copilotSession.updateConfig(
+          _config(provider: 'copilot').copyWith(sessionName: 'test-session 2'),
+        );
+
+        expect(
+          copilotProvider.getSessionId('test-session 2'),
+          'copilot-session-123',
+        );
+      },
+    );
+
+    test(
+      'updateConfig rebinds cursor session id when session name changes',
+      () {
+        final cursorProvider = FakeChatProvider(id: 'cursor');
+        final cursorSession = ChatSession(
+          panelId: 'p1',
+          config: _config(provider: 'cursor'),
+          providerFactory: (_) => cursorProvider,
+        );
+        addTearDown(cursorSession.dispose);
+        cursorSession.restoreCursorSessionId('cursor-session-123');
+
+        cursorSession.updateConfig(
+          _config(provider: 'cursor').copyWith(sessionName: 'test-session 2'),
+        );
+
+        expect(
+          cursorProvider.getSessionId('test-session 2'),
+          'cursor-session-123',
+        );
+      },
+    );
   });
 
   group('ChatSession event processing', () {
@@ -546,6 +632,64 @@ void main() {
 
       expect(opencodeSession.opencodeSessionId, 'oc-live-1');
     });
+
+    test(
+      'captures copilot session id and resumes with it on next send',
+      () async {
+        final copilotProvider = FakeChatProvider(id: 'copilot');
+        final copilotSession = ChatSession(
+          panelId: 'p1',
+          config: _config(provider: 'copilot'),
+          providerFactory: (_) => copilotProvider,
+        );
+        addTearDown(copilotSession.dispose);
+
+        final firstFuture = copilotSession.sendAndWait(text: 'hello');
+        copilotProvider.setSessionId('test-session', 'copilot-live-1');
+        await copilotProvider.complete();
+        await firstFuture;
+
+        expect(copilotSession.copilotSessionId, 'copilot-live-1');
+        expect(copilotProvider.sentIsFirstMessages, [true]);
+
+        final secondFuture = copilotSession.sendAndWait(text: 'resume');
+        expect(copilotProvider.getSessionId('test-session'), 'copilot-live-1');
+        copilotProvider.setSessionId('test-session', 'copilot-live-1');
+        await copilotProvider.complete();
+        await secondFuture;
+
+        expect(copilotProvider.sentIsFirstMessages, [true, false]);
+      },
+    );
+
+    test(
+      'captures cursor session id and resumes with it on next send',
+      () async {
+        final cursorProvider = FakeChatProvider(id: 'cursor');
+        final cursorSession = ChatSession(
+          panelId: 'p1',
+          config: _config(provider: 'cursor'),
+          providerFactory: (_) => cursorProvider,
+        );
+        addTearDown(cursorSession.dispose);
+
+        final firstFuture = cursorSession.sendAndWait(text: 'hello');
+        cursorProvider.setSessionId('test-session', 'cursor-live-1');
+        await cursorProvider.complete();
+        await firstFuture;
+
+        expect(cursorSession.cursorSessionId, 'cursor-live-1');
+        expect(cursorProvider.sentIsFirstMessages, [true]);
+
+        final secondFuture = cursorSession.sendAndWait(text: 'resume');
+        expect(cursorProvider.getSessionId('test-session'), 'cursor-live-1');
+        cursorProvider.setSessionId('test-session', 'cursor-live-1');
+        await cursorProvider.complete();
+        await secondFuture;
+
+        expect(cursorProvider.sentIsFirstMessages, [true, false]);
+      },
+    );
   });
 
   group('syncFromWidget', () {
@@ -583,6 +727,8 @@ void main() {
         isFirstMessage: false,
         totalOutputTokens: 42,
         opencodeSessionId: 'oc-123',
+        copilotSessionId: 'copilot-123',
+        cursorSessionId: 'cursor-123',
       );
 
       expect(session.messages.length, 2);
@@ -591,6 +737,8 @@ void main() {
       expect(session.isFirstMessage, isFalse);
       expect(session.totalOutputTokens, 42);
       expect(session.opencodeSessionId, 'oc-123');
+      expect(session.copilotSessionId, 'copilot-123');
+      expect(session.cursorSessionId, 'cursor-123');
     });
 
     test('session survives detach and returns synced state on re-mount', () {
@@ -598,8 +746,10 @@ void main() {
       final manager = ChatSessionManager.testInstance(
         providerFactory: (_) => FakeChatProvider(),
       );
-      final config =
-          const ChatSessionConfig(sessionName: 's', workingDir: '/d');
+      final config = const ChatSessionConfig(
+        sessionName: 's',
+        workingDir: '/d',
+      );
       final session = manager.getOrCreate('panel-A', config);
 
       // Simulate widget lifecycle: send messages, then dispose

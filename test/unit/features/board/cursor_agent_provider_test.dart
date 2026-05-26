@@ -1,4 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 
 /// Unit tests for the cursor-agent event parsing logic.
@@ -45,9 +51,97 @@ String extractText(dynamic content) {
   return '';
 }
 
+class _FakeProcess implements Process {
+  _FakeProcess({required this.pid, required IOSink stdin})
+    : _stdin = stdin,
+      _exitCode = Completer<int>();
+
+  final Completer<int> _exitCode;
+  final StreamController<List<int>> _stdout = StreamController<List<int>>();
+  final StreamController<List<int>> _stderr = StreamController<List<int>>();
+  final IOSink _stdin;
+
+  @override
+  final int pid;
+
+  @override
+  IOSink get stdin => _stdin;
+
+  @override
+  Stream<List<int>> get stdout => _stdout.stream;
+
+  @override
+  Stream<List<int>> get stderr => _stderr.stream;
+
+  @override
+  Future<int> get exitCode => _exitCode.future;
+
+  void addStdout(String text) => _stdout.add(utf8.encode(text));
+
+  void addStderr(String text) => _stderr.add(utf8.encode(text));
+
+  Future<void> closeStdout() => _stdout.close();
+
+  Future<void> closeStderr() => _stderr.close();
+
+  void completeExit(int code) {
+    if (!_exitCode.isCompleted) {
+      _exitCode.complete(code);
+    }
+  }
+
+  @override
+  bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    completeExit(-1);
+    unawaited(_stdout.close());
+    unawaited(_stderr.close());
+    return true;
+  }
+}
+
+class _ProcessStartCall {
+  const _ProcessStartCall(this.executable, this.arguments);
+
+  final String executable;
+  final List<String> arguments;
+}
+
+class _FakeProcessStarter {
+  final List<_FakeProcess> queuedProcesses = [];
+  final List<_ProcessStartCall> calls = [];
+
+  Future<Process> start(
+    String executable,
+    List<String> arguments, {
+    String? workingDirectory,
+    Map<String, String>? environment,
+  }) async {
+    calls.add(_ProcessStartCall(executable, List<String>.from(arguments)));
+    return queuedProcesses.removeAt(0);
+  }
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 void main() {
+  late Directory tempDir;
+  late File stdinSinkFile;
+  late IOSink stdinSink;
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    tempDir = await Directory.systemTemp.createTemp('cursor-provider-test-');
+    stdinSinkFile = File('${tempDir.path}/stdin.txt');
+    stdinSink = stdinSinkFile.openWrite();
+  });
+
+  tearDown(() async {
+    await stdinSink.close();
+    if (tempDir.existsSync()) {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
   group('CursorAgent event parsing logic', () {
     group('content extraction (_extractTextContent equivalent)', () {
       test('extracts text from content array', () {
@@ -216,10 +310,7 @@ void main() {
         final toolCall = {
           'shellToolCall': {
             'result': {
-              'success': {
-                'exitCode': 1,
-                'stdout': '',
-              },
+              'success': {'exitCode': 1, 'stdout': ''},
             },
           },
         };
@@ -295,6 +386,92 @@ void main() {
         expect(output, 'file contents here');
       });
     });
+
+    group('CursorAgentProvider session handling', () {
+      ChatSessionConfig config({String name = 'Hello'}) => ChatSessionConfig(
+        sessionName: name,
+        workingDir: tempDir.path,
+        provider: 'cursor',
+        model: 'claude-4-sonnet',
+      );
+
+      test(
+        'captures session id even when stdout finishes after exit code',
+        () async {
+          final starter = _FakeProcessStarter();
+          final process = _FakeProcess(pid: 301, stdin: stdinSink);
+          starter.queuedProcesses.add(process);
+          final provider = CursorAgentProvider(processStarter: starter.start);
+          addTearDown(provider.dispose);
+
+          final done = Completer<void>();
+          provider
+              .sendMessage(
+                message: 'Hello',
+                config: config(),
+                isFirstMessage: true,
+              )
+              .listen(null, onDone: () => done.complete());
+
+          process.completeExit(0);
+          process.addStdout(
+            '{"type":"system","subtype":"init","session_id":"cursor-session-1"}\n',
+          );
+          await process.closeStdout();
+          await process.closeStderr();
+          await done.future;
+
+          expect(provider.getSessionId('Hello'), 'cursor-session-1');
+          expect(starter.calls.single.arguments, isNot(contains('--resume')));
+        },
+      );
+
+      test('resumes with persisted session id on subsequent sends', () async {
+        final starter = _FakeProcessStarter();
+        final firstProcess = _FakeProcess(pid: 302, stdin: stdinSink);
+        final secondProcess = _FakeProcess(pid: 303, stdin: stdinSink);
+        starter.queuedProcesses
+          ..add(firstProcess)
+          ..add(secondProcess);
+        final provider = CursorAgentProvider(processStarter: starter.start);
+        addTearDown(provider.dispose);
+
+        final firstDone = Completer<void>();
+        provider
+            .sendMessage(
+              message: 'Hello',
+              config: config(),
+              isFirstMessage: true,
+            )
+            .listen(null, onDone: () => firstDone.complete());
+        firstProcess.addStdout(
+          '{"type":"system","subtype":"init","session_id":"cursor-session-1"}\n',
+        );
+        firstProcess.completeExit(0);
+        await firstProcess.closeStdout();
+        await firstProcess.closeStderr();
+        await firstDone.future;
+
+        final secondDone = Completer<void>();
+        provider
+            .sendMessage(
+              message: 'resume',
+              config: config(),
+              isFirstMessage: false,
+            )
+            .listen(null, onDone: () => secondDone.complete());
+        secondProcess.completeExit(0);
+        await secondProcess.closeStdout();
+        await secondProcess.closeStderr();
+        await secondDone.future;
+
+        expect(provider.getSessionId('Hello'), 'cursor-session-1');
+        expect(
+          starter.calls[1].arguments,
+          containsAll(['--resume', 'cursor-session-1']),
+        );
+      });
+    });
   });
 
   group('ChatEvent model', () {
@@ -351,10 +528,7 @@ void main() {
         type: ChatEventType.result,
         rawType: 'cursor.result',
         data: {
-          'usage': {
-            'outputTokens': 150,
-            'totalApiDurationMs': 3200,
-          },
+          'usage': {'outputTokens': 150, 'totalApiDurationMs': 3200},
         },
       );
       expect(event.usageData?['outputTokens'], 150);

@@ -1,9 +1,63 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/cli/handlers/chat_handler.dart';
+import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+
+class _FakeChatProvider extends ChatProvider {
+  final Map<String, String> _sessionIds = {};
+  final List<bool> sentIsFirstMessages = [];
+
+  @override
+  String get providerId => 'copilot';
+
+  @override
+  String get displayName => 'Fake';
+
+  @override
+  List<ChatModelInfo> get availableModels => const [];
+
+  @override
+  bool get supportsImages => false;
+
+  @override
+  ChatImageMode get imageMode => ChatImageMode.filePath;
+
+  @override
+  bool isRunning(String sessionName) => false;
+
+  @override
+  Stream<ChatEvent> sendMessage({
+    required String message,
+    required ChatSessionConfig config,
+    required bool isFirstMessage,
+    List<String> attachments = const [],
+    ChatRuntimeContext? runtimeContext,
+    List<Map<String, Object?>>? audioContentOverride,
+  }) {
+    sentIsFirstMessages.add(isFirstMessage);
+    return const Stream<ChatEvent>.empty();
+  }
+
+  @override
+  Future<void> stop(String sessionName) async {}
+
+  @override
+  void dispose() {}
+
+  @override
+  void detach() {}
+
+  @override
+  void setSessionId(String sessionName, String sessionId) {
+    _sessionIds[sessionName] = sessionId;
+  }
+
+  @override
+  String? getSessionId(String sessionName) => _sessionIds[sessionName];
+}
 
 BoardPanelInstance _panel({
   String id = 'p1',
@@ -17,15 +71,21 @@ BoardPanelInstance _panel({
 );
 
 void main() {
-  final handler = const ChatCliHandler();
+  late _FakeChatProvider provider;
+  late ChatSessionManager sessionManager;
+  late ChatCliHandler handler;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    provider = _FakeChatProvider();
+    sessionManager = ChatSessionManager.testInstance(
+      providerFactory: (_) => provider,
+    );
+    handler = ChatCliHandler(sessionManager: sessionManager);
   });
 
   tearDown(() {
-    // Clean up any sessions created during tests
-    ChatSessionManager.instance.disposeAll();
+    sessionManager.disposeAll();
   });
 
   test('typeId matches', () {
@@ -74,7 +134,7 @@ void main() {
       },
     );
     // Create a session with more messages
-    final session = ChatSessionManager.instance.getOrCreate(
+    final session = sessionManager.getOrCreate(
       'p1',
       ChatSessionConfig(sessionName: 'test', workingDir: '/tmp'),
     );
@@ -115,7 +175,7 @@ void main() {
       },
     );
     // Create a session first
-    ChatSessionManager.instance.getOrCreate(
+    sessionManager.getOrCreate(
       'p1',
       ChatSessionConfig(sessionName: 'test', workingDir: '/tmp'),
     );
@@ -124,7 +184,7 @@ void main() {
     }, panel);
     expect(r.ok, isTrue);
     expect(r.data!['config']['model'], 'claude-opus');
-    final session = ChatSessionManager.instance.get('p1');
+    final session = sessionManager.get('p1');
     expect(session?.config.model, 'claude-opus');
   });
 
@@ -145,6 +205,128 @@ void main() {
     expect(r.data!['config']['provider'], 'cloud:cloud-123');
   });
 
+  test('send restores persisted copilot session id before resuming', () async {
+    final panel = _panel(
+      state: {
+        'config': {
+          'sessionName': 'test',
+          'workingDir': '/tmp',
+          'provider': 'copilot',
+          'model': 'gpt-5-mini',
+        },
+        'messages': [
+          {'id': 'm1', 'role': 'user', 'content': 'hello'},
+        ],
+        'copilotSessionId': 'copilot-session-123',
+      },
+    );
+
+    final r = await handler.handleAction('send', {'text': 'resume me'}, panel);
+
+    expect(r.ok, isTrue);
+    final session = sessionManager.get('p1');
+    expect(session, isNotNull);
+    expect(session!.copilotSessionId, 'copilot-session-123');
+    expect(session.provider.getSessionId('test'), 'copilot-session-123');
+    expect(session.isFirstMessage, isFalse);
+    expect(provider.sentIsFirstMessages, [false]);
+  });
+
+  test(
+    'send restores copilot session id from config when top-level state is missing',
+    () async {
+      final panel = _panel(
+        state: {
+          'config': {
+            'sessionName': 'test',
+            'workingDir': '/tmp',
+            'provider': 'copilot',
+            'model': 'gpt-5-mini',
+            'copilotSessionId': 'copilot-session-from-config',
+          },
+          'messages': [
+            {'id': 'm1', 'role': 'user', 'content': 'hello'},
+          ],
+        },
+      );
+
+      final r = await handler.handleAction('send', {
+        'text': 'resume me',
+      }, panel);
+
+      expect(r.ok, isTrue);
+      final session = sessionManager.get('p1');
+      expect(session, isNotNull);
+      expect(session!.copilotSessionId, 'copilot-session-from-config');
+      expect(
+        session.provider.getSessionId('test'),
+        'copilot-session-from-config',
+      );
+      expect(provider.sentIsFirstMessages, [false]);
+    },
+  );
+
+  test('send restores persisted cursor session id before resuming', () async {
+    final panel = _panel(
+      state: {
+        'config': {
+          'sessionName': 'test',
+          'workingDir': '/tmp',
+          'provider': 'cursor',
+          'model': 'claude-4-sonnet',
+        },
+        'messages': [
+          {'id': 'm1', 'role': 'user', 'content': 'hello'},
+        ],
+        'cursorSessionId': 'cursor-session-123',
+      },
+    );
+
+    final r = await handler.handleAction('send', {'text': 'resume me'}, panel);
+
+    expect(r.ok, isTrue);
+    final session = sessionManager.get('p1');
+    expect(session, isNotNull);
+    expect(session!.cursorSessionId, 'cursor-session-123');
+    expect(session.provider.getSessionId('test'), 'cursor-session-123');
+    expect(session.isFirstMessage, isFalse);
+    expect(provider.sentIsFirstMessages, [false]);
+  });
+
+  test(
+    'send restores cursor session id from config when top-level state is missing',
+    () async {
+      final panel = _panel(
+        state: {
+          'config': {
+            'sessionName': 'test',
+            'workingDir': '/tmp',
+            'provider': 'cursor',
+            'model': 'claude-4-sonnet',
+            'cursorSessionId': 'cursor-session-from-config',
+          },
+          'messages': [
+            {'id': 'm1', 'role': 'user', 'content': 'hello'},
+          ],
+        },
+      );
+
+      final r = await handler.handleAction('send', {
+        'text': 'resume me',
+      }, panel);
+
+      expect(r.ok, isTrue);
+      final session = sessionManager.get('p1');
+      expect(session, isNotNull);
+      expect(session!.cursorSessionId, 'cursor-session-from-config');
+      expect(
+        session.provider.getSessionId('test'),
+        'cursor-session-from-config',
+      );
+      expect(provider.sentIsFirstMessages, [false]);
+    },
+  );
+
   test('clear resets messages on live session', () async {
     final panel = _panel(
       state: {
@@ -154,7 +336,7 @@ void main() {
       },
     );
     // Create a session and add messages
-    final session = ChatSessionManager.instance.getOrCreate(
+    final session = sessionManager.getOrCreate(
       'p1',
       ChatSessionConfig(sessionName: 'test', workingDir: '/tmp'),
     );
@@ -178,7 +360,7 @@ void main() {
   });
 
   test('status returns session info when session exists', () async {
-    ChatSessionManager.instance.getOrCreate(
+    sessionManager.getOrCreate(
       'p1',
       ChatSessionConfig(
         sessionName: 'test',
@@ -195,11 +377,11 @@ void main() {
   });
 
   test('sessions lists all active sessions', () async {
-    ChatSessionManager.instance.getOrCreate(
+    sessionManager.getOrCreate(
       'p1',
       ChatSessionConfig(sessionName: 's1', workingDir: '/tmp'),
     );
-    ChatSessionManager.instance.getOrCreate(
+    sessionManager.getOrCreate(
       'p2',
       ChatSessionConfig(
         sessionName: 's2',
@@ -220,7 +402,7 @@ void main() {
   });
 
   test('getContent prefers live session data', () {
-    final session = ChatSessionManager.instance.getOrCreate(
+    final session = sessionManager.getOrCreate(
       'p1',
       ChatSessionConfig(sessionName: 'test', workingDir: '/tmp'),
     );

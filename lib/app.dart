@@ -742,7 +742,7 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     final server = CliServer.instance;
     // Register all panel CLI handlers
     server.registerPanelHandler(const NoteCliHandler());
-    server.registerPanelHandler(const ChatCliHandler());
+    server.registerPanelHandler(ChatCliHandler());
     server.registerPanelHandler(const KanbanCliHandler());
     server.registerPanelHandler(const WebpageCliHandler());
     server.registerPanelHandler(const PlaylistCliHandler());
