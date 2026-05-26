@@ -5043,10 +5043,18 @@ class _SystemBubble extends StatelessWidget {
             color: const Color(0x15F87171),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(
-            content,
-            style: const TextStyle(fontSize: 12, color: Color(0xFFF87171)),
-            textAlign: TextAlign.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('✕ ', style: TextStyle(fontSize: 12, color: Color(0xFFF87171))),
+              Flexible(
+                child: SelectableText(
+                  content,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFFF87171)),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
         ),
       ),
