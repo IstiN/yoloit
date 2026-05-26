@@ -354,7 +354,12 @@ class _PromptsSectionState extends State<_PromptsSection> {
   Future<Map<String, String>> _loadPrompts() async {
     final chat = await rootBundle.loadString(_yoloChatAsset);
     final guidance = await rootBundle.loadString(_cliGuidanceAsset);
-    return {'yolochat': chat.trim(), 'agents': guidance.trim()};
+    final help = await CliGuidanceService.instance.fetchHelp();
+    return {
+      'yolochat': chat.trim(),
+      'agents': guidance.trim(),
+      'help': help ?? '(yoloit binary not found or help unavailable)',
+    };
   }
 
   @override
@@ -391,6 +396,18 @@ class _PromptsSectionState extends State<_PromptsSection> {
             _PromptCard(
               label: 'assets/prompts/cli_agent_guidance.md',
               content: prompts['agents']!,
+            ),
+            const SizedBox(height: 28),
+            const _SectionHeader(title: 'YoLoIT CLI Help (injected)'),
+            const SizedBox(height: 4),
+            const Text(
+              'Output of `yoloit help --format short` — appended to the first message in every agent session.',
+              style: TextStyle(color: Color(0xFF8C8D9E), fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            _PromptCard(
+              label: 'yoloit help --format short',
+              content: prompts['help']!,
             ),
           ],
         );

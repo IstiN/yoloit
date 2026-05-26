@@ -13,6 +13,12 @@ class CliGuidanceService {
 
   void clearCache() => _cachedHelp = null;
 
+  /// Public access to the CLI help output for preview purposes.
+  Future<String?> fetchHelp() async {
+    _cachedHelp ??= await _fetchHelp();
+    return _cachedHelp;
+  }
+
   Future<String> prependGuidance(
     String message, {
     ChatRuntimeContext? runtimeContext,
