@@ -184,6 +184,10 @@ class ChatSession extends ChangeNotifier {
     }
   }
 
+  /// Whether at least one assistant reply exists in this session.
+  bool _hasAssistantReply() =>
+      _messages.any((m) => m.role == ChatRole.assistant);
+
   void clearMessages() {
     _messages.clear();
     _totalOutputTokens = 0;
@@ -289,6 +293,7 @@ class ChatSession extends ChangeNotifier {
       runtimeContext: runtimeContext,
     );
 
+    final wasFirstMessage = _isFirstMessage;
     _isFirstMessage = false;
 
     _eventSub?.cancel();
@@ -300,6 +305,10 @@ class ChatSession extends ChangeNotifier {
       },
       onError: (Object error) {
         _isProcessing = false;
+        // If the first message failed, allow guidance to be re-injected on retry.
+        if (wasFirstMessage && !_hasAssistantReply()) {
+          _isFirstMessage = true;
+        }
         _messages.add(
           ChatMessage(
             id: 'error-${DateTime.now().millisecondsSinceEpoch}',

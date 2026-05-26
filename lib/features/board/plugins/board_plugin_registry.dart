@@ -3,6 +3,7 @@ import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/checklist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/code_snippet_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/diff_preview_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/files_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/filetree_plugin.dart';
@@ -74,6 +75,7 @@ class BoardPluginRegistry {
     register(const ChatPanelPlugin());
     register(const BoardTerminalPanelPlugin());
     register(const FileTreePlugin());
+    register(const DiffPreviewPlugin());
     register(const YoloAssistantPlugin());
     register(const CustomWidgetPlugin());
     register(const TimerPlugin());

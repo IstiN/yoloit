@@ -236,7 +236,9 @@ class CloudLlmSettingsService {
 
   static FlutterSecureStorage _buildStorage() {
     if (Platform.isMacOS) {
-      return const FlutterSecureStorage(mOptions: MacOsOptions());
+      return const FlutterSecureStorage(
+        mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+      );
     } else if (Platform.isWindows) {
       return const FlutterSecureStorage(
         wOptions: WindowsOptions(useBackwardCompatibility: false),

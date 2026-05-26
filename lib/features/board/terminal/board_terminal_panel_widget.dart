@@ -8,6 +8,7 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
+import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
@@ -169,6 +170,30 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     );
   }
 
+  Future<void> _onEnvGroupsChanged(List<String> envGroupIds) async {
+    final nextConfig = _config.copyWith(envGroupIds: envGroupIds);
+    _config = nextConfig;
+    widget.onUpdateState({'config': nextConfig.toJson()});
+    // Respawn terminal with new env vars
+    if (_config.sessionId.isNotEmpty && _session != null) {
+      setState(() => _restoring = true);
+      await _manager.killSession(_config.sessionId);
+      final session = await _manager.createSession(
+        sessionName: _config.sessionName,
+        workingDir: _config.workingDir,
+        envGroupIds: envGroupIds,
+      );
+      if (!mounted) return;
+      final updatedConfig = _config.copyWith(sessionId: session.id);
+      _config = updatedConfig;
+      widget.onUpdateState({'config': updatedConfig.toJson()});
+      setState(() {
+        _session = session;
+        _restoring = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_config.isConfigured) {
@@ -191,6 +216,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
           config: _config,
           onHistory: _showHistoryDialog,
           onKill: _killCurrentSession,
+          onEnvGroupsChanged: _onEnvGroupsChanged,
         ),
         Expanded(
           child: TerminalWidget(
@@ -204,22 +230,58 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   }
 }
 
-class _BoardTerminalInfoBar extends StatelessWidget {
+class _BoardTerminalInfoBar extends StatefulWidget {
   const _BoardTerminalInfoBar({
     required this.config,
     required this.onHistory,
     required this.onKill,
+    required this.onEnvGroupsChanged,
   });
 
   final BoardTerminalConfig config;
   final VoidCallback onHistory;
   final VoidCallback onKill;
+  final ValueChanged<List<String>> onEnvGroupsChanged;
+
+  @override
+  State<_BoardTerminalInfoBar> createState() => _BoardTerminalInfoBarState();
+}
+
+class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
+  late Future<List<String>> _envNamesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _envNamesFuture = GlobalEnvGroupsService.instance
+        .resolveSelectedGroupNames(widget.config.envGroupIds);
+  }
+
+  @override
+  void didUpdateWidget(covariant _BoardTerminalInfoBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.config.envGroupIds.join('\u0000') !=
+        widget.config.envGroupIds.join('\u0000')) {
+      _envNamesFuture = GlobalEnvGroupsService.instance
+          .resolveSelectedGroupNames(widget.config.envGroupIds);
+    }
+  }
 
   String _shortPath(String path) {
     final normalized = path.replaceAll('\\', '/');
     final parts = normalized.split('/').where((p) => p.isNotEmpty).toList();
     if (parts.length <= 2) return path;
     return '.../${parts[parts.length - 2]}/${parts.last}';
+  }
+
+  Future<void> _pickEnvGroups() async {
+    final selected = await showEnvGroupPickerDialog(
+      context,
+      initialSelected: widget.config.envGroupIds,
+    );
+    if (selected != null) {
+      widget.onEnvGroupsChanged(selected);
+    }
   }
 
   @override
@@ -241,13 +303,34 @@ class _BoardTerminalInfoBar extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              _shortPath(config.workingDir),
+              _shortPath(widget.config.workingDir),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 10, color: mutedColor),
             ),
           ),
+          FutureBuilder<List<String>>(
+            future: _envNamesFuture,
+            builder: (context, snapshot) {
+              final names = snapshot.data ?? const <String>[];
+              final hasEnv = widget.config.envGroupIds.isNotEmpty;
+              return GestureDetector(
+                onTap: _pickEnvGroups,
+                child: Tooltip(
+                  message: hasEnv
+                      ? 'Env: ${names.join(", ")}'
+                      : 'Select env groups',
+                  child: Icon(
+                    Icons.key_outlined,
+                    size: 14,
+                    color: hasEnv ? const Color(0xFF34D399) : mutedColor,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           GestureDetector(
-            onTap: onHistory,
+            onTap: widget.onHistory,
             child: Tooltip(
               message: 'Terminal history',
               child: Icon(Icons.history, size: 14, color: mutedColor),
@@ -255,7 +338,7 @@ class _BoardTerminalInfoBar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: onKill,
+            onTap: widget.onKill,
             child: const Tooltip(
               message: 'Kill terminal session',
               child: Icon(

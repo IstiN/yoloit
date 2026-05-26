@@ -17,6 +17,7 @@ class FileTreeCard extends StatelessWidget {
     this.onOpenInPanel,
     this.onRename,
     this.onCreateFile,
+    this.onDelete,
   });
   final FileTreeCardProps props;
   final void Function(String path)? onToggle;
@@ -27,6 +28,7 @@ class FileTreeCard extends StatelessWidget {
   final void Function(String path)? onOpenInPanel;
   final void Function(String path, String newName)? onRename;
   final void Function(String dirPath)? onCreateFile;
+  final void Function(String path)? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +116,7 @@ class FileTreeCard extends StatelessWidget {
                           onOpenInPanel: onOpenInPanel,
                           onRename: onRename,
                           onCreateFile: onCreateFile,
+                          onDelete: onDelete,
                         );
                       },
                     ),
@@ -136,6 +139,7 @@ class _TreeRow extends StatefulWidget {
     this.onOpenInPanel,
     this.onRename,
     this.onCreateFile,
+    this.onDelete,
   });
   final TreeEntry entry;
   final VoidCallback? onToggle;
@@ -146,6 +150,7 @@ class _TreeRow extends StatefulWidget {
   final void Function(String path)? onOpenInPanel;
   final void Function(String path, String newName)? onRename;
   final void Function(String dirPath)? onCreateFile;
+  final void Function(String path)? onDelete;
 
   @override
   State<_TreeRow> createState() => _TreeRowState();
@@ -183,6 +188,9 @@ class _TreeRowState extends State<_TreeRow> {
         if (!e.isDir && widget.onOpenInPanel != null)
           const PopupMenuItem(value: 'open_panel', child: Text('⬡ Open in panel',
               style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
+        const PopupMenuDivider(),
+        const PopupMenuItem(value: 'delete', child: Text('🗑️ Delete',
+            style: TextStyle(fontSize: 12, color: Color(0xFFEF4444)))),
       ],
     );
     if (result == null) return;
@@ -201,6 +209,8 @@ class _TreeRowState extends State<_TreeRow> {
         await PlatformLauncher.instance.revealInFinder(e.path);
       case 'open_panel':
         widget.onOpenInPanel?.call(e.path);
+      case 'delete':
+        widget.onDelete?.call(e.path);
     }
   }
 

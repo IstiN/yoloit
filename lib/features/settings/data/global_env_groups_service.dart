@@ -1,44 +1,32 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 
 class GlobalEnvGroupsService {
   GlobalEnvGroupsService._();
 
   static final instance = GlobalEnvGroupsService._();
-  static const _storageKey = 'global_env_groups_v1';
   static const _prefsFallbackKey = 'global_env_groups_fallback_v1';
 
-  static FlutterSecureStorage _buildStorage() {
-    if (Platform.isMacOS) {
-      return const FlutterSecureStorage(mOptions: MacOsOptions());
-    } else if (Platform.isWindows) {
-      return const FlutterSecureStorage(
-        wOptions: WindowsOptions(useBackwardCompatibility: false),
-      );
-    } else {
-      return const FlutterSecureStorage(lOptions: LinuxOptions());
-    }
+  File get _storageFile {
+    final dir = PlatformDirs.instance.configDir;
+    return File(p.join(dir, 'env_groups.json'));
   }
 
-  final _storage = _buildStorage();
-
   Future<List<GlobalEnvGroup>> loadAll() async {
-    String? raw;
     try {
-      raw = await _storage.read(key: _storageKey);
-    } on Exception {
-      raw = null;
-    }
-    if (raw == null || raw.isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      raw = prefs.getString(_prefsFallbackKey);
-    }
-    if (raw == null || raw.isEmpty) return [];
-    try {
+      final file = _storageFile;
+      if (!file.existsSync()) {
+        // Migrate from SharedPreferences fallback if present
+        final migrated = await _migrateFromPrefs();
+        if (migrated != null) return migrated;
+        return [];
+      }
+      final raw = await file.readAsString();
+      if (raw.trim().isEmpty) return [];
       final decoded = jsonDecode(raw) as List;
       return decoded
           .map(
@@ -50,18 +38,38 @@ class GlobalEnvGroupsService {
     }
   }
 
-  Future<GlobalEnvStorageBackend> saveAll(List<GlobalEnvGroup> groups) async {
-    final encoded = jsonEncode(groups.map((e) => e.toJson()).toList());
+  Future<List<GlobalEnvGroup>?> _migrateFromPrefs() async {
     try {
-      await _storage.write(key: _storageKey, value: encoded);
       final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefsFallbackKey);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw) as List;
+      final groups = decoded
+          .map(
+            (e) => GlobalEnvGroup.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList();
+      // Save to file-based storage
+      await saveAll(groups);
+      // Remove old fallback
       await prefs.remove(_prefsFallbackKey);
-      return GlobalEnvStorageBackend.secureStorage;
-    } on Exception {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefsFallbackKey, encoded);
-      return GlobalEnvStorageBackend.localPreferences;
+      return groups;
+    } catch (_) {
+      return null;
     }
+  }
+
+  Future<void> saveAll(List<GlobalEnvGroup> groups) async {
+    final encoded =
+        const JsonEncoder.withIndent('  ').convert(
+          groups.map((e) => e.toJson()).toList(),
+        );
+    final file = _storageFile;
+    final dir = file.parent;
+    if (!dir.existsSync()) {
+      await dir.create(recursive: true);
+    }
+    await file.writeAsString(encoded, flush: true);
   }
 
   Future<Map<String, String>> resolveSelectedGroups(
@@ -133,8 +141,6 @@ class GlobalEnvGroupsService {
     return result;
   }
 }
-
-enum GlobalEnvStorageBackend { secureStorage, localPreferences }
 
 class GlobalEnvGroup {
   const GlobalEnvGroup({

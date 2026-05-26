@@ -291,14 +291,15 @@ class RunConfigsCliHandler extends PanelCliHandler {
         'name': 'Configuration name (required)',
         'command': 'Shell command to execute (required)',
         'group': 'Group scope override (optional)',
-        'workingDir': 'Working directory (optional)',
+        'workingDir':
+            'Absolute path to working directory (optional). Must be a full path, e.g. /Users/me/project — do not use relative paths like "."',
         'env': 'Environment variables map (optional)',
         'isFlutterRun': 'Whether Flutter hot reload/restart controls apply',
         'quickActions':
             'List of quick actions: [{label, icon, command, appendNewline?}]',
       },
       example:
-          '{"name":"Flutter Run","command":"flutter run -d macos","quickActions":[{"label":"Hot Reload","icon":"local_fire_department","command":"r"},{"label":"Hot Restart","icon":"restart_alt","command":"R"}]}',
+          '{"name":"Flutter Run","command":"flutter run -d macos","workingDir":"/Users/me/project","quickActions":[{"label":"Hot Reload","icon":"local_fire_department","command":"r"},{"label":"Hot Restart","icon":"restart_alt","command":"R"}]}',
     ),
     'remove': const CliActionHelp(
       description: 'Remove a configuration by id or name',
@@ -316,7 +317,8 @@ class RunConfigsCliHandler extends PanelCliHandler {
         'group': 'Group scope override (optional)',
         'newName': 'New display name',
         'command': 'New command',
-        'workingDir': 'Working directory override',
+        'workingDir':
+            'Absolute path to working directory. Must be a full path, e.g. /Users/me/project — do not use relative paths like "."',
         'env': 'Environment variables map',
         'isFlutterRun': 'Whether Flutter controls are shown',
         'quickActions':

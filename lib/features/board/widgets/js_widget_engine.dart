@@ -68,7 +68,9 @@ class JsWidgetEngine {
   /// Environment variables injected into exec calls.
   Map<String, String> envVars = {};
 
-  static const _secureStorage = FlutterSecureStorage();
+  static const _secureStorage = FlutterSecureStorage(
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+  );
 
   // ── Public API ──────────────────────────────────────────────────────────
 

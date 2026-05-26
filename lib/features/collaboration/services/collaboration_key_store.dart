@@ -18,8 +18,8 @@ class CollaborationKeyStore {
   CollaborationKeyStore._();
 
   static const _storage = FlutterSecureStorage(
-    // On macOS the default Keychain accessibility is fine.
-    mOptions: MacOsOptions(),
+    // Use traditional Keychain for non-sandboxed app.
+    mOptions: MacOsOptions(usesDataProtectionKeychain: false),
   );
 
   static const _kSpaceKey  = 'collab_space_key_hex_v1';

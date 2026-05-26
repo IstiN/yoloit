@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -106,6 +108,7 @@ class _FileTreeNodeState extends State<FileTreeNode> {
             onOpenInPanel: (path) => _openInPanel(context, path),
             onRename: (path, currentName) => _renameEntry(context, path, currentName),
             onCreateFile: (dirPath) => _createFile(context, dirPath),
+            onDelete: (path) => _deleteEntry(context, path),
           );
         }
 
@@ -124,6 +127,7 @@ class _FileTreeNodeState extends State<FileTreeNode> {
           onOpenInPanel: (path) => _openInPanel(context, path),
           onRename: (path, currentName) => _renameEntry(context, path, currentName),
           onCreateFile: (dirPath) => _createFile(context, dirPath),
+          onDelete: (path) => _deleteEntry(context, path),
         );
       },
     );
@@ -304,6 +308,49 @@ class _FileTreeNodeState extends State<FileTreeNode> {
     // Open the new file in a mindmap panel
     final newPath = p.join(dirPath, fileName);
     if (context.mounted) _openInPanel(context, newPath);
+  }
+
+  Future<void> _deleteEntry(BuildContext context, String path) async {
+    final name = p.basename(path);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final confirmed = await showDialog<bool>(
+      context: navigator.context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1E2A),
+        title: const Text('Delete',
+            style: TextStyle(color: Color(0xFFCECEEE), fontSize: 14)),
+        content: Text(
+          'Delete "$name"? This cannot be undone.',
+          style: const TextStyle(color: Color(0xFFCECEEE), fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF6B7898), fontSize: 12)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFEF4444),
+            ),
+            child: const Text('Delete',
+                style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final type = FileSystemEntity.typeSync(path);
+      if (type == FileSystemEntityType.directory) {
+        await Directory(path).delete(recursive: true);
+      } else {
+        await File(path).delete();
+      }
+    } catch (_) {}
+    // Refresh the tree
+    if (context.mounted) setState(() {});
   }
 
   void _openInPanel(BuildContext context, String path) {

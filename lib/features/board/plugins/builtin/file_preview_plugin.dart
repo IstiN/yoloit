@@ -220,6 +220,16 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     );
   }
 
+  void _openAsWebPage(String path) {
+    final fileName = path.split(Platform.pathSeparator).last;
+    final fileUrl = Uri.file(path).toString();
+    widget.renderContext.onCreateLinkedPanel?.call(
+      'board.webpage',
+      {'url': fileUrl, 'title': fileName},
+      fileName,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final path = _path;
@@ -263,6 +273,8 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     final ext = path.contains('.') ? path.split('.').last : '';
     final canEdit = _isEditableFile(path, ext);
 
+    final isHtml = const {'html', 'htm'}.contains(ext.toLowerCase());
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -271,6 +283,7 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
           onEdit: canEdit ? () => _editFile(path) : null,
           onOpen: () => PlatformLauncher.instance.revealInFinder(path),
           onChange: _pickFile,
+          onOpenAsWebPage: isHtml ? () => _openAsWebPage(path) : null,
         ),
         const Divider(height: 1, thickness: 0.5),
         Expanded(child: _buildPreview(path, ext)),
@@ -1637,12 +1650,14 @@ class _Toolbar extends StatelessWidget {
     required this.onEdit,
     required this.onOpen,
     required this.onChange,
+    this.onOpenAsWebPage,
   });
 
   final String path;
   final VoidCallback? onEdit;
   final VoidCallback onOpen;
   final VoidCallback onChange;
+  final VoidCallback? onOpenAsWebPage;
 
   @override
   Widget build(BuildContext context) {
@@ -1672,6 +1687,17 @@ class _Toolbar extends StatelessWidget {
               label: const Text('Edit', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF8B5CF6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: const Size(0, 28),
+              ),
+            ),
+          if (onOpenAsWebPage != null)
+            TextButton.icon(
+              onPressed: onOpenAsWebPage,
+              icon: const Icon(Icons.language_outlined, size: 14),
+              label: const Text('Web', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF60A5FA),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: const Size(0, 28),
               ),

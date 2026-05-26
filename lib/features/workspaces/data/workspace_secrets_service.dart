@@ -13,7 +13,10 @@ class WorkspaceSecretsService {
   static FlutterSecureStorage _buildStorage() {
     if (Platform.isMacOS) {
       return const FlutterSecureStorage(
-        mOptions: MacOsOptions(accountName: 'yoloit'),
+        mOptions: MacOsOptions(
+          accountName: 'yoloit',
+          usesDataProtectionKeychain: false,
+        ),
       );
     } else if (Platform.isWindows) {
       return const FlutterSecureStorage(

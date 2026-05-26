@@ -46,16 +46,10 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      final backend = await _service.saveAll(_normalizedGroups());
+      await _service.saveAll(_normalizedGroups());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            backend == GlobalEnvStorageBackend.secureStorage
-                ? 'Env groups saved.'
-                : 'Env groups saved to local app storage because secure storage is unavailable.',
-          ),
-        ),
+        const SnackBar(content: Text('Env groups saved.')),
       );
     } catch (error) {
       if (!mounted) return;
@@ -247,34 +241,15 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                     Row(
                       children: [
                         Expanded(
-                          child: TextField(
-                            controller: TextEditingController(text: group.name),
+                          child: _EnvField(
+                            initialValue: group.name,
+                            hint: 'Group name',
                             onChanged:
                                 (value) => _renameGroup(groupIndex, value),
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              hintText: 'Group name',
-                              hintStyle: TextStyle(
-                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
-                                fontSize: 13,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: colors.border),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: colors.border),
-                              ),
                             ),
                           ),
                         ),
@@ -400,12 +375,14 @@ class _EnvField extends StatefulWidget {
     required this.hint,
     required this.onChanged,
     this.obscure = false,
+    this.style,
   });
 
   final String initialValue;
   final String hint;
   final ValueChanged<String> onChanged;
   final bool obscure;
+  final TextStyle? style;
 
   @override
   State<_EnvField> createState() => _EnvFieldState();
@@ -442,11 +419,12 @@ class _EnvFieldState extends State<_EnvField> {
       controller: _controller,
       obscureText: widget.obscure,
       onChanged: widget.onChanged,
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.onSurface,
-        fontSize: 12,
-        fontFamily: 'monospace',
-      ),
+      style: widget.style ??
+          TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 12,
+            fontFamily: 'monospace',
+          ),
       decoration: InputDecoration(
         isDense: true,
         hintText: widget.hint,
