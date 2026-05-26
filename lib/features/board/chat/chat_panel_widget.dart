@@ -23,6 +23,7 @@ import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -3536,12 +3537,22 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     ('local', 'Local LLM'),
   ];
 
-  List<ChatModelInfo> get _modelsForProvider => switch (_selectedProvider) {
-    'cursor' => kCursorModels,
-    'local' => kLocalModels,
-    'opencode' => _opencodeModels ?? kOpencodeModels,
-    _ => kCopilotModels,
-  };
+  List<ChatModelInfo> get _modelsForProvider {
+    // Use ProviderModelCatalogService as single source of truth,
+    // falling back to hardcoded lists only if catalog is not loaded.
+    final catalog = ProviderModelCatalogService.instance;
+    final catalogModels = catalog.modelsForProvider(_selectedProvider);
+    if (catalogModels != null && catalogModels.isNotEmpty) {
+      return catalogModels;
+    }
+    // Fallback to hardcoded lists
+    return switch (_selectedProvider) {
+      'cursor' => kCursorModels,
+      'local' => kLocalModels,
+      'opencode' => _opencodeModels ?? kOpencodeModels,
+      _ => kCopilotModels,
+    };
+  }
 
   @override
   void initState() {
