@@ -396,11 +396,19 @@ class CopilotCliProvider extends ChatProvider {
     if (process != null) {
       debugPrint('[CopilotCli] Killing process for session: $sessionName');
       process.kill(ProcessSignal.sigterm);
-      // Wait for the process to actually exit before returning
-      await process.exitCode.timeout(
-        const Duration(seconds: 3),
+      // Give SIGTERM up to 2 seconds; escalate to SIGKILL if still alive.
+      final exitCode = await process.exitCode.timeout(
+        const Duration(seconds: 2),
         onTimeout: () => -1,
       );
+      if (exitCode == -1) {
+        debugPrint('[CopilotCli] SIGTERM ignored, sending SIGKILL: $sessionName');
+        process.kill(ProcessSignal.sigkill);
+        await process.exitCode.timeout(
+          const Duration(seconds: 1),
+          onTimeout: () => -1,
+        );
+      }
     }
   }
 

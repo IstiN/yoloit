@@ -888,15 +888,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Future<void> _stopStreaming() async {
     if (!_isSending) return;
-    // Stop streaming through the session — it cancels its subscription
-    // and kills the underlying provider process.
-    await _session!.stopStreaming();
-    // Update UI immediately so the stop button and loading disappear at once.
+    // Immediately flip UI so the button responds at once.
     if (mounted) {
-      // Sync messages from session (it finalized the partial content)
-      _messages
-        ..clear()
-        ..addAll(_session!.messages);
       setState(() {
         _streamingContent = '';
         _streamingMessageId = null;
@@ -904,6 +897,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _ignoredToolCallIds.clear();
         _isSending = false;
         _setProcessing(false);
+      });
+    }
+    // Kill the underlying provider process in the background.
+    final session = _session;
+    if (session == null) return;
+    await session.stopStreaming();
+    // Sync final messages once the process has actually stopped.
+    if (mounted && _session != null) {
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(_session!.messages);
       });
     }
   }
