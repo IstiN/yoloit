@@ -264,7 +264,19 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
           : Alignment(0.0, widget.orbAlignY);
 
   // Keep listening waves and status text visually coupled to the orb position.
-  double get _particleAlignY => (_orbAlign.y + 0.03).clamp(-0.9, 0.98);
+  // Compute the alignment so the orbit center (at 60 % of particle widget height)
+  // lands exactly on the orb centre, regardless of particleScale / orbAlignY.
+  double get _particleAlignY {
+    const orbitFraction = 0.60; // must stay in sync with _ScatteredParticlesPainter
+    final orbH = _orbSize * widget.orbScale;
+    final particleH = 320.0 * widget.particleScale;
+    final denominator = _kH - particleH;
+    if (denominator <= 0) return _orbAlign.y; // degenerate: widget fills parent
+    final orbCenterY = (_kH - orbH) * (_orbAlign.y + 1) / 2 + orbH / 2;
+    final alignY =
+        2 * (orbCenterY - orbitFraction * particleH) / denominator - 1;
+    return alignY.clamp(-0.9, 2.0);
+  }
   double get _waveAlignY => (_orbAlign.y - 0.06).clamp(-0.9, 0.95);
   double get _textAlignY => (_orbAlign.y + 0.34).clamp(-0.2, 0.95);
   double get _responseCardBottomPadding {
