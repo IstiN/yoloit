@@ -6140,7 +6140,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       waveSpeed: 1400,
       waveWidth: 160.0,
       waveSpread: 0.50,
-      particleScale: 0.80,
+      particleScale: 0.50,
       responseFontSize: 15.0,
       borderSpeed: 1700,
       responseActionLabel: 'Tap YoLo to speak',

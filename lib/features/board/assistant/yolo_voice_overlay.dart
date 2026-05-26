@@ -1966,6 +1966,8 @@ class _ScatteredParticlesPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Clip to widget bounds so particles never escape into the board canvas.
+    canvas.clipRect(Offset.zero & size);
     // Keep particles close to and slightly above the orb, not near top edge.
     final center = Offset(size.width / 2, size.height * 0.60);
     final halfW = size.width / 2;
