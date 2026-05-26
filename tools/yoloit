@@ -372,6 +372,28 @@ commands = [
     "example": "yoloit agent:run copilot ~/src/project \"fix tests\"",
   },
   {
+    "group": "agents",
+    "name": "agent:model",
+    "description": "Get or set the default LLM model for an agent",
+    "params": [
+      ["agent-id", "Agent id (copilot, cursor, opencode, ...)", True],
+      ["model-id", "Optional model id to set (omit to read current)", False],
+    ],
+    "example": "yoloit agent:model copilot gpt-5.4",
+  },
+  {
+    "group": "agents",
+    "name": "agent:asr",
+    "description": "Get or set the ASR (transcription) config for an agent",
+    "params": [
+      ["agent-id", "Agent id", True],
+      ["mode", "ASR mode: local or cloud (omit to read current)", False],
+      ["--provider config-id", "Cloud provider config id (required when mode=cloud)", False],
+      ["--model model-name", "Cloud ASR model, e.g. whisper-1 (optional for cloud)", False],
+    ],
+    "example": "yoloit agent:asr copilot cloud --provider openai-cfg --model whisper-1",
+  },
+  {
     "group": "search",
     "name": "search",
     "description": "Search text across boards, panels, active chats, and saved chat sessions",
@@ -2267,6 +2289,58 @@ print(json.dumps(body))
 PY
 )
     _post "/agents/run" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
+  agent:model)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit agent:model <agent-id> [model-id]" >&2; exit 1; }
+    agent_id="$1"; shift
+    if [[ $# -eq 0 ]]; then
+      _get "/agents" | python3 -c "import sys,json; d=json.load(sys.stdin); a=next((x for x in d.get('agents',[]) if x['id']=='$agent_id'),None); print(a['defaultModel'] if a and a.get('defaultModel') else '(not set)')" 2>/dev/null
+    else
+      model_id="$1"
+      payload=$(python3 -c "import json,sys; print(json.dumps({'id':sys.argv[1],'defaultModel':sys.argv[2]}))" "$agent_id" "$model_id")
+      _post "/agents/config" "$payload" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  agent:asr)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit agent:asr <agent-id> [local|cloud] [--provider config-id] [--model model-name]" >&2; exit 1; }
+    agent_id="$1"; shift
+    if [[ $# -eq 0 ]]; then
+      _get "/agents" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+a=next((x for x in d.get('agents',[]) if x['id']=='$agent_id'),None)
+if a:
+  print('asrMode: '+a.get('asrMode','local'))
+  if a.get('asrCloudConfigId'): print('asrCloudConfigId: '+a['asrCloudConfigId'])
+  if a.get('asrCloudModel'): print('asrCloudModel: '+a['asrCloudModel'])
+else:
+  print('Agent not found')
+" 2>/dev/null
+    else
+      asr_mode=""; asr_provider=""; asr_model=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --provider) asr_provider="${2:-}"; shift 2 ;;
+          --model) asr_model="${2:-}"; shift 2 ;;
+          local|cloud) asr_mode="$1"; shift ;;
+          *) echo "Unknown argument: $1" >&2; exit 1 ;;
+        esac
+      done
+      payload=$(python3 - "$agent_id" "$asr_mode" "$asr_provider" "$asr_model" <<'PY'
+import json, sys
+agent_id, asr_mode, asr_provider, asr_model = sys.argv[1:5]
+body = {'id': agent_id}
+if asr_mode:
+    body['asrMode'] = asr_mode
+if asr_provider:
+    body['asrCloudConfigId'] = asr_provider
+if asr_model:
+    body['asrCloudModel'] = asr_model
+print(json.dumps(body))
+PY
+)
+      _post "/agents/config" "$payload" | python3 -m json.tool 2>/dev/null
+    fi
     ;;
   search)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit search <query> [--scope all|boards|active-chats|sessions]" >&2; exit 1; }
