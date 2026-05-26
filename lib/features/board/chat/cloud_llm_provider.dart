@@ -416,7 +416,7 @@ flowchart TD
     WHAT --> VIEW[👁 View / Navigation]
     VIEW --> VT{Target}
     VT -->|"перейди на доску / switch board / открой доску"| T_BF[board:focus]
-    VT -->|"покажи / фокус / открой / show / focus → ANY panel\n(note, playlist, checklist, kanban…)\nIf panel not on current board — board:focus first, then panel:focus"| T_PFC[panel:focus]
+    VT -->|"покажи / фокус / открой / show / focus → ANY panel\n(note, playlist, checklist, kanban…)\npanel:focus switches board automatically if needed"| T_PFC[panel:focus]
     VT -->|"открой файл / покажи файл / preview file / открой README\n→ files:search to find path (use --root if folder is specified), then files:preview"| T_FPV[files:preview]
     VT -->|"zoom in / увеличь зум / приблизь"| T_BZI["board:zoom scale×1.5$scaleNote"]
     VT -->|"zoom out / уменьши зум / отдали"| T_BZO["board:zoom scale×0.67$scaleNote"]

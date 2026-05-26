@@ -20,6 +20,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
+import 'package:yoloit/features/board/chat/chat_session_naming.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -668,7 +669,7 @@ class CliServer {
           Directory.current.path;
       final task = body['task'] as String?;
       final rawName = (body['name'] as String?)?.trim();
-      final sessionName =
+      final requestedSessionName =
           (rawName != null && rawName.isNotEmpty ? rawName : null) ??
           (task != null && task.trim().isNotEmpty
               ? task.trim().length > 40
@@ -684,16 +685,38 @@ class CliServer {
       final configs = await AgentConfigService.instance.load();
       final agentConfig = configs.firstWhere(
         (c) => c.id == agentId,
-        orElse: () => AgentConfig(
-          id: agentId,
-          displayName: agentId,
-          iconLabel: agentId[0].toUpperCase(),
-          launchCommand: agentId,
-          visible: true,
-          isBuiltIn: false,
-        ),
+        orElse:
+            () => AgentConfig(
+              id: agentId,
+              displayName: agentId,
+              iconLabel: agentId[0].toUpperCase(),
+              launchCommand: agentId,
+              visible: true,
+              isBuiltIn: false,
+            ),
       );
       final model = agentConfig.defaultModel ?? 'gpt-5-mini';
+
+      // Create board.chat panel on active board
+      final cubit = _cubit;
+      if (cubit == null) return _error('Board cubit not available');
+      final board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
+      if (board == null) return _error('No active board');
+      final sessionName = makeUniqueChatSessionName(
+        requestedSessionName,
+        board.panels
+            .where((p) => p.type == ChatPanelPlugin.kTypeId)
+            .map(
+              (p) =>
+                  (p.state['config'] is Map
+                      ? (Map<String, dynamic>.from(
+                            p.state['config'] as Map,
+                          ))['sessionName']
+                          as String?
+                      : null) ??
+                  p.title,
+            ),
+      );
 
       // Build ChatSessionConfig state for the board.chat panel
       final config = ChatSessionConfig(
@@ -703,13 +726,6 @@ class CliServer {
         model: model,
         autopilot: false,
       );
-
-      // Create board.chat panel on active board
-      final cubit = _cubit;
-      if (cubit == null) return _error('Board cubit not available');
-      final board =
-          cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
-      if (board == null) return _error('No active board');
 
       const plugin = ChatPanelPlugin();
       final panelId = 'chat-${DateTime.now().millisecondsSinceEpoch}';
@@ -724,10 +740,7 @@ class CliServer {
         type: ChatPanelPlugin.kTypeId,
         title: sessionName,
         bounds: bounds,
-        state: {
-          'config': config.toJson(),
-          'configured': true,
-        },
+        state: {'config': config.toJson(), 'configured': true},
         zIndex:
             board.panels.fold<int>(
               0,
@@ -736,6 +749,9 @@ class CliServer {
             1,
       );
       await cubit.addPanel(panel, boardId: board.id);
+      if (cubit.state.activeBoardId != board.id) {
+        await cubit.setActiveBoard(board.id);
+      }
       await cubit.focusPanel(panel.id, boardId: board.id);
       _scheduleRebuild();
 
@@ -743,16 +759,20 @@ class CliServer {
       // When the panel widget mounts it picks up this existing session.
       var taskSent = false;
       if (trimmedTask != null && trimmedTask.isNotEmpty) {
-        final session = ChatSessionManager.instance.getOrCreate(panelId, config);
+        final session = ChatSessionManager.instance.getOrCreate(
+          panelId,
+          config,
+        );
         taskSent = session.sendMessage(text: trimmedTask);
       }
 
       return _json({
         'ok': true,
         'taskSent': taskSent,
-        'STOP': taskSent
-            ? 'Task already sent to agent. DO NOT call yolochat:send or any other tool. Your job is done.'
-            : 'Panel created. Use yolochat:send to send a message.',
+        'STOP':
+            taskSent
+                ? 'Task already sent to agent. DO NOT call yolochat:send or any other tool. Your job is done.'
+                : 'Panel created. Use yolochat:send to send a message.',
         'panel': {
           'id': panelId,
           'title': sessionName,
@@ -852,8 +872,7 @@ class CliServer {
   ) async {
     final body = await _body(request);
     final boardId =
-        (body['board'] as String?) ??
-        request.url.queryParameters['board'];
+        (body['board'] as String?) ?? request.url.queryParameters['board'];
     final board =
         (boardId != null && boardId.isNotEmpty)
             ? _findBoard(cubit, boardId)
@@ -877,7 +896,8 @@ class CliServer {
         final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
         final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
         final result = _lineToElement(x1, y1, x2, y2, strokeWidth);
-        strokes = result.$1; size = result.$2;
+        strokes = result.$1;
+        size = result.$2;
 
       case 'arrow':
         final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
@@ -885,15 +905,19 @@ class CliServer {
         final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
         final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
         final result = _arrowToElement(x1, y1, x2, y2, strokeWidth);
-        strokes = result.$1; size = result.$2;
+        strokes = result.$1;
+        size = result.$2;
 
       case 'circle':
         final cx = (body['cx'] as num?)?.toDouble() ?? posX;
         final cy = (body['cy'] as num?)?.toDouble() ?? posY;
-        final r = (body['r'] as num?)?.toDouble() ??
-            (body['radius'] as num?)?.toDouble() ?? 50.0;
+        final r =
+            (body['r'] as num?)?.toDouble() ??
+            (body['radius'] as num?)?.toDouble() ??
+            50.0;
         final result = _circleToElement(cx, cy, r, strokeWidth);
-        strokes = result.$1; size = result.$2;
+        strokes = result.$1;
+        size = result.$2;
 
       case 'rect':
       case 'rectangle':
@@ -901,33 +925,49 @@ class CliServer {
         final ry = (body['y'] as num?)?.toDouble() ?? posY;
         // Use 'rw' or 'rectWidth' for shape width; fall back to 'width' only if
         // no stroke-width was explicitly provided (to avoid conflict).
-        final w = (body['rw'] as num?)?.toDouble() ??
+        final w =
+            (body['rw'] as num?)?.toDouble() ??
             (body['rectWidth'] as num?)?.toDouble() ??
-            (body['w'] as num?)?.toDouble() ?? 200.0;
+            (body['w'] as num?)?.toDouble() ??
+            200.0;
         final h = (body['height'] as num?)?.toDouble() ?? 100.0;
         final result = _rectToElement(rx, ry, w, h, strokeWidth);
-        strokes = result.$1; size = result.$2;
+        strokes = result.$1;
+        size = result.$2;
 
       case 'svg':
         final pathD = body['d'] as String? ?? body['path'] as String? ?? '';
         final svgStr = body['svg'] as String?;
-        final dStr = pathD.isNotEmpty
-            ? pathD
-            : (svgStr != null ? _extractSvgPathD(svgStr) : '');
+        final dStr =
+            pathD.isNotEmpty
+                ? pathD
+                : (svgStr != null ? _extractSvgPathD(svgStr) : '');
         if (dStr.isEmpty) {
-          return _json({'ok': false, 'error': 'Missing "d" (SVG path data) or "svg" field'});
+          return _json({
+            'ok': false,
+            'error': 'Missing "d" (SVG path data) or "svg" field',
+          });
         }
         final result = _svgPathToElement(dStr, posX, posY, strokeWidth);
         if (result == null) {
-          return _json({'ok': false, 'error': 'Failed to parse SVG path — check "d" syntax (M/L/C/Q/Z commands)'});
+          return _json({
+            'ok': false,
+            'error':
+                'Failed to parse SVG path — check "d" syntax (M/L/C/Q/Z commands)',
+          });
         }
-        strokes = result.$1; size = result.$2;
+        strokes = result.$1;
+        size = result.$2;
 
       case 'file':
         // Render all paths from an SVG file as a single drawing element
-        final filePath = body['file'] as String? ?? body['path'] as String? ?? '';
+        final filePath =
+            body['file'] as String? ?? body['path'] as String? ?? '';
         if (filePath.isEmpty) {
-          return _json({'ok': false, 'error': 'Missing "file" — provide path to SVG file'});
+          return _json({
+            'ok': false,
+            'error': 'Missing "file" — provide path to SVG file',
+          });
         }
         final svgFile = File(filePath);
         if (!svgFile.existsSync()) {
@@ -949,7 +989,10 @@ class CliServer {
           }
         }
         if (allStrokes.isEmpty) {
-          return _json({'ok': false, 'error': 'No drawable paths found in SVG file'});
+          return _json({
+            'ok': false,
+            'error': 'No drawable paths found in SVG file',
+          });
         }
         strokes = allStrokes;
         size = Size(maxW, maxH);
@@ -957,46 +1000,56 @@ class CliServer {
       case 'freehand':
       default:
         final rawPointsVal = body['points'];
-        final rawPoints = rawPointsVal is List
-            ? rawPointsVal
-            : rawPointsVal is String
+        final rawPoints =
+            rawPointsVal is List
+                ? rawPointsVal
+                : rawPointsVal is String
                 ? (jsonDecode(rawPointsVal) as List?)
                 : null;
         if (rawPoints == null || rawPoints.isEmpty) {
-          return _json({'ok': false, 'error': 'Missing "points" for freehand — provide [[x,y],...]'});
+          return _json({
+            'ok': false,
+            'error': 'Missing "points" for freehand — provide [[x,y],...]',
+          });
         }
-        final points = rawPoints.map((p) {
-          final pt = p as List;
-          return Offset(
-            pt[0] is num ? (pt[0] as num).toDouble() : 0,
-            pt[1] is num ? (pt[1] as num).toDouble() : 0,
-          );
-        }).toList();
+        final points =
+            rawPoints.map((p) {
+              final pt = p as List;
+              return Offset(
+                pt[0] is num ? (pt[0] as num).toDouble() : 0,
+                pt[1] is num ? (pt[1] as num).toDouble() : 0,
+              );
+            }).toList();
         final result = _freehandToElement(points, strokeWidth);
-        strokes = result.$1; size = result.$2;
+        strokes = result.$1;
+        size = result.$2;
     }
 
     final absPos = switch (type) {
       'line' || 'arrow' => Offset(
-          math.min(
-            (body['x1'] as num?)?.toDouble() ?? posX,
-            (body['x2'] as num?)?.toDouble() ?? posX + 200,
-          ) - strokeWidth,
-          math.min(
-            (body['y1'] as num?)?.toDouble() ?? posY,
-            (body['y2'] as num?)?.toDouble() ?? posY,
-          ) - strokeWidth,
-        ),
+        math.min(
+              (body['x1'] as num?)?.toDouble() ?? posX,
+              (body['x2'] as num?)?.toDouble() ?? posX + 200,
+            ) -
+            strokeWidth,
+        math.min(
+              (body['y1'] as num?)?.toDouble() ?? posY,
+              (body['y2'] as num?)?.toDouble() ?? posY,
+            ) -
+            strokeWidth,
+      ),
       'circle' => Offset(
-          ((body['cx'] as num?)?.toDouble() ?? posX) -
-              ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
-          ((body['cy'] as num?)?.toDouble() ?? posY) -
-              ((body['r'] as num?)?.toDouble() ?? 50.0) - strokeWidth,
-        ),
+        ((body['cx'] as num?)?.toDouble() ?? posX) -
+            ((body['r'] as num?)?.toDouble() ?? 50.0) -
+            strokeWidth,
+        ((body['cy'] as num?)?.toDouble() ?? posY) -
+            ((body['r'] as num?)?.toDouble() ?? 50.0) -
+            strokeWidth,
+      ),
       'rect' || 'rectangle' => Offset(
-          (body['x'] as num?)?.toDouble() ?? posX,
-          (body['y'] as num?)?.toDouble() ?? posY,
-        ),
+        (body['x'] as num?)?.toDouble() ?? posX,
+        (body['y'] as num?)?.toDouble() ?? posY,
+      ),
       _ => Offset(posX, posY),
     };
 
@@ -1031,27 +1084,35 @@ class CliServer {
     'size': [d.size.width, d.size.height],
     'strokeCount': d.strokes.length,
     'pointCount': d.strokes.fold<int>(0, (s, st) => s + st.length),
-    'strokeColor': '#${d.strokeColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
+    'strokeColor':
+        '#${d.strokeColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
     'strokeWidth': d.strokeWidth,
     'zIndex': d.zIndex,
     'hidden': d.hidden,
   };
 
   (List<List<Offset>>, Size) _lineToElement(
-    double x1, double y1, double x2, double y2, double sw) {
+    double x1,
+    double y1,
+    double x2,
+    double y2,
+    double sw,
+  ) {
     final minX = math.min(x1, x2) - sw;
     final minY = math.min(y1, y2) - sw;
     final origin = Offset(minX, minY);
     final pts = [Offset(x1, y1) - origin, Offset(x2, y2) - origin];
-    final size = Size(
-      (x2 - x1).abs() + sw * 2,
-      (y2 - y1).abs() + sw * 2,
-    );
+    final size = Size((x2 - x1).abs() + sw * 2, (y2 - y1).abs() + sw * 2);
     return ([pts], size);
   }
 
   (List<List<Offset>>, Size) _arrowToElement(
-    double x1, double y1, double x2, double y2, double sw) {
+    double x1,
+    double y1,
+    double x2,
+    double y2,
+    double sw,
+  ) {
     final angle = math.atan2(y2 - y1, x2 - x1);
     const headLen = 20.0;
     const headAngle = 0.4; // radians
@@ -1071,21 +1132,31 @@ class CliServer {
   }
 
   (List<List<Offset>>, Size) _circleToElement(
-    double cx, double cy, double r, double sw) {
+    double cx,
+    double cy,
+    double r,
+    double sw,
+  ) {
     const steps = 64;
     final minX = cx - r - sw;
     final minY = cy - r - sw;
     final origin = Offset(minX, minY);
     final pts = List.generate(steps + 1, (i) {
       final angle = 2 * math.pi * i / steps;
-      return Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)) - origin;
+      return Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)) -
+          origin;
     });
     final size = Size((r + sw) * 2, (r + sw) * 2);
     return ([pts], size);
   }
 
   (List<List<Offset>>, Size) _rectToElement(
-    double rx, double ry, double w, double h, double sw) {
+    double rx,
+    double ry,
+    double w,
+    double h,
+    double sw,
+  ) {
     final origin = Offset(rx - sw, ry - sw);
     final pts = [
       Offset(rx, ry) - origin,
@@ -1098,7 +1169,9 @@ class CliServer {
   }
 
   (List<List<Offset>>, Size) _freehandToElement(
-    List<Offset> points, double sw) {
+    List<Offset> points,
+    double sw,
+  ) {
     if (points.isEmpty) return ([<Offset>[]], Size(sw * 2, sw * 2));
     double minX = points.first.dx, minY = points.first.dy;
     double maxX = minX, maxY = minY;
@@ -1122,16 +1195,20 @@ class CliServer {
   /// Parse a subset of SVG path commands into strokes.
   /// Supports: M, L, H, V, C (cubic bezier), Q (quadratic), Z, and lowercase variants.
   (List<List<Offset>>, Size)? _svgPathToElement(
-    String d, double baseX, double baseY, double sw) {
+    String d,
+    double baseX,
+    double baseY,
+    double sw,
+  ) {
     final strokes = <List<Offset>>[];
     List<Offset> current = [];
     double cx = 0, cy = 0;
 
     // Tokenize: split on command letters, keeping the letter
-    final tokens = RegExp(r'[MLHVCSQTAZmlhvcsqtaz]|[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?')
-        .allMatches(d)
-        .map((m) => m.group(0)!)
-        .toList();
+    final tokens =
+        RegExp(
+          r'[MLHVCSQTAZmlhvcsqtaz]|[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?',
+        ).allMatches(d).map((m) => m.group(0)!).toList();
 
     int i = 0;
     String cmd = 'M';
@@ -1154,22 +1231,27 @@ class CliServer {
         i++;
         return v;
       }
+
       switch (cmd) {
         case 'M':
           if (current.isNotEmpty) strokes.add(current);
-          cx = num(); cy = num();
+          cx = num();
+          cy = num();
           current = [Offset(cx, cy)];
           cmd = 'L';
         case 'm':
           if (current.isNotEmpty) strokes.add(current);
-          cx += num(); cy += num();
+          cx += num();
+          cy += num();
           current = [Offset(cx, cy)];
           cmd = 'l';
         case 'L':
-          cx = num(); cy = num();
+          cx = num();
+          cy = num();
           current.add(Offset(cx, cy));
         case 'l':
-          cx += num(); cy += num();
+          cx += num();
+          cy += num();
           current.add(Offset(cx, cy));
         case 'H':
           cx = num();
@@ -1192,40 +1274,44 @@ class CliServer {
             final by = _cubicBezier(cy, y1, y2, ey, tt);
             current.add(Offset(bx, by));
           }
-          cx = ex; cy = ey;
+          cx = ex;
+          cy = ey;
         case 'c':
           final x1 = cx + num(), y1 = cy + num();
           final x2 = cx + num(), y2 = cy + num();
           final ex = cx + num(), ey = cy + num();
           for (int s = 1; s <= 10; s++) {
             final tt = s / 10;
-            current.add(Offset(
-              _cubicBezier(cx, x1, x2, ex, tt),
-              _cubicBezier(cy, y1, y2, ey, tt),
-            ));
+            current.add(
+              Offset(
+                _cubicBezier(cx, x1, x2, ex, tt),
+                _cubicBezier(cy, y1, y2, ey, tt),
+              ),
+            );
           }
-          cx = ex; cy = ey;
+          cx = ex;
+          cy = ey;
         case 'Q': // quadratic bezier
           final x1 = num(), y1 = num(), ex = num(), ey = num();
           for (int s = 1; s <= 10; s++) {
             final tt = s / 10;
-            current.add(Offset(
-              _quadBezier(cx, x1, ex, tt),
-              _quadBezier(cy, y1, ey, tt),
-            ));
+            current.add(
+              Offset(_quadBezier(cx, x1, ex, tt), _quadBezier(cy, y1, ey, tt)),
+            );
           }
-          cx = ex; cy = ey;
+          cx = ex;
+          cy = ey;
         case 'q':
           final x1 = cx + num(), y1 = cy + num();
           final ex = cx + num(), ey = cy + num();
           for (int s = 1; s <= 10; s++) {
             final tt = s / 10;
-            current.add(Offset(
-              _quadBezier(cx, x1, ex, tt),
-              _quadBezier(cy, y1, ey, tt),
-            ));
+            current.add(
+              Offset(_quadBezier(cx, x1, ex, tt), _quadBezier(cy, y1, ey, tt)),
+            );
           }
-          cx = ex; cy = ey;
+          cx = ex;
+          cy = ey;
         default:
           i++; // skip unknown
       }
@@ -1244,14 +1330,17 @@ class CliServer {
       if (p.dy > maxY) maxY = p.dy;
     }
     final origin = Offset(minX - sw, minY - sw);
-    final relStrokes = strokes.map((s) => s.map((p) => p - origin).toList()).toList();
+    final relStrokes =
+        strokes.map((s) => s.map((p) => p - origin).toList()).toList();
     return (relStrokes, Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
   }
 
   double _cubicBezier(double p0, double p1, double p2, double p3, double t) {
     final mt = 1 - t;
-    return mt * mt * mt * p0 + 3 * mt * mt * t * p1 +
-           3 * mt * t * t * p2 + t * t * t * p3;
+    return mt * mt * mt * p0 +
+        3 * mt * mt * t * p1 +
+        3 * mt * t * t * p2 +
+        t * t * t * p3;
   }
 
   double _quadBezier(double p0, double p1, double p2, double t) {
@@ -2216,6 +2305,9 @@ class CliServer {
       _scheduleRebuild();
     }
     if (body['focus'] == true) {
+      if (cubit.state.activeBoardId != board.id) {
+        await cubit.setActiveBoard(board.id);
+      }
       await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
       _scheduleRebuild();
     }
@@ -2830,6 +2922,9 @@ class CliServer {
     await cubit.addPanel(panel, boardId: board.id);
     pendingPanels[panel.id] = panel;
     if (_bool(raw['focus']) == true) {
+      if (cubit.state.activeBoardId != board.id) {
+        await cubit.setActiveBoard(board.id);
+      }
       await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
     }
     if ((panel.type == 'board.note.markdown') &&
@@ -2912,6 +3007,9 @@ class CliServer {
       await _applyYamlPanelUpdates(cubit, board, panel, updates);
     }
     if (_bool(raw['focus']) == true) {
+      if (cubit.state.activeBoardId != board.id) {
+        await cubit.setActiveBoard(board.id);
+      }
       await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
     }
     return {'ok': true, 'panelId': panel.id};
@@ -3084,6 +3182,10 @@ class CliServer {
   }) async {
     final panel = _resolveYamlPanel(cubit, board, refs, pendingPanels, raw);
     if (panel == null) return {'ok': false, 'error': 'Panel not found'};
+    // Switch to the target board first so the panel is actually visible.
+    if (cubit.state.activeBoardId != board.id) {
+      await cubit.setActiveBoard(board.id);
+    }
     await cubit.focusPanel(panel.id, boardId: board.id, zoomOnFocus: true);
     return {'ok': true, 'panelId': panel.id};
   }
