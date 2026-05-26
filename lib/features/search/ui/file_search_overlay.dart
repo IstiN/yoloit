@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_colors.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/search/data/file_search_service.dart';
@@ -12,15 +17,20 @@ import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 
-/// Shows the quick file search overlay.
-/// If [onFileSelected] is provided, it is called with the selected file path
-/// instead of the default ReviewCubit/FileEditorCubit open behavior (e.g. for
-/// opening files as mindmap panels).
+/// Shows the quick-open overlay.
+/// Searches open board panels, files inside file-tree panel directories,
+/// and workspace files. Arrow keys + Enter to navigate and select.
 Future<void> showFileSearch(
   BuildContext context, {
   required VoidCallback onFileOpened,
   void Function(String filePath)? onFileSelected,
 }) async {
+  // Capture bloc references before the builder closure
+  final boardCubit = context.read<BoardCubit>();
+  final workspaceCubit = context.read<WorkspaceCubit>();
+  final reviewCubit = context.read<ReviewCubit>();
+  final editorCubit = context.read<FileEditorCubit>();
+
   await showDialog<void>(
     context: context,
     barrierColor: Colors.black54,
@@ -28,9 +38,10 @@ Future<void> showFileSearch(
       type: MaterialType.transparency,
       child: MultiBlocProvider(
         providers: [
-          BlocProvider.value(value: context.read<WorkspaceCubit>()),
-          BlocProvider.value(value: context.read<ReviewCubit>()),
-          BlocProvider.value(value: context.read<FileEditorCubit>()),
+          BlocProvider.value(value: boardCubit),
+          BlocProvider.value(value: workspaceCubit),
+          BlocProvider.value(value: reviewCubit),
+          BlocProvider.value(value: editorCubit),
         ],
         child: FileSearchOverlay(
           onFileOpened: onFileOpened,
@@ -41,6 +52,32 @@ Future<void> showFileSearch(
   );
 }
 
+// ─── Quick-open result types ─────────────────────────────────────────────────
+
+enum _QuickResultKind { panel, file }
+
+class _QuickResult {
+  const _QuickResult({
+    required this.kind,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.iconColor,
+    this.panelId,
+    this.filePath,
+  });
+
+  final _QuickResultKind kind;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color iconColor;
+  final String? panelId;
+  final String? filePath;
+}
+
+// ─── Overlay widget ──────────────────────────────────────────────────────────
+
 class FileSearchOverlay extends StatefulWidget {
   const FileSearchOverlay({
     super.key,
@@ -48,7 +85,6 @@ class FileSearchOverlay extends StatefulWidget {
     this.onFileSelected,
   });
   final VoidCallback onFileOpened;
-  /// When provided, replaces the default ReviewCubit+FileEditorCubit open.
   final void Function(String filePath)? onFileSelected;
 
   @override
@@ -60,20 +96,37 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
 
-  SearchMode _mode = SearchMode.files;
-  bool _allWorkspaces = false;
-  List<SearchResult> _results = [];
+  List<_QuickResult> _results = [];
   bool _loading = false;
   int _selectedIndex = 0;
   Timer? _debounce;
+
+  // Precomputed panels + file tree roots for searching
+  List<BoardPanelInstance> _panels = [];
+  List<String> _fileTreeRoots = [];
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(_onQueryChanged);
+    _loadBoardData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
+  }
+
+  void _loadBoardData() {
+    final boardState = context.read<BoardCubit>().state;
+    final board = boardState.activeBoard;
+    if (board != null) {
+      _panels = board.panels.where((p) => !p.hidden).toList();
+      _fileTreeRoots = _panels
+          .where((p) => p.type == 'board.filetree')
+          .map((p) => p.state['rootPath'] as String? ?? '')
+          .where((p) => p.isNotEmpty)
+          .toSet()
+          .toList();
+    }
   }
 
   @override
@@ -87,39 +140,76 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
   void _onQueryChanged() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _runSearch);
-  }
-
-  List<({String name, String path})> _getWorkspaces() {
-    final wsState = context.read<WorkspaceCubit>().state;
-    if (wsState is! WorkspaceLoaded) return [];
-
-    if (_allWorkspaces) {
-      return wsState.workspaces
-          .map((w) => (name: w.name, path: w.path))
-          .toList();
-    }
-
-    // Active workspace only
-    final active = wsState.workspaces.where((w) => w.id == wsState.activeWorkspaceId).firstOrNull
-        ?? wsState.workspaces.firstOrNull;
-    if (active == null) return [];
-    return [(name: active.name, path: active.path)];
+    _debounce = Timer(const Duration(milliseconds: 150), _runSearch);
   }
 
   Future<void> _runSearch() async {
-    final query = _controller.text.trim();
+    final query = _controller.text.trim().toLowerCase();
     if (query.isEmpty) {
-      setState(() { _results = []; _loading = false; _selectedIndex = 0; });
+      setState(() {
+        _results = [];
+        _loading = false;
+        _selectedIndex = 0;
+      });
       return;
     }
 
     setState(() => _loading = true);
-    final workspaces = _getWorkspaces();
 
-    final results = _mode == SearchMode.files
-        ? await FileSearchService.instance.searchFiles(query: query, workspaces: workspaces)
-        : await FileSearchService.instance.searchContent(query: query, workspaces: workspaces);
+    final results = <_QuickResult>[];
+
+    // 1. Search open panels by title
+    for (final panel in _panels) {
+      if (_fuzzyMatch(panel.title, query)) {
+        results.add(_QuickResult(
+          kind: _QuickResultKind.panel,
+          title: panel.title,
+          subtitle: _panelTypeLabel(panel.type),
+          icon: _panelTypeIcon(panel.type),
+          iconColor: _panelTypeColor(panel.type),
+          panelId: panel.id,
+        ));
+      }
+    }
+
+    // 2. Search files inside file-tree directories
+    for (final root in _fileTreeRoots) {
+      final dir = Directory(root);
+      if (!dir.existsSync()) continue;
+      _collectMatchingFiles(dir, root, query, results, maxResults: 100);
+    }
+
+    // 3. Also search workspace files via existing service
+    final wsState = context.read<WorkspaceCubit>().state;
+    if (wsState is WorkspaceLoaded) {
+      final active = wsState.workspaces
+          .where((w) => w.id == wsState.activeWorkspaceId)
+          .firstOrNull ?? wsState.workspaces.firstOrNull;
+      if (active != null) {
+        // Only add workspace files that aren't already covered by file tree roots
+        final wsResults = await FileSearchService.instance.searchFiles(
+          query: _controller.text.trim(),
+          workspaces: [(name: active.name, path: active.path)],
+        );
+        for (final r in wsResults) {
+          // Skip if already in results from file tree
+          if (results.any((q) => q.filePath == r.filePath)) continue;
+          if (results.length >= 150) break;
+          final ext = r.fileName.contains('.')
+              ? r.fileName.split('.').last.toLowerCase()
+              : '';
+          final (icon, color) = _iconForExtension(ext);
+          results.add(_QuickResult(
+            kind: _QuickResultKind.file,
+            title: r.fileName,
+            subtitle: r.relativePath,
+            icon: icon,
+            iconColor: color,
+            filePath: r.filePath,
+          ));
+        }
+      }
+    }
 
     if (!mounted) return;
     setState(() {
@@ -129,17 +219,98 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     });
   }
 
+  void _collectMatchingFiles(
+    Directory dir,
+    String root,
+    String query,
+    List<_QuickResult> results, {
+    int maxResults = 100,
+  }) {
+    if (results.length >= maxResults) return;
+    try {
+      for (final entity in dir.listSync()) {
+        if (results.length >= maxResults) return;
+        final name = p.basename(entity.path);
+        if (name.startsWith('.')) continue;
+        if (entity is Directory) {
+          _collectMatchingFiles(entity, root, query, results,
+              maxResults: maxResults);
+        } else if (entity is File && _fuzzyMatch(name, query)) {
+          final relPath = p.relative(entity.path, from: root);
+          final ext = name.contains('.')
+              ? name.split('.').last.toLowerCase()
+              : '';
+          final (icon, color) = _iconForExtension(ext);
+          // Avoid duplicates
+          if (!results.any((r) => r.filePath == entity.path)) {
+            results.add(_QuickResult(
+              kind: _QuickResultKind.file,
+              title: name,
+              subtitle: relPath,
+              icon: icon,
+              iconColor: color,
+              filePath: entity.path,
+            ));
+          }
+        }
+      }
+    } on FileSystemException {
+      // skip inaccessible
+    }
+  }
+
+  bool _fuzzyMatch(String text, String query) {
+    final lower = text.toLowerCase();
+    if (lower.contains(query)) return true;
+    // Simple subsequence match
+    int qi = 0;
+    for (int i = 0; i < lower.length && qi < query.length; i++) {
+      if (lower[i] == query[qi]) qi++;
+    }
+    return qi == query.length;
+  }
+
   void _openSelected() {
     if (_results.isEmpty) return;
     final result = _results[_selectedIndex];
     Navigator.of(context).pop();
-    if (widget.onFileSelected != null) {
-      widget.onFileSelected!(result.filePath);
-    } else {
-      context.read<ReviewCubit>().selectFile(result.filePath);
-      context.read<FileEditorCubit>().openFile(result.filePath);
+
+    if (result.kind == _QuickResultKind.panel && result.panelId != null) {
+      context.read<BoardCubit>().focusPanel(result.panelId!, zoomOnFocus: true);
+    } else if (result.kind == _QuickResultKind.file && result.filePath != null) {
+      if (widget.onFileSelected != null) {
+        widget.onFileSelected!(result.filePath!);
+      } else {
+        // Try to open as board file preview panel
+        final boardCubit = context.read<BoardCubit>();
+        final board = boardCubit.state.activeBoard;
+        if (board != null) {
+          final fileName = p.basename(result.filePath!);
+          final bounds = BoardPanelBounds(
+            x: 200,
+            y: 200,
+            width: 500,
+            height: 400,
+          );
+          final panel = BoardPanelInstance(
+            id: 'panel-${DateTime.now().microsecondsSinceEpoch}',
+            type: FilePreviewPlugin.kTypeId,
+            title: fileName,
+            bounds: bounds,
+            state: {'path': result.filePath!, 'title': fileName},
+            zIndex: board.panels.fold<int>(
+                  0, (v, p) => p.zIndex > v ? p.zIndex : v) +
+                1,
+          );
+          boardCubit.addPanel(panel);
+          boardCubit.focusPanel(panel.id);
+        } else {
+          context.read<ReviewCubit>().selectFile(result.filePath!);
+          context.read<FileEditorCubit>().openFile(result.filePath!);
+        }
+      }
+      widget.onFileOpened();
     }
-    widget.onFileOpened();
   }
 
   void _navigate(int delta) {
@@ -147,11 +318,12 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     setState(() {
       _selectedIndex = (_selectedIndex + delta).clamp(0, _results.length - 1);
     });
-    // Scroll selected item into view immediately (no animation — avoids jitter)
-    const itemHeight = 60.0;
-    _scrollController.jumpTo(
-      (_selectedIndex * itemHeight).clamp(0.0, _scrollController.position.maxScrollExtent),
-    );
+    const itemHeight = 52.0;
+    if (_scrollController.hasClients) {
+      final target = (_selectedIndex * itemHeight)
+          .clamp(0.0, _scrollController.position.maxScrollExtent);
+      _scrollController.jumpTo(target);
+    }
   }
 
   @override
@@ -164,11 +336,16 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
         child: KeyboardListener(
           focusNode: FocusNode(),
           onKeyEvent: (event) {
-            if (event is KeyDownEvent) {
-              if (event.logicalKey == LogicalKeyboardKey.arrowDown) _navigate(1);
-              if (event.logicalKey == LogicalKeyboardKey.arrowUp) _navigate(-1);
-              if (event.logicalKey == LogicalKeyboardKey.enter) _openSelected();
-              if (event.logicalKey == LogicalKeyboardKey.escape) Navigator.of(context).pop();
+            if (event is KeyDownEvent || event is KeyRepeatEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                _navigate(1);
+              } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                _navigate(-1);
+              } else if (event.logicalKey == LogicalKeyboardKey.enter) {
+                _openSelected();
+              } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+                Navigator.of(context).pop();
+              }
             }
           },
           child: Container(
@@ -189,9 +366,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
             child: Column(
               children: [
                 _buildHeader(context),
-                _buildToolbar(),
                 const Divider(height: 1, color: Color(0xFF2A2A3A)),
                 Expanded(child: _buildResults()),
+                _buildFooter(),
               ],
             ),
           ),
@@ -203,14 +380,10 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   Widget _buildHeader(BuildContext context) {
     final colors = context.appColors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
       child: Row(
         children: [
-          Icon(
-            _mode == SearchMode.files ? Icons.search : Icons.manage_search,
-            size: 18,
-            color: colors.primary,
-          ),
+          Icon(Icons.search, size: 18, color: colors.primary),
           const SizedBox(width: 10),
           Expanded(
             child: Material(
@@ -220,10 +393,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
                 focusNode: _focusNode,
                 style: const TextStyle(color: Colors.white, fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: _mode == SearchMode.files
-                      ? 'Search files by name…'
-                      : 'Search in file contents…',
-                  hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 15),
+                  hintText: 'Search panels, files…',
+                  hintStyle:
+                      TextStyle(color: AppColors.textMuted, fontSize: 15),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -242,39 +414,13 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
             ),
           if (!_loading && _controller.text.isNotEmpty)
             GestureDetector(
-              onTap: () { _controller.clear(); setState(() => _results = []); },
-              child: Icon(Icons.close, size: 16, color: AppColors.textMuted),
+              onTap: () {
+                _controller.clear();
+                setState(() => _results = []);
+              },
+              child:
+                  Icon(Icons.close, size: 16, color: AppColors.textMuted),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToolbar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      child: Row(
-        children: [
-          _ModeChip(
-            label: 'Files',
-            icon: Icons.insert_drive_file_outlined,
-            selected: _mode == SearchMode.files,
-            onTap: () { setState(() => _mode = SearchMode.files); _runSearch(); },
-          ),
-          const SizedBox(width: 6),
-          _ModeChip(
-            label: 'Content',
-            icon: Icons.text_snippet_outlined,
-            selected: _mode == SearchMode.content,
-            onTap: () { setState(() => _mode = SearchMode.content); _runSearch(); },
-          ),
-          const Spacer(),
-          _ModeChip(
-            label: 'All workspaces',
-            icon: Icons.workspaces_outlined,
-            selected: _allWorkspaces,
-            onTap: () { setState(() => _allWorkspaces = !_allWorkspaces); _runSearch(); },
-          ),
         ],
       ),
     );
@@ -283,9 +429,24 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   Widget _buildResults() {
     if (_results.isEmpty && _controller.text.isEmpty) {
       return Center(
-        child: Text(
-          'Type to search files…',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search, size: 36, color: AppColors.textMuted.withAlpha(80)),
+            const SizedBox(height: 8),
+            Text(
+              'Type to search panels & files…',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '↑↓ navigate  ↵ open  esc close',
+              style: TextStyle(
+                color: AppColors.textMuted.withAlpha(100),
+                fontSize: 11,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -303,11 +464,11 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 8),
       itemCount: _results.length,
-      itemExtent: 60,
+      itemExtent: 52,
       itemBuilder: (context, index) {
         final result = _results[index];
         final isSelected = index == _selectedIndex;
-        return _ResultTile(
+        return _QuickResultTile(
           result: result,
           isSelected: isSelected,
           query: _controller.text.trim(),
@@ -319,165 +480,100 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       },
     );
   }
-}
 
-class _ModeChip extends StatelessWidget {
-  const _ModeChip({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 150),
-        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: selected ? colors.primary.withAlpha(30) : Colors.transparent,
-          border: Border.all(
-            color: selected ? colors.primary.withAlpha(120) : colors.border,
-          ),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: selected ? colors.primary : AppColors.textMuted),
-            SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: selected ? colors.primary : AppColors.textMuted,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ResultTile extends StatelessWidget {
-  const _ResultTile({
-    required this.result,
-    required this.isSelected,
-    required this.query,
-    required this.onTap,
-  });
-
-  final SearchResult result;
-  final bool isSelected;
-  final String query;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final extension = result.fileName.contains('.')
-        ? result.fileName.split('.').last.toLowerCase()
-        : '';
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: Duration(milliseconds: 80),
-        color: isSelected ? colors.primary.withAlpha(25) : Colors.transparent,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            _FileIcon(extension: extension),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _HighlightText(
-                    text: result.fileName,
-                    query: query,
-                    baseStyle: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      height: 1.2,
-                    ),
-                    highlightStyle: TextStyle(
-                      color: colors.primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Row(
-                    children: [
-                      if (result.lineNumber != null) ...[
-                        Text(
-                          ':${result.lineNumber}',
-                          style: TextStyle(
-                            color: colors.primary.withAlpha(180),
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      Expanded(
-                        child: Text(
-                          result.lineContent != null
-                              ? result.lineContent!
-                              : result.relativePath,
-                          style: TextStyle(color: AppColors.textMuted, fontSize: 11),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (result.lineContent == null && result.workspaceName.isNotEmpty)
-                        Text(
-                          result.workspaceName,
-                          style: TextStyle(color: AppColors.textMuted.withAlpha(120), fontSize: 10),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(Icons.keyboard_return, size: 12, color: AppColors.textMuted),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FileIcon extends StatelessWidget {
-  const _FileIcon({required this.extension});
-  final String extension;
-
-  @override
-  Widget build(BuildContext context) {
-    final (icon, color) = _iconForExtension(extension);
+  Widget _buildFooter() {
+    final panelCount =
+        _results.where((r) => r.kind == _QuickResultKind.panel).length;
+    final fileCount =
+        _results.where((r) => r.kind == _QuickResultKind.file).length;
+    if (_results.isEmpty) return const SizedBox.shrink();
     return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        color: color.withAlpha(25),
-        borderRadius: BorderRadius.circular(6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFF2A2A3A))),
       ),
-      child: Icon(icon, size: 15, color: color),
+      child: Row(
+        children: [
+          if (panelCount > 0)
+            Text(
+              '$panelCount panel${panelCount > 1 ? 's' : ''}',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+            ),
+          if (panelCount > 0 && fileCount > 0)
+            Text(' · ',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+          if (fileCount > 0)
+            Text(
+              '$fileCount file${fileCount > 1 ? 's' : ''}',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+            ),
+          const Spacer(),
+          Text(
+            '${_results.length} result${_results.length > 1 ? 's' : ''}',
+            style: TextStyle(
+                color: AppColors.textMuted.withAlpha(120), fontSize: 11),
+          ),
+        ],
+      ),
     );
+  }
+
+  // ── Icon helpers ──────────────────────────────────────────────────────────
+
+  static IconData _panelTypeIcon(String type) {
+    return switch (type) {
+      'board.chat' => Icons.chat_outlined,
+      'board.terminal' => Icons.terminal,
+      'board.filetree' => Icons.account_tree_outlined,
+      'board.file.preview' => Icons.description_outlined,
+      'board.diff.preview' => Icons.difference_outlined,
+      'board.note.markdown' => Icons.article_outlined,
+      'board.code.snippet' => Icons.code,
+      'board.run.configs' => Icons.play_circle_outline,
+      'board.webpage' => Icons.language,
+      'board.checklist' => Icons.checklist,
+      'board.kanban' => Icons.view_kanban_outlined,
+      'board.timer' => Icons.timer_outlined,
+      'board.custom.widget' => Icons.widgets_outlined,
+      'board.playlist' => Icons.queue_music,
+      'board.yolo.assistant' => Icons.assistant_outlined,
+      _ => Icons.dashboard_outlined,
+    };
+  }
+
+  static Color _panelTypeColor(String type) {
+    return switch (type) {
+      'board.chat' => const Color(0xFF60A5FA),
+      'board.terminal' => const Color(0xFF4ADE80),
+      'board.filetree' => const Color(0xFF64748B),
+      'board.file.preview' => const Color(0xFFA78BFA),
+      'board.diff.preview' => const Color(0xFF60A5FA),
+      'board.note.markdown' => const Color(0xFFFBBF24),
+      'board.code.snippet' => const Color(0xFF34D399),
+      'board.run.configs' => const Color(0xFF22D3EE),
+      _ => const Color(0xFF94A3B8),
+    };
+  }
+
+  static String _panelTypeLabel(String type) {
+    return switch (type) {
+      'board.chat' => 'Chat Panel',
+      'board.terminal' => 'Terminal',
+      'board.filetree' => 'File Tree',
+      'board.file.preview' => 'File Preview',
+      'board.diff.preview' => 'Diff Preview',
+      'board.note.markdown' => 'Markdown Note',
+      'board.code.snippet' => 'Code Snippet',
+      'board.run.configs' => 'Run Configs',
+      'board.webpage' => 'Web Page',
+      'board.checklist' => 'Checklist',
+      'board.kanban' => 'Kanban Board',
+      'board.timer' => 'Timer',
+      'board.custom.widget' => 'Custom Widget',
+      'board.playlist' => 'Playlist',
+      'board.yolo.assistant' => 'Yolo Assistant',
+      _ => type,
+    };
   }
 
   static (IconData, Color) _iconForExtension(String ext) {
@@ -500,6 +596,103 @@ class _FileIcon extends StatelessWidget {
   }
 }
 
+// ─── Result tile ─────────────────────────────────────────────────────────────
+
+class _QuickResultTile extends StatelessWidget {
+  const _QuickResultTile({
+    required this.result,
+    required this.isSelected,
+    required this.query,
+    required this.onTap,
+  });
+
+  final _QuickResult result;
+  final bool isSelected;
+  final String query;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 80),
+        color: isSelected ? colors.primary.withAlpha(25) : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: result.iconColor.withAlpha(25),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(result.icon, size: 15, color: result.iconColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _HighlightText(
+                    text: result.title,
+                    query: query,
+                    baseStyle: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      height: 1.2,
+                    ),
+                    highlightStyle: TextStyle(
+                      color: colors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    result.subtitle,
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (result.kind == _QuickResultKind.panel)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: result.iconColor.withAlpha(20),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'PANEL',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: result.iconColor,
+                  ),
+                ),
+              ),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.keyboard_return, size: 12, color: AppColors.textMuted),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Highlight text ──────────────────────────────────────────────────────────
+
 class _HighlightText extends StatelessWidget {
   const _HighlightText({
     required this.text,
@@ -515,11 +708,15 @@ class _HighlightText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (query.isEmpty) return Text(text, style: baseStyle, overflow: TextOverflow.ellipsis);
+    if (query.isEmpty) {
+      return Text(text, style: baseStyle, overflow: TextOverflow.ellipsis);
+    }
 
     final queries = FuzzyMatcher.candidates(query);
     final indices = FuzzyMatcher.bestMatchIndices(text, queries);
-    if (indices.isEmpty) return Text(text, style: baseStyle, overflow: TextOverflow.ellipsis);
+    if (indices.isEmpty) {
+      return Text(text, style: baseStyle, overflow: TextOverflow.ellipsis);
+    }
 
     final indexSet = indices.toSet();
     final spans = <TextSpan>[];
