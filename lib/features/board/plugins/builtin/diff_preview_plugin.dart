@@ -79,6 +79,19 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
     }
   }
 
+  void _openFilePreview() {
+    if (_filePath.isEmpty) return;
+    final fullPath = _rootPath.isNotEmpty
+        ? '$_rootPath/$_filePath'
+        : _filePath;
+    final fileName = _filePath.split('/').last;
+    widget.renderContext.onCreateLinkedPanel?.call(
+      'board.file.preview',
+      {'path': fullPath, 'title': fileName},
+      fileName,
+    );
+  }
+
   Future<void> _loadDiff() async {
     setState(() {
       _loading = true;
@@ -258,6 +271,15 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
             onTap: () => setState(() => _sideBySide = true),
           ),
           const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.description_outlined, size: 14),
+            onPressed: _openFilePreview,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            color: const Color(0xFF94A3B8),
+            tooltip: 'Open file preview',
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.refresh, size: 14),
             onPressed: _loadDiff,
