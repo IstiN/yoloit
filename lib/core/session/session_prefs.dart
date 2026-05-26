@@ -46,6 +46,7 @@ class SessionPrefs {
 
   // Chat context injection
   static const _kInjectCliHelp = 'chat.injectCliHelpOnFirstMessage';
+  static const _kBoardSnapshot = 'chat.boardSnapshotEnabled';
 
   // ── Load ─────────────────────────────────────────────────────────────────
   static Future<SessionSnapshot> load() async {
@@ -154,6 +155,14 @@ class SessionPrefs {
 
   static Future<void> saveInjectCliHelpEnabled(bool v) async =>
       (await _p()).setBool(_kInjectCliHelp, v);
+
+  // ── Board snapshot ────────────────────────────────────────────────────────
+
+  static Future<bool> isBoardSnapshotEnabled() async =>
+      (await _p()).getBool(_kBoardSnapshot) ?? false;
+
+  static Future<void> saveBoardSnapshotEnabled(bool v) async =>
+      (await _p()).setBool(_kBoardSnapshot, v);
 
   // ── Editor tabs (per workspace) ───────────────────────────────────────────
 

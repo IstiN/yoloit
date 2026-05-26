@@ -275,6 +275,15 @@ class ChatSession extends ChangeNotifier {
     final imageAttachments =
         allAttachments.where((t) => imageExtRe.hasMatch(t)).toList();
 
+    // Inject board snapshot as attachment for CLI agents (file path mode)
+    final snapshotPath = runtimeContext?.boardSnapshotPath;
+    if (snapshotPath != null && snapshotPath.isNotEmpty) {
+      final isCliAgent = _provider.imageMode == ChatImageMode.filePath;
+      if (isCliAgent) {
+        imageAttachments.add(snapshotPath);
+      }
+    }
+
     if (_config.provider == 'opencode' && _opencodeSessionId != null) {
       _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
     }

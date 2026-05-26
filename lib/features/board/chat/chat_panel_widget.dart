@@ -10,6 +10,8 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/cli/board_screenshot_service.dart';
+import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
@@ -983,6 +985,22 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     final board = _currentBoardForPanel();
 
+    // Capture board snapshot if enabled
+    String? snapshotPath;
+    String? snapshotBase64;
+    final snapshotEnabled = await SessionPrefs.isBoardSnapshotEnabled();
+    if (snapshotEnabled) {
+      final screenshotSvc = BoardScreenshotService.instance;
+      final isCloudProvider = _session!.provider.imageMode == ChatImageMode.base64;
+      if (isCloudProvider) {
+        snapshotBase64 = await screenshotSvc.captureBase64(pixelRatio: 0.5);
+      } else {
+        snapshotPath = await screenshotSvc.captureJpegFile(pixelRatio: 0.5);
+      }
+      // Clean up old snapshots in the background
+      screenshotSvc.cleanupOldSnapshots();
+    }
+
     // Route through the session — it owns the stream subscription.
     // When this widget is disposed, the session keeps processing events.
     final ok = _session!.sendMessage(
@@ -997,6 +1015,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         availableBoardsSummary: _availableBoardsSummary(),
         currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
         viewportScale: board?.viewport.scale,
+        boardSnapshotPath: snapshotPath,
+        boardSnapshotBase64: snapshotBase64,
       ),
       onEvent: _handleEvent,
       onError: (Object error) {

@@ -22,6 +22,8 @@ class ChatRuntimeContext {
     this.availableBoardsSummary,
     this.currentBoardPanelsSummary,
     this.viewportScale,
+    this.boardSnapshotPath,
+    this.boardSnapshotBase64,
   });
 
   final String? boardId;
@@ -33,6 +35,10 @@ class ChatRuntimeContext {
   final String? currentBoardPanelsSummary;
   /// Current board viewport zoom scale (e.g. 1.0 = 100%).
   final double? viewportScale;
+  /// Path to a compressed board screenshot file (for CLI agents).
+  final String? boardSnapshotPath;
+  /// Base64-encoded board screenshot (for cloud LLM providers).
+  final String? boardSnapshotBase64;
 }
 
 /// Abstract interface for chat backends.

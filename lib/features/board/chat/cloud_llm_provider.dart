@@ -472,7 +472,25 @@ flowchart TD
       // Multimodal user message: send audio content directly to the LLM.
       messages.add({'role': 'user', 'content': audioContentOverride});
     } else {
-      messages.add({'role': 'user', 'content': userMessage});
+      final snapshotB64 = runtimeContext?.boardSnapshotBase64;
+      if (snapshotB64 != null && snapshotB64.isNotEmpty) {
+        // Multimodal: text + board snapshot image
+        messages.add({
+          'role': 'user',
+          'content': <Map<String, Object?>>[
+            {'type': 'text', 'text': userMessage},
+            {
+              'type': 'image_url',
+              'image_url': {
+                'url': 'data:image/png;base64,$snapshotB64',
+                'detail': 'low',
+              },
+            },
+          ],
+        });
+      } else {
+        messages.add({'role': 'user', 'content': userMessage});
+      }
     }
     return messages;
   }
