@@ -19,6 +19,7 @@ import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_session_naming.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
@@ -963,6 +964,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       return;
     }
 
+    // Handle /context command — just clear input, the picker is shown inline
+    if (text == '/context') {
+      _inputController.clear();
+      return;
+    }
+
     setState(() => _isSending = true);
     if (overrideText == null) {
       _inputController.clear();
@@ -1013,7 +1020,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         panelTitle: widget.panel.title,
         panelType: widget.panel.type,
         availableBoardsSummary: _availableBoardsSummary(),
-        currentBoardPanelsSummary: _currentBoardPanelsSummary(board),
+        currentBoardPanelsSummary: _ctxBoardPanelsJson
+            ? _currentBoardPanelsSummary(board)
+            : null,
         viewportScale: board?.viewport.scale,
         boardSnapshotPath: snapshotPath,
         boardSnapshotBase64: snapshotBase64,
@@ -2297,6 +2306,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             _buildModelSuggestions(colors),
             const SizedBox(height: 8),
           ],
+          if (_isContextSlash) ...[
+            _buildContextToggles(colors),
+            const SizedBox(height: 8),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -2924,6 +2937,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       description: 'Switch AI model',
       triggers: ['/model', '.model'],
     ),
+    _SlashCommand(
+      id: 'context',
+      displayName: 'context',
+      description: 'Toggle context injections',
+      triggers: ['/context', '.context'],
+    ),
   ];
 
   _SlashCommand? _findMatchingCommand(String text) {
@@ -2945,19 +2964,40 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 : '';
         _modelSelectedIndex = 0;
         _isModelSlash = cmd.id == 'model';
+        _isContextSlash = cmd.id == 'context';
       } else {
         _modelQuery = '';
         _isModelSlash = false;
+        _isContextSlash = false;
       }
     });
     if (needsScroll) _ensureSuggestionsVisible();
   }
 
   bool _isModelSlash = false;
+  bool _isContextSlash = false;
+
+  // ── Context toggles state ─────────────────────────────────────────────────
+  bool _ctxCliHelp = true;
+  bool _ctxBoardSnapshot = false;
+  bool _ctxBoardPanelsJson = true;
+  bool _ctxSystemPrompt = true;
+  bool _ctxLoaded = false;
+
+  void _loadContextToggles() {
+    if (_ctxLoaded) return;
+    _ctxLoaded = true;
+    SessionPrefs.isInjectCliHelpEnabled().then((v) {
+      if (mounted) setState(() => _ctxCliHelp = v);
+    });
+    SessionPrefs.isBoardSnapshotEnabled().then((v) {
+      if (mounted) setState(() => _ctxBoardSnapshot = v);
+    });
+  }
 
   bool get _isPlainSlash {
     final t = _inputController.text;
-    return (t.startsWith('/') || t.startsWith('.')) && !_isModelSlash;
+    return (t.startsWith('/') || t.startsWith('.')) && !_isModelSlash && !_isContextSlash;
   }
 
   double _suggestionHeight(int count) {
@@ -3088,6 +3128,110 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                         context,
                       ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildContextToggles(AppColorScheme colors) {
+    _loadContextToggles();
+    final items = <({String id, String label, IconData icon, bool value, void Function(bool) onChanged})>[
+      (
+        id: 'cli_help',
+        label: 'CLI Help',
+        icon: Icons.terminal,
+        value: _ctxCliHelp,
+        onChanged: (v) async {
+          await SessionPrefs.saveInjectCliHelpEnabled(v);
+          CliGuidanceService.instance.clearCache();
+          setState(() => _ctxCliHelp = v);
+        },
+      ),
+      (
+        id: 'board_snapshot',
+        label: 'Board Screenshot',
+        icon: Icons.screenshot_monitor_outlined,
+        value: _ctxBoardSnapshot,
+        onChanged: (v) async {
+          await SessionPrefs.saveBoardSnapshotEnabled(v);
+          setState(() => _ctxBoardSnapshot = v);
+        },
+      ),
+      (
+        id: 'board_json',
+        label: 'Board Panels JSON',
+        icon: Icons.data_object,
+        value: _ctxBoardPanelsJson,
+        onChanged: (v) {
+          setState(() => _ctxBoardPanelsJson = v);
+        },
+      ),
+      (
+        id: 'system_prompt',
+        label: 'System Prompt',
+        icon: Icons.psychology_outlined,
+        value: _ctxSystemPrompt,
+        onChanged: (v) {
+          setState(() => _ctxSystemPrompt = v);
+        },
+      ),
+    ];
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 200),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => Divider(
+          height: 1,
+          color: colors.border.withValues(alpha: 0.3),
+        ),
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return InkWell(
+            onTap: () => item.onChanged(!item.value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    item.icon,
+                    size: 14,
+                    color: item.value
+                        ? colors.terminalPrompt
+                        : Colors.white.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: item.value
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    item.value
+                        ? Icons.check_box
+                        : Icons.check_box_outline_blank,
+                    size: 16,
+                    color: item.value
+                        ? colors.terminalPrompt
+                        : Colors.white.withValues(alpha: 0.3),
                   ),
                 ],
               ),
