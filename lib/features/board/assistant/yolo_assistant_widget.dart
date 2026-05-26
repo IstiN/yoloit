@@ -17,6 +17,7 @@ import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
 import 'package:yoloit/features/board/chat/cloud_llm_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
@@ -130,6 +131,10 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   // In-memory ring buffer of raw LLM debug sessions (last 20, not persisted).
   final List<Map<String, dynamic>> _debugSessions = [];
   Map<String, dynamic>? _activeDebugSession;
+
+  // Current session tracking for history persistence.
+  String? _assistantSessionId;
+  DateTime? _assistantSessionCreatedAt;
 
   // Pending state overrides — prevents stale widget.panel.state reads from
   // overwriting state changes made between board rebuilds. Each _updateState
@@ -678,6 +683,8 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       if (_debugSessions.length > 20) _debugSessions.removeAt(0);
       _activeDebugSession = null;
       _messageDraft = null;
+      // Persist messages to history after each exchange.
+      _persistToHistory();
       if (mounted) {
         setState(() {
           _isGeneratingReply = false;
@@ -1692,6 +1699,13 @@ $messagesJson
             style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
           const Spacer(),
+          // History
+          _SessionBarButton(
+            icon: Icons.history,
+            tooltip: 'Session history',
+            onTap: () => _showHistoryDialog(context),
+          ),
+          const SizedBox(width: 4),
           // New session
           _SessionBarButton(
             icon: Icons.add_circle_outline,
@@ -1711,9 +1725,14 @@ $messagesJson
   }
 
   void _newSession() {
+    // Persist current session before starting a new one.
+    _persistToHistory();
     _chatProvider?.dispose();
     _chatProvider = null;
     _chatProviderType = null;
+    // Reset session tracking so a fresh ID is generated for the new session.
+    _assistantSessionId = null;
+    _assistantSessionCreatedAt = null;
     _updateState({
       'messages': <dynamic>[],
       'lastUsage': null,
@@ -1726,8 +1745,75 @@ $messagesJson
     _chatProvider?.dispose();
     _chatProvider = null;
     _chatProviderType = null;
+    _assistantSessionId = null;
+    _assistantSessionCreatedAt = null;
     _updateState({'messages': <dynamic>[], 'lastUsage': null});
     setState(() {});
+  }
+
+  /// Generates a stable session ID for this conversation. The ID is kept in
+  /// memory; a new one is created each time _newSession / _clearSession resets.
+  String _getOrCreateSessionId() {
+    _assistantSessionId ??=
+        'yolo-${DateTime.now().millisecondsSinceEpoch}';
+    _assistantSessionCreatedAt ??= DateTime.now();
+    return _assistantSessionId!;
+  }
+
+  /// Persists the current messages to [ChatSessionHistory] so the user can
+  /// browse and restore past yolo chat sessions.
+  void _persistToHistory() {
+    final msgs = _messageDraft ?? _messages;
+    if (msgs.isEmpty) return;
+    final sessionId = _getOrCreateSessionId();
+    final createdAt = _assistantSessionCreatedAt ?? DateTime.now();
+
+    // Derive a short name from the first user message.
+    final firstUserMsg = msgs.firstWhere(
+      (m) => m['role'] == 'user',
+      orElse: () => <String, dynamic>{},
+    );
+    final firstText = (firstUserMsg['content'] as String? ?? '').trim();
+    final rawName = firstText.length > 60 ? firstText.substring(0, 60) : firstText;
+    final sessionName =
+        rawName.isEmpty ? 'Yolo session' : rawName.replaceAll('\n', ' ');
+
+    final providerType = _chatProviderType ?? 'local';
+    final modelLabel =
+        providerType.startsWith('cloud:')
+            ? (_chatProvider is CloudLlmProvider
+                ? (_chatProvider as CloudLlmProvider).config?.model ?? providerType
+                : providerType)
+            : 'local';
+
+    final entry = ChatSessionEntry(
+      id: sessionId,
+      sessionName: sessionName,
+      provider: providerType,
+      model: modelLabel,
+      workingDir: '',
+      createdAt: createdAt,
+      lastMessageAt: DateTime.now(),
+      messageCount: msgs.where((m) => m['role'] != 'tool').length,
+    );
+    ChatSessionHistory.instance.upsert(entry, messages: msgs.cast());
+  }
+
+  Future<void> _showHistoryDialog(BuildContext context) async {
+    final result = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (_) => _AssistantHistoryDialog(currentSessionId: _assistantSessionId),
+    );
+    if (result != null && mounted) {
+      // Restore messages and start a new session ID.
+      _assistantSessionId = null;
+      _assistantSessionCreatedAt = null;
+      _chatProvider?.dispose();
+      _chatProvider = null;
+      _chatProviderType = null;
+      _updateState({'messages': result, 'lastUsage': null});
+      setState(() {});
+    }
   }
 
   Widget _buildSkillsBar(AppColorScheme colors) {
@@ -3773,5 +3859,215 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     } catch (_) {
       return null;
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Yolo Assistant — Session history dialog
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AssistantHistoryDialog extends StatefulWidget {
+  const _AssistantHistoryDialog({this.currentSessionId});
+  final String? currentSessionId;
+
+  @override
+  State<_AssistantHistoryDialog> createState() =>
+      _AssistantHistoryDialogState();
+}
+
+class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
+  late Future<List<ChatSessionEntry>> _entriesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _entriesFuture = _loadYoloSessions();
+  }
+
+  Future<List<ChatSessionEntry>> _loadYoloSessions() async {
+    final all = await ChatSessionHistory.instance.loadAll();
+    // Show only sessions created by the yolo assistant (id starts with 'yolo-').
+    return all.where((e) => e.id.startsWith('yolo-')).toList();
+  }
+
+  void _refresh() =>
+      setState(() => _entriesFuture = _loadYoloSessions());
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AlertDialog(
+      backgroundColor: colors.surface,
+      title: Row(
+        children: [
+          Icon(Icons.history, size: 18,
+              color: Theme.of(context).colorScheme.onSurface),
+          const SizedBox(width: 8),
+          Text(
+            'Yolo session history',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 400,
+        height: 440,
+        child: FutureBuilder<List<ChatSessionEntry>>(
+          future: _entriesFuture,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final entries = snapshot.data!;
+            if (entries.isEmpty) {
+              return Center(
+                child: Text(
+                  'No sessions yet.\nStart chatting to see history here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              );
+            }
+            return ListView.separated(
+              itemCount: entries.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 4),
+              itemBuilder: (context, index) {
+                final e = entries[index];
+                final isCurrent = e.id == widget.currentSessionId;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? colors.surfaceElevated
+                        : colors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: isCurrent
+                        ? Border.all(
+                            color: const Color(0xFF34D399), width: 0.5)
+                        : Border.all(
+                            color: colors.border.withAlpha(80), width: 0.5),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        size: 14,
+                        color: isCurrent
+                            ? const Color(0xFF34D399)
+                            : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              e.sessionName.isNotEmpty
+                                  ? e.sessionName
+                                  : 'Yolo session',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isCurrent
+                                    ? const Color(0xFF34D399)
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${e.provider} • ${e.messageCount} msgs',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        _formatDate(e.lastMessageAt ?? e.createdAt),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Restore
+                      if (!isCurrent)
+                        _historyBtn(
+                          icon: Icons.restore,
+                          color: const Color(0xFF60A5FA),
+                          tooltip: 'Restore',
+                          onTap: () async {
+                            final msgs = await ChatSessionHistory.instance
+                                .loadMessages(e.id);
+                            if (!context.mounted) return;
+                            Navigator.pop(context, msgs);
+                          },
+                        ),
+                      // Delete
+                      _historyBtn(
+                        icon: Icons.delete_outline,
+                        color: const Color(0xFFF87171),
+                        tooltip: 'Delete',
+                        onTap: () async {
+                          await ChatSessionHistory.instance.delete(e.id);
+                          _refresh();
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+
+  Widget _historyBtn({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(icon, size: 14, color: color),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 }
