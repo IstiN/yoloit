@@ -13,6 +13,7 @@ import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -1688,7 +1689,7 @@ $messagesJson
           // Session info
           Text(
             '$msgCount msgs',
-            style: TextStyle(fontSize: 11, color: colors.border),
+            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
           const Spacer(),
           // New session
@@ -2911,7 +2912,7 @@ class _SessionBarButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 16, color: context.appColors.border),
+          child: Icon(icon, size: 16, color: AppColors.textSecondary),
         ),
       ),
     );
