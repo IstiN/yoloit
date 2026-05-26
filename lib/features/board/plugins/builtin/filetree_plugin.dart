@@ -112,6 +112,15 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   static const Color _accent = Color(0xFF64748B);
 
   _TreeTab _activeTab = _TreeTab.files;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _showSearch = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   String get _rootPath => widget.panel.state['rootPath'] as String? ?? '';
 
@@ -363,6 +372,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         const Divider(height: 1, thickness: 0.5),
         _buildTabs(),
         const Divider(height: 1, thickness: 0.5),
+        if (_showSearch && _activeTab == _TreeTab.files) _buildSearchBar(),
         Expanded(
           child:
               _activeTab == _TreeTab.files
@@ -392,6 +402,24 @@ class _FileTreeContentState extends State<_FileTreeContent> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (rootPath.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                _showSearch ? Icons.search_off : Icons.search,
+                size: 16,
+              ),
+              tooltip: 'Search files',
+              onPressed: () => setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }
+              }),
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              color: _showSearch ? Colors.white : _accent,
+            ),
           if (rootPath.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.refresh, size: 16),
@@ -448,6 +476,48 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     );
   }
 
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+      child: TextField(
+        controller: _searchController,
+        autofocus: true,
+        style: const TextStyle(fontSize: 12),
+        decoration: InputDecoration(
+          hintText: 'Filter files…',
+          hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+          prefixIcon: const Icon(Icons.search, size: 14, color: Color(0xFF94A3B8)),
+          prefixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 0),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? GestureDetector(
+                  onTap: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  child: const Icon(Icons.close, size: 14, color: Color(0xFF94A3B8)),
+                )
+              : null,
+          suffixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 0),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 6),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: _accent.withOpacity(0.3)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: _accent.withOpacity(0.3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: _accent),
+          ),
+        ),
+        onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+      ),
+    );
+  }
+
   Widget _buildFilesTab(String rootPath) {
     if (rootPath.isEmpty) {
       return Center(
@@ -496,10 +566,92 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       );
     }
 
+    if (_searchQuery.isNotEmpty) {
+      return _buildSearchResults(rootDir);
+    }
+
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 4),
       children: _buildTreeEntries(rootDir, 0),
     );
+  }
+
+  Widget _buildSearchResults(Directory rootDir) {
+    final matches = <File>[];
+    _collectMatchingFiles(rootDir, matches);
+    if (matches.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'No matching files',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: matches.length,
+      itemBuilder: (context, index) {
+        final file = matches[index];
+        final name = p.basename(file.path);
+        final relPath = p.relative(file.path, from: _rootPath);
+        return GestureDetector(
+          onSecondaryTapDown: (d) =>
+              _showContextMenu(context, d.globalPosition, file),
+          child: InkWell(
+            onTap: () => _selectFile(file.path, name),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                height: 28,
+                child: Row(
+                  children: [
+                    Icon(_iconForFile(name), size: 15, color: const Color(0xFF94A3B8)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        relPath,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _selectedFile == file.path
+                              ? Colors.white
+                              : const Color(0xFFCBD5E1),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _collectMatchingFiles(Directory dir, List<File> results, {int maxResults = 200}) {
+    if (results.length >= maxResults) return;
+    try {
+      final contents = dir.listSync()..sort((a, b) =>
+          p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase()));
+      for (final entity in contents) {
+        if (results.length >= maxResults) return;
+        final name = p.basename(entity.path);
+        if (name.startsWith('.')) continue;
+        if (entity is Directory) {
+          _collectMatchingFiles(entity, results, maxResults: maxResults);
+        } else if (entity is File) {
+          if (name.toLowerCase().contains(_searchQuery)) {
+            results.add(entity);
+          }
+        }
+      }
+    } on FileSystemException {
+      // skip inaccessible dirs
+    }
   }
 
   List<Widget> _buildTreeEntries(Directory dir, int depth) {
