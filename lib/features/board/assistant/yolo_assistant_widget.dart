@@ -316,6 +316,18 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     widget.onUpdateState(merged);
   }
 
+  void _stopGeneration() {
+    // Immediately flip UI so the button responds at once.
+    setState(() {
+      _isCancelled = true;
+      _isGeneratingReply = false;
+    });
+    // Cancel the underlying provider HTTP request / stream.
+    unawaited(
+      _chatProvider?.stop('__yolo_badge_assistant__').catchError((_) {}),
+    );
+  }
+
   Future<void> _sendMessage({bool mirrorToOverlay = false}) async {
     if (_isGeneratingReply) return;
     final rawText = _inputController.text.trim();
@@ -2269,7 +2281,7 @@ $messagesJson
           GestureDetector(
             onTap:
                 _isGeneratingReply
-                    ? () => setState(() => _isCancelled = true)
+                    ? _stopGeneration
                     : () => unawaited(_sendMessage()),
             child: Container(
               width: 28,
