@@ -15,6 +15,15 @@ class AgentConfig {
   /// Default model for this provider (null = use catalog/provider default).
   final String? defaultModel;
 
+  /// Transcription (ASR) mode: 'local' or 'cloud'.
+  final String asrMode;
+
+  /// Cloud provider config ID to use for ASR (when asrMode == 'cloud').
+  final String? asrCloudConfigId;
+
+  /// Cloud ASR model override, e.g. 'whisper-1' (when asrMode == 'cloud').
+  final String? asrCloudModel;
+
   const AgentConfig({
     required this.id,
     required this.displayName,
@@ -23,6 +32,9 @@ class AgentConfig {
     required this.visible,
     required this.isBuiltIn,
     this.defaultModel,
+    this.asrMode = 'local',
+    this.asrCloudConfigId,
+    this.asrCloudModel,
   });
 
   AgentConfig copyWith({
@@ -31,6 +43,9 @@ class AgentConfig {
     String? launchCommand,
     bool? visible,
     Object? defaultModel = _sentinel,
+    String? asrMode,
+    Object? asrCloudConfigId = _sentinel,
+    Object? asrCloudModel = _sentinel,
   }) => AgentConfig(
     id: id,
     displayName: displayName ?? this.displayName,
@@ -40,6 +55,15 @@ class AgentConfig {
     isBuiltIn: isBuiltIn,
     defaultModel:
         defaultModel == _sentinel ? this.defaultModel : defaultModel as String?,
+    asrMode: asrMode ?? this.asrMode,
+    asrCloudConfigId:
+        asrCloudConfigId == _sentinel
+            ? this.asrCloudConfigId
+            : asrCloudConfigId as String?,
+    asrCloudModel:
+        asrCloudModel == _sentinel
+            ? this.asrCloudModel
+            : asrCloudModel as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -50,6 +74,9 @@ class AgentConfig {
     'visible': visible,
     'isBuiltIn': isBuiltIn,
     if (defaultModel != null) 'defaultModel': defaultModel,
+    if (asrMode != 'local') 'asrMode': asrMode,
+    if (asrCloudConfigId != null) 'asrCloudConfigId': asrCloudConfigId,
+    if (asrCloudModel != null) 'asrCloudModel': asrCloudModel,
   };
 
   factory AgentConfig.fromJson(Map<String, dynamic> j) => AgentConfig(
@@ -60,6 +87,9 @@ class AgentConfig {
     visible: j['visible'] as bool? ?? true,
     isBuiltIn: j['isBuiltIn'] as bool? ?? false,
     defaultModel: j['defaultModel'] as String?,
+    asrMode: j['asrMode'] as String? ?? 'local',
+    asrCloudConfigId: j['asrCloudConfigId'] as String?,
+    asrCloudModel: j['asrCloudModel'] as String?,
   );
 }
 
@@ -181,4 +211,16 @@ class AgentConfigService {
       return null;
     }
   }
+
+  /// Returns the config for [agentId], or null if not found.
+  AgentConfig? configForAgent(String agentId) {
+    try {
+      return _cached.firstWhere((c) => c.id == agentId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// All currently loaded configs.
+  List<AgentConfig> get configs => List.unmodifiable(_cached);
 }

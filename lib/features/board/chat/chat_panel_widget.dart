@@ -27,6 +27,9 @@ import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
+import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
+import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/models_dev_catalog_service.dart';
 import 'package:yoloit/features/settings/data/opencode_auth_service.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
@@ -2608,8 +2611,44 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     try {
       if (path == null || path.isEmpty) return;
-      final transcript = await LocalAiModelsService.instance
-          .transcribeWithSelectedAsr(path);
+
+      // Check if this agent has a cloud ASR configured.
+      final agentConf = AgentConfigService.instance.configForAgent(_config.provider);
+      final useCloud =
+          agentConf?.asrMode == 'cloud' &&
+          agentConf?.asrCloudConfigId != null &&
+          agentConf!.asrCloudConfigId!.isNotEmpty;
+
+      String transcript;
+      if (useCloud) {
+        final cloudCfg = await CloudLlmSettingsService.instance
+            .loadConfigById(agentConf!.asrCloudConfigId!);
+        if (cloudCfg == null) {
+          throw StateError(
+            'Cloud ASR provider "${agentConf.asrCloudConfigId}" not found. '
+            'Please check your AI Agents settings.',
+          );
+        }
+        final voiceSettings = VoiceSettings(
+          useCloudAsr: true,
+          useChatModelForCloudAsr: false,
+          cloudAsrConfigId: cloudCfg.id,
+          cloudAsrModel:
+              agentConf.asrCloudModel?.trim().isNotEmpty == true
+                  ? agentConf.asrCloudModel
+                  : cloudCfg.model.trim().isNotEmpty
+                  ? cloudCfg.model
+                  : 'whisper-1',
+        );
+        transcript = await CloudAsrService().transcribeFromFile(
+          audioPath: path,
+          voiceSettings: voiceSettings,
+        );
+      } else {
+        transcript = await LocalAiModelsService.instance
+            .transcribeWithSelectedAsr(path);
+      }
+
       if (!mounted) return;
       final text = transcript.trim();
       if (text.isNotEmpty) {

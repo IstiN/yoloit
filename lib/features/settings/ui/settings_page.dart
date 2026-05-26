@@ -15,6 +15,7 @@ import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
+import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
@@ -771,6 +772,9 @@ class _AgentRowState extends State<_AgentRow> {
   late TextEditingController _nameCtrl;
   late TextEditingController _iconCtrl;
   late TextEditingController _cmdCtrl;
+  late TextEditingController _asrModelCtrl;
+
+  List<CloudLlmConfig> _cloudConfigs = [];
 
   @override
   void initState() {
@@ -778,6 +782,15 @@ class _AgentRowState extends State<_AgentRow> {
     _nameCtrl = TextEditingController(text: widget.config.displayName);
     _iconCtrl = TextEditingController(text: widget.config.iconLabel);
     _cmdCtrl = TextEditingController(text: widget.config.launchCommand);
+    _asrModelCtrl = TextEditingController(
+      text: widget.config.asrCloudModel ?? '',
+    );
+    _loadCloudConfigs();
+  }
+
+  Future<void> _loadCloudConfigs() async {
+    final configs = await CloudLlmSettingsService.instance.loadConfigs();
+    if (mounted) setState(() => _cloudConfigs = configs);
   }
 
   @override
@@ -787,6 +800,7 @@ class _AgentRowState extends State<_AgentRow> {
       _nameCtrl.text = widget.config.displayName;
       _iconCtrl.text = widget.config.iconLabel;
       _cmdCtrl.text = widget.config.launchCommand;
+      _asrModelCtrl.text = widget.config.asrCloudModel ?? '';
     }
   }
 
@@ -795,6 +809,7 @@ class _AgentRowState extends State<_AgentRow> {
     _nameCtrl.dispose();
     _iconCtrl.dispose();
     _cmdCtrl.dispose();
+    _asrModelCtrl.dispose();
     super.dispose();
   }
 
@@ -1001,8 +1016,119 @@ class _AgentRowState extends State<_AgentRow> {
               ],
             ),
           ],
+          // ── ASR (transcription) picker ────────────────────────────────────
+          const SizedBox(height: 6),
+          _buildAsrRow(context, colors),
         ],
       ),
+    );
+  }
+
+  Widget _buildAsrRow(BuildContext context, AppColorScheme colors) {
+    final isCloud = widget.config.asrMode == 'cloud';
+    final labelStyle = TextStyle(
+      color:
+          Theme.of(context).textTheme.bodySmall?.color ??
+          Theme.of(context).colorScheme.onSurface,
+      fontSize: 11,
+    );
+    final inputDecoration = InputDecoration(
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: colors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: colors.border),
+      ),
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(width: 8),
+        Text('ASR:', style: labelStyle),
+        const SizedBox(width: 8),
+        // Local / Cloud toggle
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'local', label: Text('Local')),
+            ButtonSegment(value: 'cloud', label: Text('Cloud')),
+          ],
+          selected: {widget.config.asrMode},
+          onSelectionChanged:
+              (v) => widget.onChanged(
+                widget.config.copyWith(asrMode: v.first),
+              ),
+          style: ButtonStyle(
+            textStyle: WidgetStateProperty.all(
+              const TextStyle(fontSize: 11),
+            ),
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        if (isCloud) ...[
+          const SizedBox(width: 8),
+          // Provider dropdown
+          SizedBox(
+            width: 140,
+            child: DropdownButtonFormField<String>(
+              value:
+                  _cloudConfigs.any(
+                        (c) => c.id == widget.config.asrCloudConfigId,
+                      )
+                      ? widget.config.asrCloudConfigId
+                      : null,
+              hint: Text('Provider', style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color)),
+              items:
+                  _cloudConfigs
+                      .map(
+                        (c) => DropdownMenuItem<String>(
+                          value: c.id,
+                          child: Text(c.name, style: const TextStyle(fontSize: 12)),
+                        ),
+                      )
+                      .toList(),
+              onChanged:
+                  (v) => widget.onChanged(
+                    widget.config.copyWith(asrCloudConfigId: v),
+                  ),
+              dropdownColor: colors.surfaceElevated,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
+              ),
+              decoration: inputDecoration,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Model text field (e.g. whisper-1)
+          SizedBox(
+            width: 110,
+            child: TextField(
+              controller: _asrModelCtrl,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
+              ),
+              decoration: inputDecoration.copyWith(hintText: 'Model (e.g. whisper-1)'),
+              onChanged:
+                  (_) => widget.onChanged(
+                    widget.config.copyWith(
+                      asrCloudModel:
+                          _asrModelCtrl.text.trim().isEmpty
+                              ? null
+                              : _asrModelCtrl.text.trim(),
+                    ),
+                  ),
+            ),
+          ),
+        ],
+        const SizedBox(width: 16),
+      ],
     );
   }
 }
