@@ -634,6 +634,11 @@ class CliServer {
                     'visible': config.visible,
                     'isBuiltIn': config.isBuiltIn,
                     'defaultModel': config.defaultModel,
+                    'asrMode': config.asrMode,
+                    if (config.asrCloudConfigId != null)
+                      'asrCloudConfigId': config.asrCloudConfigId,
+                    if (config.asrCloudModel != null)
+                      'asrCloudModel': config.asrCloudModel,
                     'isDefault': config.id == defaultId,
                   },
                 )
@@ -782,6 +787,63 @@ class CliServer {
           'provider': provider,
           'model': model,
           'workingDir': workspacePath,
+        },
+      });
+    }
+
+    // POST /agents/config — update agent config fields (defaultModel, asrMode, asrCloudConfigId, asrCloudModel)
+    if (sub.length == 1 && sub[0] == 'config' && method == 'POST') {
+      final body = await _body(request);
+      final agentId = body['id'] as String?;
+      if (agentId == null || agentId.isEmpty) {
+        return _error('Missing required field: id');
+      }
+      final configs = await AgentConfigService.instance.load();
+      final idx = configs.indexWhere((c) => c.id == agentId);
+      if (idx < 0) return _error('Unknown agent id: $agentId');
+
+      var config = configs[idx];
+      if (body.containsKey('defaultModel')) {
+        config = config.copyWith(
+          defaultModel:
+              (body['defaultModel'] as String?)?.trim().isEmpty == true
+                  ? null
+                  : body['defaultModel'] as String?,
+        );
+      }
+      if (body.containsKey('asrMode')) {
+        final mode = body['asrMode'] as String?;
+        if (mode != null && mode != 'default' && mode != 'local' && mode != 'cloud') {
+          return _error('asrMode must be "default", "local", or "cloud"');
+        }
+        config = config.copyWith(asrMode: mode ?? 'default');
+      }
+      if (body.containsKey('asrCloudConfigId')) {
+        config = config.copyWith(
+          asrCloudConfigId:
+              (body['asrCloudConfigId'] as String?)?.trim().isEmpty == true
+                  ? null
+                  : body['asrCloudConfigId'] as String?,
+        );
+      }
+      if (body.containsKey('asrCloudModel')) {
+        config = config.copyWith(
+          asrCloudModel:
+              (body['asrCloudModel'] as String?)?.trim().isEmpty == true
+                  ? null
+                  : body['asrCloudModel'] as String?,
+        );
+      }
+      configs[idx] = config;
+      await AgentConfigService.instance.save(configs);
+      return _json({
+        'ok': true,
+        'agent': {
+          'id': config.id,
+          'defaultModel': config.defaultModel,
+          'asrMode': config.asrMode,
+          'asrCloudConfigId': config.asrCloudConfigId,
+          'asrCloudModel': config.asrCloudModel,
         },
       });
     }

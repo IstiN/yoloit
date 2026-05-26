@@ -2612,20 +2612,20 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     try {
       if (path == null || path.isEmpty) return;
 
-      // Check if this agent has a cloud ASR configured.
-      final agentConf = AgentConfigService.instance.configForAgent(_config.provider);
+      // Check if this agent has a cloud ASR configured (including global default).
+      final effectiveAsr = AgentConfigService.instance.effectiveAsr(_config.provider);
       final useCloud =
-          agentConf?.asrMode == 'cloud' &&
-          agentConf?.asrCloudConfigId != null &&
-          agentConf!.asrCloudConfigId!.isNotEmpty;
+          effectiveAsr.mode == 'cloud' &&
+          effectiveAsr.configId != null &&
+          effectiveAsr.configId!.isNotEmpty;
 
       String transcript;
       if (useCloud) {
         final cloudCfg = await CloudLlmSettingsService.instance
-            .loadConfigById(agentConf!.asrCloudConfigId!);
+            .loadConfigById(effectiveAsr.configId!);
         if (cloudCfg == null) {
           throw StateError(
-            'Cloud ASR provider "${agentConf.asrCloudConfigId}" not found. '
+            'Cloud ASR provider "${effectiveAsr.configId}" not found. '
             'Please check your AI Agents settings.',
           );
         }
@@ -2634,8 +2634,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           useChatModelForCloudAsr: false,
           cloudAsrConfigId: cloudCfg.id,
           cloudAsrModel:
-              agentConf.asrCloudModel?.trim().isNotEmpty == true
-                  ? agentConf.asrCloudModel
+              effectiveAsr.model?.trim().isNotEmpty == true
+                  ? effectiveAsr.model
                   : cloudCfg.model.trim().isNotEmpty
                   ? cloudCfg.model
                   : 'whisper-1',

@@ -15,7 +15,7 @@ class AgentConfig {
   /// Default model for this provider (null = use catalog/provider default).
   final String? defaultModel;
 
-  /// Transcription (ASR) mode: 'local' or 'cloud'.
+  /// Transcription (ASR) mode: 'default' (inherit global), 'local', or 'cloud'.
   final String asrMode;
 
   /// Cloud provider config ID to use for ASR (when asrMode == 'cloud').
@@ -32,7 +32,7 @@ class AgentConfig {
     required this.visible,
     required this.isBuiltIn,
     this.defaultModel,
-    this.asrMode = 'local',
+    this.asrMode = 'default',
     this.asrCloudConfigId,
     this.asrCloudModel,
   });
@@ -74,7 +74,7 @@ class AgentConfig {
     'visible': visible,
     'isBuiltIn': isBuiltIn,
     if (defaultModel != null) 'defaultModel': defaultModel,
-    if (asrMode != 'local') 'asrMode': asrMode,
+    if (asrMode != 'default') 'asrMode': asrMode,
     if (asrCloudConfigId != null) 'asrCloudConfigId': asrCloudConfigId,
     if (asrCloudModel != null) 'asrCloudModel': asrCloudModel,
   };
@@ -87,7 +87,7 @@ class AgentConfig {
     visible: j['visible'] as bool? ?? true,
     isBuiltIn: j['isBuiltIn'] as bool? ?? false,
     defaultModel: j['defaultModel'] as String?,
-    asrMode: j['asrMode'] as String? ?? 'local',
+    asrMode: j['asrMode'] as String? ?? 'default',
     asrCloudConfigId: j['asrCloudConfigId'] as String?,
     asrCloudModel: j['asrCloudModel'] as String?,
   );
@@ -102,6 +102,11 @@ class AgentConfigService {
   // In-memory cache so cubit can read without async on every spawn.
   List<AgentConfig> _cached = [];
   String? _defaultAgentId;
+
+  // Global default ASR config (applied to agents whose asrMode == 'default').
+  String _defaultAsrMode = 'local';
+  String? _defaultAsrCloudConfigId;
+  String? _defaultAsrCloudModel;
 
   static List<AgentConfig> get _defaults => [
     ...AgentType.values.map(
@@ -158,6 +163,10 @@ class AgentConfigService {
         final prefs =
             jsonDecode(await prefsFile.readAsString()) as Map<String, dynamic>;
         _defaultAgentId = prefs['defaultAgentId'] as String?;
+        _defaultAsrMode = prefs['defaultAsrMode'] as String? ?? 'local';
+        _defaultAsrCloudConfigId =
+            prefs['defaultAsrCloudConfigId'] as String?;
+        _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
       }
     } catch (_) {}
 
@@ -175,12 +184,39 @@ class AgentConfigService {
 
   Future<void> setDefaultAgentId(String? id) async {
     _defaultAgentId = id;
+    await _savePrefs();
+  }
+
+  Future<void> saveDefaultAsr({
+    required String mode,
+    String? configId,
+    String? model,
+  }) async {
+    _defaultAsrMode = mode;
+    _defaultAsrCloudConfigId = configId;
+    _defaultAsrCloudModel = model;
+    await _savePrefs();
+  }
+
+  Future<void> _savePrefs() async {
     final prefsFile = File(_prefsPath);
     await prefsFile.parent.create(recursive: true);
-    await prefsFile.writeAsString(jsonEncode({'defaultAgentId': id}));
+    await prefsFile.writeAsString(
+      jsonEncode({
+        'defaultAgentId': _defaultAgentId,
+        if (_defaultAsrMode != 'local') 'defaultAsrMode': _defaultAsrMode,
+        if (_defaultAsrCloudConfigId != null)
+          'defaultAsrCloudConfigId': _defaultAsrCloudConfigId,
+        if (_defaultAsrCloudModel != null)
+          'defaultAsrCloudModel': _defaultAsrCloudModel,
+      }),
+    );
   }
 
   String? get defaultAgentId => _defaultAgentId;
+  String get defaultAsrMode => _defaultAsrMode;
+  String? get defaultAsrCloudConfigId => _defaultAsrCloudConfigId;
+  String? get defaultAsrCloudModel => _defaultAsrCloudModel;
 
   /// Returns the AgentType for the configured default, falling back to Copilot.
   AgentType get defaultAgentType {
@@ -219,6 +255,27 @@ class AgentConfigService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Returns the effective ASR config for [agentId], resolving 'default' mode
+  /// to the global default ASR settings.
+  ({String mode, String? configId, String? model}) effectiveAsr(
+    String agentId,
+  ) {
+    final cfg = configForAgent(agentId);
+    final mode = cfg?.asrMode ?? 'default';
+    if (mode == 'default') {
+      return (
+        mode: _defaultAsrMode,
+        configId: _defaultAsrCloudConfigId,
+        model: _defaultAsrCloudModel,
+      );
+    }
+    return (
+      mode: mode,
+      configId: cfg?.asrCloudConfigId,
+      model: cfg?.asrCloudModel,
+    );
   }
 
   /// All currently loaded configs.

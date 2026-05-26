@@ -496,6 +496,12 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
   String? _defaultAgentId;
   static const _boardChatAgentIds = {'copilot', 'cursor', 'opencode'};
 
+  // Global default ASR state.
+  String _defaultAsrMode = 'local';
+  String? _defaultAsrCloudConfigId;
+  String? _defaultAsrCloudModel;
+  List<CloudLlmConfig> _cloudConfigs = [];
+
   @override
   void initState() {
     super.initState();
@@ -505,10 +511,15 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
   Future<void> _loadConfigs() async {
     await _catalogService.load();
     final configs = await _service.load();
+    final cloudCfgs = await CloudLlmSettingsService.instance.loadConfigs();
     if (mounted)
       setState(() {
         _configs = configs;
         _defaultAgentId = _service.defaultAgentId;
+        _defaultAsrMode = _service.defaultAsrMode;
+        _defaultAsrCloudConfigId = _service.defaultAsrCloudConfigId;
+        _defaultAsrCloudModel = _service.defaultAsrCloudModel;
+        _cloudConfigs = cloudCfgs;
         _loading = false;
       });
   }
@@ -525,6 +536,27 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
   Future<void> _setDefault(String? id) async {
     setState(() => _defaultAgentId = id);
     await _service.setDefaultAgentId(id);
+  }
+
+  Future<void> _saveDefaultAsr({
+    required String mode,
+    String? configId,
+    String? model,
+  }) async {
+    setState(() {
+      _defaultAsrMode = mode;
+      _defaultAsrCloudConfigId = configId;
+      _defaultAsrCloudModel = model;
+    });
+    await _service.saveDefaultAsr(mode: mode, configId: configId, model: model);
+  }
+
+  String _defaultAsrLabel() {
+    if (_defaultAsrMode != 'cloud') return 'Local';
+    final cfg = _cloudConfigs.where((c) => c.id == _defaultAsrCloudConfigId).firstOrNull;
+    final modelName = _defaultAsrCloudModel ?? '—';
+    final provName = cfg?.name ?? '—';
+    return 'Cloud · $provName · $modelName';
   }
 
   @override
@@ -555,6 +587,58 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
             ),
           ),
         ),
+        // Global default ASR row
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Text(
+                'Default ASR:',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final result = await showDialog<
+                    ({String mode, String? configId, String? model})
+                  >(
+                    context: context,
+                    builder:
+                        (_) => _AsrPickerDialog(
+                          showDefaultOption: false,
+                          initialMode: _defaultAsrMode,
+                          initialConfigId: _defaultAsrCloudConfigId,
+                          initialModel: _defaultAsrCloudModel,
+                          cloudConfigs: _cloudConfigs,
+                        ),
+                  );
+                  if (result != null) {
+                    await _saveDefaultAsr(
+                      mode: result.mode,
+                      configId: result.configId,
+                      model: result.model,
+                    );
+                  }
+                },
+                icon: const Icon(Icons.mic, size: 14),
+                label: Text(_defaultAsrLabel(), style: const TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+        ),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
@@ -576,6 +660,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
                     return _AgentRow(
                       config: config,
                       isDefault: isDefault,
+                      cloudConfigs: _cloudConfigs,
                       onChanged: (updated) => _updateConfig(index, updated),
                       onSetDefault:
                           () => _setDefault(isDefault ? null : config.id),
@@ -755,12 +840,14 @@ class _AgentRow extends StatefulWidget {
   const _AgentRow({
     required this.config,
     required this.isDefault,
+    required this.cloudConfigs,
     required this.onChanged,
     required this.onSetDefault,
   });
 
   final AgentConfig config;
   final bool isDefault;
+  final List<CloudLlmConfig> cloudConfigs;
   final ValueChanged<AgentConfig> onChanged;
   final VoidCallback onSetDefault;
 
@@ -772,9 +859,6 @@ class _AgentRowState extends State<_AgentRow> {
   late TextEditingController _nameCtrl;
   late TextEditingController _iconCtrl;
   late TextEditingController _cmdCtrl;
-  late TextEditingController _asrModelCtrl;
-
-  List<CloudLlmConfig> _cloudConfigs = [];
 
   @override
   void initState() {
@@ -782,15 +866,6 @@ class _AgentRowState extends State<_AgentRow> {
     _nameCtrl = TextEditingController(text: widget.config.displayName);
     _iconCtrl = TextEditingController(text: widget.config.iconLabel);
     _cmdCtrl = TextEditingController(text: widget.config.launchCommand);
-    _asrModelCtrl = TextEditingController(
-      text: widget.config.asrCloudModel ?? '',
-    );
-    _loadCloudConfigs();
-  }
-
-  Future<void> _loadCloudConfigs() async {
-    final configs = await CloudLlmSettingsService.instance.loadConfigs();
-    if (mounted) setState(() => _cloudConfigs = configs);
   }
 
   @override
@@ -800,7 +875,6 @@ class _AgentRowState extends State<_AgentRow> {
       _nameCtrl.text = widget.config.displayName;
       _iconCtrl.text = widget.config.iconLabel;
       _cmdCtrl.text = widget.config.launchCommand;
-      _asrModelCtrl.text = widget.config.asrCloudModel ?? '';
     }
   }
 
@@ -809,7 +883,6 @@ class _AgentRowState extends State<_AgentRow> {
     _nameCtrl.dispose();
     _iconCtrl.dispose();
     _cmdCtrl.dispose();
-    _asrModelCtrl.dispose();
     super.dispose();
   }
 
@@ -821,6 +894,40 @@ class _AgentRowState extends State<_AgentRow> {
         launchCommand: _cmdCtrl.text,
       ),
     );
+  }
+
+  String _asrLabel() {
+    final mode = widget.config.asrMode;
+    if (mode == 'default') return 'Default';
+    if (mode == 'local') return 'Local';
+    final cfg = widget.cloudConfigs
+        .where((c) => c.id == widget.config.asrCloudConfigId)
+        .firstOrNull;
+    final modelName = widget.config.asrCloudModel ?? '—';
+    final provName = cfg?.name ?? '—';
+    return 'Cloud · $provName · $modelName';
+  }
+
+  Future<void> _pickAsr(BuildContext context) async {
+    final result = await showDialog<({String mode, String? configId, String? model})>(
+      context: context,
+      builder: (_) => _AsrPickerDialog(
+        showDefaultOption: true,
+        initialMode: widget.config.asrMode,
+        initialConfigId: widget.config.asrCloudConfigId,
+        initialModel: widget.config.asrCloudModel,
+        cloudConfigs: widget.cloudConfigs,
+      ),
+    );
+    if (result != null) {
+      widget.onChanged(
+        widget.config.copyWith(
+          asrMode: result.mode,
+          asrCloudConfigId: result.configId,
+          asrCloudModel: result.model,
+        ),
+      );
+    }
   }
 
   @override
@@ -1018,23 +1125,103 @@ class _AgentRowState extends State<_AgentRow> {
           ],
           // ── ASR (transcription) picker ────────────────────────────────────
           const SizedBox(height: 6),
-          _buildAsrRow(context, colors),
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              Text(
+                'ASR:',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _pickAsr(context),
+                icon: const Icon(Icons.mic, size: 13),
+                label: Text(_asrLabel(), style: const TextStyle(fontSize: 11)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAsrRow(BuildContext context, AppColorScheme colors) {
-    final isCloud = widget.config.asrMode == 'cloud';
-    final labelStyle = TextStyle(
-      color:
-          Theme.of(context).textTheme.bodySmall?.color ??
-          Theme.of(context).colorScheme.onSurface,
-      fontSize: 11,
-    );
+}
+
+/// Dialog for picking ASR configuration (Default / Local / Cloud + Provider + Model).
+class _AsrPickerDialog extends StatefulWidget {
+  const _AsrPickerDialog({
+    required this.showDefaultOption,
+    required this.initialMode,
+    required this.initialConfigId,
+    required this.initialModel,
+    required this.cloudConfigs,
+  });
+
+  final bool showDefaultOption;
+  final String initialMode;
+  final String? initialConfigId;
+  final String? initialModel;
+  final List<CloudLlmConfig> cloudConfigs;
+
+  @override
+  State<_AsrPickerDialog> createState() => _AsrPickerDialogState();
+}
+
+class _AsrPickerDialogState extends State<_AsrPickerDialog> {
+  late String _mode;
+  String? _configId;
+  String? _model;
+  late TextEditingController _customModelCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _mode = widget.initialMode;
+    _configId = widget.initialConfigId;
+    _model = widget.initialModel;
+    _customModelCtrl = TextEditingController(text: widget.initialModel ?? '');
+  }
+
+  @override
+  void dispose() {
+    _customModelCtrl.dispose();
+    super.dispose();
+  }
+
+  List<({String id, String name})> get _catalogModels {
+    if (_configId == null) return const [];
+    final cfg = widget.cloudConfigs.where((c) => c.id == _configId).firstOrNull;
+    if (cfg == null) return const [];
+    return kCloudLlmPresets
+            .where((p) => p.id == cfg.id)
+            .firstOrNull
+            ?.models ??
+        const [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final isCloud = _mode == 'cloud';
+    final catalog = _catalogModels;
+
     final inputDecoration = InputDecoration(
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
         borderSide: BorderSide(color: colors.border),
@@ -1045,200 +1232,158 @@ class _AgentRowState extends State<_AgentRow> {
       ),
     );
 
-    // Find catalog models for the currently selected cloud provider.
-    final selectedCfg = isCloud
-        ? _cloudConfigs
-            .where((c) => c.id == widget.config.asrCloudConfigId)
-            .firstOrNull
-        : null;
-    final catalogModels = selectedCfg != null
-        ? (kCloudLlmPresets
-                .where((p) => p.id == selectedCfg.id)
-                .firstOrNull
-                ?.models ??
-            const [])
-        : const <({String id, String name})>[];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+    return AlertDialog(
+      title: const Text('ASR Configuration', style: TextStyle(fontSize: 16)),
+      content: SizedBox(
+        width: 380,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(width: 8),
-            Text('ASR:', style: labelStyle),
-            const SizedBox(width: 8),
-            // Local / Cloud toggle
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'local', label: Text('Local')),
-                ButtonSegment(value: 'cloud', label: Text('Cloud')),
-              ],
-              selected: {widget.config.asrMode},
-              onSelectionChanged:
-                  (v) => widget.onChanged(
-                    widget.config.copyWith(asrMode: v.first),
-                  ),
-              style: ButtonStyle(
-                textStyle: WidgetStateProperty.all(
-                  const TextStyle(fontSize: 11),
-                ),
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            // Mode selector
+            Text(
+              'Mode',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).textTheme.bodySmall?.color,
               ),
             ),
+            const SizedBox(height: 6),
+            SegmentedButton<String>(
+              segments: [
+                if (widget.showDefaultOption)
+                  const ButtonSegment(
+                    value: 'default',
+                    label: Text('Default'),
+                  ),
+                const ButtonSegment(value: 'local', label: Text('Local')),
+                const ButtonSegment(value: 'cloud', label: Text('Cloud')),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (v) => setState(() {
+                _mode = v.first;
+              }),
+            ),
             if (isCloud) ...[
-              const SizedBox(width: 8),
-              // Provider dropdown
-              SizedBox(
-                width: 140,
-                child: DropdownButtonFormField<String>(
-                  value:
-                      _cloudConfigs.any(
-                            (c) => c.id == widget.config.asrCloudConfigId,
-                          )
-                          ? widget.config.asrCloudConfigId
-                          : null,
+              const SizedBox(height: 16),
+              // Provider
+              Text(
+                'Provider',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              ),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                value: widget.cloudConfigs.any((c) => c.id == _configId)
+                    ? _configId
+                    : null,
+                hint: Text(
+                  'Select provider',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                ),
+                items: widget.cloudConfigs
+                    .map(
+                      (c) => DropdownMenuItem<String>(
+                        value: c.id,
+                        child: Text(c.name, style: const TextStyle(fontSize: 13)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() {
+                  _configId = v;
+                  _model = null;
+                  _customModelCtrl.clear();
+                }),
+                dropdownColor: colors.surfaceElevated,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 13,
+                ),
+                decoration: inputDecoration,
+              ),
+              const SizedBox(height: 12),
+              // Model
+              Text(
+                'Model',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (catalog.isNotEmpty) ...[
+                DropdownButtonFormField<String>(
+                  value: catalog.any((m) => m.id == _model) ? _model : null,
                   hint: Text(
-                    'Provider',
+                    'Select model',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
                   ),
-                  items:
-                      _cloudConfigs
-                          .map(
-                            (c) => DropdownMenuItem<String>(
-                              value: c.id,
-                              child: Text(
-                                c.name,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged:
-                      (v) => widget.onChanged(
-                        widget.config.copyWith(
-                          asrCloudConfigId: v,
-                          asrCloudModel: null,
+                  items: catalog
+                      .map(
+                        (m) => DropdownMenuItem<String>(
+                          value: m.id,
+                          child: Text(m.name, style: const TextStyle(fontSize: 13)),
                         ),
-                      ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() {
+                    _model = v;
+                    _customModelCtrl.text = v ?? '';
+                  }),
                   dropdownColor: colors.surfaceElevated,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 12,
+                    fontSize: 13,
                   ),
                   decoration: inputDecoration,
                 ),
-              ),
-              if (catalogModels.isEmpty) ...[
-                const SizedBox(width: 8),
-                // No catalog — free-text model field
-                SizedBox(
-                  width: 140,
-                  child: TextField(
-                    controller: _asrModelCtrl,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 12,
-                    ),
-                    decoration: inputDecoration.copyWith(
-                      hintText: 'Model (e.g. whisper-1)',
-                    ),
-                    onChanged:
-                        (_) => widget.onChanged(
-                          widget.config.copyWith(
-                            asrCloudModel:
-                                _asrModelCtrl.text.trim().isEmpty
-                                    ? null
-                                    : _asrModelCtrl.text.trim(),
-                          ),
-                        ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _customModelCtrl,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 13,
                   ),
-                ),
-              ] else ...[
-                const SizedBox(width: 8),
-                // Catalog model dropdown
-                SizedBox(
-                  width: 200,
-                  child: DropdownButtonFormField<String>(
-                    value:
-                        catalogModels.any(
-                              (m) => m.id == widget.config.asrCloudModel,
-                            )
-                            ? widget.config.asrCloudModel
-                            : null,
-                    hint: Text(
-                      'Model',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                    ),
-                    items:
-                        catalogModels
-                            .map(
-                              (m) => DropdownMenuItem<String>(
-                                value: m.id,
-                                child: Text(
-                                  m.name,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                    onChanged: (v) {
-                      if (v != null) {
-                        _asrModelCtrl.text = v;
-                        widget.onChanged(
-                          widget.config.copyWith(asrCloudModel: v),
-                        );
-                      }
-                    },
-                    dropdownColor: colors.surfaceElevated,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 12,
-                    ),
-                    decoration: inputDecoration,
+                  decoration: inputDecoration.copyWith(
+                    hintText: 'Custom model ID (overrides selection above)',
                   ),
+                  onChanged: (v) => _model = v.trim().isEmpty ? null : v.trim(),
                 ),
-              ],
+              ] else
+                TextField(
+                  controller: _customModelCtrl,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 13,
+                  ),
+                  decoration: inputDecoration.copyWith(
+                    hintText: 'e.g. whisper-1',
+                  ),
+                  onChanged: (v) => _model = v.trim().isEmpty ? null : v.trim(),
+                ),
             ],
-            const SizedBox(width: 16),
           ],
         ),
-        // Custom model ID text field (shown below when catalog models exist)
-        if (isCloud && catalogModels.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: SizedBox(
-              width: 400,
-              child: TextField(
-                controller: _asrModelCtrl,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 12,
-                ),
-                decoration: inputDecoration.copyWith(
-                  hintText: 'Custom model ID (overrides selection above)',
-                ),
-                onChanged:
-                    (_) => widget.onChanged(
-                      widget.config.copyWith(
-                        asrCloudModel:
-                            _asrModelCtrl.text.trim().isEmpty
-                                ? null
-                                : _asrModelCtrl.text.trim(),
-                      ),
-                    ),
-              ),
-            ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(
+            (mode: _mode, configId: _configId, model: _model),
           ),
-        ],
+          child: const Text('OK'),
+        ),
       ],
     );
   }
