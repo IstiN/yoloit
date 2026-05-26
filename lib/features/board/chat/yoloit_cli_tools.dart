@@ -1281,6 +1281,15 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
       return explicit.trim();
     }
 
+    // Check the well-known install path first (~/.config/yoloit/yoloit).
+    // CliServer._installCliScript() always writes the script here, so this
+    // works for production app bundles where no source tree is present.
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isNotEmpty) {
+      final installed = File(p.join(home, '.config', 'yoloit', 'yoloit'));
+      if (installed.existsSync()) return installed.path;
+    }
+
     final checked = <String>[];
     final roots = <String?>[
       Directory.current.path,

@@ -604,6 +604,11 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: () async {
+                  // Reload cloud configs so newly-added providers appear.
+                  final freshConfigs =
+                      await CloudLlmSettingsService.instance.loadConfigs();
+                  if (mounted) setState(() => _cloudConfigs = freshConfigs);
+                  if (!context.mounted) return;
                   final result = await showDialog<
                     ({String mode, String? configId, String? model})
                   >(
@@ -614,7 +619,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
                           initialMode: _defaultAsrMode,
                           initialConfigId: _defaultAsrCloudConfigId,
                           initialModel: _defaultAsrCloudModel,
-                          cloudConfigs: _cloudConfigs,
+                          cloudConfigs: freshConfigs,
                         ),
                   );
                   if (result != null) {
@@ -909,6 +914,9 @@ class _AgentRowState extends State<_AgentRow> {
   }
 
   Future<void> _pickAsr(BuildContext context) async {
+    // Reload cloud configs so any providers added since page load are visible.
+    final freshConfigs = await CloudLlmSettingsService.instance.loadConfigs();
+    if (!context.mounted) return;
     final result = await showDialog<({String mode, String? configId, String? model})>(
       context: context,
       builder: (_) => _AsrPickerDialog(
@@ -916,7 +924,7 @@ class _AgentRowState extends State<_AgentRow> {
         initialMode: widget.config.asrMode,
         initialConfigId: widget.config.asrCloudConfigId,
         initialModel: widget.config.asrCloudModel,
-        cloudConfigs: widget.cloudConfigs,
+        cloudConfigs: freshConfigs,
       ),
     );
     if (result != null) {
