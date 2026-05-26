@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/features/settings/ui/settings_page.dart';
 
 class EnvGroupSelectionField extends StatefulWidget {
   const EnvGroupSelectionField({
@@ -305,14 +306,47 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                   child:
                       _groups.isEmpty
                           ? Center(
-                            child: Text(
-                              'No global env groups yet.\nCreate them in Settings → Environment.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
-                                fontSize: 12,
-                              ),
-                            ),
+                           child: Column(
+                             mainAxisSize: MainAxisSize.min,
+                             children: [
+                               Icon(
+                                 Icons.key_outlined,
+                                 size: 36,
+                                 color: const Color(0xFF34D399).withValues(alpha: 0.4),
+                               ),
+                               const SizedBox(height: 10),
+                               Text(
+                                 'No global env groups yet',
+                                 style: TextStyle(
+                                   color: Theme.of(context).colorScheme.onSurface,
+                                   fontSize: 13,
+                                   fontWeight: FontWeight.w600,
+                                 ),
+                               ),
+                               const SizedBox(height: 4),
+                               Text(
+                                 'Create env groups in Settings → Environment',
+                                 style: TextStyle(
+                                   color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                                   fontSize: 12,
+                                 ),
+                               ),
+                               const SizedBox(height: 14),
+                               FilledButton.icon(
+                                 onPressed: () {
+                                   Navigator.pop(context);
+                                   SettingsPage.show(context, initialCategory: 'Environment');
+                                 },
+                                 icon: const Icon(Icons.settings, size: 16),
+                                 label: const Text('Open Settings'),
+                                 style: FilledButton.styleFrom(
+                                   backgroundColor: const Color(0xFF34D399),
+                                   foregroundColor: Colors.black,
+                                   textStyle: const TextStyle(fontSize: 12),
+                                 ),
+                               ),
+                             ],
+                           ),
                           )
                           : ListView.builder(
                             itemCount: _groups.length,
