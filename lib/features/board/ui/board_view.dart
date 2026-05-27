@@ -82,6 +82,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// When true, panel chrome (borders, accents, sidebar, minimap) is hidden
   /// to produce a clean screenshot without purple-tinted decorations.
   bool _isCapturingScreenshot = false;
+  /// Suppresses focused-panel auto-centering for one rebuild cycle after
+  /// switching boards so the restored viewport position is preserved.
+  bool _suppressFocusVisibility = false;
   late final AnimationController _panController;
   Animation<Matrix4>? _panAnimation;
   VoidCallback? _panAnimationListener;
@@ -1139,6 +1142,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     if (!boardSwitched && !externalChange) return;
     _syncedBoardId = board.id;
     _syncedViewport = vp;
+    if (boardSwitched) {
+      // Suppress focus-panel auto-centering so the saved viewport is preserved.
+      _suppressFocusVisibility = true;
+    }
     _boardOverviewLog(
       'syncViewport board=${board.id} scale=${_fmt(vp.scale)} '
       'translation=${_fmtOffset(vp.translation)} '
@@ -1285,9 +1292,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final size = _viewportSize;
     if (focusedPanelId == null || size == null || _shouldAutoFit(board)) return;
     if (_isPanelDragging || _isViewportInteracting) {
-      _boardDebugLog(
-        'focusVisibility.skip focused=$focusedPanelId dragging=$_isPanelDragging viewportInteracting=$_isViewportInteracting',
-      );
+      return;
+    }
+    if (_suppressFocusVisibility) {
+      _suppressFocusVisibility = false;
+      _focusedPanelVisibilityKey = null; // reset so next user focus works
+      _boardOverviewLog('focusVisibility.suppressed (board switch)');
       return;
     }
     BoardPanelInstance? panel;
@@ -1304,25 +1314,22 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         '${board.id}:${resolvedPanel.id}:${resolvedPanel.bounds.x}:${resolvedPanel.bounds.y}:${resolvedPanel.bounds.width}:${resolvedPanel.bounds.height}:${size.width}:${size.height}:z$shouldZoom';
     if (_focusedPanelVisibilityKey == key) return;
     _focusedPanelVisibilityKey = key;
-    _boardDebugLog('focusVisibility.scheduled key=$key zoom=$shouldZoom');
+    _boardOverviewLog('focusVisibility.scheduled panel=${resolvedPanel.id} zoom=$shouldZoom');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_isPanelDragging || _isViewportInteracting) {
-        _boardDebugLog('focusVisibility.cancelledByInteraction');
         return;
       }
       if (shouldZoom) {
-        _boardDebugLog('focusVisibility.zoomToPanel panel=${resolvedPanel.id}');
+        _boardOverviewLog('focusVisibility.zoomToPanel panel=${resolvedPanel.id}');
         _zoomToPanel(board, resolvedPanel.bounds.rect);
         return;
       }
       if (_isPanelComfortablyVisible(resolvedPanel.bounds.rect)) {
-        _boardDebugLog(
-          'focusVisibility.alreadyVisible panel=${resolvedPanel.id}',
-        );
+        _boardOverviewLog('focusVisibility.alreadyVisible panel=${resolvedPanel.id}');
         return;
       }
-      _boardDebugLog('focusVisibility.center panel=${resolvedPanel.id}');
+      _boardOverviewLog('focusVisibility.center panel=${resolvedPanel.id}');
       _centerViewportOn(board, resolvedPanel.bounds.rect.center, persist: true);
     });
   }
