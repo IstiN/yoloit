@@ -1438,8 +1438,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// safely with proper delays — we just fetch PNGs via HTTP.
   Future<void> _refreshBoardPreviewsInBackground(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
+    // Skip boards with JS custom widgets — switching to them causes SIGSEGV
+    // in JavaScriptCore when the JSC VM is rapidly created/destroyed.
     final toCapture = allBoards.where(
-      (b) => b.id != activeBoardId && b.panels.isNotEmpty,
+      (b) =>
+          b.id != activeBoardId &&
+          b.panels.isNotEmpty &&
+          !b.panels.any((p) => p.type == 'board.widget.custom'),
     ).toList();
     if (toCapture.isEmpty) return;
 
@@ -1461,6 +1466,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final client = HttpClient();
 
     for (final board in toCapture) {
+      if (!mounted || !_isBoardOverviewOpen) break;
+
+      // Pause between captures to let JS widgets fully tear down/rebuild,
+      // preventing SIGSEGV in JavaScriptCore.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       if (!mounted || !_isBoardOverviewOpen) break;
 
       try {

@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
@@ -88,6 +89,8 @@ class BoardScreenshotService {
     }
 
     for (var i = 0; i < 5; i++) {
+      // Schedule a frame so endOfFrame completes even when the app is idle.
+      SchedulerBinding.instance.scheduleFrame();
       await WidgetsBinding.instance.endOfFrame;
       final boundary = key.currentContext?.findRenderObject();
       if (boundary is! RenderRepaintBoundary) {

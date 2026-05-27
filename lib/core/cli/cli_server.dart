@@ -2133,12 +2133,15 @@ class CliServer {
         await WidgetsBinding.instance.endOfFrame;
       }
       // Extra delay for heavy content (JS widgets, video, etc).
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      for (var i = 0; i < 3; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      for (var i = 0; i < 5; i++) {
         await WidgetsBinding.instance.endOfFrame;
       }
     }
 
+    // Ensure a frame is scheduled so endOfFrame in capturePng completes
+    // (when the app is idle, no frames are being painted).
+    _scheduleRebuild();
     final png = await BoardScreenshotService.instance.capturePng(
       pixelRatio: 1.5,
     );
@@ -2148,6 +2151,12 @@ class CliServer {
       debugPrint('[CliServer] screenshot: restoring board=$originalBoardId');
       await activeCubit.setActiveBoard(originalBoardId);
       _scheduleRebuild();
+      // Wait for JS widgets to fully tear down and rebuild — prevents
+      // SIGSEGV in JavaScriptCore when the next screenshot switches again.
+      for (var i = 0; i < 5; i++) {
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
 
     if (png == null) {
