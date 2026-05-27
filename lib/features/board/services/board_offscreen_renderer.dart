@@ -3,8 +3,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 
@@ -32,18 +35,23 @@ class BoardOffscreenRenderer {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return null;
 
-    // Override ErrorWidget.builder so that individual panels that crash
-    // (e.g. BLoC not available headless, native PTY, WebView) are replaced
-    // with a grey placeholder and their errors are logged — the rest of the
-    // board still renders correctly.
+    // Headless BoardCubit: pre-populated with this board's data so plugins
+    // that call context.read<BoardCubit>() get a valid, isolated instance
+    // rather than throwing ProviderNotFoundException.
+    final headlessCubit = _HeadlessBoardCubit(board);
+
+    // ErrorWidget.builder acts as a last-resort safety net for any Dart-level
+    // render error not covered by headless providers (e.g. plugin-specific
+    // state that isn't injected yet). The panel shows a broken-image icon and
+    // the error is logged; the rest of the board still renders.
     final originalErrorBuilder = ErrorWidget.builder;
     ErrorWidget.builder = (FlutterErrorDetails details) {
       debugPrint(
         '[BoardOffscreenRenderer] panel render error: ${details.exception}',
       );
-      return ColoredBox(
-        color: const Color(0x20808080),
-        child: const Center(
+      return const ColoredBox(
+        color: Color(0x20808080),
+        child: Center(
           child: Icon(
             Icons.broken_image_outlined,
             size: 20,
@@ -55,7 +63,7 @@ class BoardOffscreenRenderer {
 
     try {
       return await _renderWidgetToImage(
-        _buildBoardPreview(board),
+        _buildBoardPreview(board, headlessCubit),
         size,
         pixelRatio,
       );
@@ -65,10 +73,11 @@ class BoardOffscreenRenderer {
       return null;
     } finally {
       ErrorWidget.builder = originalErrorBuilder;
+      headlessCubit.close();
     }
   }
 
-  Widget _buildBoardPreview(BoardDocument board) {
+  Widget _buildBoardPreview(BoardDocument board, BoardCubit cubit) {
     // Dark theme matching the app's look.
     final appColors = AppColorScheme.fromAccent(const Color(0xFF7C3AED));
     final theme = ThemeData.dark().copyWith(
@@ -84,22 +93,28 @@ class BoardOffscreenRenderer {
       dividerColor: const Color(0xFF2A2A40),
     );
 
-    return MediaQuery(
-      data: const MediaQueryData(size: Size(960, 640)),
-      child: Directionality(
-        textDirection: TextDirection.ltr,
-        child: Theme(
-          data: theme,
-          child: DefaultTextStyle(
-            style: const TextStyle(
-              color: Color(0xFFE0E0F0),
-              fontSize: 12,
-            ),
-            child: IconTheme(
-              data: const IconThemeData(color: Color(0xFF8888AA), size: 14),
-              child: ColoredBox(
-                color: const Color(0xFF0F0F1A),
-                child: BoardOverviewPreview(board: board),
+    // BlocProvider.value injects headless implementations so all plugins that
+    // call context.read<BoardCubit>() receive a properly populated instance.
+    // Add more providers here as new plugins gain BLoC/service dependencies.
+    return BlocProvider<BoardCubit>.value(
+      value: cubit,
+      child: MediaQuery(
+        data: const MediaQueryData(size: Size(960, 640)),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Theme(
+            data: theme,
+            child: DefaultTextStyle(
+              style: const TextStyle(
+                color: Color(0xFFE0E0F0),
+                fontSize: 12,
+              ),
+              child: IconTheme(
+                data: const IconThemeData(color: Color(0xFF8888AA), size: 14),
+                child: ColoredBox(
+                  color: const Color(0xFF0F0F1A),
+                  child: BoardOverviewPreview(board: board),
+                ),
               ),
             ),
           ),
@@ -160,4 +175,26 @@ class BoardOffscreenRenderer {
 
     return byteData?.buffer.asUint8List();
   }
+}
+
+/// A headless [BoardCubit] pre-populated with a single [BoardDocument].
+///
+/// Injected by [BoardOffscreenRenderer] so plugins that call
+/// `context.read<BoardCubit>()` during offscreen rendering receive a valid,
+/// fully-loaded state instead of throwing [ProviderNotFoundException].
+///
+/// All mutating methods are intentionally no-ops — the headless instance is
+/// read-only and isolated from SharedPreferences / disk I/O.
+class _HeadlessBoardCubit extends BoardCubit {
+  _HeadlessBoardCubit(BoardDocument board) : super() {
+    emit(BoardState(
+      boards: [board],
+      activeBoardId: board.id,
+      isLoaded: true,
+    ));
+  }
+
+  // Prevent any async side-effects (disk writes, network) during headless render.
+  @override
+  Future<void> load() async {}
 }
