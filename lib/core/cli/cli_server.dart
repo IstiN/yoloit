@@ -9,6 +9,7 @@ import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -1879,7 +1880,7 @@ class CliServer {
     }
     // GET /api/boards/:id/screenshot
     if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
-      return _boardScreenshot(board);
+      return _boardScreenshot(board, cubit: cubit);
     }
     // GET /api/boards/:id/svg
     if (sub.length == 1 && sub[0] == 'svg' && method == 'GET') {
@@ -2110,13 +2111,58 @@ class CliServer {
         .replaceAll('\n', r'\n');
   }
 
-  Future<shelf.Response> _boardScreenshot(BoardDocument board) async {
+  Future<shelf.Response> _boardScreenshot(
+    BoardDocument board, {
+    BoardCubit? cubit,
+  }) async {
+    final activeCubit = cubit ?? _cubit;
+    if (activeCubit == null) return _error('Board cubit not available');
+
+    final activeBoard = activeCubit.state.activeBoard;
+    final needsSwitch = activeBoard == null || activeBoard.id != board.id;
+    final originalBoardId = activeBoard?.id;
+
+    if (needsSwitch) {
+      // Switch to the requested board so it renders in the RepaintBoundary.
+      debugPrint('[CliServer] screenshot: switching to board=${board.id}');
+      await activeCubit.setActiveBoard(board.id);
+      _scheduleRebuild();
+      // Wait for several frames so the board fully renders
+      // (panels, markdown, JS widgets, etc).
+      for (var i = 0; i < 8; i++) {
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      // Extra delay for heavy content (JS widgets, video, etc).
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      for (var i = 0; i < 3; i++) {
+        await WidgetsBinding.instance.endOfFrame;
+      }
+    }
+
     final png = await BoardScreenshotService.instance.capturePng(
       pixelRatio: 1.5,
     );
+
+    if (needsSwitch && originalBoardId != null) {
+      // Switch back to the original board.
+      debugPrint('[CliServer] screenshot: restoring board=$originalBoardId');
+      await activeCubit.setActiveBoard(originalBoardId);
+      _scheduleRebuild();
+    }
+
     if (png == null) {
       return _error('Failed to capture board screenshot');
     }
+
+    // Also save to the preview cache directory for the overview.
+    try {
+      final cacheDir = Directory(
+        '${Directory.systemTemp.path}/yoloit_board_previews',
+      );
+      if (!cacheDir.existsSync()) cacheDir.createSync(recursive: true);
+      File('${cacheDir.path}/${board.id}.png').writeAsBytesSync(png);
+    } catch (_) {}
+
     return shelf.Response.ok(png, headers: {'content-type': 'image/png'});
   }
 

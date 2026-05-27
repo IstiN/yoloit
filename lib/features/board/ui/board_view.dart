@@ -7,11 +7,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
+import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -1409,8 +1411,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   /// Generate synthetic previews for boards that have no cached PNG.
-  /// Real screenshots are only captured for the active board; switching
-  /// boards to capture crashes JSC widgets and is not safe.
   Future<void> _generateMissingBoardPreviews(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
     final missing = allBoards.where(
@@ -1425,11 +1425,83 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       final png = await _generateSyntheticPreviewPng(board);
       if (png != null && mounted) {
         _boardPreviewPngs[board.id] = png;
-        _saveBoardPreviewPngToDisk(board.id, png);
+        // Don't save synthetic to disk — real captures will replace them.
       }
     }
     _boardOverviewLog(
       'synthetic.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
+    );
+  }
+
+  /// Refresh board previews in the background by calling the CLI server's
+  /// screenshot endpoint for each board. The server handles board switching
+  /// safely with proper delays — we just fetch PNGs via HTTP.
+  Future<void> _refreshBoardPreviewsInBackground(String activeBoardId) async {
+    final allBoards = context.read<BoardCubit>().state.boards;
+    final toCapture = allBoards.where(
+      (b) => b.id != activeBoardId && b.panels.isNotEmpty,
+    ).toList();
+    if (toCapture.isEmpty) return;
+
+    // Read CLI server port.
+    int? port;
+    try {
+      final portFile = File('${PlatformDirs.instance.configDir}/cli.port');
+      if (portFile.existsSync()) {
+        port = int.tryParse(portFile.readAsStringSync().trim());
+      }
+    } catch (_) {}
+    if (port == null) {
+      _boardOverviewLog('bgCapture.skip — no CLI port');
+      return;
+    }
+
+    _boardOverviewLog('bgCapture.start count=${toCapture.length} port=$port');
+    final watch = Stopwatch()..start();
+    final client = HttpClient();
+
+    for (final board in toCapture) {
+      if (!mounted || !_isBoardOverviewOpen) break;
+
+      try {
+        _boardOverviewLog('bgCapture.fetch board=${board.id}');
+        final request = await client.get(
+          'localhost',
+          port,
+          '/api/boards/${board.id}/screenshot',
+        );
+        final response = await request.close();
+        if (response.statusCode == 200) {
+          final chunks = <List<int>>[];
+          await for (final chunk in response) {
+            chunks.add(chunk);
+          }
+          final bytes = Uint8List.fromList(
+            chunks.expand((c) => c).toList(),
+          );
+          if (mounted && _isBoardOverviewOpen) {
+            setState(() {
+              _boardPreviewPngs[board.id] = bytes;
+            });
+            _saveBoardPreviewPngToDisk(board.id, bytes);
+            _boardOverviewLog(
+              'bgCapture.captured board=${board.id} bytes=${bytes.length}',
+            );
+          }
+        } else {
+          _boardOverviewLog(
+            'bgCapture.failed board=${board.id} status=${response.statusCode}',
+          );
+          await response.drain<void>();
+        }
+      } catch (e) {
+        _boardOverviewLog('bgCapture.error board=${board.id} $e');
+      }
+    }
+
+    client.close();
+    _boardOverviewLog(
+      'bgCapture.done elapsed=${watch.elapsedMilliseconds}ms',
     );
   }
 
@@ -1438,13 +1510,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardOverviewLog(
       'open.request board=${activeBoard.id} boards=${context.read<BoardCubit>().state.boards.length}',
     );
-    // Load real cached PNGs from disk (from previous sessions).
+    // Load real cached PNGs from disk (from previous CLI captures or sessions).
     _loadBoardPreviewPngsFromDisk();
     // Capture a real screenshot of the active board.
     await _captureBoardPreviewPng(activeBoard.id);
     if (!mounted) return;
 
-    // Generate synthetic previews for boards still missing a PNG.
+    // Generate synthetic previews for boards still missing a PNG
+    // (instant — just canvas drawing, no widget rendering).
     await _generateMissingBoardPreviews(activeBoard.id);
     if (!mounted) return;
 
@@ -1456,6 +1529,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       _connectSourceId = null;
       _connectPreviewPointer = null;
     });
+
+    // Refresh previews with real screenshots in the background.
+    // The overview is already visible with synthetic/cached previews —
+    // as each real screenshot arrives, the card updates live.
+    _refreshBoardPreviewsInBackground(activeBoard.id);
   }
 
   Matrix4 _matrixFromViewport(BoardViewport viewport) {
