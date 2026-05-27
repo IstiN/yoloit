@@ -3,14 +3,12 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -22,6 +20,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/chat/chat_session_naming.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -92,20 +91,6 @@ class CliServer {
   }
 
   /// Wait for a single frame to be drawn using a post-frame callback.
-  /// Uses [PlatformDispatcher.scheduleFrame] directly to bypass the
-  /// [framesEnabled] check that blocks frame scheduling when the app
-  /// window is not focused.
-  Future<void> _waitForNextFrame() async {
-    final completer = Completer<void>();
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!completer.isCompleted) completer.complete();
-    });
-    ui.PlatformDispatcher.instance.scheduleFrame();
-    await completer.future.timeout(
-      const Duration(milliseconds: 200),
-      onTimeout: () {},
-    );
-  }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -2136,57 +2121,20 @@ class CliServer {
     if (activeCubit == null) return _error('Board cubit not available');
 
     final activeBoard = activeCubit.state.activeBoard;
-    final needsSwitch = activeBoard == null || activeBoard.id != board.id;
-    final originalBoardId = activeBoard?.id;
+    final isActiveBoard = activeBoard != null && activeBoard.id == board.id;
 
-    // Switching to/from boards with JS widgets causes SIGSEGV in JSC.
-    // Skip the switch and return an error so callers use synthetic previews.
-    if (needsSwitch) {
-      final hasJsWidgets = board.panels
-          .any((p) => p.type == 'board.widget.custom');
-      final originalHasJsWidgets = activeBoard?.panels
-              .any((p) => p.type == 'board.widget.custom') ??
-          false;
-      if (hasJsWidgets || originalHasJsWidgets) {
-        debugPrint(
-          '[CliServer] screenshot: skipping board=${board.id} '
-          '(JS widgets present, would crash JSC)',
-        );
-        return _error('Board contains JS widgets — screenshot skipped');
-      }
-    }
-
-    if (needsSwitch) {
-      // Switch to the requested board so it renders in the RepaintBoundary.
-      debugPrint('[CliServer] screenshot: switching to board=${board.id}');
-      await activeCubit.setActiveBoard(board.id);
+    Uint8List? png;
+    if (isActiveBoard) {
+      // Active board — capture directly from the live RepaintBoundary.
       _scheduleRebuild();
-      // Wait for several frames so the board fully renders.
-      for (var i = 0; i < 8; i++) {
-        await _waitForNextFrame();
-      }
-      // Extra delay for heavy content (JS widgets, video, etc).
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      for (var i = 0; i < 5; i++) {
-        await _waitForNextFrame();
-      }
-    }
-
-    // capturePng uses _waitForNextFrame internally.
-    final png = await BoardScreenshotService.instance.capturePng(
-      pixelRatio: 1.5,
-    );
-
-    if (needsSwitch && originalBoardId != null) {
-      // Switch back to the original board.
-      debugPrint('[CliServer] screenshot: restoring board=$originalBoardId');
-      await activeCubit.setActiveBoard(originalBoardId);
-      _scheduleRebuild();
-      // Wait for JS widgets to fully tear down and rebuild.
-      for (var i = 0; i < 5; i++) {
-        await _waitForNextFrame();
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      png = await BoardScreenshotService.instance.capturePng(
+        pixelRatio: 1.5,
+      );
+    } else {
+      // Non-active board — render offscreen from the data model.
+      // No board switching, no JSC crashes, no UI flicker.
+      debugPrint('[CliServer] screenshot: offscreen render board=${board.id}');
+      png = await BoardOffscreenRenderer.instance.renderBoard(board);
     }
 
     if (png == null) {

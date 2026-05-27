@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +12,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
-import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -27,6 +25,8 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
@@ -1263,154 +1263,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   /// Generate a synthetic PNG preview for a board using dart:ui Canvas.
-  /// Used as a fast fallback when real rendering isn't available.
-  Future<Uint8List?> _generateSyntheticPreviewPng(BoardDocument board) async {
-    final panels = board.panels.where((p) => !p.hidden).toList();
-    if (panels.isEmpty) return null;
-
-    // Compute bounds of all panels.
-    var allBounds = panels.first.bounds.rect;
-    for (final p in panels.skip(1)) {
-      allBounds = allBounds.expandToInclude(p.bounds.rect);
-    }
-    allBounds = allBounds.inflate(120);
-
-    // Canvas size — small is fine, this is a thumbnail.
-    const canvasW = 480.0;
-    const canvasH = 320.0;
-
-    final scaleX = canvasW / allBounds.width;
-    final scaleY = canvasH / allBounds.height;
-    final scale = math.min(scaleX, scaleY);
-    final dx = (canvasW - allBounds.width * scale) / 2;
-    final dy = (canvasH - allBounds.height * scale) / 2;
-
-    // Theme colors (neutral dark tones).
-    const bgColor = Color(0xFF0F0F1A);
-    const panelBg = Color(0xFF161625);
-    const panelBorder = Color(0xFF2A2A40);
-    const headerBg = Color(0xFF1C1C30);
-    const textColor = Color(0xFFCCCCDD);
-    const linkColor = Color(0xFF4488AA);
-
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, canvasW, canvasH));
-
-    // Background.
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, canvasW, canvasH),
-      Paint()..color = bgColor,
-    );
-
-    // Draw links between panels.
-    for (final link in board.links) {
-      final from = panels.where((p) => p.id == link.fromPanelId).firstOrNull;
-      final to = panels.where((p) => p.id == link.toPanelId).firstOrNull;
-      if (from == null || to == null) continue;
-      final fromCenter = from.bounds.rect.center;
-      final toCenter = to.bounds.rect.center;
-      canvas.drawLine(
-        Offset(
-          dx + (fromCenter.dx - allBounds.left) * scale,
-          dy + (fromCenter.dy - allBounds.top) * scale,
-        ),
-        Offset(
-          dx + (toCenter.dx - allBounds.left) * scale,
-          dy + (toCenter.dy - allBounds.top) * scale,
-        ),
-        Paint()
-          ..color = linkColor.withAlpha(100)
-          ..strokeWidth = 1.0,
-      );
-    }
-
-    // Draw each panel.
-    for (final panel in panels) {
-      final r = panel.bounds.rect;
-      final px = dx + (r.left - allBounds.left) * scale;
-      final py = dy + (r.top - allBounds.top) * scale;
-      final pw = math.max(12.0, r.width * scale);
-      final ph = math.max(9.0, r.height * scale);
-      final panelRect = Rect.fromLTWH(px, py, pw, ph);
-      final rrect = RRect.fromRectAndRadius(panelRect, const Radius.circular(4));
-
-      // Panel fill.
-      canvas.drawRRect(rrect, Paint()..color = panelBg);
-      // Panel border.
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color = panelBorder
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.8,
-      );
-
-      // Header bar (if panel is big enough).
-      final headerH = math.min(14.0, ph * 0.2);
-      if (pw > 20 && ph > 16) {
-        final headerRRect = RRect.fromRectAndCorners(
-          Rect.fromLTWH(px, py, pw, headerH),
-          topLeft: const Radius.circular(4),
-          topRight: const Radius.circular(4),
-        );
-        canvas.drawRRect(headerRRect, Paint()..color = headerBg);
-
-        // Title text.
-        if (pw > 30) {
-          final tp = TextPainter(
-            text: TextSpan(
-              text: panel.title,
-              style: const TextStyle(
-                color: textColor,
-                fontSize: 6.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            maxLines: 1,
-            textDirection: TextDirection.ltr,
-            ellipsis: '…',
-          );
-          tp.layout(maxWidth: pw - 8);
-          tp.paint(canvas, Offset(px + 4, py + (headerH - tp.height) / 2));
-          tp.dispose();
-        }
-      }
-
-      // Content lines (simulate text lines for panels with content).
-      if (pw > 30 && ph > 30) {
-        final contentTop = py + headerH + 3;
-        final contentBottom = py + ph - 3;
-        const lineH = 4.0;
-        const lineGap = 3.0;
-        var y = contentTop;
-        const maxLines = 5;
-        var lineCount = 0;
-        while (y + lineH < contentBottom && lineCount < maxLines) {
-          final lineW = pw * (0.4 + (lineCount.isEven ? 0.35 : 0.2));
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(px + 4, y, math.min(lineW, pw - 8), lineH),
-              const Radius.circular(1.5),
-            ),
-            Paint()..color = textColor.withAlpha(35),
-          );
-          y += lineH + lineGap;
-          lineCount++;
-        }
-      }
-    }
-
-    // Convert to PNG.
-    final picture = recorder.endRecording();
-    final img = await picture.toImage(canvasW.toInt(), canvasH.toInt());
-    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    img.dispose();
-    picture.dispose();
-    if (byteData == null) return null;
-    return byteData.buffer.asUint8List();
-  }
-
-  /// Generate synthetic previews for boards that have no cached PNG.
+  /// Generate previews for boards that have no cached PNG using offscreen
+  /// rendering. This is fast (no frame scheduling needed) and produces
+  /// the same quality as the background refresh.
   Future<void> _generateMissingBoardPreviews(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
     final missing = allBoards.where(
@@ -1418,98 +1273,57 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     ).toList();
     if (missing.isEmpty) return;
 
-    _boardOverviewLog('synthetic.start count=${missing.length}');
+    _boardOverviewLog('offscreen.start count=${missing.length}');
     final watch = Stopwatch()..start();
     for (final board in missing) {
       if (!mounted) break;
-      final png = await _generateSyntheticPreviewPng(board);
+      final png = await BoardOffscreenRenderer.instance.renderBoard(
+        board,
+        size: const Size(480, 320),
+        pixelRatio: 1.0,
+      );
       if (png != null && mounted) {
         _boardPreviewPngs[board.id] = png;
-        // Don't save synthetic to disk — real captures will replace them.
       }
     }
     _boardOverviewLog(
-      'synthetic.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
+      'offscreen.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
     );
   }
 
-  /// Refresh board previews in the background by calling the CLI server's
-  /// screenshot endpoint for each board. The server handles board switching
-  /// safely with proper delays — we just fetch PNGs via HTTP.
+  /// Refresh board previews in the background using offscreen rendering.
+  /// Each board is rendered independently from its data model — no board
+  /// switching needed, no JSC crashes, no UI flicker.
   Future<void> _refreshBoardPreviewsInBackground(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
-    // Skip boards with JS custom widgets — switching to them causes SIGSEGV
-    // in JavaScriptCore when the JSC VM is rapidly created/destroyed.
     final toCapture = allBoards.where(
-      (b) =>
-          b.id != activeBoardId &&
-          b.panels.isNotEmpty &&
-          !b.panels.any((p) => p.type == 'board.widget.custom'),
+      (b) => b.id != activeBoardId && b.panels.isNotEmpty,
     ).toList();
     if (toCapture.isEmpty) return;
 
-    // Read CLI server port.
-    int? port;
-    try {
-      final portFile = File('${PlatformDirs.instance.configDir}/cli.port');
-      if (portFile.existsSync()) {
-        port = int.tryParse(portFile.readAsStringSync().trim());
-      }
-    } catch (_) {}
-    if (port == null) {
-      _boardOverviewLog('bgCapture.skip — no CLI port');
-      return;
-    }
-
-    _boardOverviewLog('bgCapture.start count=${toCapture.length} port=$port');
+    _boardOverviewLog('bgCapture.start count=${toCapture.length} (offscreen)');
     final watch = Stopwatch()..start();
-    final client = HttpClient();
 
     for (final board in toCapture) {
       if (!mounted || !_isBoardOverviewOpen) break;
 
-      // Pause between captures to let JS widgets fully tear down/rebuild,
-      // preventing SIGSEGV in JavaScriptCore.
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      if (!mounted || !_isBoardOverviewOpen) break;
-
       try {
-        _boardOverviewLog('bgCapture.fetch board=${board.id}');
-        final request = await client.get(
-          'localhost',
-          port,
-          '/api/boards/${board.id}/screenshot',
-        );
-        final response = await request.close();
-        if (response.statusCode == 200) {
-          final chunks = <List<int>>[];
-          await for (final chunk in response) {
-            chunks.add(chunk);
-          }
-          final bytes = Uint8List.fromList(
-            chunks.expand((c) => c).toList(),
-          );
-          if (mounted && _isBoardOverviewOpen) {
-            setState(() {
-              _boardPreviewPngs[board.id] = bytes;
-            });
-            _saveBoardPreviewPngToDisk(board.id, bytes);
-            _boardOverviewLog(
-              'bgCapture.captured board=${board.id} bytes=${bytes.length}',
-            );
-          }
-        } else {
+        _boardOverviewLog('bgCapture.render board=${board.id}');
+        final png = await BoardOffscreenRenderer.instance.renderBoard(board);
+        if (png != null && mounted && _isBoardOverviewOpen) {
+          setState(() {
+            _boardPreviewPngs[board.id] = png;
+          });
+          _saveBoardPreviewPngToDisk(board.id, png);
           _boardOverviewLog(
-            'bgCapture.failed board=${board.id} status=${response.statusCode}',
+            'bgCapture.captured board=${board.id} bytes=${png.length}',
           );
-          await response.drain<void>();
         }
       } catch (e) {
         _boardOverviewLog('bgCapture.error board=${board.id} $e');
       }
     }
 
-    client.close();
     _boardOverviewLog(
       'bgCapture.done elapsed=${watch.elapsedMilliseconds}ms',
     );
@@ -3338,10 +3152,10 @@ class _BoardOverviewCard extends StatelessWidget {
               Expanded(
                 child:
                     previewPng == null
-                        ? _BoardOverviewPreview(board: board)
+                        ? BoardOverviewPreview(board: board)
                         : _BoardOverviewPngPreview(
                           bytes: previewPng!,
-                          fallback: _BoardOverviewPreview(board: board),
+                          fallback: BoardOverviewPreview(board: board),
                         ),
               ),
             ],
@@ -3431,663 +3245,6 @@ class _BoardOverviewPngPreview extends StatelessWidget {
   }
 }
 
-class _BoardOverviewPreview extends StatelessWidget {
-  const _BoardOverviewPreview({required this.board});
-
-  final BoardDocument board;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final panels = board.panels.where((panel) => !panel.hidden).toList();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
-        if (panels.isEmpty) {
-          return ColoredBox(
-            color: colors.background,
-            child: Center(
-              child: Container(
-                width: math.min(size.width, 120),
-                height: math.min(size.height, 70),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: colors.border),
-                ),
-                child: Icon(
-                  Icons.dashboard_outlined,
-                  color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
-                  size: 26,
-                ),
-              ),
-            ),
-          );
-        }
-
-        final bounds = _boundsForPanels(panels).inflate(120);
-        final scale = math.min(
-          size.width / bounds.width,
-          size.height / bounds.height,
-        );
-        final dx = (size.width - bounds.width * scale) / 2;
-        final dy = (size.height - bounds.height * scale) / 2;
-
-        return ColoredBox(
-          color: colors.background,
-          child: Stack(
-            clipBehavior: Clip.hardEdge,
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _BoardOverviewLinksPainter(
-                    links: board.links,
-                    panels: panels,
-                    bounds: bounds,
-                    scale: scale,
-                    dx: dx,
-                    dy: dy,
-                  ),
-                ),
-              ),
-              for (final panel in panels)
-                Positioned.fromRect(
-                  rect: _mapRect(panel.bounds.rect, bounds, scale, dx, dy),
-                  child: _BoardOverviewPanelPreview(panel: panel),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Rect _boundsForPanels(List<BoardPanelInstance> panels) {
-    var bounds = panels.first.bounds.rect;
-    for (final panel in panels.skip(1)) {
-      bounds = bounds.expandToInclude(panel.bounds.rect);
-    }
-    return bounds;
-  }
-
-  Rect _mapRect(Rect rect, Rect bounds, double scale, double dx, double dy) {
-    return Rect.fromLTWH(
-      dx + (rect.left - bounds.left) * scale,
-      dy + (rect.top - bounds.top) * scale,
-      math.max(12, rect.width * scale),
-      math.max(9, rect.height * scale),
-    );
-  }
-}
-
-class _BoardOverviewLinksPainter extends CustomPainter {
-  const _BoardOverviewLinksPainter({
-    required this.links,
-    required this.panels,
-    required this.bounds,
-    required this.scale,
-    required this.dx,
-    required this.dy,
-  });
-
-  final List<BoardPanelLink> links;
-  final List<BoardPanelInstance> panels;
-  final Rect bounds;
-  final double scale;
-  final double dx;
-  final double dy;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final link in links) {
-      final from = panels.where((p) => p.id == link.fromPanelId).firstOrNull;
-      final to = panels.where((p) => p.id == link.toPanelId).firstOrNull;
-      if (from == null || to == null) continue;
-      canvas.drawLine(
-        _mapPoint(from.bounds.rect.center),
-        _mapPoint(to.bounds.rect.center),
-        Paint()
-          ..color = link.color.withAlpha(120)
-          ..strokeWidth = 1.2,
-      );
-    }
-  }
-
-  Offset _mapPoint(Offset point) {
-    return Offset(
-      dx + (point.dx - bounds.left) * scale,
-      dy + (point.dy - bounds.top) * scale,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _BoardOverviewLinksPainter oldDelegate) {
-    return oldDelegate.links != links ||
-        oldDelegate.panels != panels ||
-        oldDelegate.bounds != bounds ||
-        oldDelegate.scale != scale ||
-        oldDelegate.dx != dx ||
-        oldDelegate.dy != dy;
-  }
-}
-
-class _BoardOverviewPanelPreview extends StatelessWidget {
-  const _BoardOverviewPanelPreview({required this.panel});
-
-  final BoardPanelInstance panel;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tiny = constraints.maxWidth < 54 || constraints.maxHeight < 38;
-        final textColor = Theme.of(context).colorScheme.onSurface;
-        final muted =
-            Theme.of(context).textTheme.bodySmall?.color ??
-            textColor.withAlpha(140);
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(tiny ? 3 : 6),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.background,
-              borderRadius: BorderRadius.circular(tiny ? 3 : 6),
-              border: Border.all(color: colors.divider, width: 0.5),
-            ),
-            child:
-                tiny
-                    ? const SizedBox.expand()
-                    : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          height: 18,
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                          color: colors.divider.withAlpha(30),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _iconForPanelType(panel.type),
-                                size: 9,
-                                color: muted,
-                              ),
-                              const SizedBox(width: 3),
-                              Expanded(
-                                child: Text(
-                                  panel.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 7,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(5),
-                            child: _BoardOverviewPanelContent(panel: panel),
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _BoardOverviewPanelContent extends StatelessWidget {
-  const _BoardOverviewPanelContent({required this.panel});
-
-  final BoardPanelInstance panel;
-
-  @override
-  Widget build(BuildContext context) {
-    final state = panel.state;
-    return switch (panel.type) {
-      'board.note.markdown' => _linesContent(
-        context,
-        _plainText(state['markdown']).split(RegExp(r'\n+')).take(5).toList(),
-      ),
-      'board.checklist' => _checklistContent(context, state['items']),
-      'board.kanban' => _kanbanContent(context, state),
-      'board.code.snippet' => _codeContent(context, state),
-      'board.files' => _namedListContent(
-        context,
-        state['files'],
-        Icons.insert_drive_file_outlined,
-      ),
-      'board.playlist' => _namedListContent(
-        context,
-        state['tracks'],
-        Icons.music_note_outlined,
-      ),
-      'board.filetree' => _placeholderContent(
-        context,
-        Icons.account_tree_outlined,
-        'File Tree',
-        _basename(state['rootPath'] as String? ?? ''),
-      ),
-      'board.file.preview' => _placeholderContent(
-        context,
-        Icons.description_outlined,
-        'File Preview',
-        _basename(state['path'] as String? ?? state['title'] as String? ?? ''),
-      ),
-      'board.diff.preview' => _placeholderContent(
-        context,
-        Icons.difference_outlined,
-        'Diff',
-        state['filePath'] as String? ?? '',
-      ),
-      'board.webpage' => _webPagePlaceholder(context, state),
-      'board.chat' => _placeholderContent(
-        context,
-        Icons.auto_awesome,
-        'AI Chat',
-        panel.title,
-      ),
-      'board.terminal' => _placeholderContent(
-        context,
-        Icons.terminal,
-        'Terminal',
-        _terminalSubtitle(state),
-      ),
-      'board.yolo_assistant' => _placeholderContent(
-        context,
-        Icons.auto_awesome,
-        'YoLo Assistant',
-        'voice + tools',
-      ),
-      'board.timer' => _timerContent(context, state),
-      _ => Center(
-        child: Icon(
-          _iconForPanelType(panel.type),
-          color: Theme.of(context).colorScheme.onSurface.withAlpha(140),
-          size: 18,
-        ),
-      ),
-    };
-  }
-
-  Widget _linesContent(BuildContext context, List<String> lines) {
-    final textColor = Theme.of(context).colorScheme.onSurface;
-    final clean =
-        lines
-            .map((line) => line.trim())
-            .where((line) => line.isNotEmpty)
-            .take(5)
-            .toList();
-    if (clean.isEmpty) {
-      return _placeholderContent(
-        context,
-        Icons.notes_outlined,
-        'Note',
-        'Empty',
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final line in clean)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Text(
-              line,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: textColor.withAlpha(215),
-                fontSize: 7,
-                height: 1.05,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _checklistContent(BuildContext context, Object? rawItems) {
-    final items = _maps(rawItems);
-    if (items.isEmpty) {
-      return _placeholderContent(
-        context,
-        Icons.checklist_outlined,
-        'Checklist',
-        'No items',
-      );
-    }
-    final textColor = Theme.of(context).colorScheme.onSurface;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final item in items.take(4))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Row(
-              children: [
-                Icon(
-                  (item['done'] as bool? ?? false)
-                      ? Icons.check_box_outlined
-                      : Icons.check_box_outline_blank,
-                  size: 8,
-                  color: textColor.withAlpha(140),
-                ),
-                const SizedBox(width: 3),
-                Expanded(
-                  child: Text(
-                    item['text']?.toString() ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: textColor.withAlpha(215),
-                      fontSize: 7,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _kanbanContent(BuildContext context, Map<String, dynamic> state) {
-    final columns =
-        (state['columns'] as List?)
-            ?.map((e) => e.toString())
-            .take(4)
-            .toList() ??
-        const ['Backlog', 'Todo', 'In Progress', 'Done'];
-    final cards = _maps(state['cards']);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < columns.length; i++) ...[
-          Expanded(
-            child: _miniKanbanColumn(
-              context,
-              columns[i],
-              cards.where((c) => (c['columnIndex'] as int? ?? 0) == i).toList(),
-            ),
-          ),
-          if (i != columns.length - 1) const SizedBox(width: 3),
-        ],
-      ],
-    );
-  }
-
-  Widget _miniKanbanColumn(
-    BuildContext context,
-    String title,
-    List<Map<String, dynamic>> cards,
-  ) {
-    final colors = context.appColors;
-    final textColor = Theme.of(context).colorScheme.onSurface;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated.withAlpha(165),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: textColor.withAlpha(220),
-                fontSize: 6.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 3),
-            for (final card in cards.take(3))
-              Container(
-                height: 8,
-                margin: const EdgeInsets.only(bottom: 2),
-                decoration: BoxDecoration(
-                  color: colors.surface.withAlpha(220),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Text(
-                  card['title']?.toString() ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
-                  style: TextStyle(
-                    color: textColor.withAlpha(170),
-                    fontSize: 4.8,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _codeContent(BuildContext context, Map<String, dynamic> state) {
-    final code = state['code']?.toString().trim() ?? '';
-    final language = state['language']?.toString() ?? 'code';
-    if (code.isEmpty) {
-      return _placeholderContent(
-        context,
-        Icons.code_outlined,
-        language,
-        'Empty',
-      );
-    }
-    final lines = code.split('\n').take(5).toList();
-    final textColor = Theme.of(context).colorScheme.onSurface;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          language,
-          style: TextStyle(
-            color: textColor.withAlpha(140),
-            fontSize: 6.5,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 2),
-        for (final line in lines)
-          Text(
-            line.trimRight(),
-            maxLines: 1,
-            overflow: TextOverflow.clip,
-            style: TextStyle(
-              color: textColor.withAlpha(190),
-              fontSize: 6,
-              fontFamily: 'monospace',
-              height: 1.05,
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _namedListContent(BuildContext context, Object? raw, IconData icon) {
-    final items = _maps(raw);
-    if (items.isEmpty) {
-      return _placeholderContent(context, icon, panel.title, 'No items');
-    }
-    final textColor = Theme.of(context).colorScheme.onSurface;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final item in items.take(4))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 8,
-                  color: textColor.withAlpha(140),
-                ),
-                const SizedBox(width: 3),
-                Expanded(
-                  child: Text(
-                    item['name']?.toString() ??
-                        item['title']?.toString() ??
-                        _basename(item['path']?.toString() ?? ''),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: textColor.withAlpha(215),
-                      fontSize: 7,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _webPagePlaceholder(BuildContext context, Map<String, dynamic> state) {
-    final url = state['url'] as String? ?? '';
-    final title = state['title'] as String? ?? 'Web Page';
-    return _placeholderContent(
-      context,
-      Icons.language_outlined,
-      title.isEmpty ? 'Web Page' : title,
-      _hostForUrl(url).isEmpty ? url : _hostForUrl(url),
-    );
-  }
-
-  Widget _timerContent(BuildContext context, Map<String, dynamic> state) {
-    final remaining =
-        state['remaining'] as int? ?? state['duration'] as int? ?? 0;
-    final label = state['label'] as String? ?? 'Timer';
-    final minutes = (remaining / 60).floor();
-    final seconds = (remaining % 60).toString().padLeft(2, '0');
-    return _placeholderContent(
-      context,
-      Icons.timer_outlined,
-      label.isEmpty ? 'Timer' : label,
-      '$minutes:$seconds',
-    );
-  }
-
-  Widget _placeholderContent(
-    BuildContext context,
-    IconData icon,
-    String title,
-    String subtitle,
-  ) {
-    final textColor = Theme.of(context).colorScheme.onSurface;
-    final muted =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: muted.withAlpha(180)),
-          const SizedBox(height: 3),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: textColor.withAlpha(220),
-              fontSize: 7.2,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (subtitle.trim().isNotEmpty)
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: muted.withAlpha(185), fontSize: 6.4),
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _terminalSubtitle(Map<String, dynamic> state) {
-    final config = state['config'];
-    if (config is Map) {
-      final dir = config['workingDir']?.toString() ?? '';
-      if (dir.isNotEmpty) return _basename(dir);
-    }
-    return 'shell';
-  }
-
-  List<Map<String, dynamic>> _maps(Object? raw) {
-    return (raw as List?)
-            ?.whereType<Map>()
-            .map((e) => Map<String, dynamic>.from(e))
-            .toList() ??
-        const [];
-  }
-
-  String _plainText(Object? raw) {
-    return (raw?.toString() ?? '')
-        .replaceAll(RegExp(r'[#*_>`\[\]()]'), ' ')
-        .trim();
-  }
-
-  String _basename(String value) {
-    if (value.trim().isEmpty) return '';
-    final normalized = value.replaceAll('\\', '/');
-    return normalized.split('/').where((part) => part.isNotEmpty).lastOrNull ??
-        value;
-  }
-
-  String _hostForUrl(String value) {
-    final uri = Uri.tryParse(value);
-    return uri?.host ?? '';
-  }
-}
-
-Color _panelTypeColor(String type, {Color? override}) {
-  if (override != null) return override;
-  return switch (type) {
-    'board.note.markdown' => const Color(0xFFE879F9),
-    'board.kanban' => const Color(0xFF6366F1),
-    'board.webpage' => const Color(0xFF0EA5E9),
-    'board.code.snippet' => const Color(0xFF10B981),
-    'board.checklist' => const Color(0xFFF59E0B),
-    'board.files' => const Color(0xFFEC4899),
-    'board.file.preview' => const Color(0xFF8B5CF6),
-    'board.playlist' => const Color(0xFFA855F7),
-    'board.run_configs' => const Color(0xFF22C55E),
-    'board.run' => const Color(0xFF84CC16),
-    'board.chat' => const Color(0xFF34D399),
-    'board.terminal' => const Color(0xFF14B8A6),
-    'board.filetree' => const Color(0xFF64748B),
-    'board.diff.preview' => const Color(0xFF60A5FA),
-    'board.yolo_assistant' => const Color(0xFFF97316),
-    'board.widget.custom' => const Color(0xFF7C3AED),
-    'board.timer' => const Color(0xFF3B82F6),
-    _ => const Color(0xFF94A3B8),
-  };
-}
-
-IconData _iconForPanelType(String type) {
-  return BoardPluginRegistry.instance.pluginFor(type)?.icon ??
-      Icons.widgets_outlined;
-}
 
 class _ToolbarChip extends StatelessWidget {
   const _ToolbarChip({required this.icon, required this.label});
@@ -5353,7 +4510,7 @@ class _BoardMiniMapPainter extends CustomPainter {
           ..color =
               isProcessing
                   ? const Color(0xFF34D399)
-                  : _panelTypeColor(
+                  : panelTypeColor(
                     panel.type,
                     override: panel.color,
                   ).withAlpha(0xCC),
