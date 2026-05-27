@@ -1261,8 +1261,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   /// Generate a synthetic PNG preview for a board using dart:ui Canvas.
-  /// This renders panels as rounded rectangles with titles — no widgets needed,
-  /// works for boards that have never been opened in this session.
+  /// Used as a fast fallback when real rendering isn't available.
   Future<Uint8List?> _generateSyntheticPreviewPng(BoardDocument board) async {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return null;
@@ -1379,10 +1378,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       if (pw > 30 && ph > 30) {
         final contentTop = py + headerH + 3;
         final contentBottom = py + ph - 3;
-        final lineH = 4.0;
-        final lineGap = 3.0;
+        const lineH = 4.0;
+        const lineGap = 3.0;
         var y = contentTop;
-        final maxLines = 5;
+        const maxLines = 5;
         var lineCount = 0;
         while (y + lineH < contentBottom && lineCount < maxLines) {
           final lineW = pw * (0.4 + (lineCount.isEven ? 0.35 : 0.2));
@@ -1409,6 +1408,102 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     return byteData.buffer.asUint8List();
   }
 
+  /// Capture real rendered screenshots for boards that don't have a cached PNG.
+  ///
+  /// Temporarily switches to each board, auto-fits the viewport, hides
+  /// chrome, captures the RepaintBoundary, then switches back.
+  /// An opaque overlay is shown during the process to hide flicker.
+  Future<void> _captureAllMissingBoardPreviews(String originalBoardId) async {
+    final cubit = context.read<BoardCubit>();
+    final allBoards = cubit.state.boards;
+    final missing = allBoards.where(
+      (b) => !_boardPreviewPngs.containsKey(b.id) && b.id != originalBoardId,
+    ).toList();
+    if (missing.isEmpty) return;
+
+    _boardOverviewLog('captureAll.start missing=${missing.length}');
+    final watch = Stopwatch()..start();
+
+    // Show opaque overlay to hide board-switching flicker.
+    setState(() => _isCapturingScreenshot = true);
+
+    for (final board in missing) {
+      if (!mounted) break;
+      _boardOverviewLog('captureAll.switch board=${board.id}');
+
+      // Switch to this board.
+      await cubit.setActiveBoard(board.id);
+      if (!mounted) break;
+
+      // Auto-fit viewport so all panels are visible in the capture.
+      _fitBoardPanels(board, persist: false);
+
+      // Wait several frames for the board content to render and layout.
+      for (var i = 0; i < 4; i++) {
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      if (!mounted) break;
+
+      // Capture.
+      final bytes = await BoardScreenshotService.instance.capturePng(
+        pixelRatio: 0.28,
+      );
+      if (bytes != null && mounted) {
+        _boardPreviewPngs[board.id] = bytes;
+        _saveBoardPreviewPngToDisk(board.id, bytes);
+        _boardOverviewLog(
+          'captureAll.captured board=${board.id} bytes=${bytes.length}',
+        );
+      } else {
+        // Fallback to synthetic if real capture failed.
+        _boardOverviewLog('captureAll.fallbackSynthetic board=${board.id}');
+        final synth = await _generateSyntheticPreviewPng(board);
+        if (synth != null && mounted) {
+          _boardPreviewPngs[board.id] = synth;
+          _saveBoardPreviewPngToDisk(board.id, synth);
+        }
+      }
+    }
+
+    if (!mounted) return;
+
+    // Switch back to the original board.
+    _boardOverviewLog('captureAll.restore board=$originalBoardId');
+    await cubit.setActiveBoard(originalBoardId);
+    if (!mounted) return;
+
+    // Restore original viewport.
+    final originalBoard = cubit.state.boards.firstWhere(
+      (b) => b.id == originalBoardId,
+    );
+    final vp = originalBoard.viewport;
+    if (vp != null && !_isDefaultViewport(vp)) {
+      _transformController.value = _matrixFromViewport(vp);
+    } else {
+      _fitBoardPanels(originalBoard, persist: false);
+    }
+
+    // Wait for original board to render back.
+    for (var i = 0; i < 3; i++) {
+      await WidgetsBinding.instance.endOfFrame;
+    }
+
+    // Re-capture the original board (its viewport may have shifted).
+    final origBytes = await BoardScreenshotService.instance.capturePng(
+      pixelRatio: 0.28,
+    );
+    if (origBytes != null && mounted) {
+      _boardPreviewPngs[originalBoardId] = origBytes;
+      _saveBoardPreviewPngToDisk(originalBoardId, origBytes);
+    }
+
+    if (mounted) setState(() => _isCapturingScreenshot = false);
+
+    _boardOverviewLog(
+      'captureAll.done elapsed=${watch.elapsedMilliseconds}ms',
+    );
+  }
+
   Future<void> _openBoardOverview(BoardDocument activeBoard) async {
     final watch = Stopwatch()..start();
     _boardOverviewLog(
@@ -1419,26 +1514,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     await _captureBoardPreviewPng(activeBoard.id);
     if (!mounted) return;
 
-    // Generate synthetic previews for boards that still have no PNG.
-    final allBoards = context.read<BoardCubit>().state.boards;
-    final missing = allBoards.where(
-      (b) => !_boardPreviewPngs.containsKey(b.id),
-    ).toList();
-    if (missing.isNotEmpty) {
-      _boardOverviewLog('synthetic.generating count=${missing.length}');
-      for (final board in missing) {
-        final png = await _generateSyntheticPreviewPng(board);
-        if (png != null && mounted) {
-          _boardPreviewPngs[board.id] = png;
-          _saveBoardPreviewPngToDisk(board.id, png);
-        }
-      }
-      _boardOverviewLog(
-        'synthetic.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
-      );
-    }
-
+    // Capture real rendered screenshots for boards that still have no PNG.
+    await _captureAllMissingBoardPreviews(activeBoard.id);
     if (!mounted) return;
+
     _boardOverviewLog(
       'open.showOverlay board=${activeBoard.id} elapsed=${watch.elapsedMilliseconds}ms',
     );
