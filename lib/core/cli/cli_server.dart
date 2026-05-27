@@ -2139,6 +2139,23 @@ class CliServer {
     final needsSwitch = activeBoard == null || activeBoard.id != board.id;
     final originalBoardId = activeBoard?.id;
 
+    // Switching to/from boards with JS widgets causes SIGSEGV in JSC.
+    // Skip the switch and return an error so callers use synthetic previews.
+    if (needsSwitch) {
+      final hasJsWidgets = board.panels
+          .any((p) => p.type == 'board.widget.custom');
+      final originalHasJsWidgets = activeBoard?.panels
+              .any((p) => p.type == 'board.widget.custom') ??
+          false;
+      if (hasJsWidgets || originalHasJsWidgets) {
+        debugPrint(
+          '[CliServer] screenshot: skipping board=${board.id} '
+          '(JS widgets present, would crash JSC)',
+        );
+        return _error('Board contains JS widgets — screenshot skipped');
+      }
+    }
+
     if (needsSwitch) {
       // Switch to the requested board so it renders in the RepaintBoundary.
       debugPrint('[CliServer] screenshot: switching to board=${board.id}');
