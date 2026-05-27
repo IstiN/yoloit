@@ -78,6 +78,26 @@ class BoardScreenshotService {
     return base64Encode(bytes);
   }
 
+  /// Wait for a single frame to be drawn using a post-frame callback.
+  /// Uses [PlatformDispatcher.scheduleFrame] directly to bypass the
+  /// [framesEnabled] check — when the app window is not focused (e.g.,
+  /// screenshot requested from CLI), [SchedulerBinding.scheduleFrame]
+  /// returns early and no frame is ever drawn.
+  Future<void> _waitForNextFrame() async {
+    final completer = Completer<void>();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!completer.isCompleted) completer.complete();
+    });
+    // Bypass framesEnabled check — force the engine to pump a frame.
+    ui.PlatformDispatcher.instance.scheduleFrame();
+    await completer.future.timeout(
+      const Duration(milliseconds: 200),
+      onTimeout: () {
+        debugPrint('[BoardScreenshot] frame timeout, proceeding');
+      },
+    );
+  }
+
   Future<Uint8List?> _capture({
     required double pixelRatio,
     required ui.ImageByteFormat format,
@@ -89,9 +109,7 @@ class BoardScreenshotService {
     }
 
     for (var i = 0; i < 5; i++) {
-      // Schedule a frame so endOfFrame completes even when the app is idle.
-      SchedulerBinding.instance.scheduleFrame();
-      await WidgetsBinding.instance.endOfFrame;
+      await _waitForNextFrame();
       final boundary = key.currentContext?.findRenderObject();
       if (boundary is! RenderRepaintBoundary) {
         debugPrint('[BoardScreenshot] boundary not ready: ${boundary.runtimeType}');
@@ -106,7 +124,6 @@ class BoardScreenshotService {
       } catch (e, st) {
         debugPrint('[BoardScreenshot] capture failed: $e');
         debugPrintStack(stackTrace: st);
-        // retry a few frames in case the boundary is still settling
       }
     }
     return null;

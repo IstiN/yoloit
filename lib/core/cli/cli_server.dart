@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Colors;
@@ -88,6 +89,22 @@ class CliServer {
     try {
       SchedulerBinding.instance.scheduleFrame();
     } catch (_) {}
+  }
+
+  /// Wait for a single frame to be drawn using a post-frame callback.
+  /// Uses [PlatformDispatcher.scheduleFrame] directly to bypass the
+  /// [framesEnabled] check that blocks frame scheduling when the app
+  /// window is not focused.
+  Future<void> _waitForNextFrame() async {
+    final completer = Completer<void>();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!completer.isCompleted) completer.complete();
+    });
+    ui.PlatformDispatcher.instance.scheduleFrame();
+    await completer.future.timeout(
+      const Duration(milliseconds: 200),
+      onTimeout: () {},
+    );
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -2127,21 +2144,18 @@ class CliServer {
       debugPrint('[CliServer] screenshot: switching to board=${board.id}');
       await activeCubit.setActiveBoard(board.id);
       _scheduleRebuild();
-      // Wait for several frames so the board fully renders
-      // (panels, markdown, JS widgets, etc).
+      // Wait for several frames so the board fully renders.
       for (var i = 0; i < 8; i++) {
-        await WidgetsBinding.instance.endOfFrame;
+        await _waitForNextFrame();
       }
       // Extra delay for heavy content (JS widgets, video, etc).
       await Future<void>.delayed(const Duration(milliseconds: 500));
       for (var i = 0; i < 5; i++) {
-        await WidgetsBinding.instance.endOfFrame;
+        await _waitForNextFrame();
       }
     }
 
-    // Ensure a frame is scheduled so endOfFrame in capturePng completes
-    // (when the app is idle, no frames are being painted).
-    _scheduleRebuild();
+    // capturePng uses _waitForNextFrame internally.
     final png = await BoardScreenshotService.instance.capturePng(
       pixelRatio: 1.5,
     );
@@ -2151,10 +2165,9 @@ class CliServer {
       debugPrint('[CliServer] screenshot: restoring board=$originalBoardId');
       await activeCubit.setActiveBoard(originalBoardId);
       _scheduleRebuild();
-      // Wait for JS widgets to fully tear down and rebuild — prevents
-      // SIGSEGV in JavaScriptCore when the next screenshot switches again.
+      // Wait for JS widgets to fully tear down and rebuild.
       for (var i = 0; i < 5; i++) {
-        await WidgetsBinding.instance.endOfFrame;
+        await _waitForNextFrame();
       }
       await Future<void>.delayed(const Duration(milliseconds: 500));
     }
