@@ -2655,17 +2655,43 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
                       );
               final rect = Rect.lerp(startRect, endRect, t)!;
               final opacity = isZoomBoard ? 1.0 : fade;
+              // When the zoom card is near full-screen (t < 0.5),
+              // hide the card chrome so the purple-tinted surface/border
+              // colors don't create an overlay effect.
+              final showChrome = !isZoomBoard || t >= 0.5;
               widgets.add(
                 Positioned.fromRect(
                   rect: rect,
                   child: Opacity(
                     opacity: opacity,
-                    child: _BoardOverviewCard(
-                      board: board,
-                      active: board.id == highlightedBoardId && t >= 0.92,
-                      previewPng: widget.previewPngs[board.id],
-                      onTap: () => _selectBoard(board.id),
-                    ),
+                    child:
+                        showChrome
+                            ? _BoardOverviewCard(
+                              board: board,
+                              active:
+                                  board.id == highlightedBoardId && t >= 0.92,
+                              previewPng: widget.previewPngs[board.id],
+                              onTap: () => _selectBoard(board.id),
+                            )
+                            : GestureDetector(
+                              onTap: () => _selectBoard(board.id),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  16 * t.clamp(0.0, 1.0),
+                                ),
+                                child:
+                                    widget.previewPngs[board.id] != null
+                                        ? Image.memory(
+                                          widget.previewPngs[board.id]!,
+                                          fit: BoxFit.cover,
+                                          gaplessPlayback: true,
+                                        )
+                                        : ColoredBox(
+                                          color: colors.background,
+                                          child: const SizedBox.expand(),
+                                        ),
+                              ),
+                            ),
                   ),
                 ),
               );
@@ -2729,18 +2755,29 @@ class _BoardSwitchPreviewOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return IgnorePointer(
       child: AnimatedOpacity(
         opacity: visible ? 1 : 0,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
         onEnd: onHidden,
-        child: _BoardOverviewCard(
-          board: board,
-          active: false,
-          previewPng: previewPng,
-          onTap: () {},
-        ),
+        child:
+            previewPng != null
+                ? Image.memory(
+                  previewPng!,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder:
+                      (_, _, _) => ColoredBox(
+                        color: colors.background,
+                        child: const SizedBox.expand(),
+                      ),
+                )
+                : ColoredBox(
+                  color: colors.background,
+                  child: const SizedBox.expand(),
+                ),
       ),
     );
   }
