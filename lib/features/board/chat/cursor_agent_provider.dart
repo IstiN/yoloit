@@ -133,6 +133,7 @@ class CursorAgentProvider extends ChatProvider {
     final promptParts = [effectiveMessage, ...attachments];
     args.add(promptParts.join(' '));
 
+    debugPrint('[CursorAgent] Running: cursor-agent ${args.join(' ')}');
     debugPrint('[CursorAgent] cwd: ${config.workingDir}');
 
     try {
@@ -142,23 +143,6 @@ class CursorAgentProvider extends ChatProvider {
       final enrichedPath = PlatformShell.instance.enrichedPath(
         baseEnv['PATH'] ?? '',
       );
-
-      // Pass CURSOR_API_KEY via --api-key flag to bypass keychain access.
-      // cursor-agent tries to use macOS keychain internally, which fails
-      // when launched from a non-sandboxed Flutter app.
-      final cursorApiKey = baseEnv['CURSOR_API_KEY'];
-      if (cursorApiKey != null && cursorApiKey.isNotEmpty) {
-        args.insertAll(0, ['--api-key', cursorApiKey]);
-      }
-
-      // Log args with redacted API key
-      final logArgs = args.map((a) {
-        final idx = args.indexOf(a);
-        if (idx > 0 && args[idx - 1] == '--api-key') return '***';
-        return a;
-      }).join(' ');
-      debugPrint('[CursorAgent] Running: cursor-agent $logArgs');
-
       final process = await _processStarter(
         'cursor-agent',
         args,
