@@ -79,6 +79,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   BoardDocument? _boardSwitchPreviewBoard;
   Uint8List? _boardSwitchPreviewPng;
   final Map<String, Uint8List> _boardPreviewPngs = {};
+  /// When true, panel chrome (borders, accents, sidebar, minimap) is hidden
+  /// to produce a clean screenshot without purple-tinted decorations.
+  bool _isCapturingScreenshot = false;
   late final AnimationController _panController;
   Animation<Matrix4>? _panAnimation;
   VoidCallback? _panAnimationListener;
@@ -346,6 +349,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     panel: panel,
                                                     positionOffset:
                                                         _canvasOrigin,
+                                                    capturingScreenshot:
+                                                        _isCapturingScreenshot,
                                                     onTap:
                                                         () => context
                                                             .read<BoardCubit>()
@@ -810,7 +815,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
-                                  if (!_isBoardOverviewOpen)
+                                  if (!_isBoardOverviewOpen &&
+                                      !_isCapturingScreenshot)
                                     Positioned(
                                       top: 12,
                                       right: 12,
@@ -892,8 +898,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         ],
                                       ),
                                     ),
-                                  // ── Quick Tools Panel (left side) ──────────────────
-                                  if (!_isBoardOverviewOpen)
+                                  if (!_isBoardOverviewOpen &&
+                                      !_isCapturingScreenshot)
                                     Positioned(
                                       left: 12,
                                       top: 12,
@@ -1178,9 +1184,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   Future<void> _captureBoardPreviewPng(String boardId) async {
     final watch = Stopwatch()..start();
     _boardOverviewLog('capture.start board=$boardId pixelRatio=0.28');
+
+    // Hide panel chrome (borders, accents, sidebar, minimap) so the
+    // screenshot is clean — no purple-tinted decorations.
+    setState(() => _isCapturingScreenshot = true);
+    await WidgetsBinding.instance.endOfFrame;
+
     final bytes = await BoardScreenshotService.instance.capturePng(
       pixelRatio: 0.28,
     );
+
+    // Restore decorations.
+    if (mounted) setState(() => _isCapturingScreenshot = false);
+
     _boardOverviewLog(
       'capture.done board=$boardId '
       'bytes=${bytes?.length ?? 0} elapsed=${watch.elapsedMilliseconds}ms',
@@ -3054,30 +3070,17 @@ class _BoardOverviewPngPreview extends StatelessWidget {
   final Uint8List bytes;
   final Widget fallback;
 
-  // Desaturation matrix: blend 60 % grayscale into the image to mute
-  // the accent colours that appear on panel borders/headers.
-  static const _desaturate = ColorFilter.matrix(<double>[
-    // R        G        B     A   offset
-    0.56, 0.28, 0.16, 0, 0, //
-    0.16, 0.56, 0.28, 0, 0, //
-    0.16, 0.28, 0.56, 0, 0, //
-    0, 0, 0, 1, 0, //
-  ]);
-
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
         fallback,
-        ColorFiltered(
-          colorFilter: _desaturate,
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            errorBuilder: (_, _, _) => fallback,
-          ),
+        Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => fallback,
         ),
         DecoratedBox(
           decoration: BoxDecoration(
@@ -3242,35 +3245,37 @@ class _BoardOverviewPanelPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final accent = _panelTypeColor(panel.type, override: panel.color);
     return LayoutBuilder(
       builder: (context, constraints) {
         final tiny = constraints.maxWidth < 54 || constraints.maxHeight < 38;
         final textColor = Theme.of(context).colorScheme.onSurface;
+        final muted =
+            Theme.of(context).textTheme.bodySmall?.color ??
+            textColor.withAlpha(140);
         return ClipRRect(
           borderRadius: BorderRadius.circular(tiny ? 3 : 6),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: colors.surface,
+              color: colors.background,
               borderRadius: BorderRadius.circular(tiny ? 3 : 6),
-              border: Border.all(color: accent.withAlpha(60), width: 0.6),
+              border: Border.all(color: colors.divider, width: 0.5),
             ),
             child:
                 tiny
-                    ? ColoredBox(color: accent.withAlpha(45))
+                    ? const SizedBox.expand()
                     : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Container(
                           height: 18,
                           padding: const EdgeInsets.symmetric(horizontal: 5),
-                          color: accent.withAlpha(18),
+                          color: colors.divider.withAlpha(30),
                           child: Row(
                             children: [
                               Icon(
                                 _iconForPanelType(panel.type),
                                 size: 9,
-                                color: accent.withAlpha(140),
+                                color: muted,
                               ),
                               const SizedBox(width: 3),
                               Expanded(
@@ -3370,10 +3375,7 @@ class _BoardOverviewPanelContent extends StatelessWidget {
       _ => Center(
         child: Icon(
           _iconForPanelType(panel.type),
-          color: _panelTypeColor(
-            panel.type,
-            override: panel.color,
-          ).withAlpha(210),
+          color: Theme.of(context).colorScheme.onSurface.withAlpha(140),
           size: 18,
         ),
       ),
@@ -3441,7 +3443,7 @@ class _BoardOverviewPanelContent extends StatelessWidget {
                       ? Icons.check_box_outlined
                       : Icons.check_box_outline_blank,
                   size: 8,
-                  color: _panelTypeColor(panel.type, override: panel.color),
+                  color: textColor.withAlpha(140),
                 ),
                 const SizedBox(width: 3),
                 Expanded(
@@ -3560,7 +3562,7 @@ class _BoardOverviewPanelContent extends StatelessWidget {
         Text(
           language,
           style: TextStyle(
-            color: _panelTypeColor(panel.type, override: panel.color),
+            color: textColor.withAlpha(140),
             fontSize: 6.5,
             fontWeight: FontWeight.w700,
           ),
@@ -3599,7 +3601,7 @@ class _BoardOverviewPanelContent extends StatelessWidget {
                 Icon(
                   icon,
                   size: 8,
-                  color: _panelTypeColor(panel.type, override: panel.color),
+                  color: textColor.withAlpha(140),
                 ),
                 const SizedBox(width: 3),
                 Expanded(
@@ -3657,12 +3659,11 @@ class _BoardOverviewPanelContent extends StatelessWidget {
     final muted =
         Theme.of(context).textTheme.bodySmall?.color ??
         Theme.of(context).colorScheme.onSurface;
-    final accent = _panelTypeColor(panel.type, override: panel.color);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: accent.withAlpha(220)),
+          Icon(icon, size: 16, color: muted.withAlpha(180)),
           const SizedBox(height: 3),
           Text(
             title,
@@ -3880,6 +3881,7 @@ class _BoardPanelCard extends StatefulWidget {
     this.connectMode = false,
     this.connectSourceId,
     this.onConnectTap,
+    this.capturingScreenshot = false,
   });
 
   final BoardPanelInstance panel;
@@ -3902,6 +3904,7 @@ class _BoardPanelCard extends StatefulWidget {
   final bool connectMode;
   final String? connectSourceId;
   final VoidCallback? onConnectTap;
+  final bool capturingScreenshot;
 
   @override
   State<_BoardPanelCard> createState() => _BoardPanelCardState();
@@ -3960,19 +3963,26 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
     final isFocused = panel.id == focusedPanelId;
     final isWebpage = panel.type == 'board.webpage';
     final accent = panel.color;
+    final isCapturing = widget.capturingScreenshot;
     final panelFill =
-        accent == null
-            ? colors.surface
-            : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
+        isCapturing
+            ? colors.background
+            : accent == null
+                ? colors.surface
+                : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
     final panelHeaderFill =
-        accent == null
-            ? colors.surfaceElevated
-            : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
-                colors.surfaceElevated;
+        isCapturing
+            ? colors.background
+            : accent == null
+                ? colors.surfaceElevated
+                : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
+                    colors.surfaceElevated;
     final borderColor =
-        accent == null
-            ? colors.divider
-            : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
+        isCapturing
+            ? colors.background
+            : accent == null
+                ? colors.divider
+                : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
@@ -4020,10 +4030,16 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                   color: panelFill,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isFocused ? colors.primary : borderColor,
-                    width: isFocused ? 1.5 : 1,
+                    color: isCapturing
+                        ? colors.background
+                        : isFocused
+                            ? colors.primary
+                            : borderColor,
+                    width: isFocused && !isCapturing ? 1.5 : 1,
                   ),
-                  boxShadow: [
+                  boxShadow: isCapturing
+                      ? null
+                      : [
                     BoxShadow(
                       color: Colors.black.withAlpha(35),
                       blurRadius: 22,
