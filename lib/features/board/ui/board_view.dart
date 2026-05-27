@@ -74,6 +74,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String? _focusedPanelVisibilityKey;
   bool _showMinimap = true;
   bool _showToolsPanel = true;
+  bool _isBoardOverviewOpen = false;
   final Map<String, Uint8List> _boardPreviewPngs = {};
   late final AnimationController _panController;
   Animation<Matrix4>? _panAnimation;
@@ -171,15 +172,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
               children: [
                 _BoardToolbar(
                   board: activeBoard,
-                  boards: state.boards,
-                  onSelectedBoard:
-                      (id) => context.read<BoardCubit>().setActiveBoard(id),
                   onCreateBoard: () => _createBoard(context),
                   onRenameBoard: () => _renameBoard(context, activeBoard),
                   onDeleteBoard: () => _deleteBoard(context, activeBoard),
-                  previewPngs: _boardPreviewPngs,
-                  onCapturePreview:
-                      () => _captureBoardPreviewPng(activeBoard.id),
+                  onOpenBoardOverview: () => _openBoardOverview(activeBoard),
                 ),
                 Expanded(
                   child: DecoratedBox(
@@ -811,130 +807,135 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     ),
-                                  Positioned(
-                                    top: 12,
-                                    right: 12,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            _OverlayIconButton(
-                                              icon: Icons.fit_screen_outlined,
-                                              tooltip: 'Fit board to content',
-                                              onTap:
-                                                  () => _fitBoardPanels(
-                                                    activeBoard,
-                                                    persist: true,
-                                                  ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            _OverlayIconButton(
-                                              icon:
-                                                  _showMinimap
-                                                      ? Icons.map
-                                                      : Icons.map_outlined,
-                                              tooltip:
-                                                  _showMinimap
-                                                      ? 'Hide minimap'
-                                                      : 'Show minimap',
-                                              active: _showMinimap,
-                                              onTap:
-                                                  () => setState(
-                                                    () =>
-                                                        _showMinimap =
-                                                            !_showMinimap,
+                                  if (!_isBoardOverviewOpen)
+                                    Positioned(
+                                      top: 12,
+                                      right: 12,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              _OverlayIconButton(
+                                                icon: Icons.fit_screen_outlined,
+                                                tooltip: 'Fit board to content',
+                                                onTap:
+                                                    () => _fitBoardPanels(
+                                                      activeBoard,
+                                                      persist: true,
+                                                    ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              _OverlayIconButton(
+                                                icon:
+                                                    _showMinimap
+                                                        ? Icons.map
+                                                        : Icons.map_outlined,
+                                                tooltip:
+                                                    _showMinimap
+                                                        ? 'Hide minimap'
+                                                        : 'Show minimap',
+                                                active: _showMinimap,
+                                                onTap:
+                                                    () => setState(
+                                                      () =>
+                                                          _showMinimap =
+                                                              !_showMinimap,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (_showMinimap) ...[
+                                            const SizedBox(height: 6),
+                                            ValueListenableBuilder<int>(
+                                              valueListenable:
+                                                  ChatPanelWidget
+                                                      .processingChangeNotifier,
+                                              builder:
+                                                  (
+                                                    context,
+                                                    _,
+                                                    __,
+                                                  ) => _BoardMiniMap(
+                                                    panels: activeBoard.panels,
+                                                    processingPanelIds:
+                                                        ChatPanelWidget
+                                                            .processingNotifiers
+                                                            .entries
+                                                            .where(
+                                                              (e) =>
+                                                                  e.value.value,
+                                                            )
+                                                            .map((e) => e.key)
+                                                            .toSet(),
+                                                    transformCtrl:
+                                                        _transformController,
+                                                    viewportSize:
+                                                        _viewportSize ??
+                                                        const Size(1, 1),
+                                                    origin: _canvasOrigin,
+                                                    onPanTo:
+                                                        (center) =>
+                                                            _centerViewportOn(
+                                                              activeBoard,
+                                                              center,
+                                                              persist: true,
+                                                            ),
                                                   ),
                                             ),
                                           ],
-                                        ),
-                                        if (_showMinimap) ...[
-                                          const SizedBox(height: 6),
-                                          ValueListenableBuilder<int>(
-                                            valueListenable:
-                                                ChatPanelWidget
-                                                    .processingChangeNotifier,
-                                            builder:
-                                                (
-                                                  context,
-                                                  _,
-                                                  __,
-                                                ) => _BoardMiniMap(
-                                                  panels: activeBoard.panels,
-                                                  processingPanelIds:
-                                                      ChatPanelWidget
-                                                          .processingNotifiers
-                                                          .entries
-                                                          .where(
-                                                            (e) =>
-                                                                e.value.value,
-                                                          )
-                                                          .map((e) => e.key)
-                                                          .toSet(),
-                                                  transformCtrl:
-                                                      _transformController,
-                                                  viewportSize:
-                                                      _viewportSize ??
-                                                      const Size(1, 1),
-                                                  origin: _canvasOrigin,
-                                                  onPanTo:
-                                                      (center) =>
-                                                          _centerViewportOn(
-                                                            activeBoard,
-                                                            center,
-                                                            persist: true,
-                                                          ),
-                                                ),
-                                          ),
                                         ],
-                                      ],
+                                      ),
                                     ),
-                                  ),
                                   // ── Quick Tools Panel (left side) ──────────────────
-                                  Positioned(
-                                    left: 12,
-                                    top: 12,
-                                    child: _BoardToolsPanel(
-                                      visible: _showToolsPanel,
-                                      activeTool: _activeTool,
-                                      drawSettings: _drawSettings,
-                                      connectSettings: _connectSettings,
-                                      onToolChanged:
-                                          (tool) => setState(() {
-                                            _activeTool = tool;
-                                            _activeStroke.clear();
-                                            _connectSourceId = null;
-                                            _connectPreviewPointer = null;
-                                          }),
-                                      onDrawSettingsChanged:
-                                          (s) =>
-                                              setState(() => _drawSettings = s),
-                                      onConnectSettingsChanged:
-                                          (s) => setState(
-                                            () => _connectSettings = s,
-                                          ),
-                                      onToggle:
-                                          () => setState(
-                                            () =>
-                                                _showToolsPanel =
-                                                    !_showToolsPanel,
-                                          ),
-                                      onAddNote:
-                                          () =>
-                                              _showMarkdownNoteDialog(context),
-                                      onAddChat: () => _addChatPanel(context),
-                                      onAddTerminal:
-                                          () => _addTerminalPanel(context),
-                                      onAddGeneric:
-                                          (typeId) => context
-                                              .read<BoardCubit>()
-                                              .createGenericPanel(typeId),
+                                  if (!_isBoardOverviewOpen)
+                                    Positioned(
+                                      left: 12,
+                                      top: 12,
+                                      child: _BoardToolsPanel(
+                                        visible: _showToolsPanel,
+                                        activeTool: _activeTool,
+                                        drawSettings: _drawSettings,
+                                        connectSettings: _connectSettings,
+                                        onToolChanged:
+                                            (tool) => setState(() {
+                                              _activeTool = tool;
+                                              _activeStroke.clear();
+                                              _connectSourceId = null;
+                                              _connectPreviewPointer = null;
+                                            }),
+                                        onDrawSettingsChanged:
+                                            (s) => setState(
+                                              () => _drawSettings = s,
+                                            ),
+                                        onConnectSettingsChanged:
+                                            (s) => setState(
+                                              () => _connectSettings = s,
+                                            ),
+                                        onToggle:
+                                            () => setState(
+                                              () =>
+                                                  _showToolsPanel =
+                                                      !_showToolsPanel,
+                                            ),
+                                        onAddNote:
+                                            () => _showMarkdownNoteDialog(
+                                              context,
+                                            ),
+                                        onAddChat: () => _addChatPanel(context),
+                                        onAddTerminal:
+                                            () => _addTerminalPanel(context),
+                                        onAddGeneric:
+                                            (typeId) => context
+                                                .read<BoardCubit>()
+                                                .createGenericPanel(typeId),
+                                      ),
                                     ),
-                                  ),
                                   // ── Cancel connection button ───────────────────────
-                                  if (_activeTool == BoardToolId.connect &&
+                                  if (!_isBoardOverviewOpen &&
+                                      _activeTool == BoardToolId.connect &&
                                       _connectSourceId != null)
                                     Positioned(
                                       bottom: 24,
@@ -997,13 +998,44 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                 ],
                               ),
                             ), // RepaintBoundary
+                            if (_isBoardOverviewOpen)
+                              Positioned.fill(
+                                child: _BoardOverviewLayer(
+                                  activeBoardId: activeBoard.id,
+                                  boards: state.boards,
+                                  previewPngs: _boardPreviewPngs,
+                                  onClose: () {
+                                    if (!mounted) return;
+                                    setState(
+                                      () => _isBoardOverviewOpen = false,
+                                    );
+                                  },
+                                  onCreateBoard: () {
+                                    if (!mounted) return;
+                                    setState(
+                                      () => _isBoardOverviewOpen = false,
+                                    );
+                                    _createBoard(context);
+                                  },
+                                  onSelectedBoard: (id) {
+                                    if (!mounted) return;
+                                    setState(
+                                      () => _isBoardOverviewOpen = false,
+                                    );
+                                    context.read<BoardCubit>().setActiveBoard(
+                                      id,
+                                    );
+                                  },
+                                ),
+                              ),
                             // ── YOLO badge fixed overlay (bottom-right) ────────────
-                            Positioned(
-                              left: 0,
-                              right: 0,
-                              bottom: 22,
-                              child: _YoloBadgeWithChat(),
-                            ),
+                            if (!_isBoardOverviewOpen)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 22,
+                                child: _YoloBadgeWithChat(),
+                              ),
                           ], // outer Stack children
                         ); // outer Stack
                       },
@@ -1083,6 +1115,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     if (bytes == null || !mounted) return;
     setState(() {
       _boardPreviewPngs[boardId] = bytes;
+    });
+  }
+
+  Future<void> _openBoardOverview(BoardDocument activeBoard) async {
+    await _captureBoardPreviewPng(activeBoard.id);
+    if (!mounted) return;
+    setState(() {
+      _isBoardOverviewOpen = true;
+      _connectSourceId = null;
+      _connectPreviewPointer = null;
     });
   }
 
@@ -2214,23 +2256,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 class _BoardToolbar extends StatelessWidget {
   const _BoardToolbar({
     required this.board,
-    required this.boards,
-    required this.onSelectedBoard,
     required this.onCreateBoard,
     required this.onRenameBoard,
     required this.onDeleteBoard,
-    required this.previewPngs,
-    required this.onCapturePreview,
+    required this.onOpenBoardOverview,
   });
 
   final BoardDocument board;
-  final List<BoardDocument> boards;
-  final ValueChanged<String> onSelectedBoard;
   final VoidCallback onCreateBoard;
   final VoidCallback onRenameBoard;
   final VoidCallback onDeleteBoard;
-  final Map<String, Uint8List> previewPngs;
-  final Future<void> Function() onCapturePreview;
+  final VoidCallback onOpenBoardOverview;
 
   @override
   Widget build(BuildContext context) {
@@ -2240,11 +2276,7 @@ class _BoardToolbar extends StatelessWidget {
         children: [
           _BoardSwitcherButton(
             board: board,
-            boards: boards,
-            onSelectedBoard: onSelectedBoard,
-            onCreateBoard: onCreateBoard,
-            previewPngs: previewPngs,
-            onCapturePreview: onCapturePreview,
+            onOpenBoardOverview: onOpenBoardOverview,
           ),
           const SizedBox(width: 12),
           _ToolbarChip(
@@ -2283,57 +2315,11 @@ class _BoardToolbar extends StatelessWidget {
 class _BoardSwitcherButton extends StatelessWidget {
   const _BoardSwitcherButton({
     required this.board,
-    required this.boards,
-    required this.onSelectedBoard,
-    required this.onCreateBoard,
-    required this.previewPngs,
-    required this.onCapturePreview,
+    required this.onOpenBoardOverview,
   });
 
   final BoardDocument board;
-  final List<BoardDocument> boards;
-  final ValueChanged<String> onSelectedBoard;
-  final VoidCallback onCreateBoard;
-  final Map<String, Uint8List> previewPngs;
-  final Future<void> Function() onCapturePreview;
-
-  Future<void> _openOverview(BuildContext context) async {
-    await onCapturePreview();
-    if (!context.mounted) return;
-    final selected = await showGeneralDialog<String>(
-      context: context,
-      barrierColor: Colors.black.withAlpha(150),
-      barrierDismissible: true,
-      barrierLabel: 'Boards overview',
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder:
-          (context, animation, secondaryAnimation) => _BoardOverviewDialog(
-            activeBoardId: board.id,
-            boards: boards,
-            previewPngs: previewPngs,
-          ),
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
-            child: child,
-          ),
-        );
-      },
-    );
-    if (!context.mounted || selected == null) return;
-    if (selected == _BoardOverviewDialog.createBoardValue) {
-      onCreateBoard();
-    } else {
-      onSelectedBoard(selected);
-    }
-  }
+  final VoidCallback onOpenBoardOverview;
 
   @override
   Widget build(BuildContext context) {
@@ -2347,7 +2333,7 @@ class _BoardSwitcherButton extends StatelessWidget {
     return Tooltip(
       message: 'Open boards overview',
       child: InkWell(
-        onTap: () => _openOverview(context),
+        onTap: onOpenBoardOverview,
         borderRadius: BorderRadius.circular(10),
         child: Container(
           height: 36,
@@ -2388,119 +2374,268 @@ class _BoardSwitcherButton extends StatelessWidget {
   }
 }
 
-class _BoardOverviewDialog extends StatelessWidget {
-  const _BoardOverviewDialog({
+class _BoardOverviewLayer extends StatefulWidget {
+  const _BoardOverviewLayer({
     required this.activeBoardId,
     required this.boards,
     required this.previewPngs,
+    required this.onSelectedBoard,
+    required this.onCreateBoard,
+    required this.onClose,
   });
-
-  static const createBoardValue = '__create_board__';
 
   final String activeBoardId;
   final List<BoardDocument> boards;
   final Map<String, Uint8List> previewPngs;
+  final ValueChanged<String> onSelectedBoard;
+  final VoidCallback onCreateBoard;
+  final VoidCallback onClose;
+
+  @override
+  State<_BoardOverviewLayer> createState() => _BoardOverviewLayerState();
+}
+
+class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _curve;
+  String? _zoomBoardId;
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _zoomBoardId = widget.activeBoardId;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 340),
+      reverseDuration: const Duration(milliseconds: 280),
+    );
+    _curve = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _close() async {
+    if (_closing) return;
+    setState(() {
+      _closing = true;
+      _zoomBoardId = widget.activeBoardId;
+    });
+    await _controller.reverse();
+    if (mounted) widget.onClose();
+  }
+
+  Future<void> _selectBoard(String boardId) async {
+    if (_closing) return;
+    if (boardId == widget.activeBoardId) {
+      await _close();
+      return;
+    }
+    setState(() {
+      _closing = true;
+      _zoomBoardId = boardId;
+    });
+    await _controller.reverse();
+    if (mounted) widget.onSelectedBoard(boardId);
+  }
+
+  Future<void> _createBoard() async {
+    if (_closing) return;
+    setState(() {
+      _closing = true;
+      _zoomBoardId = null;
+    });
+    await _controller.reverse();
+    if (mounted) widget.onCreateBoard();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final screen = MediaQuery.sizeOf(context);
-    final dialogWidth = math.min(screen.width - 48, 1280.0);
-    final dialogHeight = math.min(screen.height - 56, 820.0);
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final layout = _BoardOverviewGridLayout.compute(
+          size: Size(constraints.maxWidth, constraints.maxHeight),
+          itemCount: widget.boards.length + 1,
+        );
+        final fullRect = Rect.fromLTWH(
+          22,
+          22,
+          math.max(1, constraints.maxWidth - 44),
+          math.max(1, constraints.maxHeight - 44),
+        );
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(24),
-      child: Container(
-        width: dialogWidth,
-        height: dialogHeight,
-        decoration: BoxDecoration(
-          color: colors.background,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: colors.border),
-          boxShadow: const [
-            BoxShadow(color: Color(0x99000000), blurRadius: 28),
-          ],
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 12, 12),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.dashboard_outlined,
-                    color: colors.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Boards',
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+        return AnimatedBuilder(
+          animation: _curve,
+          builder: (context, _) {
+            final t = _curve.value;
+            final fade = t.clamp(0.0, 1.0).toDouble();
+            final widgets = <Widget>[
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _close,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.background.withAlpha((t * 130).round()),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '${boards.length}',
-                    style: TextStyle(color: mutedColor, fontSize: 12),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
+                ),
               ),
-            ),
-            Divider(height: 1, color: colors.divider),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = math.max(
-                    1,
-                    math.min(5, (constraints.maxWidth / 310).floor()),
-                  );
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(18),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.55,
-                    ),
-                    itemCount: boards.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == boards.length) {
-                        return _CreateBoardOverviewCard(
-                          onTap:
-                              () => Navigator.of(context).pop(createBoardValue),
-                        );
-                      }
-                      final item = boards[index];
-                      return _BoardOverviewCard(
-                        board: item,
-                        active: item.id == activeBoardId,
-                        previewPng: previewPngs[item.id],
-                        onTap: () => Navigator.of(context).pop(item.id),
+            ];
+
+            for (var i = 0; i < widget.boards.length; i++) {
+              final board = widget.boards[i];
+              final endRect = layout.rectFor(i);
+              final isZoomBoard = board.id == _zoomBoardId;
+              final startRect =
+                  isZoomBoard
+                      ? fullRect
+                      : Rect.fromCenter(
+                        center: endRect.center,
+                        width: endRect.width * 0.82,
+                        height: endRect.height * 0.82,
                       );
-                    },
-                  );
-                },
+              final rect = Rect.lerp(startRect, endRect, t)!;
+              final opacity = isZoomBoard ? 1.0 : fade;
+              widgets.add(
+                Positioned.fromRect(
+                  rect: rect,
+                  child: Opacity(
+                    opacity: opacity,
+                    child: _BoardOverviewCard(
+                      board: board,
+                      active: board.id == widget.activeBoardId,
+                      previewPng: widget.previewPngs[board.id],
+                      onTap: () => _selectBoard(board.id),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            final createRect = layout.rectFor(widget.boards.length);
+            widgets.add(
+              Positioned.fromRect(
+                rect:
+                    Rect.lerp(
+                      Rect.fromCenter(
+                        center: createRect.center,
+                        width: createRect.width * 0.82,
+                        height: createRect.height * 0.82,
+                      ),
+                      createRect,
+                      t,
+                    )!,
+                child: Opacity(
+                  opacity: fade,
+                  child: _CreateBoardOverviewCard(onTap: _createBoard),
+                ),
               ),
-            ),
-          ],
-        ),
+            );
+
+            widgets.add(
+              Positioned(
+                top: 14,
+                right: 14,
+                child: Opacity(
+                  opacity: fade,
+                  child: _OverlayIconButton(
+                    icon: Icons.close,
+                    tooltip: 'Close boards overview',
+                    onTap: _close,
+                  ),
+                ),
+              ),
+            );
+
+            return Stack(clipBehavior: Clip.none, children: widgets);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _BoardOverviewGridLayout {
+  const _BoardOverviewGridLayout({
+    required this.columns,
+    required this.cardSize,
+    required this.start,
+    required this.spacing,
+  });
+
+  static const _aspectRatio = 1.55;
+  static const _padding = 22.0;
+  static const _spacing = 16.0;
+
+  final int columns;
+  final Size cardSize;
+  final Offset start;
+  final double spacing;
+
+  Rect rectFor(int index) {
+    final col = index % columns;
+    final row = index ~/ columns;
+    return Rect.fromLTWH(
+      start.dx + col * (cardSize.width + spacing),
+      start.dy + row * (cardSize.height + spacing),
+      cardSize.width,
+      cardSize.height,
+    );
+  }
+
+  static _BoardOverviewGridLayout compute({
+    required Size size,
+    required int itemCount,
+  }) {
+    final maxColumns = math.max(1, math.min(5, itemCount));
+    final availableWidth = math.max(1.0, size.width - (_padding * 2));
+    final availableHeight = math.max(1.0, size.height - (_padding * 2));
+    var bestColumns = 1;
+    var bestSize = const Size(1, 1);
+    var bestArea = 0.0;
+
+    for (var columns = 1; columns <= maxColumns; columns++) {
+      final rows = (itemCount / columns).ceil();
+      final maxCardWidth =
+          (availableWidth - ((columns - 1) * _spacing)) / columns;
+      final maxCardHeight = (availableHeight - ((rows - 1) * _spacing)) / rows;
+      final cardWidth = math.max(
+        1.0,
+        math.min(maxCardWidth, maxCardHeight * _aspectRatio),
+      );
+      final cardHeight = cardWidth / _aspectRatio;
+      final area = cardWidth * cardHeight;
+      if (area > bestArea) {
+        bestArea = area;
+        bestColumns = columns;
+        bestSize = Size(cardWidth, cardHeight);
+      }
+    }
+
+    final rows = (itemCount / bestColumns).ceil();
+    final gridWidth =
+        (bestColumns * bestSize.width) + ((bestColumns - 1) * _spacing);
+    final gridHeight = (rows * bestSize.height) + ((rows - 1) * _spacing);
+    return _BoardOverviewGridLayout(
+      columns: bestColumns,
+      cardSize: bestSize,
+      start: Offset(
+        math.max(_padding, (size.width - gridWidth) / 2),
+        math.max(_padding, (size.height - gridHeight) / 2),
       ),
+      spacing: _spacing,
     );
   }
 }
