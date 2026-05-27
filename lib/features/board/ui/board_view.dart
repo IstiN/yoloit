@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -1220,6 +1221,42 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardOverviewLog(
       'capture.stored board=$boardId elapsed=${watch.elapsedMilliseconds}ms',
     );
+    // Persist to disk so previews survive hot restart.
+    _saveBoardPreviewPngToDisk(boardId, bytes);
+  }
+
+  static Directory get _previewCacheDir {
+    final dir = Directory(
+      '${Directory.systemTemp.path}/yoloit_board_previews',
+    );
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir;
+  }
+
+  static File _previewFile(String boardId) =>
+      File('${_previewCacheDir.path}/$boardId.png');
+
+  void _saveBoardPreviewPngToDisk(String boardId, Uint8List bytes) {
+    try {
+      _previewFile(boardId).writeAsBytesSync(bytes);
+    } catch (_) {
+      // Best-effort — don't crash if disk write fails.
+    }
+  }
+
+  void _loadBoardPreviewPngsFromDisk() {
+    final boards = context.read<BoardCubit>().state.boards;
+    for (final board in boards) {
+      if (_boardPreviewPngs.containsKey(board.id)) continue;
+      final file = _previewFile(board.id);
+      if (file.existsSync()) {
+        try {
+          _boardPreviewPngs[board.id] = file.readAsBytesSync();
+        } catch (_) {
+          // Ignore corrupt/unreadable files.
+        }
+      }
+    }
   }
 
   Future<void> _openBoardOverview(BoardDocument activeBoard) async {
@@ -1227,6 +1264,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardOverviewLog(
       'open.request board=${activeBoard.id} boards=${context.read<BoardCubit>().state.boards.length}',
     );
+    // Load cached PNGs for boards not yet visited in this session.
+    _loadBoardPreviewPngsFromDisk();
     await _captureBoardPreviewPng(activeBoard.id);
     if (!mounted) return;
     _boardOverviewLog(
@@ -1296,7 +1335,15 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
     if (_suppressFocusVisibility) {
       _suppressFocusVisibility = false;
-      _focusedPanelVisibilityKey = null; // reset so next user focus works
+      // Set the key to match so subsequent rebuilds don't re-schedule.
+      BoardPanelInstance? fp;
+      for (final entry in board.panels) {
+        if (entry.id == focusedPanelId) { fp = entry; break; }
+      }
+      if (fp != null && size != null) {
+        _focusedPanelVisibilityKey =
+            '${board.id}:${fp.id}:${fp.bounds.x}:${fp.bounds.y}:${fp.bounds.width}:${fp.bounds.height}:${size.width}:${size.height}:z${board.viewport.zoomOnFocus}';
+      }
       _boardOverviewLog('focusVisibility.suppressed (board switch)');
       return;
     }
