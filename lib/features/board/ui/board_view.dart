@@ -1063,7 +1063,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       'translation=${_fmtOffset(translation)} matrixT=${_fmtOffset(Offset(matrix[12], matrix[13]))} '
       'origin=${_fmtOffset(_canvasOrigin)} dragging=$_isPanelDragging viewportInteracting=$_isViewportInteracting',
     );
-    final newVp = board.viewport.copyWith(scale: scale, translation: translation);
+    final newVp = board.viewport.copyWith(
+      scale: scale,
+      translation: translation,
+    );
     _syncedViewport = newVp; // track so external changes are detected correctly
     return context.read<BoardCubit>().updateViewport(newVp, boardId: board.id);
   }
@@ -2212,37 +2215,15 @@ class _BoardToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: colors.divider),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: board.id,
-                dropdownColor: colors.surface,
-                borderRadius: BorderRadius.circular(12),
-                iconEnabledColor: Theme.of(context).textTheme.bodySmall?.color,
-                items: [
-                  for (final item in boards)
-                    DropdownMenuItem<String>(
-                      value: item.id,
-                      child: Text(item.name),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) onSelectedBoard(value);
-                },
-              ),
-            ),
+          _BoardSwitcherButton(
+            board: board,
+            boards: boards,
+            onSelectedBoard: onSelectedBoard,
+            onCreateBoard: onCreateBoard,
           ),
           const SizedBox(width: 12),
           _ToolbarChip(
@@ -2276,6 +2257,484 @@ class _BoardToolbar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BoardSwitcherButton extends StatelessWidget {
+  const _BoardSwitcherButton({
+    required this.board,
+    required this.boards,
+    required this.onSelectedBoard,
+    required this.onCreateBoard,
+  });
+
+  final BoardDocument board;
+  final List<BoardDocument> boards;
+  final ValueChanged<String> onSelectedBoard;
+  final VoidCallback onCreateBoard;
+
+  Future<void> _openOverview(BuildContext context) async {
+    final selected = await showDialog<String>(
+      context: context,
+      barrierColor: Colors.black.withAlpha(150),
+      builder:
+          (_) => _BoardOverviewDialog(activeBoardId: board.id, boards: boards),
+    );
+    if (!context.mounted || selected == null) return;
+    if (selected == _BoardOverviewDialog.createBoardValue) {
+      onCreateBoard();
+    } else {
+      onSelectedBoard(selected);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    return Tooltip(
+      message: 'Open boards overview',
+      child: InkWell(
+        onTap: () => _openOverview(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 36,
+          constraints: const BoxConstraints(minWidth: 160, maxWidth: 260),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: colors.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.dashboard_customize_outlined,
+                size: 16,
+                color: mutedColor,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  board.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.expand_more, size: 18, color: mutedColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardOverviewDialog extends StatelessWidget {
+  const _BoardOverviewDialog({
+    required this.activeBoardId,
+    required this.boards,
+  });
+
+  static const createBoardValue = '__create_board__';
+
+  final String activeBoardId;
+  final List<BoardDocument> boards;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final screen = MediaQuery.sizeOf(context);
+    final dialogWidth = math.min(screen.width - 48, 1280.0);
+    final dialogHeight = math.min(screen.height - 56, 820.0);
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      child: Container(
+        width: dialogWidth,
+        height: dialogHeight,
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
+          boxShadow: const [
+            BoxShadow(color: Color(0x99000000), blurRadius: 28),
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 12, 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.dashboard_outlined,
+                    color: colors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Boards',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${boards.length}',
+                    style: TextStyle(color: mutedColor, fontSize: 12),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: colors.divider),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = math.max(
+                    1,
+                    math.min(5, (constraints.maxWidth / 310).floor()),
+                  );
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(18),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: columns,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.55,
+                    ),
+                    itemCount: boards.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == boards.length) {
+                        return _CreateBoardOverviewCard(
+                          onTap:
+                              () => Navigator.of(context).pop(createBoardValue),
+                        );
+                      }
+                      final item = boards[index];
+                      return _BoardOverviewCard(
+                        board: item,
+                        active: item.id == activeBoardId,
+                        onTap: () => Navigator.of(context).pop(item.id),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardOverviewCard extends StatelessWidget {
+  const _BoardOverviewCard({
+    required this.board,
+    required this.active,
+    required this.onTap,
+  });
+
+  final BoardDocument board;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active ? colors.primary.withAlpha(190) : colors.border,
+            width: active ? 1.4 : 1,
+          ),
+          boxShadow:
+              active
+                  ? [
+                    BoxShadow(
+                      color: colors.primary.withAlpha(42),
+                      blurRadius: 18,
+                    ),
+                  ]
+                  : null,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 38,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    border: Border(bottom: BorderSide(color: colors.divider)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        if (active) ...[
+                          Icon(
+                            Icons.radio_button_checked,
+                            size: 14,
+                            color: colors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(
+                          child: Text(
+                            board.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${board.panels.length}',
+                          style: TextStyle(color: mutedColor, fontSize: 11),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.widgets_outlined,
+                          size: 13,
+                          color: mutedColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: CustomPaint(
+                  painter: _BoardOverviewPainter(board: board, colors: colors),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateBoardOverviewCard extends StatelessWidget {
+  const _CreateBoardOverviewCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.surface.withAlpha(190),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.border),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_rounded,
+                size: 46,
+                color: mutedColor.withAlpha(180),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'New board',
+                style: TextStyle(
+                  color: mutedColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardOverviewPainter extends CustomPainter {
+  const _BoardOverviewPainter({required this.board, required this.colors});
+
+  final BoardDocument board;
+  final AppColorScheme colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bg = Paint()..color = colors.background.withAlpha(130);
+    canvas.drawRect(Offset.zero & size, bg);
+
+    final panels = board.panels.where((panel) => !panel.hidden).toList();
+    if (panels.isEmpty) {
+      final paint =
+          Paint()
+            ..color = colors.border
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1;
+      final rect = Rect.fromCenter(
+        center: Offset(size.width / 2, size.height / 2),
+        width: math.min(size.width, 120),
+        height: math.min(size.height, 70),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(10)),
+        paint,
+      );
+      return;
+    }
+
+    final bounds = _boundsForPanels(panels).inflate(120);
+    final scale = math.min(
+      size.width / bounds.width,
+      size.height / bounds.height,
+    );
+    final dx = (size.width - bounds.width * scale) / 2;
+    final dy = (size.height - bounds.height * scale) / 2;
+
+    for (final link in board.links) {
+      final from = panels.where((p) => p.id == link.fromPanelId).firstOrNull;
+      final to = panels.where((p) => p.id == link.toPanelId).firstOrNull;
+      if (from == null || to == null) continue;
+      final start = _mapPoint(from.bounds.rect.center, bounds, scale, dx, dy);
+      final end = _mapPoint(to.bounds.rect.center, bounds, scale, dx, dy);
+      canvas.drawLine(
+        start,
+        end,
+        Paint()
+          ..color = link.color.withAlpha(120)
+          ..strokeWidth = 1.2,
+      );
+    }
+
+    for (final panel in panels) {
+      final rect = panel.bounds.rect;
+      final previewRect = Rect.fromLTWH(
+        dx + (rect.left - bounds.left) * scale,
+        dy + (rect.top - bounds.top) * scale,
+        math.max(12, rect.width * scale),
+        math.max(9, rect.height * scale),
+      );
+      final color = _panelTypeColor(panel.type, override: panel.color);
+      final rrect = RRect.fromRectAndRadius(
+        previewRect,
+        const Radius.circular(5),
+      );
+      canvas.drawRRect(
+        rrect,
+        Paint()..color = color.withAlpha(panel.color == null ? 190 : 230),
+      );
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = Colors.white.withAlpha(70)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8,
+      );
+    }
+  }
+
+  Rect _boundsForPanels(List<BoardPanelInstance> panels) {
+    var bounds = panels.first.bounds.rect;
+    for (final panel in panels.skip(1)) {
+      bounds = bounds.expandToInclude(panel.bounds.rect);
+    }
+    return bounds;
+  }
+
+  Offset _mapPoint(
+    Offset point,
+    Rect bounds,
+    double scale,
+    double dx,
+    double dy,
+  ) {
+    return Offset(
+      dx + (point.dx - bounds.left) * scale,
+      dy + (point.dy - bounds.top) * scale,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BoardOverviewPainter oldDelegate) {
+    return oldDelegate.board != board || oldDelegate.colors != colors;
+  }
+}
+
+Color _panelTypeColor(String type, {Color? override}) {
+  if (override != null) return override;
+  return switch (type) {
+    'board.note.markdown' => const Color(0xFFE879F9),
+    'board.kanban' => const Color(0xFF6366F1),
+    'board.webpage' => const Color(0xFF0EA5E9),
+    'board.code.snippet' => const Color(0xFF10B981),
+    'board.checklist' => const Color(0xFFF59E0B),
+    'board.files' => const Color(0xFFEC4899),
+    'board.file.preview' => const Color(0xFF8B5CF6),
+    'board.playlist' => const Color(0xFFA855F7),
+    'board.run_configs' => const Color(0xFF22C55E),
+    'board.run' => const Color(0xFF84CC16),
+    'board.chat' => const Color(0xFF34D399),
+    'board.terminal' => const Color(0xFF14B8A6),
+    'board.filetree' => const Color(0xFF64748B),
+    'board.diff.preview' => const Color(0xFF60A5FA),
+    'board.yolo_assistant' => const Color(0xFFF97316),
+    'board.widget.custom' => const Color(0xFF7C3AED),
+    'board.timer' => const Color(0xFF3B82F6),
+    _ => const Color(0xFF94A3B8),
+  };
 }
 
 class _ToolbarChip extends StatelessWidget {
@@ -3527,7 +3986,10 @@ class _BoardMiniMapPainter extends CustomPainter {
           ..color =
               isProcessing
                   ? const Color(0xFF34D399)
-                  : (panel.color ?? _colorForPanelType(panel.type)),
+                  : _panelTypeColor(
+                    panel.type,
+                    override: panel.color,
+                  ).withAlpha(0xCC),
       );
     }
 
@@ -3547,19 +4009,6 @@ class _BoardMiniMapPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4,
     );
-  }
-
-  Color _colorForPanelType(String type) {
-    return switch (type) {
-      'board.note.markdown' => const Color(0xCCE879F9),
-      'board.kanban' => const Color(0xCC6366F1),
-      'board.webpage' => const Color(0xCC0EA5E9),
-      'board.code.snippet' => const Color(0xCC10B981),
-      'board.checklist' => const Color(0xCCF59E0B),
-      'board.files' => const Color(0xCCEC4899),
-      'board.file.preview' => const Color(0xCC8B5CF6),
-      _ => const Color(0xCC64748B),
-    };
   }
 
   @override
