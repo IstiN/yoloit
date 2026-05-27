@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -73,6 +74,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String? _focusedPanelVisibilityKey;
   bool _showMinimap = true;
   bool _showToolsPanel = true;
+  final Map<String, Uint8List> _boardPreviewPngs = {};
   late final AnimationController _panController;
   Animation<Matrix4>? _panAnimation;
   VoidCallback? _panAnimationListener;
@@ -175,6 +177,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                   onCreateBoard: () => _createBoard(context),
                   onRenameBoard: () => _renameBoard(context, activeBoard),
                   onDeleteBoard: () => _deleteBoard(context, activeBoard),
+                  previewPngs: _boardPreviewPngs,
+                  onCapturePreview:
+                      () => _captureBoardPreviewPng(activeBoard.id),
                 ),
                 Expanded(
                   child: DecoratedBox(
@@ -1069,6 +1074,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     );
     _syncedViewport = newVp; // track so external changes are detected correctly
     return context.read<BoardCubit>().updateViewport(newVp, boardId: board.id);
+  }
+
+  Future<void> _captureBoardPreviewPng(String boardId) async {
+    final bytes = await BoardScreenshotService.instance.capturePng(
+      pixelRatio: 0.28,
+    );
+    if (bytes == null || !mounted) return;
+    setState(() {
+      _boardPreviewPngs[boardId] = bytes;
+    });
   }
 
   Matrix4 _matrixFromViewport(BoardViewport viewport) {
@@ -2204,6 +2219,8 @@ class _BoardToolbar extends StatelessWidget {
     required this.onCreateBoard,
     required this.onRenameBoard,
     required this.onDeleteBoard,
+    required this.previewPngs,
+    required this.onCapturePreview,
   });
 
   final BoardDocument board;
@@ -2212,6 +2229,8 @@ class _BoardToolbar extends StatelessWidget {
   final VoidCallback onCreateBoard;
   final VoidCallback onRenameBoard;
   final VoidCallback onDeleteBoard;
+  final Map<String, Uint8List> previewPngs;
+  final Future<void> Function() onCapturePreview;
 
   @override
   Widget build(BuildContext context) {
@@ -2224,6 +2243,8 @@ class _BoardToolbar extends StatelessWidget {
             boards: boards,
             onSelectedBoard: onSelectedBoard,
             onCreateBoard: onCreateBoard,
+            previewPngs: previewPngs,
+            onCapturePreview: onCapturePreview,
           ),
           const SizedBox(width: 12),
           _ToolbarChip(
@@ -2265,19 +2286,46 @@ class _BoardSwitcherButton extends StatelessWidget {
     required this.boards,
     required this.onSelectedBoard,
     required this.onCreateBoard,
+    required this.previewPngs,
+    required this.onCapturePreview,
   });
 
   final BoardDocument board;
   final List<BoardDocument> boards;
   final ValueChanged<String> onSelectedBoard;
   final VoidCallback onCreateBoard;
+  final Map<String, Uint8List> previewPngs;
+  final Future<void> Function() onCapturePreview;
 
   Future<void> _openOverview(BuildContext context) async {
-    final selected = await showDialog<String>(
+    await onCapturePreview();
+    if (!context.mounted) return;
+    final selected = await showGeneralDialog<String>(
       context: context,
       barrierColor: Colors.black.withAlpha(150),
-      builder:
-          (_) => _BoardOverviewDialog(activeBoardId: board.id, boards: boards),
+      barrierDismissible: true,
+      barrierLabel: 'Boards overview',
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder:
+          (context, animation, secondaryAnimation) => _BoardOverviewDialog(
+            activeBoardId: board.id,
+            boards: boards,
+            previewPngs: previewPngs,
+          ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+            child: child,
+          ),
+        );
+      },
     );
     if (!context.mounted || selected == null) return;
     if (selected == _BoardOverviewDialog.createBoardValue) {
@@ -2344,12 +2392,14 @@ class _BoardOverviewDialog extends StatelessWidget {
   const _BoardOverviewDialog({
     required this.activeBoardId,
     required this.boards,
+    required this.previewPngs,
   });
 
   static const createBoardValue = '__create_board__';
 
   final String activeBoardId;
   final List<BoardDocument> boards;
+  final Map<String, Uint8List> previewPngs;
 
   @override
   Widget build(BuildContext context) {
@@ -2440,6 +2490,7 @@ class _BoardOverviewDialog extends StatelessWidget {
                       return _BoardOverviewCard(
                         board: item,
                         active: item.id == activeBoardId,
+                        previewPng: previewPngs[item.id],
                         onTap: () => Navigator.of(context).pop(item.id),
                       );
                     },
@@ -2458,11 +2509,13 @@ class _BoardOverviewCard extends StatelessWidget {
   const _BoardOverviewCard({
     required this.board,
     required this.active,
+    required this.previewPng,
     required this.onTap,
   });
 
   final BoardDocument board;
   final bool active;
+  final Uint8List? previewPng;
   final VoidCallback onTap;
 
   @override
@@ -2546,7 +2599,15 @@ class _BoardOverviewCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Expanded(child: _BoardOverviewPreview(board: board)),
+              Expanded(
+                child:
+                    previewPng == null
+                        ? _BoardOverviewPreview(board: board)
+                        : _BoardOverviewPngPreview(
+                          bytes: previewPng!,
+                          fallback: _BoardOverviewPreview(board: board),
+                        ),
+              ),
             ],
           ),
         ),
@@ -2597,6 +2658,38 @@ class _CreateBoardOverviewCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BoardOverviewPngPreview extends StatelessWidget {
+  const _BoardOverviewPngPreview({required this.bytes, required this.fallback});
+
+  final Uint8List bytes;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        fallback,
+        Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (_, _, _) => fallback,
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.transparent, Colors.black.withAlpha(45)],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
