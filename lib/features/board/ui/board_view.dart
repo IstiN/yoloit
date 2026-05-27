@@ -1139,9 +1139,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     if (!boardSwitched && !externalChange) return;
     _syncedBoardId = board.id;
     _syncedViewport = vp;
-    _boardDebugLog(
+    _boardOverviewLog(
       'syncViewport board=${board.id} scale=${_fmt(vp.scale)} '
       'translation=${_fmtOffset(vp.translation)} '
+      'isDefault=${_isDefaultViewport(vp)} '
       '${externalChange ? "(external)" : "(board switch)"}',
     );
     if (_shouldAutoFit(board)) {
@@ -1155,7 +1156,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       if (!mounted || _syncedBoardId != board.id) return;
       if (_shouldAutoFit(board)) return;
       if (_hasVisiblePanels(board) && !_hasAnyPanelInViewport(board)) {
-        _boardDebugLog('syncViewport.recoverOffscreen board=${board.id}');
+        _boardOverviewLog('syncViewport.recoverOffscreen board=${board.id}');
         _fitBoardPanels(board, persist: true);
       }
     });
@@ -1168,10 +1169,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       matrix[12] + (_canvasOrigin.dx * scale),
       matrix[13] + (_canvasOrigin.dy * scale),
     );
-    _boardDebugLog(
+    _boardOverviewLog(
       'persistViewport board=${board.id} scale=${_fmt(scale)} '
-      'translation=${_fmtOffset(translation)} matrixT=${_fmtOffset(Offset(matrix[12], matrix[13]))} '
-      'origin=${_fmtOffset(_canvasOrigin)} dragging=$_isPanelDragging viewportInteracting=$_isViewportInteracting',
+      'translation=${_fmtOffset(translation)}',
     );
     final newVp = board.viewport.copyWith(
       scale: scale,
@@ -1252,9 +1252,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   bool _shouldAutoFit(BoardDocument board) {
-    return _viewportSize != null &&
+    final result = _viewportSize != null &&
         _isDefaultViewport(board.viewport) &&
         board.panels.any((panel) => !panel.hidden);
+    if (result) {
+      _boardOverviewLog(
+        'shouldAutoFit=true board=${board.id} '
+        'vpScale=${_fmt(board.viewport.scale)} '
+        'vpTx=${_fmtOffset(board.viewport.translation)}',
+      );
+    }
+    return result;
   }
 
   void _scheduleAutoFitIfNeeded(BoardDocument board) {
@@ -1691,8 +1699,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _hasAnyPanelInViewport(BoardDocument board) {
     final size = _viewportSize;
     if (size == null || size.isEmpty) return true;
-    final tl = _transformController.toScene(Offset.zero);
-    final br = _transformController.toScene(Offset(size.width, size.height));
+    final tl = _boardPointFromCanvasScene(
+      _transformController.toScene(Offset.zero),
+    );
+    final br = _boardPointFromCanvasScene(
+      _transformController.toScene(Offset(size.width, size.height)),
+    );
     final viewportRect = Rect.fromLTRB(
       math.min(tl.dx, br.dx),
       math.min(tl.dy, br.dy),
