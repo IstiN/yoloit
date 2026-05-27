@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
+import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/model/chat_models.dart';
 
 /// Test harness for ChatPanelWidget that isolates the input field
 /// and model selection behavior.
@@ -63,7 +65,9 @@ void main() {
       expect(_isModelListVisible(tester), isTrue);
     });
 
-    testWidgets('typing /mo (partial) shows filtered chips not model list', (tester) async {
+    testWidgets('typing /mo (partial) shows filtered chips not model list', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildTestApp(panel: _testPanel()));
       await tester.pump();
 
@@ -144,34 +148,41 @@ void main() {
       expect(textField.controller?.text, '/');
     });
 
-    testWidgets('Tab autocompletes partial model command and shows model list', (tester) async {
-      await tester.pumpWidget(_buildTestApp(panel: _testPanel()));
-      await tester.pump();
+    testWidgets(
+      'Tab autocompletes partial model command and shows model list',
+      (tester) async {
+        await tester.pumpWidget(_buildTestApp(panel: _testPanel()));
+        await tester.pump();
 
-      final inputFinder = find.byType(TextField);
+        final inputFinder = find.byType(TextField);
 
-      // Type partial command
-      await tester.enterText(inputFinder, '/mo');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        // Type partial command
+        await tester.enterText(inputFinder, '/mo');
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      // Verify chips are shown, not model list
-      expect(_isModelListVisible(tester), isFalse);
-      expect(find.text('model'), findsOneWidget);
+        // Verify chips are shown, not model list
+        expect(_isModelListVisible(tester), isFalse);
+        expect(find.text('model'), findsOneWidget);
 
-      // Simulate Tab autocomplete by directly entering "/model "
-      // (In real usage, Tab triggers _autoCompleteSlash which sets this text)
-      await tester.enterText(inputFinder, '/model ');
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+        // Simulate Tab autocomplete by directly entering "/model "
+        // (In real usage, Tab triggers _autoCompleteSlash which sets this text)
+        await tester.enterText(inputFinder, '/model ');
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
 
-      // After autocomplete, model list should be visible
-      expect(_isModelListVisible(tester), isTrue, reason: 'Model list should appear after /model ');
-      
-      // Input should contain "/model "
-      final textField = tester.widget<TextField>(inputFinder);
-      expect(textField.controller?.text, '/model ');
-    });
+        // After autocomplete, model list should be visible
+        expect(
+          _isModelListVisible(tester),
+          isTrue,
+          reason: 'Model list should appear after /model ',
+        );
+
+        // Input should contain "/model "
+        final textField = tester.widget<TextField>(inputFinder);
+        expect(textField.controller?.text, '/model ');
+      },
+    );
 
     testWidgets('arrow keys navigate model list', (tester) async {
       await tester.pumpWidget(_buildTestApp(panel: _testPanel()));
@@ -221,6 +232,35 @@ void main() {
       expect(_isModelListVisible(tester), isTrue);
     });
 
+    testWidgets('mounts while an existing session is processing', (
+      tester,
+    ) async {
+      final panel = _testPanel('processing-chat');
+      final config = ChatSessionConfig.fromJson(
+        Map<String, dynamic>.from(panel.state['config'] as Map),
+      );
+      final session = ChatSessionManager.instance.getOrCreate(panel.id, config);
+      addTearDown(() => ChatSessionManager.instance.remove(panel.id));
+      session.syncFromWidget(
+        messages: [
+          ChatMessage(
+            id: 'user-1',
+            role: ChatRole.user,
+            content: 'hello',
+            timestamp: DateTime(2024),
+          ),
+        ],
+        isFirstMessage: false,
+        isProcessing: true,
+      );
+
+      await tester.pumpWidget(_buildTestApp(panel: panel));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TextField), findsOneWidget);
+    });
+
     testWidgets('ESC after .model hides list without clearing', (tester) async {
       await tester.pumpWidget(_buildTestApp(panel: _testPanel()));
       await tester.pump();
@@ -249,4 +289,3 @@ void main() {
     });
   });
 }
-

@@ -177,6 +177,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   @override
   void initState() {
     super.initState();
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
     _initConfig();
     ToolCallSettingsService.instance.load().then((_) {
       if (!mounted) return;
@@ -336,10 +340,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         },
       );
     }
-    _glowCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
     // Register processing notifier for board-level glow
     ChatPanelWidget.processingNotifiers[widget.panel.id] = processingNotifier;
     // Subscribe to session ChangeNotifier so CLI-driven changes
