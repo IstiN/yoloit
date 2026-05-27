@@ -1007,14 +1007,17 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   activeBoardId: activeBoard.id,
                                   boards: state.boards,
                                   previewPngs: _boardPreviewPngs,
+                                  debugLog: _boardOverviewLog,
                                   onClose: () {
                                     if (!mounted) return;
+                                    _boardOverviewLog('close.parent');
                                     setState(
                                       () => _isBoardOverviewOpen = false,
                                     );
                                   },
                                   onCreateBoard: () {
                                     if (!mounted) return;
+                                    _boardOverviewLog('create.parent');
                                     setState(
                                       () => _isBoardOverviewOpen = false,
                                     );
@@ -1022,29 +1025,51 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   },
                                   onSelectedBoard: (board, previewPng) {
                                     if (!mounted) return;
+                                    final switchWatch = Stopwatch()..start();
+                                    _boardOverviewLog(
+                                      'select.parent.start board=${board.id} '
+                                      'hasPng=${previewPng != null}',
+                                    );
                                     setState(() {
                                       _isBoardOverviewOpen = false;
                                       _boardSwitchPreviewBoard = board;
                                       _boardSwitchPreviewPng = previewPng;
                                       _boardSwitchPreviewVisible = true;
                                     });
+                                    _boardOverviewLog(
+                                      'select.parent.previewVisible '
+                                      'elapsed=${switchWatch.elapsedMilliseconds}ms',
+                                    );
                                     context.read<BoardCubit>().setActiveBoard(
                                       board.id,
                                     );
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          Future<void>.delayed(
-                                            const Duration(milliseconds: 80),
-                                            () {
-                                              if (!mounted) return;
-                                              setState(
-                                                () =>
-                                                    _boardSwitchPreviewVisible =
-                                                        false,
-                                              );
-                                            },
+                                    _boardOverviewLog(
+                                      'select.parent.setActiveBoard.called '
+                                      'elapsed=${switchWatch.elapsedMilliseconds}ms',
+                                    );
+                                    WidgetsBinding.instance.addPostFrameCallback((
+                                      _,
+                                    ) {
+                                      _boardOverviewLog(
+                                        'select.parent.postFrame '
+                                        'elapsed=${switchWatch.elapsedMilliseconds}ms',
+                                      );
+                                      Future<void>.delayed(
+                                        const Duration(milliseconds: 80),
+                                        () {
+                                          if (!mounted) return;
+                                          _boardOverviewLog(
+                                            'select.parent.fadeStart '
+                                            'elapsed=${switchWatch.elapsedMilliseconds}ms',
                                           );
-                                        });
+                                          setState(
+                                            () =>
+                                                _boardSwitchPreviewVisible =
+                                                    false,
+                                          );
+                                        },
+                                      );
+                                    });
                                   },
                                 ),
                               ),
@@ -1055,6 +1080,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   previewPng: _boardSwitchPreviewPng,
                                   visible: _boardSwitchPreviewVisible,
                                   onHidden: () {
+                                    _boardOverviewLog(
+                                      'switchPreview.hidden '
+                                      'visible=$_boardSwitchPreviewVisible',
+                                    );
                                     if (!mounted ||
                                         _boardSwitchPreviewVisible) {
                                       return;
@@ -1147,18 +1176,39 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   Future<void> _captureBoardPreviewPng(String boardId) async {
+    final watch = Stopwatch()..start();
+    _boardOverviewLog('capture.start board=$boardId pixelRatio=0.28');
     final bytes = await BoardScreenshotService.instance.capturePng(
       pixelRatio: 0.28,
     );
-    if (bytes == null || !mounted) return;
+    _boardOverviewLog(
+      'capture.done board=$boardId '
+      'bytes=${bytes?.length ?? 0} elapsed=${watch.elapsedMilliseconds}ms',
+    );
+    if (bytes == null || !mounted) {
+      _boardOverviewLog(
+        'capture.skipStore board=$boardId mounted=$mounted hasBytes=${bytes != null}',
+      );
+      return;
+    }
     setState(() {
       _boardPreviewPngs[boardId] = bytes;
     });
+    _boardOverviewLog(
+      'capture.stored board=$boardId elapsed=${watch.elapsedMilliseconds}ms',
+    );
   }
 
   Future<void> _openBoardOverview(BoardDocument activeBoard) async {
+    final watch = Stopwatch()..start();
+    _boardOverviewLog(
+      'open.request board=${activeBoard.id} boards=${context.read<BoardCubit>().state.boards.length}',
+    );
     await _captureBoardPreviewPng(activeBoard.id);
     if (!mounted) return;
+    _boardOverviewLog(
+      'open.showOverlay board=${activeBoard.id} elapsed=${watch.elapsedMilliseconds}ms',
+    );
     setState(() {
       _isBoardOverviewOpen = true;
       _connectSourceId = null;
@@ -1649,6 +1699,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       return;
     }
     debugPrint('[BoardView] $message');
+  }
+
+  void _boardOverviewLog(String message) {
+    if (!kDebugMode) return;
+    debugPrint('[BoardOverview] $message');
   }
 
   void _boardWebFocusLog(String message) {
@@ -2420,6 +2475,7 @@ class _BoardOverviewLayer extends StatefulWidget {
     required this.onSelectedBoard,
     required this.onCreateBoard,
     required this.onClose,
+    required this.debugLog,
   });
 
   final String activeBoardId;
@@ -2429,6 +2485,7 @@ class _BoardOverviewLayer extends StatefulWidget {
   onSelectedBoard;
   final VoidCallback onCreateBoard;
   final VoidCallback onClose;
+  final ValueChanged<String> debugLog;
 
   @override
   State<_BoardOverviewLayer> createState() => _BoardOverviewLayerState();
@@ -2439,6 +2496,7 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
   late final AnimationController _controller;
   late final Animation<double> _curve;
   String? _zoomBoardId;
+  String? _lastLayoutSignature;
   bool _closing = false;
 
   @override
@@ -2455,27 +2513,47 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
+    _controller.addStatusListener(_handleAnimationStatus);
+    widget.debugLog(
+      'layer.init active=${widget.activeBoardId} boards=${widget.boards.length}',
+    );
     _controller.forward();
   }
 
   @override
   void dispose() {
+    _controller.removeStatusListener(_handleAnimationStatus);
     _controller.dispose();
     super.dispose();
   }
 
+  void _handleAnimationStatus(AnimationStatus status) {
+    widget.debugLog(
+      'layer.animation.status=$status value=${_controller.value.toStringAsFixed(3)} '
+      'closing=$_closing zoom=$_zoomBoardId',
+    );
+  }
+
   Future<void> _close() async {
     if (_closing) return;
+    final watch = Stopwatch()..start();
+    widget.debugLog('close.start active=${widget.activeBoardId}');
     setState(() {
       _closing = true;
       _zoomBoardId = widget.activeBoardId;
     });
     await _controller.reverse();
+    widget.debugLog('close.reverseDone elapsed=${watch.elapsedMilliseconds}ms');
     if (mounted) widget.onClose();
   }
 
   Future<void> _selectBoard(String boardId) async {
     if (_closing) return;
+    final watch = Stopwatch()..start();
+    widget.debugLog(
+      'select.tap board=$boardId active=${widget.activeBoardId} '
+      'hasPng=${widget.previewPngs.containsKey(boardId)}',
+    );
     if (boardId == widget.activeBoardId) {
       await _close();
       return;
@@ -2484,19 +2562,31 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
       _closing = true;
       _zoomBoardId = boardId;
     });
+    widget.debugLog('select.reverseStart board=$boardId');
     await _controller.reverse();
+    widget.debugLog(
+      'select.reverseDone board=$boardId elapsed=${watch.elapsedMilliseconds}ms',
+    );
     if (!mounted) return;
     final selected = widget.boards.firstWhere((board) => board.id == boardId);
+    widget.debugLog(
+      'select.callback board=$boardId elapsed=${watch.elapsedMilliseconds}ms',
+    );
     widget.onSelectedBoard(selected, widget.previewPngs[boardId]);
   }
 
   Future<void> _createBoard() async {
     if (_closing) return;
+    final watch = Stopwatch()..start();
+    widget.debugLog('create.start');
     setState(() {
       _closing = true;
       _zoomBoardId = null;
     });
     await _controller.reverse();
+    widget.debugLog(
+      'create.reverseDone elapsed=${watch.elapsedMilliseconds}ms',
+    );
     if (mounted) widget.onCreateBoard();
   }
 
@@ -2509,6 +2599,14 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
           size: Size(constraints.maxWidth, constraints.maxHeight),
           itemCount: widget.boards.length + 1,
         );
+        final layoutSignature =
+            '${constraints.maxWidth.toStringAsFixed(1)}x${constraints.maxHeight.toStringAsFixed(1)}:'
+            '${layout.columns}:${layout.cardSize.width.toStringAsFixed(1)}x'
+            '${layout.cardSize.height.toStringAsFixed(1)}';
+        if (_lastLayoutSignature != layoutSignature) {
+          _lastLayoutSignature = layoutSignature;
+          widget.debugLog('layer.layout $layoutSignature');
+        }
         final fullRect = Rect.fromLTWH(
           22,
           22,
@@ -2564,7 +2662,7 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
                     opacity: opacity,
                     child: _BoardOverviewCard(
                       board: board,
-                      active: board.id == highlightedBoardId,
+                      active: board.id == highlightedBoardId && t >= 0.92,
                       previewPng: widget.previewPngs[board.id],
                       onTap: () => _selectBoard(board.id),
                     ),
@@ -2641,7 +2739,7 @@ class _BoardSwitchPreviewOverlay extends StatelessWidget {
           padding: const EdgeInsets.all(22),
           child: _BoardOverviewCard(
             board: board,
-            active: true,
+            active: false,
             previewPng: previewPng,
             onTap: () {},
           ),
