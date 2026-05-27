@@ -1509,12 +1509,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardOverviewLog(
       'open.request board=${activeBoard.id} boards=${context.read<BoardCubit>().state.boards.length}',
     );
-    // Load cached PNGs for boards not yet visited in this session.
-    _loadBoardPreviewPngsFromDisk();
     await _captureBoardPreviewPng(activeBoard.id);
     if (!mounted) return;
 
-    // Capture real rendered screenshots for boards that still have no PNG.
+    // Capture real rendered screenshots for ALL other boards
+    // (ignore disk cache — always produce fresh captures).
     await _captureAllMissingBoardPreviews(activeBoard.id);
     if (!mounted) return;
 
