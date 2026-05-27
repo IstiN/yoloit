@@ -2608,10 +2608,10 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
           widget.debugLog('layer.layout $layoutSignature');
         }
         final fullRect = Rect.fromLTWH(
-          22,
-          22,
-          math.max(1, constraints.maxWidth - 44),
-          math.max(1, constraints.maxHeight - 44),
+          0,
+          0,
+          constraints.maxWidth,
+          constraints.maxHeight,
         );
 
         return AnimatedBuilder(
@@ -2735,14 +2735,11 @@ class _BoardSwitchPreviewOverlay extends StatelessWidget {
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
         onEnd: onHidden,
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: _BoardOverviewCard(
-            board: board,
-            active: false,
-            previewPng: previewPng,
-            onTap: () {},
-          ),
+        child: _BoardOverviewCard(
+          board: board,
+          active: false,
+          previewPng: previewPng,
+          onTap: () {},
         ),
       ),
     );
@@ -2897,18 +2894,9 @@ class _BoardOverviewCard extends StatelessWidget {
           color: colors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: active ? colors.primary.withAlpha(190) : colors.border,
-            width: active ? 1.4 : 1,
+            color: active ? Colors.white.withAlpha(90) : colors.border,
+            width: active ? 1.2 : 1,
           ),
-          boxShadow:
-              active
-                  ? [
-                    BoxShadow(
-                      color: colors.primary.withAlpha(42),
-                      blurRadius: 18,
-                    ),
-                  ]
-                  : null,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(15),
@@ -2929,7 +2917,7 @@ class _BoardOverviewCard extends StatelessWidget {
                           Icon(
                             Icons.radio_button_checked,
                             size: 14,
-                            color: colors.primary,
+                            color: Colors.white.withAlpha(180),
                           ),
                           const SizedBox(width: 8),
                         ],
