@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -1259,6 +1260,155 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
   }
 
+  /// Generate a synthetic PNG preview for a board using dart:ui Canvas.
+  /// This renders panels as rounded rectangles with titles — no widgets needed,
+  /// works for boards that have never been opened in this session.
+  Future<Uint8List?> _generateSyntheticPreviewPng(BoardDocument board) async {
+    final panels = board.panels.where((p) => !p.hidden).toList();
+    if (panels.isEmpty) return null;
+
+    // Compute bounds of all panels.
+    var allBounds = panels.first.bounds.rect;
+    for (final p in panels.skip(1)) {
+      allBounds = allBounds.expandToInclude(p.bounds.rect);
+    }
+    allBounds = allBounds.inflate(120);
+
+    // Canvas size — small is fine, this is a thumbnail.
+    const canvasW = 480.0;
+    const canvasH = 320.0;
+
+    final scaleX = canvasW / allBounds.width;
+    final scaleY = canvasH / allBounds.height;
+    final scale = math.min(scaleX, scaleY);
+    final dx = (canvasW - allBounds.width * scale) / 2;
+    final dy = (canvasH - allBounds.height * scale) / 2;
+
+    // Theme colors (neutral dark tones).
+    const bgColor = Color(0xFF0F0F1A);
+    const panelBg = Color(0xFF161625);
+    const panelBorder = Color(0xFF2A2A40);
+    const headerBg = Color(0xFF1C1C30);
+    const textColor = Color(0xFFCCCCDD);
+    const linkColor = Color(0xFF4488AA);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, canvasW, canvasH));
+
+    // Background.
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, canvasW, canvasH),
+      Paint()..color = bgColor,
+    );
+
+    // Draw links between panels.
+    for (final link in board.links) {
+      final from = panels.where((p) => p.id == link.fromPanelId).firstOrNull;
+      final to = panels.where((p) => p.id == link.toPanelId).firstOrNull;
+      if (from == null || to == null) continue;
+      final fromCenter = from.bounds.rect.center;
+      final toCenter = to.bounds.rect.center;
+      canvas.drawLine(
+        Offset(
+          dx + (fromCenter.dx - allBounds.left) * scale,
+          dy + (fromCenter.dy - allBounds.top) * scale,
+        ),
+        Offset(
+          dx + (toCenter.dx - allBounds.left) * scale,
+          dy + (toCenter.dy - allBounds.top) * scale,
+        ),
+        Paint()
+          ..color = linkColor.withAlpha(100)
+          ..strokeWidth = 1.0,
+      );
+    }
+
+    // Draw each panel.
+    for (final panel in panels) {
+      final r = panel.bounds.rect;
+      final px = dx + (r.left - allBounds.left) * scale;
+      final py = dy + (r.top - allBounds.top) * scale;
+      final pw = math.max(12.0, r.width * scale);
+      final ph = math.max(9.0, r.height * scale);
+      final panelRect = Rect.fromLTWH(px, py, pw, ph);
+      final rrect = RRect.fromRectAndRadius(panelRect, const Radius.circular(4));
+
+      // Panel fill.
+      canvas.drawRRect(rrect, Paint()..color = panelBg);
+      // Panel border.
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..color = panelBorder
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8,
+      );
+
+      // Header bar (if panel is big enough).
+      final headerH = math.min(14.0, ph * 0.2);
+      if (pw > 20 && ph > 16) {
+        final headerRRect = RRect.fromRectAndCorners(
+          Rect.fromLTWH(px, py, pw, headerH),
+          topLeft: const Radius.circular(4),
+          topRight: const Radius.circular(4),
+        );
+        canvas.drawRRect(headerRRect, Paint()..color = headerBg);
+
+        // Title text.
+        if (pw > 30) {
+          final tp = TextPainter(
+            text: TextSpan(
+              text: panel.title,
+              style: const TextStyle(
+                color: textColor,
+                fontSize: 6.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            maxLines: 1,
+            textDirection: TextDirection.ltr,
+            ellipsis: '…',
+          );
+          tp.layout(maxWidth: pw - 8);
+          tp.paint(canvas, Offset(px + 4, py + (headerH - tp.height) / 2));
+          tp.dispose();
+        }
+      }
+
+      // Content lines (simulate text lines for panels with content).
+      if (pw > 30 && ph > 30) {
+        final contentTop = py + headerH + 3;
+        final contentBottom = py + ph - 3;
+        final lineH = 4.0;
+        final lineGap = 3.0;
+        var y = contentTop;
+        final maxLines = 5;
+        var lineCount = 0;
+        while (y + lineH < contentBottom && lineCount < maxLines) {
+          final lineW = pw * (0.4 + (lineCount.isEven ? 0.35 : 0.2));
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(px + 4, y, math.min(lineW, pw - 8), lineH),
+              const Radius.circular(1.5),
+            ),
+            Paint()..color = textColor.withAlpha(35),
+          );
+          y += lineH + lineGap;
+          lineCount++;
+        }
+      }
+    }
+
+    // Convert to PNG.
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(canvasW.toInt(), canvasH.toInt());
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
+    img.dispose();
+    picture.dispose();
+    if (byteData == null) return null;
+    return byteData.buffer.asUint8List();
+  }
+
   Future<void> _openBoardOverview(BoardDocument activeBoard) async {
     final watch = Stopwatch()..start();
     _boardOverviewLog(
@@ -1267,6 +1417,27 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     // Load cached PNGs for boards not yet visited in this session.
     _loadBoardPreviewPngsFromDisk();
     await _captureBoardPreviewPng(activeBoard.id);
+    if (!mounted) return;
+
+    // Generate synthetic previews for boards that still have no PNG.
+    final allBoards = context.read<BoardCubit>().state.boards;
+    final missing = allBoards.where(
+      (b) => !_boardPreviewPngs.containsKey(b.id),
+    ).toList();
+    if (missing.isNotEmpty) {
+      _boardOverviewLog('synthetic.generating count=${missing.length}');
+      for (final board in missing) {
+        final png = await _generateSyntheticPreviewPng(board);
+        if (png != null && mounted) {
+          _boardPreviewPngs[board.id] = png;
+          _saveBoardPreviewPngToDisk(board.id, png);
+        }
+      }
+      _boardOverviewLog(
+        'synthetic.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
+      );
+    }
+
     if (!mounted) return;
     _boardOverviewLog(
       'open.showOverlay board=${activeBoard.id} elapsed=${watch.elapsedMilliseconds}ms',
