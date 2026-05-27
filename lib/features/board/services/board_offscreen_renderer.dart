@@ -32,6 +32,27 @@ class BoardOffscreenRenderer {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return null;
 
+    // Override ErrorWidget.builder so that individual panels that crash
+    // (e.g. BLoC not available headless, native PTY, WebView) are replaced
+    // with a grey placeholder and their errors are logged — the rest of the
+    // board still renders correctly.
+    final originalErrorBuilder = ErrorWidget.builder;
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      debugPrint(
+        '[BoardOffscreenRenderer] panel render error: ${details.exception}',
+      );
+      return ColoredBox(
+        color: const Color(0x20808080),
+        child: const Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 20,
+            color: Color(0x80808080),
+          ),
+        ),
+      );
+    };
+
     try {
       return await _renderWidgetToImage(
         _buildBoardPreview(board),
@@ -42,6 +63,8 @@ class BoardOffscreenRenderer {
       debugPrint('[BoardOffscreenRenderer] render failed: $e');
       debugPrintStack(stackTrace: st);
       return null;
+    } finally {
+      ErrorWidget.builder = originalErrorBuilder;
     }
   }
 
