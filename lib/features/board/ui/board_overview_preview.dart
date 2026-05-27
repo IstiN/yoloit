@@ -286,43 +286,13 @@ class BoardOverviewPanelContent extends StatelessWidget {
         state['tracks'],
         Icons.music_note_outlined,
       ),
-      'board.filetree' => _placeholderContent(
-        context,
-        Icons.account_tree_outlined,
-        'File Tree',
-        _basename(state['rootPath'] as String? ?? ''),
-      ),
-      'board.file.preview' => _placeholderContent(
-        context,
-        Icons.description_outlined,
-        'File Preview',
-        _basename(state['path'] as String? ?? state['title'] as String? ?? ''),
-      ),
-      'board.diff.preview' => _placeholderContent(
-        context,
-        Icons.difference_outlined,
-        'Diff',
-        state['filePath'] as String? ?? '',
-      ),
-      'board.webpage' => _webPagePlaceholder(context, state),
-      'board.chat' => _placeholderContent(
-        context,
-        Icons.auto_awesome,
-        'AI Chat',
-        panel.title,
-      ),
-      'board.terminal' => _placeholderContent(
-        context,
-        Icons.terminal,
-        'Terminal',
-        _terminalSubtitle(state),
-      ),
-      'board.yolo_assistant' => _placeholderContent(
-        context,
-        Icons.auto_awesome,
-        'YoLo Assistant',
-        'voice + tools',
-      ),
+      'board.filetree' => _filetreeContent(context, state),
+      'board.file.preview' => _filePreviewContent(context, state),
+      'board.diff.preview' => _diffContent(context, state),
+      'board.webpage' => _webPageContent(context, state),
+      'board.chat' => _chatContent(context, state),
+      'board.terminal' => _terminalContent(context, state),
+      'board.yolo_assistant' => _chatContent(context, state),
       'board.timer' => _timerContent(context, state),
       _ => Center(
         child: Icon(
@@ -578,15 +548,326 @@ class BoardOverviewPanelContent extends StatelessWidget {
     );
   }
 
-  Widget _webPagePlaceholder(BuildContext context, Map<String, dynamic> state) {
+  Widget _webPageContent(BuildContext context, Map<String, dynamic> state) {
     final url = state['url'] as String? ?? '';
-    final title = state['title'] as String? ?? 'Web Page';
-    return _placeholderContent(
-      context,
-      Icons.language_outlined,
-      title.isEmpty ? 'Web Page' : title,
-      _hostForUrl(url).isEmpty ? url : _hostForUrl(url),
+    final title = state['title'] as String? ?? '';
+    final host = _hostForUrl(url);
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).textTheme.bodySmall?.color ?? textColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(
+            color: muted.withAlpha(20),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.language_outlined, size: 7, color: muted.withAlpha(160)),
+              const SizedBox(width: 2),
+              Expanded(
+                child: Text(
+                  host.isNotEmpty ? host : url,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: muted.withAlpha(160), fontSize: 6.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (title.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: textColor.withAlpha(215),
+              fontSize: 7,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ] else if (url.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'No URL',
+              style: TextStyle(color: muted.withAlpha(140), fontSize: 6.5),
+            ),
+          ),
+      ],
     );
+  }
+
+  Widget _chatContent(BuildContext context, Map<String, dynamic> state) {
+    final messages = _maps(state['messages'])
+        .where((m) => m['role'] == 'user' || m['role'] == 'assistant')
+        .toList();
+    if (messages.isEmpty) {
+      return _placeholderContent(
+        context,
+        Icons.auto_awesome,
+        'AI Chat',
+        'No messages',
+      );
+    }
+    final recent = messages.length > 4
+        ? messages.sublist(messages.length - 4)
+        : messages;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).textTheme.bodySmall?.color ?? textColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final msg in recent) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 12,
+                height: 7,
+                margin: const EdgeInsets.only(top: 1, right: 2),
+                decoration: BoxDecoration(
+                  color: msg['role'] == 'user'
+                      ? const Color(0xFF7C3AED).withAlpha(160)
+                      : muted.withAlpha(40),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Center(
+                  child: Text(
+                    msg['role'] == 'user' ? 'U' : 'AI',
+                    style: TextStyle(
+                      color: msg['role'] == 'user'
+                          ? Colors.white.withAlpha(220)
+                          : muted.withAlpha(180),
+                      fontSize: 4.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  _plainText(msg['content']),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textColor.withAlpha(200),
+                    fontSize: 6.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+        ],
+      ],
+    );
+  }
+
+  Widget _terminalContent(BuildContext context, Map<String, dynamic> state) {
+    final config = state['config'];
+    String sessionName = '';
+    String workingDir = '';
+    if (config is Map) {
+      sessionName = config['sessionName']?.toString() ?? '';
+      workingDir = config['workingDir']?.toString() ?? '';
+    }
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).textTheme.bodySmall?.color ?? textColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.terminal, size: 8, color: const Color(0xFF4ADE80).withAlpha(200)),
+            const SizedBox(width: 3),
+            Expanded(
+              child: Text(
+                sessionName.isNotEmpty ? sessionName : 'shell',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: const Color(0xFF4ADE80).withAlpha(200),
+                  fontSize: 7,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (workingDir.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            '~ ${_basename(workingDir)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: muted.withAlpha(160), fontSize: 6.5),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _filetreeContent(BuildContext context, Map<String, dynamic> state) {
+    final rootPath = state['rootPath'] as String? ?? '';
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).textTheme.bodySmall?.color ?? textColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.folder_outlined, size: 9, color: const Color(0xFFFACC15).withAlpha(200)),
+            const SizedBox(width: 3),
+            Expanded(
+              child: Text(
+                rootPath.isEmpty ? 'No folder' : _basename(rootPath),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor.withAlpha(215),
+                  fontSize: 7,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (rootPath.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            rootPath,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: muted.withAlpha(130), fontSize: 5.5),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _filePreviewContent(BuildContext context, Map<String, dynamic> state) {
+    final path = state['path'] as String? ?? '';
+    final title = state['title'] as String? ?? '';
+    final name = title.isNotEmpty ? title : _basename(path);
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).textTheme.bodySmall?.color ?? textColor;
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(
+              _iconForExt(ext),
+              size: 9,
+              color: _colorForExt(ext).withAlpha(200),
+            ),
+            const SizedBox(width: 3),
+            Expanded(
+              child: Text(
+                name.isEmpty ? 'File Preview' : name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor.withAlpha(215),
+                  fontSize: 7,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (path.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            _dirName(path),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: muted.withAlpha(130), fontSize: 5.5),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _diffContent(BuildContext context, Map<String, dynamic> state) {
+    final filePath = state['filePath'] as String? ?? '';
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).textTheme.bodySmall?.color ?? textColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.difference_outlined, size: 9, color: const Color(0xFF60A5FA).withAlpha(200)),
+            const SizedBox(width: 3),
+            Expanded(
+              child: Text(
+                _basename(filePath).isEmpty ? 'Diff' : _basename(filePath),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: textColor.withAlpha(215),
+                  fontSize: 7,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (filePath.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            _dirName(filePath),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: muted.withAlpha(130), fontSize: 5.5),
+          ),
+        ],
+      ],
+    );
+  }
+
+  IconData _iconForExt(String ext) {
+    return switch (ext) {
+      'dart' || 'js' || 'ts' || 'py' || 'go' || 'rs' || 'java' || 'kt' ||
+      'swift' || 'c' || 'cpp' || 'h' => Icons.code_outlined,
+      'md' || 'txt' || 'log' => Icons.description_outlined,
+      'png' || 'jpg' || 'jpeg' || 'gif' || 'svg' || 'webp' => Icons.image_outlined,
+      'json' || 'yaml' || 'yml' || 'toml' || 'xml' => Icons.data_object_outlined,
+      _ => Icons.insert_drive_file_outlined,
+    };
+  }
+
+  Color _colorForExt(String ext) {
+    return switch (ext) {
+      'dart' => const Color(0xFF54C5F8),
+      'js' || 'ts' => const Color(0xFFF0DB4F),
+      'py' => const Color(0xFF4B8BBE),
+      'md' || 'txt' => const Color(0xFF9CA3AF),
+      'png' || 'jpg' || 'jpeg' || 'gif' || 'svg' => const Color(0xFFF472B6),
+      'json' || 'yaml' || 'yml' => const Color(0xFF34D399),
+      _ => const Color(0xFF9CA3AF),
+    };
+  }
+
+  String _dirName(String path) {
+    if (path.isEmpty) return '';
+    final sep = path.contains('/') ? '/' : r'\';
+    final parts = path.split(sep);
+    if (parts.length <= 1) return '';
+    return parts.sublist(0, parts.length - 1).join(sep);
   }
 
   Widget _timerContent(BuildContext context, Map<String, dynamic> state) {
@@ -643,14 +924,6 @@ class BoardOverviewPanelContent extends StatelessWidget {
     );
   }
 
-  String _terminalSubtitle(Map<String, dynamic> state) {
-    final config = state['config'];
-    if (config is Map) {
-      final dir = config['workingDir']?.toString() ?? '';
-      if (dir.isNotEmpty) return _basename(dir);
-    }
-    return 'shell';
-  }
 
   List<Map<String, dynamic>> _maps(Object? raw) {
     return (raw as List?)
