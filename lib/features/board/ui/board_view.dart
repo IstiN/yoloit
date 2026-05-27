@@ -3075,7 +3075,8 @@ class _BoardOverviewPngPreview extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        fallback,
+        // Plain background — fallback only shown on image error.
+        ColoredBox(color: context.appColors.background),
         Image.memory(
           bytes,
           fit: BoxFit.cover,
