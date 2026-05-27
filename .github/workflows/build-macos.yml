@@ -20,6 +20,7 @@ jobs:
   build-macos:
     name: Build macOS App
     runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 60
     permissions:
       contents: write   # needed to create GitHub Releases
     env:
