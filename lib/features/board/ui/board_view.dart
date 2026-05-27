@@ -3017,17 +3017,30 @@ class _BoardOverviewPngPreview extends StatelessWidget {
   final Uint8List bytes;
   final Widget fallback;
 
+  // Desaturation matrix: blend 60 % grayscale into the image to mute
+  // the accent colours that appear on panel borders/headers.
+  static const _desaturate = ColorFilter.matrix(<double>[
+    // R        G        B     A   offset
+    0.56, 0.28, 0.16, 0, 0, //
+    0.16, 0.56, 0.28, 0, 0, //
+    0.16, 0.28, 0.56, 0, 0, //
+    0, 0, 0, 1, 0, //
+  ]);
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
         fallback,
-        Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) => fallback,
+        ColorFiltered(
+          colorFilter: _desaturate,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => fallback,
+          ),
         ),
         DecoratedBox(
           decoration: BoxDecoration(
