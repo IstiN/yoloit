@@ -1408,99 +1408,28 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     return byteData.buffer.asUint8List();
   }
 
-  /// Capture real rendered screenshots for boards that don't have a cached PNG.
-  ///
-  /// Temporarily switches to each board, auto-fits the viewport, hides
-  /// chrome, captures the RepaintBoundary, then switches back.
-  /// An opaque overlay is shown during the process to hide flicker.
-  Future<void> _captureAllMissingBoardPreviews(String originalBoardId) async {
-    final cubit = context.read<BoardCubit>();
-    final allBoards = cubit.state.boards;
+  /// Generate synthetic previews for boards that have no cached PNG.
+  /// Real screenshots are only captured for the active board; switching
+  /// boards to capture crashes JSC widgets and is not safe.
+  Future<void> _generateMissingBoardPreviews(String activeBoardId) async {
+    final allBoards = context.read<BoardCubit>().state.boards;
     final missing = allBoards.where(
-      (b) => !_boardPreviewPngs.containsKey(b.id) && b.id != originalBoardId,
+      (b) => !_boardPreviewPngs.containsKey(b.id) && b.id != activeBoardId,
     ).toList();
     if (missing.isEmpty) return;
 
-    _boardOverviewLog('captureAll.start missing=${missing.length}');
+    _boardOverviewLog('synthetic.start count=${missing.length}');
     final watch = Stopwatch()..start();
-
-    // Show opaque overlay to hide board-switching flicker.
-    setState(() => _isCapturingScreenshot = true);
-
     for (final board in missing) {
       if (!mounted) break;
-      _boardOverviewLog('captureAll.switch board=${board.id}');
-
-      // Switch to this board.
-      await cubit.setActiveBoard(board.id);
-      if (!mounted) break;
-
-      // Auto-fit viewport so all panels are visible in the capture.
-      _fitBoardPanels(board, persist: false);
-
-      // Wait several frames for the board content to render and layout.
-      for (var i = 0; i < 4; i++) {
-        await WidgetsBinding.instance.endOfFrame;
-      }
-      if (!mounted) break;
-
-      // Capture.
-      final bytes = await BoardScreenshotService.instance.capturePng(
-        pixelRatio: 0.28,
-      );
-      if (bytes != null && mounted) {
-        _boardPreviewPngs[board.id] = bytes;
-        _saveBoardPreviewPngToDisk(board.id, bytes);
-        _boardOverviewLog(
-          'captureAll.captured board=${board.id} bytes=${bytes.length}',
-        );
-      } else {
-        // Fallback to synthetic if real capture failed.
-        _boardOverviewLog('captureAll.fallbackSynthetic board=${board.id}');
-        final synth = await _generateSyntheticPreviewPng(board);
-        if (synth != null && mounted) {
-          _boardPreviewPngs[board.id] = synth;
-          _saveBoardPreviewPngToDisk(board.id, synth);
-        }
+      final png = await _generateSyntheticPreviewPng(board);
+      if (png != null && mounted) {
+        _boardPreviewPngs[board.id] = png;
+        _saveBoardPreviewPngToDisk(board.id, png);
       }
     }
-
-    if (!mounted) return;
-
-    // Switch back to the original board.
-    _boardOverviewLog('captureAll.restore board=$originalBoardId');
-    await cubit.setActiveBoard(originalBoardId);
-    if (!mounted) return;
-
-    // Restore original viewport.
-    final originalBoard = cubit.state.boards.firstWhere(
-      (b) => b.id == originalBoardId,
-    );
-    final vp = originalBoard.viewport;
-    if (vp != null && !_isDefaultViewport(vp)) {
-      _transformController.value = _matrixFromViewport(vp);
-    } else {
-      _fitBoardPanels(originalBoard, persist: false);
-    }
-
-    // Wait for original board to render back.
-    for (var i = 0; i < 3; i++) {
-      await WidgetsBinding.instance.endOfFrame;
-    }
-
-    // Re-capture the original board (its viewport may have shifted).
-    final origBytes = await BoardScreenshotService.instance.capturePng(
-      pixelRatio: 0.28,
-    );
-    if (origBytes != null && mounted) {
-      _boardPreviewPngs[originalBoardId] = origBytes;
-      _saveBoardPreviewPngToDisk(originalBoardId, origBytes);
-    }
-
-    if (mounted) setState(() => _isCapturingScreenshot = false);
-
     _boardOverviewLog(
-      'captureAll.done elapsed=${watch.elapsedMilliseconds}ms',
+      'synthetic.done count=${missing.length} elapsed=${watch.elapsedMilliseconds}ms',
     );
   }
 
@@ -1509,12 +1438,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardOverviewLog(
       'open.request board=${activeBoard.id} boards=${context.read<BoardCubit>().state.boards.length}',
     );
+    // Load real cached PNGs from disk (from previous sessions).
+    _loadBoardPreviewPngsFromDisk();
+    // Capture a real screenshot of the active board.
     await _captureBoardPreviewPng(activeBoard.id);
     if (!mounted) return;
 
-    // Capture real rendered screenshots for ALL other boards
-    // (ignore disk cache — always produce fresh captures).
-    await _captureAllMissingBoardPreviews(activeBoard.id);
+    // Generate synthetic previews for boards still missing a PNG.
+    await _generateMissingBoardPreviews(activeBoard.id);
     if (!mounted) return;
 
     _boardOverviewLog(
