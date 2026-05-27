@@ -3057,7 +3057,7 @@ class _BoardOverviewPreview extends StatelessWidget {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
         if (panels.isEmpty) {
           return ColoredBox(
-            color: colors.background.withAlpha(130),
+            color: colors.background,
             child: Center(
               child: Container(
                 width: math.min(size.width, 120),
@@ -3087,7 +3087,7 @@ class _BoardOverviewPreview extends StatelessWidget {
         final dy = (size.height - bounds.height * scale) / 2;
 
         return ColoredBox(
-          color: colors.background.withAlpha(130),
+          color: colors.background,
           child: Stack(
             clipBehavior: Clip.hardEdge,
             children: [
@@ -3201,26 +3201,26 @@ class _BoardOverviewPanelPreview extends StatelessWidget {
           borderRadius: BorderRadius.circular(tiny ? 3 : 6),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: Color.lerp(colors.surface, accent, 0.14),
+              color: colors.surface,
               borderRadius: BorderRadius.circular(tiny ? 3 : 6),
-              border: Border.all(color: accent.withAlpha(185), width: 0.8),
+              border: Border.all(color: accent.withAlpha(60), width: 0.6),
             ),
             child:
                 tiny
-                    ? ColoredBox(color: accent.withAlpha(205))
+                    ? ColoredBox(color: accent.withAlpha(45))
                     : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Container(
                           height: 18,
                           padding: const EdgeInsets.symmetric(horizontal: 5),
-                          color: accent.withAlpha(50),
+                          color: accent.withAlpha(18),
                           child: Row(
                             children: [
                               Icon(
                                 _iconForPanelType(panel.type),
                                 size: 9,
-                                color: accent,
+                                color: accent.withAlpha(140),
                               ),
                               const SizedBox(width: 3),
                               Expanded(
