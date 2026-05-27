@@ -289,6 +289,35 @@ class BoardOverviewPanelContent extends StatelessWidget {
 
         final scale = math.min(availW / panelW, availH / panelH);
 
+        // Plugins that initialise native code (MPV, WebView, PTY) on widget
+        // creation will crash the process in a headless context. Show a
+        // labelled placeholder instead of calling buildContent for them.
+        final Widget child;
+        if (!plugin.supportsHeadlessRender) {
+          child = Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  plugin.icon,
+                  size: 32,
+                  color: const Color(0x809E9E9E),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  plugin.displayName,
+                  style: const TextStyle(
+                    color: Color(0x809E9E9E),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          child = plugin.buildContent(context, panel, _noOp);
+        }
+
         return SizedBox(
           width: availW,
           height: availH,
@@ -298,7 +327,7 @@ class BoardOverviewPanelContent extends StatelessWidget {
             child: SizedBox(
               width: panelW,
               height: panelH,
-              child: plugin.buildContent(context, panel, _noOp),
+              child: child,
             ),
           ),
         );

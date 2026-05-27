@@ -35,6 +35,9 @@ class BoardTerminalPanelPlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get supportsHeadlessRender => false; // native PTY — requires live terminal session
+
+  @override
   Widget buildContent(
     BuildContext context,
     BoardPanelInstance panel,

@@ -58,6 +58,9 @@ class PlaylistPlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get supportsHeadlessRender => false; // MPV initialises native GPU decoder on widget creation
+
+  @override
   Widget buildContent(
     BuildContext context,
     BoardPanelInstance panel,

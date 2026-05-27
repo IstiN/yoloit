@@ -33,6 +33,9 @@ class WebpagePlugin extends BoardPanelPlugin {
   static final Map<String, ValueNotifier<bool>> pageLoading = {};
 
   @override
+  bool get supportsHeadlessRender => false; // native WebView platform view
+
+  @override
   String get typeId => kTypeId;
 
   @override

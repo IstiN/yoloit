@@ -86,6 +86,15 @@ abstract class BoardPanelPlugin {
   /// Initial state map for a freshly created panel.
   Map<String, dynamic> get initialState => const {};
 
+  /// Whether this plugin can be safely rendered in a headless offscreen context
+  /// (no GPU, no platform views, no native video decoders).
+  ///
+  /// Override to `false` for plugins that call native code in their widget
+  /// constructors or [State.initState] — e.g. media players (MPV), WebView,
+  /// or terminal PTY. The offscreen renderer will show a grey placeholder
+  /// instead of calling [buildContent] for these plugins.
+  bool get supportsHeadlessRender => true;
+
   /// Build the content widget rendered inside the panel body.
   Widget buildContent(
     BuildContext context,
