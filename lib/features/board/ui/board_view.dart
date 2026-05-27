@@ -75,6 +75,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _showMinimap = true;
   bool _showToolsPanel = true;
   bool _isBoardOverviewOpen = false;
+  bool _boardSwitchPreviewVisible = false;
+  BoardDocument? _boardSwitchPreviewBoard;
+  Uint8List? _boardSwitchPreviewPng;
   final Map<String, Uint8List> _boardPreviewPngs = {};
   late final AnimationController _panController;
   Animation<Matrix4>? _panAnimation;
@@ -1017,14 +1020,49 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                     );
                                     _createBoard(context);
                                   },
-                                  onSelectedBoard: (id) {
+                                  onSelectedBoard: (board, previewPng) {
                                     if (!mounted) return;
-                                    setState(
-                                      () => _isBoardOverviewOpen = false,
-                                    );
+                                    setState(() {
+                                      _isBoardOverviewOpen = false;
+                                      _boardSwitchPreviewBoard = board;
+                                      _boardSwitchPreviewPng = previewPng;
+                                      _boardSwitchPreviewVisible = true;
+                                    });
                                     context.read<BoardCubit>().setActiveBoard(
-                                      id,
+                                      board.id,
                                     );
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          Future<void>.delayed(
+                                            const Duration(milliseconds: 80),
+                                            () {
+                                              if (!mounted) return;
+                                              setState(
+                                                () =>
+                                                    _boardSwitchPreviewVisible =
+                                                        false,
+                                              );
+                                            },
+                                          );
+                                        });
+                                  },
+                                ),
+                              ),
+                            if (_boardSwitchPreviewBoard != null)
+                              Positioned.fill(
+                                child: _BoardSwitchPreviewOverlay(
+                                  board: _boardSwitchPreviewBoard!,
+                                  previewPng: _boardSwitchPreviewPng,
+                                  visible: _boardSwitchPreviewVisible,
+                                  onHidden: () {
+                                    if (!mounted ||
+                                        _boardSwitchPreviewVisible) {
+                                      return;
+                                    }
+                                    setState(() {
+                                      _boardSwitchPreviewBoard = null;
+                                      _boardSwitchPreviewPng = null;
+                                    });
                                   },
                                 ),
                               ),
@@ -2387,7 +2425,8 @@ class _BoardOverviewLayer extends StatefulWidget {
   final String activeBoardId;
   final List<BoardDocument> boards;
   final Map<String, Uint8List> previewPngs;
-  final ValueChanged<String> onSelectedBoard;
+  final void Function(BoardDocument board, Uint8List? previewPng)
+  onSelectedBoard;
   final VoidCallback onCreateBoard;
   final VoidCallback onClose;
 
@@ -2446,7 +2485,9 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
       _zoomBoardId = boardId;
     });
     await _controller.reverse();
-    if (mounted) widget.onSelectedBoard(boardId);
+    if (!mounted) return;
+    final selected = widget.boards.firstWhere((board) => board.id == boardId);
+    widget.onSelectedBoard(selected, widget.previewPngs[boardId]);
   }
 
   Future<void> _createBoard() async {
@@ -2480,14 +2521,22 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
           builder: (context, _) {
             final t = _curve.value;
             final fade = t.clamp(0.0, 1.0).toDouble();
+            final highlightedBoardId =
+                _closing && _zoomBoardId != null
+                    ? _zoomBoardId
+                    : widget.activeBoardId;
             final widgets = <Widget>[
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: _close,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.background.withAlpha((t * 130).round()),
+                  child: ColoredBox(
+                    color: colors.background,
+                    child: CustomPaint(
+                      painter: _BoardOverviewBackdropPainter(
+                        minorColor: colors.divider.withAlpha(45),
+                        majorColor: colors.divider.withAlpha(85),
+                      ),
                     ),
                   ),
                 ),
@@ -2515,7 +2564,7 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
                     opacity: opacity,
                     child: _BoardOverviewCard(
                       board: board,
-                      active: board.id == widget.activeBoardId,
+                      active: board.id == highlightedBoardId,
                       previewPng: widget.previewPngs[board.id],
                       onTap: () => _selectBoard(board.id),
                     ),
@@ -2564,6 +2613,85 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
         );
       },
     );
+  }
+}
+
+class _BoardSwitchPreviewOverlay extends StatelessWidget {
+  const _BoardSwitchPreviewOverlay({
+    required this.board,
+    required this.previewPng,
+    required this.visible,
+    required this.onHidden,
+  });
+
+  final BoardDocument board;
+  final Uint8List? previewPng;
+  final bool visible;
+  final VoidCallback onHidden;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        onEnd: onHidden,
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: _BoardOverviewCard(
+            board: board,
+            active: true,
+            previewPng: previewPng,
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardOverviewBackdropPainter extends CustomPainter {
+  const _BoardOverviewBackdropPainter({
+    required this.minorColor,
+    required this.majorColor,
+  });
+
+  final Color minorColor;
+  final Color majorColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final minorPaint =
+        Paint()
+          ..color = minorColor
+          ..strokeWidth = 1;
+    final majorPaint =
+        Paint()
+          ..color = majorColor
+          ..strokeWidth = 1;
+    const minorStep = 28.0;
+    const majorEvery = 4;
+    for (var x = 0.0, i = 0; x <= size.width; x += minorStep, i++) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, size.height),
+        i % majorEvery == 0 ? majorPaint : minorPaint,
+      );
+    }
+    for (var y = 0.0, i = 0; y <= size.height; y += minorStep, i++) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        i % majorEvery == 0 ? majorPaint : minorPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BoardOverviewBackdropPainter oldDelegate) {
+    return oldDelegate.minorColor != minorColor ||
+        oldDelegate.majorColor != majorColor;
   }
 }
 
