@@ -2406,19 +2406,23 @@ $messagesJson
   }
 
   Future<void> _startRecordingFromMic() async {
-    await LocalAiModelsService.instance.initialize();
-    if (!LocalAiModelsService.instance.hasSelectedAsrInstalled) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Install ASR model first. Opening Settings → AI Models…',
+    final voiceSettings =
+        await CloudLlmSettingsService.instance.loadVoiceSettings();
+    if (!voiceSettings.useCloudAsr) {
+      await LocalAiModelsService.instance.initialize();
+      if (!LocalAiModelsService.instance.hasSelectedAsrInstalled) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Install ASR model first. Opening Settings → AI Models…',
+            ),
+            duration: Duration(seconds: 2),
           ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      await SettingsPage.show(context, initialCategory: 'AI Models');
-      return;
+        );
+        await SettingsPage.show(context, initialCategory: 'AI Models');
+        return;
+      }
     }
 
     final nativeGranted =

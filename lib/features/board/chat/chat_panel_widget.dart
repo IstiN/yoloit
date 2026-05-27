@@ -2571,19 +2571,25 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Future<void> _handleMicInput() async {
-    await LocalAiModelsService.instance.initialize();
-    if (!LocalAiModelsService.instance.hasSelectedAsrInstalled) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Install ASR model first. Opening Settings → AI Models…',
+    final effectiveAsr = AgentConfigService.instance.effectiveAsr(_config.provider);
+    final useCloudAsr = effectiveAsr.mode == 'cloud' &&
+        effectiveAsr.configId != null &&
+        effectiveAsr.configId!.isNotEmpty;
+    if (!useCloudAsr) {
+      await LocalAiModelsService.instance.initialize();
+      if (!LocalAiModelsService.instance.hasSelectedAsrInstalled) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Install ASR model first. Opening Settings → AI Models…',
+            ),
+            duration: Duration(seconds: 2),
           ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      await SettingsPage.show(context, initialCategory: 'AI Models');
-      return;
+        );
+        await SettingsPage.show(context, initialCategory: 'AI Models');
+        return;
+      }
     }
 
     if (_isRecordingMic) {
