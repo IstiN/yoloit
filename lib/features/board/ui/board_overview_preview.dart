@@ -11,10 +11,6 @@ class BoardOverviewPreview extends StatelessWidget {
 
   final BoardDocument board;
 
-  /// Standard viewport size used when computing visible bounds from saved
-  /// viewport state. Approximates a typical MacBook screen size.
-  static const Size _standardViewportSize = Size(1440, 900);
-
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -45,16 +41,8 @@ class BoardOverviewPreview extends StatelessWidget {
           );
         }
 
-        // If the user has saved a non-default viewport (zoomed / panned),
-        // show the board from that saved position instead of fitting all.
-        // Otherwise fall back to fit-all.
-        final vp = board.viewport;
-        final Rect bounds;
-        if (_isNonDefaultViewport(vp)) {
-          bounds = _visibleBoundsFromViewport(vp);
-        } else {
-          bounds = boundsForPanels(panels).inflate(120);
-        }
+        // Always fit all panels — overview purpose is to show the whole board.
+        final bounds = boundsForPanels(panels).inflate(120);
 
         final scale = math.min(
           size.width / bounds.width,
@@ -90,29 +78,6 @@ class BoardOverviewPreview extends StatelessWidget {
         );
       },
     );
-  }
-
-  bool _isNonDefaultViewport(BoardViewport vp) {
-    // Consider non-default if scale deviates significantly from 1.0 or
-    // user has panned more than a minimal amount.
-    return vp.scale != 1.0 || vp.translation != Offset.zero;
-  }
-
-  /// Compute the visible board-coordinate rect from the saved viewport.
-  ///
-  /// The board uses transform: screenPos = boardPos * scale + translation
-  /// (canvas origin is already folded into translation by _saveViewport).
-  /// So the visible board rect at a standard 1440×900 viewport is:
-  ///   left = -translation.dx / scale
-  ///   top  = -translation.dy / scale
-  ///   size = standardViewportSize / scale
-  Rect _visibleBoundsFromViewport(BoardViewport vp) {
-    final s = vp.scale;
-    final tx = vp.translation.dx;
-    final ty = vp.translation.dy;
-    final vw = _standardViewportSize.width;
-    final vh = _standardViewportSize.height;
-    return Rect.fromLTWH(-tx / s, -ty / s, vw / s, vh / s);
   }
 
   Rect boundsForPanels(List<BoardPanelInstance> panels) {
