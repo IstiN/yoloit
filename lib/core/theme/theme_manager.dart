@@ -24,25 +24,54 @@ class ThemeManager extends ChangeNotifier {
   /// When non-null, a custom theme is active instead of a preset.
   String? _activeCustomThemeId;
 
+  /// Per-slot accent overrides (persisted to SharedPreferences).
+  Map<String, Color> _accentOverrides = {};
+
   AppThemePreset get current => _current;
   Brightness get brightness => _brightness;
   bool get isDark => _brightness == Brightness.dark;
   List<CustomTheme> get customThemes => List.unmodifiable(_customThemes);
   String? get activeCustomThemeId => _activeCustomThemeId;
+  Map<String, Color> get accentOverrides => Map.unmodifiable(_accentOverrides);
 
   ThemeData get theme {
+    AppColorScheme scheme;
+    Brightness bright;
     if (_activeCustomThemeId != null) {
       final custom = _customThemes
           .where((t) => t.id == _activeCustomThemeId)
           .firstOrNull;
       if (custom != null) {
-        return AppTheme.buildThemeFromScheme(
-          custom.scheme,
-          brightness: custom.brightness,
+        scheme = custom.scheme;
+        bright = custom.brightness;
+      } else {
+        scheme = AppColorScheme.fromAccent(
+          _current.color,
+          bgSeed: _current.bgSeed,
+          brightness: _current.defaultBrightness ?? _brightness,
         );
+        bright = _current.defaultBrightness ?? _brightness;
       }
+    } else {
+      scheme = AppColorScheme.fromAccent(
+        _current.color,
+        bgSeed: _current.bgSeed,
+        brightness: _current.defaultBrightness ?? _brightness,
+      );
+      bright = _current.defaultBrightness ?? _brightness;
     }
-    return _current.themeForBrightness(_brightness);
+    if (_accentOverrides.isNotEmpty) {
+      scheme = scheme.copyWith(
+        accentGreen: _accentOverrides['accentGreen'],
+        accentGreenDim: _accentOverrides['accentGreenDim'],
+        accentGreenGlow: _accentOverrides['accentGreenGlow'],
+        accentRed: _accentOverrides['accentRed'],
+        accentRedDim: _accentOverrides['accentRedDim'],
+        accentBlue: _accentOverrides['accentBlue'],
+        accentOrange: _accentOverrides['accentOrange'],
+      );
+    }
+    return AppTheme.buildThemeFromScheme(scheme, brightness: bright);
   }
 
   Future<void> load() async {
@@ -55,6 +84,7 @@ class ThemeManager extends ChangeNotifier {
     final bright = prefs.getString('theme_brightness') ?? 'dark';
     _brightness = bright == 'light' ? Brightness.light : Brightness.dark;
     _activeCustomThemeId = prefs.getString('custom_theme_id');
+    _loadAccentOverrides(prefs);
     AppColors.setAccent(_current.color);
     await _loadCustomThemes();
     notifyListeners();
@@ -95,7 +125,7 @@ class ThemeManager extends ChangeNotifier {
     );
   }
 
-  Future<void> setBrightness(Brightness brightness) async {
+   Future<void> setBrightness(Brightness brightness) async {
     _brightness = brightness;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
@@ -107,6 +137,93 @@ class ThemeManager extends ChangeNotifier {
 
   Future<void> toggleBrightness() async {
     await setBrightness(isDark ? Brightness.light : Brightness.dark);
+  }
+
+  // ── Accent color overrides ──────────────────────────────────────────────────
+
+  static const _accentSlots = [
+    'accentGreen',
+    'accentRed',
+    'accentBlue',
+    'accentOrange',
+  ];
+
+  /// Human-readable labels for accent override slots.
+  static const accentSlotLabels = {
+    'accentGreen': 'Green',
+    'accentRed': 'Red',
+    'accentBlue': 'Blue',
+    'accentOrange': 'Orange',
+  };
+
+  /// Sets an accent color override for a specific slot.
+  Future<void> setAccentOverride(String slot, Color color) async {
+    _accentOverrides[slot] = color;
+    // Also compute dim/glow variants for green and red
+    if (slot == 'accentGreen') {
+      _accentOverrides['accentGreenDim'] =
+          Color.lerp(color, Colors.black, 0.2)!;
+      _accentOverrides['accentGreenGlow'] = color.withAlpha(0x22);
+    } else if (slot == 'accentRed') {
+      _accentOverrides['accentRedDim'] =
+          Color.lerp(color, Colors.black, 0.2)!;
+    }
+    notifyListeners();
+    await _saveAccentOverrides();
+  }
+
+  /// Removes an accent color override, reverting to the theme default.
+  Future<void> removeAccentOverride(String slot) async {
+    _accentOverrides.remove(slot);
+    if (slot == 'accentGreen') {
+      _accentOverrides.remove('accentGreenDim');
+      _accentOverrides.remove('accentGreenGlow');
+    } else if (slot == 'accentRed') {
+      _accentOverrides.remove('accentRedDim');
+    }
+    notifyListeners();
+    await _saveAccentOverrides();
+  }
+
+  /// Clears all accent overrides.
+  Future<void> clearAccentOverrides() async {
+    _accentOverrides.clear();
+    notifyListeners();
+    await _saveAccentOverrides();
+  }
+
+  void _loadAccentOverrides(SharedPreferences prefs) {
+    _accentOverrides = {};
+    final json = prefs.getString('accent_overrides');
+    if (json == null) return;
+    try {
+      final map = jsonDecode(json) as Map<String, dynamic>;
+      for (final entry in map.entries) {
+        final hex = entry.value as String;
+        final h = hex.replaceFirst('#', '');
+        if (h.length == 6) {
+          _accentOverrides[entry.key] =
+              Color(int.parse('FF$h', radix: 16));
+        } else if (h.length == 8) {
+          _accentOverrides[entry.key] = Color(int.parse(h, radix: 16));
+        }
+      }
+    } catch (_) {
+      // Ignore malformed data.
+    }
+  }
+
+  Future<void> _saveAccentOverrides() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_accentOverrides.isEmpty) {
+      await prefs.remove('accent_overrides');
+      return;
+    }
+    final map = <String, String>{};
+    for (final entry in _accentOverrides.entries) {
+      map[entry.key] = entry.value.value.toRadixString(16).padLeft(8, '0');
+    }
+    await prefs.setString('accent_overrides', jsonEncode(map));
   }
 
   // ── Custom theme management ──────────────────────────────────────────────────

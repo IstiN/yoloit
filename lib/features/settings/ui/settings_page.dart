@@ -1534,68 +1534,661 @@ class _ThemeSelector extends StatefulWidget {
 
 class _ThemeSelectorState extends State<_ThemeSelector> {
   @override
+  void initState() {
+    super.initState();
+    ThemeManager.instance.addListener(_rebuild);
+  }
+
+  @override
+  void dispose() {
+    ThemeManager.instance.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  void _rebuild() => setState(() {});
+
+  Future<void> _importTheme() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json', 'icls', 'xml'],
+      dialogTitle: 'Import Theme',
+    );
+    if (result == null || result.files.single.path == null) return;
+    final id = await ThemeManager.instance.importThemeFile(
+      result.files.single.path!,
+    );
+    await ThemeManager.instance.setCustomTheme(id);
+  }
+
+  Future<void> _pickAccentColor(String slot, Color current) async {
+    final picked = await showDialog<Color>(
+      context: context,
+      builder: (ctx) => _ColorPickerDialog(
+        title: '${ThemeManager.accentSlotLabels[slot] ?? slot} Accent',
+        initialColor: current,
+      ),
+    );
+    if (picked != null) {
+      await ThemeManager.instance.setAccentOverride(slot, picked);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final current = ThemeManager.instance.current;
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children:
-          AppThemePreset.values.map((preset) {
-            final isActive = preset == current;
-            return GestureDetector(
-              onTap: () {
-                ThemeManager.instance.setTheme(preset);
-                setState(() {});
-              },
-              child: Container(
-                width: 100,
-                padding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-                decoration: BoxDecoration(
-                  color:
-                      isActive
-                          ? colors.primary.withAlpha(30)
-                          : colors.background,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isActive ? colors.primary : colors.border,
-                    width: isActive ? 2 : 1,
+    final tm = ThemeManager.instance;
+    final activeCustomId = tm.activeCustomThemeId;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Built-in presets ──
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            ...AppThemePreset.values.map((preset) {
+              final isActive =
+                  activeCustomId == null && preset == tm.current;
+              return _ThemeChip(
+                label: preset.label,
+                color: preset.color,
+                isActive: isActive,
+                onTap: () => tm.setTheme(preset),
+              );
+            }),
+            // Custom themes
+            ...tm.customThemes.map((custom) {
+              final isActive = activeCustomId == custom.id;
+              return _ThemeChip(
+                label: custom.name,
+                color: custom.scheme.primary,
+                isActive: isActive,
+                onTap: () => tm.setCustomTheme(custom.id),
+                onDelete: () => tm.deleteCustomTheme(custom.id),
+              );
+            }),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // ── Import button ──
+        Row(
+          children: [
+            _SmallButton(
+              icon: Icons.file_download_outlined,
+              label: 'Import Theme',
+              onTap: _importTheme,
+            ),
+            const SizedBox(width: 8),
+            if (tm.accentOverrides.isNotEmpty)
+              _SmallButton(
+                icon: Icons.restart_alt,
+                label: 'Reset Accents',
+                onTap: () => tm.clearAccentOverrides(),
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // ── Accent color pickers ──
+        Text(
+          'Accent Colors',
+          style: TextStyle(
+            color: colors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            _AccentSwatch(
+              label: 'Green',
+              color: colors.accentGreen,
+              isOverridden: tm.accentOverrides.containsKey('accentGreen'),
+              onTap: () => _pickAccentColor('accentGreen', colors.accentGreen),
+              onReset: () => tm.removeAccentOverride('accentGreen'),
+            ),
+            _AccentSwatch(
+              label: 'Red',
+              color: colors.accentRed,
+              isOverridden: tm.accentOverrides.containsKey('accentRed'),
+              onTap: () => _pickAccentColor('accentRed', colors.accentRed),
+              onReset: () => tm.removeAccentOverride('accentRed'),
+            ),
+            _AccentSwatch(
+              label: 'Blue',
+              color: colors.accentBlue,
+              isOverridden: tm.accentOverrides.containsKey('accentBlue'),
+              onTap: () => _pickAccentColor('accentBlue', colors.accentBlue),
+              onReset: () => tm.removeAccentOverride('accentBlue'),
+            ),
+            _AccentSwatch(
+              label: 'Orange',
+              color: colors.accentOrange,
+              isOverridden: tm.accentOverrides.containsKey('accentOrange'),
+              onTap: () => _pickAccentColor('accentOrange', colors.accentOrange),
+              onReset: () => tm.removeAccentOverride('accentOrange'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeChip extends StatelessWidget {
+  const _ThemeChip({
+    required this.label,
+    required this.color,
+    required this.isActive,
+    required this.onTap,
+    this.onDelete,
+  });
+
+  final String label;
+  final Color color;
+  final bool isActive;
+  final VoidCallback onTap;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 100,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isActive ? colors.primary.withAlpha(30) : colors.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? colors.primary : colors.border,
+            width: isActive ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colors.border),
                   ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
+                if (onDelete != null)
+                  Positioned(
+                    right: -8,
+                    top: -8,
+                    child: GestureDetector(
+                      onTap: onDelete,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: colors.accentRed,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isActive
+                    ? colors.primary
+                    : Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccentSwatch extends StatelessWidget {
+  const _AccentSwatch({
+    required this.label,
+    required this.color,
+    required this.isOverridden,
+    required this.onTap,
+    required this.onReset,
+  });
+
+  final String label;
+  final Color color;
+  final bool isOverridden;
+  final VoidCallback onTap;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isOverridden ? colors.primary : colors.border,
+                    width: isOverridden ? 2 : 1,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.colorize,
+                  size: 14,
+                  color: Colors.white70,
+                ),
+              ),
+              if (isOverridden)
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: GestureDetector(
+                    onTap: onReset,
+                    child: Container(
+                      width: 14,
+                      height: 14,
                       decoration: BoxDecoration(
-                        color: preset.theme.colorScheme.primary,
+                        color: colors.surface,
                         shape: BoxShape.circle,
                         border: Border.all(color: colors.border),
                       ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      preset.label,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color:
-                            isActive
-                                ? colors.primary
-                                : Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color ??
-                                    Theme.of(context).colorScheme.onSurface,
-                        fontSize: 11,
-                        fontWeight:
-                            isActive ? FontWeight.w600 : FontWeight.normal,
+                      child: Icon(
+                        Icons.close,
+                        size: 8,
+                        color: colors.textMuted,
                       ),
                     ),
-                  ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallButton extends StatelessWidget {
+  const _SmallButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: colors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: colors.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: colors.textSecondary,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// HSV-based color picker dialog.
+class _ColorPickerDialog extends StatefulWidget {
+  const _ColorPickerDialog({
+    required this.title,
+    required this.initialColor,
+  });
+
+  final String title;
+  final Color initialColor;
+
+  @override
+  State<_ColorPickerDialog> createState() => _ColorPickerDialogState();
+}
+
+class _ColorPickerDialogState extends State<_ColorPickerDialog> {
+  late HSVColor _hsv;
+  late TextEditingController _hexController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hsv = HSVColor.fromColor(widget.initialColor);
+    _hexController = TextEditingController(text: _colorToHex(_hsv.toColor()));
+  }
+
+  @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  String _colorToHex(Color c) {
+    return '#${(c.value & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  }
+
+  void _updateFromHex(String hex) {
+    final h = hex.replaceFirst('#', '');
+    if (h.length != 6) return;
+    try {
+      final color = Color(int.parse('FF$h', radix: 16));
+      setState(() {
+        _hsv = HSVColor.fromColor(color);
+      });
+    } catch (_) {}
+  }
+
+  static const _presetColors = [
+    Color(0xFF00FF9F), Color(0xFF00DD88), Color(0xFF00CC7A), Color(0xFF067D17),
+    Color(0xFF2ECC71), Color(0xFF27AE60), Color(0xFF1ABC9C), Color(0xFF16A085),
+    Color(0xFFFF4F6A), Color(0xFFFF6B6B), Color(0xFFE74C3C), Color(0xFFC0392B),
+    Color(0xFFDE1B2E), Color(0xFFFF1744), Color(0xFFD50000), Color(0xFFB71C1C),
+    Color(0xFF00B4FF), Color(0xFF3498DB), Color(0xFF2980B9), Color(0xFF0066CC),
+    Color(0xFF548AF7), Color(0xFF2196F3), Color(0xFF1976D2), Color(0xFF0D47A1),
+    Color(0xFFFF9500), Color(0xFFF39C12), Color(0xFFE67E22), Color(0xFFD35400),
+    Color(0xFFCC7700), Color(0xFFFF6F00), Color(0xFFFF8F00), Color(0xFFFFAB00),
+    Color(0xFF9B59B6), Color(0xFF8E44AD), Color(0xFF7C3AED), Color(0xFF6C3483),
+    Color(0xFFE91E63), Color(0xFFF06292), Color(0xFFFFEB3B), Color(0xFFCDDC39),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final pickedColor = _hsv.toColor();
+    return Dialog(
+      backgroundColor: colors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SizedBox(
+        width: 340,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.title,
+                style: TextStyle(
+                  color: colors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            );
-          }).toList(),
+              const SizedBox(height: 16),
+              // ── Preview + hex input ──
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: pickedColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: colors.border),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _hexController,
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontSize: 13,
+                        fontFamily: 'SF Mono',
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Hex',
+                        labelStyle: TextStyle(
+                          color: colors.textMuted,
+                          fontSize: 11,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: colors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: colors.border),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                      ),
+                      onSubmitted: (v) {
+                        _updateFromHex(v);
+                        _hexController.text = _colorToHex(_hsv.toColor());
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // ── Hue slider ──
+              Text(
+                'Hue',
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 24,
+                child: SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 12,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 8,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 14,
+                    ),
+                    activeTrackColor: _hsv.toColor(),
+                    inactiveTrackColor: colors.border,
+                    thumbColor: Colors.white,
+                  ),
+                  child: Slider(
+                    value: _hsv.hue,
+                    min: 0,
+                    max: 360,
+                    onChanged: (v) {
+                      setState(() {
+                        _hsv = _hsv.withHue(v);
+                        _hexController.text = _colorToHex(_hsv.toColor());
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // ── Saturation slider ──
+              Text(
+                'Saturation',
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 24,
+                child: SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 12,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 8,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 14,
+                    ),
+                    activeTrackColor: _hsv.toColor(),
+                    inactiveTrackColor: colors.border,
+                    thumbColor: Colors.white,
+                  ),
+                  child: Slider(
+                    value: _hsv.saturation,
+                    min: 0,
+                    max: 1,
+                    onChanged: (v) {
+                      setState(() {
+                        _hsv = _hsv.withSaturation(v);
+                        _hexController.text = _colorToHex(_hsv.toColor());
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // ── Value/brightness slider ──
+              Text(
+                'Brightness',
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 24,
+                child: SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 12,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 8,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 14,
+                    ),
+                    activeTrackColor: _hsv.toColor(),
+                    inactiveTrackColor: colors.border,
+                    thumbColor: Colors.white,
+                  ),
+                  child: Slider(
+                    value: _hsv.value,
+                    min: 0,
+                    max: 1,
+                    onChanged: (v) {
+                      setState(() {
+                        _hsv = _hsv.withValue(v);
+                        _hexController.text = _colorToHex(_hsv.toColor());
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // ── Preset swatches ──
+              Text(
+                'Presets',
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _presetColors.map((c) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _hsv = HSVColor.fromColor(c);
+                        _hexController.text = _colorToHex(c);
+                      });
+                    },
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: c,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: c == pickedColor
+                              ? Colors.white
+                              : colors.border,
+                          width: c == pickedColor ? 2 : 1,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+              // ── Actions ──
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(color: colors.textMuted),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(pickedColor),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.primary,
+                    ),
+                    child: const Text('Apply'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
