@@ -1331,6 +1331,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         );
         _scrollToBottom();
         break;
+
+      case ChatEventType.result:
         final usage = event.usageData;
         if (usage != null) {
           final codeChanges = usage['codeChanges'] as Map<String, dynamic>?;
