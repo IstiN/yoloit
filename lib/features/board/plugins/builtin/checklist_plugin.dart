@@ -3,6 +3,8 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
+final _checklistDefaultColors = AppColorScheme.fromAccent(Colors.orange);
+
 class ChecklistPlugin extends BoardPanelPlugin {
   const ChecklistPlugin();
 
@@ -18,7 +20,7 @@ class ChecklistPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.checklist_outlined;
 
   @override
-  Color get accentColor => const Color(0xFFF59E0B);
+  Color get accentColor => _checklistDefaultColors.accentOrange;
 
   @override
   Size get defaultSize => const Size(320, 320);
@@ -68,32 +70,29 @@ class _ChecklistContentState extends State<_ChecklistContent> {
       [];
 
   void _save(List<Map<String, dynamic>> items) {
-    widget.renderContext.onUpdateState({
-      ...widget.panel.state,
-      'items': items,
-    });
+    widget.renderContext.onUpdateState({...widget.panel.state, 'items': items});
   }
 
   void _addItem() {
     final text = _addCtrl.text.trim();
     if (text.isEmpty) return;
     _addCtrl.clear();
-    final newItems = List<Map<String, dynamic>>.from(_items)
-      ..add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'text': text,
-        'done': false,
-      });
+    final newItems = List<Map<String, dynamic>>.from(_items)..add({
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'text': text,
+      'done': false,
+    });
     _save(newItems);
   }
 
   void _toggle(String id) {
-    final items = _items.map((item) {
-      if (item['id'] == id) {
-        return {...item, 'done': !(item['done'] as bool? ?? false)};
-      }
-      return item;
-    }).toList();
+    final items =
+        _items.map((item) {
+          if (item['id'] == id) {
+            return {...item, 'done': !(item['done'] as bool? ?? false)};
+          }
+          return item;
+        }).toList();
     _save(items);
   }
 
@@ -139,7 +138,7 @@ class _ChecklistContentState extends State<_ChecklistContent> {
               const SizedBox(height: 4),
               LinearProgressIndicator(
                 value: progress,
-                backgroundColor: colors.accentOrange.withOpacity(0.15),
+                backgroundColor: colors.accentOrange.withValues(alpha: 0.15),
                 valueColor: AlwaysStoppedAnimation(colors.accentOrange),
                 minHeight: 4,
                 borderRadius: BorderRadius.circular(4),
@@ -190,7 +189,10 @@ class _ChecklistContentState extends State<_ChecklistContent> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: colors.accentOrange, width: 2),
+                      borderSide: BorderSide(
+                        color: colors.accentOrange,
+                        width: 2,
+                      ),
                     ),
                   ),
                   onSubmitted: (_) => _addItem(),
@@ -245,7 +247,10 @@ class _ChecklistItemState extends State<_ChecklistItem> {
         margin: const EdgeInsets.symmetric(vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
-          color: _hovered ? Colors.white.withOpacity(0.04) : Colors.transparent,
+          color:
+              _hovered
+                  ? colors.textPrimary.withValues(alpha: 0.04)
+                  : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(

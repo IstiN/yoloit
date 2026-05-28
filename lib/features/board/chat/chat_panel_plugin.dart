@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+
+final _chatPanelDefaultColors = AppColorScheme.fromAccent(Colors.green);
 
 /// Board panel plugin for an AI chat powered by CLI tools (Copilot, etc.).
 class ChatPanelPlugin extends BoardPanelPlugin {
@@ -20,7 +23,7 @@ class ChatPanelPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.auto_awesome;
 
   @override
-  Color get accentColor => const Color(0xFF34D399);
+  Color get accentColor => _chatPanelDefaultColors.accentGreen;
 
   @override
   Size get defaultSize => const Size(420, 500);

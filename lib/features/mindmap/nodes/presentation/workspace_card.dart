@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation workspace card — identical visuals to macOS WorkspaceNode.
@@ -17,30 +18,38 @@ class WorkspaceCard extends StatelessWidget {
   final VoidCallback? onAddFolder;
   final VoidCallback? onCreateSession;
   final VoidCallback? onColorDotTap;
+
   /// Called with the full folder path when the user removes a folder from context.
   final void Function(String path)? onRemoveFolder;
 
-  static const _borderColor = Color(0x8060A5FA);
-  static const _bgGrad = [Color(0xFF181E2E), Color(0xFF141826)];
-
   @override
   Widget build(BuildContext context) {
-    final color = props.color ?? const Color(0xFF60A5FA);
+    final colors = context.appColors;
+    final color = props.color ?? colors.accentBlue;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: _bgGrad,
+          colors: [
+            Color.lerp(colors.surfaceElevated, color, 0.08)!,
+            Color.lerp(colors.surface, color, 0.04)!,
+          ],
         ),
-        border: Border.all(color: _borderColor, width: 1.5),
+        border: Border.all(color: color.withAlpha(128), width: 1.5),
         borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x1460A5FA), blurRadius: 24, offset: Offset(0, 4)),
+            color: color.withAlpha(20),
+            blurRadius: 24,
+            offset: const Offset(0, 4),
+          ),
           BoxShadow(
-              color: Color(0x80000000), blurRadius: 16, offset: Offset(0, 4)),
+            color: colors.background.withAlpha(128),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -50,9 +59,10 @@ class WorkspaceCard extends StatelessWidget {
           Row(
             children: [
               MouseRegion(
-                cursor: onColorDotTap != null
-                    ? SystemMouseCursors.click
-                    : MouseCursor.defer,
+                cursor:
+                    onColorDotTap != null
+                        ? SystemMouseCursors.click
+                        : MouseCursor.defer,
                 child: GestureDetector(
                   onTap: onColorDotTap,
                   child: Container(
@@ -62,7 +72,7 @@ class WorkspaceCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: color,
                       boxShadow: [
-                        BoxShadow(color: color.withAlpha(160), blurRadius: 8)
+                        BoxShadow(color: color.withAlpha(160), blurRadius: 8),
                       ],
                     ),
                   ),
@@ -72,10 +82,11 @@ class WorkspaceCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   props.name,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFE8E8FF)),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -83,10 +94,13 @@ class WorkspaceCard extends StatelessWidget {
           ),
           if (props.paths.isNotEmpty) ...[
             const SizedBox(height: 6),
-            ...props.paths.map((path) => _FolderRow(
-                  path: path,
-                  onRemove: onRemoveFolder != null ? () => onRemoveFolder!(path) : null,
-                )),
+            ...props.paths.map(
+              (path) => _FolderRow(
+                path: path,
+                onRemove:
+                    onRemoveFolder != null ? () => onRemoveFolder!(path) : null,
+              ),
+            ),
           ],
           const SizedBox(height: 8),
           Row(
@@ -124,6 +138,7 @@ class _FolderRowState extends State<_FolderRow> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return MouseRegion(
       cursor: SystemMouseCursors.basic,
       onEnter: (_) => setState(() => _hovered = true),
@@ -132,21 +147,21 @@ class _FolderRowState extends State<_FolderRow> {
         padding: const EdgeInsets.only(bottom: 2),
         child: Row(
           children: [
-            const Icon(Icons.folder_outlined, size: 10, color: Color(0xFF6B7898)),
+            Icon(Icons.folder_outlined, size: 10, color: colors.textSecondary),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 p.basename(widget.path),
-                style: const TextStyle(fontSize: 10, color: Color(0xFF6B7898)),
+                style: TextStyle(fontSize: 10, color: colors.textSecondary),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             if (_hovered && widget.onRemove != null)
               GestureDetector(
                 onTap: widget.onRemove,
-                child: const Padding(
-                  padding: EdgeInsets.only(left: 4),
-                  child: Icon(Icons.close, size: 10, color: Color(0xFFEF4444)),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Icon(Icons.close, size: 10, color: colors.accentRed),
                 ),
               ),
           ],
@@ -168,8 +183,10 @@ class _WsActionBtn extends StatefulWidget {
 
 class _WsActionBtnState extends State<_WsActionBtn> {
   bool _hovered = false;
+
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -180,32 +197,27 @@ class _WsActionBtnState extends State<_WsActionBtn> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _hovered
-                ? const Color(0xFF2A3A66)
-                : const Color(0xFF1A1E2A),
+            color: _hovered ? colors.tabActiveBg : colors.surfaceHighlight,
             border: Border.all(
-                color: _hovered
-                    ? const Color(0xFF60A5FA)
-                    : const Color(0xFF2A3040)),
+              color: _hovered ? colors.accentBlue : colors.border,
+            ),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon,
-                  size: 11,
-                  color: _hovered
-                      ? const Color(0xFF60A5FA)
-                      : const Color(0xFF8A93B0)),
+              Icon(
+                widget.icon,
+                size: 11,
+                color: _hovered ? colors.accentBlue : colors.textSecondary,
+              ),
               const SizedBox(width: 4),
               Text(
                 widget.label,
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: _hovered
-                      ? const Color(0xFFE8E8FF)
-                      : const Color(0xFF9AA3BF),
+                  color: _hovered ? colors.textPrimary : colors.textSecondary,
                 ),
               ),
             ],

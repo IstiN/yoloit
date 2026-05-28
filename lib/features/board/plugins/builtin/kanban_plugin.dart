@@ -3,6 +3,8 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
+final _kanbanDefaultColors = AppColorScheme.fromAccent(Colors.indigo);
+
 class KanbanPlugin extends BoardPanelPlugin {
   const KanbanPlugin();
 
@@ -18,7 +20,7 @@ class KanbanPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.view_kanban_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF6366F1);
+  Color get accentColor => _kanbanDefaultColors.primary;
 
   @override
   Size get defaultSize => const Size(640, 420);
@@ -54,15 +56,15 @@ class _KanbanContent extends StatefulWidget {
 }
 
 class _KanbanContentState extends State<_KanbanContent> {
-  static const List<Color> _columnColorPalette = [
-    Color(0xFF6366F1), // indigo (default)
-    Color(0xFF0EA5E9), // sky
-    Color(0xFF10B981), // emerald
-    Color(0xFFF59E0B), // amber
-    Color(0xFFEF4444), // red
-    Color(0xFFEC4899), // pink
-    Color(0xFF8B5CF6), // violet
-    Color(0xFF64748B), // slate
+  List<Color> _columnColorPalette(AppColorScheme colors) => [
+    colors.primary,
+    colors.accentBlue,
+    colors.accentGreen,
+    colors.accentOrange,
+    colors.accentRed,
+    colors.primaryLight,
+    colors.primaryDark,
+    colors.textSecondary,
   ];
 
   // ── State helpers ──────────────────────────────────────────────────────────
@@ -86,13 +88,13 @@ class _KanbanContentState extends State<_KanbanContent> {
       final v = int.tryParse(hex, radix: 16);
       if (v != null) return Color(v);
     }
-    return const Color(0xFF6366F1);
+    return context.appColors.primary;
   }
 
   List<_CardData> get _cards =>
       (widget.panel.state['cards'] as List?)
-          ?.where((e) => e is Map)
-          .map((e) => Map<String, dynamic>.from(e as Map))
+          ?.whereType<Map<dynamic, dynamic>>()
+          .map((e) => Map<String, dynamic>.from(e))
           .toList() ??
       [];
 
@@ -123,10 +125,7 @@ class _KanbanContentState extends State<_KanbanContent> {
   // ── Persistence ────────────────────────────────────────────────────────────
 
   void _saveCards(List<_CardData> cards) {
-    widget.renderContext.onUpdateState({
-      ...widget.panel.state,
-      'cards': cards,
-    });
+    widget.renderContext.onUpdateState({...widget.panel.state, 'cards': cards});
   }
 
   void _saveColumns(List<String> cols) {
@@ -153,13 +152,10 @@ class _KanbanContentState extends State<_KanbanContent> {
   void _deleteColumn(int ci) {
     final cols = List<String>.from(_columns)..removeAt(ci);
     final cards =
-        _cards
-            .where((c) => (c['columnIndex'] as int? ?? 0) != ci)
-            .map((c) {
-              final old = c['columnIndex'] as int? ?? 0;
-              return {...c, 'columnIndex': old > ci ? old - 1 : old};
-            })
-            .toList();
+        _cards.where((c) => (c['columnIndex'] as int? ?? 0) != ci).map((c) {
+          final old = c['columnIndex'] as int? ?? 0;
+          return {...c, 'columnIndex': old > ci ? old - 1 : old};
+        }).toList();
     widget.renderContext.onUpdateState({
       ...widget.panel.state,
       'columns': cols,
@@ -173,17 +169,18 @@ class _KanbanContentState extends State<_KanbanContent> {
     final col = cols.removeAt(from);
     cols.insert(to, col);
     // Remap card columnIndex values to follow the move.
-    final cards = _cards.map((c) {
-      var ci = c['columnIndex'] as int? ?? 0;
-      if (ci == from) {
-        ci = to;
-      } else if (from < to && ci > from && ci <= to) {
-        ci -= 1;
-      } else if (from > to && ci >= to && ci < from) {
-        ci += 1;
-      }
-      return {...c, 'columnIndex': ci};
-    }).toList();
+    final cards =
+        _cards.map((c) {
+          var ci = c['columnIndex'] as int? ?? 0;
+          if (ci == from) {
+            ci = to;
+          } else if (from < to && ci > from && ci <= to) {
+            ci -= 1;
+          } else if (from > to && ci >= to && ci < from) {
+            ci += 1;
+          }
+          return {...c, 'columnIndex': ci};
+        }).toList();
     // Remap column colors.
     final oldColors = _columnColors;
     final newColors = <String, String>{};
@@ -235,13 +232,12 @@ class _KanbanContentState extends State<_KanbanContent> {
       setState(() => _adding[ci] = false);
       return;
     }
-    final cards = List<_CardData>.from(_cards)
-      ..add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'title': title,
-        'description': '',
-        'columnIndex': ci,
-      });
+    final cards = List<_CardData>.from(_cards)..add({
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'title': title,
+      'description': '',
+      'columnIndex': ci,
+    });
     ctrl.clear();
     setState(() => _adding[ci] = false);
     _saveCards(cards);
@@ -286,14 +282,22 @@ class _KanbanContentState extends State<_KanbanContent> {
                   const SizedBox(width: 4),
                   Text(
                     'Edit columns',
-                    style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const Spacer(),
                   GestureDetector(
                     onTap: () => setState(() => _editMode = false),
                     child: Text(
                       'Done',
-                      style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -350,11 +354,7 @@ class _KanbanContentState extends State<_KanbanContent> {
     );
   }
 
-  Widget _buildColumn(
-    int ci,
-    List<String> columns,
-    List<_CardData> allCards,
-  ) {
+  Widget _buildColumn(int ci, List<String> columns, List<_CardData> allCards) {
     final colCards =
         allCards.where((c) => (c['columnIndex'] as int?) == ci).toList();
     final isDragOver = _dragOverCol == ci;
@@ -396,17 +396,18 @@ class _KanbanContentState extends State<_KanbanContent> {
                 padding: const EdgeInsets.all(6),
                 child: Column(
                   children: [
-                    ...colCards.map((card) => _buildCard(card, ci, columns.length)),
+                    ...colCards.map(
+                      (card) => _buildCard(card, ci, columns.length),
+                    ),
                     // Inline add field
                     if (_adding[ci] == true)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: TextField(
-                          controller:
-                              _addCtrl.putIfAbsent(
-                                ci,
-                                () => TextEditingController(),
-                              ),
+                          controller: _addCtrl.putIfAbsent(
+                            ci,
+                            () => TextEditingController(),
+                          ),
                           autofocus: true,
                           style: const TextStyle(fontSize: 12),
                           decoration: InputDecoration(
@@ -479,9 +480,9 @@ class _KanbanContentState extends State<_KanbanContent> {
     final isLight = Theme.of(context).brightness == Brightness.light;
     final color =
         isLight && baseColor.computeLuminance() > 0.50
-            ? Color.lerp(baseColor, Colors.black, 0.45)!
+            ? Color.lerp(baseColor, colors.textPrimary, 0.45)!
             : (isLight && baseColor.computeLuminance() > 0.40)
-            ? Color.lerp(baseColor, Colors.black, 0.25)!
+            ? Color.lerp(baseColor, colors.textPrimary, 0.25)!
             : baseColor;
     final muted =
         Theme.of(context).textTheme.bodySmall?.color ?? colors.textSecondary;
@@ -618,28 +619,29 @@ class _KanbanContentState extends State<_KanbanContent> {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Row(
-                children: _columnColorPalette.map((c) {
-                  final isSelected = c.toARGB32() == color.toARGB32();
-                  return GestureDetector(
-                    onTap: () => _setColumnColor(ci, c),
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      margin: const EdgeInsets.only(right: 3),
-                      decoration: BoxDecoration(
-                        color: c,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color:
-                              isSelected
-                                  ? (isLight ? Colors.black : Colors.white)
-                                  : Colors.transparent,
-                          width: isSelected ? 1.5 : 0,
+                children:
+                    _columnColorPalette(colors).map((c) {
+                      final isSelected = c.toARGB32() == color.toARGB32();
+                      return GestureDetector(
+                        onTap: () => _setColumnColor(ci, c),
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          margin: const EdgeInsets.only(right: 3),
+                          decoration: BoxDecoration(
+                            color: c,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? colors.textPrimary
+                                      : Colors.transparent,
+                              width: isSelected ? 1.5 : 0,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
             ),
         ],
@@ -660,24 +662,24 @@ class _KanbanContentState extends State<_KanbanContent> {
           width: 168,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-           color: colors.primary.withAlpha(40),
-           borderRadius: BorderRadius.circular(6),
-           border: Border.all(color: colors.primary.withAlpha(150)),
-           boxShadow: [
-             BoxShadow(
-               color: colors.primary.withAlpha(60),
-               blurRadius: 12,
-               offset: const Offset(0, 4),
-             ),
-           ],
+            color: colors.primary.withAlpha(40),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: colors.primary.withAlpha(150)),
+            boxShadow: [
+              BoxShadow(
+                color: colors.primary.withAlpha(60),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Text(
-           title,
-           style: TextStyle(
-             fontSize: 12,
-             color: colors.textPrimary,
-             fontWeight: FontWeight.w500,
-           ),
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: colors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -685,15 +687,9 @@ class _KanbanContentState extends State<_KanbanContent> {
       ),
       childWhenDragging: Opacity(
         opacity: 0.3,
-        child: _CardTile(
-          title: title,
-          onDelete: () {},
-        ),
+        child: _CardTile(title: title, onDelete: () {}),
       ),
-      child: _CardTile(
-        title: title,
-        onDelete: () => _deleteCard(id),
-      ),
+      child: _CardTile(title: title, onDelete: () => _deleteCard(id)),
     );
   }
 }
@@ -715,8 +711,7 @@ class _CardTile extends StatelessWidget {
     final cardBg = isLight ? colors.surfaceHighlight : colors.surfaceElevated;
     final border = colors.border;
     final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        colors.textSecondary;
+        Theme.of(context).textTheme.bodyMedium?.color ?? colors.textSecondary;
     final muted =
         Theme.of(context).textTheme.bodySmall?.color ?? colors.textSecondary;
     return Container(
@@ -729,10 +724,7 @@ class _CardTile extends StatelessWidget {
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color:
-                isLight
-                    ? Colors.black.withAlpha(15)
-                    : Colors.black.withOpacity(0.15),
+            color: colors.textPrimary.withValues(alpha: isLight ? 0.06 : 0.15),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -743,12 +735,8 @@ class _CardTile extends StatelessWidget {
         children: [
           // Drag handle
           Padding(
-            padding: EdgeInsets.only(right: 6, top: 1),
-            child: Icon(
-              Icons.drag_indicator,
-              size: 12,
-              color: muted,
-            ),
+            padding: const EdgeInsets.only(right: 6, top: 1),
+            child: Icon(Icons.drag_indicator, size: 12, color: muted),
           ),
           // Title
           Expanded(
@@ -769,7 +757,7 @@ class _CardTile extends StatelessWidget {
             height: 18,
             child: IconButton(
               padding: EdgeInsets.zero,
-                icon: Icon(Icons.close, size: 11, color: muted),
+              icon: Icon(Icons.close, size: 11, color: muted),
               onPressed: onDelete,
             ),
           ),

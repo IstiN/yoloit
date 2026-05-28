@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation session card — identical visuals to macOS SessionNode.
@@ -9,17 +10,22 @@ class SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final isLive = props.isLive;
-    final dotColor =
-        isLive ? const Color(0xFF34D399) : const Color(0xFF6B7898);
-
+    final dotColor = isLive ? colors.accentGreen : colors.textSecondary;
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0x66C084FC), width: 1.5),
+        border: Border.all(
+          color: colors.primaryLight.withAlpha(102),
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x70000000), blurRadius: 16, offset: Offset(0, 4))
+            color: colors.background.withAlpha(112),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: ClipRRect(
@@ -28,16 +34,25 @@ class SessionCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(width: 3, color: const Color(0xFFC084FC)),
+              Container(width: 3, color: colors.primaryLight),
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 10),
-                  decoration: const BoxDecoration(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF1A1827), Color(0xFF161322)],
+                      colors: [
+                        Color.lerp(
+                          colors.surfaceElevated,
+                          colors.primary,
+                          0.08,
+                        )!,
+                        Color.lerp(colors.surface, colors.primaryDark, 0.06)!,
+                      ],
                     ),
                   ),
                   child: Column(
@@ -52,44 +67,55 @@ class SessionCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: dotColor,
-                              boxShadow: isLive
-                                  ? [
-                                      BoxShadow(
+                              boxShadow:
+                                  isLive
+                                      ? [
+                                        BoxShadow(
                                           color: dotColor.withAlpha(160),
-                                          blurRadius: 6)
-                                    ]
-                                  : [],
+                                          blurRadius: 6,
+                                        ),
+                                      ]
+                                      : [],
                             ),
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               props.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFFE8E8FF),
+                                color: colors.textPrimary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isLive)
-                            const Text('▶',
-                                style: TextStyle(
-                                    fontSize: 9,
-                                    color: Color(0xFF34D399))),
+                            Text(
+                              '▶',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: colors.accentGreen,
+                              ),
+                            ),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(props.typeName,
-                          style: const TextStyle(
-                              fontSize: 10, color: Color(0xFF6B7898))),
+                      Text(
+                        props.typeName,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: colors.textSecondary,
+                        ),
+                      ),
                       if (props.repoCount > 0) ...[
                         const SizedBox(height: 3),
                         Text(
-                          '${props.repoCount} ${props.repoCount == 1 ? "repo" : "repos"}',
-                          style: const TextStyle(
-                              fontSize: 10, color: Color(0xFF44446A)),
+                          '${props.repoCount} ${props.repoCount == 1 ? 'repo' : 'repos'}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: colors.textMuted,
+                          ),
                         ),
                       ],
                     ],

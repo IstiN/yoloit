@@ -5,6 +5,8 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
+final _filesDefaultColors = AppColorScheme.fromAccent(Colors.pink);
+
 class FilesPlugin extends BoardPanelPlugin {
   const FilesPlugin();
 
@@ -20,7 +22,7 @@ class FilesPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.attach_file_outlined;
 
   @override
-  Color get accentColor => const Color(0xFFEC4899);
+  Color get accentColor => _filesDefaultColors.primary;
 
   @override
   Size get defaultSize => const Size(360, 320);
@@ -41,13 +43,35 @@ class FilesPlugin extends BoardPanelPlugin {
 // ─────────────────────────────────────────────────────────────────────────────
 
 IconData _iconForExtension(String ext) => switch (ext.toLowerCase()) {
-  'png' || 'jpg' || 'jpeg' || 'gif' || 'bmp' || 'svg' || 'webp' => Icons.image_outlined,
+  'png' ||
+  'jpg' ||
+  'jpeg' ||
+  'gif' ||
+  'bmp' ||
+  'svg' ||
+  'webp' => Icons.image_outlined,
   'mp4' || 'mov' || 'avi' || 'mkv' => Icons.videocam_outlined,
   'mp3' || 'wav' || 'flac' || 'aac' => Icons.audiotrack_outlined,
   'pdf' => Icons.picture_as_pdf_outlined,
-  'dart' || 'py' || 'js' || 'ts' || 'java' || 'kt' || 'swift' ||
-  'go' || 'rs' || 'c' || 'cpp' || 'h' || 'cs' => Icons.code_outlined,
-  'json' || 'yaml' || 'yml' || 'xml' || 'toml' || 'ini' => Icons.data_object_outlined,
+  'dart' ||
+  'py' ||
+  'js' ||
+  'ts' ||
+  'java' ||
+  'kt' ||
+  'swift' ||
+  'go' ||
+  'rs' ||
+  'c' ||
+  'cpp' ||
+  'h' ||
+  'cs' => Icons.code_outlined,
+  'json' ||
+  'yaml' ||
+  'yml' ||
+  'xml' ||
+  'toml' ||
+  'ini' => Icons.data_object_outlined,
   'md' || 'txt' || 'rtf' => Icons.article_outlined,
   'zip' || 'tar' || 'gz' || 'rar' || '7z' => Icons.folder_zip_outlined,
   '' => Icons.folder_outlined,
@@ -55,9 +79,25 @@ IconData _iconForExtension(String ext) => switch (ext.toLowerCase()) {
 };
 
 bool _isPreviewable(String ext) => const {
-  'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',
-  'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v',
-  'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'bmp',
+  'webp',
+  'svg',
+  'mp4',
+  'mov',
+  'avi',
+  'mkv',
+  'webm',
+  'm4v',
+  'mp3',
+  'wav',
+  'flac',
+  'aac',
+  'm4a',
+  'ogg',
 }.contains(ext.toLowerCase());
 
 class _FilesContent extends StatefulWidget {
@@ -73,16 +113,13 @@ class _FilesContent extends StatefulWidget {
 class _FilesContentState extends State<_FilesContent> {
   List<Map<String, dynamic>> get _files =>
       (widget.panel.state['files'] as List?)
-          ?.where((e) => e is Map)
-          .map((e) => Map<String, dynamic>.from(e as Map))
+          ?.whereType<Map<dynamic, dynamic>>()
+          .map((e) => Map<String, dynamic>.from(e))
           .toList() ??
       [];
 
   void _save(List<Map<String, dynamic>> files) {
-    widget.renderContext.onUpdateState({
-      ...widget.panel.state,
-      'files': files,
-    });
+    widget.renderContext.onUpdateState({...widget.panel.state, 'files': files});
   }
 
   Future<void> _addFiles() async {
@@ -92,16 +129,18 @@ class _FilesContentState extends State<_FilesContent> {
     final current = _files;
     final existingPaths = current.map((f) => f['path'] as String?).toSet();
 
-    final newEntries = result.files
-        .where((f) => f.path != null && !existingPaths.contains(f.path))
-        .map((f) => {
-              'id': DateTime.now().millisecondsSinceEpoch.toString() +
-                  f.name,
-              'path': f.path!,
-              'name': f.name,
-              'addedAt': DateTime.now().toIso8601String(),
-            })
-        .toList();
+    final newEntries =
+        result.files
+            .where((f) => f.path != null && !existingPaths.contains(f.path))
+            .map(
+              (f) => {
+                'id': DateTime.now().millisecondsSinceEpoch.toString() + f.name,
+                'path': f.path!,
+                'name': f.name,
+                'addedAt': DateTime.now().toIso8601String(),
+              },
+            )
+            .toList();
 
     if (newEntries.isEmpty) return;
     _save([...current, ...newEntries]);
@@ -139,7 +178,10 @@ class _FilesContentState extends State<_FilesContent> {
                 label: const Text('Add Files', style: TextStyle(fontSize: 12)),
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   minimumSize: const Size(0, 30),
                 ),
               ),
@@ -149,64 +191,66 @@ class _FilesContentState extends State<_FilesContent> {
         const Divider(height: 1, thickness: 0.5),
         // Files list
         Expanded(
-          child: files.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.attach_file,
-                        size: 40,
-                        color: colors.primary.withOpacity(0.35),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No files added yet',
-                        style: TextStyle(
-                          color: colors.textSecondary,
-                          fontSize: 13,
+          child:
+              files.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.attach_file,
+                          size: 40,
+                          color: colors.primary.withValues(alpha: 0.35),
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: files.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1, thickness: 0.5, indent: 52),
-                  itemBuilder: (context, index) {
-                    final file = files[index];
-                    final id = file['id'] as String;
-                    final name = file['name'] as String? ?? '';
-                    final path = file['path'] as String? ?? '';
-                    final ext = name.contains('.')
-                        ? name.split('.').last
-                        : '';
+                        const SizedBox(height: 8),
+                        Text(
+                          'No files added yet',
+                          style: TextStyle(
+                            color: colors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: files.length,
+                    separatorBuilder:
+                        (context, index) => const Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          indent: 52,
+                        ),
+                    itemBuilder: (context, index) {
+                      final file = files[index];
+                      final id = file['id'] as String;
+                      final name = file['name'] as String? ?? '';
+                      final path = file['path'] as String? ?? '';
+                      final ext =
+                          name.contains('.') ? name.split('.').last : '';
 
-                    return _FileTile(
-                      name: name,
-                      path: path,
-                      icon: _iconForExtension(ext),
-                      onReveal: () =>
-                          PlatformLauncher.instance.revealInFinder(path),
-                      onDelete: () => _removeFile(id),
-                      onOpenAsPanel: _isPreviewable(ext)
-                          ? () async {
-                              await widget.renderContext.onCreateLinkedPanel
-                                  ?.call(
-                                'board.file.preview',
-                                {
-                                  'path': file['path'] as String,
-                                  'title': file['name'] as String,
-                                },
-                                file['name'] as String,
-                              );
-                            }
-                          : null,
-                    );
-                  },
-                ),
+                      return _FileTile(
+                        name: name,
+                        path: path,
+                        icon: _iconForExtension(ext),
+                        onReveal:
+                            () =>
+                                PlatformLauncher.instance.revealInFinder(path),
+                        onDelete: () => _removeFile(id),
+                        onOpenAsPanel:
+                            _isPreviewable(ext)
+                                ? () async {
+                                  await widget.renderContext.onCreateLinkedPanel
+                                      ?.call('board.file.preview', {
+                                        'path': file['path'] as String,
+                                        'title': file['name'] as String,
+                                      }, file['name'] as String);
+                                }
+                                : null,
+                      );
+                    },
+                  ),
         ),
       ],
     );
@@ -245,14 +289,17 @@ class _FileTileState extends State<_FileTile> {
       onExit: (_) => setState(() => _hovered = false),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        color: _hovered ? Colors.white.withOpacity(0.03) : Colors.transparent,
+        color:
+            _hovered
+                ? colors.textPrimary.withValues(alpha: 0.03)
+                : Colors.transparent,
         child: Row(
           children: [
             Container(
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: colors.primary.withOpacity(0.12),
+                color: colors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Icon(widget.icon, size: 18, color: colors.primary),
@@ -264,7 +311,10 @@ class _FileTileState extends State<_FileTile> {
                 children: [
                   Text(
                     widget.name,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
@@ -283,7 +333,10 @@ class _FileTileState extends State<_FileTile> {
                   tooltip: 'Open as preview panel',
                   onPressed: widget.onOpenAsPanel,
                   padding: const EdgeInsets.all(4),
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
                   color: colors.primaryLight,
                 ),
               IconButton(

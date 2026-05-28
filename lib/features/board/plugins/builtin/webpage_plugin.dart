@@ -4,11 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/services/webview_zoom_service.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webview_manager.dart';
+
+final _webpageDefaultColors = AppColorScheme.fromAccent(Colors.lightBlue);
 
 class WebpagePlugin extends BoardPanelPlugin {
   const WebpagePlugin();
@@ -46,7 +48,7 @@ class WebpagePlugin extends BoardPanelPlugin {
   IconData get icon => Icons.language_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF0EA5E9);
+  Color get accentColor => _webpageDefaultColors.accentBlue;
 
   @override
   Size get defaultSize => const Size(700, 500);

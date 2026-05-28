@@ -40,9 +40,10 @@ class RunConfigsPlugin extends BoardPanelPlugin {
     BoardPanelRenderContext renderContext,
   ) {
     final stateGroup = panel.state['group'];
-    final groupId = stateGroup is String && stateGroup.trim().isNotEmpty
-        ? stateGroup.trim()
-        : panel.id;
+    final groupId =
+        stateGroup is String && stateGroup.trim().isNotEmpty
+            ? stateGroup.trim()
+            : panel.id;
     final activeSessionId = panel.state['activeSessionId'] as String?;
     final hiddenSessionIds = _readHiddenSessionIds(panel);
     return RunPanel(
@@ -50,10 +51,7 @@ class RunConfigsPlugin extends BoardPanelPlugin {
       initialAttachedSessionId: activeSessionId,
       hiddenSessionIds: hiddenSessionIds,
       onGroupChanged: (next) {
-        renderContext.onUpdateState({
-          ...panel.state,
-          'group': next.trim(),
-        });
+        renderContext.onUpdateState({...panel.state, 'group': next.trim()});
       },
       onAttachedSessionChanged: (sessionId) {
         renderContext.onUpdateState({
@@ -76,14 +74,10 @@ class RunConfigsPlugin extends BoardPanelPlugin {
       onDetachToPanel: (session) async {
         final createLinked = renderContext.onCreateLinkedPanel;
         if (createLinked == null) return;
-        await createLinked(
-          RunPlugin.kTypeId,
-          {
-            'group': session.config.group,
-            'activeSessionId': session.id,
-          },
-          'Run: ${session.config.name}',
-        );
+        await createLinked(RunPlugin.kTypeId, {
+          'group': session.config.group,
+          'activeSessionId': session.id,
+        }, 'Run: ${session.config.name}');
       },
     );
   }
@@ -126,9 +120,10 @@ class RunPlugin extends BoardPanelPlugin {
     BoardPanelRenderContext renderContext,
   ) {
     final stateGroup = panel.state['group'];
-    final groupId = stateGroup is String && stateGroup.trim().isNotEmpty
-        ? stateGroup.trim()
-        : 'default';
+    final groupId =
+        stateGroup is String && stateGroup.trim().isNotEmpty
+            ? stateGroup.trim()
+            : 'default';
     final activeSessionId = panel.state['activeSessionId'] as String?;
     final hiddenSessionIds = _readHiddenSessionIds(panel);
     return RunPanel(
@@ -139,10 +134,7 @@ class RunPlugin extends BoardPanelPlugin {
       initialAttachedSessionId: activeSessionId,
       hiddenSessionIds: hiddenSessionIds,
       onGroupChanged: (next) {
-        renderContext.onUpdateState({
-          ...panel.state,
-          'group': next.trim(),
-        });
+        renderContext.onUpdateState({...panel.state, 'group': next.trim()});
       },
       onAttachedSessionChanged: (sessionId) {
         renderContext.onUpdateState({
@@ -184,14 +176,10 @@ class RunPlugin extends BoardPanelPlugin {
         }
 
         if (createLinked == null) return;
-        await createLinked(
-          RunConfigsPlugin.kTypeId,
-          {
-            'group': group,
-            'activeSessionId': session.id,
-          },
-          'Run Configs: $group',
-        );
+        await createLinked(RunConfigsPlugin.kTypeId, {
+          'group': group,
+          'activeSessionId': session.id,
+        }, 'Run Configs: $group');
       },
     );
   }

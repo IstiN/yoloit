@@ -70,13 +70,15 @@ class _FileTreeNodeState extends State<FileTreeNode> {
       // Determine expanded state: explicit toggle overrides, root defaults to true.
       final isExpanded = isDir && (_localExpanded[path] ?? (rawDepth == 0));
 
-      result.add(TreeEntry(
-        name: e['name'] as String? ?? '',
-        path: path,
-        isDir: isDir,
-        depth: entryDepth,
-        isExpanded: isExpanded,
-      ));
+      result.add(
+        TreeEntry(
+          name: e['name'] as String? ?? '',
+          path: path,
+          isDir: isDir,
+          depth: entryDepth,
+          isExpanded: isExpanded,
+        ),
+      );
 
       // Recursively expand directories that are open (only their direct
       // children — listRepoDir gives us depth 0 + depth 1, so one level
@@ -90,51 +92,62 @@ class _FileTreeNodeState extends State<FileTreeNode> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ReviewCubit, ReviewState>(
-      builder: (context, state) {
-        final useReview = _reviewCubitOwnsPath(state);
+    final colors = context.appColors;
+    return ColoredBox(
+      color: colors.background.withValues(alpha: 0),
+      child: BlocBuilder<ReviewCubit, ReviewState>(
+        builder: (context, state) {
+          final useReview = _reviewCubitOwnsPath(state);
 
-        if (useReview) {
-          // ── ReviewCubit owns this path — delegate everything to it ─────
+          if (useReview) {
+            // ── ReviewCubit owns this path — delegate everything to it ─────
+            return FileTreeCard(
+              props: buildFileTreeCardProps(
+                repoPath: _repoPath,
+                repoName: widget.data.repoName,
+                reviewState: state,
+              ),
+              onToggle: (path) => context.read<ReviewCubit>().toggleNode(path),
+              onSelect: (path) => _openInPanel(context, path),
+              onNewFolder:
+                  (parentPath) => _createNewFolder(context, parentPath),
+              onShowInFinder:
+                  (path) => PlatformLauncher.instance.revealInFinder(path),
+              onOpenInPanel: (path) => _openInPanel(context, path),
+              onRename:
+                  (path, currentName) =>
+                      _renameEntry(context, path, currentName),
+              onCreateFile: (dirPath) => _createFile(context, dirPath),
+              onDelete: (path) => _deleteEntry(context, path),
+            );
+          }
+
+          // ── Local tree mode — manage expansion state in this widget ───────
+          final localEntries = _buildLocalTree(_repoPath, 0);
           return FileTreeCard(
-            props: buildFileTreeCardProps(
-              repoPath: _repoPath,
+            props: FileTreeCardProps(
               repoName: widget.data.repoName,
-              reviewState: state,
+              repoPath: _repoPath,
+              entries: localEntries,
             ),
-            onToggle: (path) => context.read<ReviewCubit>().toggleNode(path),
+            onToggle: (path) => _toggleLocal(path),
             onSelect: (path) => _openInPanel(context, path),
             onNewFolder: (parentPath) => _createNewFolder(context, parentPath),
-            onShowInFinder: (path) => PlatformLauncher.instance.revealInFinder(path),
+            onShowInFinder:
+                (path) => PlatformLauncher.instance.revealInFinder(path),
             onOpenInPanel: (path) => _openInPanel(context, path),
-            onRename: (path, currentName) => _renameEntry(context, path, currentName),
+            onRename:
+                (path, currentName) => _renameEntry(context, path, currentName),
             onCreateFile: (dirPath) => _createFile(context, dirPath),
             onDelete: (path) => _deleteEntry(context, path),
           );
-        }
-
-        // ── Local tree mode — manage expansion state in this widget ───────
-        final localEntries = _buildLocalTree(_repoPath, 0);
-        return FileTreeCard(
-          props: FileTreeCardProps(
-            repoName: widget.data.repoName,
-            repoPath: _repoPath,
-            entries: localEntries,
-          ),
-          onToggle: (path) => _toggleLocal(path),
-          onSelect: (path) => _openInPanel(context, path),
-          onNewFolder: (parentPath) => _createNewFolder(context, parentPath),
-          onShowInFinder: (path) => PlatformLauncher.instance.revealInFinder(path),
-          onOpenInPanel: (path) => _openInPanel(context, path),
-          onRename: (path, currentName) => _renameEntry(context, path, currentName),
-          onCreateFile: (dirPath) => _createFile(context, dirPath),
-          onDelete: (path) => _deleteEntry(context, path),
-        );
-      },
+        },
+      ),
     );
   }
 
   Future<void> _createNewFolder(BuildContext context, String parentPath) async {
+    final colors = context.appColors;
     // Ask user for the new folder name.
     final navigator = Navigator.of(context, rootNavigator: true);
     final reviewCubit = context.read<ReviewCubit>();
@@ -142,46 +155,55 @@ class _FileTreeNodeState extends State<FileTreeNode> {
 
     final name = await showDialog<String>(
       context: navigator.context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1E2A),
-        title: const Text('New Folder',
-            style: TextStyle(color: Color(0xFFCECEEE), fontSize: 14)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: Color(0xFFCECEEE), fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'Folder name',
-            hintStyle: const TextStyle(color: Color(0xFF6B7898), fontSize: 13),
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            filled: true,
-            fillColor: const Color(0xFF0F1117),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF2A3040)),
+      builder:
+          (dialogCtx) => AlertDialog(
+            backgroundColor: colors.surfaceElevated,
+            title: Text(
+              'New Folder',
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF7C3AED)),
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: TextStyle(color: colors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Folder name',
+                hintStyle: TextStyle(color: colors.textSecondary, fontSize: 13),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                filled: true,
+                fillColor: colors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: colors.primary),
+                ),
+              ),
+              onSubmitted: (v) => Navigator.of(dialogCtx).pop(v.trim()),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(ctrl.text.trim()),
+                child: Text(
+                  'Create',
+                  style: TextStyle(color: colors.primary, fontSize: 12),
+                ),
+              ),
+            ],
           ),
-          onSubmitted: (v) => Navigator.of(dialogCtx).pop(v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF6B7898), fontSize: 12)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(ctrl.text.trim()),
-            child: const Text('Create',
-                style: TextStyle(color: Color(0xFF7C3AED), fontSize: 12)),
-          ),
-        ],
-      ),
     );
 
     ctrl.dispose();
@@ -193,7 +215,12 @@ class _FileTreeNodeState extends State<FileTreeNode> {
     }
   }
 
-  Future<void> _renameEntry(BuildContext context, String path, String currentName) async {
+  Future<void> _renameEntry(
+    BuildContext context,
+    String path,
+    String currentName,
+  ) async {
+    final colors = context.appColors;
     final navigator = Navigator.of(context, rootNavigator: true);
     final reviewCubit = context.read<ReviewCubit>();
     final ctrl = TextEditingController(text: currentName);
@@ -203,47 +230,61 @@ class _FileTreeNodeState extends State<FileTreeNode> {
 
     final newName = await showDialog<String>(
       context: navigator.context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1E2A),
-        title: const Text('Rename',
-            style: TextStyle(color: Color(0xFFCECEEE), fontSize: 14)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: Color(0xFFCECEEE), fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'New name',
-            hintStyle: const TextStyle(color: Color(0xFF6B7898), fontSize: 13),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            filled: true,
-            fillColor: const Color(0xFF0F1117),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF2A3040)),
+      builder:
+          (dialogCtx) => AlertDialog(
+            backgroundColor: colors.surfaceElevated,
+            title: Text(
+              'Rename',
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF7C3AED)),
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: TextStyle(color: colors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'New name',
+                hintStyle: TextStyle(color: colors.textSecondary, fontSize: 13),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                filled: true,
+                fillColor: colors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: colors.primary),
+                ),
+              ),
+              onTap:
+                  () =>
+                      ctrl.selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: selectEnd,
+                      ),
+              onSubmitted: (v) => Navigator.of(dialogCtx).pop(v.trim()),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(ctrl.text.trim()),
+                child: Text(
+                  'Rename',
+                  style: TextStyle(color: colors.primary, fontSize: 12),
+                ),
+              ),
+            ],
           ),
-          onTap: () => ctrl.selection = TextSelection(
-            baseOffset: 0, extentOffset: selectEnd),
-          onSubmitted: (v) => Navigator.of(dialogCtx).pop(v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF6B7898), fontSize: 12)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(ctrl.text.trim()),
-            child: const Text('Rename',
-                style: TextStyle(color: Color(0xFF7C3AED), fontSize: 12)),
-          ),
-        ],
-      ),
     );
 
     ctrl.dispose();
@@ -254,51 +295,62 @@ class _FileTreeNodeState extends State<FileTreeNode> {
   }
 
   Future<void> _createFile(BuildContext context, String dirPath) async {
+    final colors = context.appColors;
     final navigator = Navigator.of(context, rootNavigator: true);
     final reviewCubit = context.read<ReviewCubit>();
     final ctrl = TextEditingController();
 
     final fileName = await showDialog<String>(
       context: navigator.context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1E2A),
-        title: const Text('New File',
-            style: TextStyle(color: Color(0xFFCECEEE), fontSize: 14)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: Color(0xFFCECEEE), fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'filename.dart',
-            hintStyle: const TextStyle(color: Color(0xFF6B7898), fontSize: 13),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            filled: true,
-            fillColor: const Color(0xFF0F1117),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF2A3040)),
+      builder:
+          (dialogCtx) => AlertDialog(
+            backgroundColor: colors.surfaceElevated,
+            title: Text(
+              'New File',
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF7C3AED)),
+            content: TextField(
+              controller: ctrl,
+              autofocus: true,
+              style: TextStyle(color: colors.textPrimary, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'filename.dart',
+                hintStyle: TextStyle(color: colors.textSecondary, fontSize: 13),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                filled: true,
+                fillColor: colors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: colors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: colors.primary),
+                ),
+              ),
+              onSubmitted: (v) => Navigator.of(dialogCtx).pop(v.trim()),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(ctrl.text.trim()),
+                child: Text(
+                  'Create',
+                  style: TextStyle(color: colors.primary, fontSize: 12),
+                ),
+              ),
+            ],
           ),
-          onSubmitted: (v) => Navigator.of(dialogCtx).pop(v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF6B7898), fontSize: 12)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(ctrl.text.trim()),
-            child: const Text('Create',
-                style: TextStyle(color: Color(0xFF7C3AED), fontSize: 12)),
-          ),
-        ],
-      ),
     );
 
     ctrl.dispose();
@@ -312,34 +364,37 @@ class _FileTreeNodeState extends State<FileTreeNode> {
   }
 
   Future<void> _deleteEntry(BuildContext context, String path) async {
+    final colors = context.appColors;
     final name = p.basename(path);
     final navigator = Navigator.of(context, rootNavigator: true);
     final confirmed = await showDialog<bool>(
       context: navigator.context,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1E2A),
-        title: const Text('Delete',
-            style: TextStyle(color: Color(0xFFCECEEE), fontSize: 14)),
-        content: Text(
-          'Delete "$name"? This cannot be undone.',
-          style: const TextStyle(color: Color(0xFFCECEEE), fontSize: 12),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF6B7898), fontSize: 12)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFEF4444),
+      builder:
+          (dialogCtx) => AlertDialog(
+            backgroundColor: colors.surfaceElevated,
+            title: Text(
+              'Delete',
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
             ),
-            child: const Text('Delete',
-                style: TextStyle(fontSize: 12)),
+            content: Text(
+              'Delete "$name"? This cannot be undone.',
+              style: TextStyle(color: colors.textPrimary, fontSize: 12),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(true),
+                style: TextButton.styleFrom(foregroundColor: colors.accentRed),
+                child: const Text('Delete', style: TextStyle(fontSize: 12)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
     if (confirmed != true) return;
     try {
@@ -365,7 +420,9 @@ class _FileTreeNodeState extends State<FileTreeNode> {
       context.read<MindMapCubit>().openFileAsPanel(
         id: nodeId,
         filePath: path,
-        connectorColor: context.appColors.accentBlue.withValues(alpha: 112 / 255),
+        connectorColor: context.appColors.accentBlue.withValues(
+          alpha: 112 / 255,
+        ),
       );
       debugPrint('[FileTreeNode] openFileAsPanel completed');
     } catch (e, st) {

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
@@ -52,9 +53,11 @@ buildMindMapGraph({
   required ReviewState reviewState,
   required FileEditorState editorState,
   required RunState runState,
+  AppColorScheme? colors,
 }) {
   final nodes = <MindMapNodeData>[];
   final conns = <MindMapConnection>[];
+  final palette = colors ?? AppColorScheme.fromAccent(Colors.deepPurpleAccent);
 
   if (wsState is! WorkspaceLoaded) return (nodes: nodes, conns: conns);
 
@@ -62,12 +65,13 @@ buildMindMapGraph({
     final wsNodeId = 'ws:${ws.id}';
     nodes.add(WorkspaceNodeData(id: wsNodeId, workspace: ws));
 
-    final sessions = termState is TerminalLoaded
-        ? termState.allSessions.where((s) {
-            if (s.workspaceId != null) return s.workspaceId == ws.id;
-            return ws.paths.any((p2) => s.workspacePath.startsWith(p2));
-          }).toList()
-        : <AgentSession>[];
+    final sessions =
+        termState is TerminalLoaded
+            ? termState.allSessions.where((s) {
+              if (s.workspaceId != null) return s.workspaceId == ws.id;
+              return ws.paths.any((p2) => s.workspacePath.startsWith(p2));
+            }).toList()
+            : <AgentSession>[];
 
     for (final session in sessions) {
       final agentNodeId = 'agent:${session.id}';
@@ -75,9 +79,10 @@ buildMindMapGraph({
       // Determine the branch this session is actually on.
       // For worktree sessions read from the worktree path's HEAD file.
       final sessionWtFirst = session.worktreeContexts?.values.firstOrNull;
-      final sessionBranch = sessionWtFirst != null
-          ? _branchFromDir(sessionWtFirst)
-          : _branchFromDir(ws.paths.isNotEmpty ? ws.paths.first : '');
+      final sessionBranch =
+          sessionWtFirst != null
+              ? _branchFromDir(sessionWtFirst)
+              : _branchFromDir(ws.paths.isNotEmpty ? ws.paths.first : '');
 
       nodes.add(
         AgentNodeData(
@@ -90,12 +95,9 @@ buildMindMapGraph({
       );
 
       final isLive = session.status == AgentStatus.live;
-      final agentConnStyle = isLive
-          ? ConnectorStyle.animated
-          : ConnectorStyle.solid;
-      final agentColor = isLive
-          ? const Color(0xFF34D399)
-          : const Color(0xFF60A5FA);
+      final agentConnStyle =
+          isLive ? ConnectorStyle.animated : ConnectorStyle.solid;
+      final agentColor = isLive ? palette.accentGreen : palette.accentBlue;
 
       conns.add(
         MindMapConnection(
@@ -154,7 +156,7 @@ buildMindMapGraph({
             fromId: agentNodeId,
             toId: repoNodeId,
             style: ConnectorStyle.solid,
-            color: const Color(0x59C084FC),
+            color: palette.accentBlue.withValues(alpha: 0.35),
           ),
         );
 
@@ -174,7 +176,7 @@ buildMindMapGraph({
             fromId: repoNodeId,
             toId: branchNodeId,
             style: ConnectorStyle.dashed,
-            color: const Color(0x597C6BFF),
+            color: palette.primary.withValues(alpha: 0.35),
           ),
         );
       }
@@ -182,22 +184,24 @@ buildMindMapGraph({
   }
 
   if (termState is TerminalLoaded) {
-    final existingAgents = nodes
-        .whereType<AgentNodeData>()
-        .map((agent) => agent.session.id)
-        .toSet();
+    final existingAgents =
+        nodes
+            .whereType<AgentNodeData>()
+            .map((agent) => agent.session.id)
+            .toSet();
     for (final session in termState.allSessions) {
       if (existingAgents.contains(session.id)) continue;
       final agentNodeId = 'agent:${session.id}';
-      final matchedWs = wsState.workspaces
-          .where(
-            (workspace) =>
-                workspace.id == session.workspaceId ||
-                workspace.paths.any(
-                  (repoPath) => session.workspacePath.startsWith(repoPath),
-                ),
-          )
-          .firstOrNull;
+      final matchedWs =
+          wsState.workspaces
+              .where(
+                (workspace) =>
+                    workspace.id == session.workspaceId ||
+                    workspace.paths.any(
+                      (repoPath) => session.workspacePath.startsWith(repoPath),
+                    ),
+              )
+              .firstOrNull;
       nodes.add(
         AgentNodeData(
           id: agentNodeId,
@@ -208,14 +212,15 @@ buildMindMapGraph({
         ),
       );
 
-      final wt = session.worktreeContexts?.isNotEmpty == true
-          ? session.worktreeContexts!
-          : (matchedWs != null && matchedWs.paths.isNotEmpty
-                ? {
+      final wt =
+          session.worktreeContexts?.isNotEmpty == true
+              ? session.worktreeContexts!
+              : (matchedWs != null && matchedWs.paths.isNotEmpty
+                  ? {
                     for (final repoPath in matchedWs.paths)
                       repoPath: matchedWs.gitBranch ?? 'main',
                   }
-                : {session.workspacePath: 'main'});
+                  : {session.workspacePath: 'main'});
       for (final entry in wt.entries) {
         final repoPath = entry.key;
         final branchRef = entry.value;
@@ -238,7 +243,7 @@ buildMindMapGraph({
             fromId: agentNodeId,
             toId: repoNodeId,
             style: ConnectorStyle.solid,
-            color: const Color(0x59C084FC),
+            color: palette.accentBlue.withValues(alpha: 0.35),
           ),
         );
         if (!nodes.any((node) => node.id == branchNodeId)) {
@@ -257,7 +262,7 @@ buildMindMapGraph({
             fromId: repoNodeId,
             toId: branchNodeId,
             style: ConnectorStyle.dashed,
-            color: const Color(0x597C6BFF),
+            color: palette.primary.withValues(alpha: 0.35),
           ),
         );
       }
@@ -284,7 +289,7 @@ buildMindMapGraph({
         fromId: repo.id,
         toId: treeId,
         style: ConnectorStyle.dashed,
-        color: const Color(0x6034D399),
+        color: palette.accentGreen.withValues(alpha: 0.38),
       ),
     );
     if (!nodes.any((node) => node.id == diffId)) {
@@ -301,7 +306,7 @@ buildMindMapGraph({
           fromId: treeId,
           toId: diffId,
           style: ConnectorStyle.dashed,
-          color: const Color(0x607C6BFF),
+          color: palette.primary.withValues(alpha: 0.38),
         ),
       );
     }
@@ -325,7 +330,7 @@ buildMindMapGraph({
           fromId: 'ws:${ws.id}',
           toId: treeId,
           style: ConnectorStyle.dashed,
-          color: const Color(0x5034D399),
+          color: palette.accentGreen.withValues(alpha: 0.31),
         ),
       );
       if (!nodes.any((node) => node.id == diffId)) {
@@ -342,7 +347,7 @@ buildMindMapGraph({
             fromId: treeId,
             toId: diffId,
             style: ConnectorStyle.dashed,
-            color: const Color(0x507C6BFF),
+            color: palette.primary.withValues(alpha: 0.31),
           ),
         );
       }
@@ -372,9 +377,10 @@ buildMindMapGraph({
           null,
           (best, tree) =>
               best == null ||
-                  (tree.repoPath?.length ?? 0) > (best.repoPath?.length ?? 0)
-              ? tree
-              : best,
+                      (tree.repoPath?.length ?? 0) >
+                          (best.repoPath?.length ?? 0)
+                  ? tree
+                  : best,
         );
     if (matchingTree != null) {
       conns.add(
@@ -382,7 +388,7 @@ buildMindMapGraph({
           fromId: matchingTree.id,
           toId: editorId,
           style: ConnectorStyle.dashed,
-          color: const Color(0x7060A5FA),
+          color: palette.accentBlue.withValues(alpha: 0.44),
         ),
       );
     }
@@ -390,13 +396,14 @@ buildMindMapGraph({
 
   if (runState.sessions.isNotEmpty) {
     for (final runSession in runState.sessions) {
-      final matchingWs = wsState.workspaces
-          .where(
-            (workspace) => workspace.paths.any(
-              (repoPath) => runSession.workspacePath.startsWith(repoPath),
-            ),
-          )
-          .firstOrNull;
+      final matchingWs =
+          wsState.workspaces
+              .where(
+                (workspace) => workspace.paths.any(
+                  (repoPath) => runSession.workspacePath.startsWith(repoPath),
+                ),
+              )
+              .firstOrNull;
       final runId = 'run:${runSession.id}';
       nodes.add(
         RunNodeData(
@@ -405,20 +412,23 @@ buildMindMapGraph({
           workspaceId: matchingWs?.id ?? '',
         ),
       );
-      final matchingAgent = nodes
-          .whereType<AgentNodeData>()
-          .where((agent) => agent.workspaceId == (matchingWs?.id ?? ''))
-          .firstOrNull;
+      final matchingAgent =
+          nodes
+              .whereType<AgentNodeData>()
+              .where((agent) => agent.workspaceId == (matchingWs?.id ?? ''))
+              .firstOrNull;
       conns.add(
         MindMapConnection(
           fromId: matchingAgent?.id ?? 'ws:${matchingWs?.id ?? ''}',
           toId: runId,
-          style: runSession.status == RunStatus.running
-              ? ConnectorStyle.animated
-              : ConnectorStyle.solid,
-          color: runSession.status == RunStatus.running
-              ? const Color(0xAA34D399)
-              : const Color(0x8060A5FA),
+          style:
+              runSession.status == RunStatus.running
+                  ? ConnectorStyle.animated
+                  : ConnectorStyle.solid,
+          color:
+              runSession.status == RunStatus.running
+                  ? palette.accentGreen.withValues(alpha: 0.67)
+                  : palette.accentBlue.withValues(alpha: 0.5),
         ),
       );
     }

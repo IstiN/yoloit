@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
+
+final _jsonWidgetDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
 /// Converts a JSON widget tree (produced by JS widgets) into Flutter widgets.
 ///
@@ -40,47 +43,53 @@ class JsonWidgetRenderer {
     final type = m['type'] as String? ?? '';
 
     return switch (type) {
-      'column'                    => _column(m),
-      'row'                       => _row(m),
-      'stack'                     => _stack(m),
-      'center'                    => Center(child: _child(m)),
-      'align'                     => _align(m),
-      'expanded'                  => Expanded(flex: _int(m['flex'], 1), child: _child(m)!),
-      'flexible'                  => Flexible(flex: _int(m['flex'], 1), child: _child(m)!),
-      'wrap'                      => _wrap(m),
-      'padding'                   => Padding(padding: _edgeInsets(m['padding']), child: _child(m)),
-      'sizedBox'                  => _sizedBox(m),
-      'spacer'                    => Spacer(flex: _int(m['flex'], 1)),
-      'safeArea'                  => SafeArea(child: _child(m) ?? const SizedBox()),
-      'text'                      => _text(m),
-      'icon'                      => _icon(m),
-      'divider'                   => _divider(m),
+      'column' => _column(m),
+      'row' => _row(m),
+      'stack' => _stack(m),
+      'center' => Center(child: _child(m)),
+      'align' => _align(m),
+      'expanded' => Expanded(flex: _int(m['flex'], 1), child: _child(m)!),
+      'flexible' => Flexible(flex: _int(m['flex'], 1), child: _child(m)!),
+      'wrap' => _wrap(m),
+      'padding' => Padding(
+        padding: _edgeInsets(m['padding']),
+        child: _child(m),
+      ),
+      'sizedBox' => _sizedBox(m),
+      'spacer' => Spacer(flex: _int(m['flex'], 1)),
+      'safeArea' => SafeArea(child: _child(m) ?? const SizedBox()),
+      'text' => _text(m),
+      'icon' => _icon(m),
+      'divider' => _divider(m),
       'circularProgressIndicator' => _spinner(m),
-      'container'                 => _container(m),
-      'card'                      => _card(m),
-      'inkWell'                   => _inkWell(m),
-      'listView'                  => _listView(m),
-      'gridView'                  => _gridView(m),
-      'button'                    => _elevatedButton(m),
-      'textButton'                => _textButton(m),
-      'outlinedButton'            => _outlinedButton(m),
-      'iconButton'                => _iconButton(m),
-      'image'                     => _image(m),
-      'aspectRatio'               => _aspectRatio(m),
-      'opacity'                   => Opacity(opacity: _double(m['opacity'], 1.0), child: _child(m)),
-      'clipRRect'                 => _clipRRect(m),
-      'textField'                 => _textFieldNode(m),
-      'chart'                     => _chartNode(m),
+      'container' => _container(m),
+      'card' => _card(m),
+      'inkWell' => _inkWell(m),
+      'listView' => _listView(m),
+      'gridView' => _gridView(m),
+      'button' => _elevatedButton(m),
+      'textButton' => _textButton(m),
+      'outlinedButton' => _outlinedButton(m),
+      'iconButton' => _iconButton(m),
+      'image' => _image(m),
+      'aspectRatio' => _aspectRatio(m),
+      'opacity' => Opacity(
+        opacity: _double(m['opacity'], 1.0),
+        child: _child(m),
+      ),
+      'clipRRect' => _clipRRect(m),
+      'textField' => _textFieldNode(m),
+      'chart' => _chartNode(m),
 
       // Animated widgets (implicit animations)
-      'animatedContainer'         => _animatedContainer(m),
-      'animatedOpacity'           => _animatedOpacity(m),
-      'animatedPositioned'        => _animatedPositioned(m),
+      'animatedContainer' => _animatedContainer(m),
+      'animatedOpacity' => _animatedOpacity(m),
+      'animatedPositioned' => _animatedPositioned(m),
 
       // Gesture input
-      'gestureDetector'           => _gestureDetector(m),
+      'gestureDetector' => _gestureDetector(m),
 
-      _                           => const SizedBox.shrink(),
+      _ => const SizedBox.shrink(),
     };
   }
 
@@ -101,8 +110,8 @@ class JsonWidgetRenderer {
   );
 
   Widget _stack(Map<String, dynamic> m) {
-    final children = (m['children'] as List? ?? [])
-        .map((c) {
+    final children =
+        (m['children'] as List? ?? []).map((c) {
           final cm = (c as Map?)?.cast<String, dynamic>() ?? {};
           if (cm['positioned'] != null) {
             final p = (cm['positioned'] as Map).cast<String, dynamic>();
@@ -115,12 +124,8 @@ class JsonWidgetRenderer {
             );
           }
           return _build(c);
-        })
-        .toList();
-    return Stack(
-      alignment: _alignment(m['alignment']),
-      children: children,
-    );
+        }).toList();
+    return Stack(alignment: _alignment(m['alignment']), children: children);
   }
 
   Widget _wrap(Map<String, dynamic> m) => Wrap(
@@ -130,10 +135,8 @@ class JsonWidgetRenderer {
     children: _children(m),
   );
 
-  Widget _align(Map<String, dynamic> m) => Align(
-    alignment: _alignment(m['alignment']),
-    child: _child(m),
-  );
+  Widget _align(Map<String, dynamic> m) =>
+      Align(alignment: _alignment(m['alignment']), child: _child(m));
 
   Widget _sizedBox(Map<String, dynamic> m) {
     final w = _doubleOrNull(m['width']);
@@ -148,7 +151,10 @@ class JsonWidgetRenderer {
   Widget _text(Map<String, dynamic> m) {
     final data = (m['data'] ?? m['text'] ?? '').toString();
     final style = _textStyle(m['style'] as Map?);
-    final align = _textAlign(m['textAlign'] as String? ?? (m['style'] as Map?)?['textAlign'] as String?);
+    final align = _textAlign(
+      m['textAlign'] as String? ??
+          (m['style'] as Map?)?['textAlign'] as String?,
+    );
     final maxLines = m['maxLines'] as int?;
     final overflow = _overflow(m['overflow'] as String?);
     return Text(
@@ -172,7 +178,9 @@ class JsonWidgetRenderer {
   }
 
   Widget _divider(Map<String, dynamic> m) => Divider(
-    color: _color(m['color'] as String?) ?? const Color(0x33FFFFFF),
+    color:
+        _color(m['color'] as String?) ??
+        _jsonWidgetDefaultColors.divider.withValues(alpha: 0.6),
     thickness: _double(m['thickness'], 1),
     height: _double(m['height'], 16),
     indent: _double(m['indent'], 0),
@@ -213,7 +221,12 @@ class JsonWidgetRenderer {
       padding: _edgeInsetsOrNull(m['padding']),
       margin: _edgeInsetsOrNull(m['margin']),
       alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
-      decoration: deco != null ? _boxDecoration(deco.cast<String, dynamic>()) : (m['color'] != null ? BoxDecoration(color: _color(m['color'] as String?)) : null),
+      decoration:
+          deco != null
+              ? _boxDecoration(deco.cast<String, dynamic>())
+              : (m['color'] != null
+                  ? BoxDecoration(color: _color(m['color'] as String?))
+                  : null),
       child: _child(m),
     );
   }
@@ -239,10 +252,8 @@ class JsonWidgetRenderer {
     child: _child(m),
   );
 
-  Widget _aspectRatio(Map<String, dynamic> m) => AspectRatio(
-    aspectRatio: _double(m['aspectRatio'], 1),
-    child: _child(m),
-  );
+  Widget _aspectRatio(Map<String, dynamic> m) =>
+      AspectRatio(aspectRatio: _double(m['aspectRatio'], 1), child: _child(m));
 
   // ── Lists ─────────────────────────────────────────────────────────────────
 
@@ -253,7 +264,10 @@ class JsonWidgetRenderer {
     return ListView.builder(
       shrinkWrap: shrink,
       reverse: reverse,
-      physics: shrink ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+      physics:
+          shrink
+              ? const NeverScrollableScrollPhysics()
+              : const AlwaysScrollableScrollPhysics(),
       padding: _edgeInsetsOrNull(m['padding']),
       itemCount: items.length,
       itemBuilder: (_, i) => _build(items[i]),
@@ -288,7 +302,13 @@ class JsonWidgetRenderer {
     final fg = _color(style?['foregroundColor'] as String?);
     return ElevatedButton(
       onPressed: onTap,
-      style: bg != null || fg != null ? ElevatedButton.styleFrom(backgroundColor: bg, foregroundColor: fg) : null,
+      style:
+          bg != null || fg != null
+              ? ElevatedButton.styleFrom(
+                backgroundColor: bg,
+                foregroundColor: fg,
+              )
+              : null,
       child: label,
     );
   }
@@ -342,7 +362,8 @@ class JsonWidgetRenderer {
   VoidCallback? _tapHandler(dynamic actionId, dynamic payload) {
     if (actionId == null) return null;
     final id = actionId.toString();
-    final p = payload is Map ? payload.cast<String, dynamic>() : <String, dynamic>{};
+    final p =
+        payload is Map ? payload.cast<String, dynamic>() : <String, dynamic>{};
     return () => onEvent(id, p);
   }
 
@@ -367,16 +388,20 @@ class JsonWidgetRenderer {
     return BoxDecoration(
       color: _color(d['color'] as String?),
       borderRadius: br != null ? BorderRadius.circular(br) : null,
-      border: borderColor != null ? Border.all(color: borderColor, width: borderWidth) : null,
+      border:
+          borderColor != null
+              ? Border.all(color: borderColor, width: borderWidth)
+              : null,
       gradient: _gradient(d['gradient'] as Map?),
     );
   }
 
   Gradient? _gradient(Map? g) {
     if (g == null) return null;
-    final colors = (g['colors'] as List? ?? [])
-        .map((c) => _color(c as String?) ?? Colors.transparent)
-        .toList();
+    final colors =
+        (g['colors'] as List? ?? [])
+            .map((c) => _color(c as String?) ?? Colors.transparent)
+            .toList();
     if (colors.isEmpty) return null;
     return LinearGradient(
       begin: _alignmentGradient(g['begin'] as String?),
@@ -423,133 +448,139 @@ class JsonWidgetRenderer {
     return _namedColor(s);
   }
 
-  Color? _namedColor(String name) => const {
-    'transparent': Colors.transparent,
-    'white': Colors.white,
-    'black': Colors.black,
-    'red': Colors.red,
-    'green': Colors.green,
-    'blue': Colors.blue,
-    'yellow': Colors.yellow,
-    'orange': Colors.orange,
-    'purple': Colors.purple,
-    'grey': Colors.grey,
-    'gray': Colors.grey,
-    'pink': Colors.pink,
-    'teal': Colors.teal,
-    'cyan': Colors.cyan,
-    'amber': Colors.amber,
-    'indigo': Colors.indigo,
-    'lime': Colors.lime,
-    'brown': Colors.brown,
-  }[name.toLowerCase()];
+  Color? _namedColor(String name) {
+    return switch (name.toLowerCase()) {
+      'transparent' => Colors.transparent,
+      'white' => _jsonWidgetDefaultColors.textPrimary,
+      'black' => _jsonWidgetDefaultColors.background,
+      'red' => Colors.red,
+      'green' => Colors.green,
+      'blue' => Colors.blue,
+      'yellow' => Colors.yellow,
+      'orange' => Colors.orange,
+      'purple' => Colors.purple,
+      'grey' => Colors.grey,
+      'gray' => Colors.grey,
+      'pink' => Colors.pink,
+      'teal' => Colors.teal,
+      'cyan' => Colors.cyan,
+      'amber' => Colors.amber,
+      'indigo' => Colors.indigo,
+      'lime' => Colors.lime,
+      'brown' => Colors.brown,
+      _ => null,
+    };
+  }
 
-  IconData _iconData(String name) => const {
-    'star': Icons.star,
-    'favorite': Icons.favorite,
-    'home': Icons.home,
-    'settings': Icons.settings,
-    'search': Icons.search,
-    'add': Icons.add,
-    'remove': Icons.remove,
-    'delete': Icons.delete,
-    'edit': Icons.edit,
-    'info': Icons.info,
-    'check': Icons.check,
-    'close': Icons.close,
-    'arrow_forward': Icons.arrow_forward,
-    'arrow_back': Icons.arrow_back,
-    'refresh': Icons.refresh,
-    'share': Icons.share,
-    'download': Icons.download,
-    'upload': Icons.upload,
-    'cloud': Icons.cloud,
-    'person': Icons.person,
-    'menu': Icons.menu,
-    'more_vert': Icons.more_vert,
-    'trending_up': Icons.trending_up,
-    'trending_down': Icons.trending_down,
-    'attach_money': Icons.attach_money,
-    'show_chart': Icons.show_chart,
-    'bar_chart': Icons.bar_chart,
-    'notifications': Icons.notifications,
-    'lock': Icons.lock,
-    'key': Icons.key,
-    'language': Icons.language,
-    'thermostat': Icons.thermostat,
-    'water_drop': Icons.water_drop,
-    'air': Icons.air,
-    'wb_sunny': Icons.wb_sunny,
-    'nights_stay': Icons.nights_stay,
-    'umbrella': Icons.umbrella,
-    'calculate': Icons.calculate,
-    'timer': Icons.timer,
-    'calendar_today': Icons.calendar_today,
-    'warning': Icons.warning,
-    'error': Icons.error,
-    'done': Icons.done,
-    'play_arrow': Icons.play_arrow,
-    'pause': Icons.pause,
-    'stop': Icons.stop,
-    'skip_next': Icons.skip_next,
-    'skip_previous': Icons.skip_previous,
-  }[name.toLowerCase()] ?? Icons.widgets;
+  IconData _iconData(String name) =>
+      const {
+        'star': Icons.star,
+        'favorite': Icons.favorite,
+        'home': Icons.home,
+        'settings': Icons.settings,
+        'search': Icons.search,
+        'add': Icons.add,
+        'remove': Icons.remove,
+        'delete': Icons.delete,
+        'edit': Icons.edit,
+        'info': Icons.info,
+        'check': Icons.check,
+        'close': Icons.close,
+        'arrow_forward': Icons.arrow_forward,
+        'arrow_back': Icons.arrow_back,
+        'refresh': Icons.refresh,
+        'share': Icons.share,
+        'download': Icons.download,
+        'upload': Icons.upload,
+        'cloud': Icons.cloud,
+        'person': Icons.person,
+        'menu': Icons.menu,
+        'more_vert': Icons.more_vert,
+        'trending_up': Icons.trending_up,
+        'trending_down': Icons.trending_down,
+        'attach_money': Icons.attach_money,
+        'show_chart': Icons.show_chart,
+        'bar_chart': Icons.bar_chart,
+        'notifications': Icons.notifications,
+        'lock': Icons.lock,
+        'key': Icons.key,
+        'language': Icons.language,
+        'thermostat': Icons.thermostat,
+        'water_drop': Icons.water_drop,
+        'air': Icons.air,
+        'wb_sunny': Icons.wb_sunny,
+        'nights_stay': Icons.nights_stay,
+        'umbrella': Icons.umbrella,
+        'calculate': Icons.calculate,
+        'timer': Icons.timer,
+        'calendar_today': Icons.calendar_today,
+        'warning': Icons.warning,
+        'error': Icons.error,
+        'done': Icons.done,
+        'play_arrow': Icons.play_arrow,
+        'pause': Icons.pause,
+        'stop': Icons.stop,
+        'skip_next': Icons.skip_next,
+        'skip_previous': Icons.skip_previous,
+      }[name.toLowerCase()] ??
+      Icons.widgets;
 
   MainAxisAlignment _mainAxis(dynamic v) => switch (v as String?) {
-    'start'        => MainAxisAlignment.start,
-    'end'          => MainAxisAlignment.end,
-    'center'       => MainAxisAlignment.center,
+    'start' => MainAxisAlignment.start,
+    'end' => MainAxisAlignment.end,
+    'center' => MainAxisAlignment.center,
     'spaceBetween' => MainAxisAlignment.spaceBetween,
-    'spaceAround'  => MainAxisAlignment.spaceAround,
-    'spaceEvenly'  => MainAxisAlignment.spaceEvenly,
-    _              => MainAxisAlignment.start,
+    'spaceAround' => MainAxisAlignment.spaceAround,
+    'spaceEvenly' => MainAxisAlignment.spaceEvenly,
+    _ => MainAxisAlignment.start,
   };
 
   CrossAxisAlignment _crossAxis(dynamic v) => switch (v as String?) {
-    'start'    => CrossAxisAlignment.start,
-    'end'      => CrossAxisAlignment.end,
-    'center'   => CrossAxisAlignment.center,
-    'stretch'  => CrossAxisAlignment.stretch,
+    'start' => CrossAxisAlignment.start,
+    'end' => CrossAxisAlignment.end,
+    'center' => CrossAxisAlignment.center,
+    'stretch' => CrossAxisAlignment.stretch,
     'baseline' => CrossAxisAlignment.baseline,
-    _          => CrossAxisAlignment.start,
+    _ => CrossAxisAlignment.start,
   };
 
   MainAxisSize _mainSize(dynamic v) =>
       v == 'min' ? MainAxisSize.min : MainAxisSize.max;
 
   TextAlign? _textAlign(String? v) => switch (v) {
-    'left'    => TextAlign.left,
-    'right'   => TextAlign.right,
-    'center'  => TextAlign.center,
+    'left' => TextAlign.left,
+    'right' => TextAlign.right,
+    'center' => TextAlign.center,
     'justify' => TextAlign.justify,
-    _         => null,
+    _ => null,
   };
 
   TextOverflow? _overflow(String? v) => switch (v) {
     'ellipsis' => TextOverflow.ellipsis,
-    'clip'     => TextOverflow.clip,
-    'fade'     => TextOverflow.fade,
-    _          => null,
+    'clip' => TextOverflow.clip,
+    'fade' => TextOverflow.fade,
+    _ => null,
   };
 
   FontWeight? _fontWeight(dynamic v) {
     if (v == null) return null;
-    if (v is num) return FontWeight.values.firstWhere(
-      (w) => w.value == ((v / 100).round() * 100).clamp(100, 900),
-      orElse: () => FontWeight.normal,
-    );
+    if (v is num)
+      return FontWeight.values.firstWhere(
+        (w) => w.value == ((v / 100).round() * 100).clamp(100, 900),
+        orElse: () => FontWeight.normal,
+      );
     return switch (v.toString()) {
-      'bold'   => FontWeight.bold,
-      'w100'   => FontWeight.w100,
-      'w200'   => FontWeight.w200,
-      'w300'   => FontWeight.w300,
-      'w400'   => FontWeight.w400,
-      'w500'   => FontWeight.w500,
-      'w600'   => FontWeight.w600,
-      'w700'   => FontWeight.w700,
-      'w800'   => FontWeight.w800,
-      'w900'   => FontWeight.w900,
-      _        => FontWeight.normal,
+      'bold' => FontWeight.bold,
+      'w100' => FontWeight.w100,
+      'w200' => FontWeight.w200,
+      'w300' => FontWeight.w300,
+      'w400' => FontWeight.w400,
+      'w500' => FontWeight.w500,
+      'w600' => FontWeight.w600,
+      'w700' => FontWeight.w700,
+      'w800' => FontWeight.w800,
+      'w900' => FontWeight.w900,
+      _ => FontWeight.normal,
     };
   }
 
@@ -557,57 +588,56 @@ class JsonWidgetRenderer {
     if (v == null) return Alignment.center;
     if (v is String) {
       return switch (v) {
-        'topLeft'      => Alignment.topLeft,
-        'topCenter'    => Alignment.topCenter,
-        'topRight'     => Alignment.topRight,
-        'centerLeft'   => Alignment.centerLeft,
-        'center'       => Alignment.center,
-        'centerRight'  => Alignment.centerRight,
-        'bottomLeft'   => Alignment.bottomLeft,
+        'topLeft' => Alignment.topLeft,
+        'topCenter' => Alignment.topCenter,
+        'topRight' => Alignment.topRight,
+        'centerLeft' => Alignment.centerLeft,
+        'center' => Alignment.center,
+        'centerRight' => Alignment.centerRight,
+        'bottomLeft' => Alignment.bottomLeft,
         'bottomCenter' => Alignment.bottomCenter,
-        'bottomRight'  => Alignment.bottomRight,
-        _              => Alignment.center,
+        'bottomRight' => Alignment.bottomRight,
+        _ => Alignment.center,
       };
     }
     return Alignment.center;
   }
 
   AlignmentGeometry _alignmentGradient(String? v) => switch (v) {
-    'topLeft'    => Alignment.topLeft,
-    'topRight'   => Alignment.topRight,
+    'topLeft' => Alignment.topLeft,
+    'topRight' => Alignment.topRight,
     'bottomLeft' => Alignment.bottomLeft,
-    'bottomRight'=> Alignment.bottomRight,
-    'topCenter'  => Alignment.topCenter,
+    'bottomRight' => Alignment.bottomRight,
+    'topCenter' => Alignment.topCenter,
     'bottomCenter' => Alignment.bottomCenter,
     'centerLeft' => Alignment.centerLeft,
-    'centerRight'=> Alignment.centerRight,
-    _            => Alignment.centerLeft,
+    'centerRight' => Alignment.centerRight,
+    _ => Alignment.centerLeft,
   };
 
   WrapAlignment _wrapAlignment(dynamic v) => switch (v as String?) {
-    'center'       => WrapAlignment.center,
-    'end'          => WrapAlignment.end,
+    'center' => WrapAlignment.center,
+    'end' => WrapAlignment.end,
     'spaceBetween' => WrapAlignment.spaceBetween,
-    'spaceAround'  => WrapAlignment.spaceAround,
-    'spaceEvenly'  => WrapAlignment.spaceEvenly,
-    _              => WrapAlignment.start,
+    'spaceAround' => WrapAlignment.spaceAround,
+    'spaceEvenly' => WrapAlignment.spaceEvenly,
+    _ => WrapAlignment.start,
   };
 
   BoxFit _boxFit(String? v) => switch (v) {
-    'fill'      => BoxFit.fill,
-    'contain'   => BoxFit.contain,
-    'cover'     => BoxFit.cover,
-    'fitWidth'  => BoxFit.fitWidth,
+    'fill' => BoxFit.fill,
+    'contain' => BoxFit.contain,
+    'cover' => BoxFit.cover,
+    'fitWidth' => BoxFit.fitWidth,
     'fitHeight' => BoxFit.fitHeight,
-    'none'      => BoxFit.none,
-    _           => BoxFit.cover,
+    'none' => BoxFit.none,
+    _ => BoxFit.cover,
   };
 
   double _double(dynamic v, double def) =>
       v == null ? def : (v as num).toDouble();
 
-  double? _doubleOrNull(dynamic v) =>
-      v == null ? null : (v as num).toDouble();
+  double? _doubleOrNull(dynamic v) => v == null ? null : (v as num).toDouble();
 
   Widget _textFieldNode(Map<String, dynamic> m) => _TextFieldNode(
     initialValue: m['value'] as String? ?? '',
@@ -623,7 +653,8 @@ class JsonWidgetRenderer {
     final rawPoints = m['points'] as List?;
     if (rawPoints == null || rawPoints.isEmpty) return const SizedBox.shrink();
     final points = rawPoints.map((v) => (v as num).toDouble()).toList();
-    final color = _color(m['color'] as String? ?? '#4ade80') ?? Colors.greenAccent;
+    final color =
+        _color(m['color'] as String? ?? '#4ade80') ?? Colors.greenAccent;
     final height = _double(m['height'], 60.0);
     final fill = m['fill'] == true;
     final onTap = m['onTap'] as String?;
@@ -640,8 +671,7 @@ class JsonWidgetRenderer {
     return chart;
   }
 
-  int _int(dynamic v, int def) =>
-      v == null ? def : (v as num).toInt();
+  int _int(dynamic v, int def) => v == null ? def : (v as num).toInt();
 
   // ── Animated widgets ──────────────────────────────────────────────────────
 
@@ -655,9 +685,12 @@ class JsonWidgetRenderer {
       padding: _edgeInsetsOrNull(m['padding']),
       margin: _edgeInsetsOrNull(m['margin']),
       alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
-      decoration: deco != null
-          ? _boxDecoration(deco.cast<String, dynamic>())
-          : (m['color'] != null ? BoxDecoration(color: _color(m['color'] as String?)) : null),
+      decoration:
+          deco != null
+              ? _boxDecoration(deco.cast<String, dynamic>())
+              : (m['color'] != null
+                  ? BoxDecoration(color: _color(m['color'] as String?))
+                  : null),
       transform: _matrix4(m['transform']),
       child: _child(m),
     );
@@ -683,17 +716,17 @@ class JsonWidgetRenderer {
   );
 
   Curve _curve(String? v) => switch (v) {
-    'linear'       => Curves.linear,
-    'easeIn'       => Curves.easeIn,
-    'easeOut'      => Curves.easeOut,
-    'easeInOut'    => Curves.easeInOut,
-    'bounce'       => Curves.bounceOut,
-    'bounceIn'     => Curves.bounceIn,
-    'elastic'      => Curves.elasticOut,
-    'elasticIn'    => Curves.elasticIn,
-    'decelerate'   => Curves.decelerate,
-    'fastOutSlowIn'=> Curves.fastOutSlowIn,
-    _              => Curves.easeInOut,
+    'linear' => Curves.linear,
+    'easeIn' => Curves.easeIn,
+    'easeOut' => Curves.easeOut,
+    'easeInOut' => Curves.easeInOut,
+    'bounce' => Curves.bounceOut,
+    'bounceIn' => Curves.bounceIn,
+    'elastic' => Curves.elasticOut,
+    'elasticIn' => Curves.elasticIn,
+    'decelerate' => Curves.decelerate,
+    'fastOutSlowIn' => Curves.fastOutSlowIn,
+    _ => Curves.easeInOut,
   };
 
   Matrix4? _matrix4(dynamic v) {
@@ -722,41 +755,44 @@ class JsonWidgetRenderer {
         scheduleMicrotask(() => onEvent(event, payload));
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: m['onTap'] != null
-          ? () => fire(m['onTap'] as String, {})
-          : null,
-      onTapDown: m['onTapDown'] != null
-          ? (d) => fire(m['onTapDown'] as String, {
-              'x': d.localPosition.dx,
-              'y': d.localPosition.dy,
-            })
-          : null,
-      onTapUp: m['onTapUp'] != null
-          ? (d) => fire(m['onTapUp'] as String, {
-              'x': d.localPosition.dx,
-              'y': d.localPosition.dy,
-            })
-          : null,
-      onPanStart: m['onPanStart'] != null
-          ? (d) => fire(m['onPanStart'] as String, {
-              'x': d.localPosition.dx,
-              'y': d.localPosition.dy,
-            })
-          : null,
-      onPanUpdate: m['onPanUpdate'] != null
-          ? (d) => fire(m['onPanUpdate'] as String, {
-              'x': d.localPosition.dx,
-              'y': d.localPosition.dy,
-              'dx': d.delta.dx,
-              'dy': d.delta.dy,
-            })
-          : null,
-      onPanEnd: m['onPanEnd'] != null
-          ? (d) => fire(m['onPanEnd'] as String, {
-              'velocityX': d.velocity.pixelsPerSecond.dx,
-              'velocityY': d.velocity.pixelsPerSecond.dy,
-            })
-          : null,
+      onTap: m['onTap'] != null ? () => fire(m['onTap'] as String, {}) : null,
+      onTapDown:
+          m['onTapDown'] != null
+              ? (d) => fire(m['onTapDown'] as String, {
+                'x': d.localPosition.dx,
+                'y': d.localPosition.dy,
+              })
+              : null,
+      onTapUp:
+          m['onTapUp'] != null
+              ? (d) => fire(m['onTapUp'] as String, {
+                'x': d.localPosition.dx,
+                'y': d.localPosition.dy,
+              })
+              : null,
+      onPanStart:
+          m['onPanStart'] != null
+              ? (d) => fire(m['onPanStart'] as String, {
+                'x': d.localPosition.dx,
+                'y': d.localPosition.dy,
+              })
+              : null,
+      onPanUpdate:
+          m['onPanUpdate'] != null
+              ? (d) => fire(m['onPanUpdate'] as String, {
+                'x': d.localPosition.dx,
+                'y': d.localPosition.dy,
+                'dx': d.delta.dx,
+                'dy': d.delta.dy,
+              })
+              : null,
+      onPanEnd:
+          m['onPanEnd'] != null
+              ? (d) => fire(m['onPanEnd'] as String, {
+                'velocityX': d.velocity.pixelsPerSecond.dx,
+                'velocityY': d.velocity.pixelsPerSecond.dy,
+              })
+              : null,
       child: child,
     );
   }
@@ -813,28 +849,32 @@ class _TextFieldNodeState extends State<_TextFieldNode> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return TextField(
       controller: _ctrl,
       obscureText: widget.obscure,
-      style: widget.style ?? const TextStyle(color: Colors.white, fontSize: 14),
+      style: widget.style ?? TextStyle(color: colors.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: widget.hint,
-        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        hintStyle: TextStyle(color: colors.textMuted, fontSize: 14),
         filled: true,
-        fillColor: const Color(0xFF1e293b),
+        fillColor: colors.surfaceElevated,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF334155)),
+          borderSide: BorderSide(color: colors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF334155)),
+          borderSide: BorderSide(color: colors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF3b82f6)),
+          borderSide: BorderSide(color: colors.accentBlue),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         isDense: true,
       ),
       onSubmitted: (val) {
@@ -852,7 +892,11 @@ class _TextFieldNodeState extends State<_TextFieldNode> {
 // ── Sparkline chart painter ───────────────────────────────────────────────────
 
 class _SparklinePainter extends CustomPainter {
-  const _SparklinePainter({required this.points, required this.color, required this.fill});
+  const _SparklinePainter({
+    required this.points,
+    required this.color,
+    required this.fill,
+  });
   final List<double> points;
   final Color color;
   final bool fill;
@@ -867,7 +911,10 @@ class _SparklinePainter extends CustomPainter {
 
     final xStep = size.width / (points.length - 1);
 
-    double toY(double v) => size.height - ((v - min) / effectiveRange) * size.height * 0.85 - size.height * 0.05;
+    double toY(double v) =>
+        size.height -
+        ((v - min) / effectiveRange) * size.height * 0.85 -
+        size.height * 0.05;
 
     final path = Path();
     path.moveTo(0, toY(points[0]));
@@ -879,11 +926,12 @@ class _SparklinePainter extends CustomPainter {
       path.cubicTo(cpx, toY(prev), cpx, toY(curr), x, toY(curr));
     }
 
-    final linePaint = Paint()
-      ..color = color
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    final linePaint =
+        Paint()
+          ..color = color
+          ..strokeWidth = 2.0
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round;
     canvas.drawPath(path, linePaint);
 
     if (fill) {

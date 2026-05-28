@@ -17,6 +17,8 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
+final _codeSnippetDefaultColors = AppColorScheme.fromAccent(Colors.green);
+
 class CodeSnippetPlugin extends BoardPanelPlugin {
   const CodeSnippetPlugin();
 
@@ -32,7 +34,7 @@ class CodeSnippetPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.code_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF10B981);
+  Color get accentColor => _codeSnippetDefaultColors.accentGreen;
 
   @override
   Size get defaultSize => const Size(480, 300);
@@ -53,23 +55,31 @@ class CodeSnippetPlugin extends BoardPanelPlugin {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const _kLanguages = [
-  'dart', 'python', 'javascript', 'typescript',
-  'bash', 'json', 'yaml', 'sql', 'kotlin', 'swift',
+  'dart',
+  'python',
+  'javascript',
+  'typescript',
+  'bash',
+  'json',
+  'yaml',
+  'sql',
+  'kotlin',
+  'swift',
 ];
 
 Mode _modeFor(String lang) => switch (lang) {
-  'dart'       => dart,
-  'python'     => python,
+  'dart' => dart,
+  'python' => python,
   'javascript' => javascript,
   'typescript' => typescript,
-  'bash'       => bash,
-  'json'       => json,
-  'yaml'       => yaml,
-  'sql'        => sql,
-  'kotlin'     => kotlin,
-  'swift'      => swift,
-  _            => dart,
-} as Mode;
+  'bash' => bash,
+  'json' => json,
+  'yaml' => yaml,
+  'sql' => sql,
+  'kotlin' => kotlin,
+  'swift' => swift,
+  _ => dart,
+};
 
 class _CodeSnippetPanelContent extends StatefulWidget {
   const _CodeSnippetPanelContent({
@@ -161,9 +171,11 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
           height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: colors.accentGreen.withOpacity(0.08),
+            color: colors.accentGreen.withValues(alpha: 0.08),
             border: Border(
-              bottom: BorderSide(color: colors.accentGreen.withOpacity(0.15)),
+              bottom: BorderSide(
+                color: colors.accentGreen.withValues(alpha: 0.15),
+              ),
             ),
           ),
           child: Row(
@@ -175,9 +187,12 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
                   value: _language,
                   isDense: true,
                   style: TextStyle(fontSize: 12, color: colors.accentGreen),
-                  items: _kLanguages
-                      .map((l) => DropdownMenuItem(value: l, child: Text(l)))
-                      .toList(),
+                  items:
+                      _kLanguages
+                          .map(
+                            (l) => DropdownMenuItem(value: l, child: Text(l)),
+                          )
+                          .toList(),
                   onChanged: (v) => v != null ? _setLanguage(v) : null,
                 ),
               ),
@@ -203,7 +218,10 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
             child: SingleChildScrollView(
               child: CodeField(
                 controller: _controller,
-                textStyle: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                ),
                 onChanged: _saveCode,
               ),
             ),

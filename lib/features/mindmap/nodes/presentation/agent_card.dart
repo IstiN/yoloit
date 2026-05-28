@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
 
@@ -55,21 +57,21 @@ class _AgentCardState extends State<AgentCard>
     super.dispose();
   }
 
-  Color get _statusColor => switch (widget.props.status) {
-    'live' => const Color(0xFF34D399),
-    'error' => const Color(0xFFF87171),
-    _ => const Color(0xFF60A5FA),
+  Color _statusColor(AppColorScheme colors) => switch (widget.props.status) {
+    'live' => colors.accentGreen,
+    'error' => colors.accentRed,
+    _ => colors.accentBlue,
   };
 
-  Color get _phaseColor {
+  Color _phaseColor(AppColorScheme colors) {
     final phase = widget.props.hookPhase;
     return switch (phase) {
-      null => _statusColor,
-      ThinkingPhase() => const Color(0xFFFBBF24),         // amber
-      ToolPhase() => const Color(0xFF818CF8),              // purple
-      AwaitingApprovalPhase() => const Color(0xFFF97316), // orange — needs attention!
-      DonePhase() => const Color(0xFF34D399),              // green
-      ErrorPhase() => const Color(0xFFF87171),             // red
+      null => _statusColor(colors),
+      ThinkingPhase() => colors.accentOrange,
+      ToolPhase() => colors.primaryLight,
+      AwaitingApprovalPhase() => colors.accentOrange,
+      DonePhase() => colors.accentGreen,
+      ErrorPhase() => colors.accentRed,
     };
   }
 
@@ -77,15 +79,13 @@ class _AgentCardState extends State<AgentCard>
     return switch (widget.props.hookPhase) {
       ThinkingPhase() => const Duration(milliseconds: 700),
       ToolPhase() => const Duration(milliseconds: 500),
-      AwaitingApprovalPhase() => const Duration(milliseconds: 350), // fast pulse = urgent
+      AwaitingApprovalPhase() => const Duration(milliseconds: 350),
       DonePhase() => const Duration(milliseconds: 400),
       _ => const Duration(milliseconds: 1800),
     };
   }
 
   void _updateAnimation() {
-    // Animate only when there is an active hook phase (agent doing work).
-    // When session is just live/idle (waiting for input), keep it calm.
     final shouldAnimate = widget.props.hookPhase != null;
     if (_animCtrl.duration != _animDuration) {
       _animCtrl.duration = _animDuration;
@@ -100,22 +100,23 @@ class _AgentCardState extends State<AgentCard>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final isRunning = widget.props.isRunning;
-    final color = _phaseColor;
+    final color = _phaseColor(colors);
     final phase = widget.props.hookPhase;
-    // Active = agent is actually doing something (thinking/tool/done/error).
     final isActive = phase != null;
 
     return AnimatedBuilder(
       animation: _glowAnim,
       builder: (_, child) {
-        final glowAlpha = isActive
-            ? ((_glowAnim.value * 100 + 40).round()).clamp(40, 140)
-            : 60; // static dim border when idle
+        final glowAlpha =
+            isActive
+                ? ((_glowAnim.value * 100 + 40).round()).clamp(40, 140)
+                : 60;
         return Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: const Color(0xFF0A0C10),
+            color: colors.surface,
             border: Border.all(color: color.withAlpha(glowAlpha), width: 1.5),
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
@@ -125,10 +126,10 @@ class _AgentCardState extends State<AgentCard>
                   blurRadius: phase is ThinkingPhase ? 24 : 16,
                   spreadRadius: phase is ThinkingPhase ? 2 : 1,
                 ),
-              const BoxShadow(
-                color: Color(0x90000000),
+              BoxShadow(
+                color: colors.background.withAlpha(144),
                 blurRadius: 20,
-                offset: Offset(0, 6),
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -146,37 +147,37 @@ class _AgentCardState extends State<AgentCard>
           Expanded(
             child: Stack(
               children: [
-                // Terminal / idle / text pane fills all space.
                 Positioned.fill(
-                  child: widget.body ??
+                  child:
+                      widget.body ??
                       (widget.props.isIdle
                           ? _IdlePlaceholder(onStart: widget.onSessionStart)
                           : _TerminalPane(
-                              lines: widget.props.lastLines,
-                              onInput: widget.onTerminalInput,
-                            )),
+                            lines: widget.props.lastLines,
+                            onInput: widget.onTerminalInput,
+                          )),
                 ),
-                // Phase bar overlays the top of the terminal — does NOT shift layout.
                 if (phase != null)
                   Positioned(
                     top: 0,
                     left: 0,
                     right: 0,
-                    child: _HookPhaseBar(phase: phase, color: color, animation: _glowAnim),
+                    child: _HookPhaseBar(
+                      phase: phase,
+                      color: color,
+                      animation: _glowAnim,
+                    ),
                   ),
               ],
             ),
           ),
-          // Stripes only when actively processing (not just idle-running).
-          if (isActive)
-            _ActivityStripes(animation: _glowAnim, color: color),
+          if (isActive) _ActivityStripes(animation: _glowAnim, color: color),
         ],
       ),
     );
   }
 }
 
-/// Thin bar shown between header and body when a hook phase is active.
 class _HookPhaseBar extends StatelessWidget {
   const _HookPhaseBar({
     required this.phase,
@@ -195,42 +196,47 @@ class _HookPhaseBar extends StatelessWidget {
     ErrorPhase() => '✕ Error',
   };
 
-  bool get _showDots => phase is ThinkingPhase || phase is ToolPhase || phase is AwaitingApprovalPhase;
+  bool get _showDots =>
+      phase is ThinkingPhase ||
+      phase is ToolPhase ||
+      phase is AwaitingApprovalPhase;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AnimatedBuilder(
       animation: animation,
-      builder: (_, __) => Container(
-        height: 22,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: Color.lerp(
-            const Color(0xFF1A1A1A), // near-black base
-            color,
-            0.15 + animation.value * 0.08, // subtle tint, fully opaque
-          ),
-          border: Border(
-            bottom: BorderSide(color: color.withAlpha(80), width: 0.5),
-          ),
-        ),
-        child: Row(
-          children: [
-            Text(
-              _label,
-              style: TextStyle(
-                color: color,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
+      builder:
+          (_, __) => Container(
+            height: 22,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: Color.lerp(
+                colors.surfaceElevated,
+                color,
+                0.15 + animation.value * 0.08,
+              ),
+              border: Border(
+                bottom: BorderSide(color: color.withAlpha(80), width: 0.5),
               ),
             ),
-            const Spacer(),
-            if (_showDots)
-              _DotsIndicator(animation: animation, color: color),
-          ],
-        ),
-      ),
+            child: Row(
+              children: [
+                Text(
+                  _label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const Spacer(),
+                if (_showDots)
+                  _DotsIndicator(animation: animation, color: color),
+              ],
+            ),
+          ),
     );
   }
 }
@@ -242,6 +248,8 @@ class _DotsIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final pulseColor = Color.lerp(colors.surface, color, 1)!;
     return AnimatedBuilder(
       animation: animation,
       builder: (_, __) {
@@ -256,9 +264,16 @@ class _DotsIndicator extends StatelessWidget {
                 height: 4,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: color.withAlpha(
+                  color: pulseColor.withAlpha(
                     ((v - i * 0.15).clamp(0.1, 1.0) * 200).round(),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: pulseColor.withAlpha(80),
+                      blurRadius: 3,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -281,14 +296,13 @@ class _AgentCardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F1218),
-        border: Border(
-          bottom: BorderSide(color: Color(0xFF1E2330), width: 1),
-        ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        border: Border(bottom: BorderSide(color: colors.divider, width: 1)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,9 +316,15 @@ class _AgentCardHeader extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: color,
-                  boxShadow: isRunning
-                      ? [BoxShadow(color: color.withAlpha(180), blurRadius: 8)]
-                      : [],
+                  boxShadow:
+                      isRunning
+                          ? [
+                            BoxShadow(
+                              color: color.withAlpha(180),
+                              blurRadius: 8,
+                            ),
+                          ]
+                          : [],
                 ),
               ),
               const SizedBox(width: 8),
@@ -315,26 +335,26 @@ class _AgentCardHeader extends StatelessWidget {
                   children: [
                     Text(
                       props.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFFE8E8FF),
+                        color: colors.textPrimary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (props.typeName.isNotEmpty)
                       Text(
                         props.typeName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 9,
-                          color: Color(0xFF6B7898),
+                          color: colors.textSecondary,
                         ),
                       ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.terminal, size: 13, color: Color(0xFF34D399)),
+              Icon(Icons.terminal, size: 13, color: colors.accentGreen),
             ],
           ),
           if (props.repos.isNotEmpty) ...[
@@ -354,7 +374,6 @@ class _AgentCardHeader extends StatelessWidget {
   }
 }
 
-/// Styled terminal output lines — read-only view of PTY output.
 class _TerminalPane extends StatefulWidget {
   const _TerminalPane({required this.lines, this.onInput});
   final List<String> lines;
@@ -525,6 +544,7 @@ class _TerminalPaneState extends State<_TerminalPane> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final lines = _TerminalLines(lines: widget.lines);
     if (!_interactive) return lines;
 
@@ -548,7 +568,7 @@ class _TerminalPaneState extends State<_TerminalPane> {
                     child: Container(
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: const Color(0xFF60A5FA).withAlpha(150),
+                          color: colors.accentBlue.withAlpha(150),
                           width: 1.2,
                         ),
                         borderRadius: BorderRadius.circular(6),
@@ -571,31 +591,33 @@ class _TerminalLines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (lines.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No output',
-          style: TextStyle(color: Color(0xFF475569), fontSize: 11),
+          style: TextStyle(color: colors.textMuted, fontSize: 11),
         ),
       );
     }
     return Container(
-      color: const Color(0xFF0A0F1A),
+      color: colors.terminalBackground,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: ListView.builder(
         physics: const ClampingScrollPhysics(),
         itemCount: lines.length,
-        itemBuilder: (_, i) => Text(
-          lines[i],
-          style: const TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 10.5,
-            color: Color(0xFF9ECFFF),
-            height: 1.4,
-          ),
-          overflow: TextOverflow.fade,
-          softWrap: false,
-        ),
+        itemBuilder:
+            (_, i) => Text(
+              lines[i],
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 10.5,
+                color: colors.terminalText,
+                height: 1.4,
+              ),
+              overflow: TextOverflow.fade,
+              softWrap: false,
+            ),
       ),
     );
   }
@@ -607,9 +629,10 @@ class _IdlePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      color: const Color(0xFF0A0F1A),
+      color: colors.terminalBackground,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,13 +642,13 @@ class _IdlePlaceholder extends StatelessWidget {
               Icon(
                 Icons.power_settings_new,
                 size: 14,
-                color: Colors.white.withAlpha(140),
+                color: colors.textPrimary.withAlpha(140),
               ),
               const SizedBox(width: 6),
               Text(
                 'Saved session',
                 style: TextStyle(
-                  color: Colors.white.withAlpha(180),
+                  color: colors.textPrimary.withAlpha(180),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -635,7 +658,10 @@ class _IdlePlaceholder extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'PTY not running. Click to start terminal.',
-            style: TextStyle(color: Colors.white.withAlpha(110), fontSize: 10),
+            style: TextStyle(
+              color: colors.textPrimary.withAlpha(110),
+              fontSize: 10,
+            ),
           ),
           const SizedBox(height: 10),
           if (onStart != null)
@@ -646,15 +672,13 @@ class _IdlePlaceholder extends StatelessWidget {
                 icon: const Icon(Icons.play_arrow, size: 14),
                 label: const Text('Start', style: TextStyle(fontSize: 11)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF34D399).withAlpha(40),
-                  foregroundColor: const Color(0xFF34D399),
+                  backgroundColor: colors.accentGreen.withAlpha(40),
+                  foregroundColor: colors.accentGreen,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
-                    side: BorderSide(
-                      color: const Color(0xFF34D399).withAlpha(80),
-                    ),
+                    side: BorderSide(color: colors.accentGreen.withAlpha(80)),
                   ),
                 ),
               ),
@@ -665,9 +689,6 @@ class _IdlePlaceholder extends StatelessWidget {
   }
 }
 
-// ── Shared sub-widgets ─────────────────────────────────────────────────────
-
-/// Animated horizontal stripe at the bottom of a running terminal card.
 class _ActivityStripes extends StatelessWidget {
   const _ActivityStripes({required this.animation, required this.color});
   final Animation<double> animation;
@@ -675,25 +696,28 @@ class _ActivityStripes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final stripeColor = Color.lerp(colors.surface, color, 1)!;
     return AnimatedBuilder(
       animation: animation,
-      builder: (_, __) => Container(
-        height: 3,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              color.withAlpha(0),
-              color.withAlpha(180),
-              color.withAlpha(0),
-            ],
-            stops: [
-              (animation.value - 0.5).clamp(0.0, 1.0),
-              animation.value,
-              (animation.value + 0.5).clamp(0.0, 1.0),
-            ],
+      builder:
+          (_, __) => Container(
+            height: 3,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  stripeColor.withAlpha(0),
+                  stripeColor.withAlpha(180),
+                  stripeColor.withAlpha(0),
+                ],
+                stops: [
+                  (animation.value - 0.5).clamp(0.0, 1.0),
+                  animation.value,
+                  (animation.value + 0.5).clamp(0.0, 1.0),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
     );
   }
 }
@@ -706,48 +730,49 @@ class RepoBranchPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 180),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1E2A),
-          border: Border.all(color: const Color(0xFF2A3040), width: 1),
+          color: colors.surfaceHighlight,
+          border: Border.all(color: colors.border, width: 1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
-          const Icon(Icons.folder_outlined, size: 9, color: Color(0xFFC084FC)),
-          const SizedBox(width: 3),
-          Flexible(
-            child: Text(
-              repo,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFCECEEE),
-                fontFamily: 'monospace',
+            Icon(Icons.folder_outlined, size: 9, color: colors.primaryLight),
+            const SizedBox(width: 3),
+            Flexible(
+              child: Text(
+                repo,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: colors.terminalText,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 5),
-          const Icon(Icons.alt_route, size: 9, color: Color(0xFF7C6BFF)),
-          const SizedBox(width: 2),
-          Flexible(
-            child: Text(
-              branch,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 9,
-                color: Color(0xFF9AA3BF),
-                fontFamily: 'monospace',
+            const SizedBox(width: 5),
+            Icon(Icons.alt_route, size: 9, color: colors.primary),
+            const SizedBox(width: 2),
+            Flexible(
+              child: Text(
+                branch,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: colors.textSecondary,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }

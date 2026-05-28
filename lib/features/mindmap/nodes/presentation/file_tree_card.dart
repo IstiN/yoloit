@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation file-tree card — renders a flat expandable tree from snapshot data.
@@ -32,14 +33,21 @@ class FileTreeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0B0D12),
-        border: Border.all(color: const Color(0x7034D399), width: 1.5),
+        color: colors.surface,
+        border: Border.all(
+          color: colors.accentGreen.withAlpha(112),
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x90000000), blurRadius: 20, offset: Offset(0, 6))
+            color: colors.background.withAlpha(144),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: ClipRRect(
@@ -48,17 +56,18 @@ class FileTreeCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.max,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F1218),
-                border:
-                    Border(bottom: BorderSide(color: Color(0xFF1E2330))),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: colors.surfaceElevated,
+                border: Border(bottom: BorderSide(color: colors.divider)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.account_tree_outlined,
-                      size: 12, color: Color(0xFF34D399)),
+                  Icon(
+                    Icons.account_tree_outlined,
+                    size: 12,
+                    color: colors.accentGreen,
+                  ),
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text(
@@ -66,60 +75,75 @@ class FileTreeCard extends StatelessWidget {
                           ? 'Tree · ${props.repoName}'
                           : 'File Tree',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFE8E8FF)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: props.entries.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('No files loaded',
+              child:
+                  props.entries.isEmpty
+                      ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'No files loaded',
                               style: TextStyle(
-                                  fontSize: 10, color: Color(0xFF475569))),
-                          if (props.repoPath != null &&
-                              props.repoPath!.isNotEmpty)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.only(top: 4, left: 8, right: 8),
-                              child: Text(props.repoPath!,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontSize: 9, color: Color(0xFF334155))),
+                                fontSize: 10,
+                                color: colors.textMuted,
+                              ),
                             ),
-                        ],
+                            if (props.repoPath != null &&
+                                props.repoPath!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 4,
+                                  left: 8,
+                                  right: 8,
+                                ),
+                                child: Text(
+                                  props.repoPath!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      )
+                      : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: props.entries.length,
+                        itemBuilder: (_, i) {
+                          final entry = props.entries[i];
+                          return _TreeRow(
+                            entry: entry,
+                            onToggle:
+                                onToggle != null
+                                    ? () => onToggle!(entry.path)
+                                    : null,
+                            onSelect:
+                                onSelect != null
+                                    ? () => onSelect!(entry.path)
+                                    : null,
+                            onNewFolder: onNewFolder,
+                            onCopyPath: onCopyPath,
+                            onShowInFinder: onShowInFinder,
+                            onOpenInPanel: onOpenInPanel,
+                            onRename: onRename,
+                            onCreateFile: onCreateFile,
+                            onDelete: onDelete,
+                          );
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      itemCount: props.entries.length,
-                      itemBuilder: (_, i) {
-                        final entry = props.entries[i];
-                        return _TreeRow(
-                          entry: entry,
-                          onToggle: onToggle != null
-                              ? () => onToggle!(entry.path)
-                              : null,
-                          onSelect: onSelect != null
-                              ? () => onSelect!(entry.path)
-                              : null,
-                          onNewFolder: onNewFolder,
-                          onCopyPath: onCopyPath,
-                          onShowInFinder: onShowInFinder,
-                          onOpenInPanel: onOpenInPanel,
-                          onRename: onRename,
-                          onCreateFile: onCreateFile,
-                          onDelete: onDelete,
-                        );
-                      },
-                    ),
             ),
           ],
         ),
@@ -160,37 +184,82 @@ class _TreeRowState extends State<_TreeRow> {
   bool _hovered = false;
 
   Future<void> _showContextMenu(BuildContext context, Offset globalPos) async {
+    final colors = context.appColors;
     final e = widget.entry;
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
-        globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy),
-      color: const Color(0xFF12151C),
+        globalPos.dx,
+        globalPos.dy,
+        globalPos.dx,
+        globalPos.dy,
+      ),
+      color: colors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: Color(0xFF2A3040)),
+        side: BorderSide(color: colors.border),
       ),
       items: [
         if (e.isDir)
-          const PopupMenuItem(value: 'new_folder', child: Text('📁 New Folder',
-              style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
+          PopupMenuItem(
+            value: 'new_folder',
+            child: Text(
+              '📁 New Folder',
+              style: TextStyle(fontSize: 12, color: colors.terminalText),
+            ),
+          ),
         if (e.isDir && widget.onCreateFile != null)
-          const PopupMenuItem(value: 'create_file', child: Text('📄 New File',
-              style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
-        const PopupMenuItem(value: 'rename', child: Text('✏️ Rename',
-            style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
-        const PopupMenuItem(value: 'copy_path', child: Text('📋 Copy path',
-            style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
-        const PopupMenuItem(value: 'copy_name', child: Text('📄 Copy filename',
-            style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
-        const PopupMenuItem(value: 'show_finder', child: Text('📂 Show in Finder',
-            style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
+          PopupMenuItem(
+            value: 'create_file',
+            child: Text(
+              '📄 New File',
+              style: TextStyle(fontSize: 12, color: colors.terminalText),
+            ),
+          ),
+        PopupMenuItem(
+          value: 'rename',
+          child: Text(
+            '✏️ Rename',
+            style: TextStyle(fontSize: 12, color: colors.terminalText),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'copy_path',
+          child: Text(
+            '📋 Copy path',
+            style: TextStyle(fontSize: 12, color: colors.terminalText),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'copy_name',
+          child: Text(
+            '📄 Copy filename',
+            style: TextStyle(fontSize: 12, color: colors.terminalText),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'show_finder',
+          child: Text(
+            '📂 Show in Finder',
+            style: TextStyle(fontSize: 12, color: colors.terminalText),
+          ),
+        ),
         if (!e.isDir && widget.onOpenInPanel != null)
-          const PopupMenuItem(value: 'open_panel', child: Text('⬡ Open in panel',
-              style: TextStyle(fontSize: 12, color: Color(0xFFCECEEE)))),
+          PopupMenuItem(
+            value: 'open_panel',
+            child: Text(
+              '⬡ Open in panel',
+              style: TextStyle(fontSize: 12, color: colors.terminalText),
+            ),
+          ),
         const PopupMenuDivider(),
-        const PopupMenuItem(value: 'delete', child: Text('🗑️ Delete',
-            style: TextStyle(fontSize: 12, color: Color(0xFFEF4444)))),
+        PopupMenuItem(
+          value: 'delete',
+          child: Text(
+            '🗑️ Delete',
+            style: TextStyle(fontSize: 12, color: colors.accentRed),
+          ),
+        ),
       ],
     );
     if (result == null) return;
@@ -216,6 +285,7 @@ class _TreeRowState extends State<_TreeRow> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final e = widget.entry;
     final indent = 12.0 + e.depth * 16.0;
     return MouseRegion(
@@ -225,32 +295,25 @@ class _TreeRowState extends State<_TreeRow> {
         onSecondaryTapDown: (d) => _showContextMenu(context, d.globalPosition),
         onTap: e.isDir ? widget.onToggle : widget.onSelect,
         child: Container(
-          color: _hovered ? const Color(0xFF1A1E2A) : Colors.transparent,
-          padding: EdgeInsets.only(
-              left: indent, right: 8, top: 3, bottom: 3),
+          color: _hovered ? colors.surfaceHighlight : Colors.transparent,
+          padding: EdgeInsets.only(left: indent, right: 8, top: 3, bottom: 3),
           child: Row(
             children: [
               if (e.isDir)
                 Icon(
-                  e.isExpanded
-                      ? Icons.expand_more
-                      : Icons.chevron_right,
+                  e.isExpanded ? Icons.expand_more : Icons.chevron_right,
                   size: 14,
-                  color: const Color(0xFF6B7898),
+                  color: colors.textSecondary,
                 )
               else
                 const SizedBox(width: 14),
               const SizedBox(width: 4),
               Icon(
                 e.isDir
-                    ? (e.isExpanded
-                        ? Icons.folder_open
-                        : Icons.folder)
+                    ? (e.isExpanded ? Icons.folder_open : Icons.folder)
                     : _fileIcon(e.name),
                 size: 13,
-                color: e.isDir
-                    ? const Color(0xFF34D399)
-                    : const Color(0xFF60A5FA),
+                color: e.isDir ? colors.accentGreen : colors.accentBlue,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -259,9 +322,7 @@ class _TreeRowState extends State<_TreeRow> {
                   style: TextStyle(
                     fontSize: 11,
                     fontFamily: 'monospace',
-                    color: _hovered
-                        ? const Color(0xFFE8E8FF)
-                        : const Color(0xFFCECEEE),
+                    color: _hovered ? colors.textPrimary : colors.terminalText,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

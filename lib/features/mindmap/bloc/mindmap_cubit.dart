@@ -451,7 +451,7 @@ class MindMapCubit extends Cubit<MindMapState> {
               fromId: treeNode.id,
               toId: id,
               style: ConnectorStyle.dashed,
-              color: const Color(0x7060A5FA),
+              color: connectorColor.withValues(alpha: 0.44),
             ),
           ]
         : state.connections;
@@ -505,7 +505,7 @@ class MindMapCubit extends Cubit<MindMapState> {
               fromId: diffNode.id,
               toId: id,
               style: ConnectorStyle.dashed,
-              color: const Color(0x7060A5FA),
+              color: connectorColor.withValues(alpha: 0.44),
             ),
           ]
         : state.connections;

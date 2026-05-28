@@ -6,6 +6,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation editor card — shared shell for both macOS and web.
@@ -29,6 +30,7 @@ class EditorCard extends StatefulWidget {
   final void Function(int tabIndex)? onSwitchTab;
   final VoidCallback? onSave;
   final VoidCallback? onToggleImmersive;
+
   /// Called with new content when user edits text (web only).
   final void Function(String content)? onContentUpdate;
 
@@ -56,7 +58,6 @@ class _EditorCardState extends State<EditorCard> {
   @override
   void didUpdateWidget(EditorCard old) {
     super.didUpdateWidget(old);
-    // Refresh editor content from props unless user is actively editing.
     if (!_isEditing && old.props.content != widget.props.content) {
       _editCtrl.text = widget.props.content;
     }
@@ -78,14 +79,17 @@ class _EditorCardState extends State<EditorCard> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final props = widget.props;
     final lines = props.content.split('\n').take(200).toList();
 
     Widget editorBody;
     if (props.isImage) {
-      editorBody = _ImageBody(base64: props.imageBase64!, filePath: props.filePath);
+      editorBody = _ImageBody(
+        base64: props.imageBase64!,
+        filePath: props.filePath,
+      );
     } else if (_isEditing && widget.onContentUpdate != null) {
-      // Editable code/text area (web guest only).
       editorBody = KeyboardListener(
         focusNode: FocusNode(),
         onKeyEvent: (ev) {
@@ -100,87 +104,91 @@ class _EditorCardState extends State<EditorCard> {
           focusNode: _focusNode,
           maxLines: null,
           expands: true,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'monospace',
             fontSize: 10,
-            color: Color(0xFFADD8E6),
+            color: colors.terminalText,
             height: 1.5,
           ),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             isDense: true,
             border: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            fillColor: Color(0xFF0A0F14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 6,
+            ),
+            fillColor: colors.terminalBackground,
             filled: true,
           ),
         ),
       );
     } else if (_isPreview && _isMarkdown) {
       editorBody = Container(
-        color: const Color(0xFF0A0F14),
+        color: colors.terminalBackground,
         padding: const EdgeInsets.all(12),
         child: Markdown(
           data: props.content,
           shrinkWrap: false,
           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-            p: const TextStyle(color: Color(0xFFD0D0D8), fontSize: 11),
-            h1: const TextStyle(
-              color: Color(0xFFE8E8FF),
+            p: TextStyle(color: colors.terminalText, fontSize: 11),
+            h1: TextStyle(
+              color: colors.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
-            h2: const TextStyle(
-              color: Color(0xFFE8E8FF),
+            h2: TextStyle(
+              color: colors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
-            code: const TextStyle(
+            code: TextStyle(
               fontFamily: 'monospace',
               fontSize: 10,
-              color: Color(0xFF60A5FA),
-              backgroundColor: Color(0xFF1E2330),
+              color: colors.accentBlue,
+              backgroundColor: colors.surfaceHighlight,
             ),
           ),
         ),
       );
     } else {
       editorBody = Container(
-        color: const Color(0xFF0A0F14),
+        color: colors.terminalBackground,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: SelectionArea(
           child: ListView.builder(
             itemCount: lines.length,
-            itemBuilder: (_, i) => Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 32,
-                  child: Text(
-                    '${i + 1}',
-                    textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 10,
-                      color: Color(0xFF3A4560),
-                      height: 1.5,
+            itemBuilder:
+                (_, i) => Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      child: Text(
+                        '${i + 1}',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          color: colors.textMuted,
+                          height: 1.5,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    lines[i],
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 10,
-                      color: Color(0xFFADD8E6),
-                      height: 1.5,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        lines[i],
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          color: colors.terminalText,
+                          height: 1.5,
+                        ),
+                        softWrap: true,
+                      ),
                     ),
-                    softWrap: true,
-                  ),
+                  ],
                 ),
-              ],
-            ),
           ),
         ),
       );
@@ -188,17 +196,21 @@ class _EditorCardState extends State<EditorCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0B0D12),
+        color: colors.surface,
         border: Border.all(
-          color: widget.immersive ? const Color(0xFF60A5FA) : const Color(0x5960A5FA),
+          color:
+              widget.immersive
+                  ? colors.accentBlue
+                  : colors.accentBlue.withAlpha(89),
           width: widget.immersive ? 2 : 1.5,
         ),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: widget.immersive
-                ? const Color(0xCC000000)
-                : const Color(0x90000000),
+            color:
+                widget.immersive
+                    ? colors.background.withAlpha(204)
+                    : colors.background.withAlpha(144),
             blurRadius: widget.immersive ? 32 : 20,
             offset: const Offset(0, 6),
           ),
@@ -209,15 +221,14 @@ class _EditorCardState extends State<EditorCard> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Tab chips and file header are only needed when the card renders
-            // its own content (web). When [body] is provided (macOS EditorNode),
-            // FileEditorPanel supplies its own tab bar and toolbar.
-            if (!widget.immersive && widget.body == null && props.tabs.length > 1)
+            if (!widget.immersive &&
+                widget.body == null &&
+                props.tabs.length > 1)
               Container(
                 height: 28,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0A0D12),
-                  border: Border(bottom: BorderSide(color: Color(0xFF1E2330))),
+                decoration: BoxDecoration(
+                  color: colors.background,
+                  border: Border(bottom: BorderSide(color: colors.divider)),
                 ),
                 child: ListView(
                   scrollDirection: Axis.horizontal,
@@ -238,21 +249,21 @@ class _EditorCardState extends State<EditorCard> {
                   horizontal: 12,
                   vertical: 6,
                 ),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0F1218),
-                  border: Border(bottom: BorderSide(color: Color(0xFF1E2330))),
+                decoration: BoxDecoration(
+                  color: colors.surfaceElevated,
+                  border: Border(bottom: BorderSide(color: colors.divider)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.code, size: 12, color: Color(0xFF60A5FA)),
+                    Icon(Icons.code, size: 12, color: colors.accentBlue),
                     const SizedBox(width: 7),
                     Expanded(
                       child: Text(
                         p.basename(props.filePath),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFFE8E8FF),
+                          color: colors.textPrimary,
                           fontFamily: 'monospace',
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -260,15 +271,11 @@ class _EditorCardState extends State<EditorCard> {
                     ),
                     Text(
                       props.language,
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: Color(0xFF44446A),
-                      ),
+                      style: TextStyle(fontSize: 9, color: colors.textMuted),
                     ),
-                    // Markdown preview toggle — only when the card renders its
-                    // own body (web). When a [body] override is provided (macOS),
-                    // the embedded FileEditorPanel already shows its own toggle.
-                    if (_isMarkdown && !props.isImage && widget.body == null) ...[
+                    if (_isMarkdown &&
+                        !props.isImage &&
+                        widget.body == null) ...[
                       const SizedBox(width: 6),
                       _HeaderButton(
                         label: _isPreview ? 'Code' : 'Preview',
@@ -279,7 +286,6 @@ class _EditorCardState extends State<EditorCard> {
                         },
                       ),
                     ],
-                    // Edit button (web only — only shown when onContentUpdate is provided).
                     if (widget.onContentUpdate != null && !props.isImage) ...[
                       const SizedBox(width: 6),
                       _HeaderButton(
@@ -320,16 +326,17 @@ class _TabChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF1A2040) : Colors.transparent,
+          color: isActive ? colors.tabActiveBg : Colors.transparent,
           border: Border(
             bottom: BorderSide(
-              color: isActive ? const Color(0xFF60A5FA) : Colors.transparent,
+              color: isActive ? colors.tabBorder : Colors.transparent,
               width: 2,
             ),
           ),
@@ -340,9 +347,7 @@ class _TabChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 9,
               fontFamily: 'monospace',
-              color: isActive
-                  ? const Color(0xFFE8E8FF)
-                  : const Color(0xFF6B7898),
+              color: isActive ? colors.textPrimary : colors.textSecondary,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
@@ -360,25 +365,26 @@ class _HeaderButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A2040),
+          color: colors.tabActiveBg,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: const Color(0xFF2A3560), width: 1),
+          border: Border.all(color: colors.tabBorder, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 9, color: const Color(0xFF60A5FA)),
+            Icon(icon, size: 9, color: colors.accentBlue),
             const SizedBox(width: 3),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 9,
-                color: Color(0xFF60A5FA),
+                color: colors.accentBlue,
                 fontFamily: 'monospace',
               ),
             ),
@@ -394,35 +400,40 @@ class _ImageBody extends StatelessWidget {
   final String base64;
   final String filePath;
 
-  bool get _isSvg =>
-      filePath.toLowerCase().endsWith('.svg');
+  bool get _isSvg => filePath.toLowerCase().endsWith('.svg');
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     try {
       final bytes = base64Decode(base64);
       return Container(
-        color: const Color(0xFF0A0F14),
+        color: colors.terminalBackground,
         child: Center(
-          child: _isSvg
-              ? SvgPicture.memory(bytes, fit: BoxFit.contain)
-              : Image.memory(
-                  bytes,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Center(
-                    child: Text(
-                      'Image error',
-                      style: TextStyle(color: Color(0xFF60A5FA), fontSize: 10),
-                    ),
+          child:
+              _isSvg
+                  ? SvgPicture.memory(bytes, fit: BoxFit.contain)
+                  : Image.memory(
+                    bytes,
+                    fit: BoxFit.contain,
+                    errorBuilder:
+                        (_, __, ___) => Center(
+                          child: Text(
+                            'Image error',
+                            style: TextStyle(
+                              color: colors.accentBlue,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
                   ),
-                ),
         ),
       );
     } catch (_) {
-      return const Center(
+      return Center(
         child: Text(
           'Invalid image data',
-          style: TextStyle(color: Color(0xFF60A5FA), fontSize: 10),
+          style: TextStyle(color: colors.accentBlue, fontSize: 10),
         ),
       );
     }

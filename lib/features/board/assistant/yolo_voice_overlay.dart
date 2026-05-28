@@ -1,77 +1,81 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 
 // ─── brightness-aware palette for the voice overlay ─────────────────────────
 
 class _OverlayPalette {
-  _OverlayPalette._(this._dark);
+  _OverlayPalette._(this.colors, this._dark);
 
-  factory _OverlayPalette.of(BuildContext context) =>
-      _OverlayPalette._(Theme.of(context).brightness == Brightness.dark);
+  factory _OverlayPalette.of(BuildContext context) => _OverlayPalette._(
+    context.appColors,
+    Theme.of(context).brightness == Brightness.dark,
+  );
 
+  final AppColorScheme colors;
   final bool _dark;
 
   // Response card gradient background
-  List<Color> get cardGradient => _dark
-      ? const [Color(0xF21B1F2A), Color(0xD91B1F2A), Color(0x6E1B1F2A), Color(0x1A1B1F2A)]
-      : const [Color(0xF2F0F2F8), Color(0xD9F0F2F8), Color(0x6EF0F2F8), Color(0x1AF0F2F8)];
+  List<Color> get cardGradient =>
+      _dark
+          ? [
+            colors.surface.withValues(alpha: 0.95),
+            colors.surface.withValues(alpha: 0.85),
+            colors.surface.withValues(alpha: 0.43),
+            colors.surface.withValues(alpha: 0.10),
+          ]
+          : [
+            colors.surfaceHighlight.withValues(alpha: 0.95),
+            colors.surfaceHighlight.withValues(alpha: 0.85),
+            colors.surfaceHighlight.withValues(alpha: 0.43),
+            colors.surfaceHighlight.withValues(alpha: 0.10),
+          ];
 
   // Main text color in response card
-  Color get textHigh => _dark
-      ? Colors.white.withValues(alpha: 0.95)
-      : Colors.black.withValues(alpha: 0.88);
+  Color get textHigh =>
+      colors.textPrimary.withValues(alpha: _dark ? 0.95 : 0.88);
 
-  Color get textHeading => _dark
-      ? Colors.white.withValues(alpha: 0.98)
-      : Colors.black.withValues(alpha: 0.92);
+  Color get textHeading =>
+      colors.textPrimary.withValues(alpha: _dark ? 0.98 : 0.92);
 
   // Tool log line text
-  Color get textTool => _dark
-      ? Colors.white.withValues(alpha: 0.75)
-      : Colors.black.withValues(alpha: 0.65);
+  Color get textTool =>
+      colors.textPrimary.withValues(alpha: _dark ? 0.75 : 0.65);
 
-  // Action label ("Tap YoLo to speak")
-  Color get actionLabel => _dark
-      ? const Color(0xFF8C8D9E)
-      : const Color(0xFF6B6C7E);
+  // Action label ('Tap YoLo to speak')
+  Color get actionLabel => _dark ? colors.textMuted : colors.textSecondary;
 
   // Code / link accent
-  Color get codeAccent => _dark
-      ? const Color(0xFF8BD8FF)
-      : const Color(0xFF1A73CE);
+  Color get codeAccent => colors.accentBlue;
 
   // Code block background
-  Color get codeBg => _dark
-      ? const Color(0x66101420)
-      : const Color(0x30D0D4E0);
+  Color get codeBg => (_dark ? colors.surface : colors.surfaceHighlight)
+      .withValues(alpha: _dark ? 0.40 : 0.18);
 
-  Color get codeBlockBg => _dark
-      ? const Color(0xAA101420)
-      : const Color(0x40D0D4E0);
+  Color get codeBlockBg => (_dark ? colors.surfaceElevated : colors.surface)
+      .withValues(alpha: _dark ? 0.67 : 0.25);
 
   // Text shadow for response text
-  Color get textShadow => _dark
-      ? const Color(0x889B6BFF)
-      : Colors.transparent;
+  Color get textShadow =>
+      _dark ? colors.primary.withValues(alpha: 0.53) : Colors.transparent;
 
   // Box shadow glow colors
-  Color cardGlow(bool streaming) => _dark
-      ? Color(0xFF9B6BFF).withValues(alpha: streaming ? 0.30 : 0.20)
-      : Color(0xFF9B6BFF).withValues(alpha: streaming ? 0.12 : 0.06);
+  Color cardGlow(bool streaming) => colors.primaryLight.withValues(
+    alpha: _dark ? (streaming ? 0.30 : 0.20) : (streaming ? 0.12 : 0.06),
+  );
 
-  Color get cardGlow2 => _dark
-      ? const Color(0xFF64DFFF).withValues(alpha: 0.14)
-      : const Color(0xFF64DFFF).withValues(alpha: 0.06);
+  Color get cardGlow2 =>
+      colors.accentBlue.withValues(alpha: _dark ? 0.14 : 0.06);
 
   // Glow text shadow
-  Color get glowTextShadow => _dark
-      ? Colors.black.withValues(alpha: 0.7)
-      : Colors.white.withValues(alpha: 0.5);
+  Color get glowTextShadow => (_dark ? colors.background : colors.surface)
+      .withValues(alpha: _dark ? 0.7 : 0.5);
 }
 
 // ─────────────────────────── public API ──────────────────────────────────────
@@ -136,6 +140,7 @@ class YoloVoiceOverlay extends StatefulWidget {
   final bool showIdleHint;
   final double orbAlignY;
   final double responseOrbAlignY;
+
   /// Real-time mic amplitude stream (0.0–1.0). When provided, the waveform
   /// reacts to the actual microphone input instead of animating freely.
   final Stream<double>? micAmplitudeStream;
@@ -206,7 +211,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     }
     if (old.status != widget.status) {
       // ignore: avoid_print
-      print('[VoiceOverlay] status widget: ${old.status} → ${widget.status} (shown=${_shown.name})');
+      print(
+        '[VoiceOverlay] status widget: ${old.status} → ${widget.status} (shown=${_shown.name})',
+      );
       _maybeTransition();
     }
   }
@@ -225,7 +232,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     if (target == _shown) return;
 
     // ignore: avoid_print
-    print('[VoiceOverlay] _maybeTransition: ${_shown.name} → ${target.name} (pending=$_pendingTransition)');
+    print(
+      '[VoiceOverlay] _maybeTransition: ${_shown.name} → ${target.name} (pending=$_pendingTransition)',
+    );
 
     // Tool/text streaming should surface immediately in the response card
     // instead of walking through intermediate processing/thinking states.
@@ -233,7 +242,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     // delayed transition never blocks the responding state from showing.
     if (target == _VS.responding) {
       // ignore: avoid_print
-      print('[VoiceOverlay] immediate → responding (cancelled pending=$_pendingTransition)');
+      print(
+        '[VoiceOverlay] immediate → responding (cancelled pending=$_pendingTransition)',
+      );
       _pendingTransition = false; // cancel any pending delayed transition
       setState(() {
         _shown = target;
@@ -257,7 +268,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
         if (!mounted) return;
         final latest = _VS.from(widget.status);
         // ignore: avoid_print
-        print('[VoiceOverlay] delayed fired: _shown=${_shown.name} latest=${latest.name}');
+        print(
+          '[VoiceOverlay] delayed fired: _shown=${_shown.name} latest=${latest.name}',
+        );
         if (latest == _shown) return;
 
         // Step to next sequential state, not jump to latest
@@ -267,7 +280,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
             (latestIdx > curIdx + 1) ? _order[curIdx + 1] : latest;
 
         // ignore: avoid_print
-        print('[VoiceOverlay] delayed step: ${_shown.name} → ${nextState.name}');
+        print(
+          '[VoiceOverlay] delayed step: ${_shown.name} → ${nextState.name}',
+        );
         setState(() {
           _shown = nextState;
           _shownAt = DateTime.now();
@@ -286,7 +301,9 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
       final nextState = (targetIdx > curIdx + 1) ? _order[curIdx + 1] : target;
 
       // ignore: avoid_print
-      print('[VoiceOverlay] immediate step: ${_shown.name} → ${nextState.name}');
+      print(
+        '[VoiceOverlay] immediate step: ${_shown.name} → ${nextState.name}',
+      );
       setState(() {
         _shown = nextState;
         _shownAt = DateTime.now();
@@ -335,7 +352,8 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   // Compute the alignment so the orbit center (at 60 % of particle widget height)
   // lands exactly on the orb centre, regardless of particleScale / orbAlignY.
   double get _particleAlignY {
-    const orbitFraction = 0.60; // must stay in sync with _ScatteredParticlesPainter
+    const orbitFraction =
+        0.60; // must stay in sync with _ScatteredParticlesPainter
     final orbH = _orbSize * widget.orbScale;
     final particleH = 320.0 * widget.particleScale;
     final denominator = _kH - particleH;
@@ -345,6 +363,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
         2 * (orbCenterY - orbitFraction * particleH) / denominator - 1;
     return alignY.clamp(-0.9, 2.0);
   }
+
   double get _waveAlignY => (_orbAlign.y - 0.06).clamp(-0.9, 0.95);
   double get _textAlignY => (_orbAlign.y + 0.34).clamp(-0.2, 0.95);
   double get _responseCardBottomPadding {
@@ -361,6 +380,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Focus(
       focusNode: widget.focusNode,
       onKeyEvent: (_, event) {
@@ -397,6 +417,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                     child: _OrbitParticles(
                       animate: (_isThinking || _isSending) && widget.animate,
                       scale: widget.particleScale,
+                      colors: colors,
                     ),
                   ),
                 ),
@@ -420,6 +441,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         amplitude: widget.waveAmplitude,
                         speed: widget.waveSpeed,
                         micAmplitudeStream: widget.micAmplitudeStream,
+                        colors: colors,
                       ),
                     ),
                   ),
@@ -440,6 +462,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                         amplitude: widget.waveAmplitude,
                         speed: widget.waveSpeed,
                         micAmplitudeStream: widget.micAmplitudeStream,
+                        colors: colors,
                       ),
                     ),
                   ),
@@ -470,6 +493,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                                               ? _orbAnim.value
                                               : 0.23,
                                       mode: _orbMode,
+                                      colors: colors,
                                       bgColor:
                                           Theme.of(ctx).scaffoldBackgroundColor,
                                       ovalWidth: widget.ovalWidth,
@@ -509,6 +533,7 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
                               response: widget.response,
                               streaming: widget.status == 'responding',
                               animate: widget.animate,
+                              colors: colors,
                               fontSize: widget.responseFontSize,
                               borderSpeed: widget.borderSpeed,
                               actionLabel: widget.responseActionLabel,
@@ -565,30 +590,40 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
     );
   }
 
-  Widget _orbLabel(double sz) => ShaderMask(
-    shaderCallback:
-        (b) => LinearGradient(
-          colors:
-              widget.titleColor != null
-                  ? [widget.titleColor!, widget.titleColor!]
-                  : const [Color(0xFF64DFFF), Color(0xFFB980FF)],
-        ).createShader(b),
-    child: Text(
-      'YoLo',
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: widget.titleFontSize ?? sz * 0.15,
-        fontWeight: FontWeight.w300,
-        letterSpacing: -0.8,
-        shadows: const [Shadow(color: Color(0xAA63B8FF), blurRadius: 16)],
+  Widget _orbLabel(double sz) {
+    final colors = context.appColors;
+    return ShaderMask(
+      shaderCallback:
+          (b) => LinearGradient(
+            colors:
+                widget.titleColor != null
+                    ? [widget.titleColor!, widget.titleColor!]
+                    : [colors.accentBlue, colors.primaryLight],
+          ).createShader(b),
+      child: Text(
+        'YoLo',
+        style: TextStyle(
+          color: colors.textPrimary,
+          fontSize: widget.titleFontSize ?? sz * 0.15,
+          fontWeight: FontWeight.w300,
+          letterSpacing: -0.8,
+          shadows: [
+            Shadow(
+              color: colors.accentBlue.withValues(alpha: 0.67),
+              blurRadius: 16,
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _textContent() {
     // ignore: avoid_print
-    print('[VoiceOverlay] render: _shown=${_shown.name} widget.status=${widget.status}');
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    print(
+      '[VoiceOverlay] render: _shown=${_shown.name} widget.status=${widget.status}',
+    );
+    final colors = context.appColors;
     return KeyedSubtree(
       key: ValueKey(_shown),
       child: switch (_shown) {
@@ -596,34 +631,34 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
           widget.showIdleHint
               ? _TextBlock(
                 primary: 'Click or speak to start',
-                primaryColor: isDark ? const Color(0xFFB5B6C8) : const Color(0xFF5A5B6E),
+                primaryColor: colors.textSecondary,
                 primarySize: 15,
               )
               : const SizedBox.shrink(),
         _VS.listening => _TextBlock(
           primary: 'Recording...',
-          primaryColor: isDark ? const Color(0xFFCCCCE0) : const Color(0xFF4A4A5E),
+          primaryColor: colors.textPrimary,
           primarySize: 15,
           secondary: 'Esc to cancel  •  Space to send',
-          secondaryColor: isDark ? const Color(0xFF9293A6) : const Color(0xFF6A6B7E),
+          secondaryColor: colors.textSecondary,
           secondarySize: 12,
         ),
         _VS.processing => _TextBlock(
           primary: 'Processing...',
-          primaryColor: isDark ? const Color(0xFF62C9FF) : const Color(0xFF1565C0),
+          primaryColor: colors.accentBlue,
           primarySize: 16,
           primaryBold: true,
           secondary: 'Please wait',
-          secondaryColor: isDark ? const Color(0xFF9A9BAD) : const Color(0xFF6A6B7E),
+          secondaryColor: colors.textSecondary,
           secondarySize: 12,
         ),
         _VS.thinking => _TextBlock(
           primary: 'Thinking...',
-          primaryColor: isDark ? const Color(0xFFD58BFF) : const Color(0xFF7B1FA2),
+          primaryColor: colors.primaryLight,
           primarySize: 16,
           primaryBold: true,
           secondary: 'Waiting for response...',
-          secondaryColor: isDark ? const Color(0xFF9A9BAD) : const Color(0xFF6A6B7E),
+          secondaryColor: colors.textSecondary,
           secondarySize: 12,
         ),
         _VS.responding => const SizedBox.shrink(),
@@ -720,6 +755,7 @@ class _ResponseCard extends StatefulWidget {
   const _ResponseCard({
     required this.response,
     required this.streaming,
+    required this.colors,
     this.animate = true,
     this.fontSize = 18.0,
     this.borderSpeed = 1200,
@@ -728,6 +764,7 @@ class _ResponseCard extends StatefulWidget {
 
   final String response;
   final bool streaming;
+  final AppColorScheme colors;
   final bool animate;
   final double fontSize;
   final int borderSpeed;
@@ -741,6 +778,7 @@ class _ResponseCardState extends State<_ResponseCard>
     with TickerProviderStateMixin {
   late final AnimationController _borderAnim;
   late AnimationController _typingAnim;
+
   /// Fade-in controller: animates 0→1 when streaming stops.
   late final AnimationController _crossfadeAnim;
   late final ScrollController _scrollCtrl;
@@ -826,11 +864,10 @@ class _ResponseCardState extends State<_ResponseCard>
               4000,
             ),
           ),
-          lowerBound:
-              (oldLen / widget.response.length.clamp(1, 99999)).clamp(
-                0.0,
-                0.99,
-              ),
+          lowerBound: (oldLen / widget.response.length.clamp(1, 99999)).clamp(
+            0.0,
+            0.99,
+          ),
         );
         _typingAnim.addListener(_updateVisibleChars);
         _typingAnim.forward();
@@ -865,7 +902,11 @@ class _ResponseCardState extends State<_ResponseCard>
     super.dispose();
   }
 
-  String _displayText(String response, {bool streaming = false, int visibleChars = 0}) {
+  String _displayText(
+    String response, {
+    bool streaming = false,
+    int visibleChars = 0,
+  }) {
     final full =
         response.trim().isEmpty
             ? 'YoLo! Here is what I found for you...'
@@ -877,6 +918,7 @@ class _ResponseCardState extends State<_ResponseCard>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final displayText = _displayText(
       widget.response,
       streaming: widget.streaming,
@@ -895,15 +937,16 @@ class _ResponseCardState extends State<_ResponseCard>
 
         // Build the content body, optionally with fade-in animation on final answer.
         final newBody = _buildContentBody(displayText, hasMermaid, contentMaxH);
-        final body = _isCrossfading
-            ? Opacity(
-                opacity: Curves.easeOut.transform(_crossfadeAnim.value),
-                child: Transform.translate(
-                  offset: Offset(0, (1.0 - _crossfadeAnim.value) * 12),
-                  child: newBody,
-                ),
-              )
-            : newBody;
+        final body =
+            _isCrossfading
+                ? Opacity(
+                  opacity: Curves.easeOut.transform(_crossfadeAnim.value),
+                  child: Transform.translate(
+                    offset: Offset(0, (1.0 - _crossfadeAnim.value) * 12),
+                    child: newBody,
+                  ),
+                )
+                : newBody;
 
         // Column(mainAxisSize.min) shrinks to content.
         // AnimatedContainer contains ConstrainedBox(maxH=contentMaxH) + CustomScrollView(shrinkWrap).
@@ -915,15 +958,18 @@ class _ResponseCardState extends State<_ResponseCard>
           children: [
             AnimatedBuilder(
               animation: _borderAnim,
-              builder: (ctx, child) => CustomPaint(
-                painter: widget.streaming
-                    ? _RunningBorderPainter(
-                        progress: _borderAnim.value,
-                        radius: 28,
-                      )
-                    : null,
-                child: child,
-              ),
+              builder:
+                  (ctx, child) => CustomPaint(
+                    painter:
+                        widget.streaming
+                            ? _RunningBorderPainter(
+                              progress: _borderAnim.value,
+                              radius: 28,
+                              colors: colors,
+                            )
+                            : null,
+                    child: child,
+                  ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(28),
                 child: Stack(
@@ -958,7 +1004,10 @@ class _ResponseCardState extends State<_ResponseCard>
                     // Shimmer sweep overlay while streaming.
                     if (widget.streaming)
                       Positioned.fill(
-                        child: _ShimmerSweep(animate: widget.animate),
+                        child: _ShimmerSweep(
+                          animate: widget.animate,
+                          colors: colors,
+                        ),
                       ),
                   ],
                 ),
@@ -1015,12 +1064,7 @@ class _ResponseCardState extends State<_ResponseCard>
         fontSize: widget.fontSize,
         height: 1.52,
         fontWeight: FontWeight.w500,
-        shadows: [
-          Shadow(
-            color: pal.textShadow,
-            blurRadius: 14,
-          ),
-        ],
+        shadows: [Shadow(color: pal.textShadow, blurRadius: 14)],
       ),
       h1: TextStyle(
         color: pal.textHeading,
@@ -1105,7 +1149,12 @@ class _ResponseCardState extends State<_ResponseCard>
         children: [
           SizedBox.square(
             dimension: 15,
-            child: CustomPaint(painter: _ToolStateIconPainter(state: state)),
+            child: CustomPaint(
+              painter: _ToolStateIconPainter(
+                state: state,
+                colors: widget.colors,
+              ),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -1129,10 +1178,15 @@ class _ResponseCardState extends State<_ResponseCard>
 
 /// Animated border painter — draws a running gradient stroke around the card.
 class _RunningBorderPainter extends CustomPainter {
-  _RunningBorderPainter({required this.progress, required this.radius});
+  _RunningBorderPainter({
+    required this.progress,
+    required this.radius,
+    required this.colors,
+  });
 
   final double progress;
   final double radius;
+  final AppColorScheme colors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1163,12 +1217,7 @@ class _RunningBorderPainter extends CustomPainter {
 
       // Color transitions along the trail: head bright, tail fading
       final t = segFrac;
-      final color =
-          Color.lerp(
-            const Color(0xFFFF60DD), // tail: pink
-            const Color(0xFF64DFFF), // head: cyan
-            t,
-          )!;
+      final color = Color.lerp(colors.primaryLight, colors.accentBlue, t)!;
       final alpha = (0.15 + t * 0.85).clamp(0.0, 1.0);
 
       final paint =
@@ -1188,14 +1237,15 @@ class _RunningBorderPainter extends CustomPainter {
     if (headPos != null) {
       final glowPaint =
           Paint()
-            ..color = const Color(0xFF64DFFF).withValues(alpha: 0.6)
+            ..color = colors.accentBlue.withValues(alpha: 0.6)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
       canvas.drawCircle(headPos.position, 3, glowPaint);
     }
   }
 
   @override
-  bool shouldRepaint(_RunningBorderPainter old) => old.progress != progress;
+  bool shouldRepaint(_RunningBorderPainter old) =>
+      old.progress != progress || old.colors != colors;
 }
 
 // ─────────────────────────── tool state icon ──────────────────────────────────
@@ -1204,9 +1254,10 @@ enum _ToolState { done, failed, running }
 
 /// Custom painted icon for tool log rows: circle with check/x/dot.
 class _ToolStateIconPainter extends CustomPainter {
-  const _ToolStateIconPainter({required this.state});
+  const _ToolStateIconPainter({required this.state, required this.colors});
 
   final _ToolState state;
+  final AppColorScheme colors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1214,9 +1265,9 @@ class _ToolStateIconPainter extends CustomPainter {
     final r = size.width / 2;
 
     final color = switch (state) {
-      _ToolState.done => const Color(0xFF4FFFB0),
-      _ToolState.failed => const Color(0xFFFF6B6B),
-      _ToolState.running => const Color(0xFF9B6BFF),
+      _ToolState.done => colors.accentGreen,
+      _ToolState.failed => colors.accentRed,
+      _ToolState.running => colors.primary,
     };
 
     // Background fill
@@ -1278,7 +1329,6 @@ class _ToolStateIconPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ToolStateIconPainter old) => old.state != state;
 }
-
 
 // Draws 5 large overlapping irregular translucent blobs with visible edges,
 // matching the reference: organic shapes, NOT circles.
@@ -1398,6 +1448,7 @@ class _BlobOrbPainter extends CustomPainter {
   const _BlobOrbPainter({
     required this.progress,
     required this.mode,
+    required this.colors,
     required this.bgColor,
     required this.ovalWidth,
     required this.ovalHeight,
@@ -1405,45 +1456,46 @@ class _BlobOrbPainter extends CustomPainter {
 
   final double progress;
   final _OrbMode mode;
+  final AppColorScheme colors;
   final Color bgColor;
   final double ovalWidth;
   final double ovalHeight;
 
-  static const _palettes = <_OrbMode, List<Color>>{
-    _OrbMode.ready: [
-      Color(0xFF3CE8FF), // cyan
-      Color(0xFF5A7AFF), // blue
-      Color(0xFFE060E0), // pink
-      Color(0xFF3B9EFF), // light blue
-      Color(0xFFC47AFF), // lavender
+  List<Color> get _palette => switch (mode) {
+    _OrbMode.ready => [
+      colors.accentBlue,
+      Color.lerp(colors.accentBlue, colors.primary, 0.35)!,
+      Color.lerp(colors.primaryLight, colors.accentBlue, 0.45)!,
+      Color.lerp(colors.accentBlue, colors.primaryLight, 0.55)!,
+      colors.primaryLight,
     ],
-    _OrbMode.recording: [
-      Color(0xFFAA66FF), // purple
-      Color(0xFF6644FF), // deep purple
-      Color(0xFFE050FF), // magenta
-      Color(0xFF5588FF), // blue
-      Color(0xFFCC50DD), // pink-purple
+    _OrbMode.recording => [
+      colors.primary,
+      colors.primaryDark,
+      colors.primaryLight,
+      Color.lerp(colors.accentBlue, colors.primary, 0.45)!,
+      Color.lerp(colors.primary, colors.primaryLight, 0.65)!,
     ],
-    _OrbMode.sending: [
-      Color(0xFF30E5FF), // cyan
-      Color(0xFF3060FF), // blue
-      Color(0xFF55B0FF), // sky
-      Color(0xFF28C8FF), // aqua
-      Color(0xFF4488FF), // medium blue
+    _OrbMode.sending => [
+      colors.accentBlue,
+      Color.lerp(colors.accentBlue, colors.primaryDark, 0.45)!,
+      Color.lerp(colors.accentBlue, colors.primaryLight, 0.35)!,
+      Color.lerp(colors.accentBlue, colors.surfaceHighlight, 0.20)!,
+      Color.lerp(colors.accentBlue, colors.primary, 0.25)!,
     ],
-    _OrbMode.thinking: [
-      Color(0xFFCC50FF), // purple
-      Color(0xFF6644FF), // deep blue
-      Color(0xFF9966FF), // violet
-      Color(0xFF3BAAFF), // cyan
-      Color(0xFFFF60DD), // pink
+    _OrbMode.thinking => [
+      colors.primaryLight,
+      colors.primaryDark,
+      colors.primary,
+      Color.lerp(colors.accentBlue, colors.primary, 0.35)!,
+      Color.lerp(colors.primaryLight, colors.accentRed, 0.20)!,
     ],
-    _OrbMode.response: [
-      Color(0xFF48E6FF), // cyan
-      Color(0xFFFF60CC), // pink
-      Color(0xFF8866FF), // purple
-      Color(0xFF3ABFFF), // blue
-      Color(0xFFC870FF), // lavender
+    _OrbMode.response => [
+      colors.accentBlue,
+      Color.lerp(colors.primaryLight, colors.accentRed, 0.18)!,
+      colors.primary,
+      Color.lerp(colors.accentBlue, colors.primary, 0.25)!,
+      colors.primaryLight,
     ],
   };
 
@@ -1460,7 +1512,7 @@ class _BlobOrbPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final r = size.width / 2;
-    final colors = _palettes[mode]!;
+    final palette = _palette;
     final intensity = switch (mode) {
       _OrbMode.ready => 0.72,
       _OrbMode.recording => 1.0,
@@ -1474,8 +1526,8 @@ class _BlobOrbPainter extends CustomPainter {
         Paint()
           ..shader = RadialGradient(
             colors: [
-              colors[0].withValues(alpha: 0.10 * intensity),
-              colors[2].withValues(alpha: 0.06 * intensity),
+              palette[0].withValues(alpha: 0.10 * intensity),
+              palette[2].withValues(alpha: 0.06 * intensity),
               Colors.transparent,
             ],
           ).createShader(Rect.fromCircle(center: center, radius: r * 1.35))
@@ -1514,7 +1566,7 @@ class _BlobOrbPainter extends CustomPainter {
         canvas,
         path,
         rot,
-        colors[i],
+        palette[i],
         blobCenter,
         rh * 2,
         intensity: intensity,
@@ -1553,6 +1605,7 @@ class _BlobOrbPainter extends CustomPainter {
   bool shouldRepaint(covariant _BlobOrbPainter old) =>
       old.progress != progress ||
       old.mode != mode ||
+      old.colors != colors ||
       old.bgColor != bgColor ||
       old.ovalWidth != ovalWidth ||
       old.ovalHeight != ovalHeight;
@@ -1563,6 +1616,7 @@ class _BlobOrbPainter extends CustomPainter {
 class _Waveform extends StatefulWidget {
   const _Waveform({
     required this.animate,
+    required this.colors,
     this.flip = false,
     this.barCount = 22,
     this.amplitude = 0.85,
@@ -1571,6 +1625,7 @@ class _Waveform extends StatefulWidget {
   });
 
   final bool animate;
+  final AppColorScheme colors;
   final bool flip;
   final int barCount;
   final double amplitude;
@@ -1641,35 +1696,41 @@ class _WaveformState extends State<_Waveform> with TickerProviderStateMixin {
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _c,
-    builder: (ctx, _) {
-      // Smooth amplitude toward target each frame.
-      _smoothAmplitude += (_targetAmplitude - _smoothAmplitude) * 0.18;
-      final effectiveAmplitude =
-          widget.micAmplitudeStream != null
-              ? (_smoothAmplitude * 0.85 + 0.15) // never fully silent
-              : widget.amplitude;
-      return CustomPaint(
-        painter: _WaveformPainter(
-          progress: widget.animate ? _c.value : 0.42,
-          flip: widget.flip,
-          amplitude: effectiveAmplitude,
-        ),
-      );
-    },
-  );
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (ctx, _) {
+        // Smooth amplitude toward target each frame.
+        _smoothAmplitude += (_targetAmplitude - _smoothAmplitude) * 0.18;
+        final effectiveAmplitude =
+            widget.micAmplitudeStream != null
+                ? (_smoothAmplitude * 0.85 + 0.15) // never fully silent
+                : widget.amplitude;
+        return CustomPaint(
+          painter: _WaveformPainter(
+            progress: widget.animate ? _c.value : 0.42,
+            flip: widget.flip,
+            colors: colors,
+            amplitude: effectiveAmplitude,
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _WaveformPainter extends CustomPainter {
   const _WaveformPainter({
     required this.progress,
     required this.flip,
+    required this.colors,
     this.amplitude = 0.85,
   });
 
   final double progress;
   final bool flip;
+  final AppColorScheme colors;
   final double amplitude;
 
   // Catmull-Rom → cubic bezier smooth path through sampled points
@@ -1683,9 +1744,12 @@ class _WaveformPainter extends CustomPainter {
       final p2 = pts[i + 1];
       final p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
       path.cubicTo(
-        p1.dx + (p2.dx - p0.dx) / 6, p1.dy + (p2.dy - p0.dy) / 6,
-        p2.dx - (p3.dx - p1.dx) / 6, p2.dy - (p3.dy - p1.dy) / 6,
-        p2.dx, p2.dy,
+        p1.dx + (p2.dx - p0.dx) / 6,
+        p1.dy + (p2.dy - p0.dy) / 6,
+        p2.dx - (p3.dx - p1.dx) / 6,
+        p2.dy - (p3.dy - p1.dy) / 6,
+        p2.dx,
+        p2.dy,
       );
     }
     return path;
@@ -1697,14 +1761,42 @@ class _WaveformPainter extends CustomPainter {
     final t = progress * 2 * math.pi;
 
     // Wave lines: (amplCoeff, color, strokeW, glowW, alpha, phase)
-    const waveDefs = [
-      (1.00, Color(0xFF6366F1), 1.6, 14.0, 0.65, 0.00),  // indigo
-      (0.90, Color(0xFF818CF8), 1.2, 11.0, 0.55, 0.90),  // soft indigo
-      (0.78, Color(0xFF60A5FA), 1.0,  9.0, 0.50, 1.80),  // blue
-      (0.65, Color(0xFFC084FC), 0.9,  8.0, 0.45, 2.75),  // violet
-      (0.52, Color(0xFFEC4899), 0.8,  7.0, 0.40, 3.70),  // pink
-      (0.40, Color(0xFF67E8F9), 0.7,  6.0, 0.35, 4.70),  // cyan
-      (0.28, Color(0xFFF0ABFC), 0.6,  5.0, 0.28, 5.60),  // lavender
+    final waveDefs = [
+      (1.00, colors.primary, 1.6, 14.0, 0.65, 0.00),
+      (0.90, colors.primaryLight, 1.2, 11.0, 0.55, 0.90),
+      (0.78, colors.accentBlue, 1.0, 9.0, 0.50, 1.80),
+      (
+        0.65,
+        Color.lerp(colors.primaryLight, colors.primary, 0.45)!,
+        0.9,
+        8.0,
+        0.45,
+        2.75,
+      ),
+      (
+        0.52,
+        Color.lerp(colors.primaryLight, colors.accentRed, 0.18)!,
+        0.8,
+        7.0,
+        0.40,
+        3.70,
+      ),
+      (
+        0.40,
+        Color.lerp(colors.accentBlue, colors.surfaceHighlight, 0.10)!,
+        0.7,
+        6.0,
+        0.35,
+        4.70,
+      ),
+      (
+        0.28,
+        Color.lerp(colors.primaryLight, colors.accentBlue, 0.55)!,
+        0.6,
+        5.0,
+        0.28,
+        5.60,
+      ),
     ];
 
     const steps = 80;
@@ -1712,8 +1804,8 @@ class _WaveformPainter extends CustomPainter {
     // Gradient direction: full color at orb side (frac=0), transparent at tip (frac=1).
     // flip=false (right arm): orb is at x=0, tip at x=width.
     // flip=true  (left  arm): orb is at x=width, tip at x=0.
-    final gradOrbEnd  = flip ? Offset(size.width, cy) : Offset(0, cy);
-    final gradTipEnd  = flip ? Offset(0, cy)          : Offset(size.width, cy);
+    final gradOrbEnd = flip ? Offset(size.width, cy) : Offset(0, cy);
+    final gradTipEnd = flip ? Offset(0, cy) : Offset(size.width, cy);
 
     for (final (coeff, color, strokeW, glowW, alpha, phase) in waveDefs) {
       final pts = <Offset>[];
@@ -1724,7 +1816,8 @@ class _WaveformPainter extends CustomPainter {
         final env = math.cos(frac * math.pi / 2);
 
         // Two harmonics, BOTH with integer multipliers → perfect loop seam.
-        final wave = math.sin(t + frac * math.pi * 2.5 + phase) * 0.65 +
+        final wave =
+            math.sin(t + frac * math.pi * 2.5 + phase) * 0.65 +
             math.sin(t * 2.0 + frac * math.pi * 4.5 + phase * 1.3) * 0.35;
 
         final yOff = wave * size.height * 0.46 * amplitude * coeff * env;
@@ -1737,9 +1830,10 @@ class _WaveformPainter extends CustomPainter {
 
       // Gradient shaders fade wave to transparent at the tip.
       ui.Shader gradShader(double a) => ui.Gradient.linear(
-            gradOrbEnd, gradTipEnd,
-            [color.withValues(alpha: a), color.withValues(alpha: 0.0)],
-          );
+        gradOrbEnd,
+        gradTipEnd,
+        [color.withValues(alpha: a), color.withValues(alpha: 0.0)],
+      );
 
       // 1. Wide outer glow
       canvas.drawPath(
@@ -1782,6 +1876,7 @@ class _WaveformPainter extends CustomPainter {
   bool shouldRepaint(covariant _WaveformPainter old) =>
       old.progress != progress ||
       old.flip != flip ||
+      old.colors != colors ||
       old.amplitude != amplitude;
 }
 
@@ -1790,8 +1885,9 @@ class _WaveformPainter extends CustomPainter {
 // while LLM is streaming to indicate live generation.
 
 class _ShimmerSweep extends StatefulWidget {
-  const _ShimmerSweep({required this.animate});
+  const _ShimmerSweep({required this.animate, required this.colors});
   final bool animate;
+  final AppColorScheme colors;
 
   @override
   State<_ShimmerSweep> createState() => _ShimmerSweepState();
@@ -1825,39 +1921,43 @@ class _ShimmerSweepState extends State<_ShimmerSweep>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _c,
-    builder: (_, __) {
-      final t = _c.value;
-      // Sweep band: left-edge from -0.4 to 1.0, width=0.35
-      final left = Alignment(-1.8 + t * 3.6, 0);
-      final right = Alignment(-1.8 + t * 3.6 + 0.8, 0);
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: left,
-            end: right,
-            colors: [
-              Colors.transparent,
-              const Color(0xFFAA88FF).withValues(alpha: 0.08),
-              const Color(0xFF88DDFF).withValues(alpha: 0.14),
-              const Color(0xFFAA88FF).withValues(alpha: 0.08),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) {
+        final t = _c.value;
+        // Sweep band: left-edge from -0.4 to 1.0, width=0.35
+        final left = Alignment(-1.8 + t * 3.6, 0);
+        final right = Alignment(-1.8 + t * 3.6 + 0.8, 0);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: left,
+              end: right,
+              colors: [
+                Colors.transparent,
+                colors.primaryLight.withValues(alpha: 0.08),
+                colors.accentBlue.withValues(alpha: 0.14),
+                colors.primaryLight.withValues(alpha: 0.08),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+            ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
+  }
 }
 
 // ─────────────────────────── upload beam ─────────────────────────────────────
 
 class _UploadBeam extends StatefulWidget {
-  const _UploadBeam({required this.animate});
+  const _UploadBeam({required this.animate, required this.colors});
 
   final bool animate;
+  final AppColorScheme colors;
 
   @override
   State<_UploadBeam> createState() => _UploadBeamState();
@@ -1888,25 +1988,30 @@ class _UploadBeamState extends State<_UploadBeam>
   }
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 80,
-    height: 120,
-    child: AnimatedBuilder(
-      animation: _c,
-      builder:
-          (ctx, _) => CustomPaint(
-            painter: _UploadBeamPainter(
-              progress: widget.animate ? _c.value : 0.3,
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return SizedBox(
+      width: 80,
+      height: 120,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder:
+            (ctx, _) => CustomPaint(
+              painter: _UploadBeamPainter(
+                progress: widget.animate ? _c.value : 0.3,
+                colors: colors,
+              ),
             ),
-          ),
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _UploadBeamPainter extends CustomPainter {
-  const _UploadBeamPainter({required this.progress});
+  const _UploadBeamPainter({required this.progress, required this.colors});
 
   final double progress;
+  final AppColorScheme colors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1914,7 +2019,7 @@ class _UploadBeamPainter extends CustomPainter {
     // Arrow head
     final arrow =
         Paint()
-          ..color = const Color(0xFFC081FF)
+          ..color = colors.primaryLight
           ..strokeWidth = 3.5
           ..strokeCap = StrokeCap.round
           ..style = PaintingStyle.stroke;
@@ -1931,8 +2036,8 @@ class _UploadBeamPainter extends CustomPainter {
       final t = (progress + i / 10) % 1.0;
       dotPaint
         ..color = Color.lerp(
-          const Color(0xFF55E6FF),
-          const Color(0xFF895CFF),
+          colors.accentBlue,
+          colors.primaryLight,
           t,
         )!.withValues(alpha: 0.9 - t * 0.65)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
@@ -1946,16 +2051,21 @@ class _UploadBeamPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _UploadBeamPainter old) =>
-      old.progress != progress;
+      old.progress != progress || old.colors != colors;
 }
 
 // ─────────────────────────── orbit particles ─────────────────────────────────
 // Scattered floating dots at varying distances — NOT uniform circle.
 
 class _OrbitParticles extends StatefulWidget {
-  const _OrbitParticles({required this.animate, this.scale = 1.0});
+  const _OrbitParticles({
+    required this.animate,
+    required this.colors,
+    this.scale = 1.0,
+  });
 
   final bool animate;
+  final AppColorScheme colors;
   final double scale;
 
   @override
@@ -1999,22 +2109,30 @@ class _OrbitParticlesState extends State<_OrbitParticles>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _c,
-    builder:
-        (ctx, _) => CustomPaint(
-          size: Size(320 * widget.scale, 320 * widget.scale),
-          painter: _ScatteredParticlesPainter(
-            progress: widget.animate ? _c.value : 0.2,
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AnimatedBuilder(
+      animation: _c,
+      builder:
+          (ctx, _) => CustomPaint(
+            size: Size(320 * widget.scale, 320 * widget.scale),
+            painter: _ScatteredParticlesPainter(
+              progress: widget.animate ? _c.value : 0.2,
+              colors: colors,
+            ),
           ),
-        ),
-  );
+    );
+  }
 }
 
 class _ScatteredParticlesPainter extends CustomPainter {
-  const _ScatteredParticlesPainter({required this.progress});
+  const _ScatteredParticlesPainter({
+    required this.progress,
+    required this.colors,
+  });
 
   final double progress;
+  final AppColorScheme colors;
 
   // Pre-computed particle configs (radius offset, angle offset, size, speed)
   static final _particles = List.generate(50, (i) {
@@ -2046,11 +2164,7 @@ class _ScatteredParticlesPainter extends CustomPainter {
       final y = center.dy + math.sin(angle) * orbitR * 0.56;
 
       final color =
-          Color.lerp(
-            const Color(0xFF4FAAFF),
-            const Color(0xFFD868FF),
-            p.colorT,
-          )!;
+          Color.lerp(colors.accentBlue, colors.primaryLight, p.colorT)!;
 
       if (p.bright) {
         paint
@@ -2068,7 +2182,7 @@ class _ScatteredParticlesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ScatteredParticlesPainter old) =>
-      old.progress != progress;
+      old.progress != progress || old.colors != colors;
 }
 
 // ─────────────────────────── thinking dots ───────────────────────────────────
@@ -2107,38 +2221,37 @@ class _ThinkingDotsState extends State<_ThinkingDots>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _c,
-    builder:
-        (ctx, _) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(4, (i) {
-            final w = math.sin(_c.value * 2 * math.pi + i * 0.7);
-            final color =
-                Color.lerp(
-                  const Color(0xFFFF73F6),
-                  const Color(0xFF5B5DFF),
-                  i / 3,
-                )!;
-            final d = 12.0 + w * 2.0;
-            return Container(
-              width: d,
-              height: d,
-              margin: const EdgeInsets.symmetric(horizontal: 5),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.75 + w.abs() * 0.22),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.4),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-            );
-          }),
-        ),
-  );
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AnimatedBuilder(
+      animation: _c,
+      builder:
+          (ctx, _) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(4, (i) {
+              final w = math.sin(_c.value * 2 * math.pi + i * 0.7);
+              final color =
+                  Color.lerp(colors.primaryLight, colors.primaryDark, i / 3)!;
+              final d = 12.0 + w * 2.0;
+              return Container(
+                width: d,
+                height: d,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.75 + w.abs() * 0.22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.4),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+    );
+  }
 }
 
 // ─────────────────────────── single plectrum preview ─────────────────────────
@@ -2147,12 +2260,12 @@ class _ThinkingDotsState extends State<_ThinkingDots>
 class SinglePlectrumPreview extends StatefulWidget {
   const SinglePlectrumPreview({
     super.key,
-    this.color = const Color(0xFF3CE8FF),
+    this.color,
     this.rotation = 0.0,
     this.size = 200.0,
   });
 
-  final Color color;
+  final Color? color;
   final double rotation;
   final double size;
 
@@ -2180,18 +2293,21 @@ class _SinglePlectrumPreviewState extends State<SinglePlectrumPreview>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _anim,
-    builder:
-        (ctx, _) => CustomPaint(
-          size: Size(widget.size, widget.size),
-          painter: _SinglePlectrumPainter(
-            color: widget.color,
-            rotation: widget.rotation,
-            progress: _anim.value,
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AnimatedBuilder(
+      animation: _anim,
+      builder:
+          (ctx, _) => CustomPaint(
+            size: Size(widget.size, widget.size),
+            painter: _SinglePlectrumPainter(
+              color: widget.color ?? colors.accentBlue,
+              rotation: widget.rotation,
+              progress: _anim.value,
+            ),
           ),
-        ),
-  );
+    );
+  }
 }
 
 class _SinglePlectrumPainter extends CustomPainter {

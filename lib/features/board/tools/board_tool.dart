@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart'
     show BoardLinkGeometry;
+
+final _boardToolDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool identifiers
@@ -49,7 +52,7 @@ class SelectTool extends BoardTool {
   IconData get icon => Icons.touch_app_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF60A5FA);
+  Color get accentColor => _boardToolDefaultColors.accentBlue;
 
   @override
   String? get shortcutHint => 'V';
@@ -68,7 +71,7 @@ class DrawTool extends BoardTool {
   IconData get icon => Icons.edit_outlined;
 
   @override
-  Color get accentColor => const Color(0xFFA78BFA);
+  Color get accentColor => _boardToolDefaultColors.primaryLight;
 
   @override
   String? get shortcutHint => 'D';
@@ -87,7 +90,7 @@ class ConnectTool extends BoardTool {
   IconData get icon => Icons.account_tree_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF34D399);
+  Color get accentColor => _boardToolDefaultColors.accentGreen;
 
   @override
   String? get shortcutHint => 'C';
@@ -102,7 +105,7 @@ const List<BoardTool> kBoardTools = [SelectTool(), DrawTool(), ConnectTool()];
 
 class DrawSettings {
   const DrawSettings({
-    this.strokeColor = const Color(0xFFE879F9),
+    this.strokeColor = Colors.deepPurpleAccent,
     this.strokeWidth = 3.0,
   });
 
@@ -128,7 +131,7 @@ class ConnectSettings {
   const ConnectSettings({
     this.geometry = BoardLinkGeometry.bezier,
     this.showArrow = true,
-    this.color = const Color(0xFF60A5FA),
+    this.color = Colors.lightBlueAccent,
   });
 
   final BoardLinkGeometry geometry;

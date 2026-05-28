@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation repo card — identical visuals to macOS RepoNode.
@@ -9,15 +10,19 @@ class RepoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: EdgeInsets.zero,
       decoration: BoxDecoration(
-        color: const Color(0xFF181C26),
-        border: Border.all(color: const Color(0x5922D3EE), width: 1.5),
+        color: colors.surfaceElevated,
+        border: Border.all(color: colors.accentBlue.withAlpha(89), width: 1.5),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x70000000), blurRadius: 14, offset: Offset(0, 4))
+            color: colors.background.withAlpha(112),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -25,22 +30,28 @@ class RepoCard extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: const BoxDecoration(
-              color: Color(0x0F22D3EE),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+            decoration: BoxDecoration(
+              color: colors.accentBlue.withAlpha(15),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(9),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.account_tree_rounded,
-                    size: 12, color: Color(0xFF22D3EE)),
+                Icon(
+                  Icons.account_tree_rounded,
+                  size: 12,
+                  color: colors.accentBlue,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     props.repoName,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFE8E8FF)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -51,16 +62,16 @@ class RepoCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             child: Row(
               children: [
-                const Icon(Icons.call_split,
-                    size: 11, color: Color(0xFF22D3EE)),
+                Icon(Icons.call_split, size: 11, color: colors.accentBlue),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     props.branch,
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontFamily: 'monospace',
-                        color: Color(0xFF22D3EE)),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      color: colors.accentBlue,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -80,14 +91,18 @@ class BranchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF181C26),
-        border: Border.all(color: const Color(0x667C6BFF), width: 1.5),
+        color: colors.surfaceElevated,
+        border: Border.all(color: colors.primary.withAlpha(102), width: 1.5),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x70000000), blurRadius: 14, offset: Offset(0, 4))
+            color: colors.background.withAlpha(112),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -95,23 +110,25 @@ class BranchCard extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: const BoxDecoration(
-              color: Color(0x147C6BFF),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+            decoration: BoxDecoration(
+              color: colors.primary.withAlpha(20),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(9),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.call_split,
-                    size: 11, color: Color(0xFFA99BFF)),
+                Icon(Icons.call_split, size: 11, color: colors.primaryLight),
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(
                     props.branch,
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFA99BFF)),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w700,
+                      color: colors.primaryLight,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -123,18 +140,20 @@ class BranchCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(props.repoName,
-                    style: const TextStyle(
-                        fontSize: 10, color: Color(0xFF6B7898))),
+                Text(
+                  props.repoName,
+                  style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                ),
                 if (props.commitHash.isNotEmpty)
                   Text(
                     props.commitHash.length > 7
                         ? props.commitHash.substring(0, 7)
                         : props.commitHash,
-                    style: const TextStyle(
-                        fontSize: 9,
-                        fontFamily: 'monospace',
-                        color: Color(0xFF44446A)),
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontFamily: 'monospace',
+                      color: colors.textMuted,
+                    ),
                   ),
               ],
             ),

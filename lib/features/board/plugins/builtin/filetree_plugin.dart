@@ -9,6 +9,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
+
 class FileTreePlugin extends BoardPanelPlugin {
   const FileTreePlugin();
 
@@ -179,8 +180,8 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     Offset globalPos,
     FileSystemEntity entity,
   ) async {
-    final colors = context.appColors;
     final isDir = entity is Directory;
+    final colors = context.appColors;
     final name = p.basename(entity.path);
 
     final result = await showMenu<String>(
@@ -366,15 +367,16 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final rootPath = _rootPath;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildHeader(rootPath),
-        const Divider(height: 1, thickness: 0.5),
+        Divider(color: colors.border, height: 1, thickness: 0.5),
         _buildTabs(),
-        const Divider(height: 1, thickness: 0.5),
+        Divider(color: colors.border, height: 1, thickness: 0.5),
         if (_showSearch && _activeTab == _TreeTab.files) _buildSearchBar(),
         Expanded(
           child:
@@ -946,14 +948,13 @@ class _GitDiffViewState extends State<_GitDiffView> {
   }
 
   Color _statusColor(String status) {
-    final colors = context.appColors;
+    final c = context.appColors;
     return switch (status) {
-      'M' => colors.accentOrange,
-      'A' => colors.accentGreen,
-      'D' => colors.accentRed,
-      'R' => colors.accentBlue,
-      '?' || '??' => colors.textMuted,
-      _ => colors.textMuted,
+      'M' => c.accentOrange,
+      'A' => c.accentGreen,
+      'D' => c.accentRed,
+      'R' => c.accentBlue,
+      _ => c.textMuted,
     };
   }
 

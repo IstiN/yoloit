@@ -196,11 +196,12 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (!_config.isConfigured) {
       return _BoardTerminalSetupView(onStart: _startSession);
     }
     if (_restoring) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: colors.primary));
     }
     if (_session == null) {
       return _TerminalDisconnectedView(
@@ -253,8 +254,9 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
   @override
   void initState() {
     super.initState();
-    _envNamesFuture = GlobalEnvGroupsService.instance
-        .resolveSelectedGroupNames(widget.config.envGroupIds);
+    _envNamesFuture = GlobalEnvGroupsService.instance.resolveSelectedGroupNames(
+      widget.config.envGroupIds,
+    );
   }
 
   @override
@@ -287,15 +289,14 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
         Theme.of(context).colorScheme.onSurface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: colors.surface,
-        border: Border(
-          bottom: BorderSide(color: colors.border, width: 0.5),
-        ),
+        border: Border(bottom: BorderSide(color: colors.border, width: 0.5)),
       ),
       child: Row(
         children: [
@@ -316,13 +317,12 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
               return GestureDetector(
                 onTap: _pickEnvGroups,
                 child: Tooltip(
-                  message: hasEnv
-                      ? 'Env: ${names.join(", ")}'
-                      : 'Select env groups',
+                  message:
+                      hasEnv ? 'Env: ${names.join(", ")}' : 'Select env groups',
                   child: Icon(
                     Icons.key_outlined,
                     size: 14,
-                    color: hasEnv ? const Color(0xFF34D399) : mutedColor,
+                    color: hasEnv ? colors.accentGreen : mutedColor,
                   ),
                 ),
               );
@@ -339,12 +339,12 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
           const SizedBox(width: 8),
           GestureDetector(
             onTap: widget.onKill,
-            child: const Tooltip(
+            child: Tooltip(
               message: 'Kill terminal session',
               child: Icon(
                 Icons.stop_circle_outlined,
                 size: 14,
-                color: Color(0xFFF87171),
+                color: colors.accentRed,
               ),
             ),
           ),
@@ -384,7 +384,8 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
         Theme.of(context).colorScheme.onSurface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return Padding(
@@ -427,10 +428,10 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.folder_outlined,
                     size: 16,
-                    color: Color(0xFF22C55E),
+                    color: colors.accentGreen,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -439,8 +440,7 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
-                        color:
-                            _dirCtrl.text.isEmpty ? mutedColor : onSurface,
+                        color: _dirCtrl.text.isEmpty ? mutedColor : onSurface,
                       ),
                     ),
                   ),
@@ -459,10 +459,7 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
             style: TextStyle(fontSize: 12, color: onSurface),
             decoration: InputDecoration(
               hintText: 'Defaults to folder name',
-              hintStyle: TextStyle(
-                fontSize: 12,
-                color: mutedColor,
-              ),
+              hintStyle: TextStyle(fontSize: 12, color: mutedColor),
               filled: true,
               fillColor: colors.surfaceElevated,
               border: OutlineInputBorder(
@@ -494,8 +491,8 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
                       _selectedEnvGroupIds,
                     ),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF22C55E),
-              foregroundColor: colors.surface,
+              backgroundColor: colors.accentGreen,
+              foregroundColor: colors.background,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -527,7 +524,9 @@ class _TerminalDisconnectedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+    final colors = context.appColors;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
         Theme.of(context).colorScheme.onSurface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return Center(
@@ -558,12 +557,20 @@ class _TerminalDisconnectedView extends StatelessWidget {
               children: [
                 OutlinedButton.icon(
                   onPressed: onHistory,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: colors.border),
+                    foregroundColor: onSurface,
+                  ),
                   icon: const Icon(Icons.history, size: 14),
                   label: const Text('History'),
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
                   onPressed: onRestart,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.accentGreen,
+                    foregroundColor: colors.background,
+                  ),
                   icon: const Icon(Icons.restart_alt, size: 14),
                   label: const Text('Restart'),
                 ),
@@ -606,9 +613,11 @@ class _BoardTerminalSessionHistoryDialogState
   Widget build(BuildContext context) {
     final manager = BoardTerminalSessionManager.instance;
     final colors = context.appColors;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ??
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
         Theme.of(context).colorScheme.onSurface;
-    final secondaryColor = Theme.of(context).textTheme.bodyMedium?.color ??
+    final secondaryColor =
+        Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return AlertDialog(
@@ -681,7 +690,7 @@ class _BoardTerminalSessionHistoryDialogState
                           border:
                               isCurrent
                                   ? Border.all(
-                                    color: const Color(0xFF22C55E),
+                                    color: colors.accentGreen,
                                     width: 0.5,
                                   )
                                   : null,
@@ -691,10 +700,7 @@ class _BoardTerminalSessionHistoryDialogState
                             Icon(
                               Icons.terminal,
                               size: 14,
-                              color:
-                                  isLive
-                                      ? const Color(0xFF22C55E)
-                                      : mutedColor,
+                              color: isLive ? colors.accentGreen : mutedColor,
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -710,7 +716,7 @@ class _BoardTerminalSessionHistoryDialogState
                                       fontWeight: FontWeight.w500,
                                       color:
                                           isCurrent
-                                              ? const Color(0xFF22C55E)
+                                              ? colors.accentGreen
                                               : onSurface,
                                     ),
                                   ),
@@ -729,7 +735,7 @@ class _BoardTerminalSessionHistoryDialogState
                             if (!isCurrent)
                               _historyActionButton(
                                 icon: Icons.restore,
-                                color: const Color(0xFF60A5FA),
+                                color: colors.accentBlue,
                                 tooltip: 'Restore as new terminal panel',
                                 onTap: () async {
                                   Navigator.pop(context);
@@ -751,8 +757,8 @@ class _BoardTerminalSessionHistoryDialogState
                                       : Icons.delete_outline,
                               color:
                                   isLive
-                                      ? const Color(0xFFF59E0B)
-                                      : const Color(0xFFF87171),
+                                      ? colors.accentOrange
+                                      : colors.accentRed,
                               tooltip:
                                   isLive ? 'Kill session' : 'Delete history',
                               onTap: () async {

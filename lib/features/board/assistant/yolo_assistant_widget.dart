@@ -104,6 +104,7 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   final _inputFocusNode = FocusNode();
   final AudioRecorder _micRecorder = AudioRecorder();
   StreamSubscription<dynamic>? _amplitudeSub;
+
   /// Accumulates raw PCM bytes from the mic stream (avoids disk roundtrip).
   BytesBuilder? _micStreamBytes;
   StreamSubscription<Uint8List>? _micStreamSub;
@@ -140,16 +141,16 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   // call accumulates here; acknowledged keys are cleared in didUpdateWidget.
   final Map<String, dynamic> _pendingStateOverrides = {};
 
-  static const _kAccent = Color(0xFF8B5CF6);
-
   bool get _voiceOverlayHidden =>
       (_pendingStateOverrides['voiceOverlayHidden'] ??
-          widget.panel.state['voiceOverlayHidden']) as bool? ??
+              widget.panel.state['voiceOverlayHidden'])
+          as bool? ??
       true;
 
   // Effective state: pending overrides layered on top of last-known panel state.
   Map<String, dynamic> get _effectiveState =>
-      Map<String, dynamic>.from(widget.panel.state)..addAll(_pendingStateOverrides);
+      Map<String, dynamic>.from(widget.panel.state)
+        ..addAll(_pendingStateOverrides);
 
   void _syncOverlayState({
     String? draftOverride,
@@ -171,7 +172,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
             ? 'ready'
             : 'idle');
     // ignore: avoid_print
-    print('[YoloAssistant] _syncOverlayState: forced=$forcedStatus → status=$status (isGenerating=$_isGeneratingReply, hasToken=$_receivedAssistantToken)');
+    print(
+      '[YoloAssistant] _syncOverlayState: forced=$forcedStatus → status=$status (isGenerating=$_isGeneratingReply, hasToken=$_receivedAssistantToken)',
+    );
     final effective = _effectiveState;
     _updateState({
       'voiceDraft': draft,
@@ -411,10 +414,11 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
       'userMessage': text,
       'requestAt': DateTime.now().toIso8601String(),
       'toolCalls': <Map<String, dynamic>>[],
-      if (asrDebug != null) 'asr': {
-        ...asrDebug,
-        if (asrConversionMs != null) 'conversionMs': asrConversionMs,
-      },
+      if (asrDebug != null)
+        'asr': {
+          ...asrDebug,
+          if (asrConversionMs != null) 'conversionMs': asrConversionMs,
+        },
     };
     _activeDebugSession = dbg;
 
@@ -483,7 +487,9 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
           'arguments': arguments,
           'result': result,
           'success': success,
-          'startAt': pendingToolStarts.remove(toolCommand) ?? DateTime.now().toIso8601String(),
+          'startAt':
+              pendingToolStarts.remove(toolCommand) ??
+              DateTime.now().toIso8601String(),
           'endAt': DateTime.now().toIso8601String(),
         });
       };
@@ -727,16 +733,16 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
     current[idx] = {...current[idx], 'content': content};
     _messageDraft = current;
     final newStatus =
-        _isGeneratingReply &&
-                content.trim().isEmpty &&
-                overlayToolLogs.isEmpty
+        _isGeneratingReply && content.trim().isEmpty && overlayToolLogs.isEmpty
             ? 'processing'
             : _isGeneratingReply
             ? 'responding'
             : 'output';
     // ignore: avoid_print
     if (mirrorToOverlay && !_voiceOverlayHidden) {
-      print('[YoloAssistant] _replaceContent → status=$newStatus content="${content.length}ch" tools=${overlayToolLogs.length}');
+      print(
+        '[YoloAssistant] _replaceContent → status=$newStatus content="${content.length}ch" tools=${overlayToolLogs.length}',
+      );
     }
     _updateState({
       'messages': current,
@@ -756,16 +762,23 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
 
     // Show up to 5 recent tool calls as compact lines (⚙️ tool:name).
     if (toolLogs.isEmpty) return text;
-    final recent = toolLogs.length > 5 ? toolLogs.sublist(toolLogs.length - 5) : toolLogs;
+    final recent =
+        toolLogs.length > 5 ? toolLogs.sublist(toolLogs.length - 5) : toolLogs;
     final toolText = recent
         .map((entry) {
           // Normalize: strip leading emoji/status prefixes, keep just tool name
-          final clean = entry
-              .replaceAll(RegExp(r'^[⏳✅❌]\s*running:\s*'), '')
-              .replaceAll(RegExp(r'^[⏳✅❌]\s*'), '')
-              .trim();
+          final clean =
+              entry
+                  .replaceAll(RegExp(r'^[⏳✅❌]\s*running:\s*'), '')
+                  .replaceAll(RegExp(r'^[⏳✅❌]\s*'), '')
+                  .trim();
           final isDone = entry.startsWith('✅') || entry.startsWith('❌');
-          final icon = entry.startsWith('❌') ? '❌' : isDone ? '✅' : '⚙️';
+          final icon =
+              entry.startsWith('❌')
+                  ? '❌'
+                  : isDone
+                  ? '✅'
+                  : '⚙️';
           return '$icon $clean';
         })
         .join('\n');
@@ -1354,13 +1367,26 @@ $messagesJson
                       final now = DateTime.now();
                       final fake = <String, dynamic>{
                         'id': 'sim_${now.millisecondsSinceEpoch}',
-                        'userMessage': '[Simulation] Show weather + open browser',
+                        'userMessage':
+                            '[Simulation] Show weather + open browser',
                         'modelId': 'google/gemini-3.1-flash-lite-preview',
                         'modelProvider': 'openrouter',
-                        'requestAt': now.subtract(const Duration(seconds: 8)).toIso8601String(),
-                        'promptSentAt': now.subtract(const Duration(seconds: 8)).toIso8601String(),
-                        'firstTokenAt': now.subtract(const Duration(milliseconds: 4800)).toIso8601String(),
-                        'completedAt': now.subtract(const Duration(milliseconds: 400)).toIso8601String(),
+                        'requestAt':
+                            now
+                                .subtract(const Duration(seconds: 8))
+                                .toIso8601String(),
+                        'promptSentAt':
+                            now
+                                .subtract(const Duration(seconds: 8))
+                                .toIso8601String(),
+                        'firstTokenAt':
+                            now
+                                .subtract(const Duration(milliseconds: 4800))
+                                .toIso8601String(),
+                        'completedAt':
+                            now
+                                .subtract(const Duration(milliseconds: 400))
+                                .toIso8601String(),
                         'asr': {
                           'durationMs': 1240,
                           'status': 'ok',
@@ -1374,37 +1400,103 @@ $messagesJson
                         'toolCalls': [
                           {
                             'name': 'panel:focus',
-                            'arguments': {'board': 'board-1778878703064560', 'panel': 'Список покупок'},
-                            'startAt': now.subtract(const Duration(milliseconds: 7200)).toIso8601String(),
-                            'endAt': now.subtract(const Duration(milliseconds: 6800)).toIso8601String(),
+                            'arguments': {
+                              'board': 'board-1778878703064560',
+                              'panel': 'Список покупок',
+                            },
+                            'startAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 7200),
+                                    )
+                                    .toIso8601String(),
+                            'endAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 6800),
+                                    )
+                                    .toIso8601String(),
                             'success': true,
                           },
                           {
                             'name': 'web:open',
-                            'arguments': {'board': 'board-1778878703064560', 'panel': '__yolo_badge__', 'url': 'https://www.google.com/search?q=weather+in+Grodno'},
-                            'startAt': now.subtract(const Duration(milliseconds: 6600)).toIso8601String(),
-                            'endAt': now.subtract(const Duration(milliseconds: 5900)).toIso8601String(),
+                            'arguments': {
+                              'board': 'board-1778878703064560',
+                              'panel': '__yolo_badge__',
+                              'url':
+                                  'https://www.google.com/search?q=weather+in+Grodno',
+                            },
+                            'startAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 6600),
+                                    )
+                                    .toIso8601String(),
+                            'endAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 5900),
+                                    )
+                                    .toIso8601String(),
                             'success': true,
                           },
                           {
                             'name': 'panels',
                             'arguments': {'board': 'board-1778878703064560'},
-                            'startAt': now.subtract(const Duration(milliseconds: 5700)).toIso8601String(),
-                            'endAt': now.subtract(const Duration(milliseconds: 5200)).toIso8601String(),
+                            'startAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 5700),
+                                    )
+                                    .toIso8601String(),
+                            'endAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 5200),
+                                    )
+                                    .toIso8601String(),
                             'success': true,
                           },
                           {
                             'name': 'panel:create',
-                            'arguments': {'board': 'board-1778878703064560', 'type': 'board.webpage', 'title': 'Weather in Grodno'},
-                            'startAt': now.subtract(const Duration(milliseconds: 5000)).toIso8601String(),
-                            'endAt': now.subtract(const Duration(milliseconds: 3800)).toIso8601String(),
+                            'arguments': {
+                              'board': 'board-1778878703064560',
+                              'type': 'board.webpage',
+                              'title': 'Weather in Grodno',
+                            },
+                            'startAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 5000),
+                                    )
+                                    .toIso8601String(),
+                            'endAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 3800),
+                                    )
+                                    .toIso8601String(),
                             'success': true,
                           },
                           {
                             'name': 'agent:run',
-                            'arguments': {'agent': 'copilot', 'path': '.', 'task': 'Write a Hello World program'},
-                            'startAt': now.subtract(const Duration(milliseconds: 3600)).toIso8601String(),
-                            'endAt': now.subtract(const Duration(milliseconds: 1200)).toIso8601String(),
+                            'arguments': {
+                              'agent': 'copilot',
+                              'path': '.',
+                              'task': 'Write a Hello World program',
+                            },
+                            'startAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 3600),
+                                    )
+                                    .toIso8601String(),
+                            'endAt':
+                                now
+                                    .subtract(
+                                      const Duration(milliseconds: 1200),
+                                    )
+                                    .toIso8601String(),
                             'success': true,
                           },
                         ],
@@ -1765,8 +1857,7 @@ $messagesJson
   /// Generates a stable session ID for this conversation. The ID is kept in
   /// memory; a new one is created each time _newSession / _clearSession resets.
   String _getOrCreateSessionId() {
-    _assistantSessionId ??=
-        'yolo-${DateTime.now().millisecondsSinceEpoch}';
+    _assistantSessionId ??= 'yolo-${DateTime.now().millisecondsSinceEpoch}';
     _assistantSessionCreatedAt ??= DateTime.now();
     return _assistantSessionId!;
   }
@@ -1785,7 +1876,8 @@ $messagesJson
       orElse: () => <String, dynamic>{},
     );
     final firstText = (firstUserMsg['content'] as String? ?? '').trim();
-    final rawName = firstText.length > 60 ? firstText.substring(0, 60) : firstText;
+    final rawName =
+        firstText.length > 60 ? firstText.substring(0, 60) : firstText;
     final sessionName =
         rawName.isEmpty ? 'Yolo session' : rawName.replaceAll('\n', ' ');
 
@@ -1793,7 +1885,8 @@ $messagesJson
     final modelLabel =
         providerType.startsWith('cloud:')
             ? (_chatProvider is CloudLlmProvider
-                ? (_chatProvider as CloudLlmProvider).config?.model ?? providerType
+                ? (_chatProvider as CloudLlmProvider).config?.model ??
+                    providerType
                 : providerType)
             : 'local';
 
@@ -1813,7 +1906,8 @@ $messagesJson
   Future<void> _showHistoryDialog(BuildContext context) async {
     final result = await showDialog<List<Map<String, dynamic>>>(
       context: context,
-      builder: (_) => _AssistantHistoryDialog(currentSessionId: _assistantSessionId),
+      builder:
+          (_) => _AssistantHistoryDialog(currentSessionId: _assistantSessionId),
     );
     if (result != null && mounted) {
       // Restore messages and start a new session ID.
@@ -1843,9 +1937,9 @@ $messagesJson
                   label: Text(skill, style: const TextStyle(fontSize: 11)),
                   deleteIcon: const Icon(Icons.close, size: 14),
                   onDeleted: () => _removeSkill(skill),
-                  backgroundColor: _kAccent.withAlpha(25),
-                  selectedColor: _kAccent.withAlpha(50),
-                  side: BorderSide(color: _kAccent.withAlpha(60)),
+                  backgroundColor: colors.primary.withAlpha(25),
+                  selectedColor: colors.primary.withAlpha(50),
+                  side: BorderSide(color: colors.primary.withAlpha(60)),
                   labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1932,13 +2026,13 @@ $messagesJson
           decoration: BoxDecoration(
             color:
                 success
-                    ? const Color(0x1434D399)
+                    ? colors.accentGreen.withAlpha(20)
                     : Theme.of(context).colorScheme.error.withAlpha(24),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color:
                   success
-                      ? const Color(0x5534D399)
+                      ? colors.accentGreen.withAlpha(85)
                       : Theme.of(context).colorScheme.error.withAlpha(80),
             ),
           ),
@@ -1952,7 +2046,7 @@ $messagesJson
                 size: 16,
                 color:
                     success
-                        ? const Color(0xFF34D399)
+                        ? colors.accentGreen
                         : Theme.of(context).colorScheme.error,
               ),
               const SizedBox(width: 8),
@@ -1989,8 +2083,8 @@ $messagesJson
             decoration: BoxDecoration(
               gradient:
                   isUser
-                      ? const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                      ? LinearGradient(
+                        colors: [colors.accentBlue, colors.primary],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       )
@@ -2021,9 +2115,9 @@ $messagesJson
                     : isUser
                     ? SelectableText(
                       displayContent,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        color: Colors.white,
+                        color: colors.textPrimary,
                         height: 1.4,
                       ),
                     )
@@ -2091,7 +2185,7 @@ $messagesJson
                 color: colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(Icons.graphic_eq, size: 14, color: _kAccent),
+              child: Icon(Icons.graphic_eq, size: 14, color: colors.primary),
             ),
           ),
           const SizedBox(width: 8),
@@ -2110,12 +2204,12 @@ $messagesJson
                   border:
                       _disabledLocalToolNames.isEmpty
                           ? null
-                          : Border.all(color: _kAccent.withAlpha(100)),
+                          : Border.all(color: colors.primary.withAlpha(100)),
                 ),
                 child: Icon(
                   Icons.settings_input_component_outlined,
                   size: 14,
-                  color: _kAccent,
+                  color: colors.primary,
                 ),
               ),
             ),
@@ -2136,7 +2230,7 @@ $messagesJson
                 child: Icon(
                   Icons.manage_search_outlined,
                   size: 15,
-                  color: _kAccent,
+                  color: colors.primary,
                 ),
               ),
             ),
@@ -2169,7 +2263,7 @@ $messagesJson
                   color:
                       _isGeneratingReply
                           ? Theme.of(context).colorScheme.error
-                          : _kAccent,
+                          : colors.primary,
                 ),
               ),
             ),
@@ -2191,7 +2285,7 @@ $messagesJson
                 child: Icon(
                   Icons.content_copy_outlined,
                   size: 15,
-                  color: _kAccent,
+                  color: colors.primary,
                 ),
               ),
             ),
@@ -2229,7 +2323,7 @@ $messagesJson
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: _kAccent, width: 0.8),
+                    borderSide: BorderSide(color: colors.primary, width: 0.8),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -2271,7 +2365,7 @@ $messagesJson
                 color:
                     _isRecordingMic
                         ? Theme.of(context).colorScheme.error
-                        : _kAccent,
+                        : colors.primary,
               ),
             ),
           ),
@@ -2290,12 +2384,12 @@ $messagesJson
                 color:
                     _isGeneratingReply
                         ? Theme.of(context).colorScheme.error
-                        : _kAccent,
+                        : colors.primary,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
                 _isGeneratingReply ? Icons.stop_rounded : Icons.arrow_upward,
-                color: Colors.white,
+                color: colors.textPrimary,
                 size: 16,
               ),
             ),
@@ -2342,8 +2436,9 @@ $messagesJson
                 children: [
                   AssistantVoiceVisualizer(
                     state: vizState,
+                    colors: colors,
                     size: 160,
-                    color: _kAccent,
+                    color: colors.primary,
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -2351,7 +2446,7 @@ $messagesJson
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: _kAccent.withAlpha(200),
+                      color: colors.primary.withAlpha(200),
                     ),
                   ),
                 ],
@@ -2365,7 +2460,7 @@ $messagesJson
             onPressed: _toggleMode,
             icon: const Icon(Icons.keyboard, size: 18),
             label: const Text('Back to text'),
-            style: TextButton.styleFrom(foregroundColor: _kAccent),
+            style: TextButton.styleFrom(foregroundColor: colors.primary),
           ),
         ),
       ],
@@ -2474,10 +2569,10 @@ $messagesJson
     _amplitudeSub = _micRecorder
         .onAmplitudeChanged(const Duration(milliseconds: 60))
         .listen((amp) {
-      // dBFS: 0 = max, ~-50 = silence for speech. Normalize to 0..1.
-      final normalized = ((amp.current + 50.0) / 50.0).clamp(0.0, 1.0);
-      widget.controller?._micAmplitudeCtrl.add(normalized);
-    });
+          // dBFS: 0 = max, ~-50 = silence for speech. Normalize to 0..1.
+          final normalized = ((amp.current + 50.0) / 50.0).clamp(0.0, 1.0);
+          widget.controller?._micAmplitudeCtrl.add(normalized);
+        });
     _syncOverlayState(hiddenOverride: false);
   }
 
@@ -2531,8 +2626,8 @@ $messagesJson
       final asrCfg =
           (explicitId != null && explicitId.isNotEmpty
               ? await CloudLlmSettingsService.instance.loadConfigById(
-                  explicitId,
-                )
+                explicitId,
+              )
               : null) ??
           await CloudLlmSettingsService.instance.loadActiveConfig();
       asrResolvedModel ??= asrCfg?.model.trim();
@@ -2573,7 +2668,14 @@ $messagesJson
             final tmpMp3 = tmpWav.replaceAll('.wav', '.mp3');
             await File(tmpWav).writeAsBytes(wavBytes, flush: true);
             final result = await Process.run('ffmpeg', [
-              '-i', tmpWav, '-codec:a', 'libmp3lame', '-qscale:a', '4', '-y', tmpMp3,
+              '-i',
+              tmpWav,
+              '-codec:a',
+              'libmp3lame',
+              '-qscale:a',
+              '4',
+              '-y',
+              tmpMp3,
             ]);
             convSw.stop();
             conversionMs = convSw.elapsedMilliseconds;
@@ -2582,8 +2684,12 @@ $messagesJson
               audioFormat = 'mp3';
             }
             // Clean up temp files
-            try { File(tmpWav).deleteSync(); } catch (_) {}
-            try { File(tmpMp3).deleteSync(); } catch (_) {}
+            try {
+              File(tmpWav).deleteSync();
+            } catch (_) {}
+            try {
+              File(tmpMp3).deleteSync();
+            } catch (_) {}
           } on ProcessException {
             // ffmpeg not available — fall back to WAV
           }
@@ -2591,7 +2697,10 @@ $messagesJson
         _pendingAudioContent = [
           {
             'type': 'input_audio',
-            'input_audio': {'data': base64Encode(audioBytes), 'format': audioFormat},
+            'input_audio': {
+              'data': base64Encode(audioBytes),
+              'format': audioFormat,
+            },
           },
         ];
         if (conversionMs != null) {
@@ -2684,9 +2793,7 @@ $messagesJson
           }
           // Companion metadata JSON — useful for replay benchmarks.
           final transcript =
-              asrTranscriptChars > 0
-                  ? (_inputController.text.trim())
-                  : '';
+              asrTranscriptChars > 0 ? (_inputController.text.trim()) : '';
           final meta = {
             'recordedAt': asrStartedAt,
             'completedAt': completedAt,
@@ -2699,9 +2806,9 @@ $messagesJson
             'transcriptChars': asrTranscriptChars,
             if (asrError != null) 'error': asrError,
           };
-          await File('${samplesDir.path}/$ts.json').writeAsString(
-            const JsonEncoder.withIndent('  ').convert(meta),
-          );
+          await File(
+            '${samplesDir.path}/$ts.json',
+          ).writeAsString(const JsonEncoder.withIndent('  ').convert(meta));
         } on Exception {
           // Best-effort — never block the main flow.
         }
@@ -3361,7 +3468,9 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
     final promptSentAt = _parseTs(s['promptSentAt']);
     final firstTokenAt = _parseTs(s['firstTokenAt']);
     final completedAt = _parseTs(s['completedAt']);
-    final toolCalls = (s['toolCalls'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+    final toolCalls =
+        (s['toolCalls'] as List?)?.whereType<Map<String, dynamic>>().toList() ??
+        [];
 
     // ── helpers ──────────────────────────────────────────────────────────────
     String ms(int? v) => v != null ? '${v}ms' : '?';
@@ -3451,7 +3560,9 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
     if (toolCalls.isNotEmpty && lastToolEnd != null && completedAt != null) {
       final finalMs = completedAt.difference(lastToolEnd).inMilliseconds;
       buf.writeln(row('[LLM]', 'tools → final message', ms(finalMs)));
-    } else if (toolCalls.isEmpty && firstTokenAt != null && completedAt != null) {
+    } else if (toolCalls.isEmpty &&
+        firstTokenAt != null &&
+        completedAt != null) {
       final genMs = completedAt.difference(firstTokenAt).inMilliseconds;
       buf.writeln(row('[LLM]', 'streaming response', ms(genMs)));
     }
@@ -3492,13 +3603,17 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
         ),
       );
       final loadMs = swift['swiftLoadMs'] as num?;
-      if (loadMs != null) buf.writeln(row('     ', 'load time', ms(loadMs.toInt())));
+      if (loadMs != null)
+        buf.writeln(row('     ', 'load time', ms(loadMs.toInt())));
       final ttft = swift['swiftFirstTokenMs'] as num?;
-      if (ttft != null) buf.writeln(row('     ', 'first token (TTFT)', ms(ttft.toInt())));
+      if (ttft != null)
+        buf.writeln(row('     ', 'first token (TTFT)', ms(ttft.toInt())));
       final genMs = swift['swiftGenerateMs'] as num?;
-      if (genMs != null) buf.writeln(row('     ', 'generation', ms(genMs.toInt())));
+      if (genMs != null)
+        buf.writeln(row('     ', 'generation', ms(genMs.toInt())));
       final totalMs = swift['swiftTotalMs'] as num?;
-      if (totalMs != null) buf.writeln(row('     ', 'swift total', ms(totalMs.toInt())));
+      if (totalMs != null)
+        buf.writeln(row('     ', 'swift total', ms(totalMs.toInt())));
     }
 
     // ── model settings ────────────────────────────────────────────────────────
@@ -3509,7 +3624,6 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
 
     return buf.toString();
   }
-
 
   String _buildToolsText(Map<String, dynamic> s) {
     final buf = StringBuffer();
@@ -3906,8 +4020,7 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
     return all.where((e) => e.id.startsWith('yolo-')).toList();
   }
 
-  void _refresh() =>
-      setState(() => _entriesFuture = _loadYoloSessions());
+  void _refresh() => setState(() => _entriesFuture = _loadYoloSessions());
 
   @override
   Widget build(BuildContext context) {
@@ -3916,8 +4029,11 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
       backgroundColor: colors.surface,
       title: Row(
         children: [
-          Icon(Icons.history, size: 18,
-              color: Theme.of(context).colorScheme.onSurface),
+          Icon(
+            Icons.history,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           const SizedBox(width: 8),
           Text(
             'Yolo session history',
@@ -3943,10 +4059,7 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                 child: Text(
                   'No sessions yet.\nStart chatting to see history here.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: colors.textSecondary,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: colors.textSecondary, fontSize: 13),
                 ),
               );
             }
@@ -3958,26 +4071,29 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                 final isCurrent = e.id == widget.currentSessionId;
                 return Container(
                   decoration: BoxDecoration(
-                    color: isCurrent
-                        ? colors.surfaceElevated
-                        : colors.surface,
+                    color: isCurrent ? colors.surfaceElevated : colors.surface,
                     borderRadius: BorderRadius.circular(10),
-                    border: isCurrent
-                        ? Border.all(
-                            color: const Color(0xFF34D399), width: 0.5)
-                        : Border.all(
-                            color: colors.border.withAlpha(80), width: 0.5),
+                    border:
+                        isCurrent
+                            ? Border.all(color: colors.accentGreen, width: 0.5)
+                            : Border.all(
+                              color: colors.border.withAlpha(80),
+                              width: 0.5,
+                            ),
                   ),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.chat_bubble_outline,
                         size: 14,
-                        color: isCurrent
-                            ? const Color(0xFF34D399)
-                            : colors.textSecondary,
+                        color:
+                            isCurrent
+                                ? colors.accentGreen
+                                : colors.textSecondary,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -3991,11 +4107,12 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,
-                                color: isCurrent
-                                    ? const Color(0xFF34D399)
-                                    : Theme.of(context)
-                                        .colorScheme
-                                        .onSurface,
+                                color:
+                                    isCurrent
+                                        ? colors.accentGreen
+                                        : Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -4023,7 +4140,7 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                       if (!isCurrent)
                         _historyBtn(
                           icon: Icons.restore,
-                          color: const Color(0xFF60A5FA),
+                          color: colors.accentBlue,
                           tooltip: 'Restore',
                           onTap: () async {
                             final msgs = await ChatSessionHistory.instance
@@ -4035,7 +4152,7 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                       // Delete
                       _historyBtn(
                         icon: Icons.delete_outline,
-                        color: const Color(0xFFF87171),
+                        color: colors.accentRed,
                         tooltip: 'Delete',
                         onTap: () async {
                           await ChatSessionHistory.instance.delete(e.id);

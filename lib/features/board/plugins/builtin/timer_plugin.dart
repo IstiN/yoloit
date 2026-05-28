@@ -11,6 +11,8 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 
+final _timerDefaultColors = AppColorScheme.fromAccent(Colors.blue);
+
 class TimerPlugin extends BoardPanelPlugin {
   const TimerPlugin();
 
@@ -26,7 +28,7 @@ class TimerPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.timer_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF3B82F6);
+  Color get accentColor => _timerDefaultColors.accentBlue;
 
   @override
   Size get defaultSize => const Size(300, 360);
@@ -132,8 +134,10 @@ class _TimerContentState extends State<_TimerContent>
       _pulseCtrl.stop();
       _pulseCtrl.reset();
     }
-    if (_isRunning) _startTicker();
-    else _stopTicker();
+    if (_isRunning)
+      _startTicker();
+    else
+      _stopTicker();
   }
 
   void _startTicker() {
@@ -199,10 +203,7 @@ class _TimerContentState extends State<_TimerContent>
   }
 
   void _saveState(Map<String, dynamic> updates) {
-    widget.renderContext.onUpdateState({
-      ...widget.panel.state,
-      ...updates,
-    });
+    widget.renderContext.onUpdateState({...widget.panel.state, ...updates});
   }
 
   void _start() {
@@ -282,10 +283,10 @@ class _TimerContentState extends State<_TimerContent>
       _duration > 0 ? (_remaining / _duration).clamp(0.0, 1.0) : 0.0;
 
   Color get _currentAccent {
-    final colors = context.appColors;
-    if (_completed) return colors.accentGreen;
-    if (_progress < 0.2) return colors.accentOrange;
-    return colors.accentBlue;
+    final c = context.appColors;
+    if (_completed) return c.accentGreen;
+    if (_progress < 0.2) return c.accentOrange;
+    return c.accentBlue;
   }
 
   @override
@@ -315,14 +316,14 @@ class _TimerContentState extends State<_TimerContent>
 
         Expanded(
           child: GestureDetector(
-            onTap: _isRunning || _isPaused || _completed ? null : _enterEditMode,
+            onTap:
+                _isRunning || _isPaused || _completed ? null : _enterEditMode,
             child: Center(
               child: AnimatedBuilder(
                 animation: _pulseCtrl,
                 builder: (context, _) {
-                  final pulse = _completed
-                      ? 1.0 + _pulseCtrl.value * 0.04
-                      : 1.0;
+                  final pulse =
+                      _completed ? 1.0 + _pulseCtrl.value * 0.04 : 1.0;
                   return Transform.scale(
                     scale: pulse,
                     child: SizedBox(
@@ -358,9 +359,10 @@ class _TimerContentState extends State<_TimerContent>
                                 style: TextStyle(
                                   fontSize: _completed ? 28 : 36,
                                   fontWeight: FontWeight.w700,
-                                  color: _completed
-                                      ? colors.accentGreen
-                                      : onSurface,
+                                  color:
+                                      _completed
+                                          ? colors.accentGreen
+                                          : onSurface,
                                   fontFeatures: const [
                                     FontFeature.tabularFigures(),
                                   ],
@@ -408,7 +410,10 @@ class _TimerContentState extends State<_TimerContent>
               _SmallBtn(
                 icon: Icons.refresh_rounded,
                 onPressed:
-                    _isRunning || _isPaused || _completed || _remaining < _duration
+                    _isRunning ||
+                            _isPaused ||
+                            _completed ||
+                            _remaining < _duration
                         ? _reset
                         : null,
                 color: onSurface,
@@ -444,8 +449,8 @@ class _TimerContentState extends State<_TimerContent>
                     _completed
                         ? Icons.refresh_rounded
                         : _isRunning
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
                     color: colors.textPrimary,
                     size: 28,
                   ),
@@ -478,7 +483,6 @@ class _TimerContentState extends State<_TimerContent>
                 controller: _minutesCtrl,
                 label: 'min',
                 onSurface: onSurface,
-                colors: colors,
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -495,7 +499,6 @@ class _TimerContentState extends State<_TimerContent>
                 controller: _secondsCtrl,
                 label: 'sec',
                 onSurface: onSurface,
-                colors: colors,
               ),
             ],
           ),
@@ -507,34 +510,42 @@ class _TimerContentState extends State<_TimerContent>
             spacing: 6,
             runSpacing: 6,
             alignment: WrapAlignment.center,
-            children: _quickTimers.map((m) {
-              final isActive = _duration == m * 60;
-              return GestureDetector(
-                onTap: () => _applyQuickTimer(m),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isActive ? colors.accentBlue.withValues(alpha: 0.15) : colors.surfaceHighlight,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isActive ? colors.accentBlue : colors.border,
-                      width: isActive ? 1.5 : 1,
+            children:
+                _quickTimers.map((m) {
+                  final isActive = _duration == m * 60;
+                  return GestureDetector(
+                    onTap: () => _applyQuickTimer(m),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            isActive
+                                ? colors.accentBlue.withValues(alpha: 0.15)
+                                : colors.surfaceHighlight,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isActive ? colors.accentBlue : colors.border,
+                          width: isActive ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Text(
+                        '$m min',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight:
+                              isActive ? FontWeight.w600 : FontWeight.w400,
+                          color:
+                              isActive
+                                  ? colors.accentBlue
+                                  : onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    '$m min',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                      color: isActive ? colors.accentBlue : onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+                  );
+                }).toList(),
           ),
 
           const SizedBox(height: 14),
@@ -592,7 +603,9 @@ class _TimerContentState extends State<_TimerContent>
                 onPressed: !_isRunning ? _saveEdit : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: colors.accentBlue,
-                  disabledBackgroundColor: colors.accentBlue.withValues(alpha: 0.4),
+                  disabledBackgroundColor: colors.accentBlue.withValues(
+                    alpha: 0.4,
+                  ),
                   minimumSize: const Size(80, 34),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
@@ -613,16 +626,15 @@ class _TimeField extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.onSurface,
-    required this.colors,
   });
 
   final TextEditingController controller;
   final String label;
   final Color onSurface;
-  final AppColorScheme colors;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -692,20 +704,22 @@ class _TimerCirclePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width / 2) - 8;
 
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round;
+    final trackPaint =
+        Paint()
+          ..color = trackColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6
+          ..strokeCap = StrokeCap.round;
 
     canvas.drawCircle(center, radius, trackPaint);
 
     if (progress > 0 || completed) {
-      final progressPaint = Paint()
-        ..color = accent
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 6
-        ..strokeCap = StrokeCap.round;
+      final progressPaint =
+          Paint()
+            ..color = accent
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 6
+            ..strokeCap = StrokeCap.round;
 
       final sweep = completed ? 2 * math.pi : (1.0 - progress) * 2 * math.pi;
       canvas.drawArc(
@@ -740,17 +754,22 @@ class _SmallBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return IconButton(
       icon: Icon(icon, size: 18),
       onPressed: onPressed,
-      color: onPressed == null ? color.withValues(alpha: 0.25) : color.withValues(alpha: 0.7),
+      color:
+          onPressed == null
+              ? color.withValues(alpha: 0.25)
+              : color.withValues(alpha: 0.7),
       padding: const EdgeInsets.all(6),
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
       style: IconButton.styleFrom(
-        backgroundColor: color.withValues(alpha: 0.04),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        backgroundColor:
+            onPressed == null
+                ? colors.surfaceHighlight
+                : color.withValues(alpha: 0.04),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

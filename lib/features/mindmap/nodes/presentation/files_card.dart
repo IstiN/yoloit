@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation files card — identical visuals to macOS FilesNode.
@@ -11,54 +12,70 @@ class FilesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final visibleLimit = 8;
     final files = props.files.take(visibleLimit).toList();
     final remaining = props.files.length - visibleLimit;
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF12151C),
-        border: Border.all(color: const Color(0x596B7898), width: 1.5),
+        color: colors.surfaceElevated,
+        border: Border.all(
+          color: colors.textSecondary.withAlpha(89),
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x70000000), blurRadius: 14, offset: Offset(0, 4))
+            color: colors.background.withAlpha(112),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.max,
         children: [
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: const BoxDecoration(
-              color: Color(0xFF181C26),
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(9)),
-              border:
-                  Border(bottom: BorderSide(color: Color(0xFF1E2330))),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(9),
+              ),
+              border: Border(bottom: BorderSide(color: colors.divider)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.insert_drive_file_outlined,
-                    size: 12, color: Color(0xFF6B7898)),
+                Icon(
+                  Icons.insert_drive_file_outlined,
+                  size: 12,
+                  color: colors.textSecondary,
+                ),
                 const SizedBox(width: 6),
-                const Expanded(
-                  child: Text('FILES CHANGED',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.08,
-                          color: Color(0xFF6B7898))),
+                Expanded(
+                  child: Text(
+                    'FILES CHANGED',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.08,
+                      color: colors.textSecondary,
+                    ),
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 5, vertical: 1),
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
-                      color: const Color(0xFF252B3A),
-                      borderRadius: BorderRadius.circular(3)),
-                  child: Text('${props.files.length}',
-                      style: const TextStyle(
-                          fontSize: 9, color: Color(0xFF6B7898))),
+                    color: colors.surfaceHighlight,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    '${props.files.length}',
+                    style: TextStyle(fontSize: 9, color: colors.textSecondary),
+                  ),
                 ),
               ],
             ),
@@ -67,19 +84,25 @@ class FilesCard extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                ...files.map((f) => _FileRow(
-                      file: f,
-                      onTap: onFileSelect != null
-                          ? () => onFileSelect!(f.path)
-                          : null,
-                    )),
+                ...files.map(
+                  (f) => _FileRow(
+                    file: f,
+                    onTap:
+                        onFileSelect != null
+                            ? () => onFileSelect!(f.path)
+                            : null,
+                  ),
+                ),
                 if (remaining > 0)
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    child: Text('+$remaining more',
-                        style: const TextStyle(
-                            fontSize: 9, color: Color(0xFF44446A))),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      '+$remaining more',
+                      style: TextStyle(fontSize: 9, color: colors.textMuted),
+                    ),
                   ),
               ],
             ),
@@ -97,28 +120,17 @@ class _FileRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final (statLabel, statBg, statFg) = switch (file.status.toLowerCase()) {
-      'added' || 'a' => (
-          'A',
-          const Color(0x2634D399),
-          const Color(0xFF34D399)
-        ),
-      'deleted' || 'd' => (
-          'D',
-          const Color(0x26F87171),
-          const Color(0xFFF87171)
-        ),
-      'renamed' || 'r' => (
-          'R',
-          const Color(0x2660A5FA),
-          const Color(0xFF60A5FA)
-        ),
-      'untracked' || '?' => (
-          '?',
-          const Color(0x266B7898),
-          const Color(0xFF6B7898)
-        ),
-      _ => ('M', const Color(0x26FBBF24), const Color(0xFFFBBF24)),
+      'added' ||
+      'a' => ('A', colors.accentGreen.withAlpha(38), colors.accentGreen),
+      'deleted' ||
+      'd' => ('D', colors.accentRed.withAlpha(38), colors.accentRed),
+      'renamed' ||
+      'r' => ('R', colors.accentBlue.withAlpha(38), colors.accentBlue),
+      'untracked' ||
+      '?' => ('?', colors.textSecondary.withAlpha(38), colors.textSecondary),
+      _ => ('M', colors.accentOrange.withAlpha(38), colors.accentOrange),
     };
 
     return GestureDetector(
@@ -132,32 +144,39 @@ class _FileRow extends StatelessWidget {
               height: 14,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                  color: statBg, borderRadius: BorderRadius.circular(2)),
-              child: Text(statLabel,
-                  style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                      color: statFg,
-                      fontFamily: 'monospace')),
+                color: statBg,
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: Text(
+                statLabel,
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  color: statFg,
+                  fontFamily: 'monospace',
+                ),
+              ),
             ),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 p.basename(file.path),
-                style: const TextStyle(
-                    fontSize: 10,
-                    fontFamily: 'monospace',
-                    color: Color(0xFFE8E8FF)),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  color: colors.textPrimary,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             if (file.addedLines > 0 || file.removedLines > 0)
               Text(
                 '+${file.addedLines}/-${file.removedLines}',
-                style: const TextStyle(
-                    fontSize: 9,
-                    color: Color(0xFF44446A),
-                    fontFamily: 'monospace'),
+                style: TextStyle(
+                  fontSize: 9,
+                  color: colors.textMuted,
+                  fontFamily: 'monospace',
+                ),
               ),
           ],
         ),

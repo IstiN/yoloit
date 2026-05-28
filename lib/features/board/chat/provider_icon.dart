@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 class ChatProviderIcon extends StatelessWidget {
   const ChatProviderIcon({
     super.key,
     required this.provider,
     this.size = 16,
-    this.color = const Color(0xFF34D399),
+    this.color,
   });
 
   final String provider;
   final double size;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final iconColor = color ?? colors.accentGreen;
     return switch (provider) {
       'copilot' => SvgPicture.asset(
         'assets/images/copilot_mark.svg',
         width: size,
         height: size,
-        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
       ),
       'cursor' => SizedBox(
         width: size,
@@ -31,15 +34,15 @@ class ChatProviderIcon extends StatelessWidget {
             style: TextStyle(
               fontSize: size * 0.75,
               fontWeight: FontWeight.w700,
-              color: color,
+              color: iconColor,
               height: 1,
             ),
           ),
         ),
       ),
-      'local' => Icon(Icons.memory_rounded, size: size, color: color),
-      'opencode' => Icon(Icons.code_rounded, size: size, color: color),
-      _ => Icon(Icons.auto_awesome, size: size, color: color),
+      'local' => Icon(Icons.memory_rounded, size: size, color: iconColor),
+      'opencode' => Icon(Icons.code_rounded, size: size, color: iconColor),
+      _ => Icon(Icons.auto_awesome, size: size, color: iconColor),
     };
   }
 }

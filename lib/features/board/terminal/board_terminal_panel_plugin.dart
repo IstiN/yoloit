@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart';
+
+final _boardTerminalDefaultColors = AppColorScheme.fromAccent(Colors.green);
 
 class BoardTerminalPanelPlugin extends BoardPanelPlugin {
   const BoardTerminalPanelPlugin();
@@ -19,7 +22,7 @@ class BoardTerminalPanelPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.terminal;
 
   @override
-  Color get accentColor => const Color(0xFF22C55E);
+  Color get accentColor => _boardTerminalDefaultColors.accentGreen;
 
   @override
   Size get defaultSize => const Size(520, 360);

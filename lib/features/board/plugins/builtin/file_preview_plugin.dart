@@ -23,6 +23,8 @@ import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 
+final _filePreviewDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
+
 class FilePreviewPlugin extends BoardPanelPlugin {
   const FilePreviewPlugin();
 
@@ -38,7 +40,7 @@ class FilePreviewPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.image_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF8B5CF6);
+  Color get accentColor => _filePreviewDefaultColors.primary;
 
   @override
   Size get defaultSize => const Size(460, 380);
@@ -173,8 +175,6 @@ class _FilePreviewContent extends StatefulWidget {
 }
 
 class _FilePreviewContentState extends State<_FilePreviewContent> {
-  static const Color _accent = Color(0xFF8B5CF6);
-
   String get _path => widget.panel.state['path'] as String? ?? '';
 
   StreamSubscription<BoardFileModifiedEvent>? _fileSub;
@@ -183,7 +183,9 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
   @override
   void initState() {
     super.initState();
-    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(_onFileModified);
+    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(
+      _onFileModified,
+    );
   }
 
   @override
@@ -215,7 +217,7 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
   Future<void> _editFile(String path) async {
     await showDialog<void>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.72),
+      barrierColor: context.appColors.background.withValues(alpha: 0.72),
       builder: (_) => _FilePreviewEditorDialog(path: path),
     );
   }
@@ -223,15 +225,15 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
   void _openAsWebPage(String path) {
     final fileName = path.split(Platform.pathSeparator).last;
     final fileUrl = Uri.file(path).toString();
-    widget.renderContext.onCreateLinkedPanel?.call(
-      'board.webpage',
-      {'url': fileUrl, 'title': fileName},
-      fileName,
-    );
+    widget.renderContext.onCreateLinkedPanel?.call('board.webpage', {
+      'url': fileUrl,
+      'title': fileName,
+    }, fileName);
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final path = _path;
 
     if (path.isEmpty) {
@@ -242,7 +244,7 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
             Icon(
               Icons.perm_media_outlined,
               size: 48,
-              color: _accent.withValues(alpha: 0.4),
+              color: colors.primary.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 12),
             Text(
@@ -258,7 +260,7 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
               icon: const Icon(Icons.file_open_outlined, size: 16),
               label: const Text('Pick File'),
               style: FilledButton.styleFrom(
-                backgroundColor: _accent,
+                backgroundColor: colors.primary,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 10,
@@ -292,6 +294,7 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
   }
 
   Widget _buildPreview(String path, String ext) {
+    final colors = context.appColors;
     // For binary/media types, _refreshKey forces full recreation on file change.
     // Text/markdown previews are stateful and subscribe to BoardEventBus
     // themselves, so they reload content while preserving scroll position.
@@ -331,13 +334,13 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _accent.withValues(alpha: 0.12),
+              color: colors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.insert_drive_file_outlined,
               size: 48,
-              color: _accent,
+              color: colors.primary,
             ),
           ),
           const SizedBox(height: 12),
@@ -360,7 +363,7 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
             icon: const Icon(Icons.open_in_new, size: 16),
             label: const Text('Open in Editor'),
             style: FilledButton.styleFrom(
-              backgroundColor: _accent,
+              backgroundColor: colors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
           ),
@@ -429,7 +432,9 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
   void initState() {
     super.initState();
     _content = _readFile();
-    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(_onFileModified);
+    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(
+      _onFileModified,
+    );
   }
 
   @override
@@ -463,8 +468,14 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (_content.isEmpty) {
-      return const Center(child: Text('File not found'));
+      return Center(
+        child: Text(
+          'File not found',
+          style: TextStyle(color: colors.textSecondary),
+        ),
+      );
     }
     return MarkdownDocumentPreview(content: _content);
   }
@@ -494,15 +505,15 @@ _MermaidThemeOptions _buildMermaidThemeOptions(
   final canvasColor =
       isDark
           ? Color.lerp(colors.background, colors.surface, 0.55)!
-          : Color.lerp(Colors.white, colors.background, 0.45)!;
+          : Color.lerp(colors.surface, colors.background, 0.45)!;
   final clusterFill =
       isDark
           ? Color.lerp(colors.surfaceElevated, colors.primary, 0.18)!
           : Color.lerp(colors.surfaceElevated, colors.primary, 0.10)!;
   final nodeFill =
       isDark
-          ? Color.lerp(clusterFill, Colors.white, 0.07)!
-          : Color.lerp(Colors.white, colors.primary, 0.08)!;
+          ? Color.lerp(clusterFill, colors.textPrimary, 0.07)!
+          : Color.lerp(colors.surface, colors.primary, 0.08)!;
   final secondaryFill =
       isDark
           ? Color.lerp(nodeFill, colors.primaryLight, 0.10)!
@@ -510,11 +521,11 @@ _MermaidThemeOptions _buildMermaidThemeOptions(
   final tertiaryFill =
       isDark
           ? Color.lerp(clusterFill, colors.surfaceHighlight, 0.45)!
-          : Color.lerp(colors.surfaceHighlight, Colors.white, 0.18)!;
+          : Color.lerp(colors.surfaceHighlight, colors.surface, 0.18)!;
   final noteFill =
       isDark
           ? Color.lerp(nodeFill, colors.primary, 0.12)!
-          : Color.lerp(Colors.white, colors.primary, 0.14)!;
+          : Color.lerp(colors.surface, colors.primary, 0.14)!;
   final borderColor =
       isDark
           ? Color.lerp(colors.border, colors.primaryLight, 0.42)!
@@ -523,8 +534,8 @@ _MermaidThemeOptions _buildMermaidThemeOptions(
       Color.lerp(onSurface, colors.primary, isDark ? 0.48 : 0.24)!;
   final edgeLabelBackground =
       isDark
-          ? Color.lerp(canvasColor, Colors.black, 0.16)!
-          : Color.lerp(canvasColor, Colors.white, 0.78)!;
+          ? Color.lerp(canvasColor, colors.background, 0.16)!
+          : Color.lerp(canvasColor, colors.surface, 0.78)!;
   final backgroundHex = _hexColor(canvasColor);
   final textHex = _hexColor(onSurface);
   final borderHex = _hexColor(borderColor);
@@ -923,7 +934,7 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
     );
     await showDialog<void>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.72),
+      barrierColor: context.appColors.background.withValues(alpha: 0.72),
       builder:
           (_) => _MermaidExpandedDialog(
             initialPng: _png!,
@@ -940,6 +951,7 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     _buildCount++;
     if (_buildCount <= 5 || _buildCount % 20 == 0) {
       debugPrint(
@@ -971,13 +983,13 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
       return _MermaidPreviewFrame(
         height: _previewHeight,
         colors: widget.colors,
-        borderColor: Colors.red.withValues(alpha: 0.3),
+        borderColor: colors.accentRed.withValues(alpha: 0.3),
         backgroundColor: widget.mermaidTheme.canvasColor,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Text(
             'Mermaid error: $_error',
-            style: const TextStyle(fontSize: 12, color: Colors.red),
+            style: TextStyle(fontSize: 12, color: colors.accentRed),
           ),
         ),
       );
@@ -1030,11 +1042,11 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
                   bottom: 10,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.68),
+                      color: colors.background.withValues(alpha: 0.68),
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 6,
                       ),
@@ -1044,12 +1056,15 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
                           Icon(
                             Icons.open_in_full_rounded,
                             size: 14,
-                            color: Colors.white,
+                            color: colors.textPrimary,
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
                             'Open',
-                            style: TextStyle(fontSize: 11, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.textPrimary,
+                            ),
                           ),
                         ],
                       ),
@@ -1082,12 +1097,13 @@ class _MermaidPreviewFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       height: height,
       margin: const EdgeInsets.symmetric(vertical: 8),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white,
+        color: backgroundColor ?? colors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: borderColor ?? colors.border),
       ),
@@ -1163,6 +1179,7 @@ class _MermaidExpandedDialogState extends State<_MermaidExpandedDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = context.appColors;
     return Dialog(
       insetPadding: const EdgeInsets.all(20),
       backgroundColor: widget.colors.surfaceElevated,
@@ -1243,10 +1260,10 @@ class _MermaidExpandedDialogState extends State<_MermaidExpandedDialog> {
                           bottom: 24,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.10),
+                              color: colors.accentRed.withValues(alpha: 0.10),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: Colors.red.withValues(alpha: 0.35),
+                                color: colors.accentRed.withValues(alpha: 0.35),
                               ),
                             ),
                             child: Padding(
@@ -1254,7 +1271,7 @@ class _MermaidExpandedDialogState extends State<_MermaidExpandedDialog> {
                               child: Text(
                                 'Failed to render higher resolution preview: $_refineError',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.red,
+                                  color: colors.accentRed,
                                 ),
                               ),
                             ),
@@ -1299,7 +1316,9 @@ class _CodePreviewState extends State<_CodePreview> {
   void initState() {
     super.initState();
     _lines = _readLines();
-    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(_onFileModified);
+    _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(
+      _onFileModified,
+    );
   }
 
   @override
@@ -1344,7 +1363,7 @@ class _CodePreviewState extends State<_CodePreview> {
     if (_lines.isEmpty) {
       return const Center(child: Text('File not found'));
     }
-    final colors = AppColorScheme.of(context);
+    final colors = context.appColors;
     final textColor = Theme.of(context).colorScheme.onSurface;
     final lineNumColor = textColor.withValues(alpha: 0.35);
 
@@ -1424,7 +1443,11 @@ class _VideoPreviewState extends State<_VideoPreview> {
 
   @override
   Widget build(BuildContext context) {
-    return Video(controller: _controller, controls: AdaptiveVideoControls);
+    final colors = context.appColors;
+    return ColoredBox(
+      color: colors.background,
+      child: Video(controller: _controller, controls: AdaptiveVideoControls),
+    );
   }
 }
 
@@ -1439,8 +1462,6 @@ class _AudioPreview extends StatefulWidget {
 }
 
 class _AudioPreviewState extends State<_AudioPreview> {
-  static const Color _accent = Color(0xFF8B5CF6);
-
   late final Player _player;
   Duration _total = Duration.zero;
   Duration _position = Duration.zero;
@@ -1504,13 +1525,13 @@ class _AudioPreviewState extends State<_AudioPreview> {
             width: 100,
             height: 100,
             decoration: BoxDecoration(
-              color: _accent.withValues(alpha: 0.12),
+              color: colors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.music_note_rounded,
               size: 48,
-              color: _accent,
+              color: colors.primary,
             ),
           ),
           const SizedBox(height: 16),
@@ -1532,10 +1553,10 @@ class _AudioPreviewState extends State<_AudioPreview> {
           // Progress bar
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              activeTrackColor: _accent,
+              activeTrackColor: colors.primary,
               inactiveTrackColor: colors.border,
-              thumbColor: _accent,
-              overlayColor: _accent.withValues(alpha: 0.15),
+              thumbColor: colors.primary,
+              overlayColor: colors.primary.withValues(alpha: 0.15),
               trackHeight: 3,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
             ),
@@ -1608,12 +1629,12 @@ class _AudioPreviewState extends State<_AudioPreview> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: _accent,
+                    color: colors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    color: Colors.white,
+                    color: colors.textPrimary,
                     size: 28,
                   ),
                 ),
@@ -1661,6 +1682,7 @@ class _Toolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final fileName = path.split(Platform.pathSeparator).last;
 
     return Padding(
@@ -1686,7 +1708,7 @@ class _Toolbar extends StatelessWidget {
               icon: const Icon(Icons.edit_outlined, size: 14),
               label: const Text('Edit', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: colors.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: const Size(0, 28),
               ),
@@ -1697,7 +1719,7 @@ class _Toolbar extends StatelessWidget {
               icon: const Icon(Icons.language_outlined, size: 14),
               label: const Text('Web', style: TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF60A5FA),
+                foregroundColor: colors.accentBlue,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 minimumSize: const Size(0, 28),
               ),
@@ -1707,7 +1729,7 @@ class _Toolbar extends StatelessWidget {
             icon: const Icon(Icons.folder_open_outlined, size: 14),
             label: const Text('Open', style: TextStyle(fontSize: 12)),
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF8B5CF6),
+              foregroundColor: colors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               minimumSize: const Size(0, 28),
             ),
@@ -1717,7 +1739,7 @@ class _Toolbar extends StatelessWidget {
             icon: const Icon(Icons.swap_horiz, size: 14),
             label: const Text('Change', style: TextStyle(fontSize: 12)),
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF94A3B8),
+              foregroundColor: colors.textMuted,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               minimumSize: const Size(0, 28),
             ),

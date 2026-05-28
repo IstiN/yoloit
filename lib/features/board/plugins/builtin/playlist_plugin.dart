@@ -13,6 +13,7 @@ import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.d
 export 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart'
     show PlaylistPlayerRegistry;
 
+final _playlistDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
 /// Board panel plugin: media playlist player (audio + video).
 ///
@@ -44,7 +45,7 @@ class PlaylistPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.queue_music_rounded;
 
   @override
-  Color get accentColor => const Color(0xFF8B5CF6);
+  Color get accentColor => _playlistDefaultColors.primary;
 
   @override
   Size get defaultSize => const Size(380, 480);
@@ -65,18 +66,27 @@ class PlaylistPlugin extends BoardPanelPlugin {
     BuildContext context,
     BoardPanelInstance panel,
     BoardPanelRenderContext renderContext,
-  ) =>
-      _PlaylistContent(panel: panel, renderContext: renderContext);
+  ) => _PlaylistContent(panel: panel, renderContext: renderContext);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 bool _isVideoExt(String ext) => const {
-  'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v',
+  'mp4',
+  'mov',
+  'avi',
+  'mkv',
+  'webm',
+  'm4v',
 }.contains(ext.toLowerCase());
 
 bool _isAudioExt(String ext) => const {
-  'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg',
+  'mp3',
+  'wav',
+  'flac',
+  'aac',
+  'm4a',
+  'ogg',
 }.contains(ext.toLowerCase());
 
 bool _isMediaExt(String ext) => _isVideoExt(ext) || _isAudioExt(ext);
@@ -129,9 +139,8 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   // ── State accessors ────────────────────────────────────────────────────────
 
   List<Map<String, dynamic>> get _tracks => _parseTracks(widget.panel);
-  int get _currentIndex =>
-      (widget.panel.state['currentIndex'] as int? ?? 0)
-          .clamp(0, (_tracks.isEmpty ? 0 : _tracks.length - 1));
+  int get _currentIndex => (widget.panel.state['currentIndex'] as int? ?? 0)
+      .clamp(0, (_tracks.isEmpty ? 0 : _tracks.length - 1));
   bool get _repeat => widget.panel.state['repeat'] as bool? ?? false;
   bool get _shuffle => widget.panel.state['shuffle'] as bool? ?? false;
 
@@ -168,7 +177,8 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     final oldPlaying = old.panel.state['playing'] as bool? ?? false;
     final newPlaying = widget.panel.state['playing'] as bool? ?? false;
 
-    final trackChanged = oldIndex != newIndex ||
+    final trackChanged =
+        oldIndex != newIndex ||
         _trackPathAt(oldTracks, oldIndex) != _trackPathAt(newTracks, newIndex);
 
     if (trackChanged) {
@@ -193,18 +203,26 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   void _subscribeToPlayer() {
     for (final s in _subs) s.cancel();
     _subs.clear();
-    _subs.add(_player.stream.position.listen((p) {
-      if (mounted) setState(() => _position = p);
-    }));
-    _subs.add(_player.stream.duration.listen((d) {
-      if (mounted) setState(() => _duration = d);
-    }));
-    _subs.add(_player.stream.playing.listen((v) {
-      if (mounted) setState(() => _isPlaying = v);
-    }));
-    _subs.add(_player.stream.completed.listen((completed) {
-      if (completed && mounted) _onTrackCompleted();
-    }));
+    _subs.add(
+      _player.stream.position.listen((p) {
+        if (mounted) setState(() => _position = p);
+      }),
+    );
+    _subs.add(
+      _player.stream.duration.listen((d) {
+        if (mounted) setState(() => _duration = d);
+      }),
+    );
+    _subs.add(
+      _player.stream.playing.listen((v) {
+        if (mounted) setState(() => _isPlaying = v);
+      }),
+    );
+    _subs.add(
+      _player.stream.completed.listen((completed) {
+        if (completed && mounted) _onTrackCompleted();
+      }),
+    );
   }
 
   void _openCurrentTrack({bool autoPlay = false}) {
@@ -235,9 +253,10 @@ class _PlaylistContentState extends State<_PlaylistContent> {
       _player.play();
       return;
     }
-    final nextIndex = _shuffle
-        ? _random.nextInt(tracks.length)
-        : (_currentIndex + 1) % tracks.length;
+    final nextIndex =
+        _shuffle
+            ? _random.nextInt(tracks.length)
+            : (_currentIndex + 1) % tracks.length;
     if (nextIndex == 0 && !_shuffle) return; // reached end, stop
     _userInitiated = true; // auto-advance counts as intentional
     _saveState(currentIndex: nextIndex);
@@ -280,27 +299,47 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     final onSurface = Theme.of(btnCtx).colorScheme.onSurface;
     final choice = await showMenu<String>(
       context: btnCtx,
-      position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 160, pos.dy + 80),
+      position: RelativeRect.fromLTRB(
+        pos.dx,
+        pos.dy,
+        pos.dx + 160,
+        pos.dy + 80,
+      ),
       color: colors.surfaceElevated,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
         PopupMenuItem(
           value: 'files',
           height: 36,
-          child: Row(children: [
-            Icon(Icons.folder_open_outlined, size: 14, color: onSurface.withAlpha(180)),
-            const SizedBox(width: 8),
-            Text('Add files', style: TextStyle(fontSize: 12, color: onSurface)),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.folder_open_outlined,
+                size: 14,
+                color: onSurface.withAlpha(180),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Add files',
+                style: TextStyle(fontSize: 12, color: onSurface),
+              ),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'url',
           height: 36,
-          child: Row(children: [
-            Icon(Icons.link_rounded, size: 14, color: onSurface.withAlpha(180)),
-            const SizedBox(width: 8),
-            Text('Add URL', style: TextStyle(fontSize: 12, color: onSurface)),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.link_rounded,
+                size: 14,
+                color: onSurface.withAlpha(180),
+              ),
+              const SizedBox(width: 8),
+              Text('Add URL', style: TextStyle(fontSize: 12, color: onSurface)),
+            ],
+          ),
         ),
       ],
     );
@@ -312,24 +351,34 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   }
 
   Future<void> _addUrl() async {
+    final colors = context.appColors;
     final ctrl = TextEditingController();
     final nameCtrl = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black45,
+      barrierColor: colors.background.withValues(alpha: 0.45),
       builder: (dctx) {
         final colors = dctx.appColors;
         final onSurface = Theme.of(dctx).colorScheme.onSurface;
         return Dialog(
           backgroundColor: colors.surfaceElevated,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Add URL', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: onSurface)),
+                Text(
+                  'Add URL',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: onSurface,
+                  ),
+                ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: ctrl,
@@ -337,12 +386,28 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                   style: TextStyle(fontSize: 13, color: onSurface),
                   decoration: InputDecoration(
                     hintText: 'https://example.com/audio.mp3',
-                    hintStyle: TextStyle(fontSize: 12, color: onSurface.withAlpha(100)),
-                    prefixIcon: Icon(Icons.link_rounded, size: 16, color: onSurface.withAlpha(150)),
-                    border: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.primary, width: 1.5)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    hintStyle: TextStyle(
+                      fontSize: 12,
+                      color: onSurface.withAlpha(100),
+                    ),
+                    prefixIcon: Icon(
+                      Icons.link_rounded,
+                      size: 16,
+                      color: onSurface.withAlpha(150),
+                    ),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: colors.primary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     isDense: true,
                   ),
                 ),
@@ -352,11 +417,23 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                   style: TextStyle(fontSize: 13, color: onSurface),
                   decoration: InputDecoration(
                     hintText: 'Title (optional)',
-                    hintStyle: TextStyle(fontSize: 12, color: onSurface.withAlpha(100)),
-                    border: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
-                    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.primary, width: 1.5)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    hintStyle: TextStyle(
+                      fontSize: 12,
+                      color: onSurface.withAlpha(100),
+                    ),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: colors.primary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     isDense: true,
                   ),
                   onSubmitted: (_) => Navigator.of(dctx).pop(true),
@@ -367,12 +444,21 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(dctx).pop(false),
-                      child: Text('Cancel', style: TextStyle(fontSize: 12, color: onSurface.withAlpha(150))),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: onSurface.withAlpha(150),
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
                       onPressed: () => Navigator.of(dctx).pop(true),
-                      style: FilledButton.styleFrom(backgroundColor: colors.primary, minimumSize: const Size(0, 32)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colors.primary,
+                        minimumSize: const Size(0, 32),
+                      ),
                       child: const Text('Add', style: TextStyle(fontSize: 12)),
                     ),
                   ],
@@ -388,7 +474,10 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     if (confirmed != true) return;
     final url = ctrl.text.trim();
     if (url.isEmpty) return;
-    final name = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : url.split('/').last;
+    final name =
+        nameCtrl.text.trim().isNotEmpty
+            ? nameCtrl.text.trim()
+            : url.split('/').last;
     final existing = _tracks;
     final track = {
       'id': '${DateTime.now().millisecondsSinceEpoch}$url',
@@ -397,7 +486,10 @@ class _PlaylistContentState extends State<_PlaylistContent> {
       'isUrl': true,
     };
     final updated = [...existing, track];
-    _saveState(tracks: updated, currentIndex: existing.isEmpty ? 0 : _currentIndex);
+    _saveState(
+      tracks: updated,
+      currentIndex: existing.isEmpty ? 0 : _currentIndex,
+    );
     if (existing.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openCurrentTrack());
     }
@@ -407,19 +499,35 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     final result = await FilePicker.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'],
+      allowedExtensions: [
+        'mp3',
+        'wav',
+        'flac',
+        'aac',
+        'm4a',
+        'ogg',
+        'mp4',
+        'mov',
+        'avi',
+        'mkv',
+        'webm',
+        'm4v',
+      ],
     );
     if (result == null || result.files.isEmpty) return;
     final existing = _tracks;
     final existingPaths = existing.map((t) => t['path']).toSet();
-    final newTracks = result.files
-        .where((f) => f.path != null && !existingPaths.contains(f.path))
-        .map((f) => {
-              'id': '${DateTime.now().millisecondsSinceEpoch}${f.name}',
-              'path': f.path!,
-              'name': f.name,
-            })
-        .toList();
+    final newTracks =
+        result.files
+            .where((f) => f.path != null && !existingPaths.contains(f.path))
+            .map(
+              (f) => {
+                'id': '${DateTime.now().millisecondsSinceEpoch}${f.name}',
+                'path': f.path!,
+                'name': f.name,
+              },
+            )
+            .toList();
     if (newTracks.isEmpty) return;
     final updated = [...existing, ...newTracks];
     _saveState(
@@ -453,7 +561,9 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     if (newIndex >= tracks.length) newIndex = max(0, tracks.length - 1);
     _saveState(tracks: tracks, currentIndex: newIndex);
     if (index == _currentIndex) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _openCurrentTrack(autoPlay: false));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _openCurrentTrack(autoPlay: false),
+      );
     }
   }
 
@@ -464,9 +574,10 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     }
     final tracks = _tracks;
     if (tracks.isEmpty) return;
-    final next = _shuffle
-        ? _random.nextInt(tracks.length)
-        : (_currentIndex - 1 + tracks.length) % tracks.length;
+    final next =
+        _shuffle
+            ? _random.nextInt(tracks.length)
+            : (_currentIndex - 1 + tracks.length) % tracks.length;
     _userInitiated = true;
     _saveState(currentIndex: next);
   }
@@ -474,9 +585,10 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   void _skipNext() {
     final tracks = _tracks;
     if (tracks.isEmpty) return;
-    final next = _shuffle
-        ? _random.nextInt(tracks.length)
-        : (_currentIndex + 1) % tracks.length;
+    final next =
+        _shuffle
+            ? _random.nextInt(tracks.length)
+            : (_currentIndex + 1) % tracks.length;
     _userInitiated = true;
     _saveState(currentIndex: next);
   }
@@ -488,12 +600,17 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     final colors = context.appColors;
     final tracks = _tracks;
     final hasVideo = _videoVisible && _videoCtrl != null;
-    final currentTrack = tracks.isNotEmpty && _currentIndex < tracks.length
-        ? tracks[_currentIndex]
-        : null;
-    final progress = _duration.inMilliseconds > 0
-        ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
-        : 0.0;
+    final currentTrack =
+        tracks.isNotEmpty && _currentIndex < tracks.length
+            ? tracks[_currentIndex]
+            : null;
+    final progress =
+        _duration.inMilliseconds > 0
+            ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(
+              0.0,
+              1.0,
+            )
+            : 0.0;
 
     return Column(
       children: [
@@ -511,21 +628,29 @@ class _PlaylistContentState extends State<_PlaylistContent> {
               const SizedBox(width: 6),
               Text(
                 '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.primary),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: colors.primary,
+                ),
               ),
               const Spacer(),
               Builder(
-                builder: (btnCtx) => FilledButton.icon(
-                  onPressed: () => _showAddMenu(btnCtx),
-                  icon: const Icon(Icons.add, size: 13),
-                  label: const Text('Add', style: TextStyle(fontSize: 11)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    minimumSize: const Size(0, 24),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
+                builder:
+                    (btnCtx) => FilledButton.icon(
+                      onPressed: () => _showAddMenu(btnCtx),
+                      icon: const Icon(Icons.add, size: 13),
+                      label: const Text('Add', style: TextStyle(fontSize: 11)),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colors.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        minimumSize: const Size(0, 24),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
               ),
             ],
           ),
@@ -535,31 +660,35 @@ class _PlaylistContentState extends State<_PlaylistContent> {
         if (currentTrack != null)
           SizedBox(
             height: 140,
-            child: hasVideo
-                ? Video(controller: _videoCtrl!, controls: AdaptiveVideoControls)
-                : Container(
-                    color: colors.surfaceElevated,
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: colors.primary.withOpacity(0.12),
-                              shape: BoxShape.circle,
+            child:
+                hasVideo
+                    ? Video(
+                      controller: _videoCtrl!,
+                      controls: AdaptiveVideoControls,
+                    )
+                    : Container(
+                      color: colors.surfaceElevated,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: colors.primary.withOpacity(0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.music_note_rounded,
+                                size: 36,
+                                color: colors.primary.withOpacity(0.7),
+                              ),
                             ),
-                            child: Icon(
-                              Icons.music_note_rounded,
-                              size: 36,
-                              color: colors.primary.withOpacity(0.7),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
           ),
 
         // ── Now Playing bar ────────────────────────────────────────────────
@@ -593,13 +722,19 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                     thumbColor: colors.primary,
                     overlayColor: colors.primary.withOpacity(0.15),
                     trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 5,
+                    ),
                   ),
                   child: Slider(
                     value: progress as double,
-                    onChanged: (v) => _player.seek(
-                      Duration(milliseconds: (v * _duration.inMilliseconds).round()),
-                    ),
+                    onChanged:
+                        (v) => _player.seek(
+                          Duration(
+                            milliseconds:
+                                (v * _duration.inMilliseconds).round(),
+                          ),
+                        ),
                   ),
                 ),
                 // Time
@@ -612,14 +747,18 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                         _formatDuration(_position),
                         style: TextStyle(
                           fontSize: 10,
-                          color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(120),
                         ),
                       ),
                       Text(
                         _formatDuration(_duration),
                         style: TextStyle(
                           fontSize: 10,
-                          color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withAlpha(120),
                         ),
                       ),
                     ],
@@ -634,22 +773,38 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                       icon: Icon(
                         Icons.shuffle_rounded,
                         size: 18,
-                        color: _shuffle ? colors.primary : Theme.of(context).colorScheme.onSurface.withAlpha(100),
+                        color:
+                            _shuffle
+                                ? colors.primary
+                                : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withAlpha(100),
                       ),
                       onPressed: () => _saveState(shuffle: !_shuffle),
                       padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
                     // Prev
                     IconButton(
-                      icon: Icon(Icons.skip_previous_rounded, size: 24, color: Theme.of(context).colorScheme.onSurface),
+                      icon: Icon(
+                        Icons.skip_previous_rounded,
+                        size: 24,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                       onPressed: tracks.length > 1 ? _skipPrev : null,
                       padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
                     ),
                     // Play/Pause
                     GestureDetector(
-                      onTap: () => _isPlaying ? _player.pause() : _player.play(),
+                      onTap:
+                          () => _isPlaying ? _player.pause() : _player.play(),
                       child: Container(
                         width: 44,
                         height: 44,
@@ -658,7 +813,9 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          _isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
                           color: colors.textPrimary,
                           size: 26,
                         ),
@@ -666,21 +823,36 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                     ),
                     // Next
                     IconButton(
-                      icon: Icon(Icons.skip_next_rounded, size: 24, color: Theme.of(context).colorScheme.onSurface),
+                      icon: Icon(
+                        Icons.skip_next_rounded,
+                        size: 24,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                       onPressed: tracks.length > 1 ? _skipNext : null,
                       padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
                     ),
                     // Repeat
                     IconButton(
                       icon: Icon(
                         Icons.repeat_rounded,
                         size: 18,
-                        color: _repeat ? colors.primary : Theme.of(context).colorScheme.onSurface.withAlpha(100),
+                        color:
+                            _repeat
+                                ? colors.primary
+                                : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withAlpha(100),
                       ),
                       onPressed: () => _saveState(repeat: !_repeat),
                       padding: const EdgeInsets.all(4),
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
                   ],
                 ),
@@ -691,64 +863,76 @@ class _PlaylistContentState extends State<_PlaylistContent> {
         // ── Track list ─────────────────────────────────────────────────────
         Divider(height: 1, thickness: 0.5, color: colors.border),
         Expanded(
-          child: tracks.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.queue_music_rounded, size: 40, color: colors.primary.withOpacity(0.35)),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No tracks yet',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
+          child:
+              tracks.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.queue_music_rounded,
+                          size: 40,
+                          color: colors.primary.withOpacity(0.35),
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              : ReorderableListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: tracks.length,
-                  onReorder: (oldIdx, newIdx) {
-                    final updated = List<Map<String, dynamic>>.from(tracks);
-                    if (newIdx > oldIdx) newIdx--;
-                    final item = updated.removeAt(oldIdx);
-                    updated.insert(newIdx, item);
-                    int newCurrent = _currentIndex;
-                    if (oldIdx == _currentIndex) {
-                      newCurrent = newIdx;
-                    } else if (oldIdx < _currentIndex && newIdx >= _currentIndex) {
-                      newCurrent--;
-                    } else if (oldIdx > _currentIndex && newIdx <= _currentIndex) {
-                      newCurrent++;
-                    }
-                    _saveState(tracks: updated, currentIndex: newCurrent);
-                  },
-                  itemBuilder: (context, index) {
-                    final track = tracks[index];
-                    final name = track['name'] as String? ?? '';
-                    final isActive = index == _currentIndex;
-                    final isUrl = track['isUrl'] == true;
-                    final ext = _ext(track['path'] as String? ?? '');
-                    final icon = isUrl
-                        ? Icons.link_rounded
-                        : (_isVideoExt(ext) ? Icons.videocam_outlined : Icons.audiotrack_outlined);
+                        const SizedBox(height: 8),
+                        Text(
+                          'No tracks yet',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(120),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : ReorderableListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: tracks.length,
+                    onReorder: (oldIdx, newIdx) {
+                      final updated = List<Map<String, dynamic>>.from(tracks);
+                      if (newIdx > oldIdx) newIdx--;
+                      final item = updated.removeAt(oldIdx);
+                      updated.insert(newIdx, item);
+                      int newCurrent = _currentIndex;
+                      if (oldIdx == _currentIndex) {
+                        newCurrent = newIdx;
+                      } else if (oldIdx < _currentIndex &&
+                          newIdx >= _currentIndex) {
+                        newCurrent--;
+                      } else if (oldIdx > _currentIndex &&
+                          newIdx <= _currentIndex) {
+                        newCurrent++;
+                      }
+                      _saveState(tracks: updated, currentIndex: newCurrent);
+                    },
+                    itemBuilder: (context, index) {
+                      final track = tracks[index];
+                      final name = track['name'] as String? ?? '';
+                      final isActive = index == _currentIndex;
+                      final isUrl = track['isUrl'] == true;
+                      final ext = _ext(track['path'] as String? ?? '');
+                      final icon =
+                          isUrl
+                              ? Icons.link_rounded
+                              : (_isVideoExt(ext)
+                                  ? Icons.videocam_outlined
+                                  : Icons.audiotrack_outlined);
 
-                    return _TrackTile(
-                      key: ValueKey(track['id']),
-                      index: index,
-                      name: name,
-                      icon: icon,
-                      isActive: isActive,
-                      isPlaying: isActive && _isPlaying,
-                      onTap: () => _selectTrack(index),
-                      onDelete: () => _removeTrack(index),
-                    );
-                  },
-                  buildDefaultDragHandles: false,
-                ),
+                      return _TrackTile(
+                        key: ValueKey(track['id']),
+                        index: index,
+                        name: name,
+                        icon: icon,
+                        isActive: isActive,
+                        isPlaying: isActive && _isPlaying,
+                        onTap: () => _selectTrack(index),
+                        onDelete: () => _removeTrack(index),
+                      );
+                    },
+                    buildDefaultDragHandles: false,
+                  ),
         ),
       ],
     );
@@ -795,22 +979,28 @@ class _TrackTileState extends State<_TrackTile> {
         child: Container(
           padding: const EdgeInsets.only(left: 12, right: 4, top: 7, bottom: 7),
           decoration: BoxDecoration(
-            color: widget.isActive
-                ? colors.primary.withOpacity(0.1)
-                : (_hovered ? colors.surfaceHighlight : Colors.transparent),
-            border: Border(left: BorderSide(
-              color: widget.isActive ? colors.primary : Colors.transparent,
-              width: 3,
-            )),
+            color:
+                widget.isActive
+                    ? colors.primary.withOpacity(0.1)
+                    : (_hovered ? colors.surfaceHighlight : Colors.transparent),
+            border: Border(
+              left: BorderSide(
+                color: widget.isActive ? colors.primary : Colors.transparent,
+                width: 3,
+              ),
+            ),
           ),
           child: Row(
             children: [
               Icon(
                 widget.isPlaying ? Icons.volume_up_rounded : widget.icon,
                 size: 16,
-                color: widget.isActive
-                    ? colors.primary
-                    : Theme.of(context).colorScheme.onSurface.withAlpha(120),
+                color:
+                    widget.isActive
+                        ? colors.primary
+                        : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withAlpha(120),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -820,9 +1010,10 @@ class _TrackTileState extends State<_TrackTile> {
                     fontSize: 12,
                     fontWeight:
                         widget.isActive ? FontWeight.w600 : FontWeight.normal,
-                    color: widget.isActive
-                        ? colors.primary
-                        : Theme.of(context).colorScheme.onSurface,
+                    color:
+                        widget.isActive
+                            ? colors.primary
+                            : Theme.of(context).colorScheme.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -831,13 +1022,19 @@ class _TrackTileState extends State<_TrackTile> {
               GestureDetector(
                 onTap: widget.onDelete,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
                   child: Icon(
                     Icons.close_rounded,
                     size: 14,
-                    color: _hovered
-                        ? colors.accentRed
-                        : Theme.of(context).colorScheme.onSurface.withAlpha(60),
+                    color:
+                        _hovered
+                            ? colors.accentRed
+                            : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(60),
                   ),
                 ),
               ),
@@ -845,11 +1042,16 @@ class _TrackTileState extends State<_TrackTile> {
               ReorderableDragStartListener(
                 index: widget.index,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
+                  ),
                   child: Icon(
                     Icons.drag_handle_rounded,
                     size: 16,
-                    color: Theme.of(context).colorScheme.onSurface.withAlpha(80),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withAlpha(80),
                   ),
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 /// The current state of the voice interaction.
 enum VoiceVisualizerState { idle, listening, speaking, processing }
@@ -16,13 +17,15 @@ class AssistantVoiceVisualizer extends StatefulWidget {
   const AssistantVoiceVisualizer({
     super.key,
     required this.state,
+    required this.colors,
     this.size = 180,
-    this.color = const Color(0xFF8B5CF6),
+    this.color,
   });
 
   final VoiceVisualizerState state;
+  final AppColorScheme colors;
   final double size;
-  final Color color;
+  final Color? color;
 
   @override
   State<AssistantVoiceVisualizer> createState() =>
@@ -70,6 +73,7 @@ class _AssistantVoiceVisualizerState extends State<AssistantVoiceVisualizer>
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -78,7 +82,8 @@ class _AssistantVoiceVisualizerState extends State<AssistantVoiceVisualizer>
           painter: _VisualizerPainter(
             progress: _controller.value,
             state: widget.state,
-            color: widget.color,
+            colors: colors,
+            color: widget.color ?? colors.primary,
           ),
         );
       },
@@ -90,11 +95,13 @@ class _VisualizerPainter extends CustomPainter {
   _VisualizerPainter({
     required this.progress,
     required this.state,
+    required this.colors,
     required this.color,
   });
 
   final double progress;
   final VoiceVisualizerState state;
+  final AppColorScheme colors;
   final Color color;
 
   @override
@@ -194,5 +201,8 @@ class _VisualizerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _VisualizerPainter old) =>
-      old.progress != progress || old.state != state || old.color != color;
+      old.progress != progress ||
+      old.state != state ||
+      old.colors != colors ||
+      old.color != color;
 }

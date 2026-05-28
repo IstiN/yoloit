@@ -5,8 +5,8 @@ import 'dart:math' as math;
 import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
@@ -53,7 +53,7 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColorScheme.of(context);
+    final colors = context.appColors;
     final mermaidTheme = _buildMermaidThemeOptions(context, colors);
     final styleSheet = MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
       codeblockDecoration: BoxDecoration(
@@ -119,15 +119,15 @@ _MermaidThemeOptions _buildMermaidThemeOptions(
   final canvasColor =
       isDark
           ? Color.lerp(colors.background, colors.surface, 0.55)!
-          : Color.lerp(Colors.white, colors.background, 0.45)!;
+          : Color.lerp(colors.surface, colors.background, 0.45)!;
   final clusterFill =
       isDark
           ? Color.lerp(colors.surfaceElevated, colors.primary, 0.18)!
           : Color.lerp(colors.surfaceElevated, colors.primary, 0.10)!;
   final nodeFill =
       isDark
-          ? Color.lerp(clusterFill, Colors.white, 0.07)!
-          : Color.lerp(Colors.white, colors.primary, 0.08)!;
+          ? Color.lerp(clusterFill, colors.textPrimary, 0.07)!
+          : Color.lerp(colors.surface, colors.primary, 0.08)!;
   final secondaryFill =
       isDark
           ? Color.lerp(nodeFill, colors.primaryLight, 0.10)!
@@ -135,11 +135,11 @@ _MermaidThemeOptions _buildMermaidThemeOptions(
   final tertiaryFill =
       isDark
           ? Color.lerp(clusterFill, colors.surfaceHighlight, 0.45)!
-          : Color.lerp(colors.surfaceHighlight, Colors.white, 0.18)!;
+          : Color.lerp(colors.surfaceHighlight, colors.surface, 0.18)!;
   final noteFill =
       isDark
           ? Color.lerp(nodeFill, colors.primary, 0.12)!
-          : Color.lerp(Colors.white, colors.primary, 0.14)!;
+          : Color.lerp(colors.surface, colors.primary, 0.14)!;
   final borderColor =
       isDark
           ? Color.lerp(colors.border, colors.primaryLight, 0.42)!
@@ -148,8 +148,8 @@ _MermaidThemeOptions _buildMermaidThemeOptions(
       Color.lerp(onSurface, colors.primary, isDark ? 0.48 : 0.24)!;
   final edgeLabelBackground =
       isDark
-          ? Color.lerp(canvasColor, Colors.black, 0.16)!
-          : Color.lerp(canvasColor, Colors.white, 0.78)!;
+          ? Color.lerp(canvasColor, colors.background, 0.16)!
+          : Color.lerp(canvasColor, colors.surface, 0.78)!;
   final backgroundHex = _hexColor(canvasColor);
   final textHex = _hexColor(onSurface);
   final borderHex = _hexColor(borderColor);
@@ -487,9 +487,10 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
       _expandedRenderWidth,
       math.max(_inlineRenderWidth, screenWidth * dpr),
     );
+    final colors = context.appColors;
     await showDialog<void>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.72),
+      barrierColor: colors.background.withValues(alpha: 0.72),
       builder:
           (_) => _MermaidExpandedDialog(
             initialPng: _png!,
@@ -520,6 +521,7 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (_png == null && (_loading || widget.renderer == null)) {
       return _MermaidPreviewFrame(
         height: _previewHeight,
@@ -545,13 +547,13 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
       return _MermaidPreviewFrame(
         height: _previewHeight,
         colors: widget.colors,
-        borderColor: Colors.red.withValues(alpha: 0.3),
+        borderColor: colors.accentRed.withValues(alpha: 0.3),
         backgroundColor: widget.mermaidTheme.canvasColor,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Text(
             'Mermaid error: $_error',
-            style: const TextStyle(fontSize: 12, color: Colors.red),
+            style: TextStyle(fontSize: 12, color: colors.accentRed),
           ),
         ),
       );
@@ -562,7 +564,7 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
         colors: widget.colors,
         backgroundColor: widget.mermaidTheme.canvasColor,
         child: Material(
-          color: Colors.transparent,
+          color: colors.surface.withValues(alpha: 0),
           child: InkWell(
             onTap: _openExpandedPreview,
             child: Stack(
@@ -641,8 +643,9 @@ class _MermaidOverlayActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Material(
-      color: Colors.black.withValues(alpha: 0.68),
+      color: colors.background.withValues(alpha: 0.68),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         borderRadius: BorderRadius.circular(999),
@@ -652,11 +655,11 @@ class _MermaidOverlayActionChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: Colors.white),
+              Icon(icon, size: 14, color: colors.textPrimary),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(fontSize: 11, color: Colors.white),
+                style: TextStyle(fontSize: 11, color: colors.textPrimary),
               ),
             ],
           ),
@@ -683,12 +686,13 @@ class _MermaidPreviewFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       height: height,
       margin: const EdgeInsets.symmetric(vertical: 8),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.white,
+        color: backgroundColor ?? colors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: borderColor ?? colors.border),
       ),
@@ -763,6 +767,7 @@ class _MermaidExpandedDialogState extends State<_MermaidExpandedDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final theme = Theme.of(context);
     return Dialog(
       insetPadding: const EdgeInsets.all(20),
@@ -844,10 +849,10 @@ class _MermaidExpandedDialogState extends State<_MermaidExpandedDialog> {
                           bottom: 24,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.10),
+                              color: colors.accentRed.withValues(alpha: 0.10),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: Colors.red.withValues(alpha: 0.35),
+                                color: colors.accentRed.withValues(alpha: 0.35),
                               ),
                             ),
                             child: Padding(
@@ -855,7 +860,7 @@ class _MermaidExpandedDialogState extends State<_MermaidExpandedDialog> {
                               child: Text(
                                 'Failed to render higher resolution preview: $_refineError',
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.red,
+                                  color: colors.accentRed,
                                 ),
                               ),
                             ),

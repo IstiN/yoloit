@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
+import 'package:yoloit/core/cli/handlers/assistant_handler.dart';
 import 'package:yoloit/core/cli/handlers/chat_handler.dart';
 import 'package:yoloit/core/cli/handlers/checklist_handler.dart';
 import 'package:yoloit/core/cli/handlers/code_snippet_handler.dart';
@@ -15,14 +16,14 @@ import 'package:yoloit/core/cli/handlers/note_handler.dart';
 import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
 import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
 import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
-import 'package:yoloit/core/cli/handlers/assistant_handler.dart';
 import 'package:yoloit/core/cli/handlers/timer_handler.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/core/utils/git_init_prompt.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
-import 'package:yoloit/core/utils/git_init_prompt.dart';
-import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
 import 'package:yoloit/features/collaboration/desktop/repo_directory_listing.dart';
@@ -493,43 +494,45 @@ class App extends StatelessWidget {
       final controller = TextEditingController();
       final pickedName = await showDialog<String>(
         context: dialogContext,
-        builder:
-            (ctx) => AlertDialog(
-              backgroundColor: const Color(0xFF12151C),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: Color(0xFF2A3040)),
-              ),
-              title: const Text(
-                'New Workspace',
-                style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
-              ),
-              content: TextField(
-                controller: controller,
-                autofocus: true,
-                style: const TextStyle(color: Color(0xFFE8E8FF)),
-                decoration: const InputDecoration(
-                  hintText: 'Workspace name',
-                  hintStyle: TextStyle(color: Color(0xFF6B7898)),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Color(0xFF6B7898)),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-                  child: const Text(
-                    'Pick folder →',
-                    style: TextStyle(color: Color(0xFF7C6BFF)),
-                  ),
-                ),
-              ],
+        builder: (ctx) {
+          final colors = ctx.appColors;
+          return AlertDialog(
+            backgroundColor: colors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: colors.border),
             ),
+            title: Text(
+              'New Workspace',
+              style: TextStyle(color: colors.textPrimary, fontSize: 14),
+            ),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              style: TextStyle(color: colors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Workspace name',
+                hintStyle: TextStyle(color: colors.textMuted),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: colors.textMuted),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                child: Text(
+                  'Pick folder →',
+                  style: TextStyle(color: colors.primary),
+                ),
+              ),
+            ],
+          );
+        },
       );
       controller.dispose();
       if (pickedName == null || pickedName.isEmpty) return;
@@ -580,24 +583,26 @@ class App extends StatelessWidget {
 
     final type = await showDialog<AgentType>(
       context: dialogContext,
-      builder:
-          (ctx) => SimpleDialog(
-            backgroundColor: const Color(0xFF12151C),
-            title: const Text(
-              'New Session',
-              style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
-            ),
-            children: [
-              for (final agentType in AgentType.values)
-                SimpleDialogOption(
-                  onPressed: () => Navigator.pop(ctx, agentType),
-                  child: Text(
-                    agentType.displayName,
-                    style: const TextStyle(color: Color(0xFFCECEEE)),
-                  ),
-                ),
-            ],
+      builder: (ctx) {
+        final colors = ctx.appColors;
+        return SimpleDialog(
+          backgroundColor: colors.surface,
+          title: Text(
+            'New Session',
+            style: TextStyle(color: colors.textPrimary, fontSize: 14),
           ),
+          children: [
+            for (final agentType in AgentType.values)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, agentType),
+                child: Text(
+                  agentType.displayName,
+                  style: TextStyle(color: colors.terminalText),
+                ),
+              ),
+          ],
+        );
+      },
     );
     if (type == null) return;
 

@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
+
+final _markdownNoteDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
 /// Built-in plugin that renders a Markdown note panel.
 class MarkdownNotePlugin extends BoardPanelPlugin {
@@ -24,7 +26,7 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
   IconData get icon => Icons.sticky_note_2_outlined;
 
   @override
-  Color get accentColor => const Color(0xFFB46CFF);
+  Color get accentColor => _markdownNoteDefaultColors.primaryLight;
 
   @override
   Size get defaultSize => const Size(360, 220);
@@ -57,10 +59,7 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
       );
     }
 
-    return _ScrollableNoteContent(
-      markdown: markdown,
-      autoScroll: autoScroll,
-    );
+    return _ScrollableNoteContent(markdown: markdown, autoScroll: autoScroll);
   }
 
   @override
@@ -153,9 +152,10 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
               controller: _scrollCtrl,
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child: renderAsMermaid
-                    ? MarkdownDocumentPreview(content: markdown)
-                    : MarkdownBody(data: markdown),
+                child:
+                    renderAsMermaid
+                        ? MarkdownDocumentPreview(content: markdown)
+                        : MarkdownBody(data: markdown),
               ),
             ),
           ),
@@ -173,9 +173,14 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
                     onTap: _isHovered ? _copyContent : null,
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: 0.92),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: Theme.of(context).dividerColor,
@@ -187,18 +192,24 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
                           Icon(
                             _copied ? Icons.check : Icons.copy_outlined,
                             size: 12,
-                            color: _copied
-                                ? colors.accentGreen
-                                : Theme.of(context).textTheme.bodySmall?.color,
+                            color:
+                                _copied
+                                    ? colors.accentGreen
+                                    : Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             _copied ? 'Copied' : 'Copy',
                             style: TextStyle(
                               fontSize: 11,
-                              color: _copied
-                                 ? colors.accentGreen
-                                  : Theme.of(context).textTheme.bodySmall?.color,
+                              color:
+                                  _copied
+                                      ? colors.accentGreen
+                                      : Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall?.color,
                             ),
                           ),
                         ],
@@ -269,7 +280,9 @@ class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
       final contentH = box.size.height;
       final newH = contentH + _panelHeaderHeight + _panelContentPadding * 2;
       final currentH = widget.panel.bounds.height;
-      debugPrint('[NoteAutoHeight] ${widget.panel.title}: content=$contentH current=$currentH target=$newH');
+      debugPrint(
+        '[NoteAutoHeight] ${widget.panel.title}: content=$contentH current=$currentH target=$newH',
+      );
       // Only resize if difference is more than 4px to avoid jitter.
       if ((newH - currentH).abs() > 4) {
         widget.renderContext.onResize?.call(widget.panel.bounds.width, newH);
@@ -279,16 +292,21 @@ class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final markdown = widget.markdown.isEmpty ? '*Empty note*' : widget.markdown;
     final renderAsMermaid = markdown.contains('```mermaid');
-    return SingleChildScrollView(
-      physics: const NeverScrollableScrollPhysics(),
-      child: Padding(
-        key: _contentKey,
-        padding: const EdgeInsets.all(_innerPadding),
-        child: renderAsMermaid
-            ? MarkdownDocumentPreview(content: markdown)
-            : MarkdownBody(data: markdown),
+    return ColoredBox(
+      color: colors.background,
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Padding(
+          key: _contentKey,
+          padding: const EdgeInsets.all(_innerPadding),
+          child:
+              renderAsMermaid
+                  ? MarkdownDocumentPreview(content: markdown)
+                  : MarkdownBody(data: markdown),
+        ),
       ),
     );
   }
@@ -337,12 +355,10 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
         value.selection.isValid
             ? value.selection
             : TextSelection.collapsed(offset: value.text.length);
-    final start = selection.start < selection.end
-        ? selection.start
-        : selection.end;
-    final end = selection.start < selection.end
-        ? selection.end
-        : selection.start;
+    final start =
+        selection.start < selection.end ? selection.start : selection.end;
+    final end =
+        selection.start < selection.end ? selection.end : selection.start;
     final selected = start < end ? value.text.substring(start, end) : '';
     final replacement =
         '$before${selected.isEmpty ? placeholder : selected}$after';
@@ -361,12 +377,10 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
         value.selection.isValid
             ? value.selection
             : TextSelection.collapsed(offset: value.text.length);
-    final start = selection.start < selection.end
-        ? selection.start
-        : selection.end;
-    final end = selection.start < selection.end
-        ? selection.end
-        : selection.start;
+    final start =
+        selection.start < selection.end ? selection.start : selection.end;
+    final end =
+        selection.start < selection.end ? selection.end : selection.start;
     final block = start < end ? value.text.substring(start, end) : '';
     final source = block.isEmpty ? 'item' : block;
     final replacement = source
@@ -417,9 +431,7 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
     final colors = context.appColors;
     return AlertDialog(
       title: Text(
-        widget.panel.id.isEmpty
-            ? 'Add markdown note'
-            : 'Edit markdown note',
+        widget.panel.id.isEmpty ? 'Add markdown note' : 'Edit markdown note',
       ),
       content: SizedBox(
         width: 760,
@@ -464,16 +476,12 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
                   _ToolBtn(
                     icon: Icons.link,
                     tooltip: 'Link',
-                    onTap:
-                        () =>
-                            _wrapSelection('[', '](https://)', 'text'),
+                    onTap: () => _wrapSelection('[', '](https://)', 'text'),
                   ),
                   _ToolBtn(
                     icon: Icons.code,
                     tooltip: 'Code block',
-                    onTap:
-                        () =>
-                            _wrapSelection('```\n', '\n```', 'code'),
+                    onTap: () => _wrapSelection('```\n', '\n```', 'code'),
                   ),
                   const SizedBox(width: 8),
                   InkWell(
@@ -485,8 +493,7 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color:
-                              _selectedColor ?? colors.primaryLight,
+                          color: _selectedColor ?? colors.primaryLight,
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: colors.textPrimary.withAlpha(90),
@@ -510,8 +517,8 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
                       ),
                     ],
                     selected: {_isPreview},
-                    onSelectionChanged: (sel) =>
-                        setState(() => _isPreview = sel.first),
+                    onSelectionChanged:
+                        (sel) => setState(() => _isPreview = sel.first),
                   ),
                 ],
               ),
@@ -565,9 +572,7 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
                 '_color': _selectedColor?.toARGB32(),
                 'markdown': _mdCtrl.text,
               }),
-          child: Text(
-            widget.panel.id.isEmpty ? 'Add' : 'Save',
-          ),
+          child: Text(widget.panel.id.isEmpty ? 'Add' : 'Save'),
         ),
       ],
     );
@@ -587,10 +592,11 @@ class _ToolBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return IconButton(
       tooltip: tooltip,
       onPressed: onTap,
-      icon: Icon(icon, size: 18),
+      icon: Icon(icon, size: 18, color: colors.textSecondary),
       splashRadius: 16,
       visualDensity: VisualDensity.compact,
     );

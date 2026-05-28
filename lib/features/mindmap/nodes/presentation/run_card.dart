@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 
 /// Presentation run card — identical visuals to macOS RunNode.
@@ -21,26 +22,31 @@ class RunCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final isRunning = props.isRunning;
     final statusColor = switch (props.status) {
-      'running' => const Color(0xFF34D399),
-      'failed' => const Color(0xFFFF4F6A),
-      _ => const Color(0xFF6B7898),
+      'running' => colors.accentGreen,
+      'failed' => colors.accentRed,
+      _ => colors.textSecondary,
     };
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0B0E14),
+        color: colors.surface,
         border: Border.all(
-          color: isRunning
-              ? const Color(0x5534D399)
-              : const Color(0x553A4560),
+          color:
+              isRunning
+                  ? colors.accentGreen.withAlpha(85)
+                  : colors.border.withAlpha(85),
           width: 1.5,
         ),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-              color: Color(0x80000000), blurRadius: 14, offset: Offset(0, 4)),
+            color: colors.background.withAlpha(128),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -48,64 +54,72 @@ class RunCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: isRunning
-                  ? const Color(0x0F34D399)
-                  : const Color(0x0F3A4560),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(9)),
+              color:
+                  isRunning
+                      ? colors.accentGreen.withAlpha(15)
+                      : colors.surfaceHighlight.withAlpha(15),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(9),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.play_circle_outline,
-                    size: 12, color: Color(0xFF60A5FA)),
+                Icon(
+                  Icons.play_circle_outline,
+                  size: 12,
+                  color: colors.accentBlue,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     props.name,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFE8E8FF)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: colors.textPrimary,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 _RunActionBtn(
                   icon: Icons.copy_all_rounded,
                   tooltip: 'Copy all logs',
-                  color: const Color(0xFFA78BFA),
-                  onTap: onCopy ?? () {
-                    final text = props.lines.map((l) => l.text).join('\n');
-                    Clipboard.setData(ClipboardData(text: text));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Logs copied to clipboard'),
-                        duration: Duration(seconds: 2),
-                        behavior: SnackBarBehavior.floating,
-                        width: 220,
-                      ),
-                    );
-                  },
+                  color: colors.primaryLight,
+                  onTap:
+                      onCopy ??
+                      () {
+                        final text = props.lines.map((l) => l.text).join('\n');
+                        Clipboard.setData(ClipboardData(text: text));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Logs copied to clipboard'),
+                            duration: Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            width: 220,
+                          ),
+                        );
+                      },
                 ),
                 const SizedBox(width: 4),
                 if (isRunning)
                   _RunActionBtn(
                     icon: Icons.stop_rounded,
                     tooltip: 'Stop',
-                    color: const Color(0xFFFF6B6B),
+                    color: colors.accentRed,
                     onTap: onStop,
                   )
                 else
                   _RunActionBtn(
                     icon: Icons.play_arrow_rounded,
                     tooltip: 'Start',
-                    color: const Color(0xFF34D399),
+                    color: colors.accentGreen,
                     onTap: onStart,
                   ),
                 const SizedBox(width: 4),
                 _RunActionBtn(
                   icon: Icons.refresh,
                   tooltip: 'Restart',
-                  color: const Color(0xFF60A5FA),
+                  color: colors.accentBlue,
                   onTap: onRestart,
                 ),
                 const SizedBox(width: 6),
@@ -113,7 +127,9 @@ class RunCard extends StatelessWidget {
                   width: 7,
                   height: 7,
                   decoration: BoxDecoration(
-                      color: statusColor, shape: BoxShape.circle),
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ],
             ),
@@ -121,29 +137,36 @@ class RunCard extends StatelessWidget {
           Expanded(
             child: SelectionArea(
               child: Container(
-                color: const Color(0xFF070714),
-                child: props.lines.isEmpty
-                    ? const Center(
-                        child: Text('No output',
-                            style: TextStyle(
-                                fontSize: 10, color: Color(0xFF44446A))))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(8),
-                        itemCount: props.lines.length,
-                        itemBuilder: (context, i) {
-                          final line = props.lines[i];
-                          return Text(
-                            line.text,
+                color: colors.terminalBackground,
+                child:
+                    props.lines.isEmpty
+                        ? Center(
+                          child: Text(
+                            'No output',
                             style: TextStyle(
                               fontSize: 10,
-                              fontFamily: 'monospace',
-                              color: line.isError
-                                  ? const Color(0xFFFF4F6A)
-                                  : const Color(0xFFCECEEE),
+                              color: colors.textMuted,
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        )
+                        : ListView.builder(
+                          padding: const EdgeInsets.all(8),
+                          itemCount: props.lines.length,
+                          itemBuilder: (context, i) {
+                            final line = props.lines[i];
+                            return Text(
+                              line.text,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontFamily: 'monospace',
+                                color:
+                                    line.isError
+                                        ? colors.accentRed
+                                        : colors.terminalText,
+                              ),
+                            );
+                          },
+                        ),
               ),
             ),
           ),
@@ -174,6 +197,7 @@ class _RunActionBtnState extends State<_RunActionBtn> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
@@ -187,18 +211,21 @@ class _RunActionBtnState extends State<_RunActionBtn> {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              color: _hovered
-                  ? widget.color.withAlpha(40)
-                  : const Color(0xFF12151C),
+              color:
+                  _hovered
+                      ? widget.color.withAlpha(40)
+                      : colors.surfaceElevated,
               border: Border.all(
-                color: _hovered ? widget.color : const Color(0xFF2A3040),
+                color: _hovered ? widget.color : colors.border,
                 width: 1,
               ),
               borderRadius: BorderRadius.circular(5),
             ),
-            child: Icon(widget.icon,
-                size: 13,
-                color: _hovered ? widget.color : const Color(0xFF8A93B0)),
+            child: Icon(
+              widget.icon,
+              size: 13,
+              color: _hovered ? widget.color : colors.textSecondary,
+            ),
           ),
         ),
       ),

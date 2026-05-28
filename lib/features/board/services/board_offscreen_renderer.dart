@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -34,6 +35,10 @@ class BoardOffscreenRenderer {
   }) async {
     final panels = board.panels.where((p) => !p.hidden).toList();
     if (panels.isEmpty) return null;
+    final theme = ThemeManager.instance.theme;
+    final colors =
+        theme.extension<AppColorScheme>() ??
+        AppColorScheme.fromAccent(Colors.deepPurple);
 
     // Headless BoardCubit: pre-populated with this board's data so plugins
     // that call context.read<BoardCubit>() get a valid, isolated instance
@@ -49,13 +54,13 @@ class BoardOffscreenRenderer {
       debugPrint(
         '[BoardOffscreenRenderer] panel render error: ${details.exception}',
       );
-      return const ColoredBox(
-        color: Color(0x20808080),
+      return ColoredBox(
+        color: colors.border.withAlpha(32),
         child: Center(
           child: Icon(
             Icons.broken_image_outlined,
             size: 20,
-            color: Color(0x80808080),
+            color: colors.textMuted.withAlpha(128),
           ),
         ),
       );
@@ -63,7 +68,7 @@ class BoardOffscreenRenderer {
 
     try {
       return await _renderWidgetToImage(
-        _buildBoardPreview(board, headlessCubit),
+        _buildBoardPreview(board, headlessCubit, theme, colors),
         size,
         pixelRatio,
       );
@@ -77,9 +82,12 @@ class BoardOffscreenRenderer {
     }
   }
 
-  Widget _buildBoardPreview(BoardDocument board, BoardCubit cubit) {
-    final theme = ThemeManager.instance.theme;
-
+  Widget _buildBoardPreview(
+    BoardDocument board,
+    BoardCubit cubit,
+    ThemeData theme,
+    AppColorScheme colors,
+  ) {
     // BlocProvider.value injects headless implementations so all plugins that
     // call context.read<BoardCubit>() receive a properly populated instance.
     // Use explicit MediaQuery/Theme (not MaterialApp) — isolated BuildOwner
@@ -103,17 +111,11 @@ class BoardOffscreenRenderer {
               child: Theme(
                 data: theme,
                 child: DefaultTextStyle(
-                  style: const TextStyle(
-                    color: Color(0xFFE0E0F0),
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
                   child: IconTheme(
-                    data: const IconThemeData(
-                      color: Color(0xFF8888AA),
-                      size: 14,
-                    ),
+                    data: IconThemeData(color: colors.textSecondary, size: 14),
                     child: ColoredBox(
-                      color: const Color(0xFF0F0F1A),
+                      color: colors.background,
                       child: BoardCanvasPreview(
                         board: board,
                         useViewport: true,

@@ -384,7 +384,7 @@ class BoardPanelLink extends Equatable {
     required this.toPanelId,
     this.style = BoardLinkStyle.arrow,
     this.behavior = BoardLinkBehavior.fixed,
-    this.color = const Color(0xFF60A5FA),
+    this.color = Colors.lightBlueAccent,
     this.geometry = BoardLinkGeometry.bezier,
   });
 

@@ -84,9 +84,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   BoardDocument? _boardSwitchPreviewBoard;
   Uint8List? _boardSwitchPreviewPng;
   final Map<String, Uint8List> _boardPreviewPngs = {};
+
   /// When true, panel chrome (borders, accents, sidebar, minimap) is hidden
   /// to produce a clean screenshot without purple-tinted decorations.
   bool _isCapturingScreenshot = false;
+
   /// Suppresses focused-panel auto-centering for one rebuild cycle after
   /// switching boards so the restored viewport position is preserved.
   bool _suppressFocusVisibility = false;
@@ -97,8 +99,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   // ── Tool state ────────────────────────────────────────────────────────────
   BoardToolId _activeTool = BoardToolId.select;
-  DrawSettings _drawSettings = const DrawSettings();
-  ConnectSettings _connectSettings = const ConnectSettings();
+  DrawSettings _drawSettings = DrawSettings();
+  ConnectSettings _connectSettings = ConnectSettings();
 
   /// Link id currently hovered (for showing delete badge).
   String? _hoveredLinkId;
@@ -758,9 +760,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               ),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: colors.background.withAlpha(
-                                                    45,
-                                                  ),
+                                                  color: colors.background
+                                                      .withAlpha(45),
                                                   blurRadius: 18,
                                                   offset: const Offset(0, 10),
                                                 ),
@@ -1233,9 +1234,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   static Directory get _previewCacheDir {
-    final dir = Directory(
-      '${Directory.systemTemp.path}/yoloit_board_previews',
-    );
+    final dir = Directory('${Directory.systemTemp.path}/yoloit_board_previews');
     if (!dir.existsSync()) dir.createSync(recursive: true);
     return dir;
   }
@@ -1272,9 +1271,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// the same quality as the background refresh.
   Future<void> _generateMissingBoardPreviews(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
-    final missing = allBoards.where(
-      (b) => !_boardPreviewPngs.containsKey(b.id) && b.id != activeBoardId,
-    ).toList();
+    final missing =
+        allBoards
+            .where(
+              (b) =>
+                  !_boardPreviewPngs.containsKey(b.id) && b.id != activeBoardId,
+            )
+            .toList();
     if (missing.isEmpty) return;
 
     _boardOverviewLog('offscreen.start count=${missing.length}');
@@ -1300,9 +1303,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// switching needed, no JSC crashes, no UI flicker.
   Future<void> _refreshBoardPreviewsInBackground(String activeBoardId) async {
     final allBoards = context.read<BoardCubit>().state.boards;
-    final toCapture = allBoards.where(
-      (b) => b.id != activeBoardId && b.panels.isNotEmpty,
-    ).toList();
+    final toCapture =
+        allBoards
+            .where((b) => b.id != activeBoardId && b.panels.isNotEmpty)
+            .toList();
     if (toCapture.isEmpty) return;
 
     _boardOverviewLog('bgCapture.start count=${toCapture.length} (offscreen)');
@@ -1316,10 +1320,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
       final boardWatch = Stopwatch()..start();
       try {
-        _boardOverviewLog('bgCapture.render board=${board.id} (${board.name}) started');
+        _boardOverviewLog(
+          'bgCapture.render board=${board.id} (${board.name}) started',
+        );
         final png = await BoardOffscreenRenderer.instance.renderBoard(board);
         if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
-          _boardOverviewLog('bgCapture.render board=${board.id} completed but discarded (transition active)');
+          _boardOverviewLog(
+            'bgCapture.render board=${board.id} completed but discarded (transition active)',
+          );
           break;
         }
         if (png != null) {
@@ -1331,16 +1339,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             'bgCapture.captured board=${board.id} bytes=${png.length} elapsed=${boardWatch.elapsedMilliseconds}ms',
           );
         } else {
-          _boardOverviewLog('bgCapture.render board=${board.id} returned null elapsed=${boardWatch.elapsedMilliseconds}ms');
+          _boardOverviewLog(
+            'bgCapture.render board=${board.id} returned null elapsed=${boardWatch.elapsedMilliseconds}ms',
+          );
         }
       } catch (e) {
-        _boardOverviewLog('bgCapture.error board=${board.id} $e elapsed=${boardWatch.elapsedMilliseconds}ms');
+        _boardOverviewLog(
+          'bgCapture.error board=${board.id} $e elapsed=${boardWatch.elapsedMilliseconds}ms',
+        );
       }
     }
 
-    _boardOverviewLog(
-      'bgCapture.done elapsed=${watch.elapsedMilliseconds}ms',
-    );
+    _boardOverviewLog('bgCapture.done elapsed=${watch.elapsedMilliseconds}ms');
   }
 
   Future<void> _openBoardOverview(BoardDocument activeBoard) async {
@@ -1395,7 +1405,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   bool _shouldAutoFit(BoardDocument board) {
-    final result = _viewportSize != null &&
+    final result =
+        _viewportSize != null &&
         _isDefaultViewport(board.viewport) &&
         board.panels.any((panel) => !panel.hidden);
     if (result) {
@@ -1435,7 +1446,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       // Set the key to match so subsequent rebuilds don't re-schedule.
       BoardPanelInstance? fp;
       for (final entry in board.panels) {
-        if (entry.id == focusedPanelId) { fp = entry; break; }
+        if (entry.id == focusedPanelId) {
+          fp = entry;
+          break;
+        }
       }
       if (fp != null && size != null) {
         _focusedPanelVisibilityKey =
@@ -1458,19 +1472,25 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         '${board.id}:${resolvedPanel.id}:${resolvedPanel.bounds.x}:${resolvedPanel.bounds.y}:${resolvedPanel.bounds.width}:${resolvedPanel.bounds.height}:${size.width}:${size.height}:z$shouldZoom';
     if (_focusedPanelVisibilityKey == key) return;
     _focusedPanelVisibilityKey = key;
-    _boardOverviewLog('focusVisibility.scheduled panel=${resolvedPanel.id} zoom=$shouldZoom');
+    _boardOverviewLog(
+      'focusVisibility.scheduled panel=${resolvedPanel.id} zoom=$shouldZoom',
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_isPanelDragging || _isViewportInteracting) {
         return;
       }
       if (shouldZoom) {
-        _boardOverviewLog('focusVisibility.zoomToPanel panel=${resolvedPanel.id}');
+        _boardOverviewLog(
+          'focusVisibility.zoomToPanel panel=${resolvedPanel.id}',
+        );
         _zoomToPanel(board, resolvedPanel.bounds.rect);
         return;
       }
       if (_isPanelComfortablyVisible(resolvedPanel.bounds.rect)) {
-        _boardOverviewLog('focusVisibility.alreadyVisible panel=${resolvedPanel.id}');
+        _boardOverviewLog(
+          'focusVisibility.alreadyVisible panel=${resolvedPanel.id}',
+        );
         return;
       }
       _boardOverviewLog('focusVisibility.center panel=${resolvedPanel.id}');
@@ -2280,10 +2300,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: selectedColor ?? context.appColors.primary,
+                                color:
+                                    selectedColor ?? context.appColors.primary,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: context.appColors.textPrimary.withAlpha(90),
+                                  color: context.appColors.textPrimary
+                                      .withAlpha(90),
                                 ),
                               ),
                             ),
@@ -3252,7 +3274,10 @@ class _BoardOverviewPngPreview extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, context.appColors.background.withAlpha(45)],
+              colors: [
+                Colors.transparent,
+                context.appColors.background.withAlpha(45),
+              ],
             ),
           ),
         ),
@@ -3260,7 +3285,6 @@ class _BoardOverviewPngPreview extends StatelessWidget {
     );
   }
 }
-
 
 class _ToolbarChip extends StatelessWidget {
   const _ToolbarChip({required this.icon, required this.label});
@@ -3476,21 +3500,21 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
         isCapturing
             ? colors.background
             : accent == null
-                ? colors.surface
-                : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
+            ? colors.surface
+            : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
     final panelHeaderFill =
         isCapturing
             ? colors.background
             : accent == null
-                ? colors.surfaceElevated
-                : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
-                    colors.surfaceElevated;
+            ? colors.surfaceElevated
+            : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
+                colors.surfaceElevated;
     final borderColor =
         isCapturing
             ? colors.background
             : accent == null
-                ? colors.divider
-                : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
+            ? colors.divider
+            : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
@@ -3538,22 +3562,24 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                   color: panelFill,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isCapturing
-                        ? colors.background
-                        : isFocused
+                    color:
+                        isCapturing
+                            ? colors.background
+                            : isFocused
                             ? colors.primary
                             : borderColor,
                     width: isFocused && !isCapturing ? 1.5 : 1,
                   ),
-                  boxShadow: isCapturing
-                      ? null
-                      : [
-                    BoxShadow(
-                      color: colors.background.withAlpha(35),
-                      blurRadius: 22,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+                  boxShadow:
+                      isCapturing
+                          ? null
+                          : [
+                            BoxShadow(
+                              color: colors.background.withAlpha(35),
+                              blurRadius: 22,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                 ),
                 child: Stack(
                   children: [
@@ -3653,7 +3679,9 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                                 ).colorScheme.onSurface),
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: colors.textPrimary.withAlpha(100),
+                                          color: colors.textPrimary.withAlpha(
+                                            100,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -3776,7 +3804,9 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                         width: 36,
                                         height: 36,
                                         decoration: BoxDecoration(
-                                          color: colors.statusActive.withAlpha(102),
+                                          color: colors.statusActive.withAlpha(
+                                            102,
+                                          ),
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
@@ -3803,7 +3833,9 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                         width: 36,
                                         height: 36,
                                         decoration: BoxDecoration(
-                                          color: colors.statusActive.withAlpha(102),
+                                          color: colors.statusActive.withAlpha(
+                                            102,
+                                          ),
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
@@ -5174,9 +5206,7 @@ class _DrawSettingsPanel extends StatelessWidget {
                       ],
                     ),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: colors.textPrimary.withAlpha(60),
-                    ),
+                    border: Border.all(color: colors.textPrimary.withAlpha(60)),
                   ),
                 ),
               ),
@@ -6667,8 +6697,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                         Icon(
                           Icons.chat_bubble_outline,
                           size: 14,
-                          color:
-                              isCurrent ? colors.statusActive : mutedColor,
+                          color: isCurrent ? colors.statusActive : mutedColor,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -7040,9 +7069,8 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
                               progress > 0.05
                                   ? [
                                     BoxShadow(
-                                      color: context.appColors.background.withValues(
-                                        alpha: 0.14 * progress,
-                                      ),
+                                      color: context.appColors.background
+                                          .withValues(alpha: 0.14 * progress),
                                       blurRadius: 20,
                                       spreadRadius: -4,
                                       offset: const Offset(-8, 8),
@@ -7106,11 +7134,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
             quarterTurns: 3,
             child:
                 _chatOpen
-                    ? Icon(
-                      Icons.close,
-                      size: 14,
-                      color: colors.textPrimary,
-                      )
+                    ? Icon(Icons.close, size: 14, color: colors.textPrimary)
                     : Text(
                       'YOLO',
                       style: TextStyle(
@@ -7147,9 +7171,10 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       ovalWidth: 2.00,
       ovalHeight: 1.10,
       titleFontSize: 9.0,
-      titleColor: Theme.of(context).brightness == Brightness.dark
-          ? context.appColors.terminalPrompt
-          : context.appColors.accentBlue,
+      titleColor:
+          Theme.of(context).brightness == Brightness.dark
+              ? context.appColors.terminalPrompt
+              : context.appColors.accentBlue,
       waveBarCount: 22,
       waveAmplitude: 0.85,
       waveSpeed: 1400,

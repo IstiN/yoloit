@@ -29,6 +29,7 @@ class ShowHideSidebarNode extends Equatable {
   final String label;
   final bool hidden;
   final List<ShowHideSidebarNode> children;
+
   /// Optional filesystem path (populated for workspace nodes).
   final String? path;
 
@@ -56,7 +57,9 @@ class ShowHideSidebarData extends Equatable {
 ShowHideSidebarData buildShowHideSidebarDataFromMindMapState(
   MindMapState state,
 ) {
-  final nodeById = <String, MindMapNodeData>{for (final node in state.nodes) node.id: node};
+  final nodeById = <String, MindMapNodeData>{
+    for (final node in state.nodes) node.id: node,
+  };
   final childMap = _buildChildMap(
     state.connections
         .map((c) => (fromId: c.fromId, toId: c.toId))
@@ -87,7 +90,9 @@ ShowHideSidebarData buildShowHideSidebarDataFromMindMapState(
       .toList(growable: false);
 
   final orphans = state.nodes
-      .where((node) => node is! WorkspaceNodeData && !reachable.contains(node.id))
+      .where(
+        (node) => node is! WorkspaceNodeData && !reachable.contains(node.id),
+      )
       .map(
         (node) => _buildDesktopNode(
           node.id,
@@ -112,11 +117,13 @@ ShowHideSidebarData buildShowHideSidebarDataFromMindMapState(
 Map<String, dynamic> buildShowHideSidebarSnapshotPayloadFromMindMapState(
   MindMapState state,
 ) {
-  final nodeContent = state.nodeContent.isNotEmpty
-      ? state.nodeContent
-      : {
-          for (final node in state.nodes) node.id: _snapshotContentFromNode(node),
-        };
+  final nodeContent =
+      state.nodeContent.isNotEmpty
+          ? state.nodeContent
+          : {
+            for (final node in state.nodes)
+              node.id: _snapshotContentFromNode(node),
+          };
   return {
     'positions': state.positions.map(
       (id, offset) => MapEntry(id, [offset.dx, offset.dy]),
@@ -137,12 +144,14 @@ ShowHideSidebarData buildShowHideSidebarDataFromSnapshotPayload(
       .keys
       .cast<String>()
       .toList(growable: false);
-  final hidden = ((payload['hidden'] as List?) ?? const [])
-      .map((entry) => entry.toString())
-      .toSet();
-  final hiddenTypes = ((payload['hiddenTypes'] as List?) ?? const [])
-      .map((entry) => entry.toString())
-      .toSet();
+  final hidden =
+      ((payload['hidden'] as List?) ?? const [])
+          .map((entry) => entry.toString())
+          .toSet();
+  final hiddenTypes =
+      ((payload['hiddenTypes'] as List?) ?? const [])
+          .map((entry) => entry.toString())
+          .toSet();
   final connections = ((payload['connections'] as List?) ?? const [])
       .map((entry) => Map<String, dynamic>.from(entry as Map))
       .toList(growable: false);
@@ -230,6 +239,7 @@ class MindMapShowHideSidebar extends StatefulWidget {
 
   final ShowHideSidebarData data;
   final void Function(String nodeId) onToggleHide;
+
   /// Toggle a group of node IDs together (workspace + its children).
   final void Function(List<String> ids) onToggleGroup;
   final void Function(String nodeId)? onFocusNode;
@@ -237,10 +247,13 @@ class MindMapShowHideSidebar extends StatefulWidget {
   final VoidCallback? onHideAll;
   final void Function(String typeTag)? onToggleType;
   final VoidCallback? onCreateWorkspace;
+
   /// Called when the user removes a workspace folder via right-click.
   final void Function(String workspaceId, String folderPath)? onRemoveFolder;
+
   /// Hides all nodes in [ids] (all children of a row).
   final void Function(Set<String> ids)? onHideDescendants;
+
   /// Shows all nodes in [ids] (all children of a row).
   final void Function(Set<String> ids)? onShowDescendants;
 
@@ -277,10 +290,9 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (_collapsed) {
-      return _SidebarToggle(
-        onTap: () => setState(() => _collapsed = false),
-      );
+      return _SidebarToggle(onTap: () => setState(() => _collapsed = false));
     }
 
     for (final workspace in widget.data.workspaces) {
@@ -295,11 +307,14 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
         Container(
           width: _width,
           decoration: BoxDecoration(
-            color: context.appColors.surfaceElevated,
-            border: Border.all(color: context.appColors.border),
+            color: colors.surfaceElevated,
+            border: Border.all(color: colors.border),
             borderRadius: BorderRadius.circular(10),
-            boxShadow: const [
-              BoxShadow(color: Color(0x80000000), blurRadius: 18),
+            boxShadow: [
+              BoxShadow(
+                color: colors.background.withValues(alpha: 0.5),
+                blurRadius: 18,
+              ),
             ],
           ),
           child: Column(
@@ -309,11 +324,7 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                 padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.account_tree,
-                      size: 14,
-                      color: Color(0xFF7C6BFF),
-                    ),
+                    Icon(Icons.account_tree, size: 14, color: colors.primary),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -329,24 +340,33 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                     if (widget.onHideAll != null)
                       InkWell(
                         onTap: widget.onHideAll,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
                           child: Text(
                             'Hide all',
-                            style: TextStyle(fontSize: 9, color: Color(0xFFFF6B6B)),
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: colors.accentRed,
+                            ),
                           ),
                         ),
                       ),
                     if (widget.data.hiddenCount > 0 && widget.onShowAll != null)
                       InkWell(
                         onTap: widget.onShowAll,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
                           child: Text(
                             'Show all',
                             style: TextStyle(
                               fontSize: 9,
-                              color: Color(0xFF7C6BFF),
+                              color: colors.primary,
                             ),
                           ),
                         ),
@@ -358,7 +378,9 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                         child: Icon(
                           Icons.chevron_left,
                           size: 14,
-                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -396,7 +418,9 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.5),
                             letterSpacing: 1,
                           ),
                         ),
@@ -415,9 +439,10 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
           bottom: 0,
           width: 8,
           child: _SidebarResizeHandle(
-            onDrag: (dx) => setState(() {
-              _width = (_width + dx).clamp(_minWidth, _maxWidth);
-            }),
+            onDrag:
+                (dx) => setState(() {
+                  _width = (_width + dx).clamp(_minWidth, _maxWidth);
+                }),
           ),
         ),
       ],
@@ -451,9 +476,10 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
         return ids;
       }
 
-      final VoidCallback toggleHide = isWorkspace
-          ? () => widget.onToggleGroup(_allDescendantIds(node))
-          : () => widget.onToggleHide(node.id);
+      final VoidCallback toggleHide =
+          isWorkspace
+              ? () => widget.onToggleGroup(_allDescendantIds(node))
+              : () => widget.onToggleHide(node.id);
 
       // Collect descendant IDs as a Set for hide/show-all-children callbacks.
       Set<String> descendantIds() {
@@ -466,6 +492,7 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
               collect(ch);
             }
           }
+
           collect(c);
         }
         return ids;
@@ -478,23 +505,27 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
           isWorkspace: isWorkspace,
           expanded: expanded,
           onToggleHide: toggleHide,
-          onToggleExpand: hasChildren
-              ? () => setState(() {
-                  expanded
-                      ? _expandedIds.remove(node.id)
-                      : _expandedIds.add(node.id);
-                })
-              : null,
-          onFocus: widget.onFocusNode != null
-              ? () => widget.onFocusNode!(node.id)
-              : null,
+          onToggleExpand:
+              hasChildren
+                  ? () => setState(() {
+                    expanded
+                        ? _expandedIds.remove(node.id)
+                        : _expandedIds.add(node.id);
+                  })
+                  : null,
+          onFocus:
+              widget.onFocusNode != null
+                  ? () => widget.onFocusNode!(node.id)
+                  : null,
           onRemoveFolder: widget.onRemoveFolder,
-          onHideDescendants: hasChildren && widget.onHideDescendants != null
-              ? () => widget.onHideDescendants!(descendantIds())
-              : null,
-          onShowDescendants: hasChildren && widget.onShowDescendants != null
-              ? () => widget.onShowDescendants!(descendantIds())
-              : null,
+          onHideDescendants:
+              hasChildren && widget.onHideDescendants != null
+                  ? () => widget.onHideDescendants!(descendantIds())
+                  : null,
+          onShowDescendants:
+              hasChildren && widget.onShowDescendants != null
+                  ? () => widget.onShowDescendants!(descendantIds())
+                  : null,
         ),
       );
       if (hasChildren && expanded) {
@@ -609,58 +640,22 @@ void _collectReachableIds(
 
 ({String type, String label}) _desktopMeta(MindMapNodeData node) {
   return switch (node) {
-    WorkspaceNodeData data => (
-      type: 'workspace',
-      label: data.workspace.name,
-    ),
-    AgentNodeData data => (
-      type: 'agent',
-      label: data.session.displayName,
-    ),
-    RepoNodeData data => (
-      type: 'repo',
-      label: data.repoName,
-    ),
-    BranchNodeData data => (
-      type: 'branch',
-      label: data.branch,
-    ),
-    FilesNodeData data => (
-      type: 'files',
-      label: p.basename(data.repoPath),
-    ),
-    FileTreeNodeData data => (
-      type: 'tree',
-      label: data.repoName ?? 'Tree',
-    ),
-    DiffNodeData data => (
-      type: 'diff',
-      label: data.repoName ?? 'Diff',
-    ),
-    EditorNodeData data => (
-      type: 'editor',
-      label: p.basename(data.filePath),
-    ),
-    FilePanelNodeData data => (
-      type: 'panel',
-      label: p.basename(data.filePath),
-    ),
+    WorkspaceNodeData data => (type: 'workspace', label: data.workspace.name),
+    AgentNodeData data => (type: 'agent', label: data.session.displayName),
+    RepoNodeData data => (type: 'repo', label: data.repoName),
+    BranchNodeData data => (type: 'branch', label: data.branch),
+    FilesNodeData data => (type: 'files', label: p.basename(data.repoPath)),
+    FileTreeNodeData data => (type: 'tree', label: data.repoName ?? 'Tree'),
+    DiffNodeData data => (type: 'diff', label: data.repoName ?? 'Diff'),
+    EditorNodeData data => (type: 'editor', label: p.basename(data.filePath)),
+    FilePanelNodeData data => (type: 'panel', label: p.basename(data.filePath)),
     FileDiffPanelNodeData data => (
       type: 'filediff',
       label: p.basename(data.filePath),
     ),
-    RunNodeData data => (
-      type: 'run',
-      label: data.session.config.name,
-    ),
-    SessionNodeData data => (
-      type: 'session',
-      label: data.session.displayName,
-    ),
-    MindMapPluginNodeData _ => (
-      type: 'plugin',
-      label: node.id,
-    ),
+    RunNodeData data => (type: 'run', label: data.session.config.name),
+    SessionNodeData data => (type: 'session', label: data.session.displayName),
+    MindMapPluginNodeData _ => (type: 'plugin', label: node.id),
   };
 }
 
@@ -687,10 +682,7 @@ Map<String, dynamic> _snapshotContentFromNode(MindMapNodeData node) {
       'name': data.branch,
       'branch': data.branch,
     },
-    FilesNodeData data => {
-      'type': 'files',
-      'repoPath': data.repoPath,
-    },
+    FilesNodeData data => {'type': 'files', 'repoPath': data.repoPath},
     FileTreeNodeData data => {
       'type': 'tree',
       'repoName': data.repoName,
@@ -701,23 +693,14 @@ Map<String, dynamic> _snapshotContentFromNode(MindMapNodeData node) {
       'repoName': data.repoName,
       'repoPath': data.repoPath,
     },
-    EditorNodeData data => {
-      'type': 'editor',
-      'filePath': data.filePath,
-    },
-    FilePanelNodeData data => {
-      'type': 'panel',
-      'filePath': data.filePath,
-    },
+    EditorNodeData data => {'type': 'editor', 'filePath': data.filePath},
+    FilePanelNodeData data => {'type': 'panel', 'filePath': data.filePath},
     FileDiffPanelNodeData data => {
       'type': 'filediff',
       'filePath': data.filePath,
       'repoPath': data.repoPath,
     },
-    RunNodeData data => {
-      'type': 'run',
-      'name': data.session.config.name,
-    },
+    RunNodeData data => {'type': 'run', 'name': data.session.config.name},
     SessionNodeData data => {
       'type': 'session',
       'name': data.session.displayName,
@@ -748,12 +731,14 @@ String _snapshotLabel(String id, Map<String, dynamic> content, String type) {
     'repo' => _basename(content['path'] as String?) ?? 'Repository',
     'branch' => content['branch'] as String? ?? 'Branch',
     'files' => _basename(content['repoPath'] as String?) ?? 'Files',
-    'tree' => content['repoName'] as String? ??
-        _basename(content['repoPath'] as String?) ??
-        'Tree',
-    'diff' => content['repoName'] as String? ??
-        _basename(content['repoPath'] as String?) ??
-        'Diff',
+    'tree' =>
+      content['repoName'] as String? ??
+          _basename(content['repoPath'] as String?) ??
+          'Tree',
+    'diff' =>
+      content['repoName'] as String? ??
+          _basename(content['repoPath'] as String?) ??
+          'Diff',
     'editor' => _basename(content['filePath'] as String?) ?? 'Editor',
     'run' => 'Run',
     'agent' => 'Terminal',
@@ -790,8 +775,10 @@ class _SidebarTreeRow extends StatelessWidget {
   final VoidCallback? onToggleExpand;
   final VoidCallback? onFocus;
   final void Function(String workspaceId, String folderPath)? onRemoveFolder;
+
   /// Hides all descendants of this node.
   final VoidCallback? onHideDescendants;
+
   /// Shows all descendants of this node.
   final VoidCallback? onShowDescendants;
 
@@ -809,29 +796,31 @@ class _SidebarTreeRow extends StatelessWidget {
     'plugin': Icons.extension_outlined,
   };
 
-  static const _typeColors = <String, Color>{
-    'workspace': Color(0xFF7C6BFF),
-    'agent': Color(0xFF34D399),
-    'session': Color(0xFF6B7898),
-    'repo': Color(0xFF9AA3BF),
-    'branch': Color(0xFF60A5FA),
-    'run': Color(0xFFFF6B6B),
-    'files': Color(0xFFFFAA33),
-    'tree': Color(0xFF34D399),
-    'diff': Color(0xFF7C6BFF),
-    'editor': Color(0xFFFFCC44),
-    'plugin': Color(0xFF9AA3BF),
-  };
+  ({Color color, bool isMuted}) _typeColor(AppColorScheme colors) =>
+      switch (node.type) {
+        'workspace' => (color: colors.primary, isMuted: false),
+        'agent' => (color: colors.accentGreen, isMuted: false),
+        'session' => (color: colors.textMuted, isMuted: true),
+        'repo' => (color: colors.textSecondary, isMuted: false),
+        'branch' => (color: colors.accentBlue, isMuted: false),
+        'run' => (color: colors.accentRed, isMuted: false),
+        'files' => (color: colors.accentOrange, isMuted: false),
+        'tree' => (color: colors.accentGreen, isMuted: false),
+        'diff' => (color: colors.primary, isMuted: false),
+        'editor' => (color: colors.accentOrange, isMuted: false),
+        'plugin' => (color: colors.textSecondary, isMuted: false),
+        _ => (color: colors.textMuted, isMuted: true),
+      };
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
     final icon = _typeIcons[node.type] ?? Icons.circle;
-    final rawColor = _typeColors[node.type];
-    final color = (rawColor == null || rawColor == const Color(0xFF6B7898) || rawColor == const Color(0xFF64748B))
-        ? mutedColor
-        : rawColor;
+    final rawColor = _typeColor(colors);
+    final color = rawColor.isMuted ? mutedColor : rawColor.color;
     final hasChildren = node.children.isNotEmpty;
     final isAgent = node.type == 'agent';
 
@@ -851,9 +840,12 @@ class _SidebarTreeRow extends StatelessWidget {
                   child: Icon(
                     node.hidden ? Icons.visibility_off : Icons.visibility,
                     size: 13,
-                    color: node.hidden
-                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
-                        : const Color(0xFF7C6BFF),
+                    color:
+                        node.hidden
+                            ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.5)
+                            : colors.primary,
                   ),
                 ),
               ),
@@ -861,7 +853,12 @@ class _SidebarTreeRow extends StatelessWidget {
               Icon(
                 Icons.folder_copy_outlined,
                 size: 13,
-                color: node.hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : const Color(0xFF7C6BFF),
+                color:
+                    node.hidden
+                        ? Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.5)
+                        : colors.primary,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -871,9 +868,12 @@ class _SidebarTreeRow extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: node.hidden
-                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
-                        : Theme.of(context).colorScheme.onSurface,
+                    color:
+                        node.hidden
+                            ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.5)
+                            : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -908,9 +908,12 @@ class _SidebarTreeRow extends StatelessWidget {
                   child: Icon(
                     node.hidden ? Icons.visibility_off : Icons.visibility,
                     size: 11,
-                    color: node.hidden
-                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
-                        : const Color(0x997C6BFF),
+                    color:
+                        node.hidden
+                            ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.5)
+                            : colors.primary.withValues(alpha: 0.6),
                   ),
                 ),
               ),
@@ -918,7 +921,12 @@ class _SidebarTreeRow extends StatelessWidget {
               Icon(
                 icon,
                 size: 11,
-                color: node.hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.3) : color,
+                color:
+                    node.hidden
+                        ? Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.3)
+                        : color,
               ),
               const SizedBox(width: 5),
               Expanded(
@@ -927,9 +935,14 @@ class _SidebarTreeRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
-                    color: node.hidden
-                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
-                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                    color:
+                        node.hidden
+                            ? Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.5)
+                            : Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.6),
                   ),
                 ),
               ),
@@ -944,24 +957,26 @@ class _SidebarTreeRow extends StatelessWidget {
               if (node.type == 'diff')
                 BlocBuilder<ReviewCubit, ReviewState>(
                   builder: (context, state) {
-                    final count = state is ReviewLoaded
-                        ? state.changedFiles.length
-                        : 0;
+                    final count =
+                        state is ReviewLoaded ? state.changedFiles.length : 0;
                     if (count == 0) return const SizedBox.shrink();
                     return Container(
                       margin: const EdgeInsets.only(left: 4),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 1),
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
-                        color: const Color(0x337C6BFF),
+                        color: colors.primary.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '$count',
-                        style: const TextStyle(
-                            fontSize: 8,
-                            color: Color(0xFF9B8FFF),
-                            fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 8,
+                          color: colors.primaryLight,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     );
                   },
@@ -976,7 +991,8 @@ class _SidebarTreeRow extends StatelessWidget {
     if (isAgent) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onSecondaryTapDown: (details) => _showAgentMenu(context, details.globalPosition),
+        onSecondaryTapDown:
+            (details) => _showAgentMenu(context, details.globalPosition),
         child: row,
       );
     }
@@ -984,22 +1000,25 @@ class _SidebarTreeRow extends StatelessWidget {
     if (isWorkspace) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onSecondaryTapDown: (details) =>
-            _showWorkspaceMenu(context, details.globalPosition),
+        onSecondaryTapDown:
+            (details) => _showWorkspaceMenu(context, details.globalPosition),
         child: row,
       );
     }
     // For other nodes: right-click shows hide/show children + remove folder.
-    final hasDescendantActions = onHideDescendants != null || onShowDescendants != null;
-    final isRepoFolder = node.type == 'repo' &&
+    final hasDescendantActions =
+        onHideDescendants != null || onShowDescendants != null;
+    final isRepoFolder =
+        node.type == 'repo' &&
         onRemoveFolder != null &&
         node.id.startsWith('repo:') &&
         !node.id.startsWith('repo:orphan:');
     if (hasDescendantActions || isRepoFolder) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onSecondaryTapUp: (details) =>
-            _showNodeMenu(context, details.globalPosition, isRepoFolder),
+        onSecondaryTapUp:
+            (details) =>
+                _showNodeMenu(context, details.globalPosition, isRepoFolder),
         child: row,
       );
     }
@@ -1010,52 +1029,99 @@ class _SidebarTreeRow extends StatelessWidget {
     final items = <PopupMenuEntry<String>>[];
 
     if (onHideDescendants != null) {
-      items.add(PopupMenuItem<String>(
-        value: 'hide_children',
-        height: 32,
-        child: Row(
-          children: [
-            Icon(Icons.visibility_off_outlined, size: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-            const SizedBox(width: 8),
-            Text('Hide all below', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
-          ],
+      items.add(
+        PopupMenuItem<String>(
+          value: 'hide_children',
+          height: 32,
+          child: Row(
+            children: [
+              Icon(
+                Icons.visibility_off_outlined,
+                size: 13,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Hide all below',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
         ),
-      ));
+      );
     }
     if (onShowDescendants != null) {
-      items.add(PopupMenuItem<String>(
-        value: 'show_children',
-        height: 32,
-        child: Row(
-          children: [
-            Icon(Icons.visibility_outlined, size: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-            const SizedBox(width: 8),
-            Text('Show all below', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
-          ],
+      items.add(
+        PopupMenuItem<String>(
+          value: 'show_children',
+          height: 32,
+          child: Row(
+            children: [
+              Icon(
+                Icons.visibility_outlined,
+                size: 13,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Show all below',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ),
         ),
-      ));
+      );
     }
 
     if (isRepoFolder) {
       if (items.isNotEmpty) items.add(const PopupMenuDivider(height: 8));
-      items.add(PopupMenuItem<String>(
-        value: 'remove_folder',
-        height: 32,
-        child: Row(
-          children: const [
-            Icon(Icons.folder_off_outlined, size: 13, color: Color(0xFFEF4444)),
-            SizedBox(width: 8),
-            Text('Remove Folder', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444))),
-          ],
+      items.add(
+        PopupMenuItem<String>(
+          value: 'remove_folder',
+          height: 32,
+          child: Builder(
+            builder: (context) {
+              final colors = context.appColors;
+              return Row(
+                children: [
+                  Icon(
+                    Icons.folder_off_outlined,
+                    size: 13,
+                    color: colors.accentRed,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Remove Folder',
+                    style: TextStyle(fontSize: 12, color: colors.accentRed),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
-      ));
+      );
     }
 
     if (items.isEmpty) return;
 
     showMenu<String>(
       context: context,
-      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 1, position.dy + 1),
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
+      ),
       color: context.appColors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
@@ -1071,7 +1137,10 @@ class _SidebarTreeRow extends StatelessWidget {
         final rest = node.id.substring('repo:'.length);
         final colonIdx = rest.indexOf(':');
         if (colonIdx > 0) {
-          onRemoveFolder!(rest.substring(0, colonIdx), rest.substring(colonIdx + 1));
+          onRemoveFolder!(
+            rest.substring(0, colonIdx),
+            rest.substring(colonIdx + 1),
+          );
         }
       }
     });
@@ -1081,7 +1150,10 @@ class _SidebarTreeRow extends StatelessWidget {
     final selected = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
-        position.dx, position.dy, position.dx + 1, position.dy + 1,
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
       ),
       color: context.appColors.surfaceElevated,
       items: [
@@ -1091,21 +1163,43 @@ class _SidebarTreeRow extends StatelessWidget {
             height: 32,
             child: Row(
               children: [
-                Icon(Icons.copy_outlined, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                Icon(
+                  Icons.copy_outlined,
+                  size: 14,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                ),
                 const SizedBox(width: 8),
-                Text('Copy path', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+                Text(
+                  'Copy path',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
               ],
             ),
           ),
         PopupMenuItem<String>(
           value: 'delete',
           height: 32,
-          child: Row(
-            children: const [
-              Icon(Icons.delete_outline, size: 14, color: Color(0xFFFF6B6B)),
-              SizedBox(width: 8),
-              Text('Delete workspace', style: TextStyle(fontSize: 12, color: Color(0xFFFF6B6B))),
-            ],
+          child: Builder(
+            builder: (context) {
+              final colors = context.appColors;
+              return Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 14, color: colors.accentRed),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Delete workspace',
+                    style: TextStyle(fontSize: 12, color: colors.accentRed),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -1114,32 +1208,46 @@ class _SidebarTreeRow extends StatelessWidget {
       await Clipboard.setData(ClipboardData(text: node.path!));
     } else if (selected == 'delete') {
       // node.id = 'ws:{workspaceId}'
-      final workspaceId = node.id.startsWith('ws:')
-          ? node.id.substring(3)
-          : node.id;
+      final workspaceId =
+          node.id.startsWith('ws:') ? node.id.substring(3) : node.id;
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (dlgCtx) => AlertDialog(
-          backgroundColor: context.appColors.surfaceElevated,
-          title: Text(
-            'Delete "${node.label}"?',
-            style: TextStyle(fontSize: 14, color: Theme.of(dlgCtx).colorScheme.onSurface),
-          ),
-          content: Text(
-            'This will remove the workspace. Sessions and files will not be affected.',
-            style: TextStyle(fontSize: 12, color: Theme.of(dlgCtx).colorScheme.onSurface.withOpacity(0.6)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF7C6BFF))),
+        builder:
+            (dlgCtx) => AlertDialog(
+              backgroundColor: context.appColors.surfaceElevated,
+              title: Text(
+                'Delete "${node.label}"?',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(dlgCtx).colorScheme.onSurface,
+                ),
+              ),
+              content: Text(
+                'This will remove the workspace. Sessions and files will not be affected.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    dlgCtx,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: context.appColors.primary),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text(
+                    'Delete',
+                    style: TextStyle(color: context.appColors.accentRed),
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete', style: TextStyle(color: Color(0xFFFF6B6B))),
-            ),
-          ],
-        ),
       );
       if (confirmed == true && context.mounted) {
         await context.read<WorkspaceCubit>().removeWorkspace(workspaceId);
@@ -1149,13 +1257,17 @@ class _SidebarTreeRow extends StatelessWidget {
 
   void _showAgentMenu(BuildContext context, Offset position) {
     // node.id = 'agent:{sessionId}'
-    final sessionId = node.id.startsWith('agent:') ? node.id.substring(6) : node.id;
+    final sessionId =
+        node.id.startsWith('agent:') ? node.id.substring(6) : node.id;
     final terminalCubit = context.read<TerminalCubit>();
     final mindMapCubit = context.read<MindMapCubit>();
     showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
-        position.dx, position.dy, position.dx + 1, position.dy + 1,
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
       ),
       color: context.appColors.surfaceElevated,
       items: [
@@ -1164,9 +1276,21 @@ class _SidebarTreeRow extends StatelessWidget {
           height: 32,
           child: Row(
             children: [
-              Icon(Icons.drive_file_rename_outline, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+              Icon(
+                Icons.drive_file_rename_outline,
+                size: 14,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
               const SizedBox(width: 8),
-              Text('Rename Session', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+              Text(
+                'Rename Session',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
             ],
           ),
         ),
@@ -1174,12 +1298,20 @@ class _SidebarTreeRow extends StatelessWidget {
         PopupMenuItem<String>(
           value: 'delete',
           height: 32,
-          child: Row(
-            children: const [
-              Icon(Icons.delete_outline, size: 14, color: Color(0xFFFF6B6B)),
-              SizedBox(width: 8),
-              Text('Delete Session', style: TextStyle(fontSize: 12, color: Color(0xFFFF6B6B))),
-            ],
+          child: Builder(
+            builder: (context) {
+              final colors = context.appColors;
+              return Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 14, color: colors.accentRed),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Delete Session',
+                    style: TextStyle(fontSize: 12, color: colors.accentRed),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -1199,38 +1331,79 @@ class _SidebarTreeRow extends StatelessWidget {
     TerminalCubit terminalCubit,
   ) async {
     final state = terminalCubit.state;
-    final sessions = state is TerminalLoaded ? state.allSessions : <AgentSession>[];
+    final sessions =
+        state is TerminalLoaded ? state.allSessions : <AgentSession>[];
     final session = sessions.where((s) => s.id == sessionId).firstOrNull;
-    final controller = TextEditingController(text: session?.customName ?? session?.displayName ?? '');
+    final controller = TextEditingController(
+      text: session?.customName ?? session?.displayName ?? '',
+    );
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.appColors.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: Text('Rename Session', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'Session name...',
-            hintStyle: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5)),
-            filled: true,
-            fillColor: context.appColors.surface,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: context.appColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFF7C6BFF))),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: context.appColors.surfaceElevated,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            title: Text(
+              'Rename Session',
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 13,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Session name...',
+                hintStyle: TextStyle(
+                  color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                ),
+                filled: true,
+                fillColor: context.appColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: context.appColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: context.appColors.primary),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              onSubmitted: (v) => Navigator.pop(ctx, v),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, controller.text),
+                child: Text(
+                  'Rename',
+                  style: TextStyle(
+                    color: context.appColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-          onSubmitted: (v) => Navigator.pop(ctx, v),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5)))),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('Rename', style: TextStyle(color: Color(0xFF7C6BFF), fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
     );
     controller.dispose();
     if (result != null && result.trim().isNotEmpty) {
@@ -1246,26 +1419,60 @@ class _SidebarTreeRow extends StatelessWidget {
   ) async {
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: context.appColors.surfaceElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        title: Text('Close Session', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600)),
-        content: Text(
-          'Would you like to pause the session (keep it running in the background) or kill it permanently?',
-          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6), fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5)))),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'pause'),
-            child: const Text('Pause', style: TextStyle(color: Color(0xFF7C6BFF), fontWeight: FontWeight.w600)),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: context.appColors.surfaceElevated,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            title: Text(
+              'Close Session',
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            content: Text(
+              'Would you like to pause the session (keep it running in the background) or kill it permanently?',
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6),
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'pause'),
+                child: Text(
+                  'Pause',
+                  style: TextStyle(
+                    color: context.appColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'kill'),
+                child: Text(
+                  'Kill Forever',
+                  style: TextStyle(
+                    color: context.appColors.accentRed,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'kill'),
-            child: const Text('Kill Forever', style: TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
     );
     if (!context.mounted) return;
     if (result == 'pause') {
@@ -1290,6 +1497,7 @@ class _SidebarResizeHandleState extends State<_SidebarResizeHandle> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return MouseRegion(
       cursor: SystemMouseCursors.resizeColumn,
       onEnter: (_) => setState(() => _hovered = true),
@@ -1303,9 +1511,10 @@ class _SidebarResizeHandleState extends State<_SidebarResizeHandle> {
             width: _hovered ? 3 : 1,
             height: double.infinity,
             decoration: BoxDecoration(
-              color: _hovered
-                  ? const Color(0xFF7C6BFF)
-                  : const Color(0x40FFFFFF),
+              color:
+                  _hovered
+                      ? colors.primary
+                      : colors.textPrimary.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1322,6 +1531,7 @@ class _SidebarToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: 'Show sidebar',
       child: GestureDetector(
@@ -1337,11 +1547,7 @@ class _SidebarToggle extends StatelessWidget {
               bottomRight: Radius.circular(8),
             ),
           ),
-          child: const Icon(
-            Icons.chevron_right,
-            size: 16,
-            color: Color(0xFF7C6BFF),
-          ),
+          child: Icon(Icons.chevron_right, size: 16, color: colors.primary),
         ),
       ),
     );
@@ -1379,11 +1585,9 @@ class _SidebarActionState extends State<_SidebarAction> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: _hovered ? const Color(0xFF2A1E66) : colors.surfaceElevated,
+            color: _hovered ? colors.surfaceHighlight : colors.surfaceElevated,
             border: Border.all(
-              color: _hovered
-                  ? const Color(0xFF7C6BFF)
-                  : colors.border,
+              color: _hovered ? colors.primary : colors.border,
             ),
             borderRadius: BorderRadius.circular(6),
           ),
@@ -1394,9 +1598,12 @@ class _SidebarActionState extends State<_SidebarAction> {
               Icon(
                 widget.icon,
                 size: 12,
-                color: _hovered
-                    ? const Color(0xFFC084FC)
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color:
+                    _hovered
+                        ? colors.primaryLight
+                        : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.6),
               ),
               const SizedBox(width: 6),
               Text(
@@ -1404,9 +1611,12 @@ class _SidebarActionState extends State<_SidebarAction> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: _hovered
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  color:
+                      _hovered
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ],
@@ -1425,22 +1635,35 @@ class _QuickFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
-      color: context.appColors.surface,
+      color: colors.surface,
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
       child: Row(
         children: [
-          Icon(Icons.search, size: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+          Icon(
+            Icons.search,
+            size: 12,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+          ),
           const SizedBox(width: 6),
           Expanded(
             child: TextField(
               controller: controller,
-              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface),
-              cursorColor: const Color(0xFF7C6BFF),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              cursorColor: colors.primary,
               cursorWidth: 1.5,
               decoration: InputDecoration(
                 hintText: 'Quick filter…',
-                hintStyle: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                hintStyle: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.4),
+                ),
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
@@ -1449,12 +1672,20 @@ class _QuickFilterBar extends StatelessWidget {
           ),
           ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
-            builder: (_, val, __) => val.text.isEmpty
-                ? const SizedBox.shrink()
-                : GestureDetector(
-                    onTap: controller.clear,
-                    child: Icon(Icons.close, size: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                  ),
+            builder:
+                (_, val, __) =>
+                    val.text.isEmpty
+                        ? const SizedBox.shrink()
+                        : GestureDetector(
+                          onTap: controller.clear,
+                          child: Icon(
+                            Icons.close,
+                            size: 12,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
           ),
         ],
       ),
@@ -1471,10 +1702,10 @@ class _TypeFilterBar extends StatelessWidget {
   final void Function(String) onToggle;
 
   static const _chips = [
-    (type: 'agent',  label: 'Sessions', icon: Icons.terminal),
+    (type: 'agent', label: 'Sessions', icon: Icons.terminal),
     (type: 'branch', label: 'Branches', icon: Icons.alt_route),
-    (type: 'run',    label: 'Runs',     icon: Icons.play_circle_outline),
-    (type: 'files',  label: 'Files',    icon: Icons.folder_open_outlined),
+    (type: 'run', label: 'Runs', icon: Icons.play_circle_outline),
+    (type: 'files', label: 'Files', icon: Icons.folder_open_outlined),
   ];
 
   @override
@@ -1486,43 +1717,69 @@ class _TypeFilterBar extends StatelessWidget {
       child: Wrap(
         spacing: 4,
         runSpacing: 4,
-        children: _chips.map((c) {
-          final hidden = hiddenTypes.contains(c.type);
-          return GestureDetector(
-            onTap: () => onToggle(c.type),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: hidden ? colors.surfaceElevated : const Color(0xFF1E1840),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: hidden ? colors.border : const Color(0xFF5C4FCC),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(c.icon, size: 10,
-                    color: hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : const Color(0xFF9B8FFF)),
-                  const SizedBox(width: 3),
-                  Text(
-                    c.label,
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: hidden ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5) : const Color(0xFFB0A8FF),
-                      fontWeight: FontWeight.w600,
+        children:
+            _chips.map((c) {
+              final hidden = hiddenTypes.contains(c.type);
+              return GestureDetector(
+                onTap: () => onToggle(c.type),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        hidden
+                            ? colors.surfaceElevated
+                            : colors.surfaceHighlight,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: hidden ? colors.border : colors.primary,
                     ),
                   ),
-                  if (hidden) ...[
-                    const SizedBox(width: 3),
-                    Icon(Icons.visibility_off, size: 8, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                  ],
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        c.icon,
+                        size: 10,
+                        color:
+                            hidden
+                                ? Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.5)
+                                : colors.primaryLight,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        c.label,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color:
+                              hidden
+                                  ? Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.5)
+                                  : colors.primaryLight,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (hidden) ...[
+                        const SizedBox(width: 3),
+                        Icon(
+                          Icons.visibility_off,
+                          size: 8,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
       ),
     );
   }

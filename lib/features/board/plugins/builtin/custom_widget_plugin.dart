@@ -31,7 +31,7 @@ class CustomWidgetPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.widgets_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF7C3AED);
+  Color get accentColor => _customWidgetDarkFallbackColors.primary;
 
   @override
   Size get defaultSize => const Size(360, 420);
@@ -93,6 +93,14 @@ class _CustomWidgetContent extends StatefulWidget {
   @override
   State<_CustomWidgetContent> createState() => _CustomWidgetContentState();
 }
+
+final _customWidgetDarkFallbackColors = AppColorScheme.fromAccent(
+  Colors.indigo,
+);
+final _customWidgetLightFallbackColors = AppColorScheme.fromAccent(
+  Colors.indigo,
+  brightness: Brightness.light,
+);
 
 class _CustomWidgetContentState extends State<_CustomWidgetContent> {
   JsWidgetEngine? _engine;
@@ -170,39 +178,18 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     final tm = ThemeManager.instance;
     final scheme = tm.theme.extension<AppColorScheme>();
     final isDark = tm.isDark;
+    final fallbackScheme =
+        isDark
+            ? _customWidgetDarkFallbackColors
+            : _customWidgetLightFallbackColors;
     return {
       'isDark': isDark,
-      'bg': _hexColor(
-        scheme?.background ??
-            (isDark
-                ? const Color(0xFF0F172A)
-                : const Color(0xFFF8FAFC)),
-      ),
-      'surface': _hexColor(
-        scheme?.surface ??
-            (isDark
-                ? const Color(0xFF1E293B)
-                : const Color(0xFFF8FAFC)),
-      ),
-      'border': _hexColor(
-        scheme?.border ??
-            (isDark
-                ? const Color(0xFF334155)
-                : const Color(0xFFE2E8F0)),
-      ),
-      'accent': _hexColor(scheme?.primary ?? const Color(0xFF818CF8)),
-      'text': _hexColor(
-        scheme?.textPrimary ??
-            (isDark
-                ? const Color(0xFFF1F5F9)
-                : const Color(0xFF1A1A2E)),
-      ),
-      'muted': _hexColor(
-        scheme?.textSecondary ??
-            (isDark
-                ? const Color(0xFF64748B)
-                : const Color(0xFF94A3B8)),
-      ),
+      'bg': _hexColor(scheme?.background ?? fallbackScheme.background),
+      'surface': _hexColor(scheme?.surface ?? fallbackScheme.surface),
+      'border': _hexColor(scheme?.border ?? fallbackScheme.border),
+      'accent': _hexColor(scheme?.primary ?? fallbackScheme.primary),
+      'text': _hexColor(scheme?.textPrimary ?? fallbackScheme.textPrimary),
+      'muted': _hexColor(scheme?.textSecondary ?? fallbackScheme.textSecondary),
     };
   }
 

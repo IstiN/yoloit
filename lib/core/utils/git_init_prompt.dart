@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 /// Checks whether [folderPath] contains a git repository.
 /// If not, shows a dialog asking the user whether to run `git init`.
@@ -11,33 +12,34 @@ Future<void> maybePromptGitInit(BuildContext context, String folderPath) async {
 
   if (!context.mounted) return;
 
+  final colors = context.appColors;
   final init = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF12151C),
+      backgroundColor: colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFF2A3040)),
+        side: BorderSide(color: colors.border),
       ),
-      title: const Text(
+      title: Text(
         'No Git Repository',
-        style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
+        style: TextStyle(color: colors.textPrimary, fontSize: 14),
       ),
       content: Text(
         'The folder "${_basename(folderPath)}" is not a git repository.\n'
         'Initialize one here?',
-        style: const TextStyle(color: Color(0xFFB0B0CC), fontSize: 13),
+        style: TextStyle(color: colors.textSecondary, fontSize: 13),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Skip', style: TextStyle(color: Color(0xFF6B7898))),
+          child: Text('Skip', style: TextStyle(color: colors.textMuted)),
         ),
         TextButton(
           onPressed: () => Navigator.pop(ctx, true),
-          child: const Text(
+          child: Text(
             'Initialize Git',
-            style: TextStyle(color: Color(0xFF7C6BFF)),
+            style: TextStyle(color: colors.primary),
           ),
         ),
       ],
