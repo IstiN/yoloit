@@ -1475,10 +1475,15 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
   }
 
   Future<void> _pickColor(String slot, Color current) async {
+    // Convert camelCase key to human-readable label
+    final label = slot
+        .replaceAllMapped(RegExp(r'[A-Z]'), (m) => ' ${m[0]}')
+        .trim()
+        .replaceFirstMapped(RegExp(r'^.'), (m) => m[0]!.toUpperCase());
     final picked = await showDialog<Color>(
       context: context,
       builder: (ctx) => _ColorPickerDialog(
-        title: slot,
+        title: label,
         initialColor: current,
       ),
     );
@@ -1576,6 +1581,15 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
                 onTap: () => tm.clearColorOverrides(),
               ),
           ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Supports JSON, JetBrains ICLS/XML, and VS Code themes',
+          style: TextStyle(
+            color: colors.textMuted,
+            fontSize: 10,
+            fontStyle: FontStyle.italic,
+          ),
         ),
         const SizedBox(height: 20),
         // ── Active theme label ──
@@ -2061,6 +2075,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     onPressed: () => Navigator.of(context).pop(pickedColor),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
+                      foregroundColor: Colors.white,
                     ),
                     child: const Text('Apply'),
                   ),

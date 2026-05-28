@@ -106,6 +106,17 @@ class AppTheme {
         thumbColor: WidgetStateProperty.all(scheme.border),
         thickness: WidgetStateProperty.all(4),
       ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: scheme.primary,
+          foregroundColor: Colors.white,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: scheme.textSecondary,
+        ),
+      ),
     );
   }
 }
