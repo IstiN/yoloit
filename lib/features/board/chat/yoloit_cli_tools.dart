@@ -3398,4 +3398,130 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('width', 'Stroke width in pixels', shortKey: 'w'),
     ],
   ),
+  // ── Theme management ─────────────────────────────────────────────────────
+  YoloitCliTool(
+    command: 'theme',
+    alias: 'thm',
+    description: 'Show current theme info (preset, brightness, overrides)',
+    group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'theme:presets',
+    alias: 'thmp',
+    description: 'List all available theme presets (built-in and custom)',
+    group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'theme:set',
+    alias: 'thms',
+    description:
+        'Set the active theme preset. '
+        'Use preset id for built-in themes or custom id for user-imported themes.',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p(
+        'preset',
+        'Preset id or custom theme id',
+        required: true,
+        shortKey: 'p',
+        enumValues: <String>[
+          'neonPurple',
+          'cyberGreen',
+          'deepBlue',
+          'solarOrange',
+          'crimsonRed',
+          'islandsDark',
+          'islandsLight',
+        ],
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'theme:brightness',
+    alias: 'thmb',
+    description: 'Set theme brightness mode',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p(
+        'brightness',
+        'Brightness mode',
+        required: true,
+        shortKey: 'b',
+        enumValues: <String>['dark', 'light'],
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'theme:color',
+    alias: 'thmc',
+    description:
+        'Set a color override for a specific theme slot. '
+        'Use theme:slots to see available slot names.',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('slot', 'Color slot name (e.g. primary, accentGreen)', required: true, shortKey: 's'),
+      _p('color', 'Hex color (e.g. #548AF7)', required: true, shortKey: 'c'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'theme:reset-color',
+    alias: 'thmrc',
+    description: 'Remove a color override, reverting slot to theme default',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('slot', 'Color slot name', required: true, shortKey: 's'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'theme:reset-all',
+    alias: 'thmra',
+    description: 'Clear all color overrides, reverting to base theme',
+    group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'theme:save',
+    alias: 'thmsa',
+    description: 'Save current theme (with any overrides) as a named custom preset',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('name', 'Name for the new preset', required: true, shortKey: 'n'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'theme:export',
+    alias: 'thmex',
+    description: 'Export current theme as JSON to stdout',
+    group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'theme:import',
+    alias: 'thmim',
+    description: 'Import a theme file (JSON, ICLS, or XML) and activate it',
+    group: 'app',
+    params: <YoloitCliToolParam>[
+      _p('path', 'Path to theme file', required: true, shortKey: 'p'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'theme:delete',
+    alias: 'thmd',
+    description: 'Delete a custom theme by id',
+    group: 'app',
+    destructive: true,
+    params: <YoloitCliToolParam>[
+      _p('id', 'Custom theme id', required: true),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'theme:colors',
+    alias: 'thmcl',
+    description: 'Show all effective color values for the current theme',
+    group: 'app',
+  ),
+  YoloitCliTool(
+    command: 'theme:slots',
+    alias: 'thmsl',
+    description: 'Show available color slot names grouped by category',
+    group: 'app',
+  ),
 ];
