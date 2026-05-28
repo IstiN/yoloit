@@ -7122,7 +7122,9 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       ovalWidth: 2.00,
       ovalHeight: 1.10,
       titleFontSize: 9.0,
-      titleColor: const Color(0xFF3CE8FF),
+      titleColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF3CE8FF)
+          : const Color(0xFF1A73CE),
       waveBarCount: 22,
       waveAmplitude: 0.85,
       waveSpeed: 1400,

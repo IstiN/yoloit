@@ -6,6 +6,74 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 
+// ─── brightness-aware palette for the voice overlay ─────────────────────────
+
+class _OverlayPalette {
+  _OverlayPalette._(this._dark);
+
+  factory _OverlayPalette.of(BuildContext context) =>
+      _OverlayPalette._(Theme.of(context).brightness == Brightness.dark);
+
+  final bool _dark;
+
+  // Response card gradient background
+  List<Color> get cardGradient => _dark
+      ? const [Color(0xF21B1F2A), Color(0xD91B1F2A), Color(0x6E1B1F2A), Color(0x1A1B1F2A)]
+      : const [Color(0xF2F0F2F8), Color(0xD9F0F2F8), Color(0x6EF0F2F8), Color(0x1AF0F2F8)];
+
+  // Main text color in response card
+  Color get textHigh => _dark
+      ? Colors.white.withValues(alpha: 0.95)
+      : Colors.black.withValues(alpha: 0.88);
+
+  Color get textHeading => _dark
+      ? Colors.white.withValues(alpha: 0.98)
+      : Colors.black.withValues(alpha: 0.92);
+
+  // Tool log line text
+  Color get textTool => _dark
+      ? Colors.white.withValues(alpha: 0.75)
+      : Colors.black.withValues(alpha: 0.65);
+
+  // Action label ("Tap YoLo to speak")
+  Color get actionLabel => _dark
+      ? const Color(0xFF8C8D9E)
+      : const Color(0xFF6B6C7E);
+
+  // Code / link accent
+  Color get codeAccent => _dark
+      ? const Color(0xFF8BD8FF)
+      : const Color(0xFF1A73CE);
+
+  // Code block background
+  Color get codeBg => _dark
+      ? const Color(0x66101420)
+      : const Color(0x30D0D4E0);
+
+  Color get codeBlockBg => _dark
+      ? const Color(0xAA101420)
+      : const Color(0x40D0D4E0);
+
+  // Text shadow for response text
+  Color get textShadow => _dark
+      ? const Color(0x889B6BFF)
+      : Colors.transparent;
+
+  // Box shadow glow colors
+  Color cardGlow(bool streaming) => _dark
+      ? Color(0xFF9B6BFF).withValues(alpha: streaming ? 0.30 : 0.20)
+      : Color(0xFF9B6BFF).withValues(alpha: streaming ? 0.12 : 0.06);
+
+  Color get cardGlow2 => _dark
+      ? const Color(0xFF64DFFF).withValues(alpha: 0.14)
+      : const Color(0xFF64DFFF).withValues(alpha: 0.06);
+
+  // Glow text shadow
+  Color get glowTextShadow => _dark
+      ? Colors.black.withValues(alpha: 0.7)
+      : Colors.white.withValues(alpha: 0.5);
+}
+
 // ─────────────────────────── public API ──────────────────────────────────────
 
 class YoloVoiceOverlay extends StatefulWidget {
@@ -520,41 +588,42 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
   Widget _textContent() {
     // ignore: avoid_print
     print('[VoiceOverlay] render: _shown=${_shown.name} widget.status=${widget.status}');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return KeyedSubtree(
       key: ValueKey(_shown),
       child: switch (_shown) {
         _VS.idle =>
           widget.showIdleHint
-              ? const _TextBlock(
+              ? _TextBlock(
                 primary: 'Click or speak to start',
-                primaryColor: Color(0xFFB5B6C8),
+                primaryColor: isDark ? const Color(0xFFB5B6C8) : const Color(0xFF5A5B6E),
                 primarySize: 15,
               )
               : const SizedBox.shrink(),
-        _VS.listening => const _TextBlock(
+        _VS.listening => _TextBlock(
           primary: 'Recording...',
-          primaryColor: Color(0xFFCCCCE0),
+          primaryColor: isDark ? const Color(0xFFCCCCE0) : const Color(0xFF4A4A5E),
           primarySize: 15,
           secondary: 'Esc to cancel  •  Space to send',
-          secondaryColor: Color(0xFF9293A6),
+          secondaryColor: isDark ? const Color(0xFF9293A6) : const Color(0xFF6A6B7E),
           secondarySize: 12,
         ),
-        _VS.processing => const _TextBlock(
+        _VS.processing => _TextBlock(
           primary: 'Processing...',
-          primaryColor: Color(0xFF62C9FF),
+          primaryColor: isDark ? const Color(0xFF62C9FF) : const Color(0xFF1565C0),
           primarySize: 16,
           primaryBold: true,
           secondary: 'Please wait',
-          secondaryColor: Color(0xFF9A9BAD),
+          secondaryColor: isDark ? const Color(0xFF9A9BAD) : const Color(0xFF6A6B7E),
           secondarySize: 12,
         ),
-        _VS.thinking => const _TextBlock(
+        _VS.thinking => _TextBlock(
           primary: 'Thinking...',
-          primaryColor: Color(0xFFD58BFF),
+          primaryColor: isDark ? const Color(0xFFD58BFF) : const Color(0xFF7B1FA2),
           primarySize: 16,
           primaryBold: true,
           secondary: 'Waiting for response...',
-          secondaryColor: Color(0xFF9A9BAD),
+          secondaryColor: isDark ? const Color(0xFF9A9BAD) : const Color(0xFF6A6B7E),
           secondarySize: 12,
         ),
         _VS.responding => const SizedBox.shrink(),
@@ -628,6 +697,7 @@ class _GlowText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pal = _OverlayPalette.of(context);
     return Text(
       text,
       textAlign: TextAlign.center,
@@ -637,7 +707,7 @@ class _GlowText extends StatelessWidget {
         fontWeight: weight,
         shadows: [
           Shadow(color: color.withValues(alpha: 0.45), blurRadius: 12),
-          Shadow(color: Colors.black.withValues(alpha: 0.7), blurRadius: 6),
+          Shadow(color: pal.glowTextShadow, blurRadius: 6),
         ],
       ),
     );
@@ -838,6 +908,7 @@ class _ResponseCardState extends State<_ResponseCard>
         // Column(mainAxisSize.min) shrinks to content.
         // AnimatedContainer contains ConstrainedBox(maxH=contentMaxH) + CustomScrollView(shrinkWrap).
         // This achieves: short text → small card; long text → capped + scrollable.
+        final pal = _OverlayPalette.of(context);
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -861,28 +932,21 @@ class _ResponseCardState extends State<_ResponseCard>
                       duration: const Duration(milliseconds: 620),
                       padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [
-                            Color(0xF21B1F2A),
-                            Color(0xD91B1F2A),
-                            Color(0x6E1B1F2A),
-                            Color(0x1A1B1F2A),
-                          ],
-                          stops: [0.0, 0.45, 0.78, 1.0],
+                          colors: pal.cardGradient,
+                          stops: const [0.0, 0.45, 0.78, 1.0],
                         ),
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF9B6BFF).withValues(
-                              alpha: widget.streaming ? 0.30 : 0.20,
-                            ),
+                            color: pal.cardGlow(widget.streaming),
                             blurRadius: widget.streaming ? 40 : 24,
                             spreadRadius: -6,
                           ),
                           BoxShadow(
-                            color: const Color(0xFF64DFFF).withValues(alpha: 0.14),
+                            color: pal.cardGlow2,
                             blurRadius: 26,
                             spreadRadius: -14,
                             offset: const Offset(0, 16),
@@ -906,7 +970,7 @@ class _ResponseCardState extends State<_ResponseCard>
               child: _GlowText(
                 widget.actionLabel,
                 size: 14,
-                color: const Color(0xFF8C8D9E),
+                color: pal.actionLabel,
               ),
             ),
           ],
@@ -944,50 +1008,51 @@ class _ResponseCardState extends State<_ResponseCard>
             ? allLines.sublist(nonToolStart).join('\n').trim()
             : '';
 
+    final pal = _OverlayPalette.of(context);
     final mdStyle = MarkdownStyleSheet(
       p: TextStyle(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: pal.textHigh,
         fontSize: widget.fontSize,
         height: 1.52,
         fontWeight: FontWeight.w500,
-        shadows: const [
+        shadows: [
           Shadow(
-            color: Color(0x889B6BFF),
+            color: pal.textShadow,
             blurRadius: 14,
           ),
         ],
       ),
       h1: TextStyle(
-        color: Colors.white.withValues(alpha: 0.98),
+        color: pal.textHeading,
         fontSize: widget.fontSize + 5,
         height: 1.25,
         fontWeight: FontWeight.w800,
       ),
       h2: TextStyle(
-        color: Colors.white.withValues(alpha: 0.98),
+        color: pal.textHeading,
         fontSize: widget.fontSize + 3,
         height: 1.3,
         fontWeight: FontWeight.w800,
       ),
       h3: TextStyle(
-        color: Colors.white.withValues(alpha: 0.98),
+        color: pal.textHeading,
         fontSize: widget.fontSize + 1,
         height: 1.35,
         fontWeight: FontWeight.w700,
       ),
       a: TextStyle(
-        color: const Color(0xFF8BD8FF),
+        color: pal.codeAccent,
         fontSize: widget.fontSize,
         decoration: TextDecoration.underline,
       ),
       code: TextStyle(
-        color: const Color(0xFF8BD8FF),
+        color: pal.codeAccent,
         fontSize: widget.fontSize - 1,
-        backgroundColor: const Color(0x66101420),
+        backgroundColor: pal.codeBg,
       ),
       codeblockPadding: const EdgeInsets.all(10),
       codeblockDecoration: BoxDecoration(
-        color: const Color(0xAA101420),
+        color: pal.codeBlockBg,
         borderRadius: BorderRadius.circular(10),
       ),
     );
@@ -1047,7 +1112,7 @@ class _ResponseCardState extends State<_ResponseCard>
             child: Text(
               text,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.75),
+                color: _OverlayPalette.of(context).textTool,
                 fontSize: 12.5,
                 fontFamily: 'monospace',
                 height: 1.4,
