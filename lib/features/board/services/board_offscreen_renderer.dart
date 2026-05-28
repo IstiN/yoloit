@@ -10,6 +10,7 @@ import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 
 /// Renders a [BoardDocument] to a PNG image offscreen, without needing the
@@ -80,6 +81,107 @@ class BoardOffscreenRenderer {
       ErrorWidget.builder = originalErrorBuilder;
       headlessCubit.close();
     }
+  }
+
+  /// Render a single [panel] from [board] to PNG at its native size.
+  ///
+  /// Returns null if rendering fails.
+  Future<Uint8List?> renderPanel(
+    BoardDocument board,
+    BoardPanelInstance panel, {
+    double pixelRatio = 2.0,
+  }) async {
+    final theme = ThemeManager.instance.theme;
+    final colors =
+        theme.extension<AppColorScheme>() ??
+        AppColorScheme.fromAccent(Colors.deepPurple);
+
+    final headlessCubit = _HeadlessBoardCubit(board);
+
+    final originalErrorBuilder = ErrorWidget.builder;
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      debugPrint(
+        '[BoardOffscreenRenderer] panel render error: ${details.exception}',
+      );
+      return ColoredBox(
+        color: colors.border.withAlpha(32),
+        child: Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 20,
+            color: colors.textMuted.withAlpha(128),
+          ),
+        ),
+      );
+    };
+
+    try {
+      final panelSize = Size(
+        panel.bounds.width.clamp(60.0, 4000.0),
+        panel.bounds.height.clamp(60.0, 4000.0),
+      );
+      return await _renderWidgetToImage(
+        _buildPanelPreview(board, panel, headlessCubit, theme, colors),
+        panelSize,
+        pixelRatio,
+      );
+    } catch (e, st) {
+      debugPrint('[BoardOffscreenRenderer] panel render failed: $e');
+      debugPrintStack(stackTrace: st);
+      return null;
+    } finally {
+      ErrorWidget.builder = originalErrorBuilder;
+      headlessCubit.close();
+    }
+  }
+
+  Widget _buildPanelPreview(
+    BoardDocument board,
+    BoardPanelInstance panel,
+    BoardCubit cubit,
+    ThemeData theme,
+    AppColorScheme colors,
+  ) {
+    return BlocProvider<BoardCubit>.value(
+      value: cubit,
+      child: Localizations(
+        locale: const Locale('en', 'US'),
+        delegates: [
+          DefaultMaterialLocalizations.delegate,
+          DefaultWidgetsLocalizations.delegate,
+        ],
+        child: MediaQuery(
+          data: MediaQueryData(
+            size: Size(
+              panel.bounds.width.clamp(60.0, 4000.0),
+              panel.bounds.height.clamp(60.0, 4000.0),
+            ),
+          ),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: ScrollConfiguration(
+              behavior: const HeadlessScrollBehavior(),
+              child: Theme(
+                data: theme,
+                child: DefaultTextStyle(
+                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
+                  child: IconTheme(
+                    data: IconThemeData(
+                      color: colors.textSecondary,
+                      size: 14,
+                    ),
+                    child: _OffscreenSinglePanel(
+                      panel: panel,
+                      colors: colors,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildBoardPreview(
@@ -232,6 +334,98 @@ class _HeadlessBoardCubit extends BoardCubit {
   // Prevent any async side-effects (disk writes, network) during headless render.
   @override
   Future<void> load() async {}
+}
+
+/// Renders a single panel with its header bar at full (1:1) scale for
+/// panel-level screenshots.
+class _OffscreenSinglePanel extends StatelessWidget {
+  const _OffscreenSinglePanel({
+    required this.panel,
+    required this.colors,
+  });
+
+  final BoardPanelInstance panel;
+  final AppColorScheme colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = panel.color;
+    final panelFill =
+        accent == null
+            ? colors.surface
+            : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
+    final panelHeaderFill =
+        accent == null
+            ? colors.surfaceElevated
+            : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
+                colors.surfaceElevated;
+    final borderColor =
+        accent == null
+            ? colors.border
+            : Color.lerp(colors.border, accent, 0.65) ?? colors.border;
+
+    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type) ??
+        BoardPluginRegistry.instance.fallback;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: panelFill,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: panelHeaderFill,
+                  border: Border(
+                    bottom: BorderSide(color: colors.divider, width: 1.0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      plugin.icon,
+                      size: 16,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withAlpha(180),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        panel.title,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: BoardOverviewPanelContent(
+                  panel: panel,
+                  headerHeight: 44.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// A global, lightweight registry for tracking active asynchronous tasks

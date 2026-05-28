@@ -819,6 +819,14 @@ commands = [
   },
   {
     "group": "panel",
+    "name": "panel:screenshot",
+    "description": "Save PNG screenshot of a single panel (headless offscreen render)",
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True], ["file_png", "Output PNG path (optional)", False]],
+    "example": "yoloit panel:screenshot \"My Board\" \"Kanban\" /tmp/kanban.png",
+    "aliases": ["psc"],
+  },
+  {
+    "group": "panel",
     "name": "panel:types",
     "description": "List available panel/widget type ids",
     "params": [["board", "Board id or name", True]],
@@ -2944,6 +2952,23 @@ PYEOF
     [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:show <board> <panel>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     _put "/boards/${bid}/panels/${pid}" '{"hidden":false}' | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:screenshot)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:screenshot <board> <panel> [file.png]" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    outfile="${3:-panel_screenshot.png}"
+    _resolve_base
+    tmpfile="$(mktemp /tmp/yoloit-panel-screenshot.XXXXXX)"
+    curl -s -o "$tmpfile" "${BASE}/boards/${bid}/panels/${pid}/screenshot" \
+      -H "Content-Type: application/json"
+    if file "$tmpfile" 2>/dev/null | grep -q PNG; then
+      mv "$tmpfile" "$outfile"
+      echo "Screenshot saved to $outfile ($(wc -c < "$outfile" | tr -d ' ') bytes)"
+    else
+      rm -f "$tmpfile"
+      echo "Error: unable to capture panel screenshot" >&2
+      exit 1
+    fi
     ;;
   panel:types)
     [[ $# -lt 1 ]] && { echo "Usage: yoloit panel:types <board>" >&2; exit 1; }

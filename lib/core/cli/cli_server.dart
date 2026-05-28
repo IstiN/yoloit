@@ -1993,6 +1993,10 @@ class CliServer {
       final body = await _body(request);
       return _panelAction(cubit, board, panel, body);
     }
+    // GET .../panels/:id/screenshot
+    if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
+      return _panelScreenshot(board, panel);
+    }
 
     return _notFound('Unknown panel route');
   }
@@ -2166,6 +2170,20 @@ class CliServer {
       File('${cacheDir.path}/${board.id}.png').writeAsBytesSync(png);
     } catch (_) {}
 
+    return shelf.Response.ok(png, headers: {'content-type': 'image/png'});
+  }
+
+  Future<shelf.Response> _panelScreenshot(
+    BoardDocument board,
+    BoardPanelInstance panel,
+  ) async {
+    final png = await BoardOffscreenRenderer.instance.renderPanel(
+      board,
+      panel,
+    );
+    if (png == null) {
+      return _error('Failed to capture panel screenshot');
+    }
     return shelf.Response.ok(png, headers: {'content-type': 'image/png'});
   }
 

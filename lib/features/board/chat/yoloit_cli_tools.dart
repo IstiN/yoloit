@@ -1919,6 +1919,22 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     params: <YoloitCliToolParam>[_boardParam(), _panelParam()],
   ),
   YoloitCliTool(
+    command: 'panel:screenshot',
+    alias: 'psc',
+    description: 'Save PNG screenshot of a single panel (headless offscreen render)',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      _boardParam(),
+      _panelParam(),
+      _p(
+        'file_png',
+        'Output PNG path',
+        aliases: const ['file', 'path'],
+        shortKey: 'fp',
+      ),
+    ],
+  ),
+  YoloitCliTool(
     command: 'panel:types',
     alias: 'ptp',
     description:

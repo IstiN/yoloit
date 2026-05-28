@@ -85,6 +85,9 @@ class ProviderModelCatalogService {
   String get _customModelsPath =>
       p.join(PlatformDirs.instance.configDir, 'provider_models_custom.json');
 
+  String get _cliModelsPath =>
+      p.join(PlatformDirs.instance.configDir, 'provider_models_cli.json');
+
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /// Loads catalogs. Idempotent — subsequent calls are no-ops unless [force].
@@ -93,6 +96,7 @@ class ProviderModelCatalogService {
     _loadError = null;
 
     await _loadCustomModels();
+    await _loadCliModelsCache();
 
     final json = await _fetchCatalogJson();
     if (json == null) {
@@ -206,6 +210,7 @@ class ProviderModelCatalogService {
         debugPrint(
           '[ProviderCatalog] cursor CLI: ${models.length} models discovered',
         );
+        unawaited(_saveCliModelsCache());
       }
       return models;
     } catch (e) {
@@ -303,6 +308,42 @@ class ProviderModelCatalogService {
             .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
             .toList();
       });
+    } catch (_) {}
+  }
+
+  // ── CLI models persistence ──────────────────────────────────────────────────
+
+  Future<void> _saveCliModelsCache() async {
+    try {
+      final file = File(_cliModelsPath);
+      await file.parent.create(recursive: true);
+      final data = _cliModels.map(
+        (providerId, models) => MapEntry(
+          providerId,
+          models.map((m) => m.toJson()).toList(),
+        ),
+      );
+      await file.writeAsString(jsonEncode(data));
+    } catch (_) {}
+  }
+
+  Future<void> _loadCliModelsCache() async {
+    try {
+      final file = File(_cliModelsPath);
+      if (!await file.exists()) return;
+      final raw =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      raw.forEach((providerId, models) {
+        _cliModels[providerId] = (models as List)
+            .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
+            .toList();
+      });
+      if (_cliModels.isNotEmpty) {
+        debugPrint(
+          '[ProviderCatalog] CLI cache loaded: '
+          '${_cliModels.entries.map((e) => '${e.key}=${e.value.length}').join(', ')}',
+        );
+      }
     } catch (_) {}
   }
 }
