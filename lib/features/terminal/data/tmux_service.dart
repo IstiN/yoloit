@@ -156,4 +156,36 @@ class TmuxService {
     final sessions = await listSessions();
     return sessions.contains(tmuxName(sessionId));
   }
+
+  /// Injects environment variables into an existing tmux session.
+  ///
+  /// Uses `tmux setenv` so new panes/windows inherit the values, then
+  /// `tmux send-keys` to export them into the currently running shell.
+  Future<void> injectEnv(
+    String sessionId,
+    Map<String, String> env,
+  ) async {
+    if (_tmuxBin == null || env.isEmpty) return;
+    final target = tmuxName(sessionId);
+    for (final entry in env.entries) {
+      await Process.run(
+        _tmuxBin!,
+        ['setenv', '-t', target, entry.key, entry.value],
+      );
+    }
+    // Build a single export command for the running shell.
+    final exports = env.entries
+        .map((e) => 'export ${e.key}=${_shellEscape(e.value)}')
+        .join('; ');
+    await Process.run(
+      _tmuxBin!,
+      ['send-keys', '-t', target, ' $exports', 'Enter'],
+    );
+  }
+
+  /// Escape a value for safe use in a POSIX shell single-quoted string.
+  static String _shellEscape(String value) {
+    // Wrap in single quotes; escape any embedded single quotes.
+    return "'${value.replaceAll("'", "'\\''")}'";
+  }
 }

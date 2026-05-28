@@ -129,6 +129,13 @@ class BoardTerminalSessionManager extends ChangeNotifier {
         label: session.displayName,
         extraEnv: extraEnv,
       );
+      // When reattaching to an existing tmux session (-A flag), the shell
+      // inside it retains its original environment. Push env vars into the
+      // tmux session so new panes/windows inherit them, and export them into
+      // the currently running shell via send-keys.
+      if (extraEnv.isNotEmpty) {
+        await TmuxService.instance.injectEnv(sessionId, extraEnv);
+      }
     } else {
       pty = _ptyService.launch(
         sessionId: sessionId,
