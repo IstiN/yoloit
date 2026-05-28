@@ -128,7 +128,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SettingsPage), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.close));
+      await tester.tap(find.byIcon(Icons.close).first);
       await tester.pumpAndSettle();
       expect(find.byType(SettingsPage), findsNothing);
     });

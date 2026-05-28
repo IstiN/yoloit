@@ -591,6 +591,100 @@ commands = [
     "example": "yoloit cloud:provider cloud",
   },
   {
+    "group": "theme",
+    "name": "theme",
+    "description": "Show current theme info (preset, brightness, overrides)",
+    "params": [],
+    "example": "yoloit theme",
+  },
+  {
+    "group": "theme",
+    "name": "theme:presets",
+    "description": "List all available theme presets (built-in and custom)",
+    "params": [],
+    "example": "yoloit theme:presets",
+  },
+  {
+    "group": "theme",
+    "name": "theme:set",
+    "description": "Set the active theme preset",
+    "params": [["preset", "Preset id (e.g. neonPurple, islandsDark) or custom id", True]],
+    "example": "yoloit theme:set islandsDark",
+  },
+  {
+    "group": "theme",
+    "name": "theme:brightness",
+    "description": "Set theme brightness (dark or light)",
+    "params": [["dark|light", "Brightness mode", True]],
+    "example": "yoloit theme:brightness light",
+  },
+  {
+    "group": "theme",
+    "name": "theme:color",
+    "description": "Set a color override for a theme slot",
+    "params": [
+      ["slot", "Color slot name (e.g. primary, accentGreen, textPrimary)", True],
+      ["color", "Hex color (e.g. #FF548AF7 or #548AF7)", True],
+    ],
+    "example": "yoloit theme:color primary #548AF7",
+  },
+  {
+    "group": "theme",
+    "name": "theme:reset-color",
+    "description": "Remove a color override, reverting to theme default",
+    "params": [["slot", "Color slot name", True]],
+    "example": "yoloit theme:reset-color primary",
+  },
+  {
+    "group": "theme",
+    "name": "theme:reset-all",
+    "description": "Clear all color overrides",
+    "params": [],
+    "example": "yoloit theme:reset-all",
+  },
+  {
+    "group": "theme",
+    "name": "theme:save",
+    "description": "Save current theme (with overrides) as a named custom preset",
+    "params": [["name", "Preset name", True]],
+    "example": "yoloit theme:save \"My Custom Dark\"",
+  },
+  {
+    "group": "theme",
+    "name": "theme:export",
+    "description": "Export current theme as JSON (prints to stdout)",
+    "params": [],
+    "example": "yoloit theme:export > my_theme.json",
+  },
+  {
+    "group": "theme",
+    "name": "theme:import",
+    "description": "Import a theme file (JSON, ICLS, or XML) and activate it",
+    "params": [["path", "Path to theme file", True]],
+    "example": "yoloit theme:import ~/Downloads/Islands_Dark.icls",
+  },
+  {
+    "group": "theme",
+    "name": "theme:delete",
+    "description": "Delete a custom theme by id",
+    "params": [["id", "Custom theme id", True]],
+    "example": "yoloit theme:delete custom_1234567890",
+  },
+  {
+    "group": "theme",
+    "name": "theme:colors",
+    "description": "Show all effective color values for the current theme",
+    "params": [],
+    "example": "yoloit theme:colors",
+  },
+  {
+    "group": "theme",
+    "name": "theme:slots",
+    "description": "Show available color slot names grouped by category",
+    "params": [],
+    "example": "yoloit theme:slots",
+  },
+  {
     "group": "link",
     "name": "links",
     "description": "List links on board",
@@ -2652,6 +2746,67 @@ PY
       _post "/cloud-providers/provider-type" "{\"type\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$ptype")}" | python3 -m json.tool 2>/dev/null
     fi
     ;;
+
+  # ── theme management ──
+  theme)
+    _get "/theme" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:presets)
+    _get "/theme/presets" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:set)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit theme:set <preset-id>" >&2; exit 1; }
+    preset_id="$1"
+    # Check if it looks like a custom id
+    if [[ "$preset_id" == custom_* ]]; then
+      _post "/theme/set" "{\"customId\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$preset_id")}" | python3 -m json.tool 2>/dev/null
+    else
+      _post "/theme/set" "{\"preset\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$preset_id")}" | python3 -m json.tool 2>/dev/null
+    fi
+    ;;
+  theme:brightness)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit theme:brightness <dark|light>" >&2; exit 1; }
+    if [[ "$1" != "dark" && "$1" != "light" ]]; then
+      echo "Usage: yoloit theme:brightness <dark|light>" >&2; exit 1
+    fi
+    _post "/theme/brightness" "{\"brightness\":\"$1\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:color)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit theme:color <slot> <hex-color>" >&2; exit 1; }
+    _post "/theme/color" "{\"slot\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$1"),\"color\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$2")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:reset-color)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit theme:reset-color <slot>" >&2; exit 1; }
+    _delete "/theme/color?slot=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$1")" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:reset-all)
+    _post "/theme/reset-colors" "{}" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:save)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit theme:save <name>" >&2; exit 1; }
+    _post "/theme/save" "{\"name\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$1")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:export)
+    _get "/theme/export"
+    ;;
+  theme:import)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit theme:import <path>" >&2; exit 1; }
+    t_path="$1"
+    [[ "$t_path" == ~* ]] && t_path="${t_path/#\~/$HOME}"
+    [[ "$t_path" != /* ]] && t_path="$(cd "$(dirname "$t_path")" && pwd)/$(basename "$t_path")"
+    _post "/theme/import" "{\"path\":$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$t_path")}" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:delete)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit theme:delete <custom-id>" >&2; exit 1; }
+    _delete "/theme/custom?id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$1")" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:colors)
+    _get "/theme/colors" | python3 -m json.tool 2>/dev/null
+    ;;
+  theme:slots)
+    _get "/theme/slots" | python3 -m json.tool 2>/dev/null
+    ;;
+
   files:preview)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit files:preview <board> <path> [--title TITLE]" >&2; exit 1; }
     bid_raw="$1"; shift

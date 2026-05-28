@@ -1548,9 +1548,17 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
         );
       },
     );
-    controller.dispose();
-    if (name == null || name.trim().isEmpty) return;
-    await tm.saveCurrentAsPreset(name.trim());
+    if (name == null || name.trim().isEmpty) {
+      controller.dispose();
+      return;
+    }
+    final trimmed = name.trim();
+    // Defer dispose & save to after the dialog exit animation completes,
+    // otherwise notifyListeners() fires while dependents are still mounted.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      controller.dispose();
+      await tm.saveCurrentAsPreset(trimmed);
+    });
   }
 
   Future<void> _exportTheme() async {
