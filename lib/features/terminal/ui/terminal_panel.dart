@@ -191,7 +191,7 @@ class _TerminalHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          bottom: BorderSide(color: const Color(0xFF32327A), width: 1),
+          bottom: BorderSide(color: colors.tabBorder, width: 1),
         ),
       ),
       child: Row(
@@ -960,7 +960,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         globalPos.dy + 1,
       ),
       items: items,
-      color: const Color(0xFF1A1A2E),
+      color: colors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: colors.textMuted.withAlpha(60)),
@@ -1208,27 +1208,27 @@ class TerminalWidgetState extends State<TerminalWidget> {
                   theme: TerminalTheme(
                     cursor: colors.primary,
                     selection: colors.primary.withAlpha(120),
-                    foreground: const Color(0xFFCECEEE),
-                    background: const Color(0xFF070714),
-                    black: const Color(0xFF1A1A2E),
-                    red: const Color(0xFFFF4F6A),
-                    green: const Color(0xFF00FF9F),
-                    yellow: const Color(0xFFFFD700),
-                    blue: const Color(0xFF00B4FF),
-                    magenta: const Color(0xFFB87FFF),
-                    cyan: const Color(0xFF00E5FF),
-                    white: const Color(0xFFCECEEE),
-                    brightBlack: const Color(0xFF44446A),
-                    brightRed: const Color(0xFFFF6B85),
-                    brightGreen: const Color(0xFF4DFFBE),
-                    brightYellow: const Color(0xFFFFE866),
-                    brightBlue: const Color(0xFF33C5FF),
-                    brightMagenta: const Color(0xFFCDA0FF),
-                    brightCyan: const Color(0xFF33EEFF),
-                    brightWhite: const Color(0xFFFFFFFF),
-                    searchHitBackground: const Color(0xFFFF9500),
-                    searchHitBackgroundCurrent: const Color(0xFFFFB700),
-                    searchHitForeground: const Color(0xFF000000),
+                    foreground: colors.terminalText,
+                    background: colors.terminalBackground,
+                    black: colors.surface,
+                    red: colors.accentRed,
+                    green: colors.accentGreen,
+                    yellow: colors.accentOrange,
+                    blue: colors.accentBlue,
+                    magenta: colors.primary,
+                    cyan: colors.terminalPrompt,
+                    white: colors.terminalText,
+                    brightBlack: colors.textMuted,
+                    brightRed: colors.accentRedDim,
+                    brightGreen: colors.accentGreenDim,
+                    brightYellow: colors.statusWarning,
+                    brightBlue: colors.accentBlue,
+                    brightMagenta: colors.primaryLight,
+                    brightCyan: colors.accentBlue,
+                    brightWhite: colors.textPrimary,
+                    searchHitBackground: colors.accentOrange,
+                    searchHitBackgroundCurrent: colors.statusWarning,
+                    searchHitForeground: colors.background,
                   ),
                   padding: const EdgeInsets.all(8),
                 ),
@@ -1254,12 +1254,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
         width: 320,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1A2E),
+          color: colors.surfaceElevated,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: colors.textMuted.withAlpha(80)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(80),
+              color: colors.background.withAlpha(80),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -1575,29 +1575,6 @@ class _WorkspaceColorPickerDialogState
   late Color _current;
   late final TextEditingController _hexCtrl;
 
-  static const _presets = [
-    Color(0xFF7C3AED),
-    Color(0xFF2563EB),
-    Color(0xFF059669),
-    Color(0xFFD97706),
-    Color(0xFFDC2626),
-    Color(0xFF0891B2),
-    Color(0xFFDB2777),
-    Color(0xFF65A30D),
-    Color(0xFF9333EA),
-    Color(0xFFEA580C),
-    Color(0xFF0D9488),
-    Color(0xFF4F46E5),
-    Color(0xFFF59E0B),
-    Color(0xFF10B981),
-    Color(0xFFEF4444),
-    Color(0xFF6366F1),
-    Color(0xFFF97316),
-    Color(0xFF14B8A6),
-    Color(0xFFEC4899),
-    Color(0xFF84CC16),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -1635,8 +1612,30 @@ class _WorkspaceColorPickerDialogState
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final presets = [
+      colors.primary,
+      colors.accentBlue,
+      colors.accentGreen,
+      colors.accentOrange,
+      colors.accentRed,
+      colors.terminalPrompt,
+      colors.primaryLight,
+      colors.statusActive,
+      colors.primaryDark,
+      colors.statusWarning,
+      colors.sidebarGlow,
+      colors.primaryGlow,
+      colors.accentOrange,
+      colors.accentGreenDim,
+      colors.accentRedDim,
+      colors.primary,
+      colors.accentOrange,
+      colors.terminalPrompt,
+      colors.primaryLight,
+      colors.statusActive,
+    ];
     return Dialog(
-      backgroundColor: const Color(0xFF0F0F2A),
+      backgroundColor: colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: SizedBox(
         width: 360,
@@ -1660,8 +1659,8 @@ class _WorkspaceColorPickerDialogState
                   const SizedBox(width: 8),
                   Text(
                     'Colour — ${widget.workspace.name}',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1709,14 +1708,14 @@ class _WorkspaceColorPickerDialogState
                   Expanded(
                     child: TextField(
                       controller: _hexCtrl,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.textPrimary,
                         fontSize: 12,
                         fontFamily: 'monospace',
                       ),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: const Color(0xFF1A1A3E),
+                        fillColor: colors.surfaceElevated,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(6),
                           borderSide: BorderSide(color: _current.withAlpha(80)),
@@ -1763,7 +1762,7 @@ class _WorkspaceColorPickerDialogState
                 spacing: 6,
                 runSpacing: 6,
                 children:
-                    _presets.map((c) {
+                    presets.map((c) {
                       final isSelected = _current.toARGB32() == c.toARGB32();
                       return GestureDetector(
                         onTap: () => _setColor(c),
@@ -1776,7 +1775,7 @@ class _WorkspaceColorPickerDialogState
                             border: Border.all(
                               color:
                                   isSelected
-                                      ? Colors.white
+                                      ? colors.textPrimary
                                       : Colors.transparent,
                               width: 2,
                             ),
@@ -1829,7 +1828,7 @@ class _WorkspaceColorPickerDialogState
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _current,
-                      foregroundColor: Colors.white,
+                      foregroundColor: colors.textPrimary,
                       textStyle: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

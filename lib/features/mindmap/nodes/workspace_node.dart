@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/workspace_card.dart';
@@ -12,6 +13,7 @@ import 'package:yoloit/features/workspaces/ui/new_agent_session_dialog.dart';
 
 class WorkspaceNode extends StatelessWidget {
   const WorkspaceNode({super.key, required this.data});
+
   final WorkspaceNodeData data;
 
   @override
@@ -40,7 +42,7 @@ class WorkspaceNode extends StatelessWidget {
 
   void _pickColor(BuildContext context) {
     final ws = data.workspace;
-    final current = ws.color ?? const Color(0xFF60A5FA);
+    final current = ws.color ?? context.appColors.accentBlue;
     showDialog<void>(
       context: context,
       builder: (_) => BlocProvider.value(
@@ -48,8 +50,10 @@ class WorkspaceNode extends StatelessWidget {
         child: _WsColorPickerDialog(
           workspaceId: ws.id,
           current: current,
-          onSave: (c) => context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, c),
-          onReset: () => context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, null),
+          onSave: (color) =>
+              context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, color),
+          onReset: () =>
+              context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, null),
         ),
       ),
     );
@@ -57,8 +61,6 @@ class WorkspaceNode extends StatelessWidget {
 
   Future<void> _openSessionDialog(BuildContext context) async {
     final ws = data.workspace;
-    // Capture both the navigator context and TerminalCubit BEFORE any async
-    // gap so the dialog receives proper keyboard focus on macOS.
     final navigator = Navigator.of(context, rootNavigator: true);
     final terminalCubit = context.read<TerminalCubit>();
 
@@ -89,6 +91,7 @@ class _WsColorPickerDialog extends StatefulWidget {
     required this.onSave,
     required this.onReset,
   });
+
   final String workspaceId;
   final Color current;
   final void Function(Color) onSave;
@@ -99,12 +102,22 @@ class _WsColorPickerDialog extends StatefulWidget {
 }
 
 class _WsColorPickerDialogState extends State<_WsColorPickerDialog> {
-  static const _palette = [
-    Color(0xFF7C3AED), Color(0xFF2563EB), Color(0xFF16A34A), Color(0xFFD97706),
-    Color(0xFFDC2626), Color(0xFF0891B2), Color(0xFFDB2777), Color(0xFF6D28D9),
-    Color(0xFF60A5FA), Color(0xFF34D399), Color(0xFFF59E0B), Color(0xFFF87171),
-  ];
   late Color _color;
+
+  List<Color> _palette(AppColorScheme colors) => [
+        colors.primary,
+        colors.primaryLight,
+        colors.primaryDark,
+        colors.accentBlue,
+        colors.accentGreen,
+        colors.accentGreenDim,
+        colors.accentOrange,
+        colors.accentRed,
+        colors.accentRedDim,
+        colors.statusActive,
+        colors.statusWarning,
+        colors.statusIdle,
+      ];
 
   @override
   void initState() {
@@ -114,31 +127,36 @@ class _WsColorPickerDialogState extends State<_WsColorPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final palette = _palette(colors);
     return AlertDialog(
-      backgroundColor: const Color(0xFF12151C),
+      backgroundColor: colors.surfaceElevated,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFF2A3040)),
+        side: BorderSide(color: colors.border),
       ),
-      title: const Text(
+      title: Text(
         'Workspace Color',
-        style: TextStyle(color: Color(0xFFE8E8FF), fontSize: 14),
+        style: TextStyle(color: colors.textPrimary, fontSize: 14),
       ),
       content: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: [
-          for (final c in _palette)
+          for (final color in palette)
             GestureDetector(
-              onTap: () => setState(() => _color = c),
+              onTap: () => setState(() => _color = color),
               child: Container(
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: c,
-                  border: _color == c
-                      ? Border.all(color: Colors.white, width: 2)
+                  color: color,
+                  border: _color == color
+                      ? Border.all(
+                          color: colors.textHighlight,
+                          width: 2,
+                        )
                       : null,
                 ),
               ),
@@ -151,18 +169,27 @@ class _WsColorPickerDialogState extends State<_WsColorPickerDialog> {
             widget.onReset();
             Navigator.pop(context);
           },
-          child: const Text('Reset', style: TextStyle(color: Color(0xFF6B7898))),
+          child: Text(
+            'Reset',
+            style: TextStyle(color: colors.textSecondary),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7898))),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: colors.textSecondary),
+          ),
         ),
         TextButton(
           onPressed: () {
             widget.onSave(_color);
             Navigator.pop(context);
           },
-          child: const Text('Save', style: TextStyle(color: Color(0xFF60A5FA))),
+          child: Text(
+            'Save',
+            style: TextStyle(color: colors.accentBlue),
+          ),
         ),
       ],
     );

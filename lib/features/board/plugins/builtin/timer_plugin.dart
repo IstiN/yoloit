@@ -66,10 +66,6 @@ class _TimerContent extends StatefulWidget {
 
 class _TimerContentState extends State<_TimerContent>
     with SingleTickerProviderStateMixin {
-  static const Color _accent = Color(0xFF3B82F6);
-  static const Color _completedColor = Color(0xFF10B981);
-  static const Color _warningColor = Color(0xFFF59E0B);
-
   static const List<int> _quickTimers = [1, 5, 15, 25, 45, 60];
 
   Timer? _tickTimer;
@@ -286,9 +282,10 @@ class _TimerContentState extends State<_TimerContent>
       _duration > 0 ? (_remaining / _duration).clamp(0.0, 1.0) : 0.0;
 
   Color get _currentAccent {
-    if (_completed) return _completedColor;
-    if (_progress < 0.2) return _warningColor;
-    return _accent;
+    final colors = context.appColors;
+    if (_completed) return colors.accentGreen;
+    if (_progress < 0.2) return colors.accentOrange;
+    return colors.accentBlue;
   }
 
   @override
@@ -354,7 +351,7 @@ class _TimerContentState extends State<_TimerContent>
                                 Icon(
                                   Icons.check_circle_rounded,
                                   size: 20,
-                                  color: _completedColor,
+                                  color: colors.accentGreen,
                                 ),
                               Text(
                                 _timeText,
@@ -362,7 +359,7 @@ class _TimerContentState extends State<_TimerContent>
                                   fontSize: _completed ? 28 : 36,
                                   fontWeight: FontWeight.w700,
                                   color: _completed
-                                      ? _completedColor
+                                      ? colors.accentGreen
                                       : onSurface,
                                   fontFeatures: const [
                                     FontFeature.tabularFigures(),
@@ -387,7 +384,7 @@ class _TimerContentState extends State<_TimerContent>
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: _warningColor,
+                                    color: colors.accentOrange,
                                   ),
                                 ),
                             ],
@@ -449,7 +446,7 @@ class _TimerContentState extends State<_TimerContent>
                         : _isRunning
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
-                    color: Colors.white,
+                    color: colors.textPrimary,
                     size: 28,
                   ),
                 ),
@@ -520,10 +517,10 @@ class _TimerContentState extends State<_TimerContent>
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: isActive ? _accent.withValues(alpha: 0.15) : colors.surfaceHighlight,
+                    color: isActive ? colors.accentBlue.withValues(alpha: 0.15) : colors.surfaceHighlight,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: isActive ? _accent : colors.border,
+                      color: isActive ? colors.accentBlue : colors.border,
                       width: isActive ? 1.5 : 1,
                     ),
                   ),
@@ -532,7 +529,7 @@ class _TimerContentState extends State<_TimerContent>
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                      color: isActive ? _accent : onSurface.withValues(alpha: 0.7),
+                      color: isActive ? colors.accentBlue : onSurface.withValues(alpha: 0.7),
                     ),
                   ),
                 ),
@@ -563,7 +560,7 @@ class _TimerContentState extends State<_TimerContent>
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _accent, width: 1.5),
+                borderSide: BorderSide(color: colors.accentBlue, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
@@ -594,8 +591,8 @@ class _TimerContentState extends State<_TimerContent>
               FilledButton(
                 onPressed: !_isRunning ? _saveEdit : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: _accent,
-                  disabledBackgroundColor: _accent.withValues(alpha: 0.4),
+                  backgroundColor: colors.accentBlue,
+                  disabledBackgroundColor: colors.accentBlue.withValues(alpha: 0.4),
                   minimumSize: const Size(80, 34),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
@@ -652,7 +649,7 @@ class _TimeField extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5),
+                borderSide: BorderSide(color: colors.accentBlue, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 8,

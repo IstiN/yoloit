@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import '../bloc/collaboration_cubit.dart';
-import '../bloc/collaboration_state.dart';
-import '../collaboration_ports.dart';
-import 'web_mindmap_canvas.dart';
+import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
+import 'package:yoloit/features/collaboration/bloc/collaboration_state.dart';
+import 'package:yoloit/features/collaboration/collaboration_ports.dart';
+import 'package:yoloit/features/collaboration/ui/web_mindmap_canvas.dart';
 
 /// Full-screen shell shown when the app runs in browser / non-desktop mode.
 /// - Before connect: shows a connect form
@@ -105,11 +105,11 @@ class _GuestShellState extends State<GuestShell> {
             color: colors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: colors.border, width: 1),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x60000000),
+                color: colors.textPrimary.withAlpha(96),
                 blurRadius: 40,
-                offset: Offset(0, 16),
+                offset: const Offset(0, 16),
               ),
             ],
           ),
@@ -124,15 +124,15 @@ class _GuestShellState extends State<GuestShell> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4B9EFF).withAlpha(20),
+                      color: colors.accentBlue.withAlpha(20),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: const Color(0xFF4B9EFF).withAlpha(80),
+                        color: colors.accentBlue.withAlpha(80),
                       ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.hub_rounded,
-                      color: Color(0xFF4B9EFF),
+                      color: colors.accentBlue,
                       size: 20,
                     ),
                   ),
@@ -183,25 +183,25 @@ class _GuestShellState extends State<GuestShell> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF4F6A).withAlpha(15),
+                    color: colors.accentRed.withAlpha(15),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: const Color(0xFFFF4F6A).withAlpha(60),
+                      color: colors.accentRed.withAlpha(60),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.error_outline,
-                        color: Color(0xFFFF4F6A),
+                        color: colors.accentRed,
                         size: 14,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           collab.error,
-                          style: const TextStyle(
-                            color: Color(0xFFFF4F6A),
+                          style: TextStyle(
+                            color: colors.accentRed,
                             fontSize: 12,
                           ),
                         ),
@@ -217,8 +217,8 @@ class _GuestShellState extends State<GuestShell> {
                 height: 44,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4B9EFF),
-                    foregroundColor: Colors.white,
+                    backgroundColor: colors.accentBlue,
+                    foregroundColor: colors.textPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -239,7 +239,7 @@ class _GuestShellState extends State<GuestShell> {
                 '(toolbar → Share → Start Hosting).',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  color: context.appColors.textSecondary,
                   fontSize: 11,
                 ),
               ),
@@ -253,7 +253,7 @@ class _GuestShellState extends State<GuestShell> {
   Widget _label(String text) => Text(
     text,
     style: TextStyle(
-      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+      color: context.appColors.textSecondary,
       fontSize: 12,
       fontWeight: FontWeight.w500,
     ),
@@ -285,7 +285,7 @@ class _GuestShellState extends State<GuestShell> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF4B9EFF), width: 1.5),
+            borderSide: BorderSide(color: context.appColors.accentBlue, width: 1.5),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 12,
@@ -315,7 +315,7 @@ class _GuestShellState extends State<GuestShell> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          const Icon(Icons.hub_rounded, color: Color(0xFF4B9EFF), size: 16),
+          Icon(Icons.hub_rounded, color: ctx.appColors.accentBlue, size: 16),
           const SizedBox(width: 8),
           Text(
             'YoLoIT Space',
@@ -329,10 +329,10 @@ class _GuestShellState extends State<GuestShell> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: const Color(0xFF00FF9F).withAlpha(20),
+              color: ctx.appColors.accentGreen.withAlpha(20),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF00FF9F).withAlpha(60),
+                color: ctx.appColors.accentGreen.withAlpha(60),
                 width: 1,
               ),
             ),
@@ -341,16 +341,16 @@ class _GuestShellState extends State<GuestShell> {
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xFF00FF9F),
+                    color: ctx.appColors.accentGreen,
                   ),
                 ),
                 const SizedBox(width: 5),
                 Text(
                   'Connected · ${collab.address}',
-                  style: const TextStyle(
-                    color: Color(0xFF00FF9F),
+                  style: TextStyle(
+                    color: ctx.appColors.accentGreen,
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                   ),

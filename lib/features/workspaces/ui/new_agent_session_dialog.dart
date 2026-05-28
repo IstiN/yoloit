@@ -580,7 +580,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
                 border: Border.all(color: colors.primary),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(80),
+                    color: colors.textPrimary.withAlpha(80),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),

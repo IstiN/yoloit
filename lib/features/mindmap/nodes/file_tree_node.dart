@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/features/collaboration/desktop/repo_directory_listing.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
@@ -364,6 +365,7 @@ class _FileTreeNodeState extends State<FileTreeNode> {
       context.read<MindMapCubit>().openFileAsPanel(
         id: nodeId,
         filePath: path,
+        connectorColor: context.appColors.accentBlue.withValues(alpha: 112 / 255),
       );
       debugPrint('[FileTreeNode] openFileAsPanel completed');
     } catch (e, st) {

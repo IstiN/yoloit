@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -70,8 +71,6 @@ class _FilesContent extends StatefulWidget {
 }
 
 class _FilesContentState extends State<_FilesContent> {
-  static const Color _accent = Color(0xFFEC4899);
-
   List<Map<String, dynamic>> get _files =>
       (widget.panel.state['files'] as List?)
           ?.where((e) => e is Map)
@@ -114,6 +113,7 @@ class _FilesContentState extends State<_FilesContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final files = _files;
 
     return Column(
@@ -126,10 +126,10 @@ class _FilesContentState extends State<_FilesContent> {
             children: [
               Text(
                 '${files.length} file${files.length == 1 ? '' : 's'}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFFEC4899),
+                  color: colors.primary,
                 ),
               ),
               const Spacer(),
@@ -138,7 +138,7 @@ class _FilesContentState extends State<_FilesContent> {
                 icon: const Icon(Icons.add, size: 14),
                 label: const Text('Add Files', style: TextStyle(fontSize: 12)),
                 style: FilledButton.styleFrom(
-                  backgroundColor: _accent,
+                  backgroundColor: colors.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   minimumSize: const Size(0, 30),
                 ),
@@ -157,13 +157,13 @@ class _FilesContentState extends State<_FilesContent> {
                       Icon(
                         Icons.attach_file,
                         size: 40,
-                        color: _accent.withOpacity(0.35),
+                        color: colors.primary.withOpacity(0.35),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'No files added yet',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
+                          color: colors.textSecondary,
                           fontSize: 13,
                         ),
                       ),
@@ -239,6 +239,7 @@ class _FileTileState extends State<_FileTile> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -251,10 +252,10 @@ class _FileTileState extends State<_FileTile> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: const Color(0xFFEC4899).withOpacity(0.12),
+                color: colors.primary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(widget.icon, size: 18, color: const Color(0xFFEC4899)),
+              child: Icon(widget.icon, size: 18, color: colors.primary),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -268,7 +269,7 @@ class _FileTileState extends State<_FileTile> {
                   ),
                   Text(
                     widget.path,
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 10, color: colors.textSecondary),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -283,7 +284,7 @@ class _FileTileState extends State<_FileTile> {
                   onPressed: widget.onOpenAsPanel,
                   padding: const EdgeInsets.all(4),
                   constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                  color: const Color(0xFF8B5CF6),
+                  color: colors.primaryLight,
                 ),
               IconButton(
                 icon: const Icon(Icons.folder_open_outlined, size: 16),
@@ -291,7 +292,7 @@ class _FileTileState extends State<_FileTile> {
                 onPressed: widget.onReveal,
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color: const Color(0xFF94A3B8),
+                color: colors.textMuted,
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 16),
@@ -299,7 +300,7 @@ class _FileTileState extends State<_FileTile> {
                 onPressed: widget.onDelete,
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color: Colors.redAccent,
+                color: colors.accentRed,
               ),
             ],
           ],

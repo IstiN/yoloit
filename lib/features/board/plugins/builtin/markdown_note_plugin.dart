@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -139,6 +140,7 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final markdown = widget.markdown.isEmpty ? '*Empty note*' : widget.markdown;
     final renderAsMermaid = markdown.contains('```mermaid');
     return MouseRegion(
@@ -186,7 +188,7 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
                             _copied ? Icons.check : Icons.copy_outlined,
                             size: 12,
                             color: _copied
-                                ? Colors.green
+                                ? colors.accentGreen
                                 : Theme.of(context).textTheme.bodySmall?.color,
                           ),
                           const SizedBox(width: 4),
@@ -195,7 +197,7 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
                             style: TextStyle(
                               fontSize: 11,
                               color: _copied
-                                  ? Colors.green
+                                 ? colors.accentGreen
                                   : Theme.of(context).textTheme.bodySmall?.color,
                             ),
                           ),
@@ -381,7 +383,8 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
   }
 
   Future<void> _pickColor() async {
-    Color picked = _selectedColor ?? const Color(0xFFB46CFF);
+    final colors = context.appColors;
+    Color picked = _selectedColor ?? colors.primaryLight;
     await showDialog<void>(
       context: context,
       builder:
@@ -411,6 +414,7 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AlertDialog(
       title: Text(
         widget.panel.id.isEmpty
@@ -482,11 +486,10 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
                         height: 28,
                         decoration: BoxDecoration(
                           color:
-                              _selectedColor ??
-                              const Color(0xFFB46CFF),
+                              _selectedColor ?? colors.primaryLight,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Colors.white.withAlpha(90),
+                            color: colors.textPrimary.withAlpha(90),
                           ),
                         ),
                       ),

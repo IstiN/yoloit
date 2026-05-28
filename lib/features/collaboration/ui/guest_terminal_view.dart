@@ -117,7 +117,7 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
               fontFamily: 'JetBrainsMono',
               height: 1.2,
             ),
-            theme: _guestTheme,
+            theme: _guestTheme(colors),
           ),
         ),
       ),
@@ -145,12 +145,12 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
               height: 28,
               decoration: BoxDecoration(
                 color: _mobileKbActive
-                    ? const Color(0xFF4B9EFF).withAlpha(200)
+                    ? colors.accentBlue.withAlpha(200)
                     : colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: _mobileKbActive
-                      ? const Color(0xFF4B9EFF)
+                      ? colors.accentBlue
                       : colors.border,
                 ),
               ),
@@ -158,8 +158,8 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
                 Icons.keyboard,
                 size: 14,
                 color: _mobileKbActive
-                    ? Colors.white
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    ? colors.textPrimary
+                    : colors.textSecondary,
               ),
             ),
           ),
@@ -285,9 +285,9 @@ class _MobileInputBar extends StatelessWidget {
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: colors.border),
                     ),
-                    focusedBorder: const OutlineInputBorder(
+                    focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color: Color(0xFF4B9EFF),
+                        color: colors.accentBlue,
                         width: 1.5,
                       ),
                     ),
@@ -305,13 +305,13 @@ class _MobileInputBar extends StatelessWidget {
                     vertical: 9,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4B9EFF),
+                    color: colors.accentBlue,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     '↵',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: colors.textPrimary,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -327,28 +327,28 @@ class _MobileInputBar extends StatelessWidget {
 }
 
 /// Dark theme that approximates the native macOS Terminal experience.
-const TerminalTheme _guestTheme = TerminalTheme(
-  cursor: Color(0xFFE0E0E0),
-  selection: Color(0x554B9EFF),
-  foreground: Color(0xFFE6E6E6),
-  background: Color(0xFF0A0A0F),
-  black: Color(0xFF000000),
-  red: Color(0xFFCC6666),
-  green: Color(0xFFB5BD68),
-  yellow: Color(0xFFF0C674),
-  blue: Color(0xFF81A2BE),
-  magenta: Color(0xFFB294BB),
-  cyan: Color(0xFF8ABEB7),
-  white: Color(0xFFC5C8C6),
-  brightBlack: Color(0xFF666666),
-  brightRed: Color(0xFFD54E53),
-  brightGreen: Color(0xFFB9CA4A),
-  brightYellow: Color(0xFFE7C547),
-  brightBlue: Color(0xFF7AA6DA),
-  brightMagenta: Color(0xFFC397D8),
-  brightCyan: Color(0xFF70C0B1),
-  brightWhite: Color(0xFFEAEAEA),
-  searchHitBackground: Color(0xFFAAAAAA),
-  searchHitBackgroundCurrent: Color(0xFFFFFF00),
-  searchHitForeground: Color(0xFF000000),
+TerminalTheme _guestTheme(AppColorScheme colors) => TerminalTheme(
+  cursor: colors.textPrimary,
+  selection: colors.accentBlue.withAlpha(85),
+  foreground: colors.terminalText,
+  background: colors.terminalBackground,
+  black: colors.background,
+  red: colors.accentRed,
+  green: colors.accentGreen,
+  yellow: colors.accentOrange,
+  blue: colors.accentBlue,
+  magenta: colors.primaryLight,
+  cyan: colors.terminalPrompt,
+  white: colors.textPrimary,
+  brightBlack: colors.textMuted,
+  brightRed: colors.accentRedDim,
+  brightGreen: colors.accentGreenDim,
+  brightYellow: colors.statusWarning,
+  brightBlue: colors.primaryGlow,
+  brightMagenta: colors.primary,
+  brightCyan: colors.terminalPrompt,
+  brightWhite: colors.textHighlight,
+  searchHitBackground: colors.surfaceHighlight,
+  searchHitBackgroundCurrent: colors.statusWarning,
+  searchHitForeground: colors.background,
 );

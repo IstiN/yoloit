@@ -11,6 +11,7 @@
 //  ════════════════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 import 'package:yoloit/features/mindmap/plugin/mindmap_card_plugin.dart';
 
@@ -29,7 +30,7 @@ class HelloWorldPlugin extends MindMapCardPlugin {
   IconData get icon => Icons.waving_hand_outlined;
 
   @override
-  String get typeTag => 'hello'; // sidebar filter tag
+  String get typeTag => 'hello';
 
   // ── Card behaviour ────────────────────────────────────────────────────────
 
@@ -43,9 +44,8 @@ class HelloWorldPlugin extends MindMapCardPlugin {
 
   @override
   Widget buildWidget(MindMapPluginNodeData data) {
-    // data.payload contains whatever you put in when creating the node.
     final title = data.payload['title'] as String? ?? 'Hello World';
-    final body  = data.payload['body']  as String? ?? 'A plugin card.';
+    final body = data.payload['body'] as String? ?? 'A plugin card.';
     return _HelloWorldCard(title: title, body: body);
   }
 
@@ -53,56 +53,47 @@ class HelloWorldPlugin extends MindMapCardPlugin {
 
   @override
   List<PluginNodeEntry> provideNodes(BuildContext context) {
-    // You can read your own BloCs here via context.read<YourCubit>() if
-    // you've provided them higher up in the widget tree.
-    //
-    // Here we just return one static demo card.
     return [
       PluginNodeEntry(
         data: MindMapPluginNodeData(
-          id:          'hello:main',
-          pluginId:    pluginId,
-          columnIndex: 9,                      // rightmost column
-          typeTag:     typeTag,
+          id: 'hello:main',
+          pluginId: pluginId,
+          columnIndex: 9,
+          typeTag: typeTag,
           defaultSize: const Size(260, 160),
           payload: const {
             'title': 'Hello World',
-            'body':  'This card is provided by the HelloWorldPlugin.',
+            'body': 'This card is provided by the HelloWorldPlugin.',
           },
         ),
-        // Optional: connect this card from another node.
-        // connections: [
-        //   MindMapConnection(
-        //     fromId: 'hello:main',
-        //     toId:   'ws:some-workspace-id',
-        //     style:  ConnectorStyle.dashed,
-        //     color:  Color(0x60FFAA33),
-        //   ),
-        // ],
       ),
     ];
   }
 }
 
-// ── 2. Define your card widget ─────────────────────────────────────────────
-//
-// This is just a regular Flutter widget — style it however you like.
-// The MindMapNode wrapper (drag handle + resize) is added automatically.
-
 class _HelloWorldCard extends StatelessWidget {
   const _HelloWorldCard({required this.title, required this.body});
+
   final String title;
   final String body;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1020),
-        border: Border.all(color: const Color(0x70FFAA33), width: 1.5),
+        color: colors.background,
+        border: Border.all(
+          color: colors.accentOrange.withValues(alpha: 0.44),
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
-          BoxShadow(color: Color(0x80000000), blurRadius: 16, offset: Offset(0, 4)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.background.withValues(alpha: 0.5),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: ClipRRect(
@@ -110,38 +101,46 @@ class _HelloWorldCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: const BoxDecoration(
-                color: Color(0xFF121520),
-                border: Border(bottom: BorderSide(color: Color(0xFF2A3040))),
+              decoration: BoxDecoration(
+                color: colors.surfaceElevated,
+                border: Border(
+                  bottom: BorderSide(color: colors.border),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.waving_hand_outlined, size: 12, color: Color(0xFFFFAA33)),
+                  Icon(
+                    Icons.waving_hand_outlined,
+                    size: 12,
+                    color: colors.accentOrange,
+                  ),
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text(
                       title,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFFE8E8FF),
+                        color: colors.textPrimary,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            // Body
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   body,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF9BAACB), height: 1.5),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colors.textSecondary,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ),

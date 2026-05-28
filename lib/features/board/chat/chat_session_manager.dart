@@ -9,7 +9,6 @@ import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
 /// State of a single chat session, independent of any UI widget.
 ///
@@ -664,7 +663,6 @@ class ChatSession extends ChangeNotifier {
     // Config loaded synchronously from cached settings.
     // The config ID is after "cloud:" prefix.
     final configId = providerId.substring(6);
-    final service = CloudLlmSettingsService.instance;
     // Load config async — for now return a provider that will load on first use.
     return CloudLlmProvider.deferred(configId: configId);
   }

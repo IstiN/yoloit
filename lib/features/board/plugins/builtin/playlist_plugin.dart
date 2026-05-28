@@ -115,8 +115,6 @@ class _PlaylistContent extends StatefulWidget {
 }
 
 class _PlaylistContentState extends State<_PlaylistContent> {
-  static const Color _accent = Color(0xFF8B5CF6);
-
   late Player _player;
   VideoController? _videoCtrl;
   bool _videoVisible = false;
@@ -343,7 +341,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                     prefixIcon: Icon(Icons.link_rounded, size: 16, color: onSurface.withAlpha(150)),
                     border: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: _accent, width: 1.5)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.primary, width: 1.5)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     isDense: true,
                   ),
@@ -357,7 +355,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                     hintStyle: TextStyle(fontSize: 12, color: onSurface.withAlpha(100)),
                     border: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.border)),
-                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: _accent, width: 1.5)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colors.primary, width: 1.5)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     isDense: true,
                   ),
@@ -374,7 +372,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                     const SizedBox(width: 8),
                     FilledButton(
                       onPressed: () => Navigator.of(dctx).pop(true),
-                      style: FilledButton.styleFrom(backgroundColor: _accent, minimumSize: const Size(0, 32)),
+                      style: FilledButton.styleFrom(backgroundColor: colors.primary, minimumSize: const Size(0, 32)),
                       child: const Text('Add', style: TextStyle(fontSize: 12)),
                     ),
                   ],
@@ -509,11 +507,11 @@ class _PlaylistContentState extends State<_PlaylistContent> {
           ),
           child: Row(
             children: [
-              Icon(Icons.queue_music_rounded, size: 14, color: _accent),
+              Icon(Icons.queue_music_rounded, size: 14, color: colors.primary),
               const SizedBox(width: 6),
               Text(
                 '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _accent),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colors.primary),
               ),
               const Spacer(),
               Builder(
@@ -522,7 +520,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                   icon: const Icon(Icons.add, size: 13),
                   label: const Text('Add', style: TextStyle(fontSize: 11)),
                   style: FilledButton.styleFrom(
-                    backgroundColor: _accent,
+                    backgroundColor: colors.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     minimumSize: const Size(0, 24),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -549,13 +547,13 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                             width: 72,
                             height: 72,
                             decoration: BoxDecoration(
-                              color: _accent.withOpacity(0.12),
+                              color: colors.primary.withOpacity(0.12),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.music_note_rounded,
                               size: 36,
-                              color: _accent.withOpacity(0.7),
+                              color: colors.primary.withOpacity(0.7),
                             ),
                           ),
                         ],
@@ -590,10 +588,10 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                 // Progress slider
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: _accent,
+                    activeTrackColor: colors.primary,
                     inactiveTrackColor: colors.border,
-                    thumbColor: _accent,
-                    overlayColor: _accent.withOpacity(0.15),
+                    thumbColor: colors.primary,
+                    overlayColor: colors.primary.withOpacity(0.15),
                     trackHeight: 3,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
                   ),
@@ -636,7 +634,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                       icon: Icon(
                         Icons.shuffle_rounded,
                         size: 18,
-                        color: _shuffle ? _accent : Theme.of(context).colorScheme.onSurface.withAlpha(100),
+                        color: _shuffle ? colors.primary : Theme.of(context).colorScheme.onSurface.withAlpha(100),
                       ),
                       onPressed: () => _saveState(shuffle: !_shuffle),
                       padding: const EdgeInsets.all(4),
@@ -656,12 +654,12 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: _accent,
+                          color: colors.primary,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                          color: Colors.white,
+                          color: colors.textPrimary,
                           size: 26,
                         ),
                       ),
@@ -678,7 +676,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                       icon: Icon(
                         Icons.repeat_rounded,
                         size: 18,
-                        color: _repeat ? _accent : Theme.of(context).colorScheme.onSurface.withAlpha(100),
+                        color: _repeat ? colors.primary : Theme.of(context).colorScheme.onSurface.withAlpha(100),
                       ),
                       onPressed: () => _saveState(repeat: !_repeat),
                       padding: const EdgeInsets.all(4),
@@ -698,7 +696,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.queue_music_rounded, size: 40, color: _accent.withOpacity(0.35)),
+                      Icon(Icons.queue_music_rounded, size: 40, color: colors.primary.withOpacity(0.35)),
                       const SizedBox(height: 8),
                       Text(
                         'No tracks yet',
@@ -784,7 +782,6 @@ class _TrackTile extends StatefulWidget {
 }
 
 class _TrackTileState extends State<_TrackTile> {
-  static const Color _accent = Color(0xFF8B5CF6);
   bool _hovered = false;
 
   @override
@@ -799,10 +796,10 @@ class _TrackTileState extends State<_TrackTile> {
           padding: const EdgeInsets.only(left: 12, right: 4, top: 7, bottom: 7),
           decoration: BoxDecoration(
             color: widget.isActive
-                ? _accent.withOpacity(0.1)
+                ? colors.primary.withOpacity(0.1)
                 : (_hovered ? colors.surfaceHighlight : Colors.transparent),
             border: Border(left: BorderSide(
-              color: widget.isActive ? _accent : Colors.transparent,
+              color: widget.isActive ? colors.primary : Colors.transparent,
               width: 3,
             )),
           ),
@@ -812,7 +809,7 @@ class _TrackTileState extends State<_TrackTile> {
                 widget.isPlaying ? Icons.volume_up_rounded : widget.icon,
                 size: 16,
                 color: widget.isActive
-                    ? _accent
+                    ? colors.primary
                     : Theme.of(context).colorScheme.onSurface.withAlpha(120),
               ),
               const SizedBox(width: 8),
@@ -824,7 +821,7 @@ class _TrackTileState extends State<_TrackTile> {
                     fontWeight:
                         widget.isActive ? FontWeight.w600 : FontWeight.normal,
                     color: widget.isActive
-                        ? _accent
+                        ? colors.primary
                         : Theme.of(context).colorScheme.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -839,7 +836,7 @@ class _TrackTileState extends State<_TrackTile> {
                     Icons.close_rounded,
                     size: 14,
                     color: _hovered
-                        ? Colors.redAccent
+                        ? colors.accentRed
                         : Theme.of(context).colorScheme.onSurface.withAlpha(60),
                   ),
                 ),

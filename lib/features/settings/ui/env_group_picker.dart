@@ -79,10 +79,10 @@ class _EnvGroupSelectionFieldState extends State<EnvGroupSelectionField> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.key_outlined,
                       size: 16,
-                      color: Color(0xFF34D399),
+                      color: colors.accentGreen,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -251,14 +251,14 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                             height: 18,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: const Color(0x2034D399),
+                              color: colors.accentGreen.withAlpha(32),
                               borderRadius: BorderRadius.circular(99),
                             ),
                             child: Text(
                               '${index + 1}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
-                                color: Color(0xFF34D399),
+                                color: colors.accentGreen,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -312,7 +312,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                                Icon(
                                  Icons.key_outlined,
                                  size: 36,
-                                 color: const Color(0xFF34D399).withValues(alpha: 0.4),
+                                 color: colors.accentGreen.withValues(alpha: 0.4),
                                ),
                                const SizedBox(height: 10),
                                Text(
@@ -340,8 +340,8 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                                  icon: const Icon(Icons.settings, size: 16),
                                  label: const Text('Open Settings'),
                                  style: FilledButton.styleFrom(
-                                   backgroundColor: const Color(0xFF34D399),
-                                   foregroundColor: Colors.black,
+                                   backgroundColor: colors.accentGreen,
+                                   foregroundColor: colors.background,
                                    textStyle: const TextStyle(fontSize: 12),
                                  ),
                                ),
@@ -358,7 +358,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                                 onChanged:
                                     (value) =>
                                         _toggle(group.id, value ?? false),
-                                activeColor: const Color(0xFF34D399),
+                                activeColor: colors.accentGreen,
                                 contentPadding: EdgeInsets.zero,
                                 title: Text(
                                   group.name,

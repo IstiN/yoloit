@@ -115,6 +115,8 @@ class RunConfig extends Equatable {
         const [],
   );
 
+  // Preset run colors are persisted with the config and reused for run badges
+  // outside any widget tree, so they intentionally stay as fixed accent values.
   static RunConfig flutterRunMacos(
     String workspacePath, {
     String group = 'default',

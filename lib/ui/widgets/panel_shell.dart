@@ -76,7 +76,7 @@ class _PanelHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(color: const Color(0xFF32327A), width: 2),
+          top: BorderSide(color: colors.divider, width: 2),
           bottom: BorderSide(color: colors.divider, width: 1),
         ),
       ),

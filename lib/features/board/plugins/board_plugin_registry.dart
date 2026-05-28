@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/checklist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/code_snippet_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/diff_preview_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/files_plugin.dart';
@@ -11,9 +13,8 @@ import 'package:yoloit/features/board/plugins/builtin/kanban_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/run_configs_plugin.dart';
-import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
-import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 
@@ -99,11 +100,14 @@ class _UnknownPanelPlugin extends BoardPanelPlugin {
   IconData get icon => const IconData(0xe5c9, fontFamily: 'MaterialIcons');
 
   @override
-  Widget buildContent(context, panel, renderContext) => Center(
-    child: Text(
-      'Unknown panel type: ${panel.type}',
-      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-      textAlign: TextAlign.center,
-    ),
-  );
+  Widget buildContent(context, panel, renderContext) {
+    final colors = context.appColors;
+    return Center(
+      child: Text(
+        'Unknown panel type: ${panel.type}',
+        style: TextStyle(color: colors.textMuted, fontSize: 12),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
 }

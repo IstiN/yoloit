@@ -13,6 +13,7 @@ import 'package:highlight/languages/sql.dart';
 import 'package:highlight/languages/swift.dart';
 import 'package:highlight/languages/typescript.dart';
 import 'package:highlight/languages/yaml.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -85,8 +86,6 @@ class _CodeSnippetPanelContent extends StatefulWidget {
 }
 
 class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
-  static const Color _accent = Color(0xFF10B981);
-
   late CodeController _controller;
   late String _language;
   bool _copied = false;
@@ -153,6 +152,7 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -161,20 +161,20 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
           height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: _accent.withOpacity(0.08),
+            color: colors.accentGreen.withOpacity(0.08),
             border: Border(
-              bottom: BorderSide(color: _accent.withOpacity(0.15)),
+              bottom: BorderSide(color: colors.accentGreen.withOpacity(0.15)),
             ),
           ),
           child: Row(
             children: [
-              const Icon(Icons.code, size: 14, color: Color(0xFF10B981)),
+              Icon(Icons.code, size: 14, color: colors.accentGreen),
               const SizedBox(width: 6),
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _language,
                   isDense: true,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF10B981)),
+                  style: TextStyle(fontSize: 12, color: colors.accentGreen),
                   items: _kLanguages
                       .map((l) => DropdownMenuItem(value: l, child: Text(l)))
                       .toList(),
@@ -186,7 +186,7 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
                 icon: Icon(
                   _copied ? Icons.check : Icons.copy,
                   size: 14,
-                  color: _copied ? Colors.greenAccent : const Color(0xFF94A3B8),
+                  color: _copied ? colors.accentGreen : colors.textMuted,
                 ),
                 tooltip: _copied ? 'Copied!' : 'Copy code',
                 onPressed: _copy,

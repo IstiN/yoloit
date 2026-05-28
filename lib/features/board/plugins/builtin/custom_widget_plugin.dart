@@ -173,22 +173,35 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     return {
       'isDark': isDark,
       'bg': _hexColor(
-        scheme?.background ?? (isDark ? const Color(0xFF0f172a) : Colors.white),
+        scheme?.background ??
+            (isDark
+                ? const Color(0xFF0F172A)
+                : const Color(0xFFF8FAFC)),
       ),
       'surface': _hexColor(
         scheme?.surface ??
-            (isDark ? const Color(0xFF1e293b) : const Color(0xFFF8FAFC)),
+            (isDark
+                ? const Color(0xFF1E293B)
+                : const Color(0xFFF8FAFC)),
       ),
       'border': _hexColor(
         scheme?.border ??
-            (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            (isDark
+                ? const Color(0xFF334155)
+                : const Color(0xFFE2E8F0)),
       ),
-      'accent': _hexColor(scheme?.primary ?? const Color(0xFF818cf8)),
+      'accent': _hexColor(scheme?.primary ?? const Color(0xFF818CF8)),
       'text': _hexColor(
-        isDark ? const Color(0xFFf1f5f9) : const Color(0xFF1A1A2E),
+        scheme?.textPrimary ??
+            (isDark
+                ? const Color(0xFFF1F5F9)
+                : const Color(0xFF1A1A2E)),
       ),
       'muted': _hexColor(
-        isDark ? const Color(0xFF64748b) : const Color(0xFF94A3B8),
+        scheme?.textSecondary ??
+            (isDark
+                ? const Color(0xFF64748B)
+                : const Color(0xFF94A3B8)),
       ),
     };
   }
@@ -361,18 +374,19 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Color(0xFFF87171), size: 32),
+            Icon(Icons.error_outline, color: colors.accentRed, size: 32),
             const SizedBox(height: 8),
             Text(
               error,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFF87171), fontSize: 13),
+              style: TextStyle(color: colors.accentRed, fontSize: 13),
             ),
             const SizedBox(height: 12),
             TextButton(onPressed: onRetry, child: const Text('Retry')),
@@ -681,6 +695,7 @@ class _EnvGearButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return SizedBox(
       width: 24,
       height: 24,
@@ -692,7 +707,7 @@ class _EnvGearButton extends StatelessWidget {
           Icons.settings_outlined,
           color:
               _hasEnv
-                  ? const Color(0xFF4ade80)
+                  ? colors.accentGreen
                   : Theme.of(
                     context,
                   ).colorScheme.onSurfaceVariant.withAlpha(120),

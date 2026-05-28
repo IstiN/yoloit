@@ -96,7 +96,7 @@ class _AutoUpdateBannerState extends State<AutoUpdateBanner> {
 
     return Material(
       color: isError
-          ? Colors.red.shade800.withAlpha(230)
+          ? colors.statusError.withAlpha(230)
           : colors.accentBlue.withAlpha(230),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -112,14 +112,14 @@ class _AutoUpdateBannerState extends State<AutoUpdateBanner> {
                           ? Icons.error_outline_rounded
                           : Icons.downloading_rounded,
                   size: 14,
-                  color: Colors.white,
+                  color: colors.textPrimary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _label(),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colors.textPrimary,
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                     ),
@@ -133,7 +133,7 @@ class _AutoUpdateBannerState extends State<AutoUpdateBanner> {
                 ] else if (isError) ...[
                   GestureDetector(
                     onTap: widget.onDismiss,
-                    child: const Icon(Icons.close, size: 14, color: Colors.white70),
+                    child: Icon(Icons.close, size: 14, color: colors.textPrimary.withAlpha(180)),
                   ),
                 ],
               ],
@@ -141,9 +141,9 @@ class _AutoUpdateBannerState extends State<AutoUpdateBanner> {
             // Progress / indeterminate bar
             if (widget.phase == AutoUpdatePhase.downloading &&
                 widget.progress != null)
-              _bar(widget.progress),
+              _bar(widget.progress, colors),
             if (widget.phase == AutoUpdatePhase.installing)
-              _bar(null),
+              _bar(null, colors),
           ],
         ),
       ),
@@ -166,15 +166,15 @@ class _AutoUpdateBannerState extends State<AutoUpdateBanner> {
     }
   }
 
-  Widget _bar(double? value) => Padding(
+  Widget _bar(double? value, AppColorScheme colors) => Padding(
         padding: const EdgeInsets.only(top: 4),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(2),
           child: LinearProgressIndicator(
             value: value,
             minHeight: 3,
-            backgroundColor: Colors.white24,
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            backgroundColor: colors.textPrimary.withAlpha(61),
+            valueColor: AlwaysStoppedAnimation<Color>(colors.textPrimary),
           ),
         ),
       );
@@ -186,24 +186,27 @@ class _Btn extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(30),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.white.withAlpha(60)),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-            ),
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: colors.textPrimary.withAlpha(30),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: colors.textPrimary.withAlpha(60)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 

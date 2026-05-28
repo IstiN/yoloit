@@ -102,7 +102,11 @@ class WorkspaceCubit extends Cubit<WorkspaceState> {
 
   final _dirService = WorkspaceDirService.instance;
 
-  /// Default palette for auto-assigning workspace accent colours.
+  /// Default persisted workspace accent palette.
+  ///
+  /// These colors are intentionally hardcoded because workspace accents are
+  /// stored with the model and reused for workspace/icon identity outside any
+  /// widget tree, so they cannot come from `AppColorScheme`.
   static const _kWorkspacePalette = [
     Color(0xFF7C3AED), // violet
     Color(0xFF2563EB), // blue

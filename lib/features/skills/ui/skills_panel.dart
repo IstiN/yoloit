@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/bloc/skills_state.dart';
 import 'package:yoloit/features/skills/models/skill_entry.dart';
@@ -196,9 +195,9 @@ class _StoresSidebar extends StatelessWidget {
             badge: state.installedSkills.length,
             onTap: () => cubit.selectStore('_installed'),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Divider(height: 1, color: Color(0xFF1E1E4A)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Divider(height: 1, color: colors.divider),
           ),
           ...state.config.stores.map((store) => _StoreTile(
                 label: store.name,
@@ -346,7 +345,7 @@ class _SkillsList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.all(12),
       itemCount: skills.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF1E1E4A)),
+      separatorBuilder: (_, __) => Divider(height: 1, color: colors.divider),
       itemBuilder: (context, index) =>
           _SkillCard(skill: skills[index], state: state),
     );
@@ -467,7 +466,7 @@ class _SkillCard extends StatelessWidget {
     showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0F0F2A),
+        backgroundColor: colors.surfaceElevated,
         title: Text('Uninstall Skill',
             style: TextStyle(color: colors.textPrimary, fontSize: 15)),
         content: Text(
@@ -520,7 +519,7 @@ class _SourceBadge extends StatelessWidget {
       margin: const EdgeInsets.only(left: 6),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E4A),
+        color: colors.surfaceHighlight,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -656,7 +655,7 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return AlertDialog(
-      backgroundColor: const Color(0xFF0F0F2A),
+      backgroundColor: colors.surfaceElevated,
       title: Text(
         'Add Custom Store',
         style: TextStyle(color: colors.textPrimary, fontSize: 15),
@@ -688,10 +687,10 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
                   label: Text(_typeLabel(t), style: const TextStyle(fontSize: 11)),
                   selected: _type == t,
                   onSelected: (_) => setState(() => _type = t),
-                  selectedColor: AppColors.primary.withAlpha(60),
-                  backgroundColor: const Color(0xFF161632),
+                  selectedColor: colors.primary.withAlpha(60),
+                  backgroundColor: colors.surfaceHighlight,
                   labelStyle: TextStyle(
-                    color: _type == t ? AppColors.primary : colors.textMuted,
+                    color: _type == t ? colors.primary : colors.textMuted,
                   ),
                 );
               }).toList(),
@@ -730,10 +729,10 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
             hintText: hint,
             hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
             filled: true,
-            fillColor: const Color(0xFF161632),
+            fillColor: colors.surfaceHighlight,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: Color(0xFF1E1E4A)),
+              borderSide: BorderSide(color: colors.divider),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           ),
@@ -797,7 +796,7 @@ class _InstallToRepoDialogState extends State<_InstallToRepoDialog> {
     final paths = _allRepoPaths;
 
     return AlertDialog(
-      backgroundColor: const Color(0xFF0F0F2A),
+      backgroundColor: colors.surfaceElevated,
       title: Text(
         'Install "${widget.skill.name}" to Repo',
         style: TextStyle(color: colors.textPrimary, fontSize: 15),
@@ -831,7 +830,7 @@ class _InstallToRepoDialogState extends State<_InstallToRepoDialog> {
                           style: TextStyle(
                               color: colors.textMuted, fontSize: 10),
                           overflow: TextOverflow.ellipsis),
-                      activeColor: AppColors.primary,
+                      activeColor: colors.primary,
                       dense: true,
                     );
                   }),

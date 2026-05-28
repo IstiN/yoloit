@@ -210,7 +210,7 @@ class _ReviewTabBar extends StatelessWidget {
       height: 36,
       width: double.infinity,
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: const Color(0xFF32327A), width: 1)),
+        border: Border(bottom: BorderSide(color: colors.divider, width: 1)),
       ),
       child: Row(
         children: [
@@ -586,7 +586,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
     final colors = context.appColors;
     showDialog<void>(
       context: context,
-      barrierColor: Colors.black45,
+      barrierColor: colors.textPrimary.withAlpha(70),
       builder: (dialogContext) => AlertDialog(
         backgroundColor: colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

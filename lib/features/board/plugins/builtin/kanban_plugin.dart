@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -53,14 +54,6 @@ class _KanbanContent extends StatefulWidget {
 }
 
 class _KanbanContentState extends State<_KanbanContent> {
-  static const Color _accent = Color(0xFF6366F1);
-  static const Color _bg = Color(0xFF0B0D12);
-  static const Color _colBg = Color(0xFF141821);
-  static const Color _border = Color(0xFF2A3040);
-  static const Color _lightBg = Color(0xFFF8FAFC);
-  static const Color _lightColBg = Color(0xFFFFFFFF);
-  static const Color _lightBorder = Color(0xFFDDE3EE);
-
   static const List<Color> _columnColorPalette = [
     Color(0xFF6366F1), // indigo (default)
     Color(0xFF0EA5E9), // sky
@@ -93,7 +86,7 @@ class _KanbanContentState extends State<_KanbanContent> {
       final v = int.tryParse(hex, radix: 16);
       if (v != null) return Color(v);
     }
-    return _accent;
+    return const Color(0xFF6366F1);
   }
 
   List<_CardData> get _cards =>
@@ -271,14 +264,12 @@ class _KanbanContentState extends State<_KanbanContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final columns = _columns;
     final cards = _cards;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final bg = isLight ? _lightBg : _bg;
-    final border = isLight ? _lightBorder : _border;
 
     return Container(
-      color: bg,
+      color: colors.background,
       child: Column(
         children: [
           // ── Top bar with edit toggle ──
@@ -287,22 +278,22 @@ class _KanbanContentState extends State<_KanbanContent> {
               height: 28,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: border)),
+                border: Border(bottom: BorderSide(color: colors.border)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.tune, size: 12, color: _accent),
+                  Icon(Icons.tune, size: 12, color: colors.primary),
                   const SizedBox(width: 4),
-                  const Text(
+                  Text(
                     'Edit columns',
-                    style: TextStyle(fontSize: 11, color: _accent, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.w600),
                   ),
                   const Spacer(),
                   GestureDetector(
                     onTap: () => setState(() => _editMode = false),
-                    child: const Text(
+                    child: Text(
                       'Done',
-                      style: TextStyle(fontSize: 11, color: _accent, fontWeight: FontWeight.w600),
+                      style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -335,13 +326,13 @@ class _KanbanContentState extends State<_KanbanContent> {
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: border),
+                                  border: Border.all(color: colors.border),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.add,
                                   size: 16,
-                                  color: Color(0xFF6366F1),
+                                  color: colors.primary,
                                 ),
                               ),
                             ),
@@ -377,11 +368,12 @@ class _KanbanContentState extends State<_KanbanContent> {
       onLeave: (_) => setState(() => _dragOverCol = null),
       onMove: (_) => setState(() => _dragOverCol = ci),
       builder: (ctx, candidateData, rejectedData) {
+        final colors = ctx.appColors;
         final color = _colColor(ci);
         final isLight = Theme.of(ctx).brightness == Brightness.light;
-        final colBg = isLight ? _lightColBg : _colBg;
-        final border = isLight ? _lightBorder : _border;
-        final inputBg = isLight ? _lightBg : _bg;
+        final colBg = isLight ? colors.surfaceHighlight : colors.surface;
+        final border = colors.border;
+        final inputBg = isLight ? colors.surfaceHighlight : colors.background;
         return Container(
           width: 180,
           decoration: BoxDecoration(
@@ -429,21 +421,21 @@ class _KanbanContentState extends State<_KanbanContent> {
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(color: _accent),
+                              borderSide: BorderSide(color: colors.primary),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
                               borderSide: BorderSide(
-                                color: _accent.withAlpha(100),
+                                color: colors.primary.withAlpha(100),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(color: _accent),
+                              borderSide: BorderSide(color: colors.primary),
                             ),
                             suffixIcon: IconButton(
                               icon: const Icon(Icons.check, size: 14),
-                              color: _accent,
+                              color: colors.primary,
                               onPressed: () => _addCard(ci),
                             ),
                           ),
@@ -456,10 +448,10 @@ class _KanbanContentState extends State<_KanbanContent> {
                         height: 48,
                         margin: const EdgeInsets.only(top: 4),
                         decoration: BoxDecoration(
-                          color: _accent.withAlpha(15),
+                          color: colors.primary.withAlpha(15),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: _accent.withAlpha(80),
+                            color: colors.primary.withAlpha(80),
                             style: BorderStyle.solid,
                           ),
                         ),
@@ -467,7 +459,7 @@ class _KanbanContentState extends State<_KanbanContent> {
                           child: Icon(
                             Icons.add,
                             size: 16,
-                            color: _accent.withAlpha(150),
+                            color: colors.primary.withAlpha(150),
                           ),
                         ),
                       ),
@@ -482,6 +474,7 @@ class _KanbanContentState extends State<_KanbanContent> {
   }
 
   Widget _buildColumnHeader(int ci, List<String> columns, int cardCount) {
+    final colors = context.appColors;
     final baseColor = _colColor(ci);
     final isLight = Theme.of(context).brightness == Brightness.light;
     final color =
@@ -491,7 +484,7 @@ class _KanbanContentState extends State<_KanbanContent> {
             ? Color.lerp(baseColor, Colors.black, 0.25)!
             : baseColor;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF64748B);
+        Theme.of(context).textTheme.bodySmall?.color ?? colors.textSecondary;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Column(
@@ -655,6 +648,7 @@ class _KanbanContentState extends State<_KanbanContent> {
   }
 
   Widget _buildCard(_CardData card, int ci, int totalCols) {
+    final colors = context.appColors;
     final id = card['id'] as String? ?? '';
     final title = card['title'] as String? ?? '';
 
@@ -666,24 +660,24 @@ class _KanbanContentState extends State<_KanbanContent> {
           width: 168,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: _accent.withAlpha(40),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: _accent.withAlpha(150)),
-            boxShadow: [
-              BoxShadow(
-                color: _accent.withAlpha(60),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+           color: colors.primary.withAlpha(40),
+           borderRadius: BorderRadius.circular(6),
+           border: Border.all(color: colors.primary.withAlpha(150)),
+           boxShadow: [
+             BoxShadow(
+               color: colors.primary.withAlpha(60),
+               blurRadius: 12,
+               offset: const Offset(0, 4),
+             ),
+           ],
           ),
           child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-            ),
+           title,
+           style: TextStyle(
+             fontSize: 12,
+             color: colors.textPrimary,
+             fontWeight: FontWeight.w500,
+           ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -716,14 +710,15 @@ class _CardTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final cardBg = isLight ? const Color(0xFFFFFFFF) : const Color(0xFF1E2433);
-    final border = isLight ? const Color(0xFFDDE3EE) : const Color(0xFF2A3040);
+    final cardBg = isLight ? colors.surfaceHighlight : colors.surfaceElevated;
+    final border = colors.border;
     final textColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
-        const Color(0xFFE2E8F0);
+        colors.textSecondary;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ?? const Color(0xFF4B5563);
+        Theme.of(context).textTheme.bodySmall?.color ?? colors.textSecondary;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 6),

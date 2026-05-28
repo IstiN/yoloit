@@ -1731,7 +1731,7 @@ class _FullLogView extends StatelessWidget {
       final t = _stripAnsi(line.text);
       final Color color;
       if (t.startsWith('\n[Process exited')) {
-        color = const Color(0xFF44446A);
+        color = colors.textMuted;
       } else if (t.startsWith('Reloaded') || t.contains('🔥')) {
         color = colors.accentGreen;
       } else if (line.isError) {

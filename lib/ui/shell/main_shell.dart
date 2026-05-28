@@ -1315,8 +1315,9 @@ class _WinBtnState extends State<_WinBtn> {
     final secondaryColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
+    final colors = context.appColors;
     final hoverColor =
-        widget.isClose ? const Color(0xFFE81123) : mutedColor.withAlpha(40);
+        widget.isClose ? colors.statusError : mutedColor.withAlpha(40);
     return Tooltip(
       message: widget.tooltip,
       child: MouseRegion(
@@ -1331,7 +1332,7 @@ class _WinBtnState extends State<_WinBtn> {
             child: Icon(
               widget.icon,
               size: 14,
-              color: _hovered && widget.isClose ? Colors.white : secondaryColor,
+              color: _hovered && widget.isClose ? colors.textPrimary : secondaryColor,
             ),
           ),
         ),
@@ -1480,11 +1481,11 @@ class _ResourcePanelState extends State<_ResourcePanel> {
 
     final Color memBarColor;
     if (host.usedPercent >= 90) {
-      memBarColor = const Color(0xFFFF4444);
+      memBarColor = colors.statusError;
     } else if (host.usedPercent >= 70) {
-      memBarColor = const Color(0xFFFF8C00);
+      memBarColor = colors.statusWarning;
     } else {
-      memBarColor = const Color(0xFF7C3AED);
+      memBarColor = colors.primary;
     }
 
     // Separate registered sessions from agent-scanned ones.
@@ -1516,7 +1517,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: colors.border),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withAlpha(120), blurRadius: 16),
+                  BoxShadow(color: colors.textPrimary.withAlpha(120), blurRadius: 16),
                 ],
               ),
               child: Column(

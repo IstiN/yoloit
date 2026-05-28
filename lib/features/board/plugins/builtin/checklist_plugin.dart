@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -51,8 +52,6 @@ class _ChecklistContent extends StatefulWidget {
 }
 
 class _ChecklistContentState extends State<_ChecklistContent> {
-  static const Color _accent = Color(0xFFF59E0B);
-
   final TextEditingController _addCtrl = TextEditingController();
 
   @override
@@ -104,6 +103,7 @@ class _ChecklistContentState extends State<_ChecklistContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final items = _items;
     final done = items.where((i) => i['done'] == true).length;
     final total = items.length;
@@ -123,24 +123,24 @@ class _ChecklistContentState extends State<_ChecklistContent> {
                 children: [
                   Text(
                     '$done/$total done',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFFF59E0B),
+                      color: colors.accentOrange,
                     ),
                   ),
                   if (total > 0)
                     Text(
                       '${(progress * 100).round()}%',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                      style: TextStyle(fontSize: 11, color: colors.textMuted),
                     ),
                 ],
               ),
               const SizedBox(height: 4),
               LinearProgressIndicator(
                 value: progress,
-                backgroundColor: _accent.withOpacity(0.15),
-                valueColor: const AlwaysStoppedAnimation(_accent),
+                backgroundColor: colors.accentOrange.withOpacity(0.15),
+                valueColor: AlwaysStoppedAnimation(colors.accentOrange),
                 minHeight: 4,
                 borderRadius: BorderRadius.circular(4),
               ),
@@ -190,7 +190,7 @@ class _ChecklistContentState extends State<_ChecklistContent> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFFF59E0B), width: 2),
+                      borderSide: BorderSide(color: colors.accentOrange, width: 2),
                     ),
                   ),
                   onSubmitted: (_) => _addItem(),
@@ -201,8 +201,8 @@ class _ChecklistContentState extends State<_ChecklistContent> {
                 onPressed: _addItem,
                 icon: const Icon(Icons.add, size: 16),
                 style: IconButton.styleFrom(
-                  backgroundColor: _accent,
-                  foregroundColor: Colors.white,
+                  backgroundColor: colors.accentOrange,
+                  foregroundColor: colors.textPrimary,
                   minimumSize: const Size(34, 34),
                   padding: EdgeInsets.zero,
                 ),
@@ -237,6 +237,7 @@ class _ChecklistItemState extends State<_ChecklistItem> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -256,7 +257,7 @@ class _ChecklistItemState extends State<_ChecklistItem> {
                 value: widget.isDone,
                 onChanged: (_) => widget.onToggle(),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                activeColor: const Color(0xFFF59E0B),
+                activeColor: colors.accentOrange,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -269,9 +270,7 @@ class _ChecklistItemState extends State<_ChecklistItem> {
                 style: TextStyle(
                   fontSize: 13,
                   decoration: widget.isDone ? TextDecoration.lineThrough : null,
-                  color: widget.isDone
-                      ? const Color(0xFF64748B)
-                      : null,
+                  color: widget.isDone ? colors.textSecondary : null,
                 ),
               ),
             ),
@@ -281,7 +280,7 @@ class _ChecklistItemState extends State<_ChecklistItem> {
                 height: 22,
                 child: IconButton(
                   padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.close, size: 13, color: Color(0xFF94A3B8)),
+                  icon: Icon(Icons.close, size: 13, color: colors.textMuted),
                   onPressed: widget.onDelete,
                 ),
               ),

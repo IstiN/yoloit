@@ -62,7 +62,8 @@ class _SlashCommand {
 }
 
 /// Small grey provider badge used in model picker lists.
-Widget _buildProviderBadge(String providerName) {
+Widget _buildProviderBadge(BuildContext context, String providerName) {
+  final colors = context.appColors;
   final label = switch (providerName.toLowerCase()) {
     'openrouter' => 'OR',
     'opencode' => 'OC',
@@ -81,18 +82,18 @@ Widget _buildProviderBadge(String providerName) {
     padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(3),
-      color: const Color(0xFF34D399).withOpacity(0.08),
+      color: colors.accentGreen.withOpacity(0.08),
       border: Border.all(
-        color: const Color(0xFF34D399).withOpacity(0.2),
+        color: colors.accentGreen.withOpacity(0.2),
         width: 0.5,
       ),
     ),
     child: Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 8,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF9CA3AF),
+        color: colors.textMuted,
         letterSpacing: 0.3,
       ),
     ),
@@ -1660,7 +1661,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               child: Icon(
                 Icons.rocket_launch,
                 size: 12,
-                color: _config.autopilot ? const Color(0xFF34D399) : muted,
+                color: _config.autopilot ? colors.statusActive : muted,
               ),
             ),
           ),
@@ -1675,13 +1676,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 decoration: BoxDecoration(
                   color:
                       _config.reasoningEffort != null
-                          ? const Color(0x20F59E0B)
-                          : const Color(0x151E293B),
+                          ? colors.statusWarning.withAlpha(32)
+                          : colors.surfaceHighlight.withAlpha(21),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
                     color:
                         _config.reasoningEffort != null
-                            ? const Color(0x80F59E0B)
+                            ? colors.statusWarning.withAlpha(128)
                             : colors.border,
                     width: 0.6,
                   ),
@@ -1693,7 +1694,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     fontWeight: FontWeight.w700,
                     color:
                         _config.reasoningEffort != null
-                            ? const Color(0xFFF59E0B)
+                            ? colors.statusWarning
                             : muted,
                   ),
                 ),
@@ -1710,14 +1711,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ),
           ],
           if (_isProcessing)
-            const Padding(
-              padding: EdgeInsets.only(left: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
               child: SizedBox(
                 width: 10,
                 height: 10,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.2,
-                  color: Color(0xFF34D399),
+                  color: colors.statusActive,
                 ),
               ),
             ),
@@ -2103,7 +2104,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   (tool.arguments['description'] as String?)?.trim() ??
                   (tool.arguments['name'] as String?)?.trim();
               final color =
-                  isAgent ? const Color(0xFF818CF8) : const Color(0xFFFBBF24);
+                  isAgent ? context.appColors.primaryLight : context.appColors.accentOrange;
               final subAgent = isAgent ? _subAgents[tool.toolCallId] : null;
               final panelId = isAgent ? _subAgentPanels[tool.toolCallId] : null;
 
@@ -2932,8 +2933,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   /// Small grey provider badge shown next to model name in pickers.
-  static Widget _providerBadge(String providerName) {
-    return _buildProviderBadge(providerName);
+  static Widget _providerBadge(BuildContext context, String providerName) {
+    return _buildProviderBadge(context, providerName);
   }
 
   static const _slashCommands = [
@@ -3216,7 +3217,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     size: 14,
                     color: item.value
                         ? colors.terminalPrompt
-                        : Colors.white.withValues(alpha: 0.4),
+                        : colors.textPrimary.withValues(alpha: 0.4),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -3225,8 +3226,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                       style: TextStyle(
                         fontSize: 12,
                         color: item.value
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.5),
+                            ? colors.textPrimary
+                            : colors.textPrimary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -3237,7 +3238,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     size: 16,
                     color: item.value
                         ? colors.terminalPrompt
-                        : Colors.white.withValues(alpha: 0.3),
+                        : colors.textPrimary.withValues(alpha: 0.3),
                   ),
                 ],
               ),
@@ -3308,10 +3309,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   child: Row(
                     children: [
                       if (isActive)
-                        const Icon(
+                        Icon(
                           Icons.check,
                           size: 14,
-                          color: Color(0xFF34D399),
+                          color: colors.statusActive,
                         )
                       else
                         const SizedBox(width: 14),
@@ -3320,7 +3321,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                         child: Row(
                           children: [
                             if (m.providerGroup != null) ...[
-                              _providerBadge(m.providerGroup!),
+                              _providerBadge(context, m.providerGroup!),
                               const SizedBox(width: 4),
                             ],
                             Flexible(
@@ -3331,7 +3332,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                                   fontSize: 12,
                                   color:
                                       isActive
-                                          ? const Color(0xFF34D399)
+                                          ? colors.statusActive
                                           : Theme.of(
                                             context,
                                           ).colorScheme.onSurface,
@@ -3347,7 +3348,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
-                            color: const Color(0xFF34D399),
+                            color: colors.statusActive,
                           ),
                         )
                       else if (m.inputCostPerMillion != null)
@@ -3357,7 +3358,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                             fontSize: 9,
                             color:
                                 m.inputCostPerMillion! > 10
-                                    ? const Color(0xFFF87171)
+                                    ? colors.statusError
                                     : Theme.of(
                                           context,
                                         ).textTheme.bodySmall?.color ??
@@ -3371,9 +3372,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                             fontSize: 10,
                             color:
                                 m.costMultiplier == 0
-                                    ? const Color(0xFF34D399)
+                                    ? colors.statusActive
                                     : m.costMultiplier! > 3
-                                    ? const Color(0xFFF87171)
+                                    ? colors.statusError
                                     : Theme.of(
                                           context,
                                         ).textTheme.bodySmall?.color ??
@@ -3519,7 +3520,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                     border:
                         isCurrent
                             ? Border.all(
-                              color: const Color(0xFF34D399),
+                              color: colors.statusActive,
                               width: 0.5,
                             )
                             : null,
@@ -3535,7 +3536,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                         size: 14,
                         color:
                             isCurrent
-                                ? const Color(0xFF34D399)
+                                ? colors.statusActive
                                 : Theme.of(
                                       context,
                                     ).textTheme.bodySmall?.color ??
@@ -3555,7 +3556,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                                 fontWeight: FontWeight.w500,
                                 color:
                                     isCurrent
-                                        ? const Color(0xFF34D399)
+                                        ? colors.statusActive
                                         : Theme.of(
                                           context,
                                         ).colorScheme.onSurface,
@@ -3590,7 +3591,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                       if (!isCurrent && widget.onRestore != null)
                         _actionButton(
                           icon: Icons.restore,
-                          color: const Color(0xFF60A5FA),
+                          color: colors.accentBlue,
                           tooltip: 'Restore',
                           onTap: () async {
                             final msgs = await ChatSessionHistory.instance
@@ -3603,7 +3604,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                       // Delete button
                       _actionButton(
                         icon: Icons.delete_outline,
-                        color: const Color(0xFFF87171),
+                        color: colors.statusError,
                         tooltip: 'Delete',
                         onTap: () async {
                           await ChatSessionHistory.instance.delete(e.id);
@@ -4030,10 +4031,10 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.folder_outlined,
                           size: 16,
-                          color: Color(0xFF34D399),
+                          color: context.appColors.statusActive,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -4107,7 +4108,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                     if (m != null && m.providerGroup != null) {
                       return Padding(
                         padding: const EdgeInsets.only(right: 4),
-                        child: _buildProviderBadge(m.providerGroup!),
+                        child: _buildProviderBadge(context, m.providerGroup!),
                       );
                     }
                     return const SizedBox.shrink();
@@ -4144,8 +4145,8 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                     ? null
                     : _start,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF34D399),
-              foregroundColor: const Color(0xFF0F172A),
+              backgroundColor: context.appColors.statusActive,
+              foregroundColor: context.appColors.background,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -4306,9 +4307,12 @@ class _UserBubbleState extends State<_UserBubble> {
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                  colors: [
+                    context.appColors.accentBlue,
+                    context.appColors.primary,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -4336,9 +4340,9 @@ class _UserBubbleState extends State<_UserBubble> {
                     SelectionArea(
                       child: Text(
                         resolved.text,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Colors.white,
+                          color: context.appColors.textPrimary,
                           height: 1.4,
                         ),
                       ),
@@ -4365,7 +4369,7 @@ class _BubbleMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final color =
         light
-            ? Colors.white.withOpacity(0.6)
+            ? context.appColors.textPrimary.withOpacity(0.6)
             : (Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey);
     return Padding(
       padding: const EdgeInsets.only(top: 4),
@@ -4460,16 +4464,17 @@ class _AttachmentPreviewSection extends StatelessWidget {
   }
 
   Widget _buildFileChips(BuildContext context, List<String> filePaths) {
+    final colors = context.appColors;
     final chipBg =
         onLight
             ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : Colors.white.withOpacity(0.15);
+            : colors.textPrimary.withOpacity(0.15);
     final textColor =
-        onLight ? Theme.of(context).colorScheme.onSurface : Colors.white;
+        onLight ? Theme.of(context).colorScheme.onSurface : colors.textPrimary;
     final iconColor =
         onLight
             ? Theme.of(context).colorScheme.primary
-            : const Color(0xFFBFDBFE);
+            : colors.accentBlue;
 
     return Wrap(
       spacing: 4,
@@ -4498,7 +4503,7 @@ class _AttachmentPreviewSection extends StatelessWidget {
                             ? Theme.of(
                               context,
                             ).colorScheme.outline.withOpacity(0.3)
-                            : Colors.white24,
+                            : colors.textPrimary.withOpacity(0.24),
                   ),
                 ),
                 child: Row(
@@ -4573,13 +4578,13 @@ class _ImageThumbnail extends StatelessWidget {
                       width: 80,
                       height: 60,
                       decoration: BoxDecoration(
-                        color: Colors.black12,
+                        color: context.appColors.background.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.broken_image_outlined,
                         size: 24,
-                        color: Colors.white38,
+                        color: context.appColors.textPrimary.withOpacity(0.38),
                       ),
                     ),
               ),
@@ -4588,7 +4593,10 @@ class _ImageThumbnail extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             name,
-            style: const TextStyle(fontSize: 9, color: Color(0xFFBFDBFE)),
+            style: TextStyle(
+              fontSize: 9,
+              color: context.appColors.accentBlue,
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -4671,26 +4679,26 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0x15FBBF24),
+                                color: colors.accentOrange.withAlpha(21),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: const Color(0x30FBBF24),
+                                  color: colors.accentOrange.withAlpha(48),
                                 ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.terminal_rounded,
                                     size: 10,
-                                    color: Color(0xFFFBBF24),
+                                    color: colors.accentOrange,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     tc.toolName,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 10,
-                                      color: Color(0xFFFBBF24),
+                                      color: colors.accentOrange,
                                     ),
                                   ),
                                 ],
@@ -4922,6 +4930,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final status = _ToolExecutionStatus.from(
+      colors,
       success: widget.success,
       content: widget.content,
     );
@@ -5035,10 +5044,10 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                       message: 'View agent log',
                       child: InkWell(
                         onTap: widget.onOpenAgentPanel,
-                        child: const Icon(
+                        child: Icon(
                           Icons.smart_toy_outlined,
                           size: 14,
-                          color: Color(0xFF818CF8),
+                          color: colors.primaryLight,
                         ),
                       ),
                     ),
@@ -5128,7 +5137,8 @@ class _ToolExecutionStatus {
   final Color tint;
   final bool isRunning;
 
-  static _ToolExecutionStatus from({
+  static _ToolExecutionStatus from(
+    AppColorScheme colors, {
     required bool? success,
     required String content,
   }) {
@@ -5140,20 +5150,20 @@ class _ToolExecutionStatus {
               exitCode == 0 ? Icons.check_circle_rounded : Icons.error_rounded,
           label: exitCode == 0 ? 'Done $exitCode' : 'Failed $exitCode',
           tint:
-              exitCode == 0 ? const Color(0xFF34D399) : const Color(0xFFF87171),
+              exitCode == 0 ? colors.statusActive : colors.statusError,
         );
       }
       if (content.trim().isNotEmpty) {
-        return const _ToolExecutionStatus(
+        return _ToolExecutionStatus(
           icon: Icons.check_circle_rounded,
           label: 'Done',
-          tint: Color(0xFF34D399),
+          tint: colors.statusActive,
         );
       }
-      return const _ToolExecutionStatus(
+      return _ToolExecutionStatus(
         icon: Icons.pending_outlined,
         label: 'Running',
-        tint: Color(0xFFFBBF24),
+        tint: colors.statusWarning,
         isRunning: true,
       );
     }
@@ -5161,13 +5171,13 @@ class _ToolExecutionStatus {
       return _ToolExecutionStatus(
         icon: Icons.check_circle_rounded,
         label: exitCode == null ? 'Done' : 'Done $exitCode',
-        tint: const Color(0xFF34D399),
+        tint: colors.statusActive,
       );
     }
     return _ToolExecutionStatus(
       icon: Icons.error_rounded,
       label: exitCode == null ? 'Failed' : 'Failed $exitCode',
-      tint: const Color(0xFFF87171),
+      tint: colors.statusError,
     );
   }
 }
@@ -5204,23 +5214,27 @@ class _SystemBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0x15F87171),
+            color: colors.statusError.withAlpha(21),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('✕ ', style: TextStyle(fontSize: 12, color: Color(0xFFF87171))),
+              Text(
+                '✕ ',
+                style: TextStyle(fontSize: 12, color: colors.statusError),
+              ),
               Flexible(
                 child: SelectableText(
                   content,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFFF87171)),
+                  style: TextStyle(fontSize: 12, color: colors.statusError),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -5244,32 +5258,33 @@ class _AskUserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0x15818CF8),
+          color: colors.primaryLight.withAlpha(21),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0x40818CF8)),
+          border: Border.all(color: colors.primaryLight.withAlpha(64)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.help_outline,
                   size: 16,
-                  color: Color(0xFF818CF8),
+                  color: colors.primaryLight,
                 ),
                 const SizedBox(width: 6),
-                const Text(
+                Text(
                   'Agent asks:',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF818CF8),
+                    color: colors.primaryLight,
                   ),
                 ),
               ],
@@ -5293,8 +5308,8 @@ class _AskUserCard extends StatelessWidget {
                           (choice) => OutlinedButton(
                             onPressed: () => onChoice(choice),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF818CF8),
-                              side: const BorderSide(color: Color(0xFF818CF8)),
+                              foregroundColor: colors.primaryLight,
+                              side: BorderSide(color: colors.primaryLight),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                                 vertical: 6,
@@ -5461,6 +5476,7 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final colorScheme = Theme.of(context).colorScheme;
     final surfaceColor = Theme.of(context).dialogBackgroundColor;
 
@@ -5540,16 +5556,16 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
                               child: Row(
                                 children: [
                                   if (isSelected)
-                                    const Icon(
+                                    Icon(
                                       Icons.check,
                                       size: 14,
-                                      color: Color(0xFF34D399),
+                                      color: colors.statusActive,
                                     )
                                   else
                                     const SizedBox(width: 14),
                                   const SizedBox(width: 6),
                                   if (m.providerGroup != null) ...[
-                                    _buildProviderBadge(m.providerGroup!),
+                                    _buildProviderBadge(context, m.providerGroup!),
                                     const SizedBox(width: 4),
                                   ],
                                   Expanded(
@@ -5560,7 +5576,7 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
                                         fontSize: 12,
                                         color:
                                             isSelected
-                                                ? const Color(0xFF34D399)
+                                                ? colors.statusActive
                                                 : colorScheme.onSurface,
                                       ),
                                     ),
@@ -5571,7 +5587,7 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
                                       style: TextStyle(
                                         fontSize: 9,
                                         fontWeight: FontWeight.bold,
-                                        color: const Color(0xFF34D399),
+                                        color: colors.statusActive,
                                       ),
                                     )
                                   else if (m.inputCostPerMillion != null)
@@ -5581,7 +5597,7 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
                                         fontSize: 9,
                                         color:
                                             m.inputCostPerMillion! > 10
-                                                ? const Color(0xFFF87171)
+                                                ? colors.statusError
                                                 : colorScheme.onSurface
                                                     .withOpacity(0.6),
                                       ),
@@ -5593,9 +5609,9 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
                                         fontSize: 10,
                                         color:
                                             m.costMultiplier == 0
-                                                ? const Color(0xFF34D399)
+                                                ? colors.statusActive
                                                 : m.costMultiplier! > 3
-                                                ? const Color(0xFFF87171)
+                                                ? colors.statusError
                                                 : colorScheme.onSurface
                                                     .withOpacity(0.6),
                                       ),

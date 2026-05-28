@@ -744,6 +744,7 @@ class _TabBar extends StatelessWidget {
     context.read<MindMapCubit>().openFileAsPanel(
       id: nodeId,
       filePath: tab.filePath,
+      connectorColor: context.appColors.accentBlue.withValues(alpha: 112 / 255),
     );
   }
 }
@@ -929,7 +930,10 @@ class _TabCloseButtonState extends State<_TabCloseButton> {
           width: 16,
           height: 16,
           decoration: BoxDecoration(
-            color: _hovering ? Colors.white.withAlpha(30) : Colors.transparent,
+            color:
+                _hovering
+                    ? context.appColors.textPrimary.withAlpha(30)
+                    : Colors.transparent,
             borderRadius: BorderRadius.circular(3),
           ),
           child: Icon(
@@ -961,7 +965,7 @@ class _ErrorView extends StatelessWidget {
       child: Center(
         child: Text(
           message,
-          style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+          style: TextStyle(color: colors.statusError, fontSize: 12),
           textAlign: TextAlign.center,
         ),
       ),
@@ -1440,7 +1444,7 @@ class _EditorBodyState extends State<_EditorBody> {
     final inputCtrl = TextEditingController();
     await showDialog<void>(
       context: ctx,
-      barrierColor: Colors.black54,
+      barrierColor: ctx.appColors.background.withAlpha(138),
       builder: (dctx) {
         final onSurface = Theme.of(dctx).colorScheme.onSurface;
         final mutedColor = onSurface.withAlpha(120);
@@ -1615,7 +1619,9 @@ class _EditorBodyState extends State<_EditorBody> {
                                 child: Stack(
                                   children: [
                                     CodeTheme(
-                                      data: CodeThemeData(styles: _darkTheme),
+                                      data: CodeThemeData(
+                                        styles: _buildDarkTheme(colors),
+                                      ),
                                       child: CodeField(
                                         controller: widget.codeController,
                                         expands: true,
@@ -1682,50 +1688,56 @@ class _EditorBodyState extends State<_EditorBody> {
     );
   }
 
-  static const Map<String, TextStyle> _darkTheme = {
+  static Map<String, TextStyle> _buildDarkTheme(AppColorScheme colors) => {
     'root': TextStyle(
-      color: Color(0xFFABB2BF),
+      color: colors.textPrimary,
       backgroundColor: Colors.transparent,
     ),
-    'comment': TextStyle(color: Color(0xFF5C6370), fontStyle: FontStyle.italic),
-    'keyword': TextStyle(color: Color(0xFFC678DD)),
-    'built_in': TextStyle(color: Color(0xFFE5C07B)),
-    'type': TextStyle(color: Color(0xFFE5C07B)),
-    'literal': TextStyle(color: Color(0xFF56B6C2)),
-    'number': TextStyle(color: Color(0xFFD19A66)),
-    'regexp': TextStyle(color: Color(0xFF98C379)),
-    'string': TextStyle(color: Color(0xFF98C379)),
-    'subst': TextStyle(color: Color(0xFFABB2BF)),
-    'symbol': TextStyle(color: Color(0xFF61AFEF)),
-    'class': TextStyle(color: Color(0xFFE5C07B)),
-    'function': TextStyle(color: Color(0xFF61AFEF)),
-    'title': TextStyle(color: Color(0xFF61AFEF)),
-    'params': TextStyle(color: Color(0xFFABB2BF)),
-    'formula': TextStyle(color: Color(0xFF98C379)),
-    'comment-doc': TextStyle(
-      color: Color(0xFF5C6370),
+    'comment': TextStyle(
+      color: colors.textMuted,
       fontStyle: FontStyle.italic,
     ),
-    'meta': TextStyle(color: Color(0xFF56B6C2)),
-    'tag': TextStyle(color: Color(0xFFE06C75)),
-    'name': TextStyle(color: Color(0xFFE06C75)),
-    'attr': TextStyle(color: Color(0xFFD19A66)),
-    'attribute': TextStyle(color: Color(0xFFD19A66)),
-    'variable': TextStyle(color: Color(0xFFE06C75)),
-    'bullet': TextStyle(color: Color(0xFF61AFEF)),
-    'code': TextStyle(color: Color(0xFF98C379)),
-    'emphasis': TextStyle(fontStyle: FontStyle.italic),
-    'strong': TextStyle(fontWeight: FontWeight.bold),
+    'keyword': TextStyle(color: colors.primaryLight),
+    'built_in': TextStyle(color: colors.accentOrange),
+    'type': TextStyle(color: colors.accentOrange),
+    'literal': TextStyle(color: colors.accentBlue),
+    'number': TextStyle(color: colors.accentOrange),
+    'regexp': TextStyle(color: colors.accentGreen),
+    'string': TextStyle(color: colors.accentGreen),
+    'subst': TextStyle(color: colors.textPrimary),
+    'symbol': TextStyle(color: colors.accentBlue),
+    'class': TextStyle(color: colors.accentOrange),
+    'function': TextStyle(color: colors.accentBlue),
+    'title': TextStyle(color: colors.accentBlue),
+    'params': TextStyle(color: colors.textPrimary),
+    'formula': TextStyle(color: colors.accentGreen),
+    'comment-doc': TextStyle(
+      color: colors.textMuted,
+      fontStyle: FontStyle.italic,
+    ),
+    'meta': TextStyle(color: colors.accentBlue),
+    'tag': TextStyle(color: colors.accentRed),
+    'name': TextStyle(color: colors.accentRed),
+    'attr': TextStyle(color: colors.accentOrange),
+    'attribute': TextStyle(color: colors.accentOrange),
+    'variable': TextStyle(color: colors.accentRed),
+    'bullet': TextStyle(color: colors.accentBlue),
+    'code': TextStyle(color: colors.accentGreen),
+    'emphasis': const TextStyle(fontStyle: FontStyle.italic),
+    'strong': const TextStyle(fontWeight: FontWeight.bold),
     'link': TextStyle(
-      color: Color(0xFF56B6C2),
+      color: colors.accentBlue,
       decoration: TextDecoration.underline,
     ),
-    'section': TextStyle(color: Color(0xFFE06C75), fontWeight: FontWeight.bold),
-    'selector-tag': TextStyle(color: Color(0xFFE06C75)),
-    'selector-id': TextStyle(color: Color(0xFF61AFEF)),
-    'selector-class': TextStyle(color: Color(0xFFD19A66)),
-    'addition': TextStyle(color: Color(0xFF98C379)),
-    'deletion': TextStyle(color: Color(0xFFE06C75)),
+    'section': TextStyle(
+      color: colors.accentRed,
+      fontWeight: FontWeight.bold,
+    ),
+    'selector-tag': TextStyle(color: colors.accentRed),
+    'selector-id': TextStyle(color: colors.accentBlue),
+    'selector-class': TextStyle(color: colors.accentOrange),
+    'addition': TextStyle(color: colors.diffAddText),
+    'deletion': TextStyle(color: colors.diffRemoveText),
   };
 }
 
@@ -1746,6 +1758,7 @@ class _GitGutterPainter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return LayoutBuilder(
       builder:
           (_, constraints) => CustomPaint(
@@ -1754,6 +1767,8 @@ class _GitGutterPainter extends StatelessWidget {
               markers: markers,
               lineHeight: lineHeight,
               scrollOffset: scrollOffset,
+              addedColor: colors.diffAddText,
+              removedColor: colors.diffRemoveText,
             ),
           ),
     );
@@ -1765,19 +1780,20 @@ class _GutterPaint extends CustomPainter {
     required this.markers,
     required this.lineHeight,
     required this.scrollOffset,
+    required this.addedColor,
+    required this.removedColor,
   });
 
   final Map<int, _GutterMarkerType> markers;
   final double lineHeight;
   final double scrollOffset;
-
-  static const _added = Color(0xFF00FF9F); // neon green
-  static const _removed = Color(0xFFFF4F6A); // neon red
+  final Color addedColor;
+  final Color removedColor;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final addedPaint = Paint()..color = _added;
-    final removedPaint = Paint()..color = _removed;
+    final addedPaint = Paint()..color = addedColor;
+    final removedPaint = Paint()..color = removedColor;
 
     for (final entry in markers.entries) {
       final lineIndex = entry.key - 1; // 0-indexed
@@ -2000,9 +2016,9 @@ class _FindBar extends StatelessWidget {
                   ),
                 ),
               if (hasQuery && matchCount == 0)
-                const Text(
+                Text(
                   'No results',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 10),
+                  style: TextStyle(color: colors.statusError, fontSize: 10),
                 ),
               const SizedBox(width: 4),
               _FBBtn(
@@ -2225,7 +2241,7 @@ class _SBar extends StatelessWidget {
       width: 1,
       height: 12,
       margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: const Color(0xFF2A2A4E),
+      color: context.appColors.border,
     );
   }
 }
@@ -2413,8 +2429,8 @@ class _SymbolOutline extends StatelessWidget {
                                   size: 11,
                                   color:
                                       sym.isClass
-                                          ? const Color(0xFFE5C07B)
-                                          : const Color(0xFF61AFEF),
+                                          ? context.appColors.accentOrange
+                                          : context.appColors.accentBlue,
                                 ),
                                 const SizedBox(width: 5),
                                 Expanded(

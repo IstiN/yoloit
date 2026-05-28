@@ -520,7 +520,10 @@ class _WebNodeState extends State<_WebNode> {
                     width: 22,
                     height: 22,
                     child: CustomPaint(
-                      painter: _LCornerPainter(hovered: _hovered),
+                      painter: _LCornerPainter(
+                        hovered: _hovered,
+                        colors: context.appColors,
+                      ),
                     ),
                   ),
                 ),
@@ -552,7 +555,11 @@ class _WebNodeState extends State<_WebNode> {
                     width: 22,
                     height: 22,
                     child: CustomPaint(
-                      painter: _LCornerPainter(hovered: _hovered, flipX: true),
+                      painter: _LCornerPainter(
+                        hovered: _hovered,
+                        colors: context.appColors,
+                        flipX: true,
+                      ),
                     ),
                   ),
                 ),
@@ -570,13 +577,13 @@ class _WebNodeState extends State<_WebNode> {
                     width: 18,
                     height: 18,
                     decoration: BoxDecoration(
-                      color: const Color(0xAAFF4F6A),
+                      color: context.appColors.accentRed.withAlpha(170),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.close,
                       size: 10,
-                      color: Colors.white,
+                      color: context.appColors.textPrimary,
                     ),
                   ),
                 ),
@@ -665,7 +672,12 @@ class _MobileQuickActions extends StatelessWidget {
         color: colors.surface,
         border: Border.all(color: colors.border),
         borderRadius: BorderRadius.circular(8),
-        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(
+            color: colors.textPrimary.withAlpha(102),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -704,12 +716,12 @@ class _QBtn extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
           color: accent
-              ? const Color(0x33FF4F6A)
+              ? colors.accentRed.withAlpha(51)
               : colors.surfaceElevated,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: accent
-                ? const Color(0x80FF4F6A)
+                ? colors.accentRed.withAlpha(128)
                 : colors.border,
           ),
         ),
@@ -720,7 +732,7 @@ class _QBtn extends StatelessWidget {
               icon,
               size: 16,
               color: accent
-                  ? const Color(0xFFFF7A8A)
+                  ? colors.accentRedDim
                   : Theme.of(context).colorScheme.onSurface,
             ),
             if (label.isNotEmpty) ...[
@@ -730,7 +742,7 @@ class _QBtn extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 9,
                   color: accent
-                      ? const Color(0xFFFF7A8A)
+                      ? colors.accentRedDim
                       : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
@@ -755,7 +767,9 @@ class _DragHandle extends StatelessWidget {
       child: Container(
         height: 20,
         decoration: BoxDecoration(
-          color: hovered ? const Color(0x30FFFFFF) : const Color(0x14FFFFFF),
+          color: hovered
+              ? context.appColors.textPrimary.withAlpha(48)
+              : context.appColors.textPrimary.withAlpha(20),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
         ),
         child: Center(
@@ -769,8 +783,8 @@ class _DragHandle extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
                   color: hovered
-                      ? const Color(0x80FFFFFF)
-                      : const Color(0x40FFFFFF),
+                      ? context.appColors.textPrimary.withAlpha(128)
+                      : context.appColors.textPrimary.withAlpha(64),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -811,7 +825,7 @@ class _ResizeEdge extends StatelessWidget {
               width: axis == Axis.vertical ? 3 : double.infinity,
               height: axis == Axis.vertical ? double.infinity : 3,
               decoration: BoxDecoration(
-                color: const Color(0x6060A5FA),
+                color: context.appColors.accentBlue.withAlpha(96),
                 borderRadius: BorderRadius.circular(1.5),
               ),
             ),
@@ -825,14 +839,21 @@ class _ResizeEdge extends StatelessWidget {
 // ── L-Corner painter ───────────────────────────────────────────────────────
 
 class _LCornerPainter extends CustomPainter {
-  const _LCornerPainter({required this.hovered, this.flipX = false});
+  const _LCornerPainter({
+    required this.hovered,
+    required this.colors,
+    this.flipX = false,
+  });
   final bool hovered;
+  final AppColorScheme colors;
   final bool flipX;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = hovered ? const Color(0xCC60A5FA) : const Color(0x4060A5FA)
+      ..color = hovered
+          ? colors.accentBlue.withAlpha(204)
+          : colors.accentBlue.withAlpha(64)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round;
@@ -905,7 +926,12 @@ class _WebToolbar extends StatelessWidget {
         color: colors.surface,
         border: Border.all(color: colors.border),
         borderRadius: BorderRadius.circular(8),
-        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(
+            color: colors.textPrimary.withAlpha(102),
+            blurRadius: 10,
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1030,7 +1056,12 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                     color: ctx.appColors.surface,
                     border: Border.all(color: ctx.appColors.border),
                     borderRadius: BorderRadius.circular(8),
-                    boxShadow: const [BoxShadow(color: Color(0x88000000), blurRadius: 16)],
+                    boxShadow: [
+                      BoxShadow(
+                        color: ctx.appColors.textPrimary.withAlpha(136),
+                        blurRadius: 16,
+                      ),
+                    ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1041,17 +1072,21 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                           widget.onViewSave();
                           _close();
                         },
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           child: Row(
                             children: [
-                              Icon(Icons.add, size: 13, color: Color(0xFF60A5FA)),
-                              SizedBox(width: 6),
+                              Icon(
+                                Icons.add,
+                                size: 13,
+                                color: ctx.appColors.accentBlue,
+                              ),
+                              const SizedBox(width: 6),
                               Text(
                                 'Save current view',
                                 style: TextStyle(
                                   fontSize: 10.5,
-                                  color: Color(0xFF60A5FA),
+                                  color: ctx.appColors.accentBlue,
                                 ),
                               ),
                             ],
@@ -1077,7 +1112,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                                   Icons.bookmark,
                                   size: 11,
                                   color: widget.activeViewName == name
-                                      ? const Color(0xFF60A5FA)
+                                      ? ctx.appColors.accentBlue
                                       : Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
                                 ),
                                 const SizedBox(width: 6),
@@ -1142,16 +1177,16 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                   Icons.bookmark_border,
                   size: 16,
                   color: _open
-                      ? const Color(0xFF60A5FA)
+                      ? context.appColors.accentBlue
                       : Theme.of(context).colorScheme.onSurface,
                 ),
                 if (widget.savedViews.isNotEmpty) ...[
                   const SizedBox(width: 2),
                   Text(
                     '${widget.savedViews.length}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9,
-                      color: Color(0xFF60A5FA),
+                      color: context.appColors.accentBlue,
                     ),
                   ),
                 ],
@@ -1235,10 +1270,13 @@ class _WebMiniMap extends StatelessWidget {
             height: _mapH,
             decoration: BoxDecoration(
               color: ctx.appColors.surface,
-              border: Border.all(color: const Color(0x3060A5FA)),
+              border: Border.all(color: ctx.appColors.accentBlue.withAlpha(48)),
               borderRadius: BorderRadius.circular(8),
-              boxShadow: const [
-                BoxShadow(color: Color(0x66000000), blurRadius: 10),
+              boxShadow: [
+                BoxShadow(
+                  color: ctx.appColors.textPrimary.withAlpha(102),
+                  blurRadius: 10,
+                ),
               ],
             ),
             child: ClipRRect(
@@ -1251,6 +1289,7 @@ class _WebMiniMap extends StatelessWidget {
                   nodeContent: nodeContent,
                   bounds: bounds,
                   viewportRect: viewportRect,
+                  colors: ctx.appColors,
                 ),
               ),
             ),
@@ -1269,6 +1308,7 @@ class _MiniMapPainter extends CustomPainter {
     required this.nodeContent,
     required this.bounds,
     required this.viewportRect,
+    required this.colors,
   });
   final Map<String, Offset> positions;
   final Map<String, Size> sizes;
@@ -1276,6 +1316,7 @@ class _MiniMapPainter extends CustomPainter {
   final Map<String, Map<String, dynamic>> nodeContent;
   final Rect bounds;
   final Rect viewportRect;
+  final AppColorScheme colors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1299,7 +1340,7 @@ class _MiniMapPainter extends CustomPainter {
           Rect.fromLTWH(mx, my, mw, mh),
           const Radius.circular(1.5),
         ),
-        Paint()..color = _colorForType(type),
+        Paint()..color = _colorForType(type, colors),
       );
     }
 
@@ -1312,11 +1353,14 @@ class _MiniMapPainter extends CustomPainter {
       Rect.fromLTWH(vx, vy, vw, vh),
       const Radius.circular(3),
     );
-    canvas.drawRRect(vpRRect, Paint()..color = const Color(0x2060A5FA));
+    canvas.drawRRect(
+      vpRRect,
+      Paint()..color = colors.accentBlue.withAlpha(32),
+    );
     canvas.drawRRect(
       vpRRect,
       Paint()
-        ..color = const Color(0xCC60A5FA)
+        ..color = colors.accentBlue.withAlpha(204)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
@@ -1327,18 +1371,18 @@ class _MiniMapPainter extends CustomPainter {
     return i < 0 ? 'node' : id.substring(0, i);
   }
 
-  static Color _colorForType(String type) => switch (type) {
-    'workspace' => const Color(0xCC7C3AED),
-    'agent' => const Color(0xCC34D399),
-    'branch' => const Color(0xCC60A5FA),
-    'tree' => const Color(0xCC10B981),
-    'diff' => const Color(0xCC7C6BFF),
-    'files' => const Color(0xCCF59E0B),
-    'run' => const Color(0xCCF87171),
-    'editor' => const Color(0xCCE879F9),
-    'session' => const Color(0xCC93C5FD),
-    'repo' => const Color(0xCC94A3B8),
-    _ => const Color(0xCC64748B),
+  static Color _colorForType(String type, AppColorScheme colors) => switch (type) {
+    'workspace' => colors.primary.withAlpha(204),
+    'agent' => colors.accentGreen.withAlpha(204),
+    'branch' => colors.accentBlue.withAlpha(204),
+    'tree' => colors.accentGreenDim.withAlpha(204),
+    'diff' => colors.primaryLight.withAlpha(204),
+    'files' => colors.accentOrange.withAlpha(204),
+    'run' => colors.accentRed.withAlpha(204),
+    'editor' => colors.primaryGlow.withAlpha(204),
+    'session' => colors.terminalPrompt.withAlpha(204),
+    'repo' => colors.textSecondary.withAlpha(204),
+    _ => colors.textMuted.withAlpha(204),
   };
 
   @override
@@ -1430,23 +1474,25 @@ class _SidebarRow extends StatelessWidget {
     'editor': Icons.code,
   };
 
-  static const _typeColors = <String, Color>{
-    'workspace': Color(0xFF7C6BFF),
-    'agent': Color(0xFF34D399),
-    'session': Color(0xFF6B7898),
-    'repo': Color(0xFF9AA3BF),
-    'branch': Color(0xFF60A5FA),
-    'run': Color(0xFFF87171),
-    'files': Color(0xFFFFAA33),
-    'tree': Color(0xFF34D399),
-    'diff': Color(0xFF7C6BFF),
-    'editor': Color(0xFFFFCC44),
+  static Color _typeColor(String type, AppColorScheme colors) => switch (type) {
+    'workspace' => colors.primaryLight,
+    'agent' => colors.accentGreen,
+    'session' => colors.terminalPrompt,
+    'repo' => colors.textSecondary,
+    'branch' => colors.accentBlue,
+    'run' => colors.accentRed,
+    'files' => colors.accentOrange,
+    'tree' => colors.accentGreen,
+    'diff' => colors.primaryLight,
+    'editor' => colors.primaryGlow,
+    _ => colors.textMuted,
   };
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final icon = _typeIcons[type] ?? Icons.circle;
-    final color = _typeColors[type] ?? const Color(0xFF64748B);
+    final color = _typeColor(type, colors);
     final isWs = type == 'workspace';
 
     return InkWell(
@@ -1491,8 +1537,8 @@ class _SidebarRow extends StatelessWidget {
                   color: hidden
                       ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                       : (isWs
-                            ? const Color(0xFF7C6BFF)
-                            : const Color(0x997C6BFF)),
+                            ? colors.primaryLight
+                            : colors.primaryLight.withAlpha(153)),
                 ),
               ),
             ),
@@ -1627,8 +1673,6 @@ class _GridPainter extends CustomPainter {
 class _RemoteWorkspaceDialog {
   _RemoteWorkspaceDialog._();
 
-  static const _kAccent = Color(0xFF7C6BFF);
-
   /// Shows a dialog asking for workspace name + folder path.
   /// Returns `{'name': ..., 'path': ...}` or null if cancelled.
   static Future<Map<String, String>?> showCreate(BuildContext context) async {
@@ -1697,11 +1741,12 @@ class _WorkspaceFormDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = context.appColors.surfaceElevated;
-    final border = context.appColors.border;
+    final colors = context.appColors;
+    final bg = colors.surfaceElevated;
+    final border = colors.border;
     final text = Theme.of(context).colorScheme.onSurface;
     final hint = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
-    const accent = _RemoteWorkspaceDialog._kAccent;
+    final accent = colors.primaryLight;
 
     return AlertDialog(
       backgroundColor: bg,
@@ -1771,7 +1816,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
         ),
         TextButton(
           onPressed: onConfirm,
-          child: Text(confirmLabel, style: const TextStyle(color: accent)),
+          child: Text(confirmLabel, style: TextStyle(color: accent)),
         ),
       ],
     );

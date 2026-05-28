@@ -9,13 +9,13 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
+import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/search/data/file_search_service.dart';
 import 'package:yoloit/features/search/utils/fuzzy_matcher.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 /// Shows the quick-open overlay.
 /// Searches open board panels, files inside file-tree panel directories,
@@ -31,9 +31,10 @@ Future<void> showFileSearch(
   final reviewCubit = context.read<ReviewCubit>();
   final editorCubit = context.read<FileEditorCubit>();
 
+  final colors = context.appColors;
   await showDialog<void>(
     context: context,
-    barrierColor: Colors.black54,
+    barrierColor: colors.textPrimary.withAlpha(84),
     builder: (_) => Material(
       type: MaterialType.transparency,
       child: MultiBlocProvider(
@@ -145,6 +146,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
   Future<void> _runSearch() async {
     final query = _controller.text.trim().toLowerCase();
+    final appColors = context.appColors;
     if (query.isEmpty) {
       setState(() {
         _results = [];
@@ -166,7 +168,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           title: panel.title,
           subtitle: _panelTypeLabel(panel.type),
           icon: _panelTypeIcon(panel.type),
-          iconColor: _panelTypeColor(panel.type),
+          iconColor: _panelTypeColor(panel.type, appColors),
           panelId: panel.id,
         ));
       }
@@ -198,7 +200,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           final ext = r.fileName.contains('.')
               ? r.fileName.split('.').last.toLowerCase()
               : '';
-          final (icon, color) = _iconForExtension(ext);
+          final (icon, color) = _iconForExtension(ext, appColors);
           results.add(_QuickResult(
             kind: _QuickResultKind.file,
             title: r.fileName,
@@ -240,7 +242,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           final ext = name.contains('.')
               ? name.split('.').last.toLowerCase()
               : '';
-          final (icon, color) = _iconForExtension(ext);
+          final (icon, color) = _iconForExtension(ext, context.appColors);
           // Avoid duplicates
           if (!results.any((r) => r.filePath == entity.path)) {
             results.add(_QuickResult(
@@ -357,7 +359,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
               border: Border.all(color: colors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(100),
+                  color: colors.textPrimary.withAlpha(100),
                   blurRadius: 32,
                   offset: const Offset(0, 12),
                 ),
@@ -366,7 +368,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
             child: Column(
               children: [
                 _buildHeader(context),
-                const Divider(height: 1, color: Color(0xFF2A2A3A)),
+                Divider(height: 1, color: colors.divider),
                 Expanded(child: _buildResults()),
                 _buildFooter(),
               ],
@@ -391,7 +393,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
               child: TextField(
                 controller: _controller,
                 focusNode: _focusNode,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
+                style: TextStyle(color: colors.textPrimary, fontSize: 15),
                 decoration: InputDecoration(
                   hintText: 'Search panels, files…',
                   hintStyle:
@@ -491,8 +493,8 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     if (_results.isEmpty) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFF2A2A3A))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: colors.divider)),
       ),
       child: Row(
         children: [
@@ -543,18 +545,8 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     };
   }
 
-  static Color _panelTypeColor(String type) {
-    return switch (type) {
-      'board.chat' => const Color(0xFF60A5FA),
-      'board.terminal' => const Color(0xFF4ADE80),
-      'board.filetree' => const Color(0xFF64748B),
-      'board.file.preview' => const Color(0xFFA78BFA),
-      'board.diff.preview' => const Color(0xFF60A5FA),
-      'board.note.markdown' => const Color(0xFFFBBF24),
-      'board.code.snippet' => const Color(0xFF34D399),
-      'board.run.configs' => const Color(0xFF22D3EE),
-      _ => const Color(0xFF94A3B8),
-    };
+  static Color _panelTypeColor(String type, AppColorScheme colors) {
+    return panelTypeColor(type, colors);
   }
 
   static String _panelTypeLabel(String type) {
@@ -578,22 +570,25 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     };
   }
 
-  static (IconData, Color) _iconForExtension(String ext) {
+  static (IconData, Color) _iconForExtension(
+    String ext,
+    AppColorScheme colors,
+  ) {
     return switch (ext) {
-      'dart' => (Icons.flutter_dash, const Color(0xFF54C5F8)),
-      'py' => (Icons.code, const Color(0xFFFFD43B)),
-      'js' || 'ts' || 'jsx' || 'tsx' => (Icons.javascript, const Color(0xFFF7DF1E)),
-      'swift' => (Icons.apple, const Color(0xFFFF6B35)),
-      'kt' || 'java' => (Icons.code, const Color(0xFFB07219)),
-      'go' => (Icons.code, const Color(0xFF00ADD8)),
-      'rs' => (Icons.code, const Color(0xFFDEA584)),
-      'html' || 'htm' => (Icons.html, const Color(0xFFE44D26)),
-      'css' || 'scss' || 'sass' => (Icons.style, const Color(0xFF264DE4)),
-      'json' || 'yaml' || 'yml' || 'toml' => (Icons.data_object, const Color(0xFFCBCB41)),
-      'md' || 'mdx' => (Icons.article, const Color(0xFF888888)),
-      'sh' || 'bash' || 'zsh' => (Icons.terminal, const Color(0xFF4EAF47)),
-      'png' || 'jpg' || 'jpeg' || 'gif' || 'svg' || 'webp' => (Icons.image, const Color(0xFFAB47BC)),
-      _ => (Icons.insert_drive_file_outlined, const Color(0xFF888888)),
+      'dart' => (Icons.flutter_dash, colors.accentBlue),
+      'py' => (Icons.code, colors.accentOrange),
+      'js' || 'ts' || 'jsx' || 'tsx' => (Icons.javascript, colors.primaryLight),
+      'swift' => (Icons.apple, colors.accentRed),
+      'kt' || 'java' => (Icons.code, colors.accentOrange),
+      'go' => (Icons.code, colors.accentBlue),
+      'rs' => (Icons.code, colors.accentOrange),
+      'html' || 'htm' => (Icons.html, colors.accentRed),
+      'css' || 'scss' || 'sass' => (Icons.style, colors.accentBlue),
+      'json' || 'yaml' || 'yml' || 'toml' => (Icons.data_object, colors.accentOrange),
+      'md' || 'mdx' => (Icons.article, colors.textMuted),
+      'sh' || 'bash' || 'zsh' => (Icons.terminal, colors.accentGreen),
+      'png' || 'jpg' || 'jpeg' || 'gif' || 'svg' || 'webp' => (Icons.image, colors.primaryLight),
+      _ => (Icons.insert_drive_file_outlined, colors.textMuted),
     };
   }
 }
@@ -643,8 +638,8 @@ class _QuickResultTile extends StatelessWidget {
                   _HighlightText(
                     text: result.title,
                     query: query,
-                    baseStyle: const TextStyle(
-                      color: Colors.white,
+                    baseStyle: TextStyle(
+                      color: colors.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                       height: 1.2,

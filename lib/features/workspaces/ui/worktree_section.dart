@@ -489,7 +489,7 @@ class _ConfirmRemoveDialog extends StatelessWidget {
                   onPressed: () => Navigator.of(context).pop(true),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colors.accentRed,
-                    foregroundColor: Colors.white,
+                    foregroundColor: colors.textPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(6),
                     ),
@@ -800,19 +800,19 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                     onPressed: _loading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: colors.textPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
                     child:
                         _loading
-                            ? const SizedBox(
+                            ? SizedBox(
                               width: 14,
                               height: 14,
                               child: CircularProgressIndicator(
                                 strokeWidth: 1.5,
-                                color: Colors.white,
+                                color: colors.textPrimary,
                               ),
                             )
                             : const Text('Add', style: TextStyle(fontSize: 13)),

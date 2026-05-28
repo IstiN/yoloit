@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import '../bloc/collaboration_cubit.dart';
-import '../bloc/collaboration_state.dart';
-import '../collaboration_ports.dart';
+import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
+import 'package:yoloit/features/collaboration/bloc/collaboration_state.dart';
+import 'package:yoloit/features/collaboration/collaboration_ports.dart';
 
 /// Toolbar button that opens the collaboration (Share Space) popover.
 class CollaborationButton extends StatelessWidget {
@@ -17,13 +17,14 @@ class CollaborationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<CollaborationCubit, CollaborationState>(
       builder: (ctx, state) {
+        final colors = ctx.appColors;
         final color = state.isHosting
-            ? const Color(0xFF34D399)
+            ? colors.accentGreen
             : state.isGuest
-            ? const Color(0xFF60A5FA)
+            ? colors.accentBlue
             : state.isStartingHost
-            ? const Color(0xFF7C3AED)
-            : const Color(0xFF9AA3BF);
+            ? colors.primary
+            : colors.textMuted;
         return _CollabToolBtn(
           icon: Icons.people_outline_rounded,
           tooltip: state.isStartingHost
@@ -40,9 +41,10 @@ class CollaborationButton extends StatelessWidget {
   }
 
   void _showDialog(BuildContext context) {
+    final colors = context.appColors;
     showDialog<void>(
       context: context,
-      barrierColor: const Color(0x66000000),
+      barrierColor: colors.textPrimary.withAlpha(102),
       builder: (_) => BlocProvider.value(
         value: context.read<CollaborationCubit>(),
         child: const _CollaborationDialog(),
@@ -91,11 +93,11 @@ class _CollaborationDialogState extends State<_CollaborationDialog>
             color: colors.surface,
             border: Border.all(color: colors.border),
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0xBB000000),
+                color: colors.textPrimary.withAlpha(187),
                 blurRadius: 32,
-                offset: Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -108,10 +110,10 @@ class _CollaborationDialogState extends State<_CollaborationDialog>
                 // Header
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.people_rounded,
                       size: 18,
-                      color: Color(0xFF7C3AED),
+                      color: colors.primary,
                     ),
                     const SizedBox(width: 10),
                     Text(
@@ -236,6 +238,7 @@ class _IdleView extends StatelessWidget {
 class _HostTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return BlocBuilder<CollaborationCubit, CollaborationState>(
       builder: (ctx, state) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -250,15 +253,15 @@ class _HostTab extends StatelessWidget {
             ),
           ),
           if (state.isStartingHost)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Row(
                 children: [
-                  Icon(Icons.sync, size: 12, color: Color(0xFF7C3AED)),
-                  SizedBox(width: 6),
+                  Icon(Icons.sync, size: 12, color: colors.primary),
+                  const SizedBox(width: 6),
                   Text(
                     'Starting host and probing available ports…',
-                    style: TextStyle(color: Color(0xFFB794F6), fontSize: 11),
+                    style: TextStyle(color: colors.primaryLight, fontSize: 11),
                   ),
                 ],
               ),
@@ -268,7 +271,7 @@ class _HostTab extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 state.error,
-                style: const TextStyle(color: Color(0xFFF87171), fontSize: 11),
+                style: TextStyle(color: colors.accentRed, fontSize: 11),
               ),
             ),
           const Spacer(),
@@ -297,6 +300,7 @@ class _GuestTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return BlocBuilder<CollaborationCubit, CollaborationState>(
       builder: (ctx, state) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -311,7 +315,7 @@ class _GuestTab extends StatelessWidget {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 state.error,
-                style: const TextStyle(color: Color(0xFFF87171), fontSize: 11),
+                style: TextStyle(color: colors.accentRed, fontSize: 11),
               ),
             ),
           const Spacer(),
@@ -391,21 +395,21 @@ class _HostActiveView extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: colors.surface,
-            border: Border.all(color: const Color(0x4034D399)),
+            border: Border.all(color: colors.accentGreen.withAlpha(64)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.wifi_tethering_rounded,
                 size: 14,
-                color: Color(0xFF34D399),
+                color: colors.accentGreen,
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Hosting active',
                 style: TextStyle(
-                  color: Color(0xFF34D399),
+                  color: colors.accentGreen,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -414,16 +418,16 @@ class _HostActiveView extends StatelessWidget {
               if (state.peers.isNotEmpty)
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.person_outline,
                       size: 13,
-                      color: Color(0xFF60A5FA),
+                      color: colors.accentBlue,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${state.peerCount}',
-                      style: const TextStyle(
-                        color: Color(0xFF60A5FA),
+                      style: TextStyle(
+                        color: colors.accentBlue,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -452,20 +456,20 @@ class _HostActiveView extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.laptop_mac,
                   size: 14,
-                  color: Color(0xFF34D399),
+                  color: colors.accentGreen,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Open on this Mac:',
                         style: TextStyle(
-                          color: Color(0xFF34D399),
+                          color: colors.accentGreen,
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
@@ -496,20 +500,20 @@ class _HostActiveView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: context.appColors.surface,
-              border: Border.all(color: const Color(0xFF3B5BDB)),
+              border: Border.all(color: colors.accentBlue),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.share, size: 12, color: Color(0xFF7B9EFF)),
-                    SizedBox(width: 6),
+                    Icon(Icons.share, size: 12, color: colors.accentBlue),
+                    const SizedBox(width: 6),
                     Text(
                       'Share with other devices (same Wi-Fi):',
                       style: TextStyle(
-                        color: Color(0xFF7B9EFF),
+                        color: colors.accentBlue,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -601,7 +605,7 @@ class _HostActiveView extends StatelessWidget {
         _SecondaryBtn(
           label: 'Stop Hosting',
           icon: Icons.wifi_tethering_off_rounded,
-          color: const Color(0xFFF87171),
+          color: context.appColors.accentRed,
           onTap: () {
             context.read<CollaborationCubit>().stopHosting();
             Navigator.pop(context);
@@ -634,7 +638,7 @@ class _UrlActionBtn extends StatelessWidget {
           color: context.appColors.surfaceElevated,
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Icon(icon, size: 14, color: const Color(0xFF7B9EFF)),
+        child: Icon(icon, size: 14, color: context.appColors.accentBlue),
       ),
     ),
   );
@@ -657,24 +661,24 @@ class _GuestActiveView extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: colors.surface,
-            border: Border.all(color: const Color(0x4060A5FA)),
+            border: Border.all(color: colors.accentBlue.withAlpha(64)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.lan_outlined,
                 size: 16,
-                color: Color(0xFF60A5FA),
+                color: colors.accentBlue,
               ),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Connected',
                     style: TextStyle(
-                      color: Color(0xFF60A5FA),
+                      color: colors.accentBlue,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
@@ -697,7 +701,7 @@ class _GuestActiveView extends StatelessWidget {
         _SecondaryBtn(
           label: 'Disconnect',
           icon: Icons.link_off_rounded,
-          color: const Color(0xFFF87171),
+          color: context.appColors.accentRed,
           onTap: () {
             context.read<CollaborationCubit>().disconnect();
             Navigator.pop(context);
@@ -724,18 +728,18 @@ class _PrimaryBtn extends StatelessWidget {
       child: Container(
         height: 36,
         decoration: BoxDecoration(
-          color: enabled ? const Color(0xFF7C3AED) : context.appColors.surfaceElevated,
+          color: enabled ? context.appColors.primary : context.appColors.surfaceElevated,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 14, color: Colors.white),
+            Icon(icon, size: 14, color: context.appColors.textPrimary),
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: context.appColors.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -833,7 +837,7 @@ class _DarkTextField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF7C3AED)),
+          borderSide: BorderSide(color: colors.primary),
         ),
       ),
     );
@@ -902,13 +906,13 @@ class _CollabToolBtnState extends State<_CollabToolBtn> {
                         vertical: 1,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF34D399),
+                        color: colors.accentGreen,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         widget.badge!,
-                        style: const TextStyle(
-                          color: Colors.black,
+                        style: TextStyle(
+                          color: colors.background,
                           fontSize: 8,
                           fontWeight: FontWeight.w700,
                         ),

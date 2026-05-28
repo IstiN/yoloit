@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 import 'package:yoloit/features/mindmap/plugin/mindmap_card_plugin.dart';
 
@@ -26,7 +27,7 @@ class MindMapPluginRegistry {
   /// registered it will be replaced.
   MindMapPluginRegistry register(MindMapCardPlugin plugin) {
     _plugins[plugin.pluginId] = plugin;
-    return this; // fluent API: registry..register(A)..register(B)
+    return this;
   }
 
   /// Unregister a plugin by id.
@@ -70,7 +71,10 @@ class MindMapPluginRegistry {
           result.add((data: entry.data, connections: entry.connections));
         }
       } catch (e, st) {
-        debugPrint('[MindMapPluginRegistry] ${plugin.pluginId} provideNodes() threw: $e\n$st');
+        debugPrint(
+          '[MindMapPluginRegistry] ${plugin.pluginId} provideNodes() threw: '
+          '$e\n$st',
+        );
       }
     }
     return result;
@@ -78,23 +82,26 @@ class MindMapPluginRegistry {
 
   /// Sidebar group descriptors from all registered plugins.
   List<({String tag, String label, IconData icon})> get sidebarGroups => [
-    for (final p in _plugins.values)
-      (tag: p.typeTag, label: p.displayName, icon: p.icon),
-  ];
+        for (final p in _plugins.values)
+          (tag: p.typeTag, label: p.displayName, icon: p.icon),
+      ];
 }
-
-// ── Fallback card shown when the plugin is not installed ───────────────────
 
 class _UnknownPluginCard extends StatelessWidget {
   const _UnknownPluginCard({required this.data});
+
   final MindMapPluginNodeData data;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0F1218),
-        border: Border.all(color: const Color(0xFF3A2A40), width: 1.5),
+        color: colors.surface,
+        border: Border.all(
+          color: colors.primaryDark.withValues(alpha: 0.55),
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(16),
@@ -102,12 +109,16 @@ class _UnknownPluginCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.extension_off, color: Color(0xFF6B3A6B), size: 20),
+          Icon(
+            Icons.extension_off,
+            color: colors.primaryDark,
+            size: 20,
+          ),
           const SizedBox(height: 8),
           Text(
             'Plugin not installed',
-            style: const TextStyle(
-              color: Color(0xFFE8E8FF),
+            style: TextStyle(
+              color: colors.textPrimary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
@@ -115,7 +126,10 @@ class _UnknownPluginCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             data.pluginId,
-            style: const TextStyle(color: Color(0xFF6B7898), fontSize: 10),
+            style: TextStyle(
+              color: colors.textSecondary,
+              fontSize: 10,
+            ),
           ),
         ],
       ),

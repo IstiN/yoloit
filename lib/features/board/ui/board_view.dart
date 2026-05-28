@@ -758,7 +758,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               ),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.black.withAlpha(
+                                                  color: colors.background.withAlpha(
                                                     45,
                                                   ),
                                                   blurRadius: 18,
@@ -982,7 +982,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 borderRadius:
                                                     BorderRadius.circular(20),
                                                 border: Border.all(
-                                                  color: Colors.redAccent
+                                                  color: colors.statusError
                                                       .withAlpha(160),
                                                 ),
                                               ),
@@ -992,14 +992,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   Icon(
                                                     Icons.close,
                                                     size: 14,
-                                                    color: Colors.redAccent
+                                                    color: colors.statusError
                                                         .withAlpha(200),
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Text(
                                                     'Cancel connection  (Esc)',
                                                     style: TextStyle(
-                                                      color: Colors.redAccent
+                                                      color: colors.statusError
                                                           .withAlpha(200),
                                                       fontSize: 12,
                                                     ),
@@ -1913,6 +1913,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BuildContext context,
     BoardDocument board,
   ) {
+    final colors = context.appColors;
     final panelMap = {for (final p in board.panels) p.id: p};
     final badges = <Widget>[];
     for (final link in board.links) {
@@ -1937,7 +1938,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       const hitR = 24.0;
       const badgeR = 11.0;
       final isHovered = _hoveredLinkId == link.id;
-      final linkColor = link.color ?? const Color(0xFF60A5FA);
+      final linkColor = link.color ?? colors.accentBlue;
       badges.add(
         Positioned(
           left: mid.dx - hitR,
@@ -1960,7 +1961,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                   decoration: BoxDecoration(
                     color:
                         isHovered
-                            ? const Color(0xCCF87171)
+                            ? colors.statusError.withAlpha(204)
                             : linkColor.withAlpha(100),
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -2279,10 +2280,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: selectedColor ?? const Color(0xFFB46CFF),
+                                color: selectedColor ?? context.appColors.primary,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.white.withAlpha(90),
+                                  color: context.appColors.textPrimary.withAlpha(90),
                                 ),
                               ),
                             ),
@@ -2405,7 +2406,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BuildContext context,
     Color? initialColor,
   ) {
-    var selectedColor = initialColor ?? const Color(0xFFB46CFF);
+    var selectedColor = initialColor ?? context.appColors.primary;
     return showDialog<Color?>(
       context: context,
       builder:
@@ -3110,7 +3111,7 @@ class _BoardOverviewCard extends StatelessWidget {
           color: colors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: active ? Colors.white.withAlpha(90) : colors.border,
+            color: active ? colors.textPrimary.withAlpha(90) : colors.border,
             width: active ? 1.2 : 1,
           ),
         ),
@@ -3133,7 +3134,7 @@ class _BoardOverviewCard extends StatelessWidget {
                           Icon(
                             Icons.radio_button_checked,
                             size: 14,
-                            color: Colors.white.withAlpha(180),
+                            color: colors.textPrimary.withAlpha(180),
                           ),
                           const SizedBox(width: 8),
                         ],
@@ -3251,7 +3252,7 @@ class _BoardOverviewPngPreview extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Colors.black.withAlpha(45)],
+              colors: [Colors.transparent, context.appColors.background.withAlpha(45)],
             ),
           ),
         ),
@@ -3326,7 +3327,7 @@ class _OverlayIconButton extends StatelessWidget {
             color:
                 Theme.of(context).brightness == Brightness.light
                     ? colors.surface
-                    : const Color(0xE50B0D12),
+                    : colors.surface.withAlpha(0xE5),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: active ? colors.primary.withAlpha(128) : colors.border,
@@ -3548,7 +3549,7 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                       ? null
                       : [
                     BoxShadow(
-                      color: Colors.black.withAlpha(35),
+                      color: colors.background.withAlpha(35),
                       blurRadius: 22,
                       offset: const Offset(0, 8),
                     ),
@@ -3652,7 +3653,7 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                                 ).colorScheme.onSurface),
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: Colors.white.withAlpha(100),
+                                          color: colors.textPrimary.withAlpha(100),
                                         ),
                                       ),
                                     ),
@@ -3759,15 +3760,13 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                               border: Border.all(
                                 color:
                                     connectSourceId == panel.id
-                                        ? const Color(0xFF34D399)
-                                        : const Color(
-                                          0xFF34D399,
-                                        ).withAlpha(100),
+                                        ? colors.statusActive
+                                        : colors.statusActive.withAlpha(100),
                                 width: connectSourceId == panel.id ? 2.5 : 1.5,
                               ),
                               color:
                                   connectSourceId == panel.id
-                                      ? const Color(0x1534D399)
+                                      ? colors.statusActive.withAlpha(21)
                                       : Colors.transparent,
                             ),
                             child:
@@ -3776,24 +3775,24 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                       child: Container(
                                         width: 36,
                                         height: 36,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0x6634D399),
+                                        decoration: BoxDecoration(
+                                          color: colors.statusActive.withAlpha(102),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.add_link,
                                           size: 18,
-                                          color: Color(0xFF34D399),
+                                          color: colors.statusActive,
                                         ),
                                       ),
                                     )
                                     : connectSourceId == panel.id
-                                    ? const Center(
+                                    ? Center(
                                       child: Text(
                                         'Source\n(tap to cancel)',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          color: Color(0xFF34D399),
+                                          color: colors.statusActive,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -3803,14 +3802,14 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                       child: Container(
                                         width: 36,
                                         height: 36,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0x6634D399),
+                                        decoration: BoxDecoration(
+                                          color: colors.statusActive.withAlpha(102),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.call_made,
                                           size: 18,
-                                          color: Color(0xFF34D399),
+                                          color: colors.statusActive,
                                         ),
                                       ),
                                     ),
@@ -4006,7 +4005,7 @@ class _WebViewOverlays extends StatelessWidget {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        const ColoredBox(color: Colors.white),
+                        ColoredBox(color: context.appColors.background),
                         WebViewWidget(controller: ctrl),
                         // Loading overlay
                         ValueListenableBuilder<bool>(
@@ -4015,7 +4014,9 @@ class _WebViewOverlays extends StatelessWidget {
                               ValueNotifier<bool>(false),
                           builder: (_, isLoading, __) {
                             if (!isLoading) return const SizedBox.shrink();
-                            return const ColoredBox(color: Color(0xFFF8FAFC));
+                            return ColoredBox(
+                              color: context.appColors.surfaceHighlight,
+                            );
                           },
                         ),
                         // Absorb clicks → focus this panel
@@ -4071,7 +4072,7 @@ class _WebViewOverlays extends StatelessWidget {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          const ColoredBox(color: Colors.white),
+                          ColoredBox(color: context.appColors.surface),
                           WebViewWidget(controller: ctrl),
                           // Loading overlay (navigation flash hide)
                           ValueListenableBuilder<bool>(
@@ -4080,7 +4081,9 @@ class _WebViewOverlays extends StatelessWidget {
                                 ValueNotifier<bool>(false),
                             builder: (_, isLoading, __) {
                               if (!isLoading) return const SizedBox.shrink();
-                              return const ColoredBox(color: Color(0xFFF8FAFC));
+                              return ColoredBox(
+                                color: context.appColors.surfaceHighlight,
+                              );
                             },
                           ),
                         ],
@@ -4455,8 +4458,11 @@ class _BoardMiniMap extends StatelessWidget {
               color: colors.surface.withAlpha(0xE5),
               border: Border.all(color: colors.primary.withAlpha(0x50)),
               borderRadius: BorderRadius.circular(8),
-              boxShadow: const [
-                BoxShadow(color: Color(0x66000000), blurRadius: 10),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.background.withAlpha(102),
+                  blurRadius: 10,
+                ),
               ],
             ),
             child: ClipRRect(
@@ -4467,6 +4473,7 @@ class _BoardMiniMap extends StatelessWidget {
                   processingPanelIds: processingPanelIds,
                   bounds: bounds,
                   viewportRect: viewportRect,
+                  colors: colors,
                 ),
               ),
             ),
@@ -4483,12 +4490,14 @@ class _BoardMiniMapPainter extends CustomPainter {
     required this.processingPanelIds,
     required this.bounds,
     required this.viewportRect,
+    required this.colors,
   });
 
   final List<BoardPanelInstance> panels;
   final Set<String> processingPanelIds;
   final Rect bounds;
   final Rect viewportRect;
+  final AppColorScheme colors;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -4514,7 +4523,7 @@ class _BoardMiniMapPainter extends CustomPainter {
         canvas.drawRRect(
           rrect.inflate(2),
           Paint()
-            ..color = const Color(0xFF34D399)
+            ..color = colors.accentGreen
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
         );
       }
@@ -4524,9 +4533,10 @@ class _BoardMiniMapPainter extends CustomPainter {
         Paint()
           ..color =
               isProcessing
-                  ? const Color(0xFF34D399)
+                  ? colors.accentGreen
                   : panelTypeColor(
                     panel.type,
+                    colors,
                     override: panel.color,
                   ).withAlpha(0xCC),
       );
@@ -4540,11 +4550,14 @@ class _BoardMiniMapPainter extends CustomPainter {
       Rect.fromLTWH(vx, vy, vw, vh),
       const Radius.circular(3),
     );
-    canvas.drawRRect(viewport, Paint()..color = const Color(0x2060A5FA));
+    canvas.drawRRect(
+      viewport,
+      Paint()..color = colors.accentBlue.withAlpha(32),
+    );
     canvas.drawRRect(
       viewport,
       Paint()
-        ..color = const Color(0xCC60A5FA)
+        ..color = colors.accentBlue.withAlpha(204)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.4,
     );
@@ -4555,7 +4568,8 @@ class _BoardMiniMapPainter extends CustomPainter {
     return oldDelegate.panels != panels ||
         oldDelegate.bounds != bounds ||
         oldDelegate.viewportRect != viewportRect ||
-        oldDelegate.processingPanelIds != processingPanelIds;
+        oldDelegate.processingPanelIds != processingPanelIds ||
+        oldDelegate.colors != colors;
   }
 }
 
@@ -4604,7 +4618,7 @@ class _BoardToolsPanel extends StatelessWidget {
     final panelBg =
         Theme.of(context).brightness == Brightness.light
             ? colors.surface
-            : const Color(0xE50B0D12);
+            : colors.surface.withAlpha(0xE5);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -4751,7 +4765,7 @@ class _BoardToolsPanel extends StatelessWidget {
                                       Icon(
                                         Icons.add,
                                         size: 14,
-                                        color: Color(0xFF34D399),
+                                        color: colors.statusActive,
                                       ),
                                       SizedBox(width: 8),
                                       Text(
@@ -4812,10 +4826,10 @@ class _BoardToolsPanel extends StatelessWidget {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.auto_awesome,
                               size: 18,
-                              color: Color(0xFF34D399),
+                              color: colors.statusActive,
                             ),
                           ),
                         ),
@@ -4856,7 +4870,7 @@ class _BoardToolsPanel extends StatelessWidget {
                                       Icon(
                                         Icons.add,
                                         size: 14,
-                                        color: Color(0xFF22C55E),
+                                        color: colors.statusActive,
                                       ),
                                       SizedBox(width: 8),
                                       Text(
@@ -4916,10 +4930,10 @@ class _BoardToolsPanel extends StatelessWidget {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.terminal,
                               size: 18,
-                              color: Color(0xFF22C55E),
+                              color: colors.statusActive,
                             ),
                           ),
                         ),
@@ -5064,7 +5078,7 @@ class _DrawSettingsPanel extends StatelessWidget {
       width: 160,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xE50B0D12),
+        color: colors.surface.withAlpha(0xE5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colors.border),
       ),
@@ -5086,13 +5100,13 @@ class _DrawSettingsPanel extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final c in const [
-                Color(0xFFE879F9),
-                Color(0xFF60A5FA),
-                Color(0xFF34D399),
-                Color(0xFFFBBF24),
-                Color(0xFFF87171),
-                Color(0xFFFFFFFF),
+              for (final c in [
+                colors.primaryLight,
+                colors.accentBlue,
+                colors.statusActive,
+                colors.statusWarning,
+                colors.statusError,
+                colors.textPrimary,
               ])
                 GestureDetector(
                   onTap: () => onChanged(settings.copyWith(strokeColor: c)),
@@ -5105,8 +5119,8 @@ class _DrawSettingsPanel extends StatelessWidget {
                       border: Border.all(
                         color:
                             settings.strokeColor == c
-                                ? Colors.white
-                                : Colors.white.withAlpha(40),
+                                ? colors.textPrimary
+                                : colors.textPrimary.withAlpha(40),
                         width: settings.strokeColor == c ? 2 : 1,
                       ),
                     ),
@@ -5148,19 +5162,21 @@ class _DrawSettingsPanel extends StatelessWidget {
                   width: 22,
                   height: 22,
                   decoration: BoxDecoration(
-                    gradient: const SweepGradient(
+                    gradient: SweepGradient(
                       colors: [
-                        Color(0xFFFF0000),
-                        Color(0xFFFFFF00),
-                        Color(0xFF00FF00),
-                        Color(0xFF00FFFF),
-                        Color(0xFF0000FF),
-                        Color(0xFFFF00FF),
-                        Color(0xFFFF0000),
+                        colors.statusError,
+                        colors.statusWarning,
+                        colors.statusActive,
+                        colors.accentBlue,
+                        colors.primary,
+                        colors.primaryLight,
+                        colors.statusError,
                       ],
                     ),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withAlpha(60)),
+                    border: Border.all(
+                      color: colors.textPrimary.withAlpha(60),
+                    ),
                   ),
                 ),
               ),
@@ -5216,7 +5232,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
       width: 200,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xE50B0D12),
+        color: colors.surface.withAlpha(0xE5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colors.border),
       ),
@@ -5343,13 +5359,13 @@ class _ConnectSettingsPanel extends StatelessWidget {
             spacing: 5,
             runSpacing: 5,
             children: [
-              for (final c in const [
-                Color(0xFF60A5FA),
-                Color(0xFF34D399),
-                Color(0xFFF87171),
-                Color(0xFFFBBF24),
-                Color(0xFFE879F9),
-                Color(0xFFFFFFFF),
+              for (final c in [
+                colors.accentBlue,
+                colors.statusActive,
+                colors.statusError,
+                colors.statusWarning,
+                colors.primaryLight,
+                colors.textPrimary,
               ])
                 GestureDetector(
                   onTap: () => onChanged(settings.copyWith(color: c)),
@@ -5362,8 +5378,8 @@ class _ConnectSettingsPanel extends StatelessWidget {
                       border: Border.all(
                         color:
                             settings.color == c
-                                ? Colors.white
-                                : Colors.white.withAlpha(30),
+                                ? colors.textPrimary
+                                : colors.textPrimary.withAlpha(30),
                         width: settings.color == c ? 2 : 1,
                       ),
                     ),
@@ -5441,11 +5457,15 @@ class _BoardDrawingWidgetState extends State<_BoardDrawingWidget> {
               child: Container(
                 width: 22,
                 height: 22,
-                decoration: const BoxDecoration(
-                  color: Color(0xCCF87171),
+                decoration: BoxDecoration(
+                  color: context.appColors.statusError.withAlpha(204),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.close, size: 12, color: Colors.white),
+                child: Icon(
+                  Icons.close,
+                  size: 12,
+                  color: context.appColors.textPrimary,
+                ),
               ),
             ),
           ),
@@ -5888,13 +5908,13 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
             Wrap(
               spacing: 8,
               children: [
-                for (final c in const [
-                  Color(0xFF60A5FA),
-                  Color(0xFF34D399),
-                  Color(0xFFF87171),
-                  Color(0xFFFBBF24),
-                  Color(0xFFE879F9),
-                  Color(0xFFFFFFFF),
+                for (final c in [
+                  colors.accentBlue,
+                  colors.statusActive,
+                  colors.statusError,
+                  colors.statusWarning,
+                  colors.primaryLight,
+                  colors.textPrimary,
                 ])
                   GestureDetector(
                     onTap: () => setState(() => _color = c),
@@ -5907,8 +5927,8 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
                         border: Border.all(
                           color:
                               _color == c
-                                  ? Colors.white
-                                  : Colors.white.withAlpha(30),
+                                  ? colors.textPrimary
+                                  : colors.textPrimary.withAlpha(30),
                           width: _color == c ? 2.5 : 1,
                         ),
                       ),
@@ -6159,9 +6179,9 @@ class _ChatGlowWrapperState extends State<_ChatGlowWrapper>
                 _isGlowing
                     ? [
                       BoxShadow(
-                        color: const Color(
-                          0xFF34D399,
-                        ).withAlpha((20 + _glowCtrl.value * 60).round()),
+                        color: context.appColors.accentGreenGlow.withAlpha(
+                          (20 + _glowCtrl.value * 60).round(),
+                        ),
                         blurRadius: 16 + _glowCtrl.value * 8,
                         spreadRadius: 2,
                       ),
@@ -6633,7 +6653,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                       border:
                           isCurrent
                               ? Border.all(
-                                color: const Color(0xFF34D399),
+                                color: colors.statusActive,
                                 width: 0.5,
                               )
                               : null,
@@ -6648,7 +6668,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                           Icons.chat_bubble_outline,
                           size: 14,
                           color:
-                              isCurrent ? const Color(0xFF34D399) : mutedColor,
+                              isCurrent ? colors.statusActive : mutedColor,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -6664,7 +6684,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                                   fontWeight: FontWeight.w500,
                                   color:
                                       isCurrent
-                                          ? const Color(0xFF34D399)
+                                          ? colors.statusActive
                                           : onSurface,
                                 ),
                               ),
@@ -6688,7 +6708,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                         if (!isCurrent)
                           _actionButton(
                             icon: Icons.restore,
-                            color: const Color(0xFF60A5FA),
+                            color: colors.accentBlue,
                             tooltip: 'Restore as new chat',
                             onTap: () async {
                               final msgs = await ChatSessionHistory.instance
@@ -6712,7 +6732,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                         // Delete
                         _actionButton(
                           icon: Icons.delete_outline,
-                          color: const Color(0xFFF87171),
+                          color: colors.statusError,
                           tooltip: 'Delete',
                           onTap: () async {
                             await ChatSessionHistory.instance.delete(e.id);
@@ -7003,7 +7023,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildChatTab(),
+                    child: _buildChatTab(context),
                   ),
                   AnimatedBuilder(
                     animation: _chatController,
@@ -7020,7 +7040,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
                               progress > 0.05
                                   ? [
                                     BoxShadow(
-                                      color: Colors.black.withValues(
+                                      color: context.appColors.background.withValues(
                                         alpha: 0.14 * progress,
                                       ),
                                       blurRadius: 20,
@@ -7054,7 +7074,8 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
     );
   }
 
-  Widget _buildChatTab() {
+  Widget _buildChatTab(BuildContext context) {
+    final colors = context.appColors;
     return GestureDetector(
       onTap: _toggleChat,
       child: MouseRegion(
@@ -7064,10 +7085,10 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
           height: 56,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              colors: [colors.primary, colors.primaryLight],
             ),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(10),
@@ -7075,7 +7096,7 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                color: colors.primary.withValues(alpha: 0.3),
                 blurRadius: 8,
                 offset: const Offset(-2, 2),
               ),
@@ -7085,11 +7106,15 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
             quarterTurns: 3,
             child:
                 _chatOpen
-                    ? const Icon(Icons.close, size: 14, color: Colors.white)
-                    : const Text(
+                    ? Icon(
+                      Icons.close,
+                      size: 14,
+                      color: colors.textPrimary,
+                      )
+                    : Text(
                       'YOLO',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: colors.textPrimary,
                         fontSize: 11,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2,
@@ -7123,8 +7148,8 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
       ovalHeight: 1.10,
       titleFontSize: 9.0,
       titleColor: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF3CE8FF)
-          : const Color(0xFF1A73CE),
+          ? context.appColors.terminalPrompt
+          : context.appColors.accentBlue,
       waveBarCount: 22,
       waveAmplitude: 0.85,
       waveSpeed: 1400,

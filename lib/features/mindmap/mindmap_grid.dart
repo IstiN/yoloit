@@ -197,20 +197,22 @@ class _CellOutline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final row = cellIdx ~/ cols;
     final col = cellIdx % cols;
     final x = col * (_cellW + _cellGapX) + _cellGapX / 2;
     final y = row * (_cellH + _cellGapY) + _cellGapY / 2 + 40;
+    final workspaceColor = wsNode.workspace.color ?? colors.accentBlue;
 
     return Positioned(
       left: x,
-      top:  y,
+      top: y,
       child: Container(
-        width:  _cellW + _cellGapX,
+        width: _cellW + _cellGapX,
         height: _cellH + _cellGapY,
         decoration: BoxDecoration(
           border: Border.all(
-            color: (wsNode.workspace.color ?? const Color(0xFF60A5FA)).withAlpha(40),
+            color: workspaceColor.withValues(alpha: 40 / 255),
             width: 1,
           ),
           borderRadius: BorderRadius.circular(20),
@@ -222,7 +224,7 @@ class _CellOutline extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: (wsNode.workspace.color ?? const Color(0xFF60A5FA)).withAlpha(100),
+              color: workspaceColor.withValues(alpha: 100 / 255),
               letterSpacing: 0.5,
             ),
           ),

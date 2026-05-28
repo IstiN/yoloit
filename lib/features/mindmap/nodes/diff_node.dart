@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
@@ -55,6 +56,7 @@ class _DiffNodeState extends State<DiffNode> {
       context.read<MindMapCubit>().openFileDiffAsPanel(
         filePath: absPath,
         repoPath: repoPath,
+        connectorColor: context.appColors.accentBlue.withValues(alpha: 112 / 255),
       );
       debugPrint('[DiffNode] openFileDiffAsPanel completed');
     } catch (e, st) {

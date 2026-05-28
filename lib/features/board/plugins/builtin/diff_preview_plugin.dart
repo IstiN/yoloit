@@ -1,8 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+
+final _diffPreviewDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
 class DiffPreviewPlugin extends BoardPanelPlugin {
   const DiffPreviewPlugin();
@@ -19,7 +22,7 @@ class DiffPreviewPlugin extends BoardPanelPlugin {
   IconData get icon => Icons.difference_outlined;
 
   @override
-  Color get accentColor => const Color(0xFF60A5FA);
+  Color get accentColor => _diffPreviewDefaultColors.accentBlue;
 
   @override
   Size get defaultSize => const Size(600, 500);
@@ -245,12 +248,13 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
   }
 
   Widget _buildToolbar() {
+    final colors = context.appColors;
     final fileName = _filePath.split('/').last;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Row(
         children: [
-          const Icon(Icons.difference_outlined, size: 14, color: Color(0xFF60A5FA)),
+          Icon(Icons.difference_outlined, size: 14, color: colors.accentBlue),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -276,7 +280,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
             onPressed: _openFilePreview,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-            color: const Color(0xFF94A3B8),
+            color: colors.textSecondary,
             tooltip: 'Open file preview',
           ),
           const SizedBox(width: 4),
@@ -285,7 +289,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
             onPressed: _loadDiff,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-            color: const Color(0xFF94A3B8),
+            color: colors.textSecondary,
             tooltip: 'Refresh',
           ),
         ],
@@ -294,6 +298,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
   }
 
   Widget _buildDiffContent() {
+    final colors = context.appColors;
     if (_loading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
@@ -301,16 +306,16 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
       return Center(
         child: Text(
           _error!,
-          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+          style: TextStyle(color: colors.textSecondary, fontSize: 13),
         ),
       );
     }
     final lines = _lines ?? [];
     if (lines.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'No changes',
-          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+          style: TextStyle(color: colors.textSecondary, fontSize: 13),
         ),
       );
     }
@@ -322,22 +327,23 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
   }
 
   Widget _buildUnified(List<_DiffLine> lines) {
+    final colors = context.appColors;
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 2),
       itemCount: lines.length,
       itemBuilder: (_, i) {
         final line = lines[i];
         final bgColor = switch (line.type) {
-          _DiffLineType.added => const Color(0xFF132B1E),
-          _DiffLineType.removed => const Color(0xFF2B1313),
-          _DiffLineType.hunk => const Color(0xFF1A1E2A),
+          _DiffLineType.added => colors.diffAddBg,
+          _DiffLineType.removed => colors.diffRemoveBg,
+          _DiffLineType.hunk => colors.diffContextBg,
           _DiffLineType.context => Colors.transparent,
         };
         final textColor = switch (line.type) {
-          _DiffLineType.added => const Color(0xFF4ADE80),
-          _DiffLineType.removed => const Color(0xFFF87171),
-          _DiffLineType.hunk => const Color(0xFF60A5FA),
-          _DiffLineType.context => const Color(0xFFCECEEE),
+          _DiffLineType.added => colors.diffAddText,
+          _DiffLineType.removed => colors.diffRemoveText,
+          _DiffLineType.hunk => colors.accentBlue,
+          _DiffLineType.context => colors.terminalText,
         };
         final prefix = switch (line.type) {
           _DiffLineType.added => '+',
@@ -359,10 +365,10 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
                 width: 70,
                 child: Text(
                   lineNo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
                     fontFamily: 'monospace',
-                    color: Color(0xFF475569),
+                    color: colors.textMuted,
                   ),
                 ),
               ),
@@ -398,6 +404,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
   }
 
   Widget _buildSideBySide(List<_DiffLine> lines) {
+    final colors = context.appColors;
     // Build left (old) and right (new) columns
     final leftLines = <_DiffLine>[];
     final rightLines = <_DiffLine>[];
@@ -432,15 +439,15 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
 
         if (left.type == _DiffLineType.hunk) {
           return Container(
-            color: const Color(0xFF1A1E2A),
+            color: colors.diffContextBg,
             height: 20,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
               left.content,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 fontFamily: 'monospace',
-                color: Color(0xFF60A5FA),
+                color: colors.accentBlue,
               ),
             ),
           );
@@ -451,7 +458,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
           child: Row(
             children: [
               Expanded(child: _sideCell(left, isLeft: true)),
-              const VerticalDivider(width: 1, thickness: 0.5, color: Color(0xFF2A3040)),
+              VerticalDivider(width: 1, thickness: 0.5, color: colors.border),
               Expanded(child: _sideCell(right, isLeft: false)),
             ],
           ),
@@ -461,15 +468,16 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
   }
 
   Widget _sideCell(_DiffLine line, {required bool isLeft}) {
+    final colors = context.appColors;
     final bgColor = switch (line.type) {
-      _DiffLineType.removed => const Color(0xFF2B1313),
-      _DiffLineType.added => const Color(0xFF132B1E),
+      _DiffLineType.removed => colors.diffRemoveBg,
+      _DiffLineType.added => colors.diffAddBg,
       _ => Colors.transparent,
     };
     final textColor = switch (line.type) {
-      _DiffLineType.removed => const Color(0xFFF87171),
-      _DiffLineType.added => const Color(0xFF4ADE80),
-      _ => const Color(0xFFCECEEE),
+      _DiffLineType.removed => colors.diffRemoveText,
+      _DiffLineType.added => colors.diffAddText,
+      _ => colors.terminalText,
     };
     final lineNo = isLeft ? line.oldLineNo : line.newLineNo;
 
@@ -482,10 +490,10 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
             width: 36,
             child: Text(
               lineNo != null ? '$lineNo' : '',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 fontFamily: 'monospace',
-                color: Color(0xFF475569),
+                color: colors.textMuted,
               ),
             ),
           ),
@@ -521,15 +529,16 @@ class _ToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF1E293B) : Colors.transparent,
+          color: isActive ? colors.tabActiveBg : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(
-            color: isActive ? const Color(0xFF60A5FA) : const Color(0xFF2A3040),
+            color: isActive ? colors.accentBlue : colors.border,
             width: 0.5,
           ),
         ),
@@ -537,7 +546,7 @@ class _ToggleButton extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 10,
-            color: isActive ? const Color(0xFF60A5FA) : const Color(0xFF94A3B8),
+            color: isActive ? colors.accentBlue : colors.textSecondary,
           ),
         ),
       ),

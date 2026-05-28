@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/services/webview_zoom_service.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -83,8 +84,6 @@ class _WebpageContent extends StatefulWidget {
 }
 
 class _WebpageContentState extends State<_WebpageContent> {
-  static const Color _accent = Color(0xFF0EA5E9);
-
   late final TextEditingController _urlCtrl;
   late final FocusNode _urlFocus;
   WebViewController? _controller;
@@ -485,6 +484,7 @@ class _WebpageContentState extends State<_WebpageContent> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final url = _currentUrl;
 
     return Column(
@@ -497,7 +497,7 @@ class _WebpageContentState extends State<_WebpageContent> {
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
             child: Row(
               children: [
-                const Icon(Icons.link, size: 14, color: Color(0xFF0EA5E9)),
+                Icon(Icons.link, size: 14, color: colors.accentBlue),
                 const SizedBox(width: 4),
                 Expanded(
                   child: TextField(
@@ -513,12 +513,12 @@ class _WebpageContentState extends State<_WebpageContent> {
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: Color(0xFF0EA5E9)),
+                        borderSide: BorderSide(color: colors.accentBlue),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF0EA5E9),
+                        borderSide: BorderSide(
+                          color: colors.accentBlue,
                           width: 1.5,
                         ),
                       ),
@@ -556,10 +556,10 @@ class _WebpageContentState extends State<_WebpageContent> {
                   tooltip: 'Resize panel',
                   padding: EdgeInsets.zero,
                   iconSize: 15,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.aspect_ratio,
                     size: 15,
-                    color: Color(0xFF64748B),
+                    color: colors.textSecondary,
                   ),
                   onSelected: (value) {
                     final resize = widget.renderContext.onResize;
@@ -651,12 +651,12 @@ class _WebpageContentState extends State<_WebpageContent> {
                     child: InkWell(
                       onTap: () => _showViewportLab(context),
                       borderRadius: BorderRadius.circular(4),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
                         child: Icon(
                           Icons.science_outlined,
                           size: 15,
-                          color: Color(0xFFE67E22),
+                          color: colors.accentOrange,
                         ),
                       ),
                     ),
@@ -666,7 +666,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                   child: FilledButton(
                     onPressed: _commit,
                     style: FilledButton.styleFrom(
-                      backgroundColor: _accent,
+                      backgroundColor: colors.accentBlue,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       minimumSize: const Size(0, 28),
                       textStyle: const TextStyle(fontSize: 12),
@@ -692,13 +692,13 @@ class _WebpageContentState extends State<_WebpageContent> {
                         Icon(
                           Icons.language,
                           size: 40,
-                          color: _accent.withOpacity(0.4),
+                          color: colors.accentBlue.withOpacity(0.4),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        Text(
                           'Enter a URL above',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: colors.textSecondary,
                             fontSize: 13,
                           ),
                         ),
@@ -708,7 +708,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                   : _controller == null
                   ? const Center(child: CircularProgressIndicator())
                   // WebView overlay covers this area; just show white bg.
-                  : Container(color: Colors.white),
+                  : Container(color: colors.surfaceHighlight),
         ),
       ],
     );
@@ -728,6 +728,7 @@ class _NavBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -735,7 +736,7 @@ class _NavBtn extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 15, color: const Color(0xFF94A3B8)),
+          child: Icon(icon, size: 15, color: colors.textMuted),
         ),
       ),
     );
@@ -1210,6 +1211,7 @@ JSON.stringify({
     required String suffix,
     String? hint,
   }) {
+    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1236,7 +1238,7 @@ JSON.stringify({
                 border: const OutlineInputBorder(),
                 hintText: hint,
                 suffixText: suffix,
-                suffixStyle: const TextStyle(fontSize: 11, color: Colors.grey),
+                suffixStyle: TextStyle(fontSize: 11, color: colors.textMuted),
               ),
             ),
           ),
@@ -1247,6 +1249,7 @@ JSON.stringify({
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Dialog(
       insetPadding: const EdgeInsets.all(40),
       child: ConstrainedBox(
@@ -1260,9 +1263,9 @@ JSON.stringify({
               // Header
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.science_outlined,
-                    color: Color(0xFFE67E22),
+                    color: colors.accentOrange,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -1375,17 +1378,17 @@ JSON.stringify({
                         controller: _ytPlayerWidthCtrl,
                         enabled: _ytPlayerFixEnabled,
                         style: const TextStyle(fontSize: 12),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
+                          contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 6,
                           ),
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                           suffixText: 'w',
                           suffixStyle: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey,
+                            color: colors.textMuted,
                           ),
                         ),
                       ),
@@ -1397,17 +1400,17 @@ JSON.stringify({
                         controller: _ytPlayerHeightCtrl,
                         enabled: _ytPlayerFixEnabled,
                         style: const TextStyle(fontSize: 12),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
+                          contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 6,
                           ),
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                           suffixText: 'h',
                           suffixStyle: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey,
+                            color: colors.textMuted,
                           ),
                         ),
                       ),
@@ -1421,10 +1424,10 @@ JSON.stringify({
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE67E22).withOpacity(0.1),
+                  color: colors.accentOrange.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: const Color(0xFFE67E22).withOpacity(0.3),
+                    color: colors.accentOrange.withOpacity(0.3),
                   ),
                 ),
                 child: const Text(
@@ -1499,7 +1502,7 @@ JSON.stringify({
                             : const Icon(Icons.refresh, size: 14),
                     label: const Text('Apply (Reload)'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFE67E22),
+                      backgroundColor: colors.accentOrange,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,

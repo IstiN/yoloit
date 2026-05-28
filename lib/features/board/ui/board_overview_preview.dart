@@ -436,27 +436,27 @@ class _PreviewSafePanelShell extends StatelessWidget {
   }
 }
 
-Color panelTypeColor(String type, {Color? override}) {
+Color panelTypeColor(String type, AppColorScheme colors, {Color? override}) {
   if (override != null) return override;
   return switch (type) {
-    'board.note.markdown' => const Color(0xFFE879F9),
-    'board.kanban' => const Color(0xFF6366F1),
-    'board.webpage' => const Color(0xFF0EA5E9),
-    'board.code.snippet' => const Color(0xFF10B981),
-    'board.checklist' => const Color(0xFFF59E0B),
-    'board.files' => const Color(0xFFEC4899),
-    'board.file.preview' => const Color(0xFF8B5CF6),
-    'board.playlist' => const Color(0xFFA855F7),
-    'board.run_configs' => const Color(0xFF22C55E),
-    'board.run' => const Color(0xFF84CC16),
-    'board.chat' => const Color(0xFF34D399),
-    'board.terminal' => const Color(0xFF14B8A6),
-    'board.filetree' => const Color(0xFF64748B),
-    'board.diff.preview' => const Color(0xFF60A5FA),
-    'board.yolo_assistant' => const Color(0xFFF97316),
-    'board.widget.custom' => const Color(0xFF7C3AED),
-    'board.timer' => const Color(0xFF3B82F6),
-    _ => const Color(0xFF94A3B8),
+    'board.note.markdown' => colors.primaryLight,
+    'board.kanban' => colors.primary,
+    'board.webpage' => colors.accentBlue,
+    'board.code.snippet' => colors.accentGreen,
+    'board.checklist' => colors.accentOrange,
+    'board.files' => colors.primaryGlow,
+    'board.file.preview' => colors.primaryLight,
+    'board.playlist' => colors.primaryLight,
+    'board.run_configs' => colors.statusActive,
+    'board.run' => colors.statusActive,
+    'board.chat' => colors.accentGreen,
+    'board.terminal' => colors.terminalPrompt,
+    'board.filetree' => colors.textMuted,
+    'board.diff.preview' => colors.accentBlue,
+    'board.yolo_assistant' => colors.accentOrange,
+    'board.widget.custom' => colors.primaryDark,
+    'board.timer' => colors.accentBlue,
+    _ => colors.textMuted,
   };
 }
 
@@ -474,6 +474,7 @@ Widget _buildHeadlessMockup(
   BoardPanelInstance panel,
   BoardPanelPlugin plugin,
 ) {
+  final colors = context.appColors;
   final type = panel.type;
 
   // Fallback if we don't have custom mocks
@@ -498,8 +499,8 @@ Widget _buildHeadlessMockup(
         const SizedBox(height: 4),
         Text(
           panel.title,
-          style: const TextStyle(
-            color: Color(0x809E9E9E),
+          style: TextStyle(
+            color: colors.textMuted.withAlpha(128),
             fontSize: 11,
           ),
         ),
@@ -513,51 +514,92 @@ Widget _buildHeadlessMockup(
         ? (stateConfig['workingDir'] as String? ?? '')
         : (panel.state['workingDir'] as String? ?? '');
     return Container(
-      color: const Color(0xFF0B0D12),
+      color: colors.terminalBackground,
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: colors.statusError,
+                  shape: BoxShape.circle,
+                ),
+              ),
               const SizedBox(width: 4),
-              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle)),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: colors.statusWarning,
+                  shape: BoxShape.circle,
+                ),
+              ),
               const SizedBox(width: 4),
-              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: colors.statusActive,
+                  shape: BoxShape.circle,
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   workingDir.isNotEmpty ? workingDir : 'zsh',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 10, fontFamily: 'JetBrainsMono'),
+                  style: TextStyle(
+                    color: colors.textPrimary.withAlpha(96),
+                    fontSize: 10,
+                    fontFamily: 'JetBrainsMono',
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'guest@yoloit:~\$ yoloit status',
-            style: TextStyle(color: Color(0xFF4ADE80), fontSize: 11, fontFamily: 'JetBrainsMono'),
+            style: TextStyle(
+              color: colors.terminalPrompt,
+              fontSize: 11,
+              fontFamily: 'JetBrainsMono',
+            ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             '● YoLoIT Core Services: Active',
-            style: TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            style: TextStyle(
+              color: colors.terminalText,
+              fontSize: 11,
+              fontFamily: 'JetBrainsMono',
+            ),
           ),
-          const Text(
+          Text(
             '● Sessions: 2 active, 0 suspended',
-            style: TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'JetBrainsMono'),
+            style: TextStyle(
+              color: colors.terminalText,
+              fontSize: 11,
+              fontFamily: 'JetBrainsMono',
+            ),
           ),
           const SizedBox(height: 8),
-          const Row(
+          Row(
             children: [
               Text(
                 'guest@yoloit:~\$ ',
-                style: TextStyle(color: Color(0xFF4ADE80), fontSize: 11, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(
+                  color: colors.terminalPrompt,
+                  fontSize: 11,
+                  fontFamily: 'JetBrainsMono',
+                ),
               ),
-              _PulsingCursor(),
+              const _PulsingCursor(),
             ],
           ),
         ],
@@ -568,27 +610,39 @@ Widget _buildHeadlessMockup(
   if (type == 'board.webpage') {
     final url = panel.state['url'] as String? ?? '';
     return Container(
-      color: const Color(0xFF141821),
+      color: colors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Browser address bar mockup
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            color: const Color(0xFF1E2433),
+            color: colors.surfaceElevated,
             child: Row(
               children: [
-                const Icon(Icons.arrow_back, size: 12, color: Color(0x80FFFFFF)),
+                Icon(
+                  Icons.arrow_back,
+                  size: 12,
+                  color: colors.textPrimary.withAlpha(128),
+                ),
                 const SizedBox(width: 6),
-                const Icon(Icons.arrow_forward, size: 12, color: Color(0x40FFFFFF)),
+                Icon(
+                  Icons.arrow_forward,
+                  size: 12,
+                  color: colors.textPrimary.withAlpha(64),
+                ),
                 const SizedBox(width: 6),
-                const Icon(Icons.refresh, size: 12, color: Color(0x80FFFFFF)),
+                Icon(
+                  Icons.refresh,
+                  size: 12,
+                  color: colors.textPrimary.withAlpha(128),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Container(
                     height: 20,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0B0D12),
+                      color: colors.background,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -597,7 +651,10 @@ Widget _buildHeadlessMockup(
                       url.isNotEmpty ? url : 'https://yoloit.ai',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 10),
+                      style: TextStyle(
+                        color: colors.textPrimary.withAlpha(204),
+                        fontSize: 10,
+                      ),
                     ),
                   ),
                 ),
@@ -607,16 +664,23 @@ Widget _buildHeadlessMockup(
           // Browser body mockup
           Expanded(
             child: Container(
-              color: const Color(0xFF0F111A),
+              color: colors.background,
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.language_outlined, size: 36, color: plugin.accentColor.withAlpha(120)),
+                    Icon(
+                      Icons.language_outlined,
+                      size: 36,
+                      color: plugin.accentColor.withAlpha(120),
+                    ),
                     const SizedBox(height: 10),
                     Text(
                       panel.title.isNotEmpty ? panel.title : 'Webpage Preview',
-                      style: const TextStyle(color: Color(0x80FFFFFF), fontSize: 12),
+                      style: TextStyle(
+                        color: colors.textPrimary.withAlpha(128),
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -633,14 +697,14 @@ Widget _buildHeadlessMockup(
     final tracks = rawTracks.where((e) => e is Map).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     final currentIndex = panel.state['currentIndex'] as int? ?? 0;
     return Container(
-      color: const Color(0xFF0B0D12),
+      color: colors.terminalBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Playlist Header
           Container(
             padding: const EdgeInsets.all(10),
-            color: const Color(0xFF141821),
+            color: colors.surface,
             child: Row(
               children: [
                 Icon(Icons.library_music_outlined, size: 16, color: plugin.accentColor),
@@ -655,8 +719,14 @@ Widget _buildHeadlessMockup(
           // Tracks mockup
           Expanded(
             child: tracks.isEmpty
-                ? const Center(
-                    child: Text('No tracks in playlist', style: TextStyle(color: Color(0x40FFFFFF), fontSize: 11)),
+                ? Center(
+                    child: Text(
+                      'No tracks in playlist',
+                      style: TextStyle(
+                        color: colors.textPrimary.withAlpha(64),
+                        fontSize: 11,
+                      ),
+                    ),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -673,7 +743,10 @@ Widget _buildHeadlessMockup(
                             Icon(
                               isActive ? Icons.play_arrow_rounded : Icons.music_note_outlined,
                               size: 14,
-                              color: isActive ? plugin.accentColor : const Color(0x60FFFFFF),
+                              color:
+                                  isActive
+                                      ? plugin.accentColor
+                                      : colors.textPrimary.withAlpha(96),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -683,7 +756,10 @@ Widget _buildHeadlessMockup(
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: isActive ? Colors.white : const Color(0xCCFFFFFF),
+                                  color:
+                                      isActive
+                                          ? colors.textPrimary
+                                          : colors.textPrimary.withAlpha(204),
                                   fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
@@ -708,14 +784,14 @@ Widget _buildHeadlessMockup(
   if (type == 'board.run' || type == 'board.run_configs') {
     final groupName = panel.state['group'] as String? ?? 'default';
     return Container(
-      color: const Color(0xFF0F111A),
+      color: colors.background,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Run panel top header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            color: const Color(0xFF141821),
+            color: colors.surface,
             child: Row(
               children: [
                 Icon(Icons.play_circle_outline_rounded, size: 16, color: plugin.accentColor),
@@ -734,9 +810,9 @@ Widget _buildHeadlessMockup(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildMockRunRow(plugin, 'Build Project', 'idle', 'npm run build'),
-                  _buildMockRunRow(plugin, 'Start Dev Server', 'active', 'npm run dev'),
-                  _buildMockRunRow(plugin, 'Lint & Format', 'idle', 'npm run lint'),
+                  _buildMockRunRow(context, plugin, 'Build Project', 'idle', 'npm run build'),
+                  _buildMockRunRow(context, plugin, 'Start Dev Server', 'active', 'npm run dev'),
+                  _buildMockRunRow(context, plugin, 'Lint & Format', 'idle', 'npm run lint'),
                 ],
               ),
             ),
@@ -749,7 +825,7 @@ Widget _buildHeadlessMockup(
   if (type == 'board.widget.custom') {
     final widgetId = panel.state['widgetId'] as String? ?? 'custom-app';
     return Container(
-      color: const Color(0xFF0F111A),
+      color: colors.background,
       padding: const EdgeInsets.all(16),
       child: Center(
         child: Column(
@@ -764,18 +840,18 @@ Widget _buildHeadlessMockup(
             const SizedBox(height: 4),
             Text(
               'App ID: $widgetId',
-              style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 10),
+              style: TextStyle(color: colors.textPrimary.withAlpha(96), fontSize: 10),
             ),
             const SizedBox(height: 16),
             // Decorative mock canvas dashboard element
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildMockWidgetMetric('78%', 'CPU', Colors.blue),
+                _buildMockWidgetMetric(context, '78%', 'CPU', colors.accentBlue),
                 const SizedBox(width: 8),
-                _buildMockWidgetMetric('4.2 GB', 'MEM', Colors.green),
+                _buildMockWidgetMetric(context, '4.2 GB', 'MEM', colors.accentGreen),
                 const SizedBox(width: 8),
-                _buildMockWidgetMetric('99.9%', 'UPTIME', Colors.orange),
+                _buildMockWidgetMetric(context, '99.9%', 'UPTIME', colors.accentOrange),
               ],
             ),
           ],
@@ -787,34 +863,57 @@ Widget _buildHeadlessMockup(
   return defaultMock;
 }
 
-Widget _buildMockWidgetMetric(String val, String label, Color color) {
+Widget _buildMockWidgetMetric(
+  BuildContext context,
+  String val,
+  String label,
+  Color color,
+) {
+  final colors = context.appColors;
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
     decoration: BoxDecoration(
-      color: const Color(0xFF141821),
+      color: colors.surface,
       borderRadius: BorderRadius.circular(4),
-      border: Border.all(color: const Color(0xFF232A3B), width: 0.5),
+      border: Border.all(color: colors.border, width: 0.5),
     ),
     child: Column(
       children: [
-        Text(val, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+        Text(
+          val,
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 7)),
+        Text(
+          label,
+          style: TextStyle(color: colors.textPrimary.withAlpha(96), fontSize: 7),
+        ),
       ],
     ),
   );
 }
 
-Widget _buildMockRunRow(BoardPanelPlugin plugin, String name, String status, String cmd) {
+Widget _buildMockRunRow(
+  BuildContext context,
+  BoardPanelPlugin plugin,
+  String name,
+  String status,
+  String cmd,
+) {
+  final colors = context.appColors;
   final isActive = status == 'active';
   return Container(
     margin: const EdgeInsets.symmetric(vertical: 4),
     padding: const EdgeInsets.all(8),
     decoration: BoxDecoration(
-      color: const Color(0xFF141821),
+      color: colors.surface,
       borderRadius: BorderRadius.circular(6),
       border: Border.all(
-        color: isActive ? plugin.accentColor.withAlpha(100) : const Color(0xFF232A3B),
+        color: isActive ? plugin.accentColor.withAlpha(100) : colors.border,
         width: isActive ? 1 : 0.5,
       ),
     ),
@@ -823,7 +922,7 @@ Widget _buildMockRunRow(BoardPanelPlugin plugin, String name, String status, Str
         Icon(
           isActive ? Icons.stop_circle_outlined : Icons.play_circle_outline,
           size: 16,
-          color: isActive ? Colors.red : plugin.accentColor,
+          color: isActive ? colors.statusError : plugin.accentColor,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -832,7 +931,14 @@ Widget _buildMockRunRow(BoardPanelPlugin plugin, String name, String status, Str
             children: [
               Text(name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               const SizedBox(height: 2),
-              Text(cmd, style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 8, fontFamily: 'JetBrainsMono')),
+              Text(
+                cmd,
+                style: TextStyle(
+                  color: colors.textPrimary.withAlpha(96),
+                  fontSize: 8,
+                  fontFamily: 'JetBrainsMono',
+                ),
+              ),
             ],
           ),
         ),
@@ -873,11 +979,16 @@ class _PulsingCursorState extends State<_PulsingCursor> with SingleTickerProvide
   }
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AnimatedBuilder(
       animation: _anim,
       builder: (context, _) => Opacity(
         opacity: _anim.value > 0.5 ? 1.0 : 0.0,
-        child: Container(width: 6, height: 11, color: const Color(0xFF4ADE80)),
+        child: Container(
+          width: 6,
+          height: 11,
+          color: colors.terminalPrompt,
+        ),
       ),
     );
   }
@@ -894,15 +1005,19 @@ class _OffscreenPanelCard extends StatelessWidget {
     final theme = Theme.of(context);
     
     final accent = panel.color;
-    final panelFill = accent == null
-        ? const Color(0xFF141424)
-        : Color.lerp(const Color(0xFF141424), accent, 0.12) ?? const Color(0xFF141424);
-    final panelHeaderFill = accent == null
-        ? const Color(0xFF1F1F35)
-        : Color.lerp(const Color(0xFF1F1F35), accent, 0.18) ?? const Color(0xFF1F1F35);
-    final borderColor = accent == null
-        ? const Color(0xFF2A2A40)
-        : Color.lerp(const Color(0xFF2A2A40), accent, 0.65) ?? const Color(0xFF2A2A40);
+    final panelFill =
+        accent == null
+            ? colors.surface
+            : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
+    final panelHeaderFill =
+        accent == null
+            ? colors.surfaceElevated
+            : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
+                colors.surfaceElevated;
+    final borderColor =
+        accent == null
+            ? colors.border
+            : Color.lerp(colors.border, accent, 0.65) ?? colors.border;
 
     final plugin = BoardPluginRegistry.instance.pluginFor(panel.type) ??
         BoardPluginRegistry.instance.fallback;

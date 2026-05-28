@@ -994,15 +994,15 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
   bool _hovering = false;
   bool _showColorPicker = false;
 
-  static const _palette = [
-    Color(0xFFC026D3), // purple (default)
-    Color(0xFF2563EB), // blue
-    Color(0xFF16A34A), // green
-    Color(0xFFD97706), // amber
-    Color(0xFFDC2626), // red
-    Color(0xFF0891B2), // cyan
-    Color(0xFFDB2777), // pink
-    Color(0xFF6D28D9), // violet
+  List<Color> _palette(AppColorScheme colors) => [
+    colors.primary,
+    colors.accentBlue,
+    colors.accentGreen,
+    colors.accentOrange,
+    colors.accentRed,
+    colors.terminalPrompt,
+    colors.primaryLight,
+    colors.primaryDark,
   ];
 
   void _showMenu(BuildContext context) {
@@ -1316,7 +1316,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                   SizedBox(height: 8),
                   Row(
                     children:
-                        _palette.map((c) {
+                        _palette(colors).map((c) {
                           final selected = (ws.color ?? colors.primary) == c;
                           return GestureDetector(
                             onTap: () {
@@ -1333,7 +1333,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                                 border: Border.all(
                                   color:
                                       selected
-                                          ? Colors.white
+                                          ? colors.textPrimary
                                           : Colors.transparent,
                                   width: 2,
                                 ),
@@ -1763,7 +1763,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                     onPressed: _loading ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
-                      foregroundColor: Colors.white,
+                      foregroundColor: colors.textPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),

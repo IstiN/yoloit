@@ -908,7 +908,7 @@ class _Footer extends StatelessWidget {
               onPressed: onGetStarted,
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.accentBlue,
-                foregroundColor: Colors.white,
+                foregroundColor: colors.textPrimary,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),

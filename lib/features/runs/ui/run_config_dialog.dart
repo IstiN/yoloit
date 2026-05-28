@@ -15,9 +15,10 @@ class RunConfigDialog extends StatefulWidget {
   final RunConfig? initial;
 
   static Future<RunConfig?> show(BuildContext context, {RunConfig? initial}) {
+    final colors = context.appColors;
     return showDialog<RunConfig>(
       context: context,
-      barrierColor: Colors.black54,
+      barrierColor: colors.textPrimary.withAlpha(84),
       builder: (_) => RunConfigDialog(initial: initial),
     );
   }
@@ -35,15 +36,15 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
   Color? _selectedColor;
   late List<_QuickActionDraft> _quickActions;
 
-  static const _colorChips = [
-    Color(0xFF54C5F8),
-    Color(0xFF00FF9F),
-    Color(0xFFFFD700),
-    Color(0xFFFF4F6A),
-    Color(0xFF9D4EDD),
-    Color(0xFFFF9500),
-    Color(0xFFFF69B4),
-    Color(0xFF00B4FF),
+  List<Color> _colorChips(AppColorScheme colors) => [
+    colors.accentBlue,
+    colors.accentGreen,
+    colors.statusWarning,
+    colors.accentRed,
+    colors.primary,
+    colors.accentOrange,
+    colors.primaryLight,
+    colors.terminalPrompt,
   ];
 
   @override
@@ -330,7 +331,7 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                               : null,
                     ),
                   ),
-                  ..._colorChips.map(
+                  ..._colorChips(colors).map(
                     (c) => GestureDetector(
                       onTap: () => setState(() => _selectedColor = c),
                       child: Container(
@@ -368,7 +369,7 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                       onPressed: _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colors.primary,
-                        foregroundColor: Colors.white,
+                        foregroundColor: colors.textPrimary,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,

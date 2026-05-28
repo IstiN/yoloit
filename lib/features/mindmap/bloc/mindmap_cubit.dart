@@ -427,6 +427,7 @@ class MindMapCubit extends Cubit<MindMapState> {
   void openFileAsPanel({
     required String id,
     required String filePath,
+    required Color connectorColor,
   }) {
     if (state.nodes.any((n) => n.id == id)) {
       // Already on canvas — just unhide it.
@@ -473,6 +474,7 @@ class MindMapCubit extends Cubit<MindMapState> {
   void openFileDiffAsPanel({
     required String filePath,
     required String repoPath,
+    required Color connectorColor,
   }) {
     final id = 'filediff:${filePath.hashCode}';
     debugPrint('[MindMapCubit] openFileDiffAsPanel id=$id, state.nodes.length=${state.nodes.length}');

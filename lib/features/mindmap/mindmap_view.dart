@@ -322,7 +322,11 @@ class _MindMapViewState extends State<MindMapView>
       onFileOpened: () {},
       onFileSelected: (filePath) {
         final nodeId = 'panel:${filePath.hashCode}';
-        mindMapCubit.openFileAsPanel(id: nodeId, filePath: filePath);
+        mindMapCubit.openFileAsPanel(
+          id: nodeId,
+          filePath: filePath,
+          connectorColor: context.appColors.accentBlue.withValues(alpha: 112 / 255),
+        );
       },
     );
   }
