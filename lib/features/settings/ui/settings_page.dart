@@ -1548,17 +1548,14 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
         );
       },
     );
-    if (name == null || name.trim().isEmpty) {
-      controller.dispose();
-      return;
-    }
+    // Do NOT dispose controller here — the dialog exit animation may still
+    // reference it. Let GC handle cleanup.
+    if (name == null || name.trim().isEmpty) return;
     final trimmed = name.trim();
-    // Defer dispose & save to after the dialog exit animation completes,
-    // otherwise notifyListeners() fires while dependents are still mounted.
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      controller.dispose();
-      await tm.saveCurrentAsPreset(trimmed);
-    });
+    // Wait for the dialog exit animation to fully complete before
+    // notifyListeners() fires (which rebuilds the widget tree).
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    await tm.saveCurrentAsPreset(trimmed);
   }
 
   Future<void> _exportTheme() async {
