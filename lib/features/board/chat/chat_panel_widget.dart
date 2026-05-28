@@ -1147,6 +1147,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _streamingContent = '';
           _assistantInsertIndex = _messages.length;
         });
+        debugPrint(
+          '[ChatPanel] assistantMessageStart: '
+          'insertIndex=$_assistantInsertIndex, '
+          'messages=${_messages.length}',
+        );
         break;
 
       case ChatEventType.assistantDelta:
@@ -1228,6 +1233,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _streamingContent = '';
           _assistantInsertIndex = null;
         });
+        debugPrint(
+          '[ChatPanel] assistantMessage committed: '
+          'insertAt=${_assistantInsertIndex ?? "append"}, '
+          'messages=${_messages.length}, '
+          'contentLen=${content.length}',
+        );
         _scrollToBottom();
         break;
 
@@ -1313,10 +1324,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ),
           );
         });
+        debugPrint(
+          '[ChatPanel] toolComplete: $toolName, '
+          'messages=${_messages.length}, '
+          'assistantInsertIndex=$_assistantInsertIndex',
+        );
         _scrollToBottom();
         break;
-
-      case ChatEventType.result:
         final usage = event.usageData;
         if (usage != null) {
           final codeChanges = usage['codeChanges'] as Map<String, dynamic>?;

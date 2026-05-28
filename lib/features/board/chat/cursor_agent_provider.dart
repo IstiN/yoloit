@@ -210,6 +210,22 @@ class CursorAgentProvider extends ChatProvider {
                 try {
                   final json = jsonDecode(trimmed) as Map<String, dynamic>;
 
+                  // Log raw event for debugging event ordering
+                  final eventType = json['type'] as String? ?? '?';
+                  final eventSubtype = json['subtype'] as String?;
+                  final hasTs = json.containsKey('timestamp_ms');
+                  final contentPreview = () {
+                    final msg = json['message'] as Map<String, dynamic>?;
+                    final c = _extractTextContent(msg?['content']);
+                    return c.length > 60 ? '${c.substring(0, 60)}…' : c;
+                  }();
+                  debugPrint(
+                    '[CursorAgent] RAW event: $eventType'
+                    '${eventSubtype != null ? '.$eventSubtype' : ''}'
+                    '${hasTs ? ' (delta)' : ''}'
+                    '${contentPreview.isNotEmpty ? ' content="$contentPreview"' : ''}',
+                  );
+
                   // Capture cursor session_id from init event and record the model.
                   if (json['type'] == 'system' &&
                       json['subtype'] == 'init' &&
@@ -345,9 +361,20 @@ class CursorAgentProvider extends ChatProvider {
           String trueDelta;
           if (content.startsWith(_cumulativeContent)) {
             trueDelta = content.substring(_cumulativeContent.length);
+            if (_cumulativeContent.isNotEmpty) {
+              debugPrint(
+                '[CursorAgent] cumulative diff: '
+                'prev=${_cumulativeContent.length} chars, '
+                'new=${content.length} chars, '
+                'delta=${trueDelta.length} chars',
+              );
+            }
           } else {
             // Fallback: treat as incremental if no cumulative prefix match
             trueDelta = content;
+            debugPrint(
+              '[CursorAgent] incremental delta: ${trueDelta.length} chars',
+            );
           }
           _cumulativeContent = content;
 

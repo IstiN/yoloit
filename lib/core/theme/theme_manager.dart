@@ -221,11 +221,6 @@ class ThemeManager extends ChangeNotifier {
       (key: 'diffRemoveBg', label: 'Remove Bg'),
       (key: 'diffRemoveText', label: 'Remove Text'),
     ],
-    'YoLo Orb': [
-      (key: 'orbCyan', label: 'Cyan'),
-      (key: 'orbPurple', label: 'Purple'),
-      (key: 'orbPink', label: 'Pink'),
-    ],
   };
 
   /// Auto-derived companion slots (dim/glow variants).

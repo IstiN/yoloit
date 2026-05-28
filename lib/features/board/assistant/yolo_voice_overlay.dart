@@ -2392,15 +2392,17 @@ class _YoloOrbPreviewState extends State<YoloOrbPreview>
     final colors = context.appColors;
     return AnimatedBuilder(
       animation: _ctrl,
-      builder: (_, __) => CustomPaint(
-        size: Size(widget.size, widget.size),
-        painter: _BlobOrbPainter(
-          progress: _ctrl.value,
-          mode: _OrbMode.ready,
-          colors: colors,
-          bgColor: colors.background,
-          ovalWidth: widget.size,
-          ovalHeight: widget.size,
+      builder: (_, __) => SizedBox.square(
+        dimension: widget.size,
+        child: CustomPaint(
+          painter: _BlobOrbPainter(
+            progress: _ctrl.value,
+            mode: _OrbMode.ready,
+            colors: colors,
+            bgColor: Colors.transparent,
+            ovalWidth: widget.size,
+            ovalHeight: widget.size,
+          ),
         ),
       ),
     );
