@@ -353,37 +353,32 @@ class CursorAgentProvider extends ChatProvider {
 
         if (hasTimestamp) {
           // Delta chunk (--stream-partial-output).
-          // cursor-agent sends cumulative content (full text so far) with each
-          // event, not incremental deltas.  We diff against the previous
-          // cumulative snapshot to extract the true new portion.
+          // cursor-agent sends a MIX of incremental token-level deltas AND
+          // periodic cumulative snapshots (the full text so far).  We track
+          // the accumulated text in _cumulativeContent and detect which kind
+          // each event is to avoid duplicating text in the UI.
           final isFirst = _currentStreamId == null;
 
           String trueDelta;
-          if (content.startsWith(_cumulativeContent)) {
+          if (content == _cumulativeContent) {
+            // Exact duplicate of accumulated content — skip entirely
+            trueDelta = '';
+          } else if (content.length > _cumulativeContent.length &&
+              content.startsWith(_cumulativeContent)) {
+            // Cumulative snapshot that extends past what we've seen — extract new portion
             trueDelta = content.substring(_cumulativeContent.length);
-            if (_cumulativeContent.isNotEmpty) {
-              debugPrint(
-                '[CursorAgent] cumulative diff: '
-                'prev=${_cumulativeContent.length} chars, '
-                'new=${content.length} chars, '
-                'delta=${trueDelta.length} chars',
-              );
-            }
+            _cumulativeContent = content;
           } else {
-            // Fallback: treat as incremental if no cumulative prefix match
+            // Incremental delta — append to accumulated text
             trueDelta = content;
-            debugPrint(
-              '[CursorAgent] incremental delta: ${trueDelta.length} chars',
-            );
+            _cumulativeContent += content;
           }
-          _cumulativeContent = content;
 
           if (isFirst) {
             final startId =
                 modelCallId ??
                 'cursor-${DateTime.now().millisecondsSinceEpoch}';
             _currentStreamId = startId;
-            // Emit messageStart + first delta together
             return [
               ChatEvent(
                 type: ChatEventType.assistantMessageStart,
