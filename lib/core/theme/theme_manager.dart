@@ -408,6 +408,63 @@ class ThemeManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Returns the current effective scheme (base + overrides applied).
+  AppColorScheme get effectiveScheme {
+    var scheme = baseScheme;
+    if (_colorOverrides.isNotEmpty) {
+      scheme = _applyOverrides(scheme);
+    }
+    return scheme;
+  }
+
+  /// Returns the effective brightness for the current theme.
+  Brightness get effectiveBrightness {
+    if (_activeCustomThemeId != null) {
+      return _customThemes
+              .where((t) => t.id == _activeCustomThemeId)
+              .firstOrNull
+              ?.brightness ??
+          _brightness;
+    }
+    return _current.defaultBrightness ?? _brightness;
+  }
+
+  /// Saves the current theme (with any overrides) as a new custom preset.
+  /// Returns the new custom theme's id.
+  Future<String> saveCurrentAsPreset(String name) async {
+    final custom = CustomTheme(
+      id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      scheme: effectiveScheme,
+      brightness: effectiveBrightness,
+    );
+    await _saveCustomTheme(custom);
+    _customThemes.add(custom);
+    _activeCustomThemeId = custom.id;
+    _colorOverrides.clear();
+    notifyListeners();
+    await _saveColorOverrides();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('custom_theme_id', custom.id);
+    return custom.id;
+  }
+
+  /// Exports the current theme (with overrides) as a JSON string.
+  String exportCurrentAsJson() {
+    final json = {
+      'name': _activeCustomThemeId != null
+          ? (_customThemes
+                  .where((t) => t.id == _activeCustomThemeId)
+                  .firstOrNull
+                  ?.name ??
+              'Custom')
+          : _current.label,
+      'brightness': effectiveBrightness == Brightness.light ? 'light' : 'dark',
+      'colors': effectiveScheme.toJson(),
+    };
+    return const JsonEncoder.withIndent('  ').convert(json);
+  }
+
   /// Exports a built-in preset theme as JSON string for the user.
   String exportPresetAsJson(AppThemePreset preset) {
     final scheme = AppColorScheme.fromAccent(

@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path/path.dart' as p;
 import 'package:yoloit/core/config/app_config.dart';
 import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/core/hotkeys/hotkey_definition.dart';
@@ -1492,6 +1495,99 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     }
   }
 
+  Future<void> _savePreset() async {
+    final tm = ThemeManager.instance;
+    // Determine default name
+    String defaultName;
+    if (tm.activeCustomThemeId != null) {
+      final custom = tm.customThemes
+          .where((t) => t.id == tm.activeCustomThemeId)
+          .firstOrNull;
+      defaultName = '${custom?.name ?? "Custom"} Copy';
+    } else {
+      defaultName = '${tm.current.label} Custom';
+    }
+
+    final controller = TextEditingController(text: defaultName);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final colors = context.appColors;
+        return AlertDialog(
+          backgroundColor: colors.surface,
+          title: Text(
+            'Save as Preset',
+            style: TextStyle(color: colors.textPrimary, fontSize: 14),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            style: TextStyle(color: colors.textPrimary, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Preset name',
+              hintStyle: TextStyle(color: colors.textMuted),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: colors.border),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: colors.primary),
+              ),
+            ),
+            onSubmitted: (v) => Navigator.of(ctx).pop(v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (name == null || name.trim().isEmpty) return;
+    await tm.saveCurrentAsPreset(name.trim());
+  }
+
+  Future<void> _exportTheme() async {
+    final tm = ThemeManager.instance;
+    final json = tm.exportCurrentAsJson();
+    final dirPath = await FilePicker.getDirectoryPath(
+      dialogTitle: 'Export Theme — Choose Folder',
+    );
+    if (dirPath == null) return;
+
+    // Build a safe filename
+    String themeName;
+    if (tm.activeCustomThemeId != null) {
+      final custom = tm.customThemes
+          .where((t) => t.id == tm.activeCustomThemeId)
+          .firstOrNull;
+      themeName = custom?.name ?? 'custom_theme';
+    } else {
+      themeName = tm.current.label;
+    }
+    final safeName = themeName
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+$'), '');
+    final file = File(p.join(dirPath, '${safeName}_theme.json'));
+    await file.writeAsString(json, flush: true);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Theme exported to ${file.path}'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -1555,16 +1651,27 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
         ),
         const SizedBox(height: 10),
         // ── Actions row ──
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
           children: [
             _SmallButton(
               icon: Icons.file_download_outlined,
               label: 'Import',
               onTap: _importTheme,
             ),
-            const SizedBox(width: 8),
+            _SmallButton(
+              icon: Icons.file_upload_outlined,
+              label: 'Export',
+              onTap: _exportTheme,
+            ),
+            _SmallButton(
+              icon: Icons.save_outlined,
+              label: 'Save Preset',
+              onTap: _savePreset,
+            ),
             // Dark/Light toggle (only for themes without fixed brightness)
-            if (!tm.hasFixedBrightness) ...[
+            if (!tm.hasFixedBrightness)
               _SmallButton(
                 icon: tm.isDark
                     ? Icons.light_mode_outlined
@@ -1572,8 +1679,6 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
                 label: tm.isDark ? 'Light Mode' : 'Dark Mode',
                 onTap: () => tm.toggleBrightness(),
               ),
-              const SizedBox(width: 8),
-            ],
             if (hasOverrides)
               _SmallButton(
                 icon: Icons.restart_alt,
