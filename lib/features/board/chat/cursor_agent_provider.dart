@@ -31,6 +31,8 @@ class CursorAgentProvider extends ChatProvider {
   /// sessionName → cursor session_id (UUID captured from the init event).
   final Map<String, String> _sessionIds = {};
   final Map<String, Process> _processes = {};
+  /// sessionName → model used when the session was started.
+  final Map<String, String> _sessionModels = {};
   final CursorProcessStarter _processStarter;
 
   /// The generated id of the currently streaming assistant message.
@@ -103,11 +105,19 @@ class CursorAgentProvider extends ChatProvider {
       args.addAll(['--workspace', config.workingDir]);
     }
 
-    // Resume existing cursor session (not first message)
+    // Resume existing cursor session only if the model hasn't changed.
+    // Cursor ignores --model when --resume is passed (session stores its own
+    // model), so a model switch must start a fresh session.
     if (!isFirstMessage) {
       final cursorSessionId = _sessionIds[config.sessionName];
-      if (cursorSessionId != null) {
+      final sessionModel = _sessionModels[config.sessionName];
+      final modelChanged = sessionModel != null && sessionModel != config.model;
+      if (cursorSessionId != null && !modelChanged) {
         args.addAll(['--resume', cursorSessionId]);
+      } else if (modelChanged) {
+        // Clear the old session so the next init event registers the new one.
+        _sessionIds.remove(config.sessionName);
+        _sessionModels.remove(config.sessionName);
       }
     }
 
@@ -188,14 +198,15 @@ class CursorAgentProvider extends ChatProvider {
                 try {
                   final json = jsonDecode(trimmed) as Map<String, dynamic>;
 
-                  // Capture cursor session_id from init event
+                  // Capture cursor session_id from init event and record the model.
                   if (json['type'] == 'system' &&
                       json['subtype'] == 'init' &&
                       json['session_id'] is String) {
                     _sessionIds[config.sessionName] =
                         json['session_id'] as String;
+                    _sessionModels[config.sessionName] = config.model;
                     debugPrint(
-                      '[CursorAgent] session_id: ${_sessionIds[config.sessionName]}',
+                      '[CursorAgent] session_id: ${_sessionIds[config.sessionName]} model: ${config.model}',
                     );
                   }
 
@@ -518,6 +529,7 @@ class CursorAgentProvider extends ChatProvider {
       process.kill(ProcessSignal.sigterm);
     }
     _processes.clear();
+    _sessionModels.clear();
   }
 
   /// Drop process references without killing them.

@@ -2164,6 +2164,28 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     ],
   ),
   YoloitCliTool(
+    command: 'agent:model',
+    alias: 'agm',
+    description: 'Get or set the default LLM model for an agent',
+    group: 'agents',
+    params: <YoloitCliToolParam>[
+      _p('agent_id', 'Agent id (copilot, cursor, opencode, ...)', required: true, shortKey: 'a'),
+      _p('model_id', 'Optional model id to set (omit to read current)', shortKey: 'm'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'agent:asr',
+    alias: 'aga',
+    description: 'Get or set the ASR (transcription) config for an agent',
+    group: 'agents',
+    params: <YoloitCliToolParam>[
+      _p('agent_id', 'Agent id', required: true, shortKey: 'a'),
+      _p('mode', 'ASR mode: local or cloud (omit to read current)', shortKey: 'mo'),
+      _p('provider', 'Cloud provider config id (required when mode=cloud)', shortKey: 'pr'),
+      _p('model', 'Cloud ASR model, e.g. whisper-1 (optional for cloud)', shortKey: 'ml'),
+    ],
+  ),
+  YoloitCliTool(
     command: 'search',
     alias: 'srh',
     description:
