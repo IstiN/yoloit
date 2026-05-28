@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider model catalog entry
@@ -64,6 +68,8 @@ class ProviderModelCatalogService {
   final Map<String, ProviderCatalog> _catalogs = {};
   // user custom models per provider, stored separately
   final Map<String, List<ChatModelInfo>> _customModels = {};
+  // CLI-discovered models per provider (cursor-agent --list-models, etc.)
+  final Map<String, List<ChatModelInfo>> _cliModels = {};
 
   bool _loaded = false;
   String? _loadError;
@@ -96,6 +102,8 @@ class ProviderModelCatalogService {
         _parseCatalogs(cached);
         _loaded = true;
         _loadedFromRemote = false;
+        // Kick off CLI model discovery in background (non-blocking).
+        unawaited(_discoverCliModels());
         return;
       }
       // Try bundled asset
@@ -104,6 +112,7 @@ class ProviderModelCatalogService {
         _parseCatalogs(asset);
         _loaded = true;
         _loadedFromRemote = false;
+        unawaited(_discoverCliModels());
         return;
       }
       _loadError = 'Failed to load provider model catalog: network unavailable and no local cache.';
@@ -115,12 +124,18 @@ class ProviderModelCatalogService {
     _loaded = true;
     _loadedFromRemote = true;
     await _saveCache(json);
+    // Kick off CLI model discovery in background (non-blocking).
+    unawaited(_discoverCliModels());
   }
 
-  /// Returns available models for [providerId] = remote catalog + user custom models.
+  /// Returns available models for [providerId] = CLI-discovered models
+  /// (highest priority) > remote catalog > user custom models.
   /// Returns `null` (not empty list) if catalog has not loaded successfully.
   List<ChatModelInfo>? modelsForProvider(String providerId) {
     if (!_loaded) return null;
+    // CLI models take priority — they are the ground truth from the CLI tool.
+    final cli = _cliModels[providerId];
+    if (cli != null && cli.isNotEmpty) return [...cli];
     final catalog = _catalogs[providerId];
     final base = catalog?.models ?? [];
     final custom = _customModels[providerId] ?? [];
@@ -162,6 +177,42 @@ class ProviderModelCatalogService {
 
   List<ChatModelInfo> customModelsForProvider(String providerId) =>
       List.unmodifiable(_customModels[providerId] ?? []);
+
+  // ── CLI model discovery ────────────────────────────────────────────────────
+
+  /// Discovers models by querying installed CLI tools (e.g. `cursor-agent
+  /// --list-models`). Runs in background — results silently update
+  /// [modelsForProvider] once available.
+  Future<void> _discoverCliModels() async {
+    await discoverCursorModels();
+  }
+
+  /// Fetches the cursor model list from `cursor-agent --list-models`.
+  ///
+  /// [envGroupIds] should contain the env groups that hold `CURSOR_API_KEY`.
+  /// If omitted, falls back to platform env only (works if the key is
+  /// exported in the shell profile).
+  Future<List<ChatModelInfo>?> discoverCursorModels({
+    List<String> envGroupIds = const [],
+  }) async {
+    try {
+      final extraEnv = await GlobalEnvGroupsService.instance
+          .resolveSelectedGroups(envGroupIds);
+      final models = await CursorAgentProvider.fetchModelsFromCli(
+        extraEnv: extraEnv,
+      );
+      if (models != null && models.isNotEmpty) {
+        _cliModels['cursor'] = models;
+        debugPrint(
+          '[ProviderCatalog] cursor CLI: ${models.length} models discovered',
+        );
+      }
+      return models;
+    } catch (e) {
+      debugPrint('[ProviderCatalog] cursor CLI discovery error: $e');
+      return null;
+    }
+  }
 
   // ── Parse ───────────────────────────────────────────────────────────────────
 

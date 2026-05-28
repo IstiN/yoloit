@@ -568,4 +568,65 @@ class CursorAgentProvider extends ChatProvider {
       environment: environment,
     );
   }
+
+  /// Runs `cursor-agent --list-models` and parses the output into
+  /// [ChatModelInfo] entries.
+  ///
+  /// Requires `CURSOR_API_KEY` in [extraEnv] or platform environment.
+  /// Returns `null` if cursor-agent is not installed or the command fails.
+  static Future<List<ChatModelInfo>?> fetchModelsFromCli({
+    Map<String, String> extraEnv = const {},
+  }) async {
+    try {
+      final enrichedPath = PlatformShell.instance.enrichedPath(
+        Platform.environment['PATH'] ?? '',
+      );
+      final env = {
+        ...Platform.environment,
+        ...extraEnv,
+        'PATH': enrichedPath,
+        if (Platform.isMacOS) 'AGENT_CLI_CREDENTIAL_STORE': 'memory',
+      };
+      final result = await Process.run(
+        'cursor-agent',
+        ['--list-models'],
+        environment: env,
+      ).timeout(const Duration(seconds: 10));
+      if (result.exitCode != 0) {
+        debugPrint(
+          '[CursorAgent] --list-models failed: ${result.stderr}',
+        );
+        return null;
+      }
+      final output = (result.stdout as String).trim();
+      return _parseModelList(output);
+    } catch (e) {
+      debugPrint('[CursorAgent] fetchModelsFromCli error: $e');
+      return null;
+    }
+  }
+
+  /// Parses `cursor-agent --list-models` output.
+  ///
+  /// Format: one model per line, `id - Display Name`.
+  /// First line is header ("Available models"), skipped.
+  static List<ChatModelInfo> _parseModelList(String output) {
+    final models = <ChatModelInfo>[];
+    for (final line in output.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final dashIdx = trimmed.indexOf(' - ');
+      if (dashIdx <= 0) continue;
+      final id = trimmed.substring(0, dashIdx).trim();
+      final displayName = trimmed.substring(dashIdx + 3).trim();
+      if (id.isEmpty || displayName.isEmpty) continue;
+      models.add(ChatModelInfo(
+        id: id,
+        displayName: displayName,
+        isDefault: id == 'auto',
+      ));
+    }
+    debugPrint('[CursorAgent] parsed ${models.length} models from CLI');
+    return models;
+  }
 }

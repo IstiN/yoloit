@@ -27,6 +27,7 @@ import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
+import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -3683,6 +3684,8 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   late List<String> _selectedEnvGroupIds;
   bool? _providerInstalled; // null = checking, true = ok, false = missing
   List<ChatModelInfo>? _opencodeModels; // loaded async from models.dev
+  bool _cursorModelsLoading = false;
+  bool? _cursorApiKeyConfigured; // null = unknown, true/false = checked
 
   static const _providerCommand = {
     'copilot': 'copilot',
@@ -3735,6 +3738,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     _selectedEnvGroupIds = List<String>.from(widget.config.envGroupIds);
     _checkProviderInstalled(_selectedProvider);
     if (_selectedProvider == 'opencode') _loadOpencodeModels();
+    if (_selectedProvider == 'cursor') _loadCursorModels();
   }
 
   Future<void> _loadOpencodeModels() async {
@@ -3758,6 +3762,38 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     } catch (e) {
       debugPrint('[ChatSetup] opencode models load failed: $e');
     }
+  }
+
+  Future<void> _loadCursorModels() async {
+    if (_cursorModelsLoading) return;
+    setState(() => _cursorModelsLoading = true);
+    try {
+      // Check if CURSOR_API_KEY is available in selected env groups.
+      final envMap = await GlobalEnvGroupsService.instance
+          .resolveSelectedGroups(_selectedEnvGroupIds);
+      final hasKey = envMap.containsKey('CURSOR_API_KEY') ||
+          Platform.environment.containsKey('CURSOR_API_KEY');
+      if (mounted) setState(() => _cursorApiKeyConfigured = hasKey);
+      if (!hasKey) {
+        if (mounted) setState(() => _cursorModelsLoading = false);
+        return;
+      }
+      final models = await ProviderModelCatalogService.instance
+          .discoverCursorModels(envGroupIds: _selectedEnvGroupIds);
+      if (models != null && models.isNotEmpty && mounted) {
+        setState(() {
+          if (!models.any((m) => m.id == _selectedModel)) {
+            _selectedModel =
+                models
+                    .firstWhere((m) => m.isDefault, orElse: () => models.first)
+                    .id;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[ChatSetup] cursor models load failed: $e');
+    }
+    if (mounted) setState(() => _cursorModelsLoading = false);
   }
 
   Future<void> _checkProviderInstalled(String provider) async {
@@ -3941,6 +3977,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                   });
                   _checkProviderInstalled(v);
                   if (v == 'opencode') _loadOpencodeModels();
+                  if (v == 'cursor') _loadCursorModels();
                 },
               ),
             ),
@@ -4001,8 +4038,25 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             selectedGroupIds: _selectedEnvGroupIds,
             onChanged: (value) {
               setState(() => _selectedEnvGroupIds = value);
+              if (_selectedProvider == 'cursor') _loadCursorModels();
             },
           ),
+          // Show hint when cursor is selected but CURSOR_API_KEY is missing.
+          if (_selectedProvider == 'cursor' &&
+              _cursorApiKeyConfigured == false) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Add CURSOR_API_KEY to an env group above to authenticate.',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.orange.shade300,
+              ),
+            ),
+          ],
+          if (_cursorModelsLoading) ...[
+            const SizedBox(height: 4),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
           const SizedBox(height: 14),
 
           // Working directory
