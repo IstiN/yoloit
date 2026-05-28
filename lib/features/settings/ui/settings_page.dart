@@ -1712,6 +1712,9 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
           ),
         ),
         const SizedBox(height: 12),
+        // ── YoLo Orb live preview ──
+        _OrbColorPreview(onPick: _pickColor),
+        const SizedBox(height: 16),
         // ── Color categories ──
         ...ThemeManager.colorCategories.entries.map((cat) {
           return _ColorCategoryRow(
@@ -1721,6 +1724,89 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
           );
         }),
       ],
+    );
+  }
+}
+
+// ─────────────────────────── orb color preview for appearance section ─────────
+
+/// Inline YoLo orb preview shown inside the Appearance settings section.
+///
+/// Shows the animated orb beside its three customisable colour swatches so the
+/// user can see live changes as they pick colours.
+class _OrbColorPreview extends StatelessWidget {
+  const _OrbColorPreview({required this.onPick});
+
+  final Future<void> Function(String slot, Color current) onPick;
+
+  static const _orbSlots = [
+    (key: 'orbCyan', label: 'Cyan'),
+    (key: 'orbPurple', label: 'Purple'),
+    (key: 'orbPink', label: 'Pink'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final tm = ThemeManager.instance;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        children: [
+          // Animated orb
+          YoloOrbPreview(size: 80),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'YoLo ORB',
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: _orbSlots.map((slot) {
+                    final currentColor = tm.colorForSlot(slot.key);
+                    final isOverridden =
+                        tm.colorOverrides.containsKey(slot.key);
+                    return _ColorSwatch(
+                      label: slot.label,
+                      color: currentColor,
+                      isOverridden: isOverridden,
+                      onTap: () => onPick(slot.key, currentColor),
+                      onReset: isOverridden
+                          ? () => tm.removeColorOverride(slot.key)
+                          : null,
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Customise the YoLo assistant orb colours',
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 10,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

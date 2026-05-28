@@ -57,6 +57,10 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
     required this.statusIdle,
     required this.statusError,
     required this.statusWarning,
+    // ── YoLo orb visual identity ──────────────────────────
+    required this.orbCyan,
+    required this.orbPurple,
+    required this.orbPink,
   });
 
   // ── Accent ──────────────────────────────────────────────────────────────────
@@ -110,6 +114,19 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
   final Color statusIdle;
   final Color statusError;
   final Color statusWarning;
+
+  // ── YoLo orb visual identity ──────────────────────────────────────────────────
+  /// Primary cyan used across all orb modes.  Users can override this to shift
+  /// the orb's "cool" pole colour.
+  final Color orbCyan;
+
+  /// Primary purple used in recording / thinking modes.  Overriding this
+  /// shifts the orb's "warm" pole colour.
+  final Color orbPurple;
+
+  /// Hot-pink accent used in active modes.  Overriding this changes the
+  /// energetic highlight colour across all orb states.
+  final Color orbPink;
 
   // ── Shortcut ──────────────────────────────────────────────────────────────────
   static AppColorScheme of(BuildContext context) =>
@@ -173,6 +190,9 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       statusIdle: const Color(0xFF888888),
       statusError: const Color(0xFFFF4F6A),
       statusWarning: const Color(0xFFFF9500),
+      orbCyan: const Color(0xFF3CE8FF),
+      orbPurple: const Color(0xFFAA66FF),
+      orbPink: const Color(0xFFE060E0),
     );
   }
 
@@ -224,6 +244,9 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       statusIdle: const Color(0xFF94A3B8),
       statusError: const Color(0xFFDE1B2E),
       statusWarning: const Color(0xFFCC7700),
+      orbCyan: const Color(0xFF00A8C8),
+      orbPurple: const Color(0xFF7C3AED),
+      orbPink: const Color(0xFFD946EF),
     );
   }
 
@@ -281,6 +304,9 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
     'statusIdle': _colorToHex(statusIdle),
     'statusError': _colorToHex(statusError),
     'statusWarning': _colorToHex(statusWarning),
+    'orbCyan': _colorToHex(orbCyan),
+    'orbPurple': _colorToHex(orbPurple),
+    'orbPink': _colorToHex(orbPink),
   };
 
   /// Exports the scheme as a pretty-printed JSON string.
@@ -342,6 +368,9 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       statusIdle: c('statusIdle', fallback.statusIdle),
       statusError: c('statusError', fallback.statusError),
       statusWarning: c('statusWarning', fallback.statusWarning),
+      orbCyan: c('orbCyan', fallback.orbCyan),
+      orbPurple: c('orbPurple', fallback.orbPurple),
+      orbPink: c('orbPink', fallback.orbPink),
     );
   }
 
@@ -387,6 +416,9 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
     Color? statusIdle,
     Color? statusError,
     Color? statusWarning,
+    Color? orbCyan,
+    Color? orbPurple,
+    Color? orbPink,
   }) {
     return AppColorScheme(
       primary: primary ?? this.primary,
@@ -427,6 +459,9 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       statusIdle: statusIdle ?? this.statusIdle,
       statusError: statusError ?? this.statusError,
       statusWarning: statusWarning ?? this.statusWarning,
+      orbCyan: orbCyan ?? this.orbCyan,
+      orbPurple: orbPurple ?? this.orbPurple,
+      orbPink: orbPink ?? this.orbPink,
     );
   }
 
@@ -472,6 +507,9 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       statusIdle: Color.lerp(statusIdle, other.statusIdle, t)!,
       statusError: Color.lerp(statusError, other.statusError, t)!,
       statusWarning: Color.lerp(statusWarning, other.statusWarning, t)!,
+      orbCyan: Color.lerp(orbCyan, other.orbCyan, t)!,
+      orbPurple: Color.lerp(orbPurple, other.orbPurple, t)!,
+      orbPink: Color.lerp(orbPink, other.orbPink, t)!,
     );
   }
 }

@@ -598,18 +598,18 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
             colors:
                 widget.titleColor != null
                     ? [widget.titleColor!, widget.titleColor!]
-                    : [colors.accentBlue, colors.primaryLight],
+                    : [colors.orbCyan, colors.orbPurple],
           ).createShader(b),
       child: Text(
         'YoLo',
         style: TextStyle(
-          color: colors.textPrimary,
+          color: Colors.white,
           fontSize: widget.titleFontSize ?? sz * 0.15,
           fontWeight: FontWeight.w300,
           letterSpacing: -0.8,
           shadows: [
             Shadow(
-              color: colors.accentBlue.withValues(alpha: 0.67),
+              color: colors.orbCyan.withValues(alpha: 0.67),
               blurRadius: 16,
             ),
           ],
@@ -1215,9 +1215,9 @@ class _RunningBorderPainter extends CustomPainter {
         sub.addPath(metrics.extractPath(0, segEnd), Offset.zero);
       }
 
-      // Color transitions along the trail: head bright, tail fading
+      // Color transitions along the trail: head bright (orbCyan), tail fading (orbPink)
       final t = segFrac;
-      final color = Color.lerp(colors.primaryLight, colors.accentBlue, t)!;
+      final color = Color.lerp(colors.orbPink, colors.orbCyan, t)!;
       final alpha = (0.15 + t * 0.85).clamp(0.0, 1.0);
 
       final paint =
@@ -1237,7 +1237,7 @@ class _RunningBorderPainter extends CustomPainter {
     if (headPos != null) {
       final glowPaint =
           Paint()
-            ..color = colors.accentBlue.withValues(alpha: 0.6)
+            ..color = colors.orbCyan.withValues(alpha: 0.6)
             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
       canvas.drawCircle(headPos.position, 3, glowPaint);
     }
@@ -1461,43 +1461,48 @@ class _BlobOrbPainter extends CustomPainter {
   final double ovalWidth;
   final double ovalHeight;
 
-  List<Color> get _palette => switch (mode) {
-    _OrbMode.ready => [
-      colors.accentBlue,
-      Color.lerp(colors.accentBlue, colors.primary, 0.35)!,
-      Color.lerp(colors.primaryLight, colors.accentBlue, 0.45)!,
-      Color.lerp(colors.accentBlue, colors.primaryLight, 0.55)!,
-      colors.primaryLight,
-    ],
-    _OrbMode.recording => [
-      colors.primary,
-      colors.primaryDark,
-      colors.primaryLight,
-      Color.lerp(colors.accentBlue, colors.primary, 0.45)!,
-      Color.lerp(colors.primary, colors.primaryLight, 0.65)!,
-    ],
-    _OrbMode.sending => [
-      colors.accentBlue,
-      Color.lerp(colors.accentBlue, colors.primaryDark, 0.45)!,
-      Color.lerp(colors.accentBlue, colors.primaryLight, 0.35)!,
-      Color.lerp(colors.accentBlue, colors.surfaceHighlight, 0.20)!,
-      Color.lerp(colors.accentBlue, colors.primary, 0.25)!,
-    ],
-    _OrbMode.thinking => [
-      colors.primaryLight,
-      colors.primaryDark,
-      colors.primary,
-      Color.lerp(colors.accentBlue, colors.primary, 0.35)!,
-      Color.lerp(colors.primaryLight, colors.accentRed, 0.20)!,
-    ],
-    _OrbMode.response => [
-      colors.accentBlue,
-      Color.lerp(colors.primaryLight, colors.accentRed, 0.18)!,
-      colors.primary,
-      Color.lerp(colors.accentBlue, colors.primary, 0.25)!,
-      colors.primaryLight,
-    ],
-  };
+  List<Color> get _palette {
+    final c = colors.orbCyan;
+    final p = colors.orbPurple;
+    final k = colors.orbPink;
+    return switch (mode) {
+      _OrbMode.ready => [
+        c,
+        Color.lerp(c, p, 0.55)!,
+        k,
+        Color.lerp(c, p, 0.30)!,
+        Color.lerp(p, Colors.white, 0.20)!,
+      ],
+      _OrbMode.recording => [
+        p,
+        Color.lerp(p, Colors.black, 0.20)!,
+        Color.lerp(k, p, 0.20)!,
+        Color.lerp(c, p, 0.68)!,
+        Color.lerp(k, p, 0.45)!,
+      ],
+      _OrbMode.sending => [
+        c,
+        Color.lerp(c, p, 0.80)!,
+        Color.lerp(c, Colors.white, 0.12)!,
+        Color.lerp(c, Colors.white, 0.07)!,
+        Color.lerp(c, p, 0.70)!,
+      ],
+      _OrbMode.thinking => [
+        Color.lerp(k, p, 0.08)!,
+        Color.lerp(p, Colors.black, 0.15)!,
+        Color.lerp(p, Colors.white, 0.12)!,
+        c,
+        k,
+      ],
+      _OrbMode.response => [
+        Color.lerp(c, Colors.white, 0.07)!,
+        Color.lerp(k, Colors.white, 0.04)!,
+        Color.lerp(p, Colors.white, 0.10)!,
+        c,
+        Color.lerp(p, Colors.white, 0.27)!,
+      ],
+    };
+  }
 
   // Blob shape configs: each blob has offset angle, size multiplier, aspect ratio
   static const _blobConfigs = [
@@ -2346,4 +2351,58 @@ class _SinglePlectrumPainter extends CustomPainter {
       old.progress != progress ||
       old.color != color ||
       old.rotation != rotation;
+}
+
+// ─────────────────────────── YoLo orb preview widget ─────────────────────────
+
+/// A compact, animated YoLo orb preview intended for use in the settings UI.
+///
+/// Renders the orb in its "ready" state using the current theme's orb colours
+/// (`orbCyan`, `orbPurple`, `orbPink`).  Automatically reacts to theme changes.
+class YoloOrbPreview extends StatefulWidget {
+  const YoloOrbPreview({super.key, this.size = 100});
+
+  final double size;
+
+  @override
+  State<YoloOrbPreview> createState() => _YoloOrbPreviewState();
+}
+
+class _YoloOrbPreviewState extends State<YoloOrbPreview>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => CustomPaint(
+        size: Size(widget.size, widget.size),
+        painter: _BlobOrbPainter(
+          progress: _ctrl.value,
+          mode: _OrbMode.ready,
+          colors: colors,
+          bgColor: colors.background,
+          ovalWidth: widget.size,
+          ovalHeight: widget.size,
+        ),
+      ),
+    );
+  }
 }

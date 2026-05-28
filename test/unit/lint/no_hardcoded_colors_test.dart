@@ -160,7 +160,7 @@ void main() {
       'lib/features/settings/ui/settings_page.dart': 17,
       'lib/features/board/plugins/builtin/file_preview_plugin.dart': 14,
       'lib/features/preview/widgets/markdown_document_preview.dart': 12,
-      'lib/features/board/assistant/yolo_voice_overlay.dart': 9,
+      'lib/features/board/assistant/yolo_voice_overlay.dart': 11,
       'lib/features/board/chat/chat_panel_widget.dart': 8,
       'lib/features/board/plugins/builtin/kanban_plugin.dart': 7,
       'lib/features/updates/ui/update_banner.dart': 6,

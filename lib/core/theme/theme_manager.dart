@@ -107,6 +107,9 @@ class ThemeManager extends ChangeNotifier {
       statusIdle: _colorOverrides['statusIdle'],
       statusError: _colorOverrides['statusError'],
       statusWarning: _colorOverrides['statusWarning'],
+      orbCyan: _colorOverrides['orbCyan'],
+      orbPurple: _colorOverrides['orbPurple'],
+      orbPink: _colorOverrides['orbPink'],
     );
   }
 
@@ -218,6 +221,11 @@ class ThemeManager extends ChangeNotifier {
       (key: 'diffRemoveBg', label: 'Remove Bg'),
       (key: 'diffRemoveText', label: 'Remove Text'),
     ],
+    'YoLo Orb': [
+      (key: 'orbCyan', label: 'Cyan'),
+      (key: 'orbPurple', label: 'Purple'),
+      (key: 'orbPink', label: 'Pink'),
+    ],
   };
 
   /// Auto-derived companion slots (dim/glow variants).
@@ -310,6 +318,9 @@ class ThemeManager extends ChangeNotifier {
       'statusIdle' => s.statusIdle,
       'statusError' => s.statusError,
       'statusWarning' => s.statusWarning,
+      'orbCyan' => s.orbCyan,
+      'orbPurple' => s.orbPurple,
+      'orbPink' => s.orbPink,
       _ => s.primary,
     };
   }
