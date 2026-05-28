@@ -155,7 +155,7 @@ class _ChecklistContentState extends State<_ChecklistContent> {
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
-              final id = item['id'] as String;
+              final id = item['id'] as String? ?? '';
               final text = item['text'] as String? ?? '';
               final isDone = item['done'] as bool? ?? false;
 

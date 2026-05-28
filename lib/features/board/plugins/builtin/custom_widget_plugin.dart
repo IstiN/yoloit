@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
@@ -40,6 +41,9 @@ class CustomWidgetPlugin extends BoardPanelPlugin {
     'widgetId': '',
     'config': <String, dynamic>{},
   };
+
+  @override
+  bool get supportsHeadlessRender => false; // JSC VM — crashes on rapid mount/dispose
 
   @override
   Widget buildContent(
@@ -154,6 +158,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
   @override
   void dispose() {
+    HeadlessRenderRegistry.activeTasks.remove('widget:${widget.panel.id}');
     ThemeManager.instance.removeListener(_onThemeChanged);
     WidgetEngineManager.instance.detach(widget.panel.id);
     super.dispose();
@@ -232,6 +237,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
   void _handleRenderedTree(Map<String, dynamic> tree) {
     if (!mounted) return;
+    HeadlessRenderRegistry.activeTasks.remove('widget:${widget.panel.id}');
     setState(() => _uiTree = tree);
   }
 
@@ -245,6 +251,11 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
     bool forceReload = false,
     bool keepExistingUi = false,
   }) async {
+    final taskKey = 'widget:${widget.panel.id}';
+    if (_widgetId.isNotEmpty) {
+      HeadlessRenderRegistry.activeTasks.add(taskKey);
+    }
+
     if (!keepExistingUi) {
       _engine = null;
       _renderer = null;
@@ -253,6 +264,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
 
     if (_widgetId.isEmpty) {
       WidgetEngineManager.instance.remove(widget.panel.id);
+      HeadlessRenderRegistry.activeTasks.remove(taskKey);
       if (mounted) {
         setState(() {
           _loading = false;
@@ -282,6 +294,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
         onRenderUI: _handleRenderedTree,
       );
       if (engine == null) {
+        HeadlessRenderRegistry.activeTasks.remove(taskKey);
         if (mounted) {
           setState(() {
             _loading = false;
@@ -295,6 +308,9 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
       _engine = engine;
       _renderer = _buildRenderer(engine);
       final tree = WidgetEngineManager.instance.tree(widget.panel.id);
+      if (tree != null) {
+        HeadlessRenderRegistry.activeTasks.remove(taskKey);
+      }
       if (mounted) {
         setState(() {
           _uiTree = tree ?? _uiTree;
@@ -303,6 +319,7 @@ class _CustomWidgetContentState extends State<_CustomWidgetContent> {
         });
       }
     } catch (e) {
+      HeadlessRenderRegistry.activeTasks.remove(taskKey);
       if (mounted) {
         setState(() {
           _loading = false;

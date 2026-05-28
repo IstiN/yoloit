@@ -9,6 +9,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 
 class MarkdownDocumentPreview extends StatefulWidget {
   const MarkdownDocumentPreview({super.key, required this.content});
@@ -21,25 +22,32 @@ class MarkdownDocumentPreview extends StatefulWidget {
 }
 
 class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
-  final MermaidRenderer _renderer = MermaidRenderer();
+  static final MermaidRenderer _sharedRenderer = MermaidRenderer();
+  static Future<void>? _initFuture;
   bool _rendererReady = false;
 
   @override
   void initState() {
     super.initState();
-    _renderer
-        .init()
+    final taskKey = 'mermaid_init:${_sharedRenderer.hashCode}';
+    HeadlessRenderRegistry.activeTasks.add(taskKey);
+    _initFuture ??= _sharedRenderer.init();
+    _initFuture!
         .then((_) {
           if (mounted) setState(() => _rendererReady = true);
         })
         .catchError((Object e) {
           debugPrint('[Mermaid] init() FAILED: $e');
+        })
+        .whenComplete(() {
+          HeadlessRenderRegistry.activeTasks.remove(taskKey);
         });
   }
 
   @override
   void dispose() {
-    _renderer.dispose();
+    HeadlessRenderRegistry.activeTasks.remove('mermaid_init:${_sharedRenderer.hashCode}');
+    // Do NOT dispose the static shared renderer, as it persists for the process lifetime!
     super.dispose();
   }
 
@@ -59,23 +67,30 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
         backgroundColor: colors.terminalBackground,
       ),
     );
-    return SelectionArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: MarkdownBody(
-          key: ValueKey(_rendererReady),
-          data: widget.content,
-          softLineBreak: true,
-          builders: {
-            'pre': _MermaidBlockBuilder(
-              renderer: _rendererReady ? _renderer : null,
-              colors: colors,
-              mermaidTheme: mermaidTheme,
-            ),
-          },
-          styleSheet: styleSheet,
-        ),
+    final Widget mdBody = SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: MarkdownBody(
+        key: ValueKey(_rendererReady),
+        data: widget.content,
+        softLineBreak: true,
+        builders: {
+          'pre': _MermaidBlockBuilder(
+            renderer: _rendererReady ? _sharedRenderer : null,
+            colors: colors,
+            mermaidTheme: mermaidTheme,
+          ),
+        },
+        styleSheet: styleSheet,
       ),
+    );
+
+    if (View.maybeOf(context) == null) {
+      // Headless context: bypass SelectionArea to avoid View.of() crashes
+      return mdBody;
+    }
+
+    return SelectionArea(
+      child: mdBody,
     );
   }
 }
@@ -393,6 +408,8 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
     if (widget.renderer == null) {
       return;
     }
+    final taskKey = 'mermaid:${widget.code.hashCode}';
+    HeadlessRenderRegistry.activeTasks.add(taskKey);
     setState(() {
       _loading = true;
       _error = null;
@@ -407,7 +424,9 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
       );
       if (!mounted) return;
       final imageProvider = diagram.imageProvider;
-      await precacheImage(imageProvider, context);
+      if (View.maybeOf(context) != null) {
+        await precacheImage(imageProvider, context);
+      }
       if (mounted) {
         setState(() {
           _svg = diagram.svg;
@@ -424,6 +443,8 @@ class _MermaidDiagramState extends State<_MermaidDiagram> {
           _loading = false;
         });
       }
+    } finally {
+      HeadlessRenderRegistry.activeTasks.remove(taskKey);
     }
   }
 

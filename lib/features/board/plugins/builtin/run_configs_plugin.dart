@@ -31,6 +31,9 @@ class RunConfigsPlugin extends BoardPanelPlugin {
   Map<String, dynamic> get initialState => const {};
 
   @override
+  bool get supportsHeadlessRender => false; // requires live RunCubit + session state
+
+  @override
   Widget buildContent(
     BuildContext context,
     BoardPanelInstance panel,
@@ -112,6 +115,9 @@ class RunPlugin extends BoardPanelPlugin {
     'group': 'default',
     'activeSessionId': null,
   };
+
+  @override
+  bool get supportsHeadlessRender => false; // requires live RunCubit + session state
 
   @override
   Widget buildContent(

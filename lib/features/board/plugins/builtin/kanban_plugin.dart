@@ -98,8 +98,8 @@ class _KanbanContentState extends State<_KanbanContent> {
 
   List<_CardData> get _cards =>
       (widget.panel.state['cards'] as List?)
-          ?.whereType<_CardData>()
-          .map((e) => Map<String, dynamic>.from(e))
+          ?.where((e) => e is Map)
+          .map((e) => Map<String, dynamic>.from(e as Map))
           .toList() ??
       [];
 

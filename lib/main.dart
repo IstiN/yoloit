@@ -1,10 +1,11 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show unawaited, Completer;
 import 'dart:io' show Platform, File, exit;
 
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:yoloit/app.dart';
+import 'package:yoloit/core/cli/cli_server.dart';
 import 'package:yoloit/core/cli/real_llm_tool_test_runner.dart';
 import 'package:yoloit/core/config/app_config.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
@@ -13,11 +14,34 @@ import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
+// CLI Handlers
+import 'package:yoloit/core/cli/handlers/chat_handler.dart';
+import 'package:yoloit/core/cli/handlers/checklist_handler.dart';
+import 'package:yoloit/core/cli/handlers/code_snippet_handler.dart';
+import 'package:yoloit/core/cli/handlers/files_handler.dart';
+import 'package:yoloit/core/cli/handlers/filetree_handler.dart';
+import 'package:yoloit/core/cli/handlers/kanban_handler.dart';
+import 'package:yoloit/core/cli/handlers/note_handler.dart';
+import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
+import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
+import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
+import 'package:yoloit/core/cli/handlers/assistant_handler.dart';
+import 'package:yoloit/core/cli/handlers/timer_handler.dart';
+import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
+
+// Managers and Cubits
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
+import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
+import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
+import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
+
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (RealLlmToolTestRunner.isRequested(args)) {
     exit(await RealLlmToolTestRunner.run(args));
   }
+
   // On macOS, media_kit's default `DynamicLibrary.open('Mpv.framework/Mpv')`
   // collides with media_kit_video's linked `@rpath/Mpv.framework/Versions/A/Mpv`
   // because dyld treats them as different lookup keys → loads Mpv twice →
@@ -76,8 +100,10 @@ void main(List<String> args) async {
     windowButtonVisibility: true,
   );
   await windowManager.waitUntilReadyToShow(options, () async {
-    await windowManager.show();
-    await windowManager.focus();
+    if (!args.contains('--headless')) {
+      await windowManager.show();
+      await windowManager.focus();
+    }
   });
 
   ResourceMonitorService.instance.start();

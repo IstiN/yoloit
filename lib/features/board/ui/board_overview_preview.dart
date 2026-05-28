@@ -42,7 +42,7 @@ class BoardOverviewPreview extends StatelessWidget {
         }
 
         // Always fit all panels — overview purpose is to show the whole board.
-        final bounds = boundsForPanels(panels).inflate(120);
+        final bounds = boundsForBoardPanels(panels).inflate(120);
 
         final scale = math.min(
           size.width / bounds.width,
@@ -70,7 +70,13 @@ class BoardOverviewPreview extends StatelessWidget {
               ),
               for (final panel in panels)
                 Positioned.fromRect(
-                  rect: mapPanelRect(panel.bounds.rect, bounds, scale, dx, dy),
+                  rect: mapBoardPanelRect(
+                    panel.bounds.rect,
+                    bounds,
+                    scale,
+                    dx,
+                    dy,
+                  ),
                   child: BoardOverviewPanelPreview(panel: panel),
                 ),
             ],
@@ -80,22 +86,107 @@ class BoardOverviewPreview extends StatelessWidget {
     );
   }
 
-  Rect boundsForPanels(List<BoardPanelInstance> panels) {
-    var bounds = panels.first.bounds.rect;
-    for (final panel in panels.skip(1)) {
-      bounds = bounds.expandToInclude(panel.bounds.rect);
-    }
-    return bounds;
-  }
+  Rect boundsForPanels(List<BoardPanelInstance> panels) =>
+      boundsForBoardPanels(panels);
 
-  Rect mapPanelRect(Rect rect, Rect bounds, double scale, double dx, double dy) {
-    return Rect.fromLTWH(
-      dx + (rect.left - bounds.left) * scale,
-      dy + (rect.top - bounds.top) * scale,
-      math.max(12, rect.width * scale),
-      math.max(9, rect.height * scale),
+  Rect mapPanelRect(Rect rect, Rect bounds, double scale, double dx, double dy) =>
+      mapBoardPanelRect(rect, bounds, scale, dx, dy);
+}
+
+/// Canvas-style preview for offscreen PNG capture: panels at board coordinates
+/// with full plugin content (no overview card headers / tiny-mode blanks).
+class BoardCanvasPreview extends StatelessWidget {
+  const BoardCanvasPreview({required this.board, this.useViewport = false});
+
+  final BoardDocument board;
+  final bool useViewport;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final panels = board.panels.where((panel) => !panel.hidden).toList();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        if (panels.isEmpty) {
+          return ColoredBox(color: colors.background);
+        }
+
+        final Matrix4 matrix;
+        final bounds = boundsForBoardPanels(panels).inflate(120);
+
+        if (useViewport) {
+          matrix = Matrix4.identity()
+            ..translate(board.viewport.translation.dx, board.viewport.translation.dy)
+            ..scale(board.viewport.scale);
+        } else {
+          final scale = math.min(
+            size.width / bounds.width,
+            size.height / bounds.height,
+          );
+          final dx = (size.width - bounds.width * scale) / 2 - bounds.left * scale;
+          final dy = (size.height - bounds.height * scale) / 2 - bounds.top * scale;
+          matrix = Matrix4.identity()
+            ..translate(dx, dy)
+            ..scale(scale);
+        }
+
+        return ColoredBox(
+          color: colors.background,
+          child: Transform(
+            transform: matrix,
+            alignment: Alignment.topLeft,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: BoardOverviewLinksPainter(
+                      links: board.links,
+                      panels: panels,
+                      bounds: bounds,
+                      scale: 1.0,
+                      dx: 0.0,
+                      dy: 0.0,
+                      useViewport: true,
+                    ),
+                  ),
+                ),
+                for (final panel in panels)
+                  Positioned.fromRect(
+                    rect: panel.bounds.rect,
+                    child: _OffscreenPanelCard(panel: panel),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
+}
+
+Rect boundsForBoardPanels(List<BoardPanelInstance> panels) {
+  var bounds = panels.first.bounds.rect;
+  for (final panel in panels.skip(1)) {
+    bounds = bounds.expandToInclude(panel.bounds.rect);
+  }
+  return bounds;
+}
+
+Rect mapBoardPanelRect(
+  Rect rect,
+  Rect bounds,
+  double scale,
+  double dx,
+  double dy,
+) {
+  return Rect.fromLTWH(
+    dx + (rect.left - bounds.left) * scale,
+    dy + (rect.top - bounds.top) * scale,
+    math.max(12, rect.width * scale),
+    math.max(9, rect.height * scale),
+  );
 }
 
 class BoardOverviewLinksPainter extends CustomPainter {
@@ -106,6 +197,7 @@ class BoardOverviewLinksPainter extends CustomPainter {
     required this.scale,
     required this.dx,
     required this.dy,
+    this.useViewport = false,
   });
 
   final List<BoardPanelLink> links;
@@ -114,6 +206,7 @@ class BoardOverviewLinksPainter extends CustomPainter {
   final double scale;
   final double dx;
   final double dy;
+  final bool useViewport;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -121,13 +214,27 @@ class BoardOverviewLinksPainter extends CustomPainter {
       final from = panels.where((p) => p.id == link.fromPanelId).firstOrNull;
       final to = panels.where((p) => p.id == link.toPanelId).firstOrNull;
       if (from == null || to == null) continue;
-      canvas.drawLine(
-        _mapPoint(from.bounds.rect.center),
-        _mapPoint(to.bounds.rect.center),
-        Paint()
-          ..color = link.color.withAlpha(120)
-          ..strokeWidth = 1.2,
-      );
+      
+      final fromPt = from.bounds.rect.center;
+      final toPt = to.bounds.rect.center;
+
+      if (useViewport) {
+        canvas.drawLine(
+          fromPt,
+          toPt,
+          Paint()
+            ..color = link.color.withAlpha(120)
+            ..strokeWidth = 1.2,
+        );
+      } else {
+        canvas.drawLine(
+          _mapPoint(fromPt),
+          _mapPoint(toPt),
+          Paint()
+            ..color = link.color.withAlpha(120)
+            ..strokeWidth = 1.2,
+        );
+      }
     }
   }
 
@@ -145,7 +252,8 @@ class BoardOverviewLinksPainter extends CustomPainter {
         oldDelegate.bounds != bounds ||
         oldDelegate.scale != scale ||
         oldDelegate.dx != dx ||
-        oldDelegate.dy != dy;
+        oldDelegate.dy != dy ||
+        oldDelegate.useViewport != useViewport;
   }
 }
 
@@ -207,7 +315,10 @@ class BoardOverviewPanelPreview extends StatelessWidget {
                         ),
                         Expanded(
                           child: ClipRect(
-                            child: BoardOverviewPanelContent(panel: panel),
+                            child: BoardOverviewPanelContent(
+                              panel: panel,
+                              headerHeight: 18.0,
+                            ),
                           ),
                         ),
                       ],
@@ -226,9 +337,10 @@ class BoardOverviewPanelPreview extends StatelessWidget {
 /// Any exceptions thrown during build are surfaced via [ErrorWidget.builder]
 /// (overridden in [BoardOffscreenRenderer] to log + return a grey box).
 class BoardOverviewPanelContent extends StatelessWidget {
-  const BoardOverviewPanelContent({required this.panel});
+  const BoardOverviewPanelContent({required this.panel, this.headerHeight = 0.0});
 
   final BoardPanelInstance panel;
+  final double headerHeight;
 
   static final BoardPanelRenderContext _noOp = BoardPanelRenderContext(
     isSelected: false,
@@ -247,56 +359,79 @@ class BoardOverviewPanelContent extends StatelessWidget {
             BoardPluginRegistry.instance.fallback;
 
         final panelW = panel.bounds.width.clamp(60.0, 4000.0);
-        final panelH = panel.bounds.height.clamp(60.0, 4000.0);
+        final panelH = (panel.bounds.height - headerHeight).clamp(60.0, 4000.0);
         final availW = constraints.maxWidth;
         final availH =
             constraints.maxHeight.isFinite ? constraints.maxHeight : panelH;
 
-        final scale = math.min(availW / panelW, availH / panelH);
+        final isFullScaleCanvas = headerHeight == 44.0;
+        final scale = isFullScaleCanvas ? 1.0 : math.min(availW / panelW, availH / panelH);
 
         // Plugins that initialise native code (MPV, WebView, PTY) on widget
         // creation will crash the process in a headless context. Show a
-        // labelled placeholder instead of calling buildContent for them.
+        // detailed, realistic visual mockup instead of calling buildContent.
+        // We selectively allow Custom JS Widgets to render on the full-scale offscreen
+        // canvas, as it is a single-pass render and does not trigger JSC rapid dispose crashes.
         final Widget child;
-        if (!plugin.supportsHeadlessRender) {
-          child = Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  plugin.icon,
-                  size: 32,
-                  color: const Color(0x809E9E9E),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  plugin.displayName,
-                  style: const TextStyle(
-                    color: Color(0x809E9E9E),
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          );
+        final supportsRender = plugin.supportsHeadlessRender || 
+            (isFullScaleCanvas && panel.type == 'board.widget.custom');
+
+        if (!supportsRender) {
+          child = _buildHeadlessMockup(context, panel, plugin);
         } else {
-          child = plugin.buildContent(context, panel, _noOp);
+          child = _PreviewSafePanelShell(
+            child: plugin.buildContent(context, panel, _noOp),
+          );
         }
 
+        // Use OverflowBox to allow the child to lay out at its full design size
+        // (panelW x panelH) regardless of parent constraints. Transform.scale
+        // then paints the child perfectly shrunk down.
         return SizedBox(
           width: availW,
           height: availH,
           child: Transform.scale(
             scale: scale,
             alignment: Alignment.topLeft,
-            child: SizedBox(
-              width: panelW,
-              height: panelH,
+            child: OverflowBox(
+              alignment: Alignment.topLeft,
+              minWidth: panelW,
+              maxWidth: panelW,
+              minHeight: panelH,
+              maxHeight: panelH,
               child: child,
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Supplies [Material] for buttons and disables [Tooltip] overlay insertion
+/// during scaled overview previews (live cards + offscreen PNG capture).
+class _PreviewSafePanelShell extends StatelessWidget {
+  const _PreviewSafePanelShell({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TickerMode(
+      enabled: false,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Overlay(
+          initialEntries: [
+            OverlayEntry(
+              builder: (context) => TooltipVisibility(
+                visible: false,
+                child: child,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -328,4 +463,507 @@ Color panelTypeColor(String type, {Color? override}) {
 IconData iconForPanelType(String type) {
   return BoardPluginRegistry.instance.pluginFor(type)?.icon ??
       Icons.widgets_outlined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Headless Mockups for Native-Only / Unsupported Plugins
+// ─────────────────────────────────────────────────────────────────────────────
+
+Widget _buildHeadlessMockup(
+  BuildContext context,
+  BoardPanelInstance panel,
+  BoardPanelPlugin plugin,
+) {
+  final type = panel.type;
+
+  // Fallback if we don't have custom mocks
+  final defaultMock = Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          plugin.icon,
+          size: 40,
+          color: plugin.accentColor.withAlpha(160),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          plugin.displayName,
+          style: TextStyle(
+            color: plugin.accentColor.withAlpha(200),
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          panel.title,
+          style: const TextStyle(
+            color: Color(0x809E9E9E),
+            fontSize: 11,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  if (type == 'board.terminal') {
+    final stateConfig = panel.state['config'];
+    final workingDir = stateConfig is Map
+        ? (stateConfig['workingDir'] as String? ?? '')
+        : (panel.state['workingDir'] as String? ?? '');
+    return Container(
+      color: const Color(0xFF0B0D12),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  workingDir.isNotEmpty ? workingDir : 'zsh',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 10, fontFamily: 'JetBrainsMono'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'guest@yoloit:~\$ yoloit status',
+            style: TextStyle(color: Color(0xFF4ADE80), fontSize: 11, fontFamily: 'JetBrainsMono'),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '● YoLoIT Core Services: Active',
+            style: TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'JetBrainsMono'),
+          ),
+          const Text(
+            '● Sessions: 2 active, 0 suspended',
+            style: TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'JetBrainsMono'),
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              Text(
+                'guest@yoloit:~\$ ',
+                style: TextStyle(color: Color(0xFF4ADE80), fontSize: 11, fontFamily: 'JetBrainsMono'),
+              ),
+              _PulsingCursor(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  if (type == 'board.webpage') {
+    final url = panel.state['url'] as String? ?? '';
+    return Container(
+      color: const Color(0xFF141821),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Browser address bar mockup
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            color: const Color(0xFF1E2433),
+            child: Row(
+              children: [
+                const Icon(Icons.arrow_back, size: 12, color: Color(0x80FFFFFF)),
+                const SizedBox(width: 6),
+                const Icon(Icons.arrow_forward, size: 12, color: Color(0x40FFFFFF)),
+                const SizedBox(width: 6),
+                const Icon(Icons.refresh, size: 12, color: Color(0x80FFFFFF)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Container(
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B0D12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      url.isNotEmpty ? url : 'https://yoloit.ai',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Browser body mockup
+          Expanded(
+            child: Container(
+              color: const Color(0xFF0F111A),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.language_outlined, size: 36, color: plugin.accentColor.withAlpha(120)),
+                    const SizedBox(height: 10),
+                    Text(
+                      panel.title.isNotEmpty ? panel.title : 'Webpage Preview',
+                      style: const TextStyle(color: Color(0x80FFFFFF), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  if (type == 'board.playlist') {
+    final rawTracks = panel.state['tracks'] as List? ?? [];
+    final tracks = rawTracks.where((e) => e is Map).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final currentIndex = panel.state['currentIndex'] as int? ?? 0;
+    return Container(
+      color: const Color(0xFF0B0D12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Playlist Header
+          Container(
+            padding: const EdgeInsets.all(10),
+            color: const Color(0xFF141821),
+            child: Row(
+              children: [
+                Icon(Icons.library_music_outlined, size: 16, color: plugin.accentColor),
+                const SizedBox(width: 6),
+                const Text(
+                  'Media Playlist',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          // Tracks mockup
+          Expanded(
+            child: tracks.isEmpty
+                ? const Center(
+                    child: Text('No tracks in playlist', style: TextStyle(color: Color(0x40FFFFFF), fontSize: 11)),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: tracks.length,
+                    itemBuilder: (context, idx) {
+                      final track = tracks[idx];
+                      final name = track['name'] as String? ?? 'Track ${idx + 1}';
+                      final isActive = idx == currentIndex;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        color: isActive ? plugin.accentColor.withAlpha(30) : Colors.transparent,
+                        child: Row(
+                          children: [
+                            Icon(
+                              isActive ? Icons.play_arrow_rounded : Icons.music_note_outlined,
+                              size: 14,
+                              color: isActive ? plugin.accentColor : const Color(0x60FFFFFF),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isActive ? Colors.white : const Color(0xCCFFFFFF),
+                                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                            if (isActive)
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(color: plugin.accentColor, shape: BoxShape.circle),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  if (type == 'board.run' || type == 'board.run_configs') {
+    final groupName = panel.state['group'] as String? ?? 'default';
+    return Container(
+      color: const Color(0xFF0F111A),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Run panel top header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            color: const Color(0xFF141821),
+            child: Row(
+              children: [
+                Icon(Icons.play_circle_outline_rounded, size: 16, color: plugin.accentColor),
+                const SizedBox(width: 6),
+                Text(
+                  'Run Scope: $groupName',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          // Run tasks list mock
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildMockRunRow(plugin, 'Build Project', 'idle', 'npm run build'),
+                  _buildMockRunRow(plugin, 'Start Dev Server', 'active', 'npm run dev'),
+                  _buildMockRunRow(plugin, 'Lint & Format', 'idle', 'npm run lint'),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  if (type == 'board.widget.custom') {
+    final widgetId = panel.state['widgetId'] as String? ?? 'custom-app';
+    return Container(
+      color: const Color(0xFF0F111A),
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.dashboard_customize_outlined, size: 36, color: plugin.accentColor.withAlpha(150)),
+            const SizedBox(height: 10),
+            Text(
+              panel.title.isNotEmpty ? panel.title : 'Custom JS Widget',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'App ID: $widgetId',
+              style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 10),
+            ),
+            const SizedBox(height: 16),
+            // Decorative mock canvas dashboard element
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildMockWidgetMetric('78%', 'CPU', Colors.blue),
+                const SizedBox(width: 8),
+                _buildMockWidgetMetric('4.2 GB', 'MEM', Colors.green),
+                const SizedBox(width: 8),
+                _buildMockWidgetMetric('99.9%', 'UPTIME', Colors.orange),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  return defaultMock;
+}
+
+Widget _buildMockWidgetMetric(String val, String label, Color color) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    decoration: BoxDecoration(
+      color: const Color(0xFF141821),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: const Color(0xFF232A3B), width: 0.5),
+    ),
+    child: Column(
+      children: [
+        Text(val, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 7)),
+      ],
+    ),
+  );
+}
+
+Widget _buildMockRunRow(BoardPanelPlugin plugin, String name, String status, String cmd) {
+  final isActive = status == 'active';
+  return Container(
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    padding: const EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: const Color(0xFF141821),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(
+        color: isActive ? plugin.accentColor.withAlpha(100) : const Color(0xFF232A3B),
+        width: isActive ? 1 : 0.5,
+      ),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          isActive ? Icons.stop_circle_outlined : Icons.play_circle_outline,
+          size: 16,
+          color: isActive ? Colors.red : plugin.accentColor,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              Text(cmd, style: const TextStyle(color: Color(0x60FFFFFF), fontSize: 8, fontFamily: 'JetBrainsMono')),
+            ],
+          ),
+        ),
+        if (isActive)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: plugin.accentColor.withAlpha(40),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              'RUNNING',
+              style: TextStyle(color: plugin.accentColor, fontSize: 7, fontWeight: FontWeight.bold),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _PulsingCursor extends StatefulWidget {
+  const _PulsingCursor();
+  @override
+  State<_PulsingCursor> createState() => _PulsingCursorState();
+}
+
+class _PulsingCursorState extends State<_PulsingCursor> with SingleTickerProviderStateMixin {
+  late AnimationController _anim;
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..repeat(reverse: true);
+  }
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, _) => Opacity(
+        opacity: _anim.value > 0.5 ? 1.0 : 0.0,
+        child: Container(width: 6, height: 11, color: const Color(0xFF4ADE80)),
+      ),
+    );
+  }
+}
+
+class _OffscreenPanelCard extends StatelessWidget {
+  const _OffscreenPanelCard({required this.panel});
+
+  final BoardPanelInstance panel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final theme = Theme.of(context);
+    
+    final accent = panel.color;
+    final panelFill = accent == null
+        ? const Color(0xFF141424)
+        : Color.lerp(const Color(0xFF141424), accent, 0.12) ?? const Color(0xFF141424);
+    final panelHeaderFill = accent == null
+        ? const Color(0xFF1F1F35)
+        : Color.lerp(const Color(0xFF1F1F35), accent, 0.18) ?? const Color(0xFF1F1F35);
+    final borderColor = accent == null
+        ? const Color(0xFF2A2A40)
+        : Color.lerp(const Color(0xFF2A2A40), accent, 0.65) ?? const Color(0xFF2A2A40);
+
+    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type) ??
+        BoardPluginRegistry.instance.fallback;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: panelFill,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: panelHeaderFill,
+                  border: Border(
+                    bottom: BorderSide(color: colors.divider, width: 1.0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      plugin.icon,
+                      size: 16,
+                      color: theme.colorScheme.onSurface.withAlpha(180),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        panel.title,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ClipRect(
+                  child: BoardOverviewPanelContent(
+                    panel: panel,
+                    headerHeight: 44.0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

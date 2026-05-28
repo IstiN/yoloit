@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -29,7 +30,7 @@ class BoardOffscreenRenderer {
   /// Returns null if the board has no visible panels or rendering fails.
   Future<Uint8List?> renderBoard(
     BoardDocument board, {
-    Size size = const Size(960, 640),
+    Size size = const Size(1400, 900),
     double pixelRatio = 1.5,
   }) async {
     final panels = board.panels.where((p) => !p.hidden).toList();
@@ -78,47 +79,47 @@ class BoardOffscreenRenderer {
   }
 
   Widget _buildBoardPreview(BoardDocument board, BoardCubit cubit) {
-    // Dark theme matching the app's look.
-    final appColors = AppColorScheme.fromAccent(const Color(0xFF7C3AED));
-    final theme = ThemeData.dark().copyWith(
-      extensions: [appColors],
-      colorScheme: const ColorScheme.dark(
-        surface: Color(0xFF0F0F1A),
-        onSurface: Color(0xFFE0E0F0),
-        primary: Color(0xFF9D4EDD),
-      ),
-      textTheme: const TextTheme(
-        bodySmall: TextStyle(color: Color(0xFF8888AA)),
-      ),
-      dividerColor: const Color(0xFF2A2A40),
-    );
+    final theme = ThemeManager.instance.theme;
 
     // BlocProvider.value injects headless implementations so all plugins that
     // call context.read<BoardCubit>() receive a properly populated instance.
-    // Add more providers here as new plugins gain BLoC/service dependencies.
+    // Use explicit MediaQuery/Theme (not MaterialApp) — isolated BuildOwner
+    // has no View ancestor, so MaterialApp's ScaffoldMessenger breaks.
+    // Panel-level Material + TooltipVisibility is applied in
+    // [BoardOverviewPanelContent] via [_PreviewSafePanelShell].
     return BlocProvider<BoardCubit>.value(
       value: cubit,
-      child: MediaQuery(
-        data: const MediaQueryData(size: Size(960, 640)),
+      child: Localizations(
+        locale: const Locale('en', 'US'),
+        delegates: [
+          DefaultMaterialLocalizations.delegate,
+          DefaultWidgetsLocalizations.delegate,
+        ],
+        child: MediaQuery(
+        data: const MediaQueryData(size: Size(1400, 900)),
         child: Directionality(
           textDirection: TextDirection.ltr,
-          child: Theme(
-            data: theme,
-            child: DefaultTextStyle(
-              style: const TextStyle(
-                color: Color(0xFFE0E0F0),
-                fontSize: 12,
-              ),
-              child: IconTheme(
-                data: const IconThemeData(color: Color(0xFF8888AA), size: 14),
-                child: ColoredBox(
-                  color: const Color(0xFF0F0F1A),
-                  child: BoardOverviewPreview(board: board),
+          child: ScrollConfiguration(
+            behavior: const HeadlessScrollBehavior(),
+            child: Theme(
+              data: theme,
+              child: DefaultTextStyle(
+                style: const TextStyle(
+                  color: Color(0xFFE0E0F0),
+                  fontSize: 12,
+                ),
+                child: IconTheme(
+                  data: const IconThemeData(color: Color(0xFF8888AA), size: 14),
+                  child: ColoredBox(
+                    color: const Color(0xFF0F0F1A),
+                    child: BoardCanvasPreview(board: board, useViewport: true),
+                  ),
                 ),
               ),
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -159,7 +160,38 @@ class BoardOffscreenRenderer {
       ),
     ).attachToRenderTree(buildOwner);
 
-    // Build, layout, paint — all synchronous, no frame scheduling needed.
+    // Smart Adaptive Polling with 200ms Debounce: flushes dirty layouts and
+    // processes build scopes every 50ms until the active task registry remains
+    // completely empty for 4 consecutive event-loop turns (200ms). This prevents
+    // sequential asynchronous tasks from being skipped during phase transitions.
+    final watch = Stopwatch()..start();
+    var emptyTurns = 0;
+    
+    while (watch.elapsedMilliseconds < 15000) {
+      buildOwner.buildScope(rootElement);
+      pipelineOwner.flushLayout();
+      
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      
+      if (HeadlessRenderRegistry.activeTasks.isEmpty) {
+        emptyTurns++;
+        if (emptyTurns >= 4) {
+          break;
+        }
+      } else {
+        emptyTurns = 0;
+      }
+    }
+
+    // Final build, layout pass before we allow animations and decoders to settle.
+    buildOwner.buildScope(rootElement);
+    pipelineOwner.flushLayout();
+
+    // Give image decoders and AnimatedOpacity fade-in transitions (140ms)
+    // 300ms to completely finish and settle on the canvas.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    // Final composite and paint pass immediately before capture.
     buildOwner.buildScope(rootElement);
     pipelineOwner.flushLayout();
     pipelineOwner.flushCompositingBits();
@@ -197,4 +229,42 @@ class _HeadlessBoardCubit extends BoardCubit {
   // Prevent any async side-effects (disk writes, network) during headless render.
   @override
   Future<void> load() async {}
+}
+
+/// A global, lightweight registry for tracking active asynchronous tasks
+/// (like Mermaid rendering and Custom JS Widget loads) during offscreen
+/// screenshot captures.
+class HeadlessRenderRegistry {
+  HeadlessRenderRegistry._();
+  static final Set<String> activeTasks = {};
+}
+
+/// A global custom scroll behavior for the headless/offscreen renderer.
+class HeadlessScrollBehavior extends ScrollBehavior {
+  const HeadlessScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const HeadlessScrollPhysics();
+  }
+}
+
+/// A custom ScrollPhysics that overrides [recommendDeferredLoading] to bypass
+/// the standard Flutter [View.of] lookup, avoiding headless runtime exceptions.
+class HeadlessScrollPhysics extends ScrollPhysics {
+  const HeadlessScrollPhysics({super.parent});
+
+  @override
+  HeadlessScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return HeadlessScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  bool recommendDeferredLoading(
+    double velocity,
+    dynamic direction,
+    BuildContext context,
+  ) {
+    return false; // Bypass View.of() completely!
+  }
 }

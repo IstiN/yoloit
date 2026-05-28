@@ -1882,7 +1882,13 @@ class CliServer {
     }
     // GET /api/boards/:id/screenshot
     if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
-      return _boardScreenshot(board, cubit: cubit);
+      final forceOffscreen =
+          request.url.queryParameters['mode'] == 'offscreen';
+      return _boardScreenshot(
+        board,
+        cubit: cubit,
+        forceOffscreen: forceOffscreen,
+      );
     }
     // GET /api/boards/:id/svg
     if (sub.length == 1 && sub[0] == 'svg' && method == 'GET') {
@@ -2116,25 +2122,28 @@ class CliServer {
   Future<shelf.Response> _boardScreenshot(
     BoardDocument board, {
     BoardCubit? cubit,
+    bool forceOffscreen = false,
   }) async {
     final activeCubit = cubit ?? _cubit;
     if (activeCubit == null) return _error('Board cubit not available');
 
-    final activeBoard = activeCubit.state.activeBoard;
-    final isActiveBoard = activeBoard != null && activeBoard.id == board.id;
-
     Uint8List? png;
-    if (isActiveBoard) {
-      // Active board — capture directly from the live RepaintBoundary.
-      _scheduleRebuild();
-      png = await BoardScreenshotService.instance.capturePng(
-        pixelRatio: 1.5,
-      );
-    } else {
-      // Non-active board — render offscreen from the data model.
-      // No board switching, no JSC crashes, no UI flicker.
-      debugPrint('[CliServer] screenshot: offscreen render board=${board.id}');
+    if (forceOffscreen) {
+      debugPrint('[CliServer] screenshot: offscreen board=${board.id}');
       png = await BoardOffscreenRenderer.instance.renderBoard(board);
+    } else {
+      final activeBoard = activeCubit.state.activeBoard;
+      final isActiveBoard =
+          activeBoard != null && activeBoard.id == board.id;
+      if (isActiveBoard) {
+        _scheduleRebuild();
+        png = await BoardScreenshotService.instance.capturePng(
+          pixelRatio: 1.5,
+        );
+      } else {
+        debugPrint('[CliServer] screenshot: offscreen board=${board.id}');
+        png = await BoardOffscreenRenderer.instance.renderBoard(board);
+      }
     }
 
     if (png == null) {

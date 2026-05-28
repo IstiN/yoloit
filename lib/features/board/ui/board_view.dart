@@ -79,6 +79,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _showMinimap = true;
   bool _showToolsPanel = true;
   bool _isBoardOverviewOpen = false;
+  bool _cancelBgCapture = false;
   bool _boardSwitchPreviewVisible = false;
   BoardDocument? _boardSwitchPreviewBoard;
   Uint8List? _boardSwitchPreviewPng;
@@ -1024,16 +1025,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   onClose: () {
                                     if (!mounted) return;
                                     _boardOverviewLog('close.parent');
-                                    setState(
-                                      () => _isBoardOverviewOpen = false,
-                                    );
+                                    setState(() {
+                                      _isBoardOverviewOpen = false;
+                                      _cancelBgCapture = true;
+                                    });
                                   },
                                   onCreateBoard: () {
                                     if (!mounted) return;
                                     _boardOverviewLog('create.parent');
-                                    setState(
-                                      () => _isBoardOverviewOpen = false,
-                                    );
+                                    setState(() {
+                                      _isBoardOverviewOpen = false;
+                                      _cancelBgCapture = true;
+                                    });
                                     _createBoard(context);
                                   },
                                   onSelectedBoard: (board, previewPng) {
@@ -1045,6 +1048,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                     );
                                     setState(() {
                                       _isBoardOverviewOpen = false;
+                                      _cancelBgCapture = true;
                                       _boardSwitchPreviewBoard = board;
                                       _boardSwitchPreviewPng = previewPng;
                                       _boardSwitchPreviewVisible = true;
@@ -1305,22 +1309,32 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final watch = Stopwatch()..start();
 
     for (final board in toCapture) {
-      if (!mounted || !_isBoardOverviewOpen) break;
+      if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
+        _boardOverviewLog('bgCapture.canceled loop broken (transition active)');
+        break;
+      }
 
+      final boardWatch = Stopwatch()..start();
       try {
-        _boardOverviewLog('bgCapture.render board=${board.id}');
+        _boardOverviewLog('bgCapture.render board=${board.id} (${board.name}) started');
         final png = await BoardOffscreenRenderer.instance.renderBoard(board);
-        if (png != null && mounted && _isBoardOverviewOpen) {
+        if (_cancelBgCapture || !mounted || !_isBoardOverviewOpen) {
+          _boardOverviewLog('bgCapture.render board=${board.id} completed but discarded (transition active)');
+          break;
+        }
+        if (png != null) {
           setState(() {
             _boardPreviewPngs[board.id] = png;
           });
           _saveBoardPreviewPngToDisk(board.id, png);
           _boardOverviewLog(
-            'bgCapture.captured board=${board.id} bytes=${png.length}',
+            'bgCapture.captured board=${board.id} bytes=${png.length} elapsed=${boardWatch.elapsedMilliseconds}ms',
           );
+        } else {
+          _boardOverviewLog('bgCapture.render board=${board.id} returned null elapsed=${boardWatch.elapsedMilliseconds}ms');
         }
       } catch (e) {
-        _boardOverviewLog('bgCapture.error board=${board.id} $e');
+        _boardOverviewLog('bgCapture.error board=${board.id} $e elapsed=${boardWatch.elapsedMilliseconds}ms');
       }
     }
 
@@ -1350,6 +1364,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     );
     setState(() {
       _isBoardOverviewOpen = true;
+      _cancelBgCapture = false;
       _connectSourceId = null;
       _connectPreviewPointer = null;
     });

@@ -115,6 +115,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _showSearch = false;
+  bool _showHidden = true;
 
   @override
   void dispose() {
@@ -405,6 +406,18 @@ class _FileTreeContentState extends State<_FileTreeContent> {
           if (rootPath.isNotEmpty)
             IconButton(
               icon: Icon(
+                _showHidden ? Icons.visibility : Icons.visibility_off,
+                size: 16,
+              ),
+              tooltip: _showHidden ? 'Hide dotfiles' : 'Show dotfiles',
+              onPressed: () => setState(() => _showHidden = !_showHidden),
+              padding: const EdgeInsets.all(4),
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              color: _showHidden ? Colors.white : _accent,
+            ),
+          if (rootPath.isNotEmpty)
+            IconButton(
+              icon: Icon(
                 _showSearch ? Icons.search_off : Icons.search,
                 size: 16,
               ),
@@ -668,7 +681,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       for (final entity in contents) {
         if (results.length >= maxResults) return;
         final name = p.basename(entity.path);
-        if (name.startsWith('.')) continue;
+        if (!_showHidden && name.startsWith('.')) continue;
         if (entity is Directory) {
           if (name.toLowerCase().contains(_searchQuery)) {
             results.add(entity);
@@ -702,8 +715,8 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
       for (final entity in contents) {
         final name = p.basename(entity.path);
-        // Skip hidden files/directories.
-        if (name.startsWith('.')) continue;
+        // Skip hidden files/directories unless _showHidden is enabled.
+        if (!_showHidden && name.startsWith('.')) continue;
 
         if (entity is Directory) {
           final isExpanded = _expandedDirs.contains(entity.path);

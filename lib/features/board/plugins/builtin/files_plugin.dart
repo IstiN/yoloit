@@ -74,8 +74,8 @@ class _FilesContentState extends State<_FilesContent> {
 
   List<Map<String, dynamic>> get _files =>
       (widget.panel.state['files'] as List?)
-          ?.whereType<Map<String, dynamic>>()
-          .map((e) => Map<String, dynamic>.from(e))
+          ?.where((e) => e is Map)
+          .map((e) => Map<String, dynamic>.from(e as Map))
           .toList() ??
       [];
 
