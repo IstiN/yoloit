@@ -172,6 +172,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   // Streaming assistant message accumulator
   String _streamingContent = '';
   String? _streamingMessageId;
+  // Insert position for the assistant message being streamed.
+  // Saved at assistantMessageStart so that tool results added during streaming
+  // don't push the assistant text below them.
+  int? _assistantInsertIndex;
   final AudioRecorder _micRecorder = AudioRecorder();
   bool _isRecordingMic = false;
   bool _isTranscribingMic = false;
@@ -1141,6 +1145,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         setState(() {
           _streamingMessageId = event.messageId;
           _streamingContent = '';
+          _assistantInsertIndex = _messages.length;
         });
         break;
 
@@ -1184,21 +1189,44 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             _totalOutputTokens += outputTokens;
           }
 
-          _messages.add(
-            ChatMessage(
-              id:
-                  event.messageId ??
-                  'assistant-${DateTime.now().millisecondsSinceEpoch}',
-              role: ChatRole.assistant,
-              content: content,
-              timestamp: event.timestamp ?? DateTime.now(),
-              toolCalls: toolCalls,
-              isStreaming: false,
-              tokenUsage: usage,
-            ),
-          );
+          // Insert at the position saved when streaming started so the
+          // assistant text appears before any tool-result messages that were
+          // added while the assistant was still streaming (cursor-agent sends
+          // tool events before the final assistantMessage event).
+          final insertAt = _assistantInsertIndex?.clamp(0, _messages.length);
+          if (insertAt != null && insertAt < _messages.length) {
+            _messages.insert(
+              insertAt,
+              ChatMessage(
+                id:
+                    event.messageId ??
+                    'assistant-${DateTime.now().millisecondsSinceEpoch}',
+                role: ChatRole.assistant,
+                content: content,
+                timestamp: event.timestamp ?? DateTime.now(),
+                toolCalls: toolCalls,
+                isStreaming: false,
+                tokenUsage: usage,
+              ),
+            );
+          } else {
+            _messages.add(
+              ChatMessage(
+                id:
+                    event.messageId ??
+                    'assistant-${DateTime.now().millisecondsSinceEpoch}',
+                role: ChatRole.assistant,
+                content: content,
+                timestamp: event.timestamp ?? DateTime.now(),
+                toolCalls: toolCalls,
+                isStreaming: false,
+                tokenUsage: usage,
+              ),
+            );
+          }
           _streamingMessageId = null;
           _streamingContent = '';
+          _assistantInsertIndex = null;
         });
         _scrollToBottom();
         break;

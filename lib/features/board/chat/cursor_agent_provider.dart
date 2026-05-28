@@ -38,6 +38,12 @@ class CursorAgentProvider extends ChatProvider {
   /// Non-null means we are mid-stream; null means the stream is idle.
   String? _currentStreamId;
 
+  /// Accumulated text from the current streaming turn.
+  /// cursor-agent's `--stream-partial-output` sends cumulative content (full
+  /// text so far) rather than incremental deltas, so we diff against this to
+  /// compute the true delta for the UI.
+  String _cumulativeContent = '';
+
   @override
   String get providerId => 'cursor';
 
@@ -89,6 +95,7 @@ class CursorAgentProvider extends ChatProvider {
   }) async {
     await stop(config.sessionName);
     _currentStreamId = null;
+    _cumulativeContent = '';
 
     final args = <String>[
       '--print',
@@ -330,9 +337,19 @@ class CursorAgentProvider extends ChatProvider {
 
         if (hasTimestamp) {
           // Delta chunk (--stream-partial-output).
-          // Use _currentStreamId == null to detect the first delta of a new
-          // assistant turn (model_call_id is absent from delta events).
+          // cursor-agent sends cumulative content (full text so far) with each
+          // event, not incremental deltas.  We diff against the previous
+          // cumulative snapshot to extract the true new portion.
           final isFirst = _currentStreamId == null;
+
+          String trueDelta;
+          if (content.startsWith(_cumulativeContent)) {
+            trueDelta = content.substring(_cumulativeContent.length);
+          } else {
+            // Fallback: treat as incremental if no cumulative prefix match
+            trueDelta = content;
+          }
+          _cumulativeContent = content;
 
           if (isFirst) {
             final startId =
@@ -347,18 +364,20 @@ class CursorAgentProvider extends ChatProvider {
                 data: {'messageId': startId},
                 id: startId,
               ),
-              ChatEvent(
-                type: ChatEventType.assistantDelta,
-                rawType: 'cursor.assistant.delta',
-                data: {'deltaContent': content},
-              ),
+              if (trueDelta.isNotEmpty)
+                ChatEvent(
+                  type: ChatEventType.assistantDelta,
+                  rawType: 'cursor.assistant.delta',
+                  data: {'deltaContent': trueDelta},
+                ),
             ];
           }
+          if (trueDelta.isEmpty) return [];
           return [
             ChatEvent(
               type: ChatEventType.assistantDelta,
               rawType: 'cursor.assistant.delta',
-              data: {'deltaContent': content},
+              data: {'deltaContent': trueDelta},
             ),
           ];
         } else {
@@ -368,6 +387,7 @@ class CursorAgentProvider extends ChatProvider {
               _currentStreamId ??
               'cursor-${DateTime.now().millisecondsSinceEpoch}';
           _currentStreamId = null; // reset so next turn starts fresh
+          _cumulativeContent = ''; // reset cumulative tracker
           return [
             ChatEvent(
               type: ChatEventType.assistantMessage,
