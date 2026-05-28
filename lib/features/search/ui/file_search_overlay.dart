@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoloit/core/theme/app_colors.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
@@ -395,7 +395,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
                 decoration: InputDecoration(
                   hintText: 'Search panels, files…',
                   hintStyle:
-                      TextStyle(color: AppColors.textMuted, fontSize: 15),
+                      TextStyle(color: colors.textMuted, fontSize: 15),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -419,7 +419,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
                 setState(() => _results = []);
               },
               child:
-                  Icon(Icons.close, size: 16, color: AppColors.textMuted),
+                  Icon(Icons.close, size: 16, color: colors.textMuted),
             ),
         ],
       ),
@@ -427,22 +427,23 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   }
 
   Widget _buildResults() {
+    final colors = context.appColors;
     if (_results.isEmpty && _controller.text.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search, size: 36, color: AppColors.textMuted.withAlpha(80)),
+            Icon(Icons.search, size: 36, color: colors.textMuted.withAlpha(80)),
             const SizedBox(height: 8),
             Text(
               'Type to search panels & files…',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              style: TextStyle(color: colors.textMuted, fontSize: 13),
             ),
             const SizedBox(height: 4),
             Text(
               '↑↓ navigate  ↵ open  esc close',
               style: TextStyle(
-                color: AppColors.textMuted.withAlpha(100),
+                color: colors.textMuted.withAlpha(100),
                 fontSize: 11,
               ),
             ),
@@ -455,7 +456,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       return Center(
         child: Text(
           'No results found',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          style: TextStyle(color: colors.textMuted, fontSize: 13),
         ),
       );
     }
@@ -482,6 +483,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   }
 
   Widget _buildFooter() {
+    final colors = context.appColors;
     final panelCount =
         _results.where((r) => r.kind == _QuickResultKind.panel).length;
     final fileCount =
@@ -497,21 +499,21 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           if (panelCount > 0)
             Text(
               '$panelCount panel${panelCount > 1 ? 's' : ''}',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(color: colors.textMuted, fontSize: 11),
             ),
           if (panelCount > 0 && fileCount > 0)
             Text(' · ',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                style: TextStyle(color: colors.textMuted, fontSize: 11)),
           if (fileCount > 0)
             Text(
               '$fileCount file${fileCount > 1 ? 's' : ''}',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(color: colors.textMuted, fontSize: 11),
             ),
           const Spacer(),
           Text(
             '${_results.length} result${_results.length > 1 ? 's' : ''}',
             style: TextStyle(
-                color: AppColors.textMuted.withAlpha(120), fontSize: 11),
+                color: colors.textMuted.withAlpha(120), fontSize: 11),
           ),
         ],
       ),
@@ -657,7 +659,7 @@ class _QuickResultTile extends StatelessWidget {
                   const SizedBox(height: 1),
                   Text(
                     result.subtitle,
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    style: TextStyle(color: colors.textMuted, fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -682,7 +684,7 @@ class _QuickResultTile extends StatelessWidget {
               ),
             if (isSelected) ...[
               const SizedBox(width: 8),
-              Icon(Icons.keyboard_return, size: 12, color: AppColors.textMuted),
+              Icon(Icons.keyboard_return, size: 12, color: colors.textMuted),
             ],
           ],
         ),

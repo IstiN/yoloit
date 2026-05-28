@@ -15,12 +15,16 @@ class AppTheme {
       bgSeed: bgSeed,
       brightness: brightness,
     );
+    return buildThemeFromScheme(scheme, brightness: brightness);
+  }
+
+  /// Builds a [ThemeData] from a fully-specified [AppColorScheme].
+  /// Used by both preset themes and custom JSON themes.
+  static ThemeData buildThemeFromScheme(
+    AppColorScheme scheme, {
+    Brightness brightness = Brightness.dark,
+  }) {
     final isLight = brightness == Brightness.light;
-    final textPrimary =
-        isLight ? const Color(0xFF1A1A2E) : AppColors.textPrimary;
-    final textSecondary =
-        isLight ? const Color(0xFF64748B) : AppColors.textSecondary;
-    final textMuted = isLight ? const Color(0xFF94A3B8) : AppColors.textMuted;
     return ThemeData(
       brightness: brightness,
       scaffoldBackgroundColor: scheme.background,
@@ -32,16 +36,16 @@ class AppTheme {
                 surface: scheme.surface,
                 onPrimary: Colors.white,
                 onSecondary: Colors.white,
-                onSurface: textPrimary,
+                onSurface: scheme.textPrimary,
                 outline: scheme.border,
               )
               : ColorScheme.dark(
-                primary: accentColor,
-                secondary: accentColor,
+                primary: scheme.primary,
+                secondary: scheme.primary,
                 surface: scheme.surface,
                 onPrimary: Colors.white,
                 onSecondary: Colors.white,
-                onSurface: AppColors.textPrimary,
+                onSurface: scheme.textPrimary,
                 outline: scheme.border,
               ),
       splashColor: scheme.primary.withAlpha(30),
@@ -50,44 +54,44 @@ class AppTheme {
       extensions: [scheme],
       textTheme: TextTheme(
         headlineLarge: TextStyle(
-          color: textPrimary,
+          color: scheme.textPrimary,
           fontSize: 24,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.5,
         ),
         headlineMedium: TextStyle(
-          color: textPrimary,
+          color: scheme.textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.w600,
         ),
         titleLarge: TextStyle(
-          color: textPrimary,
+          color: scheme.textPrimary,
           fontSize: 14,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.1,
         ),
         titleMedium: TextStyle(
-          color: textSecondary,
+          color: scheme.textSecondary,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
         bodyLarge: TextStyle(
-          color: textPrimary,
+          color: scheme.textPrimary,
           fontSize: 13,
           fontWeight: FontWeight.w400,
         ),
         bodyMedium: TextStyle(
-          color: textSecondary,
+          color: scheme.textSecondary,
           fontSize: 12,
           fontWeight: FontWeight.w400,
         ),
         bodySmall: TextStyle(
-          color: textMuted,
+          color: scheme.textMuted,
           fontSize: 11,
           fontWeight: FontWeight.w400,
         ),
         labelSmall: TextStyle(
-          color: textMuted,
+          color: scheme.textMuted,
           fontSize: 10,
           fontWeight: FontWeight.w500,
           letterSpacing: 0.5,

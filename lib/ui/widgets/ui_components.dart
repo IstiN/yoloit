@@ -33,7 +33,9 @@ class NeonBadge extends StatelessWidget {
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: color.withAlpha(120), blurRadius: 4)],
+                boxShadow: [
+                  BoxShadow(color: color.withAlpha(120), blurRadius: 4),
+                ],
               ),
             ),
             const SizedBox(width: 4),
@@ -78,8 +80,8 @@ class PanelHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: colors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.2,
@@ -89,10 +91,7 @@ class PanelHeader extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               subtitle!,
-              style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: colors.textMuted, fontSize: 11),
             ),
           ],
           const Spacer(),
@@ -134,9 +133,10 @@ class _IconTextButtonState extends State<IconTextButton> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final effective = widget.activeColor ?? colors.primary;
-    final color = widget.isActive
-        ? effective
-        : _hovering
+    final color =
+        widget.isActive
+            ? effective
+            : _hovering
             ? widget.color.withAlpha(200)
             : widget.color;
 
@@ -153,9 +153,10 @@ class _IconTextButtonState extends State<IconTextButton> {
             vertical: widget.dense ? 4 : 6,
           ),
           decoration: BoxDecoration(
-            color: widget.isActive
-                ? effective.withAlpha(30)
-                : _hovering
+            color:
+                widget.isActive
+                    ? effective.withAlpha(30)
+                    : _hovering
                     ? colors.surfaceHighlight
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
@@ -172,7 +173,8 @@ class _IconTextButtonState extends State<IconTextButton> {
                 style: TextStyle(
                   color: color,
                   fontSize: 12,
-                  fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight:
+                      widget.isActive ? FontWeight.w600 : FontWeight.w400,
                 ),
               ),
             ],

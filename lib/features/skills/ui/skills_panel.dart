@@ -60,11 +60,12 @@ class _SkillsPanelState extends State<SkillsPanel> {
   }
 
   void _showError(BuildContext context, String message) {
+    final colors = context.appColors;
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(fontSize: 12)),
-        backgroundColor: AppColors.neonOrange.withAlpha(200),
+        backgroundColor: colors.accentOrange.withAlpha(200),
         action: SnackBarAction(
           label: 'Dismiss',
           onPressed: () => context.read<SkillsCubit>().clearError(),
@@ -111,6 +112,7 @@ class _SyncStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final cubit = context.read<SkillsCubit>();
     final wsState = context.read<WorkspaceCubit>().state;
     return Container(
@@ -120,7 +122,7 @@ class _SyncStatusBar extends StatelessWidget {
           Icon(
             loadedFromRemote ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
             size: 13,
-            color: loadedFromRemote ? AppColors.neonGreen : AppColors.textMuted,
+            color: loadedFromRemote ? colors.accentGreen : colors.textMuted,
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -129,7 +131,7 @@ class _SyncStatusBar extends StatelessWidget {
                   ? 'Catalog synced from github.com/IstiN/yoloit'
                   : 'Using cached catalog — no network or offline',
               style: TextStyle(
-                color: loadedFromRemote ? AppColors.neonGreenDim : AppColors.textMuted,
+                color: loadedFromRemote ? colors.accentGreenDim : colors.textMuted,
                 fontSize: 10,
               ),
             ),
@@ -141,9 +143,9 @@ class _SyncStatusBar extends StatelessWidget {
             },
             child: Row(
               children: [
-                const Icon(Icons.refresh, size: 12, color: AppColors.textMuted),
+                Icon(Icons.refresh, size: 12, color: colors.textMuted),
                 const SizedBox(width: 3),
-                const Text('Sync', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                Text('Sync', style: TextStyle(color: colors.textMuted, fontSize: 10)),
               ],
             ),
           ),
@@ -161,6 +163,7 @@ class _StoresSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final cubit = context.read<SkillsCubit>();
 
     return SizedBox(
@@ -173,7 +176,7 @@ class _StoresSidebar extends StatelessWidget {
             child: Text(
               'STORES',
               style: TextStyle(
-                color: AppColors.textMuted,
+                color: colors.textMuted,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.8,
@@ -267,14 +270,14 @@ class _StoreTile extends StatelessWidget {
             Icon(
               icon,
               size: 13,
-              color: isSelected ? colors.primary : AppColors.textMuted,
+              color: isSelected ? colors.primary : colors.textMuted,
             ),
             const SizedBox(width: 7),
             Expanded(
               child: Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? colors.primary : AppColors.textSecondary,
+                  color: isSelected ? colors.primary : colors.textSecondary,
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
                 ),
@@ -296,9 +299,9 @@ class _StoreTile extends StatelessWidget {
             if (onRemove != null)
               GestureDetector(
                 onTap: onRemove,
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.only(left: 4),
-                  child: Icon(Icons.close, size: 12, color: AppColors.textMuted),
+                  child: Icon(Icons.close, size: 12, color: colors.textMuted),
                 ),
               ),
           ],
@@ -316,6 +319,7 @@ class _SkillsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final List<SkillEntry> skills;
     if (state.selectedStoreId == '_installed') {
       skills = state.installedSkills;
@@ -328,11 +332,11 @@ class _SkillsList extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.extension_outlined, size: 36, color: AppColors.textMuted),
+            Icon(Icons.extension_outlined, size: 36, color: colors.textMuted),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No skills found',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              style: TextStyle(color: colors.textMuted, fontSize: 13),
             ),
           ],
         ),
@@ -356,6 +360,7 @@ class _SkillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final cubit = context.read<SkillsCubit>();
     final isBusy = state.busySkillIds.contains(skill.id);
 
@@ -370,7 +375,7 @@ class _SkillCard extends StatelessWidget {
             child: Icon(
               skill.isInstalled ? Icons.check_circle : Icons.extension_outlined,
               size: 16,
-              color: skill.isInstalled ? AppColors.neonGreen : AppColors.textMuted,
+              color: skill.isInstalled ? colors.accentGreen : colors.textMuted,
             ),
           ),
           Expanded(
@@ -382,8 +387,8 @@ class _SkillCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         skill.name,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
+                        style: TextStyle(
+                          color: colors.textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                         ),
@@ -396,7 +401,7 @@ class _SkillCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     skill.description,
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    style: TextStyle(color: colors.textMuted, fontSize: 11),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -429,7 +434,7 @@ class _SkillCard extends StatelessWidget {
                 _SmallButton(
                   label: 'Remove',
                   icon: Icons.delete_outline,
-                  color: AppColors.neonOrange,
+                  color: colors.accentOrange,
                   onTap: () => _confirmUninstall(context, cubit),
                 ),
                 const SizedBox(height: 4),
@@ -458,15 +463,16 @@ class _SkillCard extends StatelessWidget {
   }
 
   void _confirmUninstall(BuildContext context, SkillsCubit cubit) {
+    final colors = context.appColors;
     showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF0F0F2A),
-        title: const Text('Uninstall Skill',
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 15)),
+        title: Text('Uninstall Skill',
+            style: TextStyle(color: colors.textPrimary, fontSize: 15)),
         content: Text(
           'Remove "${skill.name}" from the global skills store? Workspace symlinks will also be removed.',
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+          style: TextStyle(color: colors.textMuted, fontSize: 13),
         ),
         actions: [
           TextButton(
@@ -478,7 +484,7 @@ class _SkillCard extends StatelessWidget {
               Navigator.pop(context);
               cubit.uninstallSkill(skill.id);
             },
-            child: const Text('Remove', style: TextStyle(color: AppColors.neonOrange)),
+            child: Text('Remove', style: TextStyle(color: colors.accentOrange)),
           ),
         ],
       ),
@@ -503,6 +509,7 @@ class _SourceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final label = switch (skill.sourceType) {
       SkillSourceType.github => 'GitHub',
       SkillSourceType.url => 'URL',
@@ -518,7 +525,7 @@ class _SourceBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+        style: TextStyle(color: colors.textMuted, fontSize: 9),
       ),
     );
   }
@@ -577,7 +584,7 @@ class _WorkspaceCheckboxRow extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 ws.name,
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(color: colors.textMuted, fontSize: 11),
               ),
             ],
           ),
@@ -604,11 +611,11 @@ class _AddStoreButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add, size: 13, color: AppColors.textMuted),
+            Icon(Icons.add, size: 13, color: colors.textMuted),
             const SizedBox(width: 4),
             Text(
               'Add Store',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(color: colors.textMuted, fontSize: 11),
             ),
           ],
         ),
@@ -647,11 +654,12 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return AlertDialog(
       backgroundColor: const Color(0xFF0F0F2A),
-      title: const Text(
+      title: Text(
         'Add Custom Store',
-        style: TextStyle(color: AppColors.textPrimary, fontSize: 15),
+        style: TextStyle(color: colors.textPrimary, fontSize: 15),
       ),
       content: SizedBox(
         width: 400,
@@ -671,7 +679,7 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
               hint: 'owner/repo  or  https://...  or  curl -fsSL ...',
             ),
             const SizedBox(height: 12),
-            const Text('Type', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+            Text('Type', style: TextStyle(color: colors.textMuted, fontSize: 11)),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
@@ -683,7 +691,7 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
                   selectedColor: AppColors.primary.withAlpha(60),
                   backgroundColor: const Color(0xFF161632),
                   labelStyle: TextStyle(
-                    color: _type == t ? AppColors.primary : AppColors.textMuted,
+                    color: _type == t ? AppColors.primary : colors.textMuted,
                   ),
                 );
               }).toList(),
@@ -709,17 +717,18 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
     required String label,
     required String hint,
   }) {
+    final colors = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+        Text(label, style: TextStyle(color: colors.textMuted, fontSize: 11)),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+          style: TextStyle(color: colors.textPrimary, fontSize: 12),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
             filled: true,
             fillColor: const Color(0xFF161632),
             border: OutlineInputBorder(
@@ -784,28 +793,29 @@ class _InstallToRepoDialogState extends State<_InstallToRepoDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final paths = _allRepoPaths;
 
     return AlertDialog(
       backgroundColor: const Color(0xFF0F0F2A),
       title: Text(
         'Install "${widget.skill.name}" to Repo',
-        style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+        style: TextStyle(color: colors.textPrimary, fontSize: 15),
       ),
       content: SizedBox(
         width: 380,
         child: paths.isEmpty
-            ? const Text(
+            ? Text(
                 'No repositories found. Add a workspace with a repo path first.',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                style: TextStyle(color: colors.textMuted, fontSize: 12),
               )
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Select a repository to install the skill into:',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    style: TextStyle(color: colors.textMuted, fontSize: 12),
                   ),
                   const SizedBox(height: 10),
                   ...paths.map((path) {
@@ -815,11 +825,11 @@ class _InstallToRepoDialogState extends State<_InstallToRepoDialog> {
                       groupValue: _selectedPath,
                       onChanged: (v) => setState(() => _selectedPath = v),
                       title: Text(name,
-                          style: const TextStyle(
-                              color: AppColors.textPrimary, fontSize: 12)),
+                          style: TextStyle(
+                              color: colors.textPrimary, fontSize: 12)),
                       subtitle: Text(path,
-                          style: const TextStyle(
-                              color: AppColors.textMuted, fontSize: 10),
+                          style: TextStyle(
+                              color: colors.textMuted, fontSize: 10),
                           overflow: TextOverflow.ellipsis),
                       activeColor: AppColors.primary,
                       dense: true,
@@ -893,14 +903,15 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, size: 32, color: AppColors.neonOrange),
+          Icon(Icons.error_outline, size: 32, color: colors.accentOrange),
           const SizedBox(height: 12),
           Text(message,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(color: colors.textMuted, fontSize: 12),
               textAlign: TextAlign.center),
           const SizedBox(height: 12),
           TextButton.icon(

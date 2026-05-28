@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
@@ -206,8 +205,8 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                 widget.initial == null
                     ? 'New Run Configuration'
                     : 'Edit Run Configuration',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: colors.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -228,10 +227,10 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
               const SizedBox(height: 12),
               _WorkingDirField(controller: _workingDirCtrl),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Preset',
                 style: TextStyle(
-                  color: AppColors.textMuted,
+                  color: colors.textMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
@@ -293,10 +292,10 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                 },
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Color',
                 style: TextStyle(
-                  color: AppColors.textMuted,
+                  color: colors.textMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
@@ -316,17 +315,17 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                         border: Border.all(
                           color:
                               _selectedColor == null
-                                  ? AppColors.textPrimary
-                                  : AppColors.textMuted,
+                                  ? colors.textPrimary
+                                  : colors.textMuted,
                           width: _selectedColor == null ? 2 : 1,
                         ),
                       ),
                       child:
                           _selectedColor == null
-                              ? const Icon(
+                              ? Icon(
                                 Icons.close,
                                 size: 10,
-                                color: AppColors.textPrimary,
+                                color: colors.textPrimary,
                               )
                               : null,
                     ),
@@ -343,7 +342,7 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                           border:
                               _selectedColor?.toARGB32() == c.toARGB32()
                                   ? Border.all(
-                                    color: AppColors.textPrimary,
+                                    color: colors.textPrimary,
                                     width: 2,
                                   )
                                   : null,
@@ -360,7 +359,7 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.textMuted,
+                        foregroundColor: colors.textMuted,
                       ),
                       child: const Text('Cancel'),
                     ),
@@ -475,10 +474,10 @@ class _QuickActionsEditor extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Quick Actions',
           style: TextStyle(
-            color: AppColors.textMuted,
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: FontWeight.w500,
           ),
@@ -531,10 +530,10 @@ class _QuickActionsEditor extends StatelessWidget {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Preview',
                                 style: TextStyle(
-                                  color: AppColors.textMuted,
+                                  color: colors.textMuted,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -589,14 +588,14 @@ class _QuickActionsEditor extends StatelessWidget {
                             onChanged();
                           },
                           activeColor: colors.primary,
-                          side: const BorderSide(color: AppColors.textMuted),
+                          side: BorderSide(color: colors.textMuted),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'Append Enter (\\n)',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: colors.textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -604,7 +603,7 @@ class _QuickActionsEditor extends StatelessWidget {
                       TextButton(
                         onPressed: () => onRemove(index),
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.neonRed,
+                          foregroundColor: colors.accentRed,
                         ),
                         child: const Text('Remove'),
                       ),
@@ -762,10 +761,10 @@ class _WorkingDirFieldState extends State<_WorkingDirField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Working Directory',
           style: TextStyle(
-            color: AppColors.textMuted,
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: FontWeight.w500,
           ),
@@ -776,15 +775,15 @@ class _WorkingDirFieldState extends State<_WorkingDirField> {
             Expanded(
               child: TextField(
                 controller: controller,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: colors.textPrimary,
                   fontSize: 12,
                   fontFamily: 'monospace',
                 ),
                 decoration: InputDecoration(
                   hintText: 'Leave empty to use workspace root',
-                  hintStyle: const TextStyle(
-                    color: AppColors.textMuted,
+                  hintStyle: TextStyle(
+                    color: colors.textMuted,
                     fontSize: 12,
                   ),
                   filled: true,
@@ -864,7 +863,7 @@ class _WorkingDirFieldState extends State<_WorkingDirField> {
                         style: TextStyle(
                           fontSize: 11,
                           color:
-                              isSelected ? colors.primary : AppColors.textMuted,
+                              isSelected ? colors.primary : colors.textMuted,
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -899,8 +898,8 @@ class _Field extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: AppColors.textMuted,
+          style: TextStyle(
+            color: colors.textMuted,
             fontSize: 11,
             fontWeight: FontWeight.w500,
           ),
@@ -909,14 +908,14 @@ class _Field extends StatelessWidget {
         TextField(
           controller: controller,
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: colors.textPrimary,
             fontSize: 13,
             fontFamily: fontFamily,
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
-              color: AppColors.textMuted,
+            hintStyle: TextStyle(
+              color: colors.textMuted,
               fontSize: 12,
             ),
             filled: true,

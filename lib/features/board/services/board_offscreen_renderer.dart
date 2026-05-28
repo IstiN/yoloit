@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -96,30 +95,36 @@ class BoardOffscreenRenderer {
           DefaultWidgetsLocalizations.delegate,
         ],
         child: MediaQuery(
-        data: const MediaQueryData(size: Size(1400, 900)),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: ScrollConfiguration(
-            behavior: const HeadlessScrollBehavior(),
-            child: Theme(
-              data: theme,
-              child: DefaultTextStyle(
-                style: const TextStyle(
-                  color: Color(0xFFE0E0F0),
-                  fontSize: 12,
-                ),
-                child: IconTheme(
-                  data: const IconThemeData(color: Color(0xFF8888AA), size: 14),
-                  child: ColoredBox(
-                    color: const Color(0xFF0F0F1A),
-                    child: BoardCanvasPreview(board: board, useViewport: true),
+          data: const MediaQueryData(size: Size(1400, 900)),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: ScrollConfiguration(
+              behavior: const HeadlessScrollBehavior(),
+              child: Theme(
+                data: theme,
+                child: DefaultTextStyle(
+                  style: const TextStyle(
+                    color: Color(0xFFE0E0F0),
+                    fontSize: 12,
+                  ),
+                  child: IconTheme(
+                    data: const IconThemeData(
+                      color: Color(0xFF8888AA),
+                      size: 14,
+                    ),
+                    child: ColoredBox(
+                      color: const Color(0xFF0F0F1A),
+                      child: BoardCanvasPreview(
+                        board: board,
+                        useViewport: true,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -166,13 +171,13 @@ class BoardOffscreenRenderer {
     // sequential asynchronous tasks from being skipped during phase transitions.
     final watch = Stopwatch()..start();
     var emptyTurns = 0;
-    
+
     while (watch.elapsedMilliseconds < 15000) {
       buildOwner.buildScope(rootElement);
       pipelineOwner.flushLayout();
-      
+
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      
+
       if (HeadlessRenderRegistry.activeTasks.isEmpty) {
         emptyTurns++;
         if (emptyTurns >= 4) {
@@ -219,11 +224,7 @@ class BoardOffscreenRenderer {
 /// read-only and isolated from SharedPreferences / disk I/O.
 class _HeadlessBoardCubit extends BoardCubit {
   _HeadlessBoardCubit(BoardDocument board) : super() {
-    emit(BoardState(
-      boards: [board],
-      activeBoardId: board.id,
-      isLoaded: true,
-    ));
+    emit(BoardState(boards: [board], activeBoardId: board.id, isLoaded: true));
   }
 
   // Prevent any async side-effects (disk writes, network) during headless render.

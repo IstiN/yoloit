@@ -13,7 +13,6 @@ import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -1708,7 +1707,7 @@ $messagesJson
           // Session info
           Text(
             '$msgCount msgs',
-            style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            style: TextStyle(fontSize: 11, color: colors.textMuted),
           ),
           const Spacer(),
           // History
@@ -3007,6 +3006,7 @@ class _SessionBarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -3014,7 +3014,7 @@ class _SessionBarButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 16, color: AppColors.textSecondary),
+          child: Icon(icon, size: 16, color: colors.textSecondary),
         ),
       ),
     );
@@ -3944,7 +3944,7 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                   'No sessions yet.\nStart chatting to see history here.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: colors.textSecondary,
                     fontSize: 13,
                   ),
                 ),
@@ -3977,7 +3977,7 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                         size: 14,
                         color: isCurrent
                             ? const Color(0xFF34D399)
-                            : AppColors.textSecondary,
+                            : colors.textSecondary,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -4003,9 +4003,9 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                             const SizedBox(height: 2),
                             Text(
                               '${e.provider} • ${e.messageCount} msgs',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 10,
-                                color: AppColors.textSecondary,
+                                color: colors.textSecondary,
                               ),
                             ),
                           ],
@@ -4013,9 +4013,9 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                       ),
                       Text(
                         _formatDate(e.lastMessageAt ?? e.createdAt),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 9,
-                          color: AppColors.textSecondary,
+                          color: colors.textSecondary,
                         ),
                       ),
                       const SizedBox(width: 6),

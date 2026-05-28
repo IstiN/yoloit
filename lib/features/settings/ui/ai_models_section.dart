@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 
@@ -374,14 +373,15 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final (label, color) = switch (status) {
       LocalAiModelStatus.notDownloaded => (
         'Not Downloaded',
-        AppColors.textMuted,
+        colors.textMuted,
       ),
-      LocalAiModelStatus.downloading => ('Downloading...', AppColors.neonBlue),
+      LocalAiModelStatus.downloading => ('Downloading...', colors.accentBlue),
       LocalAiModelStatus.paused => ('Paused', Colors.amber),
-      LocalAiModelStatus.ready => ('Ready', AppColors.neonGreen),
+      LocalAiModelStatus.ready => ('Ready', colors.accentGreen),
       LocalAiModelStatus.failed => (
         'Failed',
         Theme.of(context).colorScheme.error,
@@ -426,7 +426,7 @@ class _PrerequisitesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final ready = status.isReady;
-    final color = ready ? AppColors.neonGreen : AppColors.neonOrange;
+    final color = ready ? colors.accentGreen : colors.accentOrange;
     final textColor = Theme.of(context).colorScheme.onSurface;
     final message =
         status.message ??

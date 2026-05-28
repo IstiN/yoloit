@@ -16,7 +16,9 @@ echo "🚀 Starting yoloit..."
 echo "💡 Use ./hot_reload.sh to hot reload"
 
 # Run flutter reading from FIFO and capture VM URL
-flutter run -d macos < "$FIFO" 2>&1 | tee /tmp/yoloit_flutter_log.txt | while IFS= read -r line; do
+# --no-pub skips `flutter pub get` on every launch (run `flutter pub get`
+# manually when pubspec.yaml changes).  This saves ~3-5 s per restart.
+flutter run -d macos --no-pub < "$FIFO" 2>&1 | tee /tmp/yoloit_flutter_log.txt | while IFS= read -r line; do
   echo "$line"
   if [[ "$line" == *"Dart VM Service on macOS is available at:"* ]]; then
     url="${line##*at: }"

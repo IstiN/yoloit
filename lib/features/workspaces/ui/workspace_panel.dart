@@ -1,7 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
@@ -48,10 +47,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
           Expanded(
             child: SingleChildScrollView(
               child: Column(
-                children: [
-                  _buildWorkspacesList(),
-                  _buildSetupSection(),
-                ],
+                children: [_buildWorkspacesList(), _buildSetupSection()],
               ),
             ),
           ),
@@ -82,8 +78,10 @@ class WorkspacePanelState extends State<WorkspacePanel> {
   Widget _buildWorkspacesList() {
     return BlocBuilder<WorkspaceCubit, WorkspaceState>(
       builder: (context, state) {
-        final workspaces = state is WorkspaceLoaded ? state.workspaces : <Workspace>[];
-        final activeId = state is WorkspaceLoaded ? state.activeWorkspaceId : null;
+        final workspaces =
+            state is WorkspaceLoaded ? state.workspaces : <Workspace>[];
+        final activeId =
+            state is WorkspaceLoaded ? state.activeWorkspaceId : null;
         return _WorkspaceList(
           workspaces: workspaces,
           activeId: activeId,
@@ -92,8 +90,11 @@ class WorkspacePanelState extends State<WorkspacePanel> {
           onRemove: (ws) => _confirmRemoveWorkspace(context, ws),
           onRename: (ws) => _renameWorkspaceDialog(context, ws),
           onSpawnAgent: (ws, type) => _spawnAgent(context, ws, type),
-          onColorChange: (ws, color) =>
-              context.read<WorkspaceCubit>().setWorkspaceColor(ws.id, color),
+          onColorChange:
+              (ws, color) => context.read<WorkspaceCubit>().setWorkspaceColor(
+                ws.id,
+                color,
+              ),
           onSecretsOpen: (ws) => _showSecretsDialog(context, ws),
           onAddPath: (ws) => _addPathToWorkspace(context, ws.id),
           onRemovePath: (ws, path) => _confirmRemovePath(context, ws.id, path),
@@ -118,7 +119,9 @@ class WorkspacePanelState extends State<WorkspacePanel> {
           trailing: Icon(
             _showThemePicker ? Icons.expand_less : Icons.chevron_right,
             size: 14,
-            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+            color:
+                Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -132,54 +135,65 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(
-        children: themes.map((t) {
-          final isActive = t == current;
-          return InkWell(
-            onTap: () {
-              ThemeManager.instance.setTheme(t);
-              setState(() {});
-            },
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
-              decoration: isActive
-                  ? BoxDecoration(
-                      color: t.color.withAlpha(25),
-                      borderRadius: BorderRadius.circular(4),
-                    )
-                  : null,
-              child: Row(
-                children: [
-                  Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: t.color,
-                      shape: BoxShape.circle,
-                      border: isActive
-                          ? Border.all(color: t.color, width: 2)
+        children:
+            themes.map((t) {
+              final isActive = t == current;
+              return InkWell(
+                onTap: () {
+                  ThemeManager.instance.setTheme(t);
+                  setState(() {});
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 5,
+                    horizontal: 4,
+                  ),
+                  decoration:
+                      isActive
+                          ? BoxDecoration(
+                            color: t.color.withAlpha(25),
+                            borderRadius: BorderRadius.circular(4),
+                          )
                           : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      t.label,
-                      style: TextStyle(
-                        color: isActive ? t.color : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
-                        fontSize: 12,
-                        fontWeight:
-                            isActive ? FontWeight.w600 : FontWeight.normal,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: t.color,
+                          shape: BoxShape.circle,
+                          border:
+                              isActive
+                                  ? Border.all(color: t.color, width: 2)
+                                  : null,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          t.label,
+                          style: TextStyle(
+                            color:
+                                isActive
+                                    ? t.color
+                                    : Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium?.color ??
+                                        Theme.of(context).colorScheme.onSurface,
+                            fontSize: 12,
+                            fontWeight:
+                                isActive ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      if (isActive) Icon(Icons.check, size: 12, color: t.color),
+                    ],
                   ),
-                  if (isActive)
-                    Icon(Icons.check, size: 12, color: t.color),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+                ),
+              );
+            }).toList(),
       ),
     );
   }
@@ -230,74 +244,107 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appColors.surfaceElevated,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: ctx.appColors.border),
-        ),
-        title: Text(
-          'New Workspace',
-          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'Workspace name',
-            hintStyle: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
-            filled: true,
-            fillColor: ctx.appColors.surface,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: ctx.appColors.border),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: ctx.appColors.surfaceElevated,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: ctx.appColors.border),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: ctx.appColors.border),
+            title: Text(
+              'New Workspace',
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 14,
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: ctx.appColors.primary),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 13,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Workspace name',
+                hintStyle: TextStyle(
+                  color:
+                      Theme.of(ctx).textTheme.bodySmall?.color ??
+                      Theme.of(ctx).colorScheme.onSurface,
+                  fontSize: 13,
+                ),
+                filled: true,
+                fillColor: ctx.appColors.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: ctx.appColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: ctx.appColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: ctx.appColors.primary),
+                ),
+              ),
+              onSubmitted: (v) {
+                final trimmed = v.trim();
+                if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
+              },
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color:
+                        Theme.of(ctx).textTheme.bodySmall?.color ??
+                        Theme.of(ctx).colorScheme.onSurface,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  final trimmed = controller.text.trim();
+                  if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
+                },
+                child: Text(
+                  'Next →',
+                  style: TextStyle(
+                    color: ctx.appColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-          onSubmitted: (v) {
-            final trimmed = v.trim();
-            if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
-          ),
-          TextButton(
-            onPressed: () {
-              final trimmed = controller.text.trim();
-              if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
-            },
-            child: Text(
-              'Next →',
-              style: TextStyle(color: ctx.appColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
     );
     controller.dispose();
     return result;
   }
 
-  Future<void> _addPathToWorkspace(BuildContext context, String workspaceId) async {
+  Future<void> _addPathToWorkspace(
+    BuildContext context,
+    String workspaceId,
+  ) async {
     final result = await FilePicker.getDirectoryPath(
       dialogTitle: 'Add Folder to Workspace',
     );
     if (result == null || !context.mounted) return;
     await maybePromptGitInit(context, result);
     if (context.mounted) {
-      await context.read<WorkspaceCubit>().addPathToWorkspace(workspaceId, result);
+      await context.read<WorkspaceCubit>().addPathToWorkspace(
+        workspaceId,
+        result,
+      );
     }
   }
 
@@ -309,89 +356,124 @@ class WorkspacePanelState extends State<WorkspacePanel> {
   void _spawnAgent(BuildContext context, Workspace ws, AgentType type) {
     context.read<WorkspaceCubit>().setActive(ws.id);
     context.read<TerminalCubit>().spawnSession(
-          type: type,
-          workspacePath: ws.workspaceDir,
-          workspaceId: ws.id,
-        );
+      type: type,
+      workspacePath: ws.workspaceDir,
+      workspaceId: ws.id,
+    );
   }
 
   void _showSecretsDialog(BuildContext context, Workspace ws) {
     showDialog<void>(
       context: context,
-      builder: (ctx) => _SecretsDialog(workspaceId: ws.id, workspaceName: ws.name),
+      builder:
+          (ctx) => _SecretsDialog(workspaceId: ws.id, workspaceName: ws.name),
     );
   }
 
   void _showAddSkillDialog(BuildContext context, Workspace ws) {
     showDialog<void>(
       context: context,
-      builder: (_) => BlocProvider.value(
-        value: context.read<SkillsCubit>(),
-        child: _AddSkillToWorkspaceDialog(workspace: ws),
-      ),
+      builder:
+          (_) => BlocProvider.value(
+            value: context.read<SkillsCubit>(),
+            child: _AddSkillToWorkspaceDialog(workspace: ws),
+          ),
     );
   }
 
-  Future<void> _renameWorkspaceDialog(BuildContext context, Workspace ws) async {
+  Future<void> _renameWorkspaceDialog(
+    BuildContext context,
+    Workspace ws,
+  ) async {
     final controller = TextEditingController(text: ws.name);
-    controller.selection = TextSelection(baseOffset: 0, extentOffset: ws.name.length);
+    controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: ws.name.length,
+    );
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appColors.surfaceElevated,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: ctx.appColors.border),
-        ),
-        title: Text(
-          'Rename Workspace',
-          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14),
-        ),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
-          decoration: InputDecoration(
-            hintText: 'Workspace name',
-            hintStyle: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 13),
-            filled: true,
-            fillColor: ctx.appColors.surface,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: ctx.appColors.border),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: ctx.appColors.surfaceElevated,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: ctx.appColors.border),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: ctx.appColors.border),
+            title: Text(
+              'Rename Workspace',
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 14,
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: ctx.appColors.primary),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              style: TextStyle(
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 13,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Workspace name',
+                hintStyle: TextStyle(
+                  color:
+                      Theme.of(ctx).textTheme.bodySmall?.color ??
+                      Theme.of(ctx).colorScheme.onSurface,
+                  fontSize: 13,
+                ),
+                filled: true,
+                fillColor: ctx.appColors.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: ctx.appColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: ctx.appColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: ctx.appColors.primary),
+                ),
+              ),
+              onSubmitted: (v) {
+                final trimmed = v.trim();
+                if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
+              },
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color:
+                        Theme.of(ctx).textTheme.bodySmall?.color ??
+                        Theme.of(ctx).colorScheme.onSurface,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  final trimmed = controller.text.trim();
+                  if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
+                },
+                child: Text(
+                  'Rename',
+                  style: TextStyle(
+                    color: ctx.appColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-          onSubmitted: (v) {
-            final trimmed = v.trim();
-            if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
-          ),
-          TextButton(
-            onPressed: () {
-              final trimmed = controller.text.trim();
-              if (trimmed.isNotEmpty) Navigator.of(ctx).pop(trimmed);
-            },
-            child: Text(
-              'Rename',
-              style: TextStyle(color: ctx.appColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
     );
     controller.dispose();
     if (result != null && result != ws.name && context.mounted) {
@@ -407,7 +489,10 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     }
   }
 
-  Future<void> _confirmRemoveWorkspace(BuildContext context, Workspace ws) async {
+  Future<void> _confirmRemoveWorkspace(
+    BuildContext context,
+    Workspace ws,
+  ) async {
     final confirmed = await _showConfirmDialog(
       context,
       title: 'Remove Workspace',
@@ -420,7 +505,11 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     }
   }
 
-  Future<void> _confirmRemovePath(BuildContext context, String workspaceId, String path) async {
+  Future<void> _confirmRemovePath(
+    BuildContext context,
+    String workspaceId,
+    String path,
+  ) async {
     final name = path.split('/').last;
     final confirmed = await _showConfirmDialog(
       context,
@@ -430,7 +519,10 @@ class WorkspacePanelState extends State<WorkspacePanel> {
       isDestructive: true,
     );
     if (confirmed && context.mounted) {
-      await context.read<WorkspaceCubit>().removePathFromWorkspace(workspaceId, path);
+      await context.read<WorkspaceCubit>().removePathFromWorkspace(
+        workspaceId,
+        path,
+      );
     }
   }
 
@@ -443,32 +535,58 @@ class WorkspacePanelState extends State<WorkspacePanel> {
   }) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.appColors.surfaceElevated,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: ctx.appColors.border),
-        ),
-        title: Text(title, style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface, fontSize: 14)),
-        content: Text(message, style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancel', style: TextStyle(color: Theme.of(ctx).textTheme.bodySmall?.color ?? Theme.of(ctx).colorScheme.onSurface, fontSize: 12)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              confirmLabel,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: ctx.appColors.surfaceElevated,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: ctx.appColors.border),
+            ),
+            title: Text(
+              title,
               style: TextStyle(
-                color: isDestructive ? Colors.red.shade300 : ctx.appColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+                color: Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 14,
               ),
             ),
+            content: Text(
+              message,
+              style: TextStyle(
+                color:
+                    Theme.of(ctx).textTheme.bodySmall?.color ??
+                    Theme.of(ctx).colorScheme.onSurface,
+                fontSize: 12,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color:
+                        Theme.of(ctx).textTheme.bodySmall?.color ??
+                        Theme.of(ctx).colorScheme.onSurface,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(
+                  confirmLabel,
+                  style: TextStyle(
+                    color:
+                        isDestructive
+                            ? Colors.red.shade300
+                            : ctx.appColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
     return result ?? false;
   }
@@ -507,12 +625,23 @@ class _PathChipState extends State<_PathChip> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.folder_outlined, size: 9, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+              Icon(
+                Icons.folder_outlined,
+                size: 9,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+              ),
               const SizedBox(width: 3),
               Flexible(
                 child: Text(
                   name,
-                  style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 9),
+                  style: TextStyle(
+                    color:
+                        Theme.of(context).textTheme.bodyMedium?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                    fontSize: 9,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -608,7 +737,9 @@ class _WorkspaceListState extends State<_WorkspaceList> {
                 child: Text(
                   'Workspaces / Repositories',
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -638,12 +769,23 @@ class _WorkspaceListState extends State<_WorkspaceList> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.folder_open_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                    Icon(
+                      Icons.folder_open_outlined,
+                      size: 14,
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                    ),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
                         'Open a folder...',
-                        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                        style: TextStyle(
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
+                          fontSize: 12,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -684,8 +826,6 @@ class _WorkspaceListState extends State<_WorkspaceList> {
     );
   }
 }
-
-
 
 class _ActiveWorkspaceCard extends StatefulWidget {
   const _ActiveWorkspaceCard({
@@ -793,7 +933,11 @@ class _ActiveWorkspaceCardState extends State<_ActiveWorkspaceCard>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Divider(height: 1, thickness: 1, color: accent.withAlpha(50)),
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: accent.withAlpha(50),
+                        ),
                         WorkspaceInlineTree(workspace: widget.workspace),
                       ],
                     ),
@@ -837,6 +981,7 @@ class _WorkspaceTile extends StatefulWidget {
   final VoidCallback onAddPath;
   final void Function(String path) onRemovePath;
   final VoidCallback onAddSkill;
+
   /// When true the tile renders without its own margin/border/background —
   /// a parent container provides the decoration instead.
   final bool suppressDecoration;
@@ -862,8 +1007,12 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
 
   void _showMenu(BuildContext context) {
     final RenderBox button = context.findRenderObject()! as RenderBox;
-    final RenderBox overlay = Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
-    final offset = button.localToGlobal(Offset(button.size.width, 0), ancestor: overlay);
+    final RenderBox overlay =
+        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+    final offset = button.localToGlobal(
+      Offset(button.size.width, 0),
+      ancestor: overlay,
+    );
     showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -882,57 +1031,136 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
           PopupMenuItem(
             value: 'spawn_${type.name}',
             height: 36,
-            child: Row(children: [
-              Text(type.iconLabel, style: const TextStyle(fontSize: 13)),
-              const SizedBox(width: 8),
-              Text('Start ${type.displayName}', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
-            ]),
+            child: Row(
+              children: [
+                Text(type.iconLabel, style: const TextStyle(fontSize: 13)),
+                const SizedBox(width: 8),
+                Text(
+                  'Start ${type.displayName}',
+                  style: TextStyle(
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
         const PopupMenuDivider(height: 1),
         PopupMenuItem(
           value: 'rename',
           height: 36,
-          child: Row(children: [
-            Icon(Icons.drive_file_rename_outline, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
-            const SizedBox(width: 8),
-            Text('Rename', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.drive_file_rename_outline,
+                size: 14,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Rename',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'add_folder',
           height: 36,
-          child: Row(children: [
-            Icon(Icons.create_new_folder_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
-            const SizedBox(width: 8),
-            Text('Add Folder', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.create_new_folder_outlined,
+                size: 14,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Add Folder',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'add_skill',
           height: 36,
-          child: Row(children: [
-            Icon(Icons.extension_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
-            const SizedBox(width: 8),
-            Text('Add Skill', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.extension_outlined,
+                size: 14,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Add Skill',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'secrets',
           height: 36,
-          child: Row(children: [
-            Icon(Icons.key_outlined, size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
-            const SizedBox(width: 8),
-            Text('Workspace Secrets', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
-          ]),
+          child: Row(
+            children: [
+              Icon(
+                Icons.key_outlined,
+                size: 14,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Workspace Secrets',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'remove',
           height: 36,
-          child: Row(children: [
-            Icon(Icons.close, size: 14, color: Colors.red.shade300),
-            const SizedBox(width: 8),
-            Text('Remove', style: TextStyle(color: Colors.red.shade300, fontSize: 12)),
-          ]),
+          child: Row(
+            children: [
+              Icon(Icons.close, size: 14, color: Colors.red.shade300),
+              const SizedBox(width: 8),
+              Text(
+                'Remove',
+                style: TextStyle(color: Colors.red.shade300, fontSize: 12),
+              ),
+            ],
+          ),
         ),
       ],
     ).then((value) {
@@ -962,9 +1190,10 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
     final accentColor = ws.color ?? colors.primary;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() {
-        _hovering = false;
-      }),
+      onExit:
+          (_) => setState(() {
+            _hovering = false;
+          }),
       child: Semantics(
         label: '${ws.name} workspace${widget.isActive ? ', active' : ''}',
         button: true,
@@ -973,23 +1202,27 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            margin: widget.suppressDecoration
-                ? EdgeInsets.zero
-                : const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            margin:
+                widget.suppressDecoration
+                    ? EdgeInsets.zero
+                    : const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             padding: EdgeInsets.all(10),
-            decoration: widget.suppressDecoration
-                ? const BoxDecoration()
-                : BoxDecoration(
-                    color: widget.isActive
-                        ? accentColor.withAlpha(30)
-                        : _hovering
-                            ? colors.surfaceHighlight
-                            : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    border: widget.isActive
-                        ? Border.all(color: accentColor.withAlpha(80))
-                        : null,
-                  ),
+            decoration:
+                widget.suppressDecoration
+                    ? const BoxDecoration()
+                    : BoxDecoration(
+                      color:
+                          widget.isActive
+                              ? accentColor.withAlpha(30)
+                              : _hovering
+                              ? colors.surfaceHighlight
+                              : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6),
+                      border:
+                          widget.isActive
+                              ? Border.all(color: accentColor.withAlpha(80))
+                              : null,
+                    ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -997,7 +1230,10 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                   children: [
                     // Color dot — click to open color picker
                     GestureDetector(
-                      onTap: () => setState(() => _showColorPicker = !_showColorPicker),
+                      onTap:
+                          () => setState(
+                            () => _showColorPicker = !_showColorPicker,
+                          ),
                       child: Container(
                         width: 10,
                         height: 10,
@@ -1005,7 +1241,9 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                           color: accentColor,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: Theme.of(context).colorScheme.onSurface.withAlpha(60),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withAlpha(60),
                             width: 1,
                           ),
                         ),
@@ -1016,7 +1254,13 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                       child: Text(
                         ws.name,
                         style: TextStyle(
-                          color: widget.isActive ? Theme.of(context).colorScheme.onSurface : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color:
+                              widget.isActive
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium?.color ??
+                                      Theme.of(context).colorScheme.onSurface,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1029,15 +1273,18 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                       child: IgnorePointer(
                         ignoring: !widget.isActive,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
-                            color: AppColors.neonGreen.withAlpha(30),
+                            color: colors.accentGreen.withAlpha(30),
                             borderRadius: BorderRadius.circular(3),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Active',
                             style: TextStyle(
-                              color: AppColors.neonGreen,
+                              color: colors.accentGreen,
                               fontSize: 9,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1054,11 +1301,12 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                         color: Colors.red.shade300,
                       ),
                       Builder(
-                        builder: (ctx) => _SmallIconButton(
-                          icon: Icons.more_horiz,
-                          onTap: () => _showMenu(ctx),
-                          tooltip: 'More actions',
-                        ),
+                        builder:
+                            (ctx) => _SmallIconButton(
+                              icon: Icons.more_horiz,
+                              onTap: () => _showMenu(ctx),
+                              tooltip: 'More actions',
+                            ),
                       ),
                     ],
                   ],
@@ -1067,28 +1315,32 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                 if (_showColorPicker) ...[
                   SizedBox(height: 8),
                   Row(
-                    children: _palette.map((c) {
-                      final selected = (ws.color ?? colors.primary) == c;
-                      return GestureDetector(
-                        onTap: () {
-                          widget.onColorChange(c);
-                          setState(() => _showColorPicker = false);
-                        },
-                        child: Container(
-                          width: 16,
-                          height: 16,
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: c,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: selected ? Colors.white : Colors.transparent,
-                              width: 2,
+                    children:
+                        _palette.map((c) {
+                          final selected = (ws.color ?? colors.primary) == c;
+                          return GestureDetector(
+                            onTap: () {
+                              widget.onColorChange(c);
+                              setState(() => _showColorPicker = false);
+                            },
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              margin: const EdgeInsets.only(right: 6),
+                              decoration: BoxDecoration(
+                                color: c,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color:
+                                      selected
+                                          ? Colors.white
+                                          : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                          );
+                        }).toList(),
                   ),
                 ],
                 // Folder path chips — one per referenced folder
@@ -1097,24 +1349,38 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                   spacing: 4,
                   runSpacing: 4,
                   children: [
-                    ...ws.paths.map((path) => _PathChip(
-                          path: path,
-                          onRemove: ws.paths.length > 1
-                              ? () => widget.onRemovePath(path)
-                              : null,
-                        )),
+                    ...ws.paths.map(
+                      (path) => _PathChip(
+                        path: path,
+                        onRemove:
+                            ws.paths.length > 1
+                                ? () => widget.onRemovePath(path)
+                                : null,
+                      ),
+                    ),
                   ],
                 ),
                 if (ws.gitBranch != null) ...[
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.alt_route, size: 10, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                      Icon(
+                        Icons.alt_route,
+                        size: 10,
+                        color:
+                            Theme.of(context).textTheme.bodySmall?.color ??
+                            Theme.of(context).colorScheme.onSurface,
+                      ),
                       const SizedBox(width: 3),
                       Flexible(
                         child: Text(
                           'Git Branch: ${ws.gitBranch}',
-                          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
+                            fontSize: 10,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1128,26 +1394,39 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                       if (ws.addedLines > 0)
                         Text(
                           '+${ws.addedLines}',
-                          style: const TextStyle(
-                            color: AppColors.neonGreen,
+                          style: TextStyle(
+                            color: colors.accentGreen,
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       if (ws.addedLines > 0 && ws.removedLines > 0)
-                        Text(' / ', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10)),
+                        Text(
+                          ' / ',
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
+                            fontSize: 10,
+                          ),
+                        ),
                       if (ws.removedLines > 0)
                         Text(
                           '-${ws.removedLines}',
-                          style: const TextStyle(
-                            color: AppColors.neonRed,
+                          style: TextStyle(
+                            color: colors.accentRed,
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       Text(
                         ' lines',
-                        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+                        style: TextStyle(
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
@@ -1199,12 +1478,23 @@ class _SetupItemState extends State<_SetupItem> {
             color: _hovering ? colors.surfaceHighlight : Colors.transparent,
             child: Row(
               children: [
-                Icon(widget.icon, size: 14, color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface),
+                Icon(
+                  widget.icon,
+                  size: 14,
+                  color:
+                      Theme.of(context).textTheme.bodyMedium?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     widget.label,
-                    style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                    style: TextStyle(
+                      color:
+                          Theme.of(context).textTheme.bodyMedium?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 if (widget.trailing != null) widget.trailing!,
@@ -1241,7 +1531,14 @@ class _SmallIconButton extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(3),
-            child: Icon(icon, size: 12, color: color ?? Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+            child: Icon(
+              icon,
+              size: 12,
+              color:
+                  color ??
+                  Theme.of(context).textTheme.bodySmall?.color ??
+                  Theme.of(context).colorScheme.onSurface,
+            ),
           ),
         ),
       ),
@@ -1250,7 +1547,10 @@ class _SmallIconButton extends StatelessWidget {
 }
 
 class _SecretsDialog extends StatefulWidget {
-  const _SecretsDialog({required this.workspaceId, required this.workspaceName});
+  const _SecretsDialog({
+    required this.workspaceId,
+    required this.workspaceName,
+  });
 
   final String workspaceId;
   final String workspaceName;
@@ -1272,8 +1572,14 @@ class _SecretsDialogState extends State<_SecretsDialog> {
   }
 
   Future<void> _load() async {
-    final loaded = await WorkspaceSecretsService.instance.load(widget.workspaceId);
-    if (mounted) setState(() { _secrets = Map.from(loaded); _loading = false; });
+    final loaded = await WorkspaceSecretsService.instance.load(
+      widget.workspaceId,
+    );
+    if (mounted)
+      setState(() {
+        _secrets = Map.from(loaded);
+        _loading = false;
+      });
   }
 
   void _addEntry() {
@@ -1305,7 +1611,11 @@ class _SecretsDialogState extends State<_SecretsDialog> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.lock_outline, size: 18, color: Theme.of(context).colorScheme.onSurface),
+                  Icon(
+                    Icons.lock_outline,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -1322,7 +1632,12 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                         const SizedBox(height: 2),
                         Text(
                           'Injected as env vars when launching agents in ${widget.workspaceName}',
-                          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -1338,7 +1653,12 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
                       'No secrets yet. Add a KEY=VALUE pair.',
-                      style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                      style: TextStyle(
+                        color:
+                            Theme.of(context).textTheme.bodySmall?.color ??
+                            Theme.of(context).colorScheme.onSurface,
+                        fontSize: 12,
+                      ),
                     ),
                   )
                 else
@@ -1371,27 +1691,44 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                                 initialValue: value,
                                 hint: 'VALUE',
                                 obscure: !revealed,
-                                onChanged: (v) => setState(() => _secrets[key] = v),
+                                onChanged:
+                                    (v) => setState(() => _secrets[key] = v),
                               ),
                             ),
                             const SizedBox(width: 4),
                             IconButton(
                               icon: Icon(
-                                revealed ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                revealed
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
                                 size: 16,
-                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color ??
+                                    Theme.of(context).colorScheme.onSurface,
                               ),
                               splashRadius: 14,
                               tooltip: revealed ? 'Hide' : 'Reveal',
-                              onPressed: () => setState(() {
-                                if (revealed) { _revealed.remove(i); } else { _revealed.add(i); }
-                              }),
+                              onPressed:
+                                  () => setState(() {
+                                    if (revealed) {
+                                      _revealed.remove(i);
+                                    } else {
+                                      _revealed.add(i);
+                                    }
+                                  }),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.neonRed),
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 16,
+                                color: colors.accentRed,
+                              ),
                               splashRadius: 14,
                               tooltip: 'Delete',
-                              onPressed: () => setState(() => _secrets.remove(key)),
+                              onPressed:
+                                  () => setState(() => _secrets.remove(key)),
                             ),
                           ],
                         ),
@@ -1412,7 +1749,14 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text('Cancel', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface)),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color:
+                            Theme.of(context).textTheme.bodyMedium?.color ??
+                            Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
                   ),
                   SizedBox(width: 8),
                   ElevatedButton(
@@ -1420,7 +1764,9 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
                     child: const Text('Save', style: TextStyle(fontSize: 13)),
                   ),
@@ -1453,10 +1799,18 @@ class _SecretTextField extends StatelessWidget {
     return TextFormField(
       initialValue: initialValue,
       obscureText: obscure,
-      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
+        fontSize: 12,
+      ),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+        hintStyle: TextStyle(
+          color:
+              Theme.of(context).textTheme.bodySmall?.color ??
+              Theme.of(context).colorScheme.onSurface,
+          fontSize: 12,
+        ),
         contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         isDense: true,
         filled: true,
@@ -1496,9 +1850,10 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
     final colors = context.appColors;
     return BlocBuilder<TerminalCubit, TerminalState>(
       builder: (context, termState) {
-        final agentSessions = termState is TerminalLoaded
-            ? termState.allSessions
-            : <AgentSession>[];
+        final agentSessions =
+            termState is TerminalLoaded
+                ? termState.allSessions
+                : <AgentSession>[];
         return BlocBuilder<RunCubit, RunState>(
           builder: (context, runState) {
             final runSessions = runState.sessions;
@@ -1513,13 +1868,23 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                     padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                     child: Row(
                       children: [
-                        Icon(Icons.terminal, size: 12, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                        Icon(
+                          Icons.terminal,
+                          size: 12,
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'Active Sessions',
                             style: TextStyle(
-                              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.color ??
+                                  Theme.of(context).colorScheme.onSurface,
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.8,
@@ -1529,7 +1894,9 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                         if (total > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: colors.primary.withAlpha(40),
                               borderRadius: BorderRadius.circular(8),
@@ -1547,7 +1914,9 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                         Icon(
                           _expanded ? Icons.expand_less : Icons.expand_more,
                           size: 14,
-                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
                         ),
                       ],
                     ),
@@ -1562,7 +1931,11 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                       child: Text(
                         'No active sessions',
                         style: TextStyle(
-                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
+                          fontSize: 10,
+                        ),
                       ),
                     ),
                 ],
@@ -1593,7 +1966,11 @@ class _AgentSessionRowState extends State<_AgentSessionRow> {
     final colors = context.appColors;
     final s = widget.session;
     final isLive = s.status == AgentStatus.live;
-    final dotColor = isLive ? AppColors.neonGreen : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface);
+    final dotColor =
+        isLive
+            ? colors.accentGreen
+            : (Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -1606,8 +1983,10 @@ class _AgentSessionRowState extends State<_AgentSessionRow> {
             Container(
               width: 6,
               height: 6,
-              decoration:
-                  BoxDecoration(color: dotColor, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+              ),
             ),
             const SizedBox(width: 6),
             Text(s.type.iconLabel, style: const TextStyle(fontSize: 10)),
@@ -1616,7 +1995,11 @@ class _AgentSessionRowState extends State<_AgentSessionRow> {
               child: Text(
                 s.workspacePath.split('/').last,
                 style: TextStyle(
-                    color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+                  color:
+                      Theme.of(context).textTheme.bodyMedium?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 10,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1626,12 +2009,14 @@ class _AgentSessionRowState extends State<_AgentSessionRow> {
               child: IgnorePointer(
                 ignoring: !_hovering,
                 child: GestureDetector(
-                  onTap: () =>
-                      context.read<TerminalCubit>().closeSession(s.id),
+                  onTap: () => context.read<TerminalCubit>().closeSession(s.id),
                   child: Tooltip(
                     message: 'Kill session',
-                    child: Icon(Icons.close,
-                        size: 12, color: Colors.red.shade300),
+                    child: Icon(
+                      Icons.close,
+                      size: 12,
+                      color: Colors.red.shade300,
+                    ),
                   ),
                 ),
               ),
@@ -1662,9 +2047,13 @@ class _RunSessionRowState extends State<_RunSessionRow> {
     final s = widget.session;
 
     final (dotColor, icon) = switch (s.status) {
-      RunStatus.running => (AppColors.neonGreen, Icons.play_arrow),
-      RunStatus.failed => (AppColors.neonRed, Icons.error_outline),
-      _ => (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, Icons.stop_circle_outlined),
+      RunStatus.running => (colors.accentGreen, Icons.play_arrow),
+      RunStatus.failed => (colors.accentRed, Icons.error_outline),
+      _ => (
+        Theme.of(context).textTheme.bodySmall?.color ??
+            Theme.of(context).colorScheme.onSurface,
+        Icons.stop_circle_outlined,
+      ),
     };
 
     return MouseRegion(
@@ -1681,8 +2070,10 @@ class _RunSessionRowState extends State<_RunSessionRow> {
               Container(
                 width: 6,
                 height: 6,
-                decoration:
-                    BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 6),
               Icon(icon, size: 11, color: dotColor),
@@ -1691,7 +2082,11 @@ class _RunSessionRowState extends State<_RunSessionRow> {
                 child: Text(
                   s.config.name,
                   style: TextStyle(
-                      color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+                    color:
+                        Theme.of(context).textTheme.bodyMedium?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                    fontSize: 10,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1700,23 +2095,33 @@ class _RunSessionRowState extends State<_RunSessionRow> {
                 duration: const Duration(milliseconds: 150),
                 child: IgnorePointer(
                   ignoring: !_hovering,
-                  child: s.status == RunStatus.running
-                    ? GestureDetector(
-                        onTap: () => context.read<RunCubit>().stopRun(s.id),
-                        child: Tooltip(
-                          message: 'Stop run',
-                          child: Icon(Icons.stop,
-                              size: 12, color: Colors.orange.shade300),
-                        ),
-                      )
-                    : GestureDetector(
-                        onTap: () => context.read<RunCubit>().removeSession(s.id),
-                        child: Tooltip(
-                          message: 'Remove',
-                          child: Icon(Icons.close,
-                              size: 12, color: Colors.red.shade300),
-                        ),
-                      ),
+                  child:
+                      s.status == RunStatus.running
+                          ? GestureDetector(
+                            onTap: () => context.read<RunCubit>().stopRun(s.id),
+                            child: Tooltip(
+                              message: 'Stop run',
+                              child: Icon(
+                                Icons.stop,
+                                size: 12,
+                                color: Colors.orange.shade300,
+                              ),
+                            ),
+                          )
+                          : GestureDetector(
+                            onTap:
+                                () => context.read<RunCubit>().removeSession(
+                                  s.id,
+                                ),
+                            child: Tooltip(
+                              message: 'Remove',
+                              child: Icon(
+                                Icons.close,
+                                size: 12,
+                                color: Colors.red.shade300,
+                              ),
+                            ),
+                          ),
                 ),
               ),
             ],
@@ -1734,10 +2139,12 @@ class _AddSkillToWorkspaceDialog extends StatefulWidget {
   final Workspace workspace;
 
   @override
-  State<_AddSkillToWorkspaceDialog> createState() => _AddSkillToWorkspaceDialogState();
+  State<_AddSkillToWorkspaceDialog> createState() =>
+      _AddSkillToWorkspaceDialogState();
 }
 
-class _AddSkillToWorkspaceDialogState extends State<_AddSkillToWorkspaceDialog> {
+class _AddSkillToWorkspaceDialogState
+    extends State<_AddSkillToWorkspaceDialog> {
   // Local copy of enabled skills that user is editing.
   late Set<String> _enabled;
   bool _saving = false;
@@ -1752,9 +2159,10 @@ class _AddSkillToWorkspaceDialogState extends State<_AddSkillToWorkspaceDialog> 
   Widget build(BuildContext context) {
     return BlocBuilder<SkillsCubit, SkillsState>(
       builder: (context, state) {
-        final installedSkills = state is SkillsLoaded
-            ? state.skills.where((s) => s.isInstalled).toList()
-            : <SkillEntry>[];
+        final installedSkills =
+            state is SkillsLoaded
+                ? state.skills.where((s) => s.isInstalled).toList()
+                : <SkillEntry>[];
 
         return AlertDialog(
           backgroundColor: context.appColors.surfaceElevated,
@@ -1767,104 +2175,158 @@ class _AddSkillToWorkspaceDialogState extends State<_AddSkillToWorkspaceDialog> 
             children: [
               Text(
                 'Add Skills to Workspace',
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 widget.workspace.name,
-                style: TextStyle(color: context.appColors.primary, fontSize: 11),
+                style: TextStyle(
+                  color: context.appColors.primary,
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
           content: SizedBox(
             width: 320,
-            child: installedSkills.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      'No skills installed yet.\nInstall skills from the Skills panel first.',
-                      style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 320),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: installedSkills.length,
-                      itemBuilder: (context, i) {
-                        final skill = installedSkills[i];
-                        final isEnabled = _enabled.contains(skill.id);
-                        return InkWell(
-                          onTap: () => setState(() {
-                            if (isEnabled) {
-                              _enabled.remove(skill.id);
-                            } else {
-                              _enabled.add(skill.id);
-                            }
-                          }),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: Checkbox(
-                                    value: isEnabled,
-                                    onChanged: (_) => setState(() {
-                                      if (isEnabled) {
-                                        _enabled.remove(skill.id);
-                                      } else {
-                                        _enabled.add(skill.id);
-                                      }
-                                    }),
-                                    activeColor: context.appColors.primary,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    visualDensity: VisualDensity.compact,
+            child:
+                installedSkills.isEmpty
+                    ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'No skills installed yet.\nInstall skills from the Skills panel first.',
+                        style: TextStyle(
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                    : ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 320),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: installedSkills.length,
+                        itemBuilder: (context, i) {
+                          final skill = installedSkills[i];
+                          final isEnabled = _enabled.contains(skill.id);
+                          return InkWell(
+                            onTap:
+                                () => setState(() {
+                                  if (isEnabled) {
+                                    _enabled.remove(skill.id);
+                                  } else {
+                                    _enabled.add(skill.id);
+                                  }
+                                }),
+                            borderRadius: BorderRadius.circular(6),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 6,
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: Checkbox(
+                                      value: isEnabled,
+                                      onChanged:
+                                          (_) => setState(() {
+                                            if (isEnabled) {
+                                              _enabled.remove(skill.id);
+                                            } else {
+                                              _enabled.add(skill.id);
+                                            }
+                                          }),
+                                      activeColor: context.appColors.primary,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        skill.name,
-                                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w500),
-                                      ),
-                                      if (skill.description.isNotEmpty)
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
                                         Text(
-                                          skill.description,
-                                          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                          skill.name,
+                                          style: TextStyle(
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurface,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                         ),
-                                    ],
+                                        if (skill.description.isNotEmpty)
+                                          Text(
+                                            skill.description,
+                                            style: TextStyle(
+                                              color:
+                                                  Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.color ??
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface,
+                                              fontSize: 11,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
           ),
           actions: [
             TextButton(
               onPressed: _saving ? null : () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
             ),
             TextButton(
               onPressed: _saving ? null : () => _save(context),
-              child: _saving
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(
-                      'Apply',
-                      style: TextStyle(color: context.appColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
+              child:
+                  _saving
+                      ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : Text(
+                        'Apply',
+                        style: TextStyle(
+                          color: context.appColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
             ),
           ],
         );

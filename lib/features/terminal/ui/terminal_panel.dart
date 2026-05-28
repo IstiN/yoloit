@@ -7,7 +7,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/session/session_prefs.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
@@ -67,18 +66,18 @@ class _EmptyTerminal extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'AI Agents',
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: colors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Open a workspace and start an AI agent to begin',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(color: colors.textMuted, fontSize: 13),
                   ),
                   const SizedBox(height: 24),
                   BlocBuilder<WorkspaceCubit, WorkspaceState>(
@@ -87,10 +86,10 @@ class _EmptyTerminal extends StatelessWidget {
                           wsState is WorkspaceLoaded &&
                           wsState.activeWorkspace != null;
                       if (!hasActive) {
-                        return const Text(
+                        return Text(
                           'Select a workspace from the left panel first',
                           style: TextStyle(
-                            color: AppColors.textMuted,
+                            color: colors.textMuted,
                             fontSize: 12,
                           ),
                         );
@@ -319,6 +318,7 @@ class _AgentTabState extends State<_AgentTab> {
   }
 
   void _showContextMenu(BuildContext context, Offset position) async {
+    final colors = context.appColors;
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -336,7 +336,7 @@ class _AgentTabState extends State<_AgentTab> {
               Icon(
                 Icons.drive_file_rename_outline,
                 size: 14,
-                color: AppColors.textMuted,
+                color: colors.textMuted,
               ),
               const SizedBox(width: 8),
               const Text('Rename', style: TextStyle(fontSize: 13)),
@@ -348,7 +348,7 @@ class _AgentTabState extends State<_AgentTab> {
           height: 32,
           child: Row(
             children: [
-              Icon(Icons.close, size: 14, color: AppColors.textMuted),
+              Icon(Icons.close, size: 14, color: colors.textMuted),
               const SizedBox(width: 8),
               const Text('Close', style: TextStyle(fontSize: 13)),
             ],
@@ -365,7 +365,7 @@ class _AgentTabState extends State<_AgentTab> {
     final colors = context.appColors;
     final session = widget.session;
     final isLive = session.status == AgentStatus.live;
-    final statusColor = isLive ? AppColors.statusActive : AppColors.statusIdle;
+    final statusColor = isLive ? colors.statusActive : colors.statusIdle;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -399,7 +399,7 @@ class _AgentTabState extends State<_AgentTab> {
                   color:
                       widget.isActive
                           ? colors.primaryLight
-                          : AppColors.textMuted,
+                          : colors.textMuted,
                 ),
               ),
               const SizedBox(width: 5),
@@ -410,8 +410,8 @@ class _AgentTabState extends State<_AgentTab> {
                   child: TextField(
                     controller: _nameController,
                     focusNode: _nameFocus,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: colors.textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -444,7 +444,7 @@ class _AgentTabState extends State<_AgentTab> {
                     color:
                         widget.isActive
                             ? colors.primaryLight
-                            : AppColors.textSecondary,
+                            : colors.textSecondary,
                     fontSize: 12,
                     fontWeight:
                         widget.isActive ? FontWeight.w600 : FontWeight.normal,
@@ -474,8 +474,8 @@ class _AgentTabState extends State<_AgentTab> {
                         size: 12,
                         color:
                             _hovering
-                                ? AppColors.textPrimary
-                                : AppColors.textMuted,
+                                ? colors.textPrimary
+                                : colors.textMuted,
                       ),
                     ),
                   ),
@@ -517,8 +517,8 @@ class _SessionInfoBar extends StatelessWidget {
           Flexible(
             child: Text(
               session.type.command,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: colors.textSecondary,
                 fontSize: 11,
                 fontFamily: 'monospace',
               ),
@@ -869,81 +869,82 @@ class TerminalWidgetState extends State<TerminalWidget> {
     BuildContext context,
     Offset globalPos,
   ) async {
+    final colors = context.appColors;
     final selection = _controller.selection;
     final hasSelection = selection != null;
 
     final items = <PopupMenuEntry<_TermCtxAction>>[
-      const PopupMenuItem(
+      PopupMenuItem(
         value: _TermCtxAction.selectAll,
         height: 36,
         child: Row(
           children: [
-            Icon(Icons.select_all, size: 14, color: AppColors.textSecondary),
+            Icon(Icons.select_all, size: 14, color: colors.textSecondary),
             SizedBox(width: 8),
             Text(
               'Select All',
-              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13, color: colors.textPrimary),
             ),
           ],
         ),
       ),
       if (hasSelection)
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _TermCtxAction.copy,
           height: 36,
           child: Row(
             children: [
-              Icon(Icons.copy, size: 14, color: AppColors.textSecondary),
+              Icon(Icons.copy, size: 14, color: colors.textSecondary),
               SizedBox(width: 8),
               Text(
                 'Copy',
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 13, color: colors.textPrimary),
               ),
             ],
           ),
         ),
-      const PopupMenuItem(
+      PopupMenuItem(
         value: _TermCtxAction.paste,
         height: 36,
         child: Row(
           children: [
-            Icon(Icons.content_paste, size: 14, color: AppColors.textSecondary),
+            Icon(Icons.content_paste, size: 14, color: colors.textSecondary),
             SizedBox(width: 8),
             Text(
               'Paste',
-              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13, color: colors.textPrimary),
             ),
           ],
         ),
       ),
       if (hasSelection) ...[
         const PopupMenuDivider(height: 1),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: _TermCtxAction.clearSelection,
           height: 36,
           child: Row(
             children: [
-              Icon(Icons.clear, size: 14, color: AppColors.textSecondary),
+              Icon(Icons.clear, size: 14, color: colors.textSecondary),
               SizedBox(width: 8),
               Text(
                 'Clear selection',
-                style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 13, color: colors.textPrimary),
               ),
             ],
           ),
         ),
       ],
       const PopupMenuDivider(height: 1),
-      const PopupMenuItem(
+      PopupMenuItem(
         value: _TermCtxAction.search,
         height: 36,
         child: Row(
           children: [
-            Icon(Icons.search, size: 14, color: AppColors.textSecondary),
+            Icon(Icons.search, size: 14, color: colors.textSecondary),
             SizedBox(width: 8),
             Text(
               'Find',
-              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13, color: colors.textPrimary),
             ),
           ],
         ),
@@ -962,7 +963,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       color: const Color(0xFF1A1A2E),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: AppColors.textMuted.withAlpha(60)),
+        side: BorderSide(color: colors.textMuted.withAlpha(60)),
       ),
     );
 
@@ -1242,7 +1243,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     );
   }
 
-  Widget _buildSearchBar(dynamic colors) {
+  Widget _buildSearchBar(AppColorScheme colors) {
     final hitCount = _searchHits.length;
     final hitLabel =
         hitCount == 0 ? 'No results' : '${_currentHitIndex + 1} of $hitCount';
@@ -1255,7 +1256,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A2E),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.textMuted.withAlpha(80)),
+          border: Border.all(color: colors.textMuted.withAlpha(80)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(80),
@@ -1278,15 +1279,15 @@ class TerminalWidgetState extends State<TerminalWidget> {
                 child: TextField(
                   controller: _searchController,
                   focusNode: _searchFocusNode,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textPrimary,
+                    color: colors.textPrimary,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Find in terminal…',
                     hintStyle: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textMuted,
+                      color: colors.textMuted,
                     ),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
@@ -1303,7 +1304,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
             if (_searchController.text.isNotEmpty) ...[
               Text(
                 hitLabel,
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 11, color: colors.textMuted),
               ),
               const SizedBox(width: 4),
               _searchIconBtn(Icons.keyboard_arrow_up, _prevHit),
@@ -1317,12 +1318,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   Widget _searchIconBtn(IconData icon, VoidCallback onTap) {
+    final colors = context.appColors;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: Icon(icon, size: 16, color: AppColors.textSecondary),
+        child: Icon(icon, size: 16, color: colors.textSecondary),
       ),
     );
   }
@@ -1376,7 +1378,7 @@ class _AddSessionButtonState extends State<_AddSessionButton> {
             child: Icon(
               Icons.add,
               size: 14,
-              color: _hovering ? AppColors.textPrimary : AppColors.textMuted,
+              color: _hovering ? colors.textPrimary : colors.textMuted,
             ),
           ),
         ),
@@ -1513,18 +1515,18 @@ class _WorkspaceStatusBar extends StatelessWidget {
                         ),
                         if (ws?.gitBranch != null) ...[
                           const SizedBox(width: 6),
-                          const Icon(
+                          Icon(
                             Icons.alt_route,
                             size: 10,
-                            color: AppColors.textMuted,
+                            color: colors.textMuted,
                           ),
                           const SizedBox(width: 3),
                           Flexible(
                             child: Text(
                               ws!.gitBranch!,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textMuted,
+                              style: TextStyle(
+                                color: colors.textMuted,
                                 fontSize: 10,
                               ),
                             ),
@@ -1632,6 +1634,7 @@ class _WorkspaceColorPickerDialogState
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Dialog(
       backgroundColor: const Color(0xFF0F0F2A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1665,10 +1668,10 @@ class _WorkspaceColorPickerDialogState
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.close,
                       size: 16,
-                      color: AppColors.textMuted,
+                      color: colors.textMuted,
                     ),
                     onPressed: () => Navigator.of(context).pop(),
                     padding: EdgeInsets.zero,
@@ -1694,10 +1697,10 @@ class _WorkspaceColorPickerDialogState
               // Hex input
               Row(
                 children: [
-                  const Text(
+                  Text(
                     'HEX',
                     style: TextStyle(
-                      color: AppColors.textMuted,
+                      color: colors.textMuted,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1746,10 +1749,10 @@ class _WorkspaceColorPickerDialogState
               const SizedBox(height: 16),
 
               // Preset swatches
-              const Text(
+              Text(
                 'PRESETS',
                 style: TextStyle(
-                  color: AppColors.textMuted,
+                  color: colors.textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.8,
@@ -1805,7 +1808,7 @@ class _WorkspaceColorPickerDialogState
                     icon: const Icon(Icons.refresh, size: 14),
                     label: const Text('Reset to theme'),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textMuted,
+                      foregroundColor: colors.textMuted,
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -1814,7 +1817,7 @@ class _WorkspaceColorPickerDialogState
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                     style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textMuted,
+                      foregroundColor: colors.textMuted,
                       textStyle: const TextStyle(fontSize: 12),
                     ),
                   ),

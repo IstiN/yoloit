@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/utils/file_type_utils.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
@@ -39,20 +38,20 @@ class _EmptyReview extends StatelessWidget {
     final colors = context.appColors;
     return Container(
       color: colors.surface,
-      child: const Center(
+      child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.rate_review_outlined, size: 32, color: AppColors.textMuted),
+            Icon(Icons.rate_review_outlined, size: 32, color: colors.textMuted),
             SizedBox(height: 12),
             Text(
               'Changes & Review',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(color: colors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 6),
             Text(
               'Open a workspace to see file changes',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(color: colors.textMuted, fontSize: 12),
             ),
           ],
         ),
@@ -149,24 +148,24 @@ class _CollapsibleRunPanelState extends State<_CollapsibleRunPanel> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.play_circle_outline, size: 13, color: AppColors.textMuted),
+                  Icon(Icons.play_circle_outline, size: 13, color: colors.textMuted),
                   const SizedBox(width: 6),
-                  const Text(
+                  Text(
                     'Run',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: colors.textSecondary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const Spacer(),
                   if (!widget.collapsed)
-                    const Icon(Icons.drag_handle, size: 14, color: AppColors.textMuted),
+                    Icon(Icons.drag_handle, size: 14, color: colors.textMuted),
                   const SizedBox(width: 6),
                   AnimatedRotation(
                     turns: widget.collapsed ? -0.25 : 0,
                     duration: const Duration(milliseconds: 150),
-                    child: const Icon(Icons.expand_less, size: 14, color: AppColors.textMuted),
+                    child: Icon(Icons.expand_less, size: 14, color: colors.textMuted),
                   ),
                 ],
               ),
@@ -204,6 +203,7 @@ class _ReviewTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final changedCount = state.changedFiles.length;
 
     return Container(
@@ -228,9 +228,9 @@ class _ReviewTabBar extends StatelessWidget {
           const Spacer(),
           GestureDetector(
             onTap: () => context.read<ReviewCubit>().refresh(),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(Icons.refresh, size: 14, color: AppColors.textMuted),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(Icons.refresh, size: 14, color: colors.textMuted),
             ),
           ),
         ],
@@ -262,7 +262,7 @@ class _TabItemState extends State<_TabItem> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final labelColor = widget.isActive ? AppColors.textPrimary : AppColors.textMuted;
+    final labelColor = widget.isActive ? colors.textPrimary : colors.textMuted;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -301,13 +301,13 @@ class _TabItemState extends State<_TabItem> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                   decoration: BoxDecoration(
-                    color: AppColors.neonOrange.withAlpha(40),
+                    color: colors.accentOrange.withAlpha(40),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${widget.badge}',
-                    style: const TextStyle(
-                      color: AppColors.neonOrange,
+                    style: TextStyle(
+                      color: colors.accentOrange,
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                     ),
@@ -329,19 +329,20 @@ class _GitChangesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final staged = state.changedFiles.where((f) => f.isStaged).toList();
     final unstaged = state.changedFiles.where((f) => !f.isStaged).toList();
 
     if (state.changedFiles.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_outline, size: 28, color: AppColors.textMuted),
+            Icon(Icons.check_circle_outline, size: 28, color: colors.textMuted),
             SizedBox(height: 10),
             Text(
               'No changes',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(color: colors.textMuted, fontSize: 12),
             ),
           ],
         ),
@@ -392,9 +393,9 @@ class _GitChangesSection extends StatelessWidget {
       padding: EdgeInsets.zero,
       children: [
         if (staged.isNotEmpty)
-          buildGroup('STAGED', Icons.check_circle_outline, AppColors.neonGreen, stagedByRepo),
+          buildGroup('STAGED', Icons.check_circle_outline, colors.accentGreen, stagedByRepo),
         if (unstaged.isNotEmpty)
-          buildGroup('CHANGES', Icons.edit_outlined, AppColors.neonOrange, unstagedByRepo),
+          buildGroup('CHANGES', Icons.edit_outlined, colors.accentOrange, unstagedByRepo),
       ],
     );
   }
@@ -415,6 +416,7 @@ class _ChangesSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Row(
@@ -423,8 +425,8 @@ class _ChangesSectionHeader extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textMuted,
+            style: TextStyle(
+              color: colors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,
@@ -433,8 +435,8 @@ class _ChangesSectionHeader extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             '($count)',
-            style: const TextStyle(
-              color: AppColors.textMuted,
+            style: TextStyle(
+              color: colors.textMuted,
               fontSize: 10,
             ),
           ),
@@ -451,16 +453,17 @@ class _RepoGroupHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 6, 12, 2),
       child: Row(
         children: [
-          const Icon(Icons.folder_outlined, size: 11, color: AppColors.textMuted),
+          Icon(Icons.folder_outlined, size: 11, color: colors.textMuted),
           const SizedBox(width: 5),
           Text(
             repoName,
-            style: const TextStyle(
-              color: AppColors.textMuted,
+            style: TextStyle(
+              color: colors.textMuted,
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
@@ -478,33 +481,34 @@ class _FileTreeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: const Row(
+          child: Row(
             children: [
               Text(
                 'File Tree',
                 style: TextStyle(
-                  color: AppColors.textMuted,
+                  color: colors.textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.8,
                 ),
               ),
               Spacer(),
-              Icon(Icons.unfold_more, size: 12, color: AppColors.textMuted),
+              Icon(Icons.unfold_more, size: 12, color: colors.textMuted),
             ],
           ),
         ),
         Expanded(
           child: state.fileTree.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'No files',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    style: TextStyle(color: colors.textMuted, fontSize: 12),
                   ),
                 )
               : ListView.builder(
@@ -586,14 +590,14 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: colors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: const Text('New Folder', style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+        title: Text('New Folder', style: TextStyle(color: colors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          style: TextStyle(color: colors.textPrimary, fontSize: 13),
           decoration: InputDecoration(
             hintText: 'Folder name',
-            hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            hintStyle: TextStyle(color: colors.textMuted, fontSize: 13),
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             border: OutlineInputBorder(
@@ -615,7 +619,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+            child: Text('Cancel', style: TextStyle(color: colors.textMuted, fontSize: 13)),
           ),
           TextButton(
             onPressed: () {
@@ -654,6 +658,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
   }
 
   void _showContextMenu(BuildContext context, Offset position) async {
+    final colors = context.appColors;
     final node = widget.node;
     final result = await showMenu<String>(
       context: context,
@@ -664,7 +669,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
             value: 'new_folder',
             height: 32,
             child: Row(children: [
-              Icon(Icons.create_new_folder_outlined, size: 14, color: AppColors.textMuted),
+              Icon(Icons.create_new_folder_outlined, size: 14, color: colors.textMuted),
               const SizedBox(width: 8),
               const Text('New Folder', style: TextStyle(fontSize: 13)),
             ]),
@@ -675,7 +680,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
           value: 'copy_path',
           height: 32,
           child: Row(children: [
-            Icon(Icons.copy_outlined, size: 14, color: AppColors.textMuted),
+            Icon(Icons.copy_outlined, size: 14, color: colors.textMuted),
             const SizedBox(width: 8),
             const Text('Copy path', style: TextStyle(fontSize: 13)),
           ]),
@@ -684,7 +689,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
           value: 'copy_name',
           height: 32,
           child: Row(children: [
-            Icon(Icons.text_snippet_outlined, size: 14, color: AppColors.textMuted),
+            Icon(Icons.text_snippet_outlined, size: 14, color: colors.textMuted),
             const SizedBox(width: 8),
             const Text('Copy filename', style: TextStyle(fontSize: 13)),
           ]),
@@ -695,7 +700,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
             value: 'rename',
             height: 32,
             child: Row(children: [
-              Icon(Icons.drive_file_rename_outline, size: 14, color: AppColors.textMuted),
+              Icon(Icons.drive_file_rename_outline, size: 14, color: colors.textMuted),
               const SizedBox(width: 8),
               const Text('Rename', style: TextStyle(fontSize: 13)),
             ]),
@@ -706,7 +711,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
           value: 'show_in_finder',
           height: 32,
           child: Row(children: [
-            Icon(Icons.folder_open_outlined, size: 14, color: AppColors.textMuted),
+            Icon(Icons.folder_open_outlined, size: 14, color: colors.textMuted),
             const SizedBox(width: 8),
             const Text('Show in Finder', style: TextStyle(fontSize: 13)),
           ]),
@@ -783,7 +788,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
                     Icon(
                       node.isExpanded ? Icons.expand_more : Icons.chevron_right,
                       size: 12,
-                      color: AppColors.textMuted,
+                      color: colors.textMuted,
                     )
                   else
                     const SizedBox(width: 12),
@@ -793,14 +798,14 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
                       return Icon(
                         node.isExpanded ? Icons.folder_open : Icons.folder,
                         size: 12,
-                        color: AppColors.neonBlue.withAlpha(180),
+                        color: colors.accentBlue.withAlpha(180),
                       );
                     }
                     final ft = FileTypeUtils.forPath(node.path.isNotEmpty ? node.path : node.name);
                     return Icon(
                       ft.icon,
                       size: 12,
-                      color: node.isModified ? AppColors.neonOrange : ft.color,
+                      color: node.isModified ? colors.accentOrange : ft.color,
                     );
                   }),
                   const SizedBox(width: 5),
@@ -809,8 +814,8 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
                         ? TextField(
                             controller: _renameCtrl,
                             focusNode: _renameFocus,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
+                            style: TextStyle(
+                              color: colors.textPrimary,
                               fontSize: 12,
                             ),
                             decoration: InputDecoration(
@@ -831,10 +836,10 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
                             node.name,
                             style: TextStyle(
                               color: node.isModified
-                                  ? AppColors.neonOrange
+                                  ? colors.accentOrange
                                   : isSelected
-                                      ? AppColors.textPrimary
-                                      : AppColors.textSecondary,
+                                      ? colors.textPrimary
+                                      : colors.textSecondary,
                               fontSize: 12,
                               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                             ),
@@ -845,8 +850,8 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
                     Container(
                       width: 5,
                       height: 5,
-                      decoration: const BoxDecoration(
-                        color: AppColors.neonOrange,
+                      decoration: BoxDecoration(
+                        color: colors.accentOrange,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -884,10 +889,10 @@ class _ChangedFileTileState extends State<_ChangedFileTile> {
     final colors = context.appColors;
     final file = widget.file;
     final statusColor = switch (file.status) {
-      FileChangeStatus.added => AppColors.neonGreen,
-      FileChangeStatus.deleted => AppColors.neonRed,
-      FileChangeStatus.modified => AppColors.neonOrange,
-      _ => AppColors.textSecondary,
+      FileChangeStatus.added => colors.accentGreen,
+      FileChangeStatus.deleted => colors.accentRed,
+      FileChangeStatus.modified => colors.accentOrange,
+      _ => colors.textSecondary,
     };
     final statusLabel = switch (file.status) {
       FileChangeStatus.added => 'A',
@@ -954,7 +959,7 @@ class _ChangedFileTileState extends State<_ChangedFileTile> {
                 ),
               ),
               if (file.isStaged)
-                const Icon(Icons.check_circle_outline, size: 10, color: AppColors.neonGreen),
+                Icon(Icons.check_circle_outline, size: 10, color: colors.accentGreen),
             ],
           ),
         ),
@@ -978,26 +983,26 @@ class _PrStatusSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Text(
                 'PR Status',
                 style: TextStyle(
-                  color: AppColors.textMuted,
+                  color: colors.textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.8,
                 ),
               ),
-              SizedBox(width: 6),
-              Icon(Icons.more_horiz, size: 12, color: AppColors.textMuted),
+              const SizedBox(width: 6),
+              Icon(Icons.more_horiz, size: 12, color: colors.textMuted),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             'PR #${pr.prNumber}: ${pr.title}',
-            style: const TextStyle(
-              color: AppColors.textSecondary,
+            style: TextStyle(
+              color: colors.textSecondary,
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -1006,17 +1011,17 @@ class _PrStatusSection extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              const Text(
+              Text(
                 'Status: ',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
               ),
               Text(
                 pr.status,
-                style: const TextStyle(color: AppColors.neonOrange, fontSize: 10),
+                style: TextStyle(color: colors.accentOrange, fontSize: 10),
               ),
               Text(
                 '  ·  Reviewers: ${pr.reviewers} Pending',
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
               ),
             ],
           ),
@@ -1031,13 +1036,13 @@ class _PrStatusSection extends StatelessWidget {
               const SizedBox(width: 4),
               _PrButton(
                 label: 'Merge',
-                color: AppColors.neonGreen,
+                color: colors.accentGreen,
                 onTap: () {},
               ),
               const SizedBox(width: 4),
               _PrButton(
                 label: 'Close',
-                color: AppColors.neonRed,
+                color: colors.accentRed,
                 onTap: () {},
               ),
             ],

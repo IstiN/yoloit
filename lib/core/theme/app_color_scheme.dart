@@ -1,17 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 /// Dynamic colour palette embedded in [ThemeData.extensions].
 ///
-/// Because this is an [InheritedWidget]-backed extension, any widget that
-/// calls [Theme.of(context)] — including widgets created with `const` — will
-/// automatically rebuild when the theme changes. This is the correct Flutter
-/// pattern for dynamic colours.
+/// Every colour used by the app lives here — no hardcoded [AppColors] references
+/// should exist in feature code.  When the user switches themes, every widget
+/// that reads [context.appColors] rebuilds automatically.
 ///
-/// Usage:
-/// ```dart
-/// final colors = context.appColors;
-/// Text('hello', style: TextStyle(color: colors.primary));
-/// ```
+/// Themes can be loaded from JSON or derived from a single accent colour via
+/// [AppColorScheme.fromAccent].
 class AppColorScheme extends ThemeExtension<AppColorScheme> {
   const AppColorScheme({
     // ── Accent ──────────────────────────────────────────
@@ -34,6 +32,31 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
     required this.tabBorder,
     required this.tabActiveBg,
     required this.tabInactiveBg,
+    // ── Text ─────────────────────────────────────────────
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.textMuted,
+    required this.textHighlight,
+    required this.terminalText,
+    // ── Semantic accents ─────────────────────────────────
+    required this.accentGreen,
+    required this.accentGreenDim,
+    required this.accentGreenGlow,
+    required this.accentRed,
+    required this.accentRedDim,
+    required this.accentBlue,
+    required this.accentOrange,
+    // ── Diff ──────────────────────────────────────────────
+    required this.diffAddBg,
+    required this.diffAddText,
+    required this.diffRemoveBg,
+    required this.diffRemoveText,
+    required this.diffContextBg,
+    // ── Status ────────────────────────────────────────────
+    required this.statusActive,
+    required this.statusIdle,
+    required this.statusError,
+    required this.statusWarning,
   });
 
   // ── Accent ──────────────────────────────────────────────────────────────────
@@ -58,6 +81,35 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
   final Color tabBorder;
   final Color tabActiveBg;
   final Color tabInactiveBg;
+
+  // ── Text ──────────────────────────────────────────────────────────────────────
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color textMuted;
+  final Color textHighlight;
+  final Color terminalText;
+
+  // ── Semantic accents ──────────────────────────────────────────────────────────
+  final Color accentGreen;
+  final Color accentGreenDim;
+  final Color accentGreenGlow;
+  final Color accentRed;
+  final Color accentRedDim;
+  final Color accentBlue;
+  final Color accentOrange;
+
+  // ── Diff ──────────────────────────────────────────────────────────────────────
+  final Color diffAddBg;
+  final Color diffAddText;
+  final Color diffRemoveBg;
+  final Color diffRemoveText;
+  final Color diffContextBg;
+
+  // ── Status ────────────────────────────────────────────────────────────────────
+  final Color statusActive;
+  final Color statusIdle;
+  final Color statusError;
+  final Color statusWarning;
 
   // ── Shortcut ──────────────────────────────────────────────────────────────────
   static AppColorScheme of(BuildContext context) =>
@@ -100,6 +152,27 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       tabBorder: accent,
       tabActiveBg: _mixBg(bg, accent, 0.15),
       tabInactiveBg: _mixBg(bg, accent, 0.06),
+      textPrimary: const Color(0xFFE8E8FF),
+      textSecondary: const Color(0xFF8888BB),
+      textMuted: const Color(0xFF44446A),
+      textHighlight: const Color(0xFFFFFFFF),
+      terminalText: const Color(0xFFCECEEE),
+      accentGreen: const Color(0xFF00FF9F),
+      accentGreenDim: const Color(0xFF00CC7A),
+      accentGreenGlow: const Color(0x2200FF9F),
+      accentRed: const Color(0xFFFF4F6A),
+      accentRedDim: const Color(0xFFCC3D54),
+      accentBlue: const Color(0xFF00B4FF),
+      accentOrange: const Color(0xFFFF9500),
+      diffAddBg: const Color(0xFF0D2A1A),
+      diffAddText: const Color(0xFF00FF9F),
+      diffRemoveBg: const Color(0xFF2A0D12),
+      diffRemoveText: const Color(0xFFFF4F6A),
+      diffContextBg: _mixBg(bg, accent, 0.04),
+      statusActive: const Color(0xFF00DD88),
+      statusIdle: const Color(0xFF888888),
+      statusError: const Color(0xFFFF4F6A),
+      statusWarning: const Color(0xFFFF9500),
     );
   }
 
@@ -130,11 +203,147 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       tabBorder: accentDark,
       tabActiveBg: Color.lerp(bg, accent, 0.12)!,
       tabInactiveBg: Color.lerp(bg, accent, 0.04)!,
+      textPrimary: const Color(0xFF1A1A2E),
+      textSecondary: const Color(0xFF64748B),
+      textMuted: const Color(0xFF94A3B8),
+      textHighlight: const Color(0xFF000000),
+      terminalText: const Color(0xFF1E293B),
+      accentGreen: const Color(0xFF067D17),
+      accentGreenDim: const Color(0xFF059212),
+      accentGreenGlow: const Color(0x22067D17),
+      accentRed: const Color(0xFFDE1B2E),
+      accentRedDim: const Color(0xFFB5152A),
+      accentBlue: const Color(0xFF0066CC),
+      accentOrange: const Color(0xFFCC7700),
+      diffAddBg: const Color(0xFFE6F7ED),
+      diffAddText: const Color(0xFF067D17),
+      diffRemoveBg: const Color(0xFFFDE8E8),
+      diffRemoveText: const Color(0xFFDE1B2E),
+      diffContextBg: const Color(0xFFF8FAFC),
+      statusActive: const Color(0xFF067D17),
+      statusIdle: const Color(0xFF94A3B8),
+      statusError: const Color(0xFFDE1B2E),
+      statusWarning: const Color(0xFFCC7700),
     );
   }
 
   static Color _mixBg(Color bg, Color accent, double t) =>
       Color.lerp(bg, accent, t)!;
+
+  // ── JSON serialization ────────────────────────────────────────────────────────
+
+  static String _colorToHex(Color c) =>
+      c.value.toRadixString(16).padLeft(8, '0');
+
+  static Color _hexToColor(String hex) {
+    final h = hex.replaceFirst('#', '');
+    if (h.length == 6) return Color(int.parse('FF$h', radix: 16));
+    return Color(int.parse(h, radix: 16));
+  }
+
+  /// Serialises the full colour scheme to a JSON-compatible map.
+  Map<String, String> toJson() => {
+    'primary': _colorToHex(primary),
+    'primaryLight': _colorToHex(primaryLight),
+    'primaryDark': _colorToHex(primaryDark),
+    'primaryGlow': _colorToHex(primaryGlow),
+    'background': _colorToHex(background),
+    'surface': _colorToHex(surface),
+    'surfaceElevated': _colorToHex(surfaceElevated),
+    'surfaceHighlight': _colorToHex(surfaceHighlight),
+    'border': _colorToHex(border),
+    'divider': _colorToHex(divider),
+    'terminalBackground': _colorToHex(terminalBackground),
+    'sidebar': _colorToHex(sidebar),
+    'sidebarGlow': _colorToHex(sidebarGlow),
+    'terminalPrompt': _colorToHex(terminalPrompt),
+    'tabBorder': _colorToHex(tabBorder),
+    'tabActiveBg': _colorToHex(tabActiveBg),
+    'tabInactiveBg': _colorToHex(tabInactiveBg),
+    'textPrimary': _colorToHex(textPrimary),
+    'textSecondary': _colorToHex(textSecondary),
+    'textMuted': _colorToHex(textMuted),
+    'textHighlight': _colorToHex(textHighlight),
+    'terminalText': _colorToHex(terminalText),
+    'accentGreen': _colorToHex(accentGreen),
+    'accentGreenDim': _colorToHex(accentGreenDim),
+    'accentGreenGlow': _colorToHex(accentGreenGlow),
+    'accentRed': _colorToHex(accentRed),
+    'accentRedDim': _colorToHex(accentRedDim),
+    'accentBlue': _colorToHex(accentBlue),
+    'accentOrange': _colorToHex(accentOrange),
+    'diffAddBg': _colorToHex(diffAddBg),
+    'diffAddText': _colorToHex(diffAddText),
+    'diffRemoveBg': _colorToHex(diffRemoveBg),
+    'diffRemoveText': _colorToHex(diffRemoveText),
+    'diffContextBg': _colorToHex(diffContextBg),
+    'statusActive': _colorToHex(statusActive),
+    'statusIdle': _colorToHex(statusIdle),
+    'statusError': _colorToHex(statusError),
+    'statusWarning': _colorToHex(statusWarning),
+  };
+
+  /// Exports the scheme as a pretty-printed JSON string.
+  String toJsonString() =>
+      const JsonEncoder.withIndent('  ').convert(toJson());
+
+  /// Creates a scheme from a JSON map.  Missing keys fall back to a dark
+  /// default derived from [fallbackAccent].
+  factory AppColorScheme.fromJson(
+    Map<String, dynamic> json, {
+    Color fallbackAccent = const Color(0xFF7C3AED),
+    Brightness brightness = Brightness.dark,
+  }) {
+    final fallback = AppColorScheme.fromAccent(
+      fallbackAccent,
+      brightness: brightness,
+    );
+    Color c(String key, Color fb) {
+      final v = json[key];
+      if (v is String && v.isNotEmpty) return _hexToColor(v);
+      return fb;
+    }
+    return AppColorScheme(
+      primary: c('primary', fallback.primary),
+      primaryLight: c('primaryLight', fallback.primaryLight),
+      primaryDark: c('primaryDark', fallback.primaryDark),
+      primaryGlow: c('primaryGlow', fallback.primaryGlow),
+      background: c('background', fallback.background),
+      surface: c('surface', fallback.surface),
+      surfaceElevated: c('surfaceElevated', fallback.surfaceElevated),
+      surfaceHighlight: c('surfaceHighlight', fallback.surfaceHighlight),
+      border: c('border', fallback.border),
+      divider: c('divider', fallback.divider),
+      terminalBackground: c('terminalBackground', fallback.terminalBackground),
+      sidebar: c('sidebar', fallback.sidebar),
+      sidebarGlow: c('sidebarGlow', fallback.sidebarGlow),
+      terminalPrompt: c('terminalPrompt', fallback.terminalPrompt),
+      tabBorder: c('tabBorder', fallback.tabBorder),
+      tabActiveBg: c('tabActiveBg', fallback.tabActiveBg),
+      tabInactiveBg: c('tabInactiveBg', fallback.tabInactiveBg),
+      textPrimary: c('textPrimary', fallback.textPrimary),
+      textSecondary: c('textSecondary', fallback.textSecondary),
+      textMuted: c('textMuted', fallback.textMuted),
+      textHighlight: c('textHighlight', fallback.textHighlight),
+      terminalText: c('terminalText', fallback.terminalText),
+      accentGreen: c('accentGreen', fallback.accentGreen),
+      accentGreenDim: c('accentGreenDim', fallback.accentGreenDim),
+      accentGreenGlow: c('accentGreenGlow', fallback.accentGreenGlow),
+      accentRed: c('accentRed', fallback.accentRed),
+      accentRedDim: c('accentRedDim', fallback.accentRedDim),
+      accentBlue: c('accentBlue', fallback.accentBlue),
+      accentOrange: c('accentOrange', fallback.accentOrange),
+      diffAddBg: c('diffAddBg', fallback.diffAddBg),
+      diffAddText: c('diffAddText', fallback.diffAddText),
+      diffRemoveBg: c('diffRemoveBg', fallback.diffRemoveBg),
+      diffRemoveText: c('diffRemoveText', fallback.diffRemoveText),
+      diffContextBg: c('diffContextBg', fallback.diffContextBg),
+      statusActive: c('statusActive', fallback.statusActive),
+      statusIdle: c('statusIdle', fallback.statusIdle),
+      statusError: c('statusError', fallback.statusError),
+      statusWarning: c('statusWarning', fallback.statusWarning),
+    );
+  }
 
   // ── ThemeExtension boilerplate ────────────────────────────────────────────────
 
@@ -157,6 +366,27 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
     Color? tabBorder,
     Color? tabActiveBg,
     Color? tabInactiveBg,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? textMuted,
+    Color? textHighlight,
+    Color? terminalText,
+    Color? accentGreen,
+    Color? accentGreenDim,
+    Color? accentGreenGlow,
+    Color? accentRed,
+    Color? accentRedDim,
+    Color? accentBlue,
+    Color? accentOrange,
+    Color? diffAddBg,
+    Color? diffAddText,
+    Color? diffRemoveBg,
+    Color? diffRemoveText,
+    Color? diffContextBg,
+    Color? statusActive,
+    Color? statusIdle,
+    Color? statusError,
+    Color? statusWarning,
   }) {
     return AppColorScheme(
       primary: primary ?? this.primary,
@@ -176,6 +406,27 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       tabBorder: tabBorder ?? this.tabBorder,
       tabActiveBg: tabActiveBg ?? this.tabActiveBg,
       tabInactiveBg: tabInactiveBg ?? this.tabInactiveBg,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      textMuted: textMuted ?? this.textMuted,
+      textHighlight: textHighlight ?? this.textHighlight,
+      terminalText: terminalText ?? this.terminalText,
+      accentGreen: accentGreen ?? this.accentGreen,
+      accentGreenDim: accentGreenDim ?? this.accentGreenDim,
+      accentGreenGlow: accentGreenGlow ?? this.accentGreenGlow,
+      accentRed: accentRed ?? this.accentRed,
+      accentRedDim: accentRedDim ?? this.accentRedDim,
+      accentBlue: accentBlue ?? this.accentBlue,
+      accentOrange: accentOrange ?? this.accentOrange,
+      diffAddBg: diffAddBg ?? this.diffAddBg,
+      diffAddText: diffAddText ?? this.diffAddText,
+      diffRemoveBg: diffRemoveBg ?? this.diffRemoveBg,
+      diffRemoveText: diffRemoveText ?? this.diffRemoveText,
+      diffContextBg: diffContextBg ?? this.diffContextBg,
+      statusActive: statusActive ?? this.statusActive,
+      statusIdle: statusIdle ?? this.statusIdle,
+      statusError: statusError ?? this.statusError,
+      statusWarning: statusWarning ?? this.statusWarning,
     );
   }
 
@@ -200,6 +451,27 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       tabBorder: Color.lerp(tabBorder, other.tabBorder, t)!,
       tabActiveBg: Color.lerp(tabActiveBg, other.tabActiveBg, t)!,
       tabInactiveBg: Color.lerp(tabInactiveBg, other.tabInactiveBg, t)!,
+      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
+      textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      textHighlight: Color.lerp(textHighlight, other.textHighlight, t)!,
+      terminalText: Color.lerp(terminalText, other.terminalText, t)!,
+      accentGreen: Color.lerp(accentGreen, other.accentGreen, t)!,
+      accentGreenDim: Color.lerp(accentGreenDim, other.accentGreenDim, t)!,
+      accentGreenGlow: Color.lerp(accentGreenGlow, other.accentGreenGlow, t)!,
+      accentRed: Color.lerp(accentRed, other.accentRed, t)!,
+      accentRedDim: Color.lerp(accentRedDim, other.accentRedDim, t)!,
+      accentBlue: Color.lerp(accentBlue, other.accentBlue, t)!,
+      accentOrange: Color.lerp(accentOrange, other.accentOrange, t)!,
+      diffAddBg: Color.lerp(diffAddBg, other.diffAddBg, t)!,
+      diffAddText: Color.lerp(diffAddText, other.diffAddText, t)!,
+      diffRemoveBg: Color.lerp(diffRemoveBg, other.diffRemoveBg, t)!,
+      diffRemoveText: Color.lerp(diffRemoveText, other.diffRemoveText, t)!,
+      diffContextBg: Color.lerp(diffContextBg, other.diffContextBg, t)!,
+      statusActive: Color.lerp(statusActive, other.statusActive, t)!,
+      statusIdle: Color.lerp(statusIdle, other.statusIdle, t)!,
+      statusError: Color.lerp(statusError, other.statusError, t)!,
+      statusWarning: Color.lerp(statusWarning, other.statusWarning, t)!,
     );
   }
 }

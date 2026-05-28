@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
@@ -116,12 +115,12 @@ class _CatalogStatusCard extends StatelessWidget {
         ? (
             Icons.check_circle_outline,
             'Loaded from GitHub',
-            AppColors.neonGreen,
+            colors.accentGreen,
           )
         : (
             Icons.warning_amber_rounded,
             'Loaded from cache/asset',
-            AppColors.neonOrange,
+            colors.accentOrange,
           );
 
     return Container(

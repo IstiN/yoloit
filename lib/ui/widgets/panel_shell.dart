@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 
 /// Wraps panel content with a unified header bar:
 /// [icon] TITLE   [actions...] [collapse] [close]
@@ -89,7 +88,7 @@ class _PanelHeader extends StatelessWidget {
             SizedBox(width: 13, height: 13, child: iconWidget),
             const SizedBox(width: 6),
           ] else if (icon != null) ...[
-            Icon(icon, size: 13, color: AppColors.textMuted),
+            Icon(icon, size: 13, color: colors.textMuted),
             const SizedBox(width: 6),
           ],
           // Title — Expanded absorbs all remaining space, pushing buttons to right edge
@@ -97,8 +96,8 @@ class _PanelHeader extends StatelessWidget {
             child: Text(
               title,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              style: TextStyle(
+                color: colors.textMuted,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.8,
@@ -167,15 +166,19 @@ class _PanelHeaderBtnState extends State<_PanelHeaderBtn> {
             width: 20,
             height: 20,
             decoration: BoxDecoration(
-              color: _hovering
-                  ? widget.colors.surfaceElevated
-                  : Colors.transparent,
+              color:
+                  _hovering
+                      ? widget.colors.surfaceElevated
+                      : Colors.transparent,
               borderRadius: BorderRadius.circular(3),
             ),
             child: Icon(
               widget.icon,
               size: 13,
-              color: _hovering ? AppColors.textPrimary : AppColors.textMuted,
+              color:
+                  _hovering
+                      ? widget.colors.textPrimary
+                      : widget.colors.textMuted,
             ),
           ),
         ),
@@ -225,7 +228,7 @@ class _PanelActionBtnState extends State<PanelActionBtn> {
             child: Icon(
               widget.icon,
               size: 13,
-              color: _hovering ? AppColors.textPrimary : AppColors.textMuted,
+              color: _hovering ? colors.textPrimary : colors.textMuted,
             ),
           ),
         ),

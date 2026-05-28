@@ -26,7 +26,6 @@ import 'package:highlight/languages/yaml.dart';
 import 'package:yoloit/core/services/git_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/editor/utils/file_type_utils.dart';
@@ -342,12 +341,12 @@ class _FileEditorPanelState extends State<FileEditorPanel>
             Icon(
               Icons.code,
               size: 40,
-              color: AppColors.textMuted.withAlpha(60),
+              color: colors.textMuted.withAlpha(60),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Open a file to edit',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+              style: TextStyle(color: colors.textMuted, fontSize: 13),
             ),
           ],
         ),
@@ -507,13 +506,13 @@ class _ModeButton extends StatelessWidget {
             Icon(
               icon,
               size: 11,
-              color: active ? colors.primary : AppColors.textMuted,
+              color: active ? colors.primary : colors.textMuted,
             ),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
-                color: active ? colors.primary : AppColors.textMuted,
+                color: active ? colors.primary : colors.textMuted,
                 fontSize: 11,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               ),
@@ -1869,7 +1868,7 @@ class _EditorToolbar extends StatelessWidget {
             padding: const EdgeInsets.only(right: 10),
             child: Text(
               language,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+              style: TextStyle(color: colors.textMuted, fontSize: 10),
             ),
           ),
         ],
@@ -1904,7 +1903,7 @@ class _ToolbarBtn extends StatelessWidget {
           child: Icon(
             icon,
             size: 14,
-            color: active ? colors.primaryLight : AppColors.textMuted,
+            color: active ? colors.primaryLight : colors.textMuted,
           ),
         ),
       ),
@@ -1963,7 +1962,7 @@ class _FindBar extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.search, size: 14, color: AppColors.textMuted),
+              Icon(Icons.search, size: 14, color: colors.textMuted),
               const SizedBox(width: 6),
               SizedBox(
                 width: 220,
@@ -1972,14 +1971,14 @@ class _FindBar extends StatelessWidget {
                   controller: findCtrl,
                   focusNode: findFocus,
                   onChanged: onQueryChanged,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
+                  style: TextStyle(
+                    color: colors.textPrimary,
                     fontSize: 12,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Find',
                     hintStyle: TextStyle(
-                      color: AppColors.textMuted,
+                      color: colors.textMuted,
                       fontSize: 12,
                     ),
                     border: InputBorder.none,
@@ -1995,8 +1994,8 @@ class _FindBar extends StatelessWidget {
               if (hasQuery && matchCount > 0)
                 Text(
                   '${currentMatch + 1} / $matchCount',
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: colors.textMuted,
                     fontSize: 10,
                   ),
                 ),
@@ -2036,21 +2035,21 @@ class _FindBar extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.edit, size: 14, color: AppColors.textMuted),
+                Icon(Icons.edit, size: 14, color: colors.textMuted),
                 const SizedBox(width: 6),
                 SizedBox(
                   width: 220,
                   height: 24,
                   child: TextField(
                     controller: replaceCtrl,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: colors.textPrimary,
                       fontSize: 12,
                     ),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Replace',
                       hintStyle: TextStyle(
-                        color: AppColors.textMuted,
+                        color: colors.textMuted,
                         fontSize: 12,
                       ),
                       border: InputBorder.none,
@@ -2105,7 +2104,7 @@ class _FBBtn extends StatelessWidget {
           child: Icon(
             icon,
             size: 13,
-            color: active ? colors.primaryLight : AppColors.textMuted,
+            color: active ? colors.primaryLight : colors.textMuted,
           ),
         ),
       ),
@@ -2132,7 +2131,7 @@ class _TextBtn extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+          style: TextStyle(color: colors.textMuted, fontSize: 11),
         ),
       ),
     );
@@ -2195,22 +2194,22 @@ class _EditorStatusBarState extends State<_EditorStatusBar> {
           const SizedBox(width: 10),
           Text(
             'Ln $_line, Col $_col',
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+            style: TextStyle(color: colors.textMuted, fontSize: 10),
           ),
           _SBar(),
-          const Text(
+          Text(
             'UTF-8',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+            style: TextStyle(color: colors.textMuted, fontSize: 10),
           ),
           _SBar(),
-          const Text(
+          Text(
             'LF',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+            style: TextStyle(color: colors.textMuted, fontSize: 10),
           ),
           _SBar(),
           Text(
             widget.language,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+            style: TextStyle(color: colors.textMuted, fontSize: 10),
           ),
           const SizedBox(width: 8),
         ],
@@ -2368,12 +2367,12 @@ class _SymbolOutline extends StatelessWidget {
             decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: colors.border)),
             ),
-            child: const Align(
+            child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Outline',
                 style: TextStyle(
-                  color: AppColors.textMuted,
+                  color: colors.textMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -2383,11 +2382,11 @@ class _SymbolOutline extends StatelessWidget {
           Expanded(
             child:
                 symbols.isEmpty
-                    ? const Center(
+                    ? Center(
                       child: Text(
                         'No symbols',
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: colors.textMuted,
                           fontSize: 11,
                         ),
                       ),
@@ -2421,8 +2420,8 @@ class _SymbolOutline extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     sym.name,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
+                                    style: TextStyle(
+                                      color: colors.textPrimary,
                                       fontSize: 11,
                                       fontFamily: 'monospace',
                                     ),
@@ -2431,8 +2430,8 @@ class _SymbolOutline extends StatelessWidget {
                                 ),
                                 Text(
                                   '${sym.line}',
-                                  style: const TextStyle(
-                                    color: AppColors.textMuted,
+                                  style: TextStyle(
+                                    color: colors.textMuted,
                                     fontSize: 9,
                                   ),
                                 ),
@@ -2455,22 +2454,23 @@ class _DiffBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final hunks = tab.diffHunks!;
     if (hunks.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.difference_outlined,
               size: 32,
-              color: AppColors.textSecondary,
+              color: colors.textSecondary,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No diff available',
               style: TextStyle(
-                color: AppColors.textSecondary,
+                color: colors.textSecondary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -2478,7 +2478,7 @@ class _DiffBody extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               tab.filePath.replaceFirst('diff:', ''),
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              style: TextStyle(color: colors.textMuted, fontSize: 11),
               textAlign: TextAlign.center,
             ),
           ],
@@ -2520,8 +2520,8 @@ class _DiffHunkWidget extends StatelessWidget {
             ),
             child: Text(
               hunk.header,
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              style: TextStyle(
+                color: colors.textMuted,
                 fontSize: 10,
                 fontFamily: 'monospace',
               ),
@@ -2542,22 +2542,23 @@ class _DiffLineWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     Color bg;
     Color textColor;
     String prefix;
 
     switch (line.type) {
       case DiffLineType.add:
-        bg = AppColors.diffAddBg;
-        textColor = AppColors.diffAddText;
+        bg = colors.diffAddBg;
+        textColor = colors.diffAddText;
         prefix = '+';
       case DiffLineType.remove:
-        bg = AppColors.diffRemoveBg;
-        textColor = AppColors.diffRemoveText;
+        bg = colors.diffRemoveBg;
+        textColor = colors.diffRemoveText;
         prefix = '-';
       default:
         bg = Colors.transparent;
-        textColor = AppColors.textSecondary;
+        textColor = colors.textSecondary;
         prefix = ' ';
     }
 
@@ -2570,9 +2571,9 @@ class _DiffLineWidget extends StatelessWidget {
           SizedBox(
             width: 28,
             child: Text(
-              '${line.oldLineNum ?? ""}',
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              '${line.oldLineNum ?? ''}',
+              style: TextStyle(
+                color: colors.textMuted,
                 fontSize: 10,
                 fontFamily: 'monospace',
               ),
@@ -2583,9 +2584,9 @@ class _DiffLineWidget extends StatelessWidget {
           SizedBox(
             width: 28,
             child: Text(
-              '${line.newLineNum ?? ""}',
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              '${line.newLineNum ?? ''}',
+              style: TextStyle(
+                color: colors.textMuted,
                 fontSize: 10,
                 fontFamily: 'monospace',
               ),

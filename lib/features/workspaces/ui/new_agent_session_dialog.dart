@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
@@ -250,7 +249,7 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
-                      foregroundColor: AppColors.textHighlight,
+                      foregroundColor: colors.textHighlight,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 10),
                       shape: RoundedRectangleBorder(

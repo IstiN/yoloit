@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 
 class GlobalEnvGroupsSection extends StatefulWidget {
@@ -269,7 +268,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                           onPressed: () => _deleteGroup(groupIndex),
                           tooltip: 'Delete group',
                           icon: const Icon(Icons.delete_outline, size: 18),
-                          color: AppColors.neonRed,
+                          color: colors.accentRed,
                         ),
                       ],
                     ),
@@ -346,7 +345,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                                   Icons.delete_outline,
                                   size: 16,
                                 ),
-                                color: AppColors.neonRed,
+                                color: colors.accentRed,
                                 splashRadius: 14,
                               ),
                             ],

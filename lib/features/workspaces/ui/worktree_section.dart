@@ -1,12 +1,9 @@
-
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoloit/core/theme/app_colors.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 class WorktreeSection extends StatefulWidget {
   const WorktreeSection({
@@ -73,6 +70,7 @@ class _WorktreeSectionState extends State<WorktreeSection> {
   }
 
   Future<void> _removeWorktree(String repoPath, WorktreeEntry entry) async {
+    final colors = context.appColors;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => _ConfirmRemoveDialog(worktreePath: entry.path),
@@ -88,7 +86,7 @@ class _WorktreeSectionState extends State<WorktreeSection> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error, style: const TextStyle(fontSize: 12)),
-          backgroundColor: AppColors.neonRed,
+          backgroundColor: colors.accentRed,
         ),
       );
     } else {
@@ -99,10 +97,7 @@ class _WorktreeSectionState extends State<WorktreeSection> {
   Future<void> _showAddDialog(String repoPath) async {
     await showDialog<void>(
       context: context,
-      builder: (ctx) => _AddWorktreeDialog(
-        repoPath: repoPath,
-        onAdded: _load,
-      ),
+      builder: (ctx) => _AddWorktreeDialog(repoPath: repoPath, onAdded: _load),
     );
   }
 
@@ -119,13 +114,21 @@ class _WorktreeSectionState extends State<WorktreeSection> {
           padding: const EdgeInsets.fromLTRB(12, 16, 8, 4),
           child: Row(
             children: [
-              Icon(Icons.account_tree_outlined, size: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+              Icon(
+                Icons.account_tree_outlined,
+                size: 11,
+                color:
+                    Theme.of(context).textTheme.bodySmall?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+              ),
               const SizedBox(width: 5),
               Flexible(
                 child: Text(
                   'Worktrees',
                   style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -159,13 +162,21 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                 padding: const EdgeInsets.fromLTRB(12, 8, 8, 2),
                 child: Row(
                   children: [
-                    Icon(Icons.folder_outlined, size: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                    Icon(
+                      Icons.folder_outlined,
+                      size: 11,
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                    ),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
                         p.basename(path),
                         style: TextStyle(
-                          color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color:
+                              Theme.of(context).textTheme.bodyMedium?.color ??
+                              Theme.of(context).colorScheme.onSurface,
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
                         ),
@@ -183,19 +194,25 @@ class _WorktreeSectionState extends State<WorktreeSection> {
               ),
             if (_errorsByPath[path] != null)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 child: Text(
                   _errorsByPath[path]!,
-                  style: const TextStyle(color: AppColors.neonRed, fontSize: 10),
+                  style: TextStyle(color: colors.accentRed, fontSize: 10),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               )
             else ...[
-              ...(_worktreesByPath[path] ?? []).map((entry) => _WorktreeTile(
-                    entry: entry,
-                    onRemove: entry.isMain ? null : () => _removeWorktree(path, entry),
-                  )),
+              ...(_worktreesByPath[path] ?? []).map(
+                (entry) => _WorktreeTile(
+                  entry: entry,
+                  onRemove:
+                      entry.isMain ? null : () => _removeWorktree(path, entry),
+                ),
+              ),
               // Add worktree button (only for single repo, or inline per repo)
               if (!multiRepo)
                 Padding(
@@ -211,12 +228,22 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.add, size: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                          Icon(
+                            Icons.add,
+                            size: 11,
+                            color:
+                                Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
+                          ),
                           const SizedBox(width: 5),
                           Text(
                             'Add worktree',
                             style: TextStyle(
-                              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.color ??
+                                  Theme.of(context).colorScheme.onSurface,
                               fontSize: 11,
                             ),
                           ),
@@ -232,12 +259,20 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                     onTap: () => _showAddDialog(path),
                     child: Row(
                       children: [
-                        Icon(Icons.add, size: 10, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                        Icon(
+                          Icons.add,
+                          size: 10,
+                          color:
+                              Theme.of(context).textTheme.bodySmall?.color ??
+                              Theme.of(context).colorScheme.onSurface,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'Add worktree',
                           style: TextStyle(
-                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                            color:
+                                Theme.of(context).textTheme.bodySmall?.color ??
+                                Theme.of(context).colorScheme.onSurface,
                             fontSize: 10,
                           ),
                         ),
@@ -247,7 +282,12 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                 ),
             ],
             if (multiRepo && path != widget.workspacePaths.last)
-              const Divider(height: 4, thickness: 0.5, indent: 12, endIndent: 12),
+              const Divider(
+                height: 4,
+                thickness: 0.5,
+                indent: 12,
+                endIndent: 12,
+              ),
           ],
       ],
     );
@@ -272,8 +312,13 @@ class _WorktreeTileState extends State<_WorktreeTile> {
     final colors = context.appColors;
     final entry = widget.entry;
     final displayPath = p.basename(entry.path);
-    final branchLabel = entry.branch ?? (entry.commit != null ? entry.commit! : 'detached');
-    final accentColor = entry.isMain ? colors.primary : (Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface);
+    final branchLabel =
+        entry.branch ?? (entry.commit != null ? entry.commit! : 'detached');
+    final accentColor =
+        entry.isMain
+            ? colors.primary
+            : (Theme.of(context).textTheme.bodyMedium?.color ??
+                Theme.of(context).colorScheme.onSurface);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -289,7 +334,9 @@ class _WorktreeTileState extends State<_WorktreeTile> {
         child: Row(
           children: [
             Icon(
-              entry.isLocked ? Icons.lock_outline : Icons.folder_special_outlined,
+              entry.isLocked
+                  ? Icons.lock_outline
+                  : Icons.folder_special_outlined,
               size: 12,
               color: entry.isLocked ? Colors.amber : accentColor,
             ),
@@ -305,9 +352,20 @@ class _WorktreeTileState extends State<_WorktreeTile> {
                         child: Text(
                           displayPath,
                           style: TextStyle(
-                            color: entry.isMain ? Theme.of(context).colorScheme.onSurface : (Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface),
+                            color:
+                                entry.isMain
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : (Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium?.color ??
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface),
                             fontSize: 11,
-                            fontWeight: entry.isMain ? FontWeight.w600 : FontWeight.w400,
+                            fontWeight:
+                                entry.isMain
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -315,7 +373,10 @@ class _WorktreeTileState extends State<_WorktreeTile> {
                       if (entry.isMain) ...[
                         SizedBox(width: 4),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: colors.primary.withAlpha(40),
                             borderRadius: BorderRadius.circular(3),
@@ -339,7 +400,9 @@ class _WorktreeTileState extends State<_WorktreeTile> {
                   Text(
                     branchLabel,
                     style: TextStyle(
-                      color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
                       fontSize: 9,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -352,7 +415,13 @@ class _WorktreeTileState extends State<_WorktreeTile> {
                 onTap: widget.onRemove,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: Icon(Icons.close, size: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                  child: Icon(
+                    Icons.close,
+                    size: 11,
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
           ],
@@ -393,7 +462,12 @@ class _ConfirmRemoveDialog extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               'Remove worktree at:\n$worktreePath',
-              style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+              style: TextStyle(
+                color:
+                    Theme.of(context).textTheme.bodyMedium?.color ??
+                    Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 16),
             Row(
@@ -401,15 +475,24 @@ class _ConfirmRemoveDialog extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: Text('Cancel', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface)),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color:
+                          Theme.of(context).textTheme.bodyMedium?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(true),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.neonRed,
+                    backgroundColor: colors.accentRed,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                   ),
                   child: const Text('Remove', style: TextStyle(fontSize: 13)),
                 ),
@@ -455,7 +538,9 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
   }
 
   Future<void> _loadBranches() async {
-    final branches = await WorktreeService.instance.listBranches(widget.repoPath);
+    final branches = await WorktreeService.instance.listBranches(
+      widget.repoPath,
+    );
     if (mounted) {
       setState(() {
         _branches = branches;
@@ -481,9 +566,10 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
       return;
     }
 
-    final branchOrCommit = _createNewBranch
-        ? _newBranchController.text.trim()
-        : (_selectedBranch ?? '');
+    final branchOrCommit =
+        _createNewBranch
+            ? _newBranchController.text.trim()
+            : (_selectedBranch ?? '');
     if (branchOrCommit.isEmpty) {
       _showError('Branch cannot be empty');
       return;
@@ -508,10 +594,11 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
   }
 
   void _showError(String message) {
+    final colors = context.appColors;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message, style: const TextStyle(fontSize: 12)),
-        backgroundColor: AppColors.neonRed,
+        backgroundColor: colors.accentRed,
       ),
     );
   }
@@ -535,7 +622,11 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.account_tree_outlined, size: 18, color: Theme.of(context).colorScheme.onSurface),
+                  Icon(
+                    Icons.account_tree_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Add Worktree',
@@ -551,7 +642,12 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
               // Path row
               Text(
                 'Worktree path',
-                style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodyMedium?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 11,
+                ),
               ),
               const SizedBox(height: 6),
               Row(
@@ -561,8 +657,14 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                       type: MaterialType.transparency,
                       child: TextField(
                         controller: _pathController,
-                        style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
-                        decoration: _inputDecoration('e.g. /path/to/worktree', context),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 12,
+                        ),
+                        decoration: _inputDecoration(
+                          'e.g. /path/to/worktree',
+                          context,
+                        ),
                       ),
                     ),
                   ),
@@ -579,7 +681,8 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                     height: 18,
                     child: Checkbox(
                       value: _createNewBranch,
-                      onChanged: (v) => setState(() => _createNewBranch = v ?? false),
+                      onChanged:
+                          (v) => setState(() => _createNewBranch = v ?? false),
                       activeColor: colors.primary,
                       side: BorderSide(color: colors.border),
                     ),
@@ -587,7 +690,12 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                   const SizedBox(width: 8),
                   Text(
                     'Create new branch',
-                    style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                    style: TextStyle(
+                      color:
+                          Theme.of(context).textTheme.bodyMedium?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
@@ -595,21 +703,37 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
               if (_createNewBranch) ...[
                 Text(
                   'New branch name',
-                  style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+                  style: TextStyle(
+                    color:
+                        Theme.of(context).textTheme.bodyMedium?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                    fontSize: 11,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Material(
                   type: MaterialType.transparency,
                   child: TextField(
                     controller: _newBranchController,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
-                    decoration: _inputDecoration('e.g. feature/my-feature', context),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
+                    decoration: _inputDecoration(
+                      'e.g. feature/my-feature',
+                      context,
+                    ),
                   ),
                 ),
               ] else ...[
                 Text(
                   'Branch / commit',
-                  style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+                  style: TextStyle(
+                    color:
+                        Theme.of(context).textTheme.bodyMedium?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                    fontSize: 11,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 if (_loadingBranches)
@@ -621,7 +745,12 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                 else if (_branches.isEmpty)
                   Text(
                     'No branches found',
-                    style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                    style: TextStyle(
+                      color:
+                          Theme.of(context).textTheme.bodySmall?.color ??
+                          Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
                   )
                 else
                   Container(
@@ -636,10 +765,17 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                       isExpanded: true,
                       underline: SizedBox.shrink(),
                       dropdownColor: colors.surfaceElevated,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
-                      items: _branches
-                          .map((b) => DropdownMenuItem(value: b, child: Text(b)))
-                          .toList(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 12,
+                      ),
+                      items:
+                          _branches
+                              .map(
+                                (b) =>
+                                    DropdownMenuItem(value: b, child: Text(b)),
+                              )
+                              .toList(),
                       onChanged: (v) => setState(() => _selectedBranch = v),
                     ),
                   ),
@@ -650,8 +786,14 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text('Cancel',
-                        style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface)),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color:
+                            Theme.of(context).textTheme.bodyMedium?.color ??
+                            Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
                   ),
                   SizedBox(width: 8),
                   ElevatedButton(
@@ -659,18 +801,21 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
-                    child: _loading
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('Add', style: TextStyle(fontSize: 13)),
+                    child:
+                        _loading
+                            ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: Colors.white,
+                              ),
+                            )
+                            : const Text('Add', style: TextStyle(fontSize: 13)),
                   ),
                 ],
               ),
@@ -684,25 +829,30 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
   InputDecoration _inputDecoration(String hint, BuildContext context) {
     final colors = context.appColors;
     return InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
-        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        isDense: true,
-        filled: true,
-        fillColor: colors.surfaceElevated,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
-          borderSide: BorderSide(color: colors.primary),
-        ),
-      );
+      hintText: hint,
+      hintStyle: TextStyle(
+        color:
+            Theme.of(context).textTheme.bodySmall?.color ??
+            Theme.of(context).colorScheme.onSurface,
+        fontSize: 12,
+      ),
+      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      isDense: true,
+      filled: true,
+      fillColor: colors.surfaceElevated,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(4),
+        borderSide: BorderSide(color: colors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(4),
+        borderSide: BorderSide(color: colors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(4),
+        borderSide: BorderSide(color: colors.primary),
+      ),
+    );
   }
 }
 
@@ -726,7 +876,12 @@ class _OutlineButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+          style: TextStyle(
+            color:
+                Theme.of(context).textTheme.bodyMedium?.color ??
+                Theme.of(context).colorScheme.onSurface,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -752,7 +907,13 @@ class _SmallIconButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(3),
-          child: Icon(icon, size: 12, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+          child: Icon(
+            icon,
+            size: 12,
+            color:
+                Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface,
+          ),
         ),
       ),
     );

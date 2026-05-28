@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
@@ -155,6 +154,7 @@ class _RepoTree extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final repoName = p.basename(repoPath);
     final children = <Widget>[];
 
@@ -191,7 +191,7 @@ class _RepoTree extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
             child: Row(
               children: [
-                Icon(Icons.folder_open, size: 14, color: AppColors.neonBlue.withAlpha(180)),
+                Icon(Icons.folder_open, size: 14, color: colors.accentBlue.withAlpha(180)),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -226,9 +226,10 @@ class _BranchRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final branch = entry.branch ?? entry.commit ?? '(detached)';
     final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
-    final dotColor = entry.isMain ? AppColors.neonGreen : hasSession ? AppColors.neonBlue : mutedColor;
+    final dotColor = entry.isMain ? colors.accentGreen : hasSession ? colors.accentBlue : mutedColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 1, 8, 1),
       child: Row(
@@ -443,9 +444,9 @@ class _SessionRowState extends State<_SessionRow> {
     final colors = context.appColors;
     final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
     final statusColor = switch (widget.session.status) {
-      AgentStatus.live => AppColors.neonGreen,
+      AgentStatus.live => colors.accentGreen,
       AgentStatus.idle => mutedColor,
-      AgentStatus.error => AppColors.neonRed,
+      AgentStatus.error => colors.accentRed,
     };
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),

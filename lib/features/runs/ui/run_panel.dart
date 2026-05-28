@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_state.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
@@ -376,7 +375,7 @@ class _ConsoleHeader extends StatelessWidget {
                           : action.label,
                   icon: _quickActionIcon(action.icon),
                   label: action.label.isNotEmpty ? action.label[0] : 'A',
-                  iconColor: AppColors.neonGreen,
+                  iconColor: colors.accentGreen,
                   onTap:
                       () => cubit.triggerQuickAction(activeSession.id, action),
                 ),
@@ -385,14 +384,14 @@ class _ConsoleHeader extends StatelessWidget {
               _HeaderButton(
                 tooltip: 'Stop',
                 icon: Icons.stop_rounded,
-                iconColor: AppColors.neonRed,
+                iconColor: colors.accentRed,
                 onTap: () => cubit.stopRun(activeSession.id),
               )
             else
               _HeaderButton(
                 tooltip: 'Re-run',
                 icon: Icons.refresh_rounded,
-                iconColor: AppColors.neonGreen,
+                iconColor: colors.accentGreen,
                 onTap: () => cubit.restartSession(activeSession.id),
               ),
             _HeaderButton(
@@ -442,7 +441,7 @@ class _ConsoleHeader extends StatelessWidget {
               _HeaderButton(
                 tooltip: 'Detach to new panel',
                 icon: Icons.open_in_new_rounded,
-                iconColor: AppColors.neonGreen,
+                iconColor: colors.accentGreen,
                 onTap: () async {
                   onSessionVisibilityChanged?.call(activeSession.id, true);
                   await onDetachToPanel!(activeSession);
@@ -453,7 +452,7 @@ class _ConsoleHeader extends StatelessWidget {
               _HeaderButton(
                 tooltip: 'Send to group',
                 icon: Icons.group_work_rounded,
-                iconColor: AppColors.neonGreen,
+                iconColor: colors.accentGreen,
                 onTap: () async {
                   final target = await _pickSendTarget(
                     context,
@@ -561,7 +560,7 @@ class _ConsoleHeader extends StatelessWidget {
             _HeaderButton(
               tooltip: 'Attach session',
               icon: Icons.link_rounded,
-              iconColor: AppColors.neonGreen,
+              iconColor: colors.accentGreen,
               onTap: () async {
                 final selected = await _pickAttachTarget(context, allSessions);
                 if (selected == null) return;
@@ -684,7 +683,7 @@ class _ConsoleHeader extends StatelessWidget {
                                       size: 8,
                                       color:
                                           isRunning
-                                              ? AppColors.neonGreen
+                                              ? colors.accentGreen
                                               : Theme.of(context)
                                                   .colorScheme
                                                   .onSurface
@@ -865,7 +864,7 @@ class _SessionTab extends StatelessWidget {
     final dotColor =
         session.config.color ??
         (isRunning
-            ? AppColors.neonGreen
+            ? colors.accentGreen
             : Theme.of(context).colorScheme.onSurface.withAlpha(120));
 
     return GestureDetector(
@@ -896,7 +895,7 @@ class _SessionTab extends StatelessWidget {
                   shape: BoxShape.circle,
                   color:
                       session.status == RunStatus.failed
-                          ? AppColors.neonRed
+                          ? colors.accentRed
                           : dotColor,
                 ),
               ),
@@ -1288,7 +1287,7 @@ class _SessionGroup extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: runningCount > 0 ? AppColors.neonGreen : titleColor,
+                color: runningCount > 0 ? colors.accentGreen : titleColor,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1298,9 +1297,9 @@ class _SessionGroup extends StatelessWidget {
               final isRunning = session.status == RunStatus.running;
               final markerColor =
                   isRunning
-                      ? AppColors.neonGreen
+                      ? colors.accentGreen
                       : session.status == RunStatus.failed
-                      ? AppColors.neonRed
+                      ? colors.accentRed
                       : Theme.of(context).colorScheme.onSurface.withAlpha(110);
               final startedAt = session.startedAt;
               final trailingTime =
@@ -1436,9 +1435,9 @@ class _ConfigItemState extends State<_ConfigItem> {
             // prevent layout jump on hover.
             Opacity(
               opacity: widget.isRunning ? 1.0 : 0.0,
-              child: const _SmallIconButton(
+              child: _SmallIconButton(
                 icon: Icons.fiber_manual_record,
-                color: AppColors.neonGreen,
+                color: colors.accentGreen,
                 tooltip: 'Running',
                 onTap: null,
               ),
@@ -1447,7 +1446,7 @@ class _ConfigItemState extends State<_ConfigItem> {
               opacity: (_hovering || widget.isRunning) ? 1.0 : 0.0,
               child: _SmallIconButton(
                 icon: Icons.play_arrow_rounded,
-                color: AppColors.neonGreen,
+                color: colors.accentGreen,
                 tooltip: 'Run',
                 onTap: (_hovering || widget.isRunning) ? widget.onRun : null,
               ),
@@ -1471,6 +1470,7 @@ class _ConfigItemState extends State<_ConfigItem> {
   }
 
   void _showMenu(BuildContext context) {
+    final colors = context.appColors;
     final box = context.findRenderObject() as RenderBox?;
     if (box == null) return;
     final offset = box.localToGlobal(Offset.zero);
@@ -1495,12 +1495,12 @@ class _ConfigItemState extends State<_ConfigItem> {
             ),
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'delete',
           height: 32,
           child: Text(
             'Delete',
-            style: TextStyle(color: AppColors.neonRed, fontSize: 12),
+            style: TextStyle(color: colors.accentRed, fontSize: 12),
           ),
         ),
       ],
@@ -1670,7 +1670,7 @@ class _ConsoleState extends State<_Console> {
                                     ? Theme.of(
                                       context,
                                     ).colorScheme.onSurface.withAlpha(80)
-                                    : AppColors.neonGreen,
+                                    : colors.accentGreen,
                           ),
                         ),
                       ),
@@ -1723,6 +1723,8 @@ class _FullLogView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+
     // Build a TextSpan that colours error lines red / orange.
     final spans = <TextSpan>[];
     for (final line in output) {
@@ -1731,13 +1733,13 @@ class _FullLogView extends StatelessWidget {
       if (t.startsWith('\n[Process exited')) {
         color = const Color(0xFF44446A);
       } else if (t.startsWith('Reloaded') || t.contains('🔥')) {
-        color = AppColors.neonGreen;
+        color = colors.accentGreen;
       } else if (line.isError) {
-        color = AppColors.neonRed;
+        color = colors.accentRed;
       } else if (t.toLowerCase().contains('error')) {
-        color = AppColors.neonOrange;
+        color = colors.accentOrange;
       } else {
-        color = AppColors.terminalText;
+        color = colors.terminalText;
       }
       spans.add(TextSpan(text: '$t\n', style: TextStyle(color: color)));
     }

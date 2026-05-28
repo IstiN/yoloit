@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 
 enum SyncMethod { none, git, googleDrive, customPath }
 
@@ -266,20 +265,20 @@ class _SyncSectionState extends State<SyncSection> {
             _syncInfoRow(
               Icons.check_circle,
               'Board layouts and panel states',
-              AppColors.neonGreen,
+              colors.accentGreen,
             ),
             _syncInfoRow(
               Icons.check_circle,
               'Settings and preferences',
-              AppColors.neonGreen,
+              colors.accentGreen,
             ),
             _syncInfoRow(
               Icons.check_circle,
               'Skills configuration',
-              AppColors.neonGreen,
+              colors.accentGreen,
             ),
-            _syncInfoRow(Icons.cancel, 'Media files', AppColors.neonRed),
-            _syncInfoRow(Icons.cancel, 'Terminal sessions', AppColors.neonRed),
+            _syncInfoRow(Icons.cancel, 'Media files', colors.accentRed),
+            _syncInfoRow(Icons.cancel, 'Terminal sessions', colors.accentRed),
           ],
         ),
       ),
@@ -398,7 +397,8 @@ class _StatusIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = connected ? AppColors.neonGreen : AppColors.textMuted;
+    final colors = context.appColors;
+    final color = connected ? colors.accentGreen : colors.textMuted;
     final label = connected ? 'Connected' : 'Not connected';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

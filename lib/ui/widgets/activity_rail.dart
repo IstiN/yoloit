@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 
 class ActivityRailItem {
   const ActivityRailItem({
@@ -87,7 +86,7 @@ class _RailItemButtonState extends State<_RailItemButton> {
                   : Icon(
                       widget.item.icon,
                       size: 16,
-                      color: _hovering ? colors.primary : AppColors.textMuted,
+                      color: _hovering ? colors.primary : colors.textMuted,
                     ),
             ),
           ),

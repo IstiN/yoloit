@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
 
 // ── Embedded (Settings panel) ─────────────────────────────────────────────────
@@ -37,6 +36,7 @@ class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     if (_loading) return const Center(child: _LoadingView());
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -49,7 +49,7 @@ class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
               Icon(
                 _result!.allRequiredDepsOk ? Icons.check_circle_outline : Icons.warning_amber_rounded,
                 size: 13,
-                color: _result!.allRequiredDepsOk ? AppColors.neonGreen : AppColors.neonOrange,
+                color: _result!.allRequiredDepsOk ? colors.accentGreen : colors.accentOrange,
               ),
               const SizedBox(width: 6),
               Text(
@@ -57,7 +57,7 @@ class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
                     ? 'All required dependencies found'
                     : 'Some required dependencies are missing',
                 style: TextStyle(
-                  color: _result!.allRequiredDepsOk ? AppColors.neonGreen : AppColors.neonOrange,
+                  color: _result!.allRequiredDepsOk ? colors.accentGreen : colors.accentOrange,
                   fontSize: 11,
                 ),
               ),
@@ -164,6 +164,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
@@ -171,10 +172,10 @@ class _Header extends StatelessWidget {
           Container(
             width: 40, height: 40,
             decoration: BoxDecoration(
-              color: AppColors.neonBlue.withAlpha(20),
+              color: colors.accentBlue.withAlpha(20),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.checklist_rtl_rounded, color: AppColors.neonBlue, size: 20),
+            child: Icon(Icons.checklist_rtl_rounded, color: colors.accentBlue, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -208,10 +209,11 @@ class _LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.neonBlue)),
+        SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: colors.accentBlue)),
         const SizedBox(height: 12),
         Text('Checking your environment...', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
       ],
@@ -229,6 +231,7 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -260,7 +263,7 @@ class _Body extends StatelessWidget {
             subtitle: result.anyAgentAvailable
                 ? 'Detected on your system'
                 : 'No agents detected — install at least one to get started',
-            subtitleColor: result.anyAgentAvailable ? null : AppColors.neonOrange,
+            subtitleColor: result.anyAgentAvailable ? null : colors.accentOrange,
           ),
           const SizedBox(height: 10),
           ...result.agents.map((agent) => _DependencyCard(dep: agent, onInstalled: onInstalled)),
@@ -330,21 +333,21 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
     final IconData statusIcon;
 
     if (_checking) {
-      statusColor = AppColors.neonBlue;
+      statusColor = colors.accentBlue;
       statusIcon = Icons.hourglass_top_rounded;
     } else if (_status == _PermissionStatus.granted) {
-      statusColor = AppColors.neonGreen;
+      statusColor = colors.accentGreen;
       statusIcon = Icons.check_circle_outline;
     } else {
-      statusColor = AppColors.neonOrange;
+      statusColor = colors.accentOrange;
       statusIcon = Icons.warning_amber_rounded;
     }
 
     final borderColor = _status == _PermissionStatus.granted
-        ? AppColors.neonGreen.withAlpha(60)
+        ? colors.accentGreen.withAlpha(60)
         : _checking
-            ? AppColors.neonBlue.withAlpha(60)
-            : AppColors.neonOrange.withAlpha(60);
+            ? colors.accentBlue.withAlpha(60)
+            : colors.accentOrange.withAlpha(60);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -358,9 +361,9 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
         child: Row(
           children: [
             if (_checking)
-              const SizedBox(
+              SizedBox(
                 width: 14, height: 14,
-                child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.neonBlue),
+                child: CircularProgressIndicator(strokeWidth: 1.5, color: colors.accentBlue),
               )
             else
               Icon(statusIcon, size: 14, color: statusColor),
@@ -389,10 +392,10 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.neonGreen.withAlpha(20),
+                    color: colors.accentGreen.withAlpha(20),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text('Granted', style: TextStyle(color: AppColors.neonGreen, fontSize: 9, fontWeight: FontWeight.w600)),
+                  child: Text('Granted', style: TextStyle(color: colors.accentGreen, fontSize: 9, fontWeight: FontWeight.w600)),
                 )
               else ...[
                 GestureDetector(
@@ -420,16 +423,16 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.neonBlue.withAlpha(20),
+                    color: colors.accentBlue.withAlpha(20),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.neonBlue.withAlpha(60)),
+                    border: Border.all(color: colors.accentBlue.withAlpha(60)),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.security_outlined, size: 10, color: AppColors.neonBlue),
-                      SizedBox(width: 4),
-                      Text('Privacy Settings', style: TextStyle(color: AppColors.neonBlue, fontSize: 9, fontWeight: FontWeight.w600)),
+                      Icon(Icons.security_outlined, size: 10, color: colors.accentBlue),
+                      const SizedBox(width: 4),
+                      Text('Privacy Settings', style: TextStyle(color: colors.accentBlue, fontSize: 9, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -453,9 +456,10 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Row(
       children: [
-        Icon(icon, size: 14, color: AppColors.neonBlue),
+        Icon(icon, size: 14, color: colors.accentBlue),
         const SizedBox(width: 8),
         Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(width: 8),
@@ -548,26 +552,26 @@ class _DependencyCardState extends State<_DependencyCard> {
     Color statusColor;
     IconData statusIcon;
     if (ok) {
-      statusColor = AppColors.neonGreen;
+      statusColor = colors.accentGreen;
       statusIcon = Icons.check_circle_outline;
     } else if (_phase == _Phase.installing) {
-      statusColor = AppColors.neonBlue;
+      statusColor = colors.accentBlue;
       statusIcon = Icons.hourglass_top_rounded;
     } else if (_phase == _Phase.done) {
-      statusColor = AppColors.neonGreen;
+      statusColor = colors.accentGreen;
       statusIcon = Icons.check_circle_outline;
     } else if (_phase == _Phase.failed) {
       statusColor = Colors.red.shade400;
       statusIcon = Icons.error_outline;
     } else {
-      statusColor = dep.isRequired ? Colors.red.shade400 : AppColors.neonOrange;
+      statusColor = dep.isRequired ? Colors.red.shade400 : colors.accentOrange;
       statusIcon = Icons.warning_amber_rounded;
     }
 
     final borderColor = ok || _phase == _Phase.done
-        ? AppColors.neonGreen.withAlpha(60)
+        ? colors.accentGreen.withAlpha(60)
         : _phase == _Phase.installing
-            ? AppColors.neonBlue.withAlpha(60)
+            ? colors.accentBlue.withAlpha(60)
             : _phase == _Phase.failed
                 ? Colors.red.withAlpha(60)
                 : dep.isRequired
@@ -590,11 +594,11 @@ class _DependencyCardState extends State<_DependencyCard> {
               children: [
                 // Status icon / spinner
                 if (_phase == _Phase.installing)
-                  const SizedBox(
+                  SizedBox(
                     width: 14, height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 1.5,
-                      color: AppColors.neonBlue,
+                      color: colors.accentBlue,
                     ),
                   )
                 else
@@ -637,10 +641,10 @@ class _DependencyCardState extends State<_DependencyCard> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.neonGreen.withAlpha(20),
+                      color: colors.accentGreen.withAlpha(20),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text('Available', style: TextStyle(color: AppColors.neonGreen, fontSize: 9, fontWeight: FontWeight.w600)),
+                    child: Text('Available', style: TextStyle(color: colors.accentGreen, fontSize: 9, fontWeight: FontWeight.w600)),
                   )
                 else if (_phase == _Phase.installing)
                   _outputToggleButton(_showOutput)
@@ -678,7 +682,7 @@ class _DependencyCardState extends State<_DependencyCard> {
                   const SizedBox(width: 4),
                   TextButton(
                     onPressed: _install,
-                    child: const Text('Retry', style: TextStyle(fontSize: 10, color: AppColors.neonBlue)),
+                    child: Text('Retry', style: TextStyle(fontSize: 10, color: colors.accentBlue)),
                   ),
                 ],
               ),
@@ -756,7 +760,7 @@ class _OutputLog extends StatelessWidget {
                     fontFamily: 'monospace',
                     fontSize: 9,
                     color: isSuccess
-                        ? AppColors.neonGreen
+                        ? colors.accentGreen
                         : isError
                             ? Colors.red.shade300
                             : Theme.of(context).textTheme.bodyMedium?.color ?? Theme.of(context).colorScheme.onSurface,
@@ -779,21 +783,22 @@ class _InstallButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return GestureDetector(
       onTap: onPressed,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.neonBlue.withAlpha(25),
+          color: colors.accentBlue.withAlpha(25),
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: AppColors.neonBlue.withAlpha(80)),
+          border: Border.all(color: colors.accentBlue.withAlpha(80)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.download_rounded, size: 10, color: AppColors.neonBlue),
-            SizedBox(width: 4),
-            Text('Install', style: TextStyle(color: AppColors.neonBlue, fontSize: 9, fontWeight: FontWeight.w600)),
+            Icon(Icons.download_rounded, size: 10, color: colors.accentBlue),
+            const SizedBox(width: 4),
+            Text('Install', style: TextStyle(color: colors.accentBlue, fontSize: 9, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -870,6 +875,7 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final ok = result?.allRequiredDepsOk ?? false;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -879,13 +885,13 @@ class _Footer extends StatelessWidget {
             Icon(
               ok ? Icons.check_circle_outline : Icons.warning_amber_rounded,
               size: 13,
-              color: ok ? AppColors.neonGreen : AppColors.neonOrange,
+              color: ok ? colors.accentGreen : colors.accentOrange,
             ),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 ok ? 'All required dependencies found' : 'Some required dependencies are missing',
-                style: TextStyle(color: ok ? AppColors.neonGreen : AppColors.neonOrange, fontSize: 11),
+                style: TextStyle(color: ok ? colors.accentGreen : colors.accentOrange, fontSize: 11),
               ),
             ),
           ] else
@@ -901,7 +907,7 @@ class _Footer extends StatelessWidget {
             ElevatedButton(
               onPressed: onGetStarted,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.neonBlue,
+                backgroundColor: colors.accentBlue,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),

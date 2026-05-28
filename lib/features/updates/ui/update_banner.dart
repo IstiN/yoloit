@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 
 /// Phase of the silent auto-update flow.
@@ -92,11 +92,12 @@ class _AutoUpdateBannerState extends State<AutoUpdateBanner> {
   Widget build(BuildContext context) {
     final isReady = widget.phase == AutoUpdatePhase.ready;
     final isError = widget.phase == AutoUpdatePhase.error;
+    final colors = context.appColors;
 
     return Material(
       color: isError
           ? Colors.red.shade800.withAlpha(230)
-          : AppColors.neonBlue.withAlpha(230),
+          : colors.accentBlue.withAlpha(230),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Column(

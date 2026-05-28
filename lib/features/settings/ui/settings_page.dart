@@ -10,7 +10,6 @@ import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
@@ -429,9 +428,7 @@ class _PromptCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colors.border.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: colors.border.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,8 +494,6 @@ class _PromptCard extends StatelessWidget {
     );
   }
 }
-
-
 
 class _AgentSettingsSection extends StatefulWidget {
   @override
@@ -570,7 +565,10 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
 
   String _defaultAsrLabel() {
     if (_defaultAsrMode != 'cloud') return 'Local';
-    final cfg = _cloudConfigs.where((c) => c.id == _defaultAsrCloudConfigId).firstOrNull;
+    final cfg =
+        _cloudConfigs
+            .where((c) => c.id == _defaultAsrCloudConfigId)
+            .firstOrNull;
     final modelName = _defaultAsrCloudModel ?? '—';
     final provName = cfg?.name ?? '—';
     return 'Cloud · $provName · $modelName';
@@ -648,7 +646,10 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
                   }
                 },
                 icon: const Icon(Icons.mic, size: 14),
-                label: Text(_defaultAsrLabel(), style: const TextStyle(fontSize: 12)),
+                label: Text(
+                  _defaultAsrLabel(),
+                  style: const TextStyle(fontSize: 12),
+                ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -942,9 +943,10 @@ class _AgentRowState extends State<_AgentRow> {
     final mode = widget.config.asrMode;
     if (mode == 'default') return 'Default';
     if (mode == 'local') return 'Local';
-    final cfg = widget.cloudConfigs
-        .where((c) => c.id == widget.config.asrCloudConfigId)
-        .firstOrNull;
+    final cfg =
+        widget.cloudConfigs
+            .where((c) => c.id == widget.config.asrCloudConfigId)
+            .firstOrNull;
     final modelName = widget.config.asrCloudModel ?? '—';
     final provName = cfg?.name ?? '—';
     return 'Cloud · $provName · $modelName';
@@ -954,16 +956,18 @@ class _AgentRowState extends State<_AgentRow> {
     // Reload cloud configs so any providers added since page load are visible.
     final freshConfigs = await CloudLlmSettingsService.instance.loadConfigs();
     if (!context.mounted) return;
-    final result = await showDialog<({String mode, String? configId, String? model})>(
-      context: context,
-      builder: (_) => _AsrPickerDialog(
-        showDefaultOption: true,
-        initialMode: widget.config.asrMode,
-        initialConfigId: widget.config.asrCloudConfigId,
-        initialModel: widget.config.asrCloudModel,
-        cloudConfigs: freshConfigs,
-      ),
-    );
+    final result =
+        await showDialog<({String mode, String? configId, String? model})>(
+          context: context,
+          builder:
+              (_) => _AsrPickerDialog(
+                showDefaultOption: true,
+                initialMode: widget.config.asrMode,
+                initialConfigId: widget.config.asrCloudConfigId,
+                initialModel: widget.config.asrCloudModel,
+                cloudConfigs: freshConfigs,
+              ),
+        );
     if (result != null) {
       widget.onChanged(
         widget.config.copyWith(
@@ -1202,7 +1206,6 @@ class _AgentRowState extends State<_AgentRow> {
       ),
     );
   }
-
 }
 
 /// Dialog for picking ASR configuration (Default / Local / Cloud + Provider + Model).
@@ -1250,10 +1253,7 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
     if (_configId == null) return const [];
     final cfg = widget.cloudConfigs.where((c) => c.id == _configId).firstOrNull;
     if (cfg == null) return const [];
-    return kCloudLlmPresets
-            .where((p) => p.id == cfg.id)
-            .firstOrNull
-            ?.models ??
+    return kCloudLlmPresets.where((p) => p.id == cfg.id).firstOrNull?.models ??
         const [];
   }
 
@@ -1265,8 +1265,7 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
 
     final inputDecoration = InputDecoration(
       isDense: true,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
         borderSide: BorderSide(color: colors.border),
@@ -1297,17 +1296,15 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
             SegmentedButton<String>(
               segments: [
                 if (widget.showDefaultOption)
-                  const ButtonSegment(
-                    value: 'default',
-                    label: Text('Default'),
-                  ),
+                  const ButtonSegment(value: 'default', label: Text('Default')),
                 const ButtonSegment(value: 'local', label: Text('Local')),
                 const ButtonSegment(value: 'cloud', label: Text('Cloud')),
               ],
               selected: {_mode},
-              onSelectionChanged: (v) => setState(() {
-                _mode = v.first;
-              }),
+              onSelectionChanged:
+                  (v) => setState(() {
+                    _mode = v.first;
+                  }),
             ),
             if (isCloud) ...[
               const SizedBox(height: 16),
@@ -1321,9 +1318,10 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
               ),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: widget.cloudConfigs.any((c) => c.id == _configId)
-                    ? _configId
-                    : null,
+                value:
+                    widget.cloudConfigs.any((c) => c.id == _configId)
+                        ? _configId
+                        : null,
                 hint: Text(
                   'Select provider',
                   style: TextStyle(
@@ -1331,19 +1329,24 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
                     color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
                 ),
-                items: widget.cloudConfigs
-                    .map(
-                      (c) => DropdownMenuItem<String>(
-                        value: c.id,
-                        child: Text(c.name, style: const TextStyle(fontSize: 13)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  _configId = v;
-                  _model = null;
-                  _customModelCtrl.clear();
-                }),
+                items:
+                    widget.cloudConfigs
+                        .map(
+                          (c) => DropdownMenuItem<String>(
+                            value: c.id,
+                            child: Text(
+                              c.name,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                onChanged:
+                    (v) => setState(() {
+                      _configId = v;
+                      _model = null;
+                      _customModelCtrl.clear();
+                    }),
                 dropdownColor: colors.surfaceElevated,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
@@ -1371,18 +1374,23 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
                       color: Theme.of(context).textTheme.bodySmall?.color,
                     ),
                   ),
-                  items: catalog
-                      .map(
-                        (m) => DropdownMenuItem<String>(
-                          value: m.id,
-                          child: Text(m.name, style: const TextStyle(fontSize: 13)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() {
-                    _model = v;
-                    _customModelCtrl.text = v ?? '';
-                  }),
+                  items:
+                      catalog
+                          .map(
+                            (m) => DropdownMenuItem<String>(
+                              value: m.id,
+                              child: Text(
+                                m.name,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged:
+                      (v) => setState(() {
+                        _model = v;
+                        _customModelCtrl.text = v ?? '';
+                      }),
                   dropdownColor: colors.surfaceElevated,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
@@ -1424,9 +1432,10 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(
-            (mode: _mode, configId: _configId, model: _model),
-          ),
+          onPressed:
+              () => Navigator.of(
+                context,
+              ).pop((mode: _mode, configId: _configId, model: _model)),
           child: const Text('OK'),
         ),
       ],
@@ -2091,13 +2100,14 @@ class _AboutSectionState extends State<_AboutSection> {
       // If we get here without exit(), the installer opened browser fallback.
     } catch (e) {
       if (mounted) {
+        final colors = context.appColors;
         setState(() {
           _installing = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Update failed: $e'),
-            backgroundColor: AppColors.neonRed,
+            backgroundColor: colors.accentRed,
           ),
         );
       }
@@ -2157,16 +2167,16 @@ class _AboutSectionState extends State<_AboutSection> {
                                   vertical: 1,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.neonOrange.withAlpha(30),
+                                  color: colors.accentOrange.withAlpha(30),
                                   borderRadius: BorderRadius.circular(3),
                                   border: Border.all(
-                                    color: AppColors.neonOrange.withAlpha(80),
+                                    color: colors.accentOrange.withAlpha(80),
                                   ),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'DEV',
                                   style: TextStyle(
-                                    color: AppColors.neonOrange,
+                                    color: colors.accentOrange,
                                     fontSize: 8,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.5,
@@ -2244,7 +2254,7 @@ class _AboutSectionState extends State<_AboutSection> {
                   ),
                   Switch(
                     value: _autoCheck,
-                    activeColor: AppColors.neonBlue,
+                    activeColor: colors.accentBlue,
                     onChanged: (v) {
                       setState(() => _autoCheck = v);
                       SessionPrefs.saveAutoUpdateCheckEnabled(v);
@@ -2300,18 +2310,15 @@ class _AboutSectionState extends State<_AboutSection> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.check_circle_outline,
                       size: 14,
-                      color: AppColors.neonGreen,
+                      color: colors.accentGreen,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       _upToDateMsg!,
-                      style: const TextStyle(
-                        color: AppColors.neonGreen,
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: colors.accentGreen, fontSize: 11),
                     ),
                   ],
                 ),
@@ -2335,8 +2342,8 @@ class _AboutSectionState extends State<_AboutSection> {
                       const SizedBox(height: 6),
                       LinearProgressIndicator(
                         value: _installProgress,
-                        backgroundColor: AppColors.neonBlue.withAlpha(30),
-                        color: AppColors.neonBlue,
+                        backgroundColor: colors.accentBlue.withAlpha(30),
+                        color: colors.accentBlue,
                         minHeight: 3,
                       ),
                       const SizedBox(height: 4),
@@ -2381,22 +2388,23 @@ class _UpdateAvailableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.neonBlue.withAlpha(15),
+        color: colors.accentBlue.withAlpha(15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.neonBlue.withAlpha(60)),
+        border: Border.all(color: colors.accentBlue.withAlpha(60)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.system_update_alt_rounded,
                 size: 14,
-                color: AppColors.neonBlue,
+                color: colors.accentBlue,
               ),
               const SizedBox(width: 8),
               Text(
@@ -2432,7 +2440,7 @@ class _UpdateAvailableCard extends StatelessWidget {
                 icon: const Icon(Icons.download_rounded, size: 14),
                 label: const Text('Download'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.neonBlue,
+                  backgroundColor: colors.accentBlue,
                   foregroundColor: Colors.white,
                   textStyle: const TextStyle(fontSize: 11),
                   elevation: 0,
