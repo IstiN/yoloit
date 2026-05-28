@@ -24,10 +24,17 @@ class GlobalEnvGroupsService {
   static const _prefsFallbackKey = 'global_env_groups_fallback_v1';
   static const _secureKeyPrefix = 'env_group_';
 
+  // flutter_secure_storage_darwin 0.2.0 has a key-name mismatch:
+  //   Dart sends  'usesDataProtectionKeychain'  (lowercase c, with s)
+  //   Swift reads 'useDataProtectionKeyChain'    (uppercase C, no s)
+  // So usesDataProtectionKeychain: false is silently ignored and the data
+  // protection keychain is always used (default true). This causes writes
+  // to fail on non-sandboxed macOS apps. Work around by sending the correct
+  // Swift key directly via a custom MacOsOptions subclass.
   static FlutterSecureStorage _buildStorage() {
     if (Platform.isMacOS) {
       return const FlutterSecureStorage(
-        mOptions: MacOsOptions(
+        mOptions: _FixedMacOsOptions(
           accountName: 'yoloit',
           usesDataProtectionKeychain: false,
         ),
@@ -72,12 +79,14 @@ class GlobalEnvGroupsService {
       final needsMigration = metas.any((m) => m.embeddedValues.isNotEmpty);
 
       final groups = <GlobalEnvGroup>[];
+      var allWritesSucceeded = true;
       for (final meta in metas) {
         Map<String, String> values;
         if (meta.embeddedValues.isNotEmpty) {
           // Migration: move embedded values → secure storage.
           values = meta.embeddedValues;
-          await _writeSecureValues(meta.id, values);
+          final ok = await _writeSecureValues(meta.id, values);
+          if (!ok) allWritesSucceeded = false;
         } else {
           values = await _readSecureValues(meta.id, meta.keys);
         }
@@ -88,11 +97,17 @@ class GlobalEnvGroupsService {
         ));
       }
 
-      // Rewrite JSON without embedded values if we just migrated.
-      if (needsMigration) {
+      // Only strip embedded values from JSON when ALL secure writes succeed.
+      // If any write failed, keep the values in JSON to prevent data loss.
+      if (needsMigration && allWritesSucceeded) {
         await _writeMetaFile(groups);
         debugPrint(
           '[EnvGroups] Migrated ${groups.length} group(s) to secure storage',
+        );
+      } else if (needsMigration) {
+        debugPrint(
+          '[EnvGroups] Migration SKIPPED — secure storage writes failed, '
+          'keeping values in JSON to prevent data loss',
         );
       }
 
@@ -126,7 +141,23 @@ class GlobalEnvGroupsService {
   Future<void> saveAll(List<GlobalEnvGroup> groups) async {
     // Write secret values to secure storage.
     for (final group in groups) {
-      await _writeSecureValues(group.id, group.values);
+      final ok = await _writeSecureValues(group.id, group.values);
+      if (!ok) {
+        debugPrint(
+          '[EnvGroups] WARNING: saveAll failed to persist secrets for '
+          '${group.name} (${group.id})',
+        );
+      }
+      // Verify the write by reading back
+      final readBack = await _readSecureValues(
+        group.id,
+        group.values.keys.toList(),
+      );
+      final nonEmpty = readBack.values.where((v) => v.isNotEmpty).length;
+      debugPrint(
+        '[EnvGroups] saveAll verify ${group.name}: '
+        '${nonEmpty}/${group.values.length} keys persisted',
+      );
     }
     // Write metadata (no values) to JSON.
     await _writeMetaFile(groups);
@@ -240,17 +271,25 @@ class GlobalEnvGroupsService {
     await file.writeAsString(encoded, flush: true);
   }
 
-  Future<void> _writeSecureValues(
+  /// Returns `true` if the write succeeded.
+  Future<bool> _writeSecureValues(
     String groupId,
     Map<String, String> values,
   ) async {
     try {
+      final encoded = jsonEncode(values);
+      debugPrint(
+        '[EnvGroups] _writeSecureValues $groupId: '
+        '${values.length} keys, ${encoded.length} bytes',
+      );
       await _storage.write(
         key: '$_secureKeyPrefix$groupId',
-        value: jsonEncode(values),
+        value: encoded,
       );
+      return true;
     } catch (e) {
-      debugPrint('[EnvGroups] _writeSecureValues error for $groupId: $e');
+      debugPrint('[EnvGroups] _writeSecureValues FAILED for $groupId: $e');
+      return false;
     }
   }
 
@@ -367,5 +406,29 @@ class GlobalEnvGroup {
       name: name ?? this.name,
       values: values ?? this.values,
     );
+  }
+}
+
+/// Workaround for flutter_secure_storage_darwin 0.2.0 key-name mismatch.
+///
+/// The native Swift code reads `useDataProtectionKeyChain` (no 's', capital C)
+/// but [MacOsOptions.toMap] sends `usesDataProtectionKeychain` (with 's',
+/// lowercase c). This class overrides [toMap] to emit the correct key so the
+/// option actually reaches the native layer.
+class _FixedMacOsOptions extends MacOsOptions {
+  const _FixedMacOsOptions({
+    super.accountName,
+    super.usesDataProtectionKeychain,
+  });
+
+  @override
+  Map<String, String> toMap() {
+    final base = super.toMap();
+    // Remove the broken Dart key and add the correct Swift key.
+    final value = base.remove('usesDataProtectionKeychain');
+    if (value != null) {
+      base['useDataProtectionKeyChain'] = value;
+    }
+    return base;
   }
 }
