@@ -172,9 +172,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   // Streaming assistant message accumulator
   String _streamingContent = '';
   String? _streamingMessageId;
-  // Insert position for the assistant message being streamed.
-  // Saved at assistantMessageStart so that tool results added during streaming
-  // don't push the assistant text below them.
+  // Insert position for the assistant message of the current turn.
+  // Established as early as possible (send/tool/start) so tool results never
+  // appear above the assistant text in providers that emit tools before final
+  // assistant.message.
   int? _assistantInsertIndex;
   final AudioRecorder _micRecorder = AudioRecorder();
   bool _isRecordingMic = false;
@@ -906,6 +907,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       setState(() {
         _streamingContent = '';
         _streamingMessageId = null;
+        _assistantInsertIndex = null;
         _activeToolCalls.clear();
         _ignoredToolCallIds.clear();
         _isSending = false;
@@ -991,10 +993,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       setState(() {
         _streamingContent = '';
         _streamingMessageId = null;
+        _assistantInsertIndex = null;
         _activeToolCalls.clear();
         _ignoredToolCallIds.clear();
       });
     }
+
+    _assistantInsertIndex = _messages.length;
 
     final board = _currentBoardForPanel();
 
@@ -1039,6 +1044,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         setState(() {
           _isSending = false;
           _setProcessing(false);
+          _assistantInsertIndex = null;
           _messages
             ..clear()
             ..addAll(_session!.messages);
@@ -1078,6 +1084,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ..addAll(_session!.messages);
           _streamingContent = '';
           _streamingMessageId = null;
+          _assistantInsertIndex = null;
           _markAllActiveToolCallsCompleted();
         });
         _persistMessages();
@@ -1145,13 +1152,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         setState(() {
           _streamingMessageId = event.messageId;
           _streamingContent = '';
-          _assistantInsertIndex = _messages.length;
+          _assistantInsertIndex ??= _messages.length;
         });
-        debugPrint(
-          '[ChatPanel] assistantMessageStart: '
-          'insertIndex=$_assistantInsertIndex, '
-          'messages=${_messages.length}',
-        );
         break;
 
       case ChatEventType.assistantDelta:
@@ -1233,12 +1235,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _streamingContent = '';
           _assistantInsertIndex = null;
         });
-        debugPrint(
-          '[ChatPanel] assistantMessage committed: '
-          'insertAt=${_assistantInsertIndex ?? "append"}, '
-          'messages=${_messages.length}, '
-          'contentLen=${content.length}',
-        );
         _scrollToBottom();
         break;
 
@@ -1252,6 +1248,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           break;
         }
         setState(() {
+          _assistantInsertIndex ??= _messages.length;
           _activeToolCalls[toolCallId] = ChatToolCall(
             toolCallId: toolCallId,
             toolName: toolName,
@@ -1296,6 +1293,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           BoardEventBus.instance.fileModified(path);
         }
         setState(() {
+          _assistantInsertIndex ??= _messages.length;
           _activeToolCalls[toolCallId] = (_activeToolCalls[toolCallId] ??
                   ChatToolCall(
                     toolCallId: toolCallId,
@@ -1324,11 +1322,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             ),
           );
         });
-        debugPrint(
-          '[ChatPanel] toolComplete: $toolName, '
-          'messages=${_messages.length}, '
-          'assistantInsertIndex=$_assistantInsertIndex',
-        );
         _scrollToBottom();
         break;
 

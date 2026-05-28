@@ -39,9 +39,9 @@ class CursorAgentProvider extends ChatProvider {
   String? _currentStreamId;
 
   /// Accumulated text from the current streaming turn.
-  /// cursor-agent's `--stream-partial-output` sends cumulative content (full
-  /// text so far) rather than incremental deltas, so we diff against this to
-  /// compute the true delta for the UI.
+  /// cursor-agent can emit both incremental token chunks and periodic
+  /// cumulative snapshots (full text so far); we use this accumulator to
+  /// normalize both into true UI deltas.
   String _cumulativeContent = '';
 
   @override
@@ -209,22 +209,6 @@ class CursorAgentProvider extends ChatProvider {
                 if (trimmed.isEmpty) continue;
                 try {
                   final json = jsonDecode(trimmed) as Map<String, dynamic>;
-
-                  // Log raw event for debugging event ordering
-                  final eventType = json['type'] as String? ?? '?';
-                  final eventSubtype = json['subtype'] as String?;
-                  final hasTs = json.containsKey('timestamp_ms');
-                  final contentPreview = () {
-                    final msg = json['message'] as Map<String, dynamic>?;
-                    final c = _extractTextContent(msg?['content']);
-                    return c.length > 60 ? '${c.substring(0, 60)}…' : c;
-                  }();
-                  debugPrint(
-                    '[CursorAgent] RAW event: $eventType'
-                    '${eventSubtype != null ? '.$eventSubtype' : ''}'
-                    '${hasTs ? ' (delta)' : ''}'
-                    '${contentPreview.isNotEmpty ? ' content="$contentPreview"' : ''}',
-                  );
 
                   // Capture cursor session_id from init event and record the model.
                   if (json['type'] == 'system' &&
@@ -439,6 +423,7 @@ class CursorAgentProvider extends ChatProvider {
         } else if (subtype == 'completed') {
           final callId = _sanitizeCallId(json['call_id'] as String? ?? '');
           final toolCall = json['tool_call'] as Map<String, dynamic>?;
+          final (description, _) = _extractToolInfo(toolCall);
           final (isSuccess, output) = _extractToolResult(toolCall);
           return [
             ChatEvent(
@@ -446,6 +431,7 @@ class CursorAgentProvider extends ChatProvider {
               rawType: 'cursor.tool_call.completed',
               data: {
                 'toolCallId': callId,
+                'toolName': description,
                 'success': isSuccess,
                 'result': {'content': output},
               },

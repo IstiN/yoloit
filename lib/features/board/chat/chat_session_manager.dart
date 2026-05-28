@@ -34,6 +34,7 @@ class ChatSession extends ChangeNotifier {
   bool _isFirstMessage = true;
   String _streamingContent = '';
   String? _streamingMessageId;
+  int? _assistantInsertIndex;
   int _totalOutputTokens = 0;
   ChatTokenUsage? _lastUsage;
   StreamSubscription<ChatEvent>? _eventSub;
@@ -268,6 +269,7 @@ class ChatSession extends ChangeNotifier {
     );
     _streamingContent = '';
     _streamingMessageId = null;
+    _assistantInsertIndex = _messages.length;
     notifyListeners();
 
     // Start streaming
@@ -353,6 +355,7 @@ class ChatSession extends ChangeNotifier {
         if (_streamingMessageId != null && _streamingContent.isNotEmpty) {
           _finalizeStreamingMessage();
         }
+        _assistantInsertIndex = null;
         notifyListeners();
         _persistToHistory();
         _uiDoneCallback?.call();
@@ -404,6 +407,7 @@ class ChatSession extends ChangeNotifier {
     }
     _streamingContent = '';
     _streamingMessageId = null;
+    _assistantInsertIndex = null;
     _isProcessing = false;
     notifyListeners();
     await _provider.stop(_config.sessionName);
@@ -436,6 +440,7 @@ class ChatSession extends ChangeNotifier {
       case ChatEventType.assistantMessageStart:
         _streamingMessageId = event.messageId;
         _streamingContent = '';
+        _assistantInsertIndex ??= _messages.length;
         notifyListeners();
 
       case ChatEventType.assistantDelta:
@@ -474,27 +479,33 @@ class ChatSession extends ChangeNotifier {
           _totalOutputTokens += outputTokens;
         }
 
-        _messages.add(
-          ChatMessage(
-            id:
-                event.messageId ??
-                'assistant-${DateTime.now().millisecondsSinceEpoch}',
-            role: ChatRole.assistant,
-            content: content,
-            timestamp: event.timestamp ?? DateTime.now(),
-            toolCalls: toolCalls,
-            isStreaming: false,
-            tokenUsage: usage,
-          ),
+        final insertAt = _assistantInsertIndex?.clamp(0, _messages.length);
+        final assistantMessage = ChatMessage(
+          id:
+              event.messageId ??
+              'assistant-${DateTime.now().millisecondsSinceEpoch}',
+          role: ChatRole.assistant,
+          content: content,
+          timestamp: event.timestamp ?? DateTime.now(),
+          toolCalls: toolCalls,
+          isStreaming: false,
+          tokenUsage: usage,
         );
+        if (insertAt != null && insertAt < _messages.length) {
+          _messages.insert(insertAt, assistantMessage);
+        } else {
+          _messages.add(assistantMessage);
+        }
         _streamingMessageId = null;
         _streamingContent = '';
+        _assistantInsertIndex = null;
         notifyListeners();
 
       case ChatEventType.toolStart:
-        {}
+        _assistantInsertIndex ??= _messages.length;
 
       case ChatEventType.toolComplete:
+        _assistantInsertIndex ??= _messages.length;
         _messages.add(
           ChatMessage(
             id:
@@ -554,6 +565,7 @@ class ChatSession extends ChangeNotifier {
     );
     _streamingMessageId = null;
     _streamingContent = '';
+    _assistantInsertIndex = null;
   }
 
   static const _maxSavedMessages = 100;

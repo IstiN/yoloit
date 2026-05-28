@@ -561,6 +561,28 @@ void main() {
       expect(session.totalOutputTokens, 7);
     });
 
+    test('keeps assistant message above tools when tools arrive first', () async {
+      session.sendMessage(text: 'hello');
+      provider.emitEvent(
+        _toolComplete(
+          toolCallId: 'tool-a',
+          toolName: 'board.apply',
+          content: 'applied',
+        ),
+      );
+      provider.emitEvent(_assistantMessageStart(messageId: 'msg-a'));
+      provider.emitEvent(_assistantDelta('Done'));
+      provider.emitEvent(_assistantMessage('Done', messageId: 'msg-a'));
+      await provider.complete();
+      await _flushEvents();
+
+      expect(session.messages.length, 3);
+      expect(session.messages[1].role, ChatRole.assistant);
+      expect(session.messages[1].content, 'Done');
+      expect(session.messages[2].role, ChatRole.tool);
+      expect(session.messages[2].toolName, 'board.apply');
+    });
+
     test('adds system error message on provider error', () async {
       session.sendMessage(text: 'hello');
       provider.emitError(Exception('boom'));
