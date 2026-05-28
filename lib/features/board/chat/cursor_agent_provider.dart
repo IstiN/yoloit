@@ -148,6 +148,10 @@ class CursorAgentProvider extends ChatProvider {
     try {
       final extraEnv = await GlobalEnvGroupsService.instance
           .resolveSelectedGroups(config.envGroupIds);
+      debugPrint(
+        '[CursorAgent] envGroupIds: ${config.envGroupIds}, '
+        'resolved keys: ${extraEnv.keys.toList()}',
+      );
       final baseEnv = {...Platform.environment, ...extraEnv};
       final enrichedPath = PlatformShell.instance.enrichedPath(
         baseEnv['PATH'] ?? '',

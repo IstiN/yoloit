@@ -150,8 +150,18 @@ class GlobalEnvGroupsService {
     for (final id in selectedGroupIds) {
       final group = byId[id];
       if (group == null) continue;
-      merged.addAll(group.values);
+      // Only merge non-empty values — a failed secure-storage read returns
+      // empty strings which would silently overwrite valid env vars.
+      for (final entry in group.values.entries) {
+        if (entry.value.isNotEmpty) {
+          merged[entry.key] = entry.value;
+        }
+      }
     }
+    debugPrint(
+      '[EnvGroups] resolveSelectedGroups ids=$selectedGroupIds → '
+      'keys=${merged.keys.toList()}',
+    );
     return merged;
   }
 
@@ -251,12 +261,25 @@ class GlobalEnvGroupsService {
     try {
       final raw = await _storage.read(key: '$_secureKeyPrefix$groupId');
       if (raw == null || raw.isEmpty) {
+        debugPrint(
+          '[EnvGroups] _readSecureValues: no data for $groupId '
+          '(keys: $expectedKeys)',
+        );
         return {for (final k in expectedKeys) k: ''};
       }
       final decoded = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      return {
+      final result = {
         for (final k in expectedKeys) k: (decoded[k] ?? '').toString(),
       };
+      final emptyKeys =
+          result.entries.where((e) => e.value.isEmpty).map((e) => e.key);
+      if (emptyKeys.isNotEmpty) {
+        debugPrint(
+          '[EnvGroups] _readSecureValues: empty values for $groupId '
+          'keys: ${emptyKeys.toList()}',
+        );
+      }
+      return result;
     } catch (e) {
       debugPrint('[EnvGroups] _readSecureValues error for $groupId: $e');
       return {for (final k in expectedKeys) k: ''};
