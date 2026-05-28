@@ -7,6 +7,7 @@ import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
+import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 
@@ -73,7 +74,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   Future<void> killSession(String sessionId) async {
     _outputSubs.remove(sessionId)?.cancel();
-    _ptyService.kill(sessionId);
+    _ptyService.kill(
+      sessionId,
+      onKillTmux: TmuxService.instance.killSession,
+    );
     final session = _sessions.remove(sessionId);
     if (session != null) {
       await BoardTerminalSessionHistory.instance.upsert(
@@ -116,12 +120,23 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     );
     final extraEnv = await GlobalEnvGroupsService.instance
         .resolveSelectedGroups(envGroupIds);
-    final pty = _ptyService.launch(
-      sessionId: sessionId,
-      workspacePath: workingDir,
-      label: session.displayName,
-      extraEnv: extraEnv,
-    );
+    final Pty pty;
+    if (TmuxService.instance.isActive) {
+      pty = _ptyService.launchTmux(
+        sessionId: sessionId,
+        workspacePath: workingDir,
+        tmuxLauncher: TmuxService.instance.launch,
+        label: session.displayName,
+        extraEnv: extraEnv,
+      );
+    } else {
+      pty = _ptyService.launch(
+        sessionId: sessionId,
+        workspacePath: workingDir,
+        label: session.displayName,
+        extraEnv: extraEnv,
+      );
+    }
     _sessions[sessionId] = session;
     _attachPty(pty, session);
     await BoardTerminalSessionHistory.instance.upsert(
