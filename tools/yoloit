@@ -4024,7 +4024,7 @@ PY
     ;;
 
   validate)
-    # Validate that the command registry matches bash case handlers.
+    # Validate that the command registry matches bash case handlers AND Dart LLM tools.
     # Run: yoloit validate
     # Used in pre-commit hook as a "compilation check".
     python3 - "$0" <<'PYEOF'
@@ -4119,9 +4119,48 @@ for entry in registry:
         else:
             alias_map[a] = entry["name"]
 
+# ── Cross-check with Dart LLM tool catalog ──────────────────────────
+# Parse command: 'xxx' entries from the Dart _tools list so that any
+# CLI command that should be callable by the LLM is verified to exist
+# in both registries.
+script_dir = os.path.dirname(os.path.abspath(script_path))
+dart_path = os.path.join(script_dir, "lib", "features", "board", "chat", "yoloit_cli_tools.dart")
+if not os.path.isfile(dart_path):
+    # tools/ is one level deep — try parent
+    dart_path = os.path.join(script_dir, "..", "lib", "features", "board", "chat", "yoloit_cli_tools.dart")
+
+dart_total = "?"
+if os.path.isfile(dart_path):
+    with open(dart_path) as f:
+        dart_src = f.read()
+    dart_commands = set(re.findall(r"command:\s*'([^']+)'", dart_src))
+    dart_total = len(dart_commands)
+
+    # Commands that are internal / not meant for LLM exposure
+    dart_exempt = {"lm:generate", "process-command"}
+
+    bash_names = {e["name"] for e in registry}
+    in_bash_not_dart = bash_names - dart_commands - dart_exempt
+    in_dart_not_bash = dart_commands - bash_names
+
+    if in_bash_not_dart:
+        print("❌ CLI commands missing from Dart LLM tools (_tools list):")
+        for cmd in sorted(in_bash_not_dart):
+            print(f"   add YoloitCliTool(command: '{cmd}', ...) to yoloit_cli_tools.dart")
+        errors += len(in_bash_not_dart)
+
+    if in_dart_not_bash:
+        print("❌ Dart LLM tools missing from CLI bash registry:")
+        for cmd in sorted(in_dart_not_bash):
+            print(f"   add '{cmd}' to commands[] in tools/yoloit")
+        errors += len(in_dart_not_bash)
+else:
+    print("⚠️  Could not find yoloit_cli_tools.dart — skipping Dart cross-check")
+    warnings += 1
+
 if errors == 0 and warnings == 0:
     total = len(expected)
-    print(f"✅ CLI registry is consistent ({total} commands/aliases, 0 errors)")
+    print(f"✅ CLI registry is consistent ({total} commands/aliases, {dart_total} LLM tools, 0 errors)")
 elif errors == 0:
     print(f"✅ No errors ({warnings} warnings — bash handlers not in registry are OK)")
 else:
