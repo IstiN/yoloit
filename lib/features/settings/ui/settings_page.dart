@@ -219,10 +219,6 @@ class _SettingsPageState extends State<SettingsPage> {
           children: [
             const _SectionHeader(title: 'Appearance'),
             const SizedBox(height: 12),
-            _BrightnessToggle(),
-            const SizedBox(height: 16),
-            const _SectionHeader(title: 'Accent Color'),
-            const SizedBox(height: 12),
             _ThemeSelector(),
           ],
         ),
@@ -1443,89 +1439,7 @@ class _AsrPickerDialogState extends State<_AsrPickerDialog> {
   }
 }
 
-class _BrightnessToggle extends StatefulWidget {
-  @override
-  State<_BrightnessToggle> createState() => _BrightnessToggleState();
-}
-
-class _BrightnessToggleState extends State<_BrightnessToggle> {
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final isDark = ThemeManager.instance.isDark;
-    return Row(
-      children: [
-        _buildModeButton(
-          icon: Icons.dark_mode_outlined,
-          label: 'Dark',
-          isActive: isDark,
-          colors: colors,
-          onTap: () {
-            ThemeManager.instance.setBrightness(Brightness.dark);
-            setState(() {});
-          },
-        ),
-        const SizedBox(width: 8),
-        _buildModeButton(
-          icon: Icons.light_mode_outlined,
-          label: 'Light',
-          isActive: !isDark,
-          colors: colors,
-          onTap: () {
-            ThemeManager.instance.setBrightness(Brightness.light);
-            setState(() {});
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildModeButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required AppColorScheme colors,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 100,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-        decoration: BoxDecoration(
-          color: isActive ? colors.primary.withAlpha(30) : colors.background,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? colors.primary : colors.border,
-            width: isActive ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isActive ? colors.primary : colors.border,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color:
-                    isActive
-                        ? colors.primary
-                        : Theme.of(context).textTheme.bodySmall?.color,
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// ─── Theme Selector ───────────────────────────────────────────────────────
 
 class _ThemeSelector extends StatefulWidget {
   @override
@@ -1560,16 +1474,16 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     await ThemeManager.instance.setCustomTheme(id);
   }
 
-  Future<void> _pickAccentColor(String slot, Color current) async {
+  Future<void> _pickColor(String slot, Color current) async {
     final picked = await showDialog<Color>(
       context: context,
       builder: (ctx) => _ColorPickerDialog(
-        title: '${ThemeManager.accentSlotLabels[slot] ?? slot} Accent',
+        title: slot,
         initialColor: current,
       ),
     );
     if (picked != null) {
-      await ThemeManager.instance.setAccentOverride(slot, picked);
+      await ThemeManager.instance.setColorOverride(slot, picked);
     }
   }
 
@@ -1578,111 +1492,120 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     final colors = context.appColors;
     final tm = ThemeManager.instance;
     final activeCustomId = tm.activeCustomThemeId;
+    final hasOverrides = tm.hasOverrides;
+
+    // Active theme label
+    String activeLabel;
+    if (activeCustomId != null) {
+      final custom = tm.customThemes
+          .where((t) => t.id == activeCustomId)
+          .firstOrNull;
+      activeLabel = custom?.name ?? 'Custom';
+    } else {
+      activeLabel = tm.current.label;
+    }
+    if (hasOverrides) {
+      activeLabel = '$activeLabel (customized)';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Built-in presets ──
+        // ── Preset strip ──
         Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 8,
+          runSpacing: 8,
           children: [
             ...AppThemePreset.values.map((preset) {
-              final isActive =
-                  activeCustomId == null && preset == tm.current;
-              return _ThemeChip(
+              final isActive = activeCustomId == null &&
+                  preset == tm.current &&
+                  !hasOverrides;
+              return _PresetChip(
                 label: preset.label,
                 color: preset.color,
+                brightness: preset.defaultBrightness,
                 isActive: isActive,
-                onTap: () => tm.setTheme(preset),
+                onTap: () {
+                  tm.setTheme(preset);
+                  tm.clearColorOverrides();
+                },
               );
             }),
-            // Custom themes
             ...tm.customThemes.map((custom) {
-              final isActive = activeCustomId == custom.id;
-              return _ThemeChip(
+              final isActive =
+                  activeCustomId == custom.id && !hasOverrides;
+              return _PresetChip(
                 label: custom.name,
                 color: custom.scheme.primary,
+                brightness: custom.brightness,
                 isActive: isActive,
-                onTap: () => tm.setCustomTheme(custom.id),
+                onTap: () {
+                  tm.setCustomTheme(custom.id);
+                  tm.clearColorOverrides();
+                },
                 onDelete: () => tm.deleteCustomTheme(custom.id),
               );
             }),
           ],
         ),
-        const SizedBox(height: 12),
-        // ── Import button ──
+        const SizedBox(height: 10),
+        // ── Actions row ──
         Row(
           children: [
             _SmallButton(
               icon: Icons.file_download_outlined,
-              label: 'Import Theme',
+              label: 'Import',
               onTap: _importTheme,
             ),
             const SizedBox(width: 8),
-            if (tm.accentOverrides.isNotEmpty)
+            // Dark/Light toggle (only for themes without fixed brightness)
+            if (!tm.hasFixedBrightness) ...[
+              _SmallButton(
+                icon: tm.isDark
+                    ? Icons.light_mode_outlined
+                    : Icons.dark_mode_outlined,
+                label: tm.isDark ? 'Light Mode' : 'Dark Mode',
+                onTap: () => tm.toggleBrightness(),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (hasOverrides)
               _SmallButton(
                 icon: Icons.restart_alt,
-                label: 'Reset Accents',
-                onTap: () => tm.clearAccentOverrides(),
+                label: 'Reset All',
+                onTap: () => tm.clearColorOverrides(),
               ),
           ],
         ),
         const SizedBox(height: 20),
-        // ── Accent color pickers ──
+        // ── Active theme label ──
         Text(
-          'Accent Colors',
+          activeLabel,
           style: TextStyle(
-            color: colors.textSecondary,
-            fontSize: 11,
+            color: colors.textPrimary,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            _AccentSwatch(
-              label: 'Green',
-              color: colors.accentGreen,
-              isOverridden: tm.accentOverrides.containsKey('accentGreen'),
-              onTap: () => _pickAccentColor('accentGreen', colors.accentGreen),
-              onReset: () => tm.removeAccentOverride('accentGreen'),
-            ),
-            _AccentSwatch(
-              label: 'Red',
-              color: colors.accentRed,
-              isOverridden: tm.accentOverrides.containsKey('accentRed'),
-              onTap: () => _pickAccentColor('accentRed', colors.accentRed),
-              onReset: () => tm.removeAccentOverride('accentRed'),
-            ),
-            _AccentSwatch(
-              label: 'Blue',
-              color: colors.accentBlue,
-              isOverridden: tm.accentOverrides.containsKey('accentBlue'),
-              onTap: () => _pickAccentColor('accentBlue', colors.accentBlue),
-              onReset: () => tm.removeAccentOverride('accentBlue'),
-            ),
-            _AccentSwatch(
-              label: 'Orange',
-              color: colors.accentOrange,
-              isOverridden: tm.accentOverrides.containsKey('accentOrange'),
-              onTap: () => _pickAccentColor('accentOrange', colors.accentOrange),
-              onReset: () => tm.removeAccentOverride('accentOrange'),
-            ),
-          ],
-        ),
+        const SizedBox(height: 12),
+        // ── Color categories ──
+        ...ThemeManager.colorCategories.entries.map((cat) {
+          return _ColorCategoryRow(
+            title: cat.key,
+            slots: cat.value,
+            onPick: _pickColor,
+          );
+        }),
       ],
     );
   }
 }
 
-class _ThemeChip extends StatelessWidget {
-  const _ThemeChip({
+class _PresetChip extends StatelessWidget {
+  const _PresetChip({
     required this.label,
     required this.color,
+    this.brightness,
     required this.isActive,
     required this.onTap,
     this.onDelete,
@@ -1690,6 +1613,7 @@ class _ThemeChip extends StatelessWidget {
 
   final String label;
   final Color color;
+  final Brightness? brightness;
   final bool isActive;
   final VoidCallback onTap;
   final VoidCallback? onDelete;
@@ -1697,71 +1621,52 @@ class _ThemeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final isLight = brightness == Brightness.light;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 100,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
         decoration: BoxDecoration(
-          color: isActive ? colors.primary.withAlpha(30) : colors.background,
+          color: isActive ? colors.primary.withAlpha(30) : colors.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isActive ? colors.primary : colors.border,
             width: isActive ? 2 : 1,
           ),
         ),
-        child: Column(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: colors.border),
-                  ),
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isLight ? Colors.black26 : Colors.white24,
                 ),
-                if (onDelete != null)
-                  Positioned(
-                    right: -8,
-                    top: -8,
-                    child: GestureDetector(
-                      onTap: onDelete,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: colors.accentRed,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(width: 6),
             Text(
               label,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: isActive
                     ? colors.primary
                     : Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        colors.textSecondary,
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
+            if (onDelete != null) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: onDelete,
+                child: Icon(Icons.close, size: 12, color: colors.textMuted),
+              ),
+            ],
           ],
         ),
       ),
@@ -1769,20 +1674,73 @@ class _ThemeChip extends StatelessWidget {
   }
 }
 
-class _AccentSwatch extends StatelessWidget {
-  const _AccentSwatch({
+class _ColorCategoryRow extends StatelessWidget {
+  const _ColorCategoryRow({
+    required this.title,
+    required this.slots,
+    required this.onPick,
+  });
+
+  final String title;
+  final List<({String key, String label})> slots;
+  final Future<void> Function(String slot, Color current) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final tm = ThemeManager.instance;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              color: colors.textMuted,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: slots.map((slot) {
+              final currentColor = tm.colorForSlot(slot.key);
+              final isOverridden = tm.colorOverrides.containsKey(slot.key);
+              return _ColorSwatch(
+                label: slot.label,
+                color: currentColor,
+                isOverridden: isOverridden,
+                onTap: () => onPick(slot.key, currentColor),
+                onReset: isOverridden
+                    ? () => tm.removeColorOverride(slot.key)
+                    : null,
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({
     required this.label,
     required this.color,
     required this.isOverridden,
     required this.onTap,
-    required this.onReset,
+    this.onReset,
   });
 
   final String label;
   final Color color;
   final bool isOverridden;
   final VoidCallback onTap;
-  final VoidCallback onReset;
+  final VoidCallback? onReset;
 
   @override
   Widget build(BuildContext context) {
@@ -1796,8 +1754,8 @@ class _AccentSwatch extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: BorderRadius.circular(6),
@@ -1806,21 +1764,16 @@ class _AccentSwatch extends StatelessWidget {
                     width: isOverridden ? 2 : 1,
                   ),
                 ),
-                child: const Icon(
-                  Icons.colorize,
-                  size: 14,
-                  color: Colors.white70,
-                ),
               ),
-              if (isOverridden)
+              if (isOverridden && onReset != null)
                 Positioned(
-                  right: -6,
-                  top: -6,
+                  right: -5,
+                  top: -5,
                   child: GestureDetector(
                     onTap: onReset,
                     child: Container(
-                      width: 14,
-                      height: 14,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         color: colors.surface,
                         shape: BoxShape.circle,
@@ -1828,7 +1781,7 @@ class _AccentSwatch extends StatelessWidget {
                       ),
                       child: Icon(
                         Icons.close,
-                        size: 8,
+                        size: 7,
                         color: colors.textMuted,
                       ),
                     ),
@@ -1836,12 +1789,12 @@ class _AccentSwatch extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
-              color: colors.textSecondary,
-              fontSize: 10,
+              color: colors.textMuted,
+              fontSize: 9,
             ),
           ),
         ],
@@ -1975,7 +1928,6 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              // ── Preview + hex input ──
               Row(
                 children: [
                   Container(
@@ -2024,138 +1976,68 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 ],
               ),
               const SizedBox(height: 16),
-              // ── Hue slider ──
-              Text(
-                'Hue',
-                style: TextStyle(color: colors.textMuted, fontSize: 10),
-              ),
-              const SizedBox(height: 4),
-              SizedBox(
-                height: 24,
-                child: SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 12,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 8,
-                    ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 14,
-                    ),
-                    activeTrackColor: _hsv.toColor(),
-                    inactiveTrackColor: colors.border,
-                    thumbColor: Colors.white,
-                  ),
-                  child: Slider(
-                    value: _hsv.hue,
-                    min: 0,
-                    max: 360,
-                    onChanged: (v) {
-                      setState(() {
-                        _hsv = _hsv.withHue(v);
-                        _hexController.text = _colorToHex(_hsv.toColor());
-                      });
-                    },
-                  ),
-                ),
+              _HsvSlider(
+                label: 'Hue',
+                value: _hsv.hue,
+                max: 360,
+                color: _hsv.toColor(),
+                borderColor: colors.border,
+                labelColor: colors.textMuted,
+                onChanged: (v) => setState(() {
+                  _hsv = _hsv.withHue(v);
+                  _hexController.text = _colorToHex(_hsv.toColor());
+                }),
               ),
               const SizedBox(height: 8),
-              // ── Saturation slider ──
-              Text(
-                'Saturation',
-                style: TextStyle(color: colors.textMuted, fontSize: 10),
-              ),
-              const SizedBox(height: 4),
-              SizedBox(
-                height: 24,
-                child: SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 12,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 8,
-                    ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 14,
-                    ),
-                    activeTrackColor: _hsv.toColor(),
-                    inactiveTrackColor: colors.border,
-                    thumbColor: Colors.white,
-                  ),
-                  child: Slider(
-                    value: _hsv.saturation,
-                    min: 0,
-                    max: 1,
-                    onChanged: (v) {
-                      setState(() {
-                        _hsv = _hsv.withSaturation(v);
-                        _hexController.text = _colorToHex(_hsv.toColor());
-                      });
-                    },
-                  ),
-                ),
+              _HsvSlider(
+                label: 'Saturation',
+                value: _hsv.saturation,
+                max: 1,
+                color: _hsv.toColor(),
+                borderColor: colors.border,
+                labelColor: colors.textMuted,
+                onChanged: (v) => setState(() {
+                  _hsv = _hsv.withSaturation(v);
+                  _hexController.text = _colorToHex(_hsv.toColor());
+                }),
               ),
               const SizedBox(height: 8),
-              // ── Value/brightness slider ──
-              Text(
-                'Brightness',
-                style: TextStyle(color: colors.textMuted, fontSize: 10),
+              _HsvSlider(
+                label: 'Brightness',
+                value: _hsv.value,
+                max: 1,
+                color: _hsv.toColor(),
+                borderColor: colors.border,
+                labelColor: colors.textMuted,
+                onChanged: (v) => setState(() {
+                  _hsv = _hsv.withValue(v);
+                  _hexController.text = _colorToHex(_hsv.toColor());
+                }),
               ),
-              const SizedBox(height: 4),
-              SizedBox(
-                height: 24,
-                child: SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 12,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 8,
-                    ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 14,
-                    ),
-                    activeTrackColor: _hsv.toColor(),
-                    inactiveTrackColor: colors.border,
-                    thumbColor: Colors.white,
-                  ),
-                  child: Slider(
-                    value: _hsv.value,
-                    min: 0,
-                    max: 1,
-                    onChanged: (v) {
-                      setState(() {
-                        _hsv = _hsv.withValue(v);
-                        _hexController.text = _colorToHex(_hsv.toColor());
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // ── Preset swatches ──
+              const SizedBox(height: 14),
               Text(
                 'Presets',
                 style: TextStyle(color: colors.textMuted, fontSize: 10),
               ),
               const SizedBox(height: 6),
               Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: 5,
+                runSpacing: 5,
                 children: _presetColors.map((c) {
                   return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _hsv = HSVColor.fromColor(c);
-                        _hexController.text = _colorToHex(c);
-                      });
-                    },
+                    onTap: () => setState(() {
+                      _hsv = HSVColor.fromColor(c);
+                      _hexController.text = _colorToHex(c);
+                    }),
                     child: Container(
-                      width: 22,
-                      height: 22,
+                      width: 20,
+                      height: 20,
                       decoration: BoxDecoration(
                         color: c,
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: c == pickedColor
-                              ? Colors.white
-                              : colors.border,
+                          color:
+                              c == pickedColor ? Colors.white : colors.border,
                           width: c == pickedColor ? 2 : 1,
                         ),
                       ),
@@ -2163,8 +2045,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 20),
-              // ── Actions ──
+              const SizedBox(height: 18),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -2189,6 +2070,57 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _HsvSlider extends StatelessWidget {
+  const _HsvSlider({
+    required this.label,
+    required this.value,
+    required this.max,
+    required this.color,
+    required this.borderColor,
+    required this.labelColor,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double max;
+  final Color color;
+  final Color borderColor;
+  final Color labelColor;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: labelColor, fontSize: 10)),
+        const SizedBox(height: 2),
+        SizedBox(
+          height: 24,
+          child: SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 10,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              overlayShape:
+                  const RoundSliderOverlayShape(overlayRadius: 12),
+              activeTrackColor: color,
+              inactiveTrackColor: borderColor,
+              thumbColor: Colors.white,
+            ),
+            child: Slider(
+              value: value,
+              min: 0,
+              max: max,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

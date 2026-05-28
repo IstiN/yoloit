@@ -24,54 +24,90 @@ class ThemeManager extends ChangeNotifier {
   /// When non-null, a custom theme is active instead of a preset.
   String? _activeCustomThemeId;
 
-  /// Per-slot accent overrides (persisted to SharedPreferences).
-  Map<String, Color> _accentOverrides = {};
+  /// Per-slot color overrides (persisted to SharedPreferences).
+  /// Any key matching an [AppColorScheme] field name can be overridden.
+  Map<String, Color> _colorOverrides = {};
 
   AppThemePreset get current => _current;
   Brightness get brightness => _brightness;
   bool get isDark => _brightness == Brightness.dark;
   List<CustomTheme> get customThemes => List.unmodifiable(_customThemes);
   String? get activeCustomThemeId => _activeCustomThemeId;
-  Map<String, Color> get accentOverrides => Map.unmodifiable(_accentOverrides);
+  Map<String, Color> get colorOverrides => Map.unmodifiable(_colorOverrides);
+  bool get hasOverrides => _colorOverrides.isNotEmpty;
 
-  ThemeData get theme {
-    AppColorScheme scheme;
-    Brightness bright;
+  /// Returns the base scheme (before overrides) for previewing defaults.
+  AppColorScheme get baseScheme {
     if (_activeCustomThemeId != null) {
       final custom = _customThemes
           .where((t) => t.id == _activeCustomThemeId)
           .firstOrNull;
-      if (custom != null) {
-        scheme = custom.scheme;
-        bright = custom.brightness;
-      } else {
-        scheme = AppColorScheme.fromAccent(
-          _current.color,
-          bgSeed: _current.bgSeed,
-          brightness: _current.defaultBrightness ?? _brightness,
-        );
-        bright = _current.defaultBrightness ?? _brightness;
-      }
-    } else {
-      scheme = AppColorScheme.fromAccent(
-        _current.color,
-        bgSeed: _current.bgSeed,
-        brightness: _current.defaultBrightness ?? _brightness,
-      );
-      bright = _current.defaultBrightness ?? _brightness;
+      if (custom != null) return custom.scheme;
     }
-    if (_accentOverrides.isNotEmpty) {
-      scheme = scheme.copyWith(
-        accentGreen: _accentOverrides['accentGreen'],
-        accentGreenDim: _accentOverrides['accentGreenDim'],
-        accentGreenGlow: _accentOverrides['accentGreenGlow'],
-        accentRed: _accentOverrides['accentRed'],
-        accentRedDim: _accentOverrides['accentRedDim'],
-        accentBlue: _accentOverrides['accentBlue'],
-        accentOrange: _accentOverrides['accentOrange'],
-      );
+    return AppColorScheme.fromAccent(
+      _current.color,
+      bgSeed: _current.bgSeed,
+      brightness: _current.defaultBrightness ?? _brightness,
+    );
+  }
+
+  ThemeData get theme {
+    var scheme = baseScheme;
+    final bright = _activeCustomThemeId != null
+        ? (_customThemes
+                .where((t) => t.id == _activeCustomThemeId)
+                .firstOrNull
+                ?.brightness ??
+            _current.defaultBrightness ??
+            _brightness)
+        : (_current.defaultBrightness ?? _brightness);
+    if (_colorOverrides.isNotEmpty) {
+      scheme = _applyOverrides(scheme);
     }
     return AppTheme.buildThemeFromScheme(scheme, brightness: bright);
+  }
+
+  AppColorScheme _applyOverrides(AppColorScheme scheme) {
+    return scheme.copyWith(
+      primary: _colorOverrides['primary'],
+      primaryLight: _colorOverrides['primaryLight'],
+      primaryDark: _colorOverrides['primaryDark'],
+      primaryGlow: _colorOverrides['primaryGlow'],
+      background: _colorOverrides['background'],
+      surface: _colorOverrides['surface'],
+      surfaceElevated: _colorOverrides['surfaceElevated'],
+      surfaceHighlight: _colorOverrides['surfaceHighlight'],
+      border: _colorOverrides['border'],
+      divider: _colorOverrides['divider'],
+      terminalBackground: _colorOverrides['terminalBackground'],
+      sidebar: _colorOverrides['sidebar'],
+      sidebarGlow: _colorOverrides['sidebarGlow'],
+      terminalPrompt: _colorOverrides['terminalPrompt'],
+      tabBorder: _colorOverrides['tabBorder'],
+      tabActiveBg: _colorOverrides['tabActiveBg'],
+      tabInactiveBg: _colorOverrides['tabInactiveBg'],
+      textPrimary: _colorOverrides['textPrimary'],
+      textSecondary: _colorOverrides['textSecondary'],
+      textMuted: _colorOverrides['textMuted'],
+      textHighlight: _colorOverrides['textHighlight'],
+      terminalText: _colorOverrides['terminalText'],
+      accentGreen: _colorOverrides['accentGreen'],
+      accentGreenDim: _colorOverrides['accentGreenDim'],
+      accentGreenGlow: _colorOverrides['accentGreenGlow'],
+      accentRed: _colorOverrides['accentRed'],
+      accentRedDim: _colorOverrides['accentRedDim'],
+      accentBlue: _colorOverrides['accentBlue'],
+      accentOrange: _colorOverrides['accentOrange'],
+      diffAddBg: _colorOverrides['diffAddBg'],
+      diffAddText: _colorOverrides['diffAddText'],
+      diffRemoveBg: _colorOverrides['diffRemoveBg'],
+      diffRemoveText: _colorOverrides['diffRemoveText'],
+      diffContextBg: _colorOverrides['diffContextBg'],
+      statusActive: _colorOverrides['statusActive'],
+      statusIdle: _colorOverrides['statusIdle'],
+      statusError: _colorOverrides['statusError'],
+      statusWarning: _colorOverrides['statusWarning'],
+    );
   }
 
   Future<void> load() async {
@@ -84,7 +120,7 @@ class ThemeManager extends ChangeNotifier {
     final bright = prefs.getString('theme_brightness') ?? 'dark';
     _brightness = bright == 'light' ? Brightness.light : Brightness.dark;
     _activeCustomThemeId = prefs.getString('custom_theme_id');
-    _loadAccentOverrides(prefs);
+    _loadColorOverrides(prefs);
     AppColors.setAccent(_current.color);
     await _loadCustomThemes();
     notifyListeners();
@@ -125,7 +161,7 @@ class ThemeManager extends ChangeNotifier {
     );
   }
 
-   Future<void> setBrightness(Brightness brightness) async {
+  Future<void> setBrightness(Brightness brightness) async {
     _brightness = brightness;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
@@ -139,62 +175,150 @@ class ThemeManager extends ChangeNotifier {
     await setBrightness(isDark ? Brightness.light : Brightness.dark);
   }
 
-  // ── Accent color overrides ──────────────────────────────────────────────────
+  /// Whether the active preset has a fixed brightness (e.g. Islands Light).
+  bool get hasFixedBrightness {
+    if (_activeCustomThemeId != null) return false;
+    return _current.defaultBrightness != null;
+  }
 
-  static const _accentSlots = [
-    'accentGreen',
-    'accentRed',
-    'accentBlue',
-    'accentOrange',
-  ];
+  // ── Color overrides ─────────────────────────────────────────────────────────
 
-  /// Human-readable labels for accent override slots.
-  static const accentSlotLabels = {
-    'accentGreen': 'Green',
-    'accentRed': 'Red',
-    'accentBlue': 'Blue',
-    'accentOrange': 'Orange',
+  /// Color slot categories for the settings UI.
+  static const colorCategories = <String, List<({String key, String label})>>{
+    'Accent': [
+      (key: 'primary', label: 'Primary'),
+      (key: 'accentGreen', label: 'Green'),
+      (key: 'accentRed', label: 'Red'),
+      (key: 'accentBlue', label: 'Blue'),
+      (key: 'accentOrange', label: 'Orange'),
+    ],
+    'Text': [
+      (key: 'textPrimary', label: 'Primary'),
+      (key: 'textSecondary', label: 'Secondary'),
+      (key: 'textMuted', label: 'Muted'),
+      (key: 'textHighlight', label: 'Highlight'),
+      (key: 'terminalText', label: 'Terminal'),
+    ],
+    'Background': [
+      (key: 'background', label: 'Base'),
+      (key: 'surface', label: 'Surface'),
+      (key: 'surfaceElevated', label: 'Elevated'),
+      (key: 'border', label: 'Border'),
+      (key: 'terminalBackground', label: 'Terminal'),
+    ],
+    'Status': [
+      (key: 'statusActive', label: 'Active'),
+      (key: 'statusIdle', label: 'Idle'),
+      (key: 'statusError', label: 'Error'),
+      (key: 'statusWarning', label: 'Warning'),
+    ],
+    'Diff': [
+      (key: 'diffAddBg', label: 'Add Bg'),
+      (key: 'diffAddText', label: 'Add Text'),
+      (key: 'diffRemoveBg', label: 'Remove Bg'),
+      (key: 'diffRemoveText', label: 'Remove Text'),
+    ],
   };
 
-  /// Sets an accent color override for a specific slot.
-  Future<void> setAccentOverride(String slot, Color color) async {
-    _accentOverrides[slot] = color;
-    // Also compute dim/glow variants for green and red
-    if (slot == 'accentGreen') {
-      _accentOverrides['accentGreenDim'] =
-          Color.lerp(color, Colors.black, 0.2)!;
-      _accentOverrides['accentGreenGlow'] = color.withAlpha(0x22);
-    } else if (slot == 'accentRed') {
-      _accentOverrides['accentRedDim'] =
-          Color.lerp(color, Colors.black, 0.2)!;
+  /// Auto-derived companion slots (dim/glow variants).
+  static const _derivedSlots = {
+    'accentGreen': ['accentGreenDim', 'accentGreenGlow'],
+    'accentRed': ['accentRedDim'],
+  };
+
+  /// Sets a color override for any slot. Auto-derives companion variants.
+  Future<void> setColorOverride(String slot, Color color) async {
+    _colorOverrides[slot] = color;
+    final derived = _derivedSlots[slot];
+    if (derived != null) {
+      for (final d in derived) {
+        if (d.endsWith('Dim')) {
+          _colorOverrides[d] = Color.lerp(color, Colors.black, 0.2)!;
+        } else if (d.endsWith('Glow')) {
+          _colorOverrides[d] = color.withAlpha(0x22);
+        }
+      }
     }
     notifyListeners();
-    await _saveAccentOverrides();
+    await _saveColorOverrides();
   }
 
-  /// Removes an accent color override, reverting to the theme default.
-  Future<void> removeAccentOverride(String slot) async {
-    _accentOverrides.remove(slot);
-    if (slot == 'accentGreen') {
-      _accentOverrides.remove('accentGreenDim');
-      _accentOverrides.remove('accentGreenGlow');
-    } else if (slot == 'accentRed') {
-      _accentOverrides.remove('accentRedDim');
+  /// Removes a color override, reverting to the theme default.
+  Future<void> removeColorOverride(String slot) async {
+    _colorOverrides.remove(slot);
+    final derived = _derivedSlots[slot];
+    if (derived != null) {
+      for (final d in derived) {
+        _colorOverrides.remove(d);
+      }
     }
     notifyListeners();
-    await _saveAccentOverrides();
+    await _saveColorOverrides();
   }
 
-  /// Clears all accent overrides.
-  Future<void> clearAccentOverrides() async {
-    _accentOverrides.clear();
+  /// Clears all color overrides, reverting to the base preset/custom theme.
+  Future<void> clearColorOverrides() async {
+    _colorOverrides.clear();
     notifyListeners();
-    await _saveAccentOverrides();
+    await _saveColorOverrides();
   }
 
-  void _loadAccentOverrides(SharedPreferences prefs) {
-    _accentOverrides = {};
-    final json = prefs.getString('accent_overrides');
+  /// Returns the current effective color for a slot (override or base).
+  Color colorForSlot(String slot) {
+    final override = _colorOverrides[slot];
+    if (override != null) return override;
+    return _slotFromScheme(baseScheme, slot);
+  }
+
+  static Color _slotFromScheme(AppColorScheme s, String slot) {
+    return switch (slot) {
+      'primary' => s.primary,
+      'primaryLight' => s.primaryLight,
+      'primaryDark' => s.primaryDark,
+      'primaryGlow' => s.primaryGlow,
+      'background' => s.background,
+      'surface' => s.surface,
+      'surfaceElevated' => s.surfaceElevated,
+      'surfaceHighlight' => s.surfaceHighlight,
+      'border' => s.border,
+      'divider' => s.divider,
+      'terminalBackground' => s.terminalBackground,
+      'sidebar' => s.sidebar,
+      'sidebarGlow' => s.sidebarGlow,
+      'terminalPrompt' => s.terminalPrompt,
+      'tabBorder' => s.tabBorder,
+      'tabActiveBg' => s.tabActiveBg,
+      'tabInactiveBg' => s.tabInactiveBg,
+      'textPrimary' => s.textPrimary,
+      'textSecondary' => s.textSecondary,
+      'textMuted' => s.textMuted,
+      'textHighlight' => s.textHighlight,
+      'terminalText' => s.terminalText,
+      'accentGreen' => s.accentGreen,
+      'accentGreenDim' => s.accentGreenDim,
+      'accentGreenGlow' => s.accentGreenGlow,
+      'accentRed' => s.accentRed,
+      'accentRedDim' => s.accentRedDim,
+      'accentBlue' => s.accentBlue,
+      'accentOrange' => s.accentOrange,
+      'diffAddBg' => s.diffAddBg,
+      'diffAddText' => s.diffAddText,
+      'diffRemoveBg' => s.diffRemoveBg,
+      'diffRemoveText' => s.diffRemoveText,
+      'diffContextBg' => s.diffContextBg,
+      'statusActive' => s.statusActive,
+      'statusIdle' => s.statusIdle,
+      'statusError' => s.statusError,
+      'statusWarning' => s.statusWarning,
+      _ => s.primary,
+    };
+  }
+
+  void _loadColorOverrides(SharedPreferences prefs) {
+    _colorOverrides = {};
+    // Migrate old key
+    var json = prefs.getString('color_overrides') ??
+        prefs.getString('accent_overrides');
     if (json == null) return;
     try {
       final map = jsonDecode(json) as Map<String, dynamic>;
@@ -202,10 +326,10 @@ class ThemeManager extends ChangeNotifier {
         final hex = entry.value as String;
         final h = hex.replaceFirst('#', '');
         if (h.length == 6) {
-          _accentOverrides[entry.key] =
+          _colorOverrides[entry.key] =
               Color(int.parse('FF$h', radix: 16));
         } else if (h.length == 8) {
-          _accentOverrides[entry.key] = Color(int.parse(h, radix: 16));
+          _colorOverrides[entry.key] = Color(int.parse(h, radix: 16));
         }
       }
     } catch (_) {
@@ -213,17 +337,18 @@ class ThemeManager extends ChangeNotifier {
     }
   }
 
-  Future<void> _saveAccentOverrides() async {
+  Future<void> _saveColorOverrides() async {
     final prefs = await SharedPreferences.getInstance();
-    if (_accentOverrides.isEmpty) {
+    if (_colorOverrides.isEmpty) {
+      await prefs.remove('color_overrides');
       await prefs.remove('accent_overrides');
       return;
     }
     final map = <String, String>{};
-    for (final entry in _accentOverrides.entries) {
+    for (final entry in _colorOverrides.entries) {
       map[entry.key] = entry.value.value.toRadixString(16).padLeft(8, '0');
     }
-    await prefs.setString('accent_overrides', jsonEncode(map));
+    await prefs.setString('color_overrides', jsonEncode(map));
   }
 
   // ── Custom theme management ──────────────────────────────────────────────────
