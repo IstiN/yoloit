@@ -765,6 +765,11 @@ const List<ChatModelInfo> kCursorModels = [
     displayName: 'Gemini 3 Flash',
     costMultiplier: 0.1,
   ),
+  ChatModelInfo(
+    id: 'gemini-3.5-flash',
+    displayName: 'Gemini 3.5 Flash',
+    costMultiplier: 0.1,
+  ),
 
   // Standard
   ChatModelInfo(
@@ -814,6 +819,11 @@ const List<ChatModelInfo> kCursorModels = [
   ),
   ChatModelInfo(id: 'grok-4.3', displayName: 'Grok 4.3', costMultiplier: 2),
   ChatModelInfo(
+    id: 'claude-opus-4-8-medium',
+    displayName: 'Opus 4.8',
+    costMultiplier: 5,
+  ),
+  ChatModelInfo(
     id: 'claude-opus-4-7-medium',
     displayName: 'Opus 4.7',
     costMultiplier: 5,
@@ -841,6 +851,11 @@ const List<ChatModelInfo> kCursorModels = [
     costMultiplier: 2,
   ),
   ChatModelInfo(
+    id: 'claude-opus-4-8-thinking-high',
+    displayName: 'Opus 4.8 Thinking',
+    costMultiplier: 8,
+  ),
+  ChatModelInfo(
     id: 'claude-opus-4-7-thinking-medium',
     displayName: 'Opus 4.7 Thinking',
     costMultiplier: 8,
@@ -850,7 +865,11 @@ const List<ChatModelInfo> kCursorModels = [
     displayName: 'Opus 4.6 Thinking',
     costMultiplier: 6,
   ),
-  ChatModelInfo(id: 'composer-2', displayName: 'Composer 2', costMultiplier: 1),
+  ChatModelInfo(
+    id: 'composer-2.5',
+    displayName: 'Composer 2.5',
+    costMultiplier: 1,
+  ),
 ];
 
 /// Local on-device chat models backed by flutter_local_models.
