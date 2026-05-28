@@ -132,9 +132,11 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
   }
 
   void _deleteGroup(int index) {
+    final groupId = _groups[index].id;
     setState(() {
       _groups.removeAt(index);
     });
+    _service.deleteGroupSecrets(groupId);
   }
 
   void _addVariable(int index) {

@@ -31,10 +31,20 @@ class ThemeManager extends ChangeNotifier {
 
   Future<void> setTheme(AppThemePreset preset) async {
     _current = preset;
+    // Presets with a fixed brightness auto-switch the global brightness.
+    if (preset.defaultBrightness != null) {
+      _brightness = preset.defaultBrightness!;
+    }
     AppColors.setAccent(preset.color);
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme_preset', preset.name);
+    if (preset.defaultBrightness != null) {
+      await prefs.setString(
+        'theme_brightness',
+        _brightness == Brightness.light ? 'light' : 'dark',
+      );
+    }
   }
 
   Future<void> setBrightness(Brightness brightness) async {

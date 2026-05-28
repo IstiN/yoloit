@@ -14,7 +14,10 @@ void main() {
       for (final preset in AppThemePreset.values) {
         final theme = preset.theme;
         expect(theme, isNotNull);
-        expect(theme.brightness, Brightness.dark);
+        expect(
+          theme.brightness,
+          preset.defaultBrightness ?? Brightness.dark,
+        );
       }
     });
 
@@ -30,8 +33,8 @@ void main() {
   });
 
   group('AppThemePreset', () {
-    test('has 5 presets', () {
-      expect(AppThemePreset.values, hasLength(5));
+    test('has 7 presets', () {
+      expect(AppThemePreset.values, hasLength(7));
     });
 
     test('all presets have non-empty labels', () {

@@ -111,16 +111,41 @@ enum AppThemePreset {
   cyberGreen('Cyber Green', AppColors.presetCyberGreen, Color(0xFF07100A)),
   deepBlue('Deep Blue', AppColors.presetDeepBlue, Color(0xFF07090F)),
   solarOrange('Solar Orange', AppColors.presetSolarOrange, Color(0xFF100A07)),
-  crimsonRed('Crimson Red', AppColors.presetCrimsonRed, Color(0xFF100707));
+  crimsonRed('Crimson Red', AppColors.presetCrimsonRed, Color(0xFF100707)),
+  islandsDark(
+    'Islands Dark',
+    Color(0xFF548AF7),
+    Color(0xFF191A1C),
+    defaultBrightness: Brightness.dark,
+  ),
+  islandsLight(
+    'Islands Light',
+    Color(0xFF0033B3),
+    Color(0xFFF5F7FB),
+    defaultBrightness: Brightness.light,
+  );
 
-  const AppThemePreset(this.label, this.color, this.bgSeed);
+  const AppThemePreset(
+    this.label,
+    this.color,
+    this.bgSeed, {
+    this.defaultBrightness,
+  });
   final String label;
   final Color color;
   final Color bgSeed;
 
-  ThemeData get theme => themeForBrightness(Brightness.dark);
+  /// If set, this preset uses a fixed brightness instead of following the
+  /// global toggle. Presets like "Islands Light" are inherently light.
+  final Brightness? defaultBrightness;
+
+  ThemeData get theme => themeForBrightness(defaultBrightness ?? Brightness.dark);
 
   ThemeData themeForBrightness(Brightness brightness) =>
-      AppTheme.buildTheme(color, bgSeed: bgSeed, brightness: brightness);
+      AppTheme.buildTheme(
+        color,
+        bgSeed: bgSeed,
+        brightness: defaultBrightness ?? brightness,
+      );
 }
 

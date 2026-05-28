@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -154,29 +153,31 @@ class CursorAgentProvider extends ChatProvider {
         baseEnv['PATH'] ?? '',
       );
 
-      // On macOS, cursor-agent uses the `security` CLI to read/write keychain.
-      // When spawned from a GUI app the security context lacks a default keychain
-      // (exit 154 / errSecNoDefaultKeychain), which cursor-agent throws as a hard
-      // error — bypassing its own CURSOR_API_KEY env-var fallback.
-      //
-      // Fix: inject a `security` shim into PATH that returns exit 44
-      // (errSecItemNotFound) for password lookups. cursor-agent handles that code
-      // as "item not found" and naturally falls back to CURSOR_API_KEY from env.
-      // The API key never appears in process arguments.
-      final shimPath = await _ensureSecurityShim();
-
       debugPrint('[CursorAgent] Running: cursor-agent ${args.join(' ')}');
 
-      final finalPath = shimPath != null
-          ? '$shimPath:$enrichedPath'
-          : enrichedPath;
+      // On macOS, cursor-agent hardcodes `/usr/bin/security` to access the
+      // login keychain. When spawned from a GUI app the security context
+      // lacks a default keychain → exit 154 (errSecNoDefaultKeychain), which
+      // cursor-agent throws as a hard error before checking the
+      // CURSOR_API_KEY env-var fallback.
+      //
+      // Setting AGENT_CLI_CREDENTIAL_STORE=memory makes cursor-agent use an
+      // in-memory credential store (no keychain access at all). The auth
+      // flow then naturally falls back to CURSOR_API_KEY from the process
+      // environment, which the user can export from their shell profile or
+      // store in macOS Keychain via `security add-generic-password`.
+      final processEnv = {
+        ...baseEnv,
+        'PATH': enrichedPath,
+        if (Platform.isMacOS) 'AGENT_CLI_CREDENTIAL_STORE': 'memory',
+      };
 
       final process = await _processStarter(
         'cursor-agent',
         args,
         workingDirectory:
             config.workingDir.isNotEmpty ? config.workingDir : null,
-        environment: {...baseEnv, 'PATH': finalPath},
+        environment: processEnv,
       );
       _processes[config.sessionName] = process;
 
@@ -549,50 +550,6 @@ class CursorAgentProvider extends ChatProvider {
 
   @override
   String? getSessionId(String sessionName) => _sessionIds[sessionName];
-
-  /// Writes a `security` shim script to `~/.config/yoloit/bin/security` and
-  /// returns the directory path so it can be prepended to PATH.
-  ///
-  /// The shim answers keychain password lookups with exit 44
-  /// (errSecItemNotFound), which cursor-agent treats as "key not in keychain"
-  /// and falls back to the CURSOR_API_KEY environment variable.
-  /// Write operations exit 0 (silently discarded).
-  /// All other `security` sub-commands are forwarded to /usr/bin/security.
-  static Future<String?> _ensureSecurityShim() async {
-    if (!Platform.isMacOS) return null;
-    try {
-      final binDir =
-          Directory('${PlatformDirs.instance.configDir}/bin');
-      await binDir.create(recursive: true);
-      final shim = File('${binDir.path}/security');
-      const script = '''#!/bin/bash
-# YoLoIT shim: lets cursor-agent fall back to CURSOR_API_KEY env var
-# instead of failing with errSecNoDefaultKeychain (exit 154).
-cmd="\${1:-}"
-case "\$cmd" in
-  find-generic-password|find-internet-password)
-    exit 44  # errSecItemNotFound — cursor-agent catches this and uses env var
-    ;;
-  add-generic-password|add-internet-password|\\
-  delete-generic-password|delete-internet-password)
-    exit 0   # silently succeed so session writes don't error
-    ;;
-  *)
-    exec /usr/bin/security "\$@"
-    ;;
-esac
-''';
-      // Only rewrite if content changed (avoids unnecessary disk I/O).
-      if (!await shim.exists() || await shim.readAsString() != script) {
-        await shim.writeAsString(script);
-        await Process.run('chmod', ['+x', shim.path]);
-      }
-      return binDir.path;
-    } catch (e) {
-      debugPrint('[CursorAgent] Failed to write security shim: $e');
-      return null;
-    }
-  }
 
   static Future<Process> _defaultProcessStarter(
     String executable,

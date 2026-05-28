@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
@@ -33,6 +35,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     tmpDir = Directory.systemTemp.createTempSync('env_groups_test_');
     PlatformDirs.setInstance(_TempPlatformDirs(tmpDir.path));
   });
@@ -69,16 +72,18 @@ void main() {
       expect(loaded[0].id, 'g1');
       expect(loaded[0].name, 'production');
       expect(loaded[0].values['API_KEY'], 'abc123');
+      expect(loaded[0].values['DB_HOST'], 'localhost');
       expect(loaded[1].id, 'g2');
       expect(loaded[1].name, 'staging');
+      expect(loaded[1].values['API_KEY'], 'xyz789');
     });
 
-    test('saved JSON file is pretty-printed', () async {
+    test('JSON file contains only metadata, not secret values', () async {
       final data = [
         const GlobalEnvGroup(
           id: 'g1',
           name: 'test',
-          values: {'A': '1'},
+          values: {'SECRET': 'super_secret_value'},
         ),
       ];
 
@@ -87,8 +92,78 @@ void main() {
       final file = File('${tmpDir.path}/env_groups.json');
       expect(file.existsSync(), isTrue);
       final content = file.readAsStringSync();
-      // Pretty-printed JSON has newlines
-      expect(content, contains('\n'));
+      // JSON must NOT contain the secret value.
+      expect(content, isNot(contains('super_secret_value')));
+      // JSON must contain keys list, not a values map.
+      expect(content, contains('"keys"'));
+      expect(content, contains('SECRET'));
+    });
+
+    test('values are stored in FlutterSecureStorage', () async {
+      final data = [
+        const GlobalEnvGroup(
+          id: 'g1',
+          name: 'test',
+          values: {'TOKEN': 'my_token'},
+        ),
+      ];
+
+      await GlobalEnvGroupsService.instance.saveAll(data);
+
+      // Read directly from mock secure storage.
+      const storage = FlutterSecureStorage();
+      final raw = await storage.read(key: 'env_group_g1');
+      expect(raw, isNotNull);
+      final decoded = jsonDecode(raw!) as Map;
+      expect(decoded['TOKEN'], 'my_token');
+    });
+
+    test('migrates old JSON format with embedded values', () async {
+      // Write old-format JSON with values embedded.
+      final oldJson = jsonEncode([
+        {
+          'id': 'g1',
+          'name': 'legacy',
+          'values': {'OLD_KEY': 'old_value'},
+        },
+      ]);
+      final file = File('${tmpDir.path}/env_groups.json');
+      file.writeAsStringSync(oldJson);
+
+      // Load should migrate automatically.
+      final loaded = await GlobalEnvGroupsService.instance.loadAll();
+      expect(loaded.length, 1);
+      expect(loaded[0].values['OLD_KEY'], 'old_value');
+
+      // After migration, JSON should no longer contain the value.
+      final updatedContent = file.readAsStringSync();
+      expect(updatedContent, isNot(contains('old_value')));
+      expect(updatedContent, contains('"keys"'));
+
+      // Value should now be in secure storage.
+      const storage = FlutterSecureStorage();
+      final raw = await storage.read(key: 'env_group_g1');
+      expect(raw, isNotNull);
+      final decoded = jsonDecode(raw!) as Map;
+      expect(decoded['OLD_KEY'], 'old_value');
+    });
+
+    test('deleteGroupSecrets removes from secure storage', () async {
+      final data = [
+        const GlobalEnvGroup(
+          id: 'g1',
+          name: 'test',
+          values: {'KEY': 'val'},
+        ),
+      ];
+
+      await GlobalEnvGroupsService.instance.saveAll(data);
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'env_group_g1'), isNotNull);
+
+      await GlobalEnvGroupsService.instance.deleteGroupSecrets('g1');
+      expect(await storage.read(key: 'env_group_g1'), isNull);
     });
   });
 
