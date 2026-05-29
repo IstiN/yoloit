@@ -56,7 +56,25 @@ class TmuxService {
     if (!prefs.containsKey(_enabledKey) && _available) {
       await prefs.setBool(_enabledKey, true);
     }
-    if (_available) await _ensureConfig();
+    if (_available) {
+      await _ensureConfig();
+      // Apply status-bar setting to any already-running tmux server.
+      // The -f config flag is only honoured when the server first starts;
+      // if the server is already up from a previous launch it ignores the
+      // config file. Sending the command directly guarantees the green
+      // status bar is hidden even on existing sessions.
+      await _applyStatusOff();
+    }
+  }
+
+  /// Tells the running tmux server (if any) to hide the status bar.
+  Future<void> _applyStatusOff() async {
+    if (_tmuxBin == null) return;
+    try {
+      await Process.run(_tmuxBin!, ['set', '-g', 'status', 'off']);
+    } catch (_) {
+      // No server running yet — safe to ignore, config file covers next start.
+    }
   }
 
   Future<void> setEnabled(bool value) async {
