@@ -13,6 +13,7 @@ import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
+import 'package:yoloit/features/terminal/data/tmux_service.dart';
 
 // CLI Handlers
 import 'package:yoloit/core/cli/handlers/chat_handler.dart';
@@ -86,6 +87,10 @@ void main(List<String> args) async {
   await ThemeManager.instance.load();
   await HotkeyRegistry.instance.load();
   await AppConfig.instance.load();
+  // Init TmuxService early so board terminal panels can reattach to existing
+  // tmux sessions during the first frame — before TerminalCubit.initialize()
+  // runs in its postFrameCallback.
+  await TmuxService.instance.init();
   unawaited(ProviderModelCatalogService.instance.load());
 
   await windowManager.ensureInitialized();

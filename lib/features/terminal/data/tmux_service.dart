@@ -32,11 +32,16 @@ class TmuxService {
   bool _available = false;
   bool get available => _available;
 
+  bool _initialized = false;
+
   /// Full path to the tmux binary, or null if not found.
   String? get tmuxBin => _tmuxBin;
 
-  /// Must be called once at startup before using any other methods.
+  /// Must be called at startup before using any other methods.
+  /// Safe to call multiple times — subsequent calls are no-ops.
   Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
     if (Platform.isWindows) {
       _available = false;
       _enabled = false;
@@ -87,19 +92,29 @@ class TmuxService {
   static String get _configPath =>
       '${PlatformDirs.instance.configDir}/tmux.conf';
 
-  /// Ensures the yoloit tmux config exists with status bar disabled.
+  static const _configVersion = '# YoLoIT tmux config v2';
+
+  /// Writes (or overwrites) the yoloit tmux config so it always reflects
+  /// the current expected settings — e.g. status bar disabled.
+  ///
+  /// We always overwrite rather than skip when the file exists: old installs
+  /// may have a stale config without `set -g status off`, which causes a
+  /// visible green tmux status bar on one machine but not another.
   Future<void> _ensureConfig() async {
     final file = File(_configPath);
-    if (!await file.exists()) {
-      await file.parent.create(recursive: true);
-      await file.writeAsString([
-        '# YoLoIT tmux config — auto-generated, do not edit manually',
-        'set -g status off',          // hide the green status bar
-        'set -g mouse on',            // enable mouse scroll
-        'set -g history-limit 50000', // large scrollback
-        'set -sg escape-time 0',      // no ESC delay (important for vim/editors)
-      ].join('\n'));
+    await file.parent.create(recursive: true);
+    // Check if file is already up-to-date to avoid unnecessary writes.
+    if (await file.exists()) {
+      final existing = await file.readAsString();
+      if (existing.startsWith(_configVersion)) return;
     }
+    await file.writeAsString([
+      _configVersion,
+      'set -g status off',          // hide the green status bar
+      'set -g mouse on',            // enable mouse scroll
+      'set -g history-limit 50000', // large scrollback
+      'set -sg escape-time 0',      // no ESC delay (important for vim/editors)
+    ].join('\n'));
   }
 
   /// Creates or attaches to a named tmux session and returns a PTY connected
