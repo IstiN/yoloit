@@ -24,6 +24,22 @@ class GlobalEnvGroupsService {
   static const _prefsFallbackKey = 'global_env_groups_fallback_v1';
   static const _secureKeyPrefix = 'env_group_';
 
+  String _canonicalGroupId(String groupId) {
+    if (groupId.startsWith(_secureKeyPrefix)) {
+      return groupId.substring(_secureKeyPrefix.length);
+    }
+    return groupId;
+  }
+
+  String _secureStorageKey(String groupId) {
+    return '$_secureKeyPrefix${_canonicalGroupId(groupId)}';
+  }
+
+  String? _legacySecureStorageKey(String groupId) {
+    if (!groupId.startsWith(_secureKeyPrefix)) return null;
+    return '$_secureKeyPrefix$groupId';
+  }
+
   // flutter_secure_storage_darwin 0.2.0 has a key-name mismatch:
   //   Dart sends  'usesDataProtectionKeychain'  (lowercase c, with s)
   //   Swift reads 'useDataProtectionKeyChain'    (uppercase C, no s)
@@ -166,7 +182,12 @@ class GlobalEnvGroupsService {
   /// Deletes a group's secure values from the credential store.
   Future<void> deleteGroupSecrets(String groupId) async {
     try {
-      await _storage.delete(key: '$_secureKeyPrefix$groupId');
+      final key = _secureStorageKey(groupId);
+      await _storage.delete(key: key);
+      final legacyKey = _legacySecureStorageKey(groupId);
+      if (legacyKey != null && legacyKey != key) {
+        await _storage.delete(key: legacyKey);
+      }
     } catch (e) {
       debugPrint('[EnvGroups] deleteGroupSecrets error: $e');
     }
@@ -212,7 +233,7 @@ class GlobalEnvGroupsService {
     final content = await file.readAsString();
     final name = p.basenameWithoutExtension(filePath).replaceAll('.env', '');
     return GlobalEnvGroup(
-      id: 'env_group_${DateTime.now().millisecondsSinceEpoch}',
+      id: 'group_${DateTime.now().millisecondsSinceEpoch}',
       name: name.isEmpty ? 'Imported Group' : name,
       values: parseEnvContent(content),
     );
@@ -278,14 +299,19 @@ class GlobalEnvGroupsService {
   ) async {
     try {
       final encoded = jsonEncode(values);
+      final key = _secureStorageKey(groupId);
       debugPrint(
         '[EnvGroups] _writeSecureValues $groupId: '
         '${values.length} keys, ${encoded.length} bytes',
       );
       await _storage.write(
-        key: '$_secureKeyPrefix$groupId',
+        key: key,
         value: encoded,
       );
+      final legacyKey = _legacySecureStorageKey(groupId);
+      if (legacyKey != null && legacyKey != key) {
+        await _storage.delete(key: legacyKey);
+      }
       return true;
     } catch (e) {
       debugPrint('[EnvGroups] _writeSecureValues FAILED for $groupId: $e');
@@ -298,7 +324,22 @@ class GlobalEnvGroupsService {
     List<String> expectedKeys,
   ) async {
     try {
-      final raw = await _storage.read(key: '$_secureKeyPrefix$groupId');
+      final key = _secureStorageKey(groupId);
+      var raw = await _storage.read(key: key);
+      final legacyKey = _legacySecureStorageKey(groupId);
+      if ((raw == null || raw.isEmpty) &&
+          legacyKey != null &&
+          legacyKey != key) {
+        raw = await _storage.read(key: legacyKey);
+        if (raw != null && raw.isNotEmpty) {
+          await _storage.write(key: key, value: raw);
+          await _storage.delete(key: legacyKey);
+          debugPrint(
+            '[EnvGroups] Migrated legacy secure key for $groupId '
+            '($legacyKey -> $key)',
+          );
+        }
+      }
       if (raw == null || raw.isEmpty) {
         debugPrint(
           '[EnvGroups] _readSecureValues: no data for $groupId '

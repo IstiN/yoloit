@@ -84,7 +84,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
     setState(() {
       _groups.add(
         GlobalEnvGroup(
-          id: 'env_group_${DateTime.now().millisecondsSinceEpoch}',
+          id: 'group_${DateTime.now().millisecondsSinceEpoch}',
           name: 'New Group',
           values: const {},
         ),

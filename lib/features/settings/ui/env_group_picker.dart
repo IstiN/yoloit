@@ -209,7 +209,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
 
     setState(() => _saving = true);
     try {
-      final id = 'env_group_${DateTime.now().millisecondsSinceEpoch}';
+      final id = 'group_${DateTime.now().millisecondsSinceEpoch}';
       final group = GlobalEnvGroup(id: id, name: name, values: values);
       // Load existing groups, append, and save all
       final existing = await _service.loadAll();

@@ -118,6 +118,22 @@ void main() {
       expect(decoded['TOKEN'], 'my_token');
     });
 
+    test('prefixed group ids do not produce double-prefixed secure keys', () async {
+      final data = [
+        const GlobalEnvGroup(
+          id: 'env_group_123',
+          name: 'test',
+          values: {'TOKEN': 'my_token'},
+        ),
+      ];
+
+      await GlobalEnvGroupsService.instance.saveAll(data);
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'env_group_123'), isNotNull);
+      expect(await storage.read(key: 'env_group_env_group_123'), isNull);
+    });
+
     test('migrates old JSON format with embedded values', () async {
       // Write old-format JSON with values embedded.
       final oldJson = jsonEncode([
@@ -164,6 +180,32 @@ void main() {
 
       await GlobalEnvGroupsService.instance.deleteGroupSecrets('g1');
       expect(await storage.read(key: 'env_group_g1'), isNull);
+    });
+
+    test('loadAll migrates legacy double-prefixed secure key', () async {
+      final encoded = jsonEncode({'TOKEN': 'legacy_token'});
+      FlutterSecureStorage.setMockInitialValues({
+        'env_group_env_group_legacy': encoded,
+      });
+
+      final file = File('${tmpDir.path}/env_groups.json');
+      file.writeAsStringSync(
+        jsonEncode([
+          {
+            'id': 'env_group_legacy',
+            'name': 'legacy',
+            'keys': ['TOKEN'],
+          },
+        ]),
+      );
+
+      final loaded = await GlobalEnvGroupsService.instance.loadAll();
+      expect(loaded.length, 1);
+      expect(loaded.first.values['TOKEN'], 'legacy_token');
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'env_group_legacy'), isNotNull);
+      expect(await storage.read(key: 'env_group_env_group_legacy'), isNull);
     });
   });
 
