@@ -167,8 +167,10 @@ class RuntimeTerminalClient {
   ) async {
     await ensureStarted();
     final request = await _http.postUrl(_uri(path));
+    final encodedBody = utf8.encode(jsonEncode(body));
     request.headers.contentType = ContentType.json;
-    request.write(jsonEncode(body));
+    request.contentLength = encodedBody.length;
+    request.add(encodedBody);
     final response = await request.close();
     final text = await response.transform(utf8.decoder).join();
     if (response.statusCode < 200 || response.statusCode >= 300) {

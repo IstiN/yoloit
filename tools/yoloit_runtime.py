@@ -155,6 +155,8 @@ class RuntimeState:
         self.lock = threading.Lock()
 
     def create(self, payload: dict[str, Any]) -> RuntimeSession:
+        if not payload.get("id"):
+            raise ValueError("missing session id")
         session_id = str(payload["id"])
         cwd = str(payload.get("cwd") or os.getcwd())
         command = str(payload.get("command") or os.environ.get("SHELL") or "/bin/sh")
@@ -214,7 +216,11 @@ class Handler(BaseHTTPRequestHandler):
         parts = [p for p in urlparse(self.path).path.split("/") if p]
         payload = self._read_json()
         if parts == ["sessions"]:
-            session = STATE.create(payload)
+            try:
+                session = STATE.create(payload)
+            except ValueError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+                return
             self._json({"ok": True, "session": session.to_json(), "existing": getattr(session, "attached_existing", False)})
             return
         if len(parts) == 3 and parts[0] == "sessions":
