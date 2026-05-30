@@ -224,7 +224,7 @@ class KimiCliProvider extends ChatProvider {
       final json = jsonDecode(trimmed) as Map<String, dynamic>;
       final role = json['role'] as String?;
       if (role == 'assistant') {
-        final content = json['content'] as String? ?? '';
+        final content = _extractText(json['content']);
         if (content.isEmpty) return;
         final id = 'kimi-${DateTime.now().microsecondsSinceEpoch}';
         controller.add(
@@ -247,6 +247,24 @@ class KimiCliProvider extends ChatProvider {
       debugPrint('[KimiCli] Failed to parse line: $trimmed');
       debugPrint('[KimiCli] Error: $error');
     }
+  }
+
+  String _extractText(Object? content) {
+    if (content is String) return content;
+    if (content is List) {
+      return content
+          .map((part) {
+            if (part is String) return part;
+            if (part is Map) {
+              final text = part['text'];
+              if (text is String) return text;
+            }
+            return '';
+          })
+          .where((text) => text.isNotEmpty)
+          .join();
+    }
+    return '';
   }
 
   @override

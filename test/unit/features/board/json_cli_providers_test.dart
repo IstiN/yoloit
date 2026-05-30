@@ -137,6 +137,37 @@ void main() {
     expect(stdinSink.closed, isTrue);
   });
 
+  test('Kimi provider parses upstream assistant content parts', () async {
+    final starter = _FakeStarter();
+    final process = _FakeProcess(pid: 102, stdin: stdinSink);
+    starter.processes.add(process);
+    final provider = KimiCliProvider(processStarter: starter.start);
+
+    final eventsFuture =
+        provider
+            .sendMessage(
+              message: 'hello',
+              config: config('kimi'),
+              isFirstMessage: true,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+
+    process.addStdout(
+      '{"role":"assistant","content":[{"type":"text","text":"KIMI_"},{"text":"PARTS"}]}\n',
+    );
+    await process.closeStdout();
+    await process.closeStderr();
+    process.completeExit(0);
+
+    final events = await eventsFuture;
+    expect(events.single.type, ChatEventType.assistantMessage);
+    expect(events.single.messageContent, 'KIMI_PARTS');
+    expect(stdinSink.closed, isTrue);
+    expect(starter.calls.single, contains('--output-format'));
+    expect(starter.calls.single, contains('stream-json'));
+  });
+
   test('Codex provider parses thread, assistant, and usage JSONL', () async {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 202, stdin: stdinSink);
