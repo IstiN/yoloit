@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
 
@@ -63,12 +65,19 @@ void main() {
 
     test('optional dep defaults isRequired to true but can be overridden', () {
       const required = DependencyStatus(
-        id: 'x', name: 'x', description: 'd',
-        installHint: 'h', isAvailable: false,
+        id: 'x',
+        name: 'x',
+        description: 'd',
+        installHint: 'h',
+        isAvailable: false,
       );
       const optional = DependencyStatus(
-        id: 'y', name: 'y', description: 'd',
-        installHint: 'h', isAvailable: false, isRequired: false,
+        id: 'y',
+        name: 'y',
+        description: 'd',
+        installHint: 'h',
+        isAvailable: false,
+        isRequired: false,
       );
       expect(required.isRequired, isTrue);
       expect(optional.isRequired, isFalse);
@@ -78,12 +87,24 @@ void main() {
   // ── SetupCheckResult ───────────────────────────────────────────────────────
   group('SetupCheckResult', () {
     test('allRequiredDepsOk is true when all required deps available', () {
-      final result = SetupCheckResult(
+      const result = SetupCheckResult(
         deps: [
-          const DependencyStatus(id: 'git', name: 'git', description: 'd',
-              installHint: 'h', isAvailable: true, isRequired: true),
-          const DependencyStatus(id: 'brew', name: 'Homebrew', description: 'd',
-              installHint: 'h', isAvailable: false, isRequired: false),
+          DependencyStatus(
+            id: 'git',
+            name: 'git',
+            description: 'd',
+            installHint: 'h',
+            isAvailable: true,
+            isRequired: true,
+          ),
+          DependencyStatus(
+            id: 'brew',
+            name: 'Homebrew',
+            description: 'd',
+            installHint: 'h',
+            isAvailable: false,
+            isRequired: false,
+          ),
         ],
         agents: [],
       );
@@ -91,10 +112,16 @@ void main() {
     });
 
     test('allRequiredDepsOk is false when a required dep is missing', () {
-      final result = SetupCheckResult(
+      const result = SetupCheckResult(
         deps: [
-          const DependencyStatus(id: 'git', name: 'git', description: 'd',
-              installHint: 'h', isAvailable: false, isRequired: true),
+          DependencyStatus(
+            id: 'git',
+            name: 'git',
+            description: 'd',
+            installHint: 'h',
+            isAvailable: false,
+            isRequired: true,
+          ),
         ],
         agents: [],
       );
@@ -102,31 +129,49 @@ void main() {
     });
 
     test('anyAgentAvailable is true when at least one agent present', () {
-      final result = SetupCheckResult(
+      const result = SetupCheckResult(
         deps: [],
         agents: [
-          const DependencyStatus(id: 'copilot', name: 'Copilot', description: 'd',
-              installHint: 'h', isAvailable: true, isRequired: false),
-          const DependencyStatus(id: 'claude', name: 'Claude', description: 'd',
-              installHint: 'h', isAvailable: false, isRequired: false),
+          DependencyStatus(
+            id: 'copilot',
+            name: 'Copilot',
+            description: 'd',
+            installHint: 'h',
+            isAvailable: true,
+            isRequired: false,
+          ),
+          DependencyStatus(
+            id: 'claude',
+            name: 'Claude',
+            description: 'd',
+            installHint: 'h',
+            isAvailable: false,
+            isRequired: false,
+          ),
         ],
       );
       expect(result.anyAgentAvailable, isTrue);
     });
 
     test('anyAgentAvailable is false when no agents present', () {
-      final result = SetupCheckResult(
+      const result = SetupCheckResult(
         deps: [],
         agents: [
-          const DependencyStatus(id: 'copilot', name: 'Copilot', description: 'd',
-              installHint: 'h', isAvailable: false, isRequired: false),
+          DependencyStatus(
+            id: 'copilot',
+            name: 'Copilot',
+            description: 'd',
+            installHint: 'h',
+            isAvailable: false,
+            isRequired: false,
+          ),
         ],
       );
       expect(result.anyAgentAvailable, isFalse);
     });
 
     test('anyAgentAvailable is false when agents list is empty', () {
-      final result = SetupCheckResult(deps: [], agents: []);
+      const result = SetupCheckResult(deps: [], agents: []);
       expect(result.anyAgentAvailable, isFalse);
     });
   });
@@ -145,8 +190,10 @@ void main() {
 
     for (final entry in windowsDepsHints.entries) {
       test('${entry.key} install hint is winget-based', () {
-        expect(entry.value.toLowerCase(),
-            anyOf(contains('winget'), contains('microsoft store')));
+        expect(
+          entry.value.toLowerCase(),
+          anyOf(contains('winget'), contains('microsoft store')),
+        );
       });
     }
 
@@ -175,8 +222,10 @@ void main() {
 
     for (final entry in macDepsHints.entries) {
       test('${entry.key} install hint is homebrew-based', () {
-        expect(entry.value.toLowerCase(),
-            anyOf(contains('brew'), contains('homebrew')));
+        expect(
+          entry.value.toLowerCase(),
+          anyOf(contains('brew'), contains('homebrew')),
+        );
       });
     }
 
@@ -199,5 +248,17 @@ void main() {
         expect(hint, contains('apt'));
       });
     }
+  });
+
+  group('PATH enrichment', () {
+    test('includes kimi-code install directory on Unix', () {
+      if (Platform.isWindows) return;
+
+      final home = Platform.environment['HOME'];
+      if (home == null || home.isEmpty) return;
+
+      final path = SetupCheckService.debugExtendedPathForTesting();
+      expect(path.split(':'), contains('$home/.kimi-code/bin'));
+    });
   });
 }

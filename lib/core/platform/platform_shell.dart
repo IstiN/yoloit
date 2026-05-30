@@ -56,15 +56,14 @@ abstract class PlatformShell {
 /// macOS shell configuration — zsh with Homebrew and Flutter paths.
 class MacosPlatformShell extends PlatformShell {
   const MacosPlatformShell({String? homeOverride})
-      : _homeOverride = homeOverride;
+    : _homeOverride = homeOverride;
 
   final String? _homeOverride;
 
   String get _home => _homeOverride ?? Platform.environment['HOME'] ?? '';
 
   @override
-  String get defaultShell =>
-      Platform.environment['SHELL'] ?? '/bin/zsh';
+  String get defaultShell => Platform.environment['SHELL'] ?? '/bin/zsh';
 
   @override
   String get pathSeparator => ':';
@@ -74,6 +73,7 @@ class MacosPlatformShell extends PlatformShell {
     final extras = <String>[
       if (_home.isNotEmpty) '$_home/.config/yoloit',
       if (_home.isNotEmpty) '$_home/.opencode/bin',
+      if (_home.isNotEmpty) '$_home/.kimi-code/bin',
       if (_home.isNotEmpty) '$_home/.local/bin',
       if (_home.isNotEmpty) '$_home/go/bin',
       if (_home.isNotEmpty) '$_home/.local/go/bin',
@@ -94,15 +94,14 @@ class MacosPlatformShell extends PlatformShell {
 /// Linux shell configuration — bash with XDG-compliant tool paths.
 class LinuxPlatformShell extends PlatformShell {
   const LinuxPlatformShell({String? homeOverride})
-      : _homeOverride = homeOverride;
+    : _homeOverride = homeOverride;
 
   final String? _homeOverride;
 
   String get _home => _homeOverride ?? Platform.environment['HOME'] ?? '';
 
   @override
-  String get defaultShell =>
-      Platform.environment['SHELL'] ?? '/bin/bash';
+  String get defaultShell => Platform.environment['SHELL'] ?? '/bin/bash';
 
   @override
   String get pathSeparator => ':';
@@ -111,6 +110,7 @@ class LinuxPlatformShell extends PlatformShell {
   String enrichedPath(String existing) {
     final extras = <String>[
       if (_home.isNotEmpty) '$_home/.config/yoloit',
+      if (_home.isNotEmpty) '$_home/.kimi-code/bin',
       if (_home.isNotEmpty) '$_home/.local/bin',
       if (_home.isNotEmpty) '$_home/go/bin',
       if (_home.isNotEmpty) '$_home/.local/go/bin',
@@ -128,7 +128,7 @@ class LinuxPlatformShell extends PlatformShell {
 /// Windows shell configuration — cmd.exe with semicolon PATH separator.
 class WindowsPlatformShell extends PlatformShell {
   const WindowsPlatformShell({String? userProfileOverride})
-      : _userProfileOverride = userProfileOverride;
+    : _userProfileOverride = userProfileOverride;
 
   final String? _userProfileOverride;
 
@@ -138,8 +138,7 @@ class WindowsPlatformShell extends PlatformShell {
       'C:\\Users\\Default';
 
   @override
-  String get defaultShell =>
-      Platform.environment['ComSpec'] ?? 'cmd.exe';
+  String get defaultShell => Platform.environment['ComSpec'] ?? 'cmd.exe';
 
   @override
   String get pathSeparator => ';';

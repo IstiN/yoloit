@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 
 // ── InstallAction ─────────────────────────────────────────────────────────────
@@ -61,10 +62,7 @@ class DependencyStatus {
 
 /// Result of checking all dependencies and agents.
 class SetupCheckResult {
-  const SetupCheckResult({
-    required this.deps,
-    required this.agents,
-  });
+  const SetupCheckResult({required this.deps, required this.agents});
 
   final List<DependencyStatus> deps;
   final List<DependencyStatus> agents;
@@ -106,6 +104,7 @@ class SetupCheckService {
     if (home.isNotEmpty) {
       candidates.addAll([
         '$home/.nvm/versions/node/current/bin',
+        '$home/.kimi-code/bin',
         '$home/.volta/bin',
         '$home/.pyenv/shims',
         '$home/.pyenv/bin',
@@ -119,12 +118,9 @@ class SetupCheckService {
       try {
         final dir = Directory(nvmDir);
         if (dir.existsSync()) {
-          final versions = dir
-              .listSync()
-              .whereType<Directory>()
-              .map((d) => d.path)
-              .toList()
-            ..sort((a, b) => b.compareTo(a));
+          final versions =
+              dir.listSync().whereType<Directory>().map((d) => d.path).toList()
+                ..sort((a, b) => b.compareTo(a));
           for (final v in versions.take(3)) {
             candidates.add('$v/bin');
           }
@@ -144,7 +140,8 @@ class SetupCheckService {
     final current = Platform.environment['PATH'] ?? '';
     final appData = Platform.environment['APPDATA'] ?? '';
     final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
-    final programFiles = Platform.environment['ProgramFiles'] ?? r'C:\Program Files';
+    final programFiles =
+        Platform.environment['ProgramFiles'] ?? r'C:\Program Files';
     final programFilesX86 =
         Platform.environment['ProgramFiles(x86)'] ?? r'C:\Program Files (x86)';
     final userProfile = Platform.environment['USERPROFILE'] ?? '';
@@ -160,11 +157,14 @@ class SetupCheckService {
       '$programFilesX86\\nodejs',
       if (appData.isNotEmpty) '$appData\\npm',
       if (localAppData.isNotEmpty) '$localAppData\\Microsoft\\WinGet\\Links',
-      if (userProfile.isNotEmpty) '$userProfile\\AppData\\Local\\Microsoft\\WinGet\\Links',
+      if (userProfile.isNotEmpty)
+        '$userProfile\\AppData\\Local\\Microsoft\\WinGet\\Links',
       if (userProfile.isNotEmpty) '$userProfile\\.cargo\\bin',
-      if (userProfile.isNotEmpty) '$userProfile\\AppData\\Local\\Programs\\Python\\Python3\\Scripts',
+      if (userProfile.isNotEmpty)
+        '$userProfile\\AppData\\Local\\Programs\\Python\\Python3\\Scripts',
       // Cursor IDE — installs to LocalAppData/Programs/cursor/resources/app/bin
-      if (localAppData.isNotEmpty) '$localAppData\\Programs\\cursor\\resources\\app\\bin',
+      if (localAppData.isNotEmpty)
+        '$localAppData\\Programs\\cursor\\resources\\app\\bin',
       if (localAppData.isNotEmpty) '$localAppData\\Programs\\Cursor',
       // nvm / volta / fnm Node version managers
       if (appData.isNotEmpty) '$appData\\nvm',
@@ -192,6 +192,7 @@ class SetupCheckService {
       '/sbin',
       if (home.isNotEmpty) '$home/.local/bin',
       if (home.isNotEmpty) '$home/.cargo/bin',
+      if (home.isNotEmpty) '$home/.kimi-code/bin',
       if (home.isNotEmpty) '$home/.nvm/versions/node/current/bin',
       if (home.isNotEmpty) '$home/.volta/bin',
     ];
@@ -210,6 +211,12 @@ class SetupCheckService {
     if (_isWindows) return _extendedPath = _buildExtendedPathWindows();
     if (_isMacOS) return _extendedPath = _buildExtendedPathMacOS();
     return _extendedPath = _buildExtendedPathLinux();
+  }
+
+  @visibleForTesting
+  static String debugExtendedPathForTesting() {
+    _extendedPath = null;
+    return _path;
   }
 
   static Map<String, String> get _env {
@@ -232,9 +239,7 @@ class SetupCheckService {
   // ── macOS / Linux dependency lists ───────────────────────────────────────
 
   static Future<SetupCheckResult> _checkAllUnix() async {
-    final depFutures = _isMacOS
-        ? _macOSDeps()
-        : _linuxDeps();
+    final depFutures = _isMacOS ? _macOSDeps() : _linuxDeps();
 
     final agentFutures = _commonAgents(winget: false);
 
@@ -247,7 +252,8 @@ class SetupCheckService {
     _checkTool(
       id: 'brew',
       name: 'Homebrew',
-      description: 'macOS package manager — needed to install other dependencies',
+      description:
+          'macOS package manager — needed to install other dependencies',
       command: 'brew',
       versionArgs: ['--version'],
       installHint:
@@ -271,7 +277,10 @@ class SetupCheckService {
       installHint: 'brew install git',
       installUrl: 'https://git-scm.com/downloads',
       isRequired: true,
-      installAction: const InstallAction(executable: 'brew', args: ['install', 'git']),
+      installAction: const InstallAction(
+        executable: 'brew',
+        args: ['install', 'git'],
+      ),
     ),
     _checkTool(
       id: 'node',
@@ -282,18 +291,25 @@ class SetupCheckService {
       installHint: 'brew install node',
       installUrl: 'https://nodejs.org',
       isRequired: false,
-      installAction: const InstallAction(executable: 'brew', args: ['install', 'node']),
+      installAction: const InstallAction(
+        executable: 'brew',
+        args: ['install', 'node'],
+      ),
     ),
     _checkTool(
       id: 'tmux',
       name: 'tmux',
-      description: 'Terminal multiplexer — required for persistent agent sessions',
+      description:
+          'Terminal multiplexer — required for persistent agent sessions',
       command: 'tmux',
       versionArgs: ['-V'],
       installHint: 'brew install tmux',
       installUrl: 'https://github.com/tmux/tmux',
       isRequired: true,
-      installAction: const InstallAction(executable: 'brew', args: ['install', 'tmux']),
+      installAction: const InstallAction(
+        executable: 'brew',
+        args: ['install', 'tmux'],
+      ),
     ),
     _checkTool(
       id: 'bash',
@@ -303,7 +319,10 @@ class SetupCheckService {
       versionArgs: ['--version'],
       installHint: 'brew install bash',
       isRequired: true,
-      installAction: const InstallAction(executable: 'brew', args: ['install', 'bash']),
+      installAction: const InstallAction(
+        executable: 'brew',
+        args: ['install', 'bash'],
+      ),
     ),
   ];
 
@@ -339,7 +358,8 @@ class SetupCheckService {
     _checkTool(
       id: 'tmux',
       name: 'tmux',
-      description: 'Terminal multiplexer — required for persistent agent sessions',
+      description:
+          'Terminal multiplexer — required for persistent agent sessions',
       command: 'tmux',
       versionArgs: ['-V'],
       installHint: 'sudo apt install tmux',
@@ -398,7 +418,8 @@ class SetupCheckService {
       _checkTool(
         id: 'node',
         name: 'Node.js',
-        description: 'Required for npm-based AI agents (Copilot, Claude, Gemini)',
+        description:
+            'Required for npm-based AI agents (Copilot, Claude, Gemini)',
         command: 'node',
         versionArgs: ['--version'],
         installHint: 'winget install OpenJS.NodeJS.LTS',
@@ -406,7 +427,14 @@ class SetupCheckService {
         isRequired: false,
         installAction: const InstallAction(
           executable: 'winget',
-          args: ['install', '--id', 'OpenJS.NodeJS.LTS', '-e', '--source', 'winget'],
+          args: [
+            'install',
+            '--id',
+            'OpenJS.NodeJS.LTS',
+            '-e',
+            '--source',
+            'winget',
+          ],
         ),
       ),
       _checkTool(
@@ -429,7 +457,14 @@ class SetupCheckService {
         isRequired: false,
         installAction: const InstallAction(
           executable: 'winget',
-          args: ['install', '--id', 'Microsoft.WindowsTerminal', '-e', '--source', 'winget'],
+          args: [
+            'install',
+            '--id',
+            'Microsoft.WindowsTerminal',
+            '-e',
+            '--source',
+            'winget',
+          ],
         ),
       ),
     ];
@@ -443,25 +478,38 @@ class SetupCheckService {
 
   // ── Common agent checks (macOS + Linux = npm, Windows adds winget) ───────
 
-  static List<Future<DependencyStatus>> _commonAgents({required bool winget}) => [
+  static List<Future<DependencyStatus>> _commonAgents({
+    required bool winget,
+  }) => [
     _checkTool(
       id: 'copilot',
       name: 'GitHub Copilot',
       description: 'AI coding agent by GitHub — autonomous agentic CLI',
       command: 'copilot',
       versionArgs: ['--version'],
-      installHint: winget ? 'winget install GitHub.Copilot' : 'npm install -g @github/copilot',
+      installHint:
+          winget
+              ? 'winget install GitHub.Copilot'
+              : 'npm install -g @github/copilot',
       installUrl: 'https://github.com/github/copilot-cli',
       isRequired: false,
-      installAction: winget
-          ? const InstallAction(
-              executable: 'winget',
-              args: ['install', '--id', 'GitHub.Copilot', '-e', '--source', 'winget'],
-            )
-          : const InstallAction(
-              executable: 'npm',
-              args: ['install', '-g', '@github/copilot'],
-            ),
+      installAction:
+          winget
+              ? const InstallAction(
+                executable: 'winget',
+                args: [
+                  'install',
+                  '--id',
+                  'GitHub.Copilot',
+                  '-e',
+                  '--source',
+                  'winget',
+                ],
+              )
+              : const InstallAction(
+                executable: 'npm',
+                args: ['install', '-g', '@github/copilot'],
+              ),
     ),
     _checkTool(
       id: 'claude',
@@ -497,15 +545,26 @@ class SetupCheckService {
       description: 'AI-first code editor with agent mode',
       command: 'cursor',
       versionArgs: ['--version'],
-      installHint: winget ? 'winget install Anysphere.Cursor' : 'Download from cursor.com',
+      installHint:
+          winget
+              ? 'winget install Anysphere.Cursor'
+              : 'Download from cursor.com',
       installUrl: 'https://cursor.com',
       isRequired: false,
-      installAction: winget
-          ? const InstallAction(
-              executable: 'winget',
-              args: ['install', '--id', 'Anysphere.Cursor', '-e', '--source', 'winget'],
-            )
-          : null,
+      installAction:
+          winget
+              ? const InstallAction(
+                executable: 'winget',
+                args: [
+                  'install',
+                  '--id',
+                  'Anysphere.Cursor',
+                  '-e',
+                  '--source',
+                  'winget',
+                ],
+              )
+              : null,
     ),
     _checkTool(
       id: 'aider',
@@ -527,28 +586,30 @@ class SetupCheckService {
       description: 'AI coding agent for your terminal',
       command: 'opencode',
       versionArgs: ['--version'],
-      installHint: winget
-          ? 'npm i -g opencode-ai'
-          : _isMacOS
+      installHint:
+          winget
+              ? 'npm i -g opencode-ai'
+              : _isMacOS
               ? 'brew install anomalyco/tap/opencode'
               : 'curl -fsSL https://opencode.ai/install | bash',
       installUrl: 'https://opencode.ai',
       isRequired: false,
-      installAction: winget
-          ? const InstallAction(
-              executable: 'npm',
-              args: ['i', '-g', 'opencode-ai'],
-            )
-          : _isMacOS
+      installAction:
+          winget
               ? const InstallAction(
-                  executable: 'brew',
-                  args: ['install', 'anomalyco/tap/opencode'],
-                )
+                executable: 'npm',
+                args: ['i', '-g', 'opencode-ai'],
+              )
+              : _isMacOS
+              ? const InstallAction(
+                executable: 'brew',
+                args: ['install', 'anomalyco/tap/opencode'],
+              )
               : const InstallAction(
-                  executable: 'bash',
-                  args: ['-c', 'curl -fsSL https://opencode.ai/install | bash'],
-                  requiresInteractiveTerminal: true,
-                ),
+                executable: 'bash',
+                args: ['-c', 'curl -fsSL https://opencode.ai/install | bash'],
+                requiresInteractiveTerminal: true,
+              ),
     ),
   ];
 
@@ -563,7 +624,9 @@ class SetupCheckService {
         if (action.requiresInteractiveTerminal) {
           await _openInTerminal(action.displayCommand);
           controller.add('ℹ️  Opened Terminal to run the installer.');
-          controller.add('   Please follow the instructions there, then click Re-check.');
+          controller.add(
+            '   Please follow the instructions there, then click Re-check.',
+          );
           await controller.close();
           return;
         }
@@ -629,11 +692,10 @@ class SetupCheckService {
       return _findPathWindows(cmd);
     }
     try {
-      final r = await Process.run(
-        '/bin/bash',
-        ['-c', 'which "$cmd" 2>/dev/null'],
-        environment: _env,
-      ).timeout(const Duration(seconds: 5));
+      final r = await Process.run('/bin/bash', [
+        '-c',
+        'which "$cmd" 2>/dev/null',
+      ], environment: _env).timeout(const Duration(seconds: 5));
       final out = (r.stdout as String).trim().split('\n').first.trim();
       return (r.exitCode == 0 && out.isNotEmpty) ? out : null;
     } catch (_) {
@@ -647,16 +709,12 @@ class SetupCheckService {
   static Future<String?> _findPathWindows(String cmd) async {
     // 1) PowerShell Get-Command — always reads the current registry PATH
     try {
-      final r = await Process.run(
-        'powershell',
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-Command',
-          'try { (Get-Command "$cmd" -ErrorAction Stop).Source } catch { exit 1 }',
-        ],
-        runInShell: false,
-      ).timeout(const Duration(seconds: 8));
+      final r = await Process.run('powershell', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'try { (Get-Command "$cmd" -ErrorAction Stop).Source } catch { exit 1 }',
+      ], runInShell: false).timeout(const Duration(seconds: 8));
       final out = (r.stdout as String).trim().split('\n').first.trim();
       if (r.exitCode == 0 && out.isNotEmpty) return out;
     } catch (_) {}
@@ -695,7 +753,10 @@ class SetupCheckService {
   }) async {
     final env = _env;
 
-    Future<DependencyStatus?> tryCommand(String cmd, List<String> verArgs) async {
+    Future<DependencyStatus?> tryCommand(
+      String cmd,
+      List<String> verArgs,
+    ) async {
       try {
         final resolvedPath = await _findPath(cmd);
         if (resolvedPath == null) return null;
@@ -732,8 +793,10 @@ class SetupCheckService {
     if (primary != null) return primary;
 
     if (fallbackCommand != null) {
-      final fallback =
-          await tryCommand(fallbackCommand, fallbackVersionArgs ?? versionArgs);
+      final fallback = await tryCommand(
+        fallbackCommand,
+        fallbackVersionArgs ?? versionArgs,
+      );
       if (fallback != null) return fallback;
     }
 
@@ -753,7 +816,9 @@ class SetupCheckService {
     final match = RegExp(r'[\d]+\.[\d]+[\.\d]*').firstMatch(raw);
     return match != null
         ? match.group(0)!
-        : raw.length > 40 ? raw.substring(0, 40) : raw;
+        : raw.length > 40
+        ? raw.substring(0, 40)
+        : raw;
   }
 }
 
