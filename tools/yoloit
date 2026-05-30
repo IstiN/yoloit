@@ -432,6 +432,20 @@ commands = [
   },
   {
     "group": "yolochat",
+    "name": "yolochat:terminal",
+    "description": "Send text to a board terminal and press Enter by default",
+    "params": [
+      ["text", "Terminal input text", True],
+      ["--board id|name", "Target board (optional)", False],
+      ["--panel id|title", "Target terminal panel (optional)", False],
+      ["--session id", "Terminal session id override (optional)", False],
+      ["--no-enter", "Send raw text without trailing Enter", False],
+    ],
+    "example": "yoloit yolochat:terminal \"npm test\" --board \"Main\" --panel \"Terminal\"",
+    "aliases": ["chat:terminal", "terminal:send", "term:send"],
+  },
+  {
+    "group": "yolochat",
     "name": "yolochat:messages",
     "description": "Read chat messages from a YoLo chat panel",
     "params": [
@@ -923,6 +937,30 @@ commands = [
     "params": [["title", "Note title", True], ["[content]", "Markdown content", False], ["[board]", "Board name (first arg when 3+)", False]],
     "example": "yoloit note:create \"Sprint Plan\" \"# Goals\\n- Ship\"",
     "aliases": ["n:c"],
+  },
+  {
+    "group": "board",
+    "name": "sticky:create",
+    "description": "Create a Miro-style sticky note panel",
+    "params": [["[board]", "Board id or name (optional)", False], ["title", "Sticky title", True], ["text", "Sticky text", False], ["--color #RRGGBB", "Background color", False]],
+    "example": "yoloit sticky:create \"Ideas\" \"Ship terminal control\" --color \"#FEF08A\"",
+    "aliases": ["sticky:new"],
+  },
+  {
+    "group": "board",
+    "name": "shape:create",
+    "description": "Create a geometric shape panel",
+    "params": [["[board]", "Board id or name (optional)", False], ["shape", "rectangle|circle|diamond|triangle|hexagon|frame", True], ["title", "Panel title", True], ["--text label", "Centered label", False], ["--fill #RRGGBB", "Fill color", False], ["--stroke #RRGGBB", "Stroke color", False]],
+    "example": "yoloit shape:create diamond \"Decision\" --text \"Go / No-go\"",
+    "aliases": ["shape:new"],
+  },
+  {
+    "group": "board",
+    "name": "frame:create",
+    "description": "Create a Miro-style frame panel for grouping board content",
+    "params": [["[board]", "Board id or name (optional)", False], ["title", "Frame title", True]],
+    "example": "yoloit frame:create \"Sprint scope\"",
+    "aliases": ["frame:new"],
   },
   {
     "group": "note",
@@ -2670,6 +2708,42 @@ PY
 )
     _post "/yolochat/send" "$payload"
     ;;
+  yolochat:terminal|chat:terminal|terminal:send|term:send)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit yolochat:terminal <text> [--board <id|name>] [--panel <id|title>] [--session <id>] [--no-enter]" >&2; exit 1; }
+    text="$1"
+    shift
+    board=""
+    panel=""
+    session_id=""
+    append_newline=true
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --board) board="${2:-}"; shift 2 ;;
+        --panel) panel="${2:-}"; shift 2 ;;
+        --session|--session-id) session_id="${2:-}"; shift 2 ;;
+        --no-enter) append_newline=false; shift ;;
+        *)
+          echo "Unknown option: $1" >&2
+          echo "Usage: yoloit yolochat:terminal <text> [--board <id|name>] [--panel <id|title>] [--session <id>] [--no-enter]" >&2
+          exit 1
+          ;;
+      esac
+    done
+    payload=$(python3 - "$text" "$board" "$panel" "$session_id" "$append_newline" <<'PY'
+import json, sys
+text, board, panel, session_id, append_newline = sys.argv[1:6]
+body = {"text": text, "appendNewline": append_newline == "true"}
+if board:
+    body["board"] = board
+if panel:
+    body["panel"] = panel
+if session_id:
+    body["sessionId"] = session_id
+print(json.dumps(body))
+PY
+)
+    _post "/yolochat/terminal" "$payload" | python3 -m json.tool 2>/dev/null
+    ;;
   yolochat:messages)
     board=""
     panel=""
@@ -3075,7 +3149,7 @@ PYEOF
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     _put "/boards/${bid}/panels/${pid}" '{"hidden":false}' | python3 -m json.tool 2>/dev/null
     ;;
-  panel:screenshot)
+  panel:screenshot|psc)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:screenshot <board> <panel> [file.png]" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
     outfile="${3:-panel_screenshot.png}"
@@ -3163,6 +3237,73 @@ PYEOF
     state=$(python3 -c "import json,sys; print(json.dumps({'markdown': sys.argv[1] if len(sys.argv)>1 else ''}))" "${content:-}" 2>/dev/null)
     pid=$(_auto_panel "$bid" "board.note.markdown" "$title" "$state")
     echo "Note panel created: $pid"
+    ;;
+  sticky:create|sticky:new)
+    local bid_raw="" title="" text="" color="#FEF08A"
+    local sticky_args=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --color) color="${2:-$color}"; shift 2 ;;
+        *) sticky_args+=("$1"); shift ;;
+      esac
+    done
+    set -- "${sticky_args[@]}"
+    case $# in
+      0) echo "Usage: yoloit sticky:create [board] <title> [text] [--color #RRGGBB]" >&2; exit 1 ;;
+      1) title="$1" ;;
+      2) title="$1"; text="$2" ;;
+      *) bid_raw="$1"; title="$2"; shift 2; text="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    state=$(python3 -c "import json,sys; print(json.dumps({'text':sys.argv[1], 'color':sys.argv[2]}))" "$text" "$color")
+    pid=$(_auto_panel "$bid" "board.sticky" "$title" "$state")
+    echo "Sticky panel created: $pid"
+    ;;
+  shape:create|shape:new)
+    local bid_raw="" shape="" title="" text="" fill="#1E293B" stroke="#93C5FD"
+    local shape_args=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --text) text="${2:-}"; shift 2 ;;
+        --fill|--fill-color) fill="${2:-$fill}"; shift 2 ;;
+        --stroke|--stroke-color) stroke="${2:-$stroke}"; shift 2 ;;
+        *) shape_args+=("$1"); shift ;;
+      esac
+    done
+    set -- "${shape_args[@]}"
+    case $# in
+      0|1) echo "Usage: yoloit shape:create [board] <shape> <title> [--text label] [--fill #RRGGBB] [--stroke #RRGGBB]" >&2; exit 1 ;;
+      2) shape="$1"; title="$2" ;;
+      *)
+        case "$1" in
+          rectangle|rect|circle|oval|diamond|triangle|hexagon|frame)
+            shape="$1"; shift; title="$*"
+            ;;
+          *)
+            bid_raw="$1"; shape="$2"; shift 2; title="$*"
+            ;;
+        esac
+        ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    state=$(python3 -c "import json,sys; print(json.dumps({'shape':sys.argv[1], 'text':sys.argv[2], 'fillColor':sys.argv[3], 'strokeColor':sys.argv[4]}))" "$shape" "$text" "$fill" "$stroke")
+    pid=$(_auto_panel "$bid" "board.shape" "$title" "$state")
+    echo "Shape panel created: $pid"
+    ;;
+  frame:create|frame:new)
+    local bid_raw="" title=""
+    case $# in
+      0) echo "Usage: yoloit frame:create [board] <title>" >&2; exit 1 ;;
+      1) title="$1" ;;
+      *) bid_raw="$1"; shift; title="$*" ;;
+    esac
+    bid_raw=$(_require_board "$bid_raw")
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    state=$(python3 -c "import json,sys; print(json.dumps({'shape':'frame', 'text':sys.argv[1], 'fillColor':'#00000000', 'strokeColor':'#A78BFA', 'strokeWidth':4}))" "$title")
+    pid=$(_auto_panel "$bid" "board.shape" "$title" "$state")
+    echo "Frame panel created: $pid"
     ;;
   note:append|n:ap)
     # Explicit board+panel required (legacy compat)
@@ -3827,11 +3968,14 @@ ALIAS = {
     'chat:clear':'yolochat:clear','chat:sessions':'yolochat:sessions',
     'chat:status':'yolochat:status','chat:stop':'yolochat:stop',
     'chat:logs':'yolochat:logs','chat:send':'yolochat:send',
+    'chat:terminal':'yolochat:terminal','terminal:send':'yolochat:terminal',
+    'term:send':'yolochat:terminal',
     'board:generate-screenshot':'board:screenshot','board:generate':'board:snapshot',
     'panel:close':'panel:hide','note:write':'note:add',
     'board:copy':'board:clone','board:config':'board:settings',
     'board:translate':'board:focus','note:delete':'panel:delete',
     'panel:stop':'panel:hide','run:script':'run:attach',
+    'sticky:new':'sticky:create','shape:new':'shape:create','frame:new':'frame:create',
 }
 if cmd in ALIAS:
     cmd = ALIAS[cmd]

@@ -9,7 +9,16 @@ class PlaylistCliHandler extends PanelCliHandler {
   String get typeId => 'board.playlist';
 
   @override
-  List<String> get supportedActions => ['list', 'add', 'remove', 'play', 'pause', 'stop', 'next', 'prev'];
+  List<String> get supportedActions => [
+    'list',
+    'add',
+    'remove',
+    'play',
+    'pause',
+    'stop',
+    'next',
+    'prev',
+  ];
 
   /// Returns the `tracks` list from panel state (key used by the widget).
   List<dynamic> _tracks(BoardPanelInstance panel) =>
@@ -20,16 +29,19 @@ class PlaylistCliHandler extends PanelCliHandler {
     final tracks = _tracks(panel);
     final currentIndex = panel.state['currentIndex'] as int? ?? -1;
     return {
-      'tracks': tracks
-          .asMap()
-          .entries
-          .map((e) => {
-                'index': e.key,
-                'title': (e.value as Map?)?['title'] ?? e.value,
-                'path': (e.value as Map?)?['path'] ?? '',
-                'current': e.key == currentIndex,
-              })
-          .toList(),
+      'tracks':
+          tracks
+              .asMap()
+              .entries
+              .map(
+                (e) => {
+                  'index': e.key,
+                  'title': (e.value as Map?)?['title'] ?? e.value,
+                  'path': (e.value as Map?)?['path'] ?? '',
+                  'current': e.key == currentIndex,
+                },
+              )
+              .toList(),
       'currentIndex': currentIndex,
       'playing': panel.state['playing'] ?? false,
       'count': tracks.length,
@@ -49,12 +61,19 @@ class PlaylistCliHandler extends PanelCliHandler {
       case 'add':
         final path = args['path'] as String? ?? args['url'] as String?;
         if (path == null) {
-          return const CliActionResult(ok: false, message: 'Missing "path" or "url"');
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "path" or "url"',
+          );
         }
         final tracks = List<dynamic>.from(_tracks(panel));
-        tracks.add({'path': path, 'title': args['title'] ?? path.split('/').last});
+        tracks.add({
+          'path': path,
+          'title': args['title'] ?? path.split('/').last,
+        });
         return CliActionResult(
-          message: 'Added "${args['title'] ?? path.split('/').last}" to playlist (${tracks.length} tracks total)',
+          message:
+              'Added "${args['title'] ?? path.split('/').last}" to playlist (${tracks.length} tracks total)',
           stateUpdate: {'tracks': tracks},
         );
 
@@ -65,11 +84,17 @@ class PlaylistCliHandler extends PanelCliHandler {
         }
         final tracks = List<dynamic>.from(_tracks(panel));
         if (index < 0 || index >= tracks.length) {
-          return CliActionResult(ok: false, message: 'Index $index out of range (0–${tracks.length - 1})');
+          return CliActionResult(
+            ok: false,
+            message: 'Index $index out of range (0–${tracks.length - 1})',
+          );
         }
         final removed = (tracks[index] as Map?)?['title'] ?? 'track $index';
         tracks.removeAt(index);
-        final newIndex = (panel.state['currentIndex'] as int? ?? 0).clamp(0, tracks.isEmpty ? 0 : tracks.length - 1);
+        final newIndex = (panel.state['currentIndex'] as int? ?? 0).clamp(
+          0,
+          tracks.isEmpty ? 0 : tracks.length - 1,
+        );
         return CliActionResult(
           message: 'Removed "$removed"',
           stateUpdate: {'tracks': tracks, 'currentIndex': newIndex},
@@ -78,9 +103,15 @@ class PlaylistCliHandler extends PanelCliHandler {
       case 'play':
         final tracks = _tracks(panel);
         if (tracks.isEmpty) {
-          return const CliActionResult(ok: false, message: 'Playlist is empty. Add tracks first with the "add" action.');
+          return const CliActionResult(
+            ok: false,
+            message:
+                'Playlist is empty. Add tracks first with the "add" action.',
+          );
         }
-        final index = (args['index'] as int? ?? panel.state['currentIndex'] as int? ?? 0)
+        final index = (args['index'] as int? ??
+                panel.state['currentIndex'] as int? ??
+                0)
             .clamp(0, tracks.length - 1);
         final title = (tracks[index] as Map?)?['title'] ?? 'track $index';
         return CliActionResult(
@@ -130,4 +161,33 @@ class PlaylistCliHandler extends PanelCliHandler {
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'list': const CliActionHelp(
+      description: 'List playlist tracks and playback state',
+    ),
+    'add': const CliActionHelp(
+      description: 'Add a media file or URL to the playlist',
+      params: {
+        'path': 'Media file path',
+        'url': 'Media URL',
+        'title': 'Optional title',
+      },
+    ),
+    'remove': const CliActionHelp(
+      description: 'Remove a track by zero-based index',
+      params: {'index': 'Zero-based track index'},
+    ),
+    'play': const CliActionHelp(
+      description: 'Start playback, optionally at a track index',
+      params: {'index': 'Optional zero-based track index'},
+    ),
+    'pause': const CliActionHelp(description: 'Pause playback'),
+    'stop': const CliActionHelp(
+      description: 'Stop playback and reset to the first track',
+    ),
+    'next': const CliActionHelp(description: 'Skip to next track'),
+    'prev': const CliActionHelp(description: 'Skip to previous track'),
+  };
 }

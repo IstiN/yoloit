@@ -267,4 +267,48 @@ class KanbanCliHandler extends PanelCliHandler {
     }
     return removedIndex ?? 0;
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'columns': const CliActionHelp(description: 'List kanban columns'),
+    'cards': const CliActionHelp(description: 'List kanban columns with cards'),
+    'add-column': const CliActionHelp(
+      description: 'Add a kanban column',
+      params: {'name': 'Column name'},
+    ),
+    'rename-column': const CliActionHelp(
+      description: 'Rename a column by index or name',
+      params: {'column': 'Column index or name', 'name': 'New column name'},
+    ),
+    'remove-column': const CliActionHelp(
+      description: 'Remove a column by index or name',
+      params: {'column': 'Column index or name'},
+    ),
+    'add-card': const CliActionHelp(
+      description: 'Add a card to a column',
+      params: {
+        'column': 'Column index or name',
+        'title': 'Card title',
+        'description': 'Optional description',
+        'color': 'Optional color',
+      },
+    ),
+    'move-card': const CliActionHelp(
+      description: 'Move a card to another column',
+      params: {'cardId': 'Card id', 'to': 'Target column index or name'},
+    ),
+    'remove-card': const CliActionHelp(
+      description: 'Remove a card by id',
+      params: {'cardId': 'Card id'},
+    ),
+    'update-card': const CliActionHelp(
+      description: 'Update card title, description, or color',
+      params: {
+        'cardId': 'Card id',
+        'title': 'New title',
+        'description': 'New description',
+        'color': 'Color',
+      },
+    ),
+  };
 }

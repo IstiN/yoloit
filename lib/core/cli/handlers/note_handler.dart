@@ -9,13 +9,17 @@ class NoteCliHandler extends PanelCliHandler {
   String get typeId => 'board.note.markdown';
 
   @override
-  List<String> get supportedActions => ['set', 'get', 'append', 'wrap', 'nowrap'];
+  List<String> get supportedActions => [
+    'set',
+    'get',
+    'append',
+    'wrap',
+    'nowrap',
+  ];
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
-    return {
-      'markdown': panel.state['markdown'] ?? '',
-    };
+    return {'markdown': panel.state['markdown'] ?? ''};
   }
 
   @override
@@ -32,7 +36,10 @@ class NoteCliHandler extends PanelCliHandler {
       case 'set':
         final text = args['text'] as String? ?? args['markdown'] as String?;
         if (text == null) {
-          return const CliActionResult(ok: false, message: 'Missing "text" or "markdown" field');
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "text" or "markdown" field',
+          );
         }
         return CliActionResult(
           message: 'Note updated',
@@ -41,7 +48,10 @@ class NoteCliHandler extends PanelCliHandler {
       case 'append':
         final text = args['text'] as String?;
         if (text == null) {
-          return const CliActionResult(ok: false, message: 'Missing "text" field');
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "text" field',
+          );
         }
         final current = panel.state['markdown'] as String? ?? '';
         return CliActionResult(
@@ -69,11 +79,18 @@ class NoteCliHandler extends PanelCliHandler {
     'set': const CliActionHelp(
       description: 'Set note content',
       params: {'text': 'Markdown text to set'},
-      example: 'yoloit board <id> panel <id> action --action set --text "# Hello"',
+      example:
+          'yoloit board <id> panel <id> action --action set --text "# Hello"',
     ),
     'append': const CliActionHelp(
       description: 'Append text to note',
       params: {'text': 'Text to append'},
+    ),
+    'wrap': const CliActionHelp(
+      description: 'Enable auto-height so the note grows to fit content',
+    ),
+    'nowrap': const CliActionHelp(
+      description: 'Disable auto-height and keep the note panel fixed-size',
     ),
   };
 }

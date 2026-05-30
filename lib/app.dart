@@ -15,6 +15,8 @@ import 'package:yoloit/core/cli/handlers/kanban_handler.dart';
 import 'package:yoloit/core/cli/handlers/note_handler.dart';
 import 'package:yoloit/core/cli/handlers/playlist_handler.dart';
 import 'package:yoloit/core/cli/handlers/run_configs_handler.dart';
+import 'package:yoloit/core/cli/handlers/shape_handler.dart';
+import 'package:yoloit/core/cli/handlers/sticky_note_handler.dart';
 import 'package:yoloit/core/cli/handlers/terminal_handler.dart';
 import 'package:yoloit/core/cli/handlers/timer_handler.dart';
 import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
@@ -747,6 +749,8 @@ class _AutoHostShellState extends State<_AutoHostShell> {
     final server = CliServer.instance;
     // Register all panel CLI handlers
     server.registerPanelHandler(const NoteCliHandler());
+    server.registerPanelHandler(const StickyNoteCliHandler());
+    server.registerPanelHandler(const ShapeCliHandler());
     server.registerPanelHandler(ChatCliHandler());
     server.registerPanelHandler(const KanbanCliHandler());
     server.registerPanelHandler(const WebpageCliHandler());

@@ -422,7 +422,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
                       Expanded(
                         flex: 1,
                         child: Container(
-                          color: Colors.black,
+                          color: context.appColors.background,
                           padding: const EdgeInsets.all(4),
                           child: ListView.builder(
                             controller: logScroll,

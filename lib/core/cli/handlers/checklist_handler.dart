@@ -169,4 +169,37 @@ class ChecklistCliHandler extends PanelCliHandler {
     );
     return exact < 0 ? null : exact;
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'items': const CliActionHelp(description: 'List checklist items'),
+    'add': const CliActionHelp(
+      description: 'Add a checklist item',
+      params: {'text': 'Item text'},
+    ),
+    'check': const CliActionHelp(
+      description: 'Mark an item done by index, id, or text',
+      params: {
+        'index': 'Zero-based item index',
+        'id': 'Item id',
+        'text': 'Item text',
+      },
+    ),
+    'uncheck': const CliActionHelp(
+      description: 'Mark an item not done by index, id, or text',
+      params: {
+        'index': 'Zero-based item index',
+        'id': 'Item id',
+        'text': 'Item text',
+      },
+    ),
+    'remove': const CliActionHelp(
+      description: 'Remove an item by zero-based index',
+      params: {'index': 'Zero-based item index'},
+    ),
+    'rename': const CliActionHelp(
+      description: 'Rename an item by zero-based index',
+      params: {'index': 'Zero-based item index', 'text': 'New item text'},
+    ),
+  };
 }

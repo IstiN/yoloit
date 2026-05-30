@@ -13,7 +13,10 @@ class TerminalCliHandler extends PanelCliHandler {
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
-    return {'config': panel.state['config'] as Map<String, dynamic>? ?? <String, dynamic>{}};
+    return {
+      'config':
+          panel.state['config'] as Map<String, dynamic>? ?? <String, dynamic>{},
+    };
   }
 
   @override
@@ -31,7 +34,8 @@ class TerminalCliHandler extends PanelCliHandler {
           return const CliActionResult(ok: false, message: 'Missing "dir"');
         }
         final config = Map<String, dynamic>.from(
-          (panel.state['config'] as Map<String, dynamic>?) ?? <String, dynamic>{},
+          (panel.state['config'] as Map<String, dynamic>?) ??
+              <String, dynamic>{},
         );
         config['workingDir'] = dir;
         return CliActionResult(
@@ -42,4 +46,16 @@ class TerminalCliHandler extends PanelCliHandler {
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'config': const CliActionHelp(
+      description: 'Read terminal panel configuration',
+    ),
+    'set-dir': const CliActionHelp(
+      description: 'Set terminal working directory for the panel',
+      params: {'dir': 'Absolute working directory path'},
+      example: 'yoloit do "<board>" "<terminal>" set-dir \'{"dir":"/repo"}\'',
+    ),
+  };
 }

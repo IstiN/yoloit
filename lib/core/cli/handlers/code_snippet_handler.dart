@@ -31,18 +31,30 @@ class CodeSnippetCliHandler extends PanelCliHandler {
       case 'set':
         final code = args['code'] as String?;
         if (code == null) {
-          return const CliActionResult(ok: false, message: 'Missing "code" field');
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing "code" field',
+          );
         }
         final lang = args['language'] as String?;
         return CliActionResult(
           message: 'Code updated',
-          stateUpdate: {
-            'code': code,
-            if (lang != null) 'language': lang,
-          },
+          stateUpdate: {'code': code, if (lang != null) 'language': lang},
         );
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'get': const CliActionHelp(description: 'Read code snippet content'),
+    'set': const CliActionHelp(
+      description: 'Replace code snippet content and optional language',
+      params: {
+        'code': 'Source code text',
+        'language': 'Optional language id, for example dart or python',
+      },
+    ),
+  };
 }

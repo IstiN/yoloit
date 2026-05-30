@@ -98,4 +98,26 @@ class FileTreeCliHandler extends PanelCliHandler {
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'list': const CliActionHelp(description: 'Read file tree panel state'),
+    'open': const CliActionHelp(
+      description: 'Select a file path in the tree',
+      params: {'path': 'Absolute file path'},
+    ),
+    'expand': const CliActionHelp(
+      description: 'Expand a directory in the tree',
+      params: {'dir': 'Absolute directory path'},
+    ),
+    'collapse': const CliActionHelp(
+      description: 'Collapse a directory in the tree',
+      params: {'dir': 'Absolute directory path'},
+    ),
+    'set-root': const CliActionHelp(
+      description: 'Set the root directory shown by the tree',
+      params: {'path': 'Absolute root directory path'},
+    ),
+    'refresh': const CliActionHelp(description: 'Refresh file tree contents'),
+  };
 }

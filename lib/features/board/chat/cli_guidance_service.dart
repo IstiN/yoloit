@@ -58,10 +58,11 @@ class CliGuidanceService {
   Future<String?> _fetchHelp() async {
     final bin = _resolveYoloitBin();
     try {
-      final result = await Process.run(
-        bin ?? 'yoloit',
-        ['help', '--format', 'short'],
-      ).timeout(const Duration(seconds: 4));
+      final result = await Process.run(bin ?? 'yoloit', [
+        'help',
+        '--format',
+        'short',
+      ]).timeout(const Duration(seconds: 4));
       if (result.exitCode == 0) {
         final out = result.stdout.toString().trim();
         return out.isNotEmpty ? out : null;
@@ -71,6 +72,8 @@ class CliGuidanceService {
   }
 
   String? _resolveYoloitBin() {
+    final source = _findSourceTreeCli();
+    if (source != null) return source;
     final home = Platform.environment['HOME'] ?? '';
     if (home.isNotEmpty) {
       final installed = File('$home/.config/yoloit/yoloit');
@@ -78,5 +81,31 @@ class CliGuidanceService {
     }
     return null;
   }
-}
 
+  String? _findSourceTreeCli() {
+    final roots = <String?>[
+      Directory.current.path,
+      Platform.environment['PWD'],
+      Platform.environment['YOLOIT_PROJECT_ROOT'],
+    ];
+    final seen = <String>{};
+    for (final raw in roots) {
+      if (raw == null || raw.trim().isEmpty) continue;
+      var dir = Directory(raw.trim()).absolute;
+      for (var depth = 0; depth < 10; depth++) {
+        if (!seen.add(dir.path)) break;
+        final candidates = [
+          File('${dir.path}/tools/yoloit'),
+          File('${dir.path}/yoloit/tools/yoloit'),
+        ];
+        for (final candidate in candidates) {
+          if (candidate.existsSync()) return candidate.path;
+        }
+        final parent = dir.parent;
+        if (parent.path == dir.path) break;
+        dir = parent;
+      }
+    }
+    return null;
+  }
+}

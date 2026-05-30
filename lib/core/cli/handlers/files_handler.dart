@@ -38,6 +38,15 @@ class FilesCliHandler extends PanelCliHandler {
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'get': const CliActionHelp(description: 'Read selected folder path'),
+    'open': const CliActionHelp(
+      description: 'Select a folder or file path in the files panel',
+      params: {'path': 'Absolute file or folder path'},
+    ),
+  };
 }
 
 /// CLI handler for File Preview panels (`board.file.preview`).
@@ -52,7 +61,8 @@ class FilePreviewCliHandler extends PanelCliHandler {
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
-    return {'filePath': panel.state['filePath'] ?? ''};
+    final path = panel.state['path'] ?? panel.state['filePath'] ?? '';
+    return {'path': path, 'filePath': path};
   }
 
   @override
@@ -71,10 +81,22 @@ class FilePreviewCliHandler extends PanelCliHandler {
         }
         return CliActionResult(
           message: 'Previewing $path',
-          stateUpdate: {'filePath': path},
+          stateUpdate: {'path': path, 'filePath': path},
         );
       default:
         return CliActionResult(ok: false, message: 'Unknown action: $action');
     }
   }
+
+  @override
+  Map<String, CliActionHelp> get actionHelp => {
+    'get': const CliActionHelp(description: 'Read current preview file path'),
+    'open': const CliActionHelp(
+      description: 'Open a file in the file preview panel',
+      params: {
+        'path':
+            'Absolute file path; supports images, text, markdown, media, and PDF',
+      },
+    ),
+  };
 }

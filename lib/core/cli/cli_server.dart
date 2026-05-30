@@ -25,9 +25,11 @@ import 'package:yoloit/features/board/chat/chat_session_naming.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
@@ -38,6 +40,7 @@ import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
@@ -823,7 +826,10 @@ class CliServer {
       }
       if (body.containsKey('asrMode')) {
         final mode = body['asrMode'] as String?;
-        if (mode != null && mode != 'default' && mode != 'local' && mode != 'cloud') {
+        if (mode != null &&
+            mode != 'default' &&
+            mode != 'local' &&
+            mode != 'cloud') {
           return _error('asrMode must be "default", "local", or "cloud"');
         }
         config = config.copyWith(asrMode: mode ?? 'default');
@@ -1600,6 +1606,55 @@ class CliServer {
       return _panelAction(cubit, target.board, target.panel, actionBody);
     }
 
+    if (sub.length == 1 &&
+        (sub[0] == 'terminal' || sub[0] == 'terminal-input') &&
+        method == 'POST') {
+      final body = await _body(request);
+      final text = body['text'] as String? ?? body['input'] as String?;
+      if (text == null || text.isEmpty) {
+        return _error('Missing "text" field');
+      }
+      final appendNewline =
+          body['appendNewline'] as bool? ?? body['enter'] as bool? ?? true;
+      final explicitSession =
+          body['sessionId'] as String? ?? body['session'] as String?;
+      var sessionId = explicitSession?.trim() ?? '';
+      ({BoardDocument board, BoardPanelInstance panel})? target;
+
+      if (sessionId.isEmpty) {
+        target = _resolveTerminalTarget(
+          cubit,
+          boardHint: body['board'] as String? ?? body['boardId'] as String?,
+          panelHint: body['panel'] as String? ?? body['panelId'] as String?,
+        );
+        if (target == null) {
+          return _error('No board.terminal panel found (or target not found)');
+        }
+        final config = _terminalConfigForPanel(target.panel);
+        if (!config.isConfigured || config.sessionId.trim().isEmpty) {
+          return _error('Target terminal panel is not configured');
+        }
+        await BoardTerminalSessionManager.instance.ensureSession(config);
+        sessionId = config.sessionId;
+      }
+
+      final payload = appendNewline ? '$text\n' : text;
+      TerminalBackendService.instance.write(sessionId, payload);
+      return _json({
+        'ok': true,
+        'sessionId': sessionId,
+        'bytes': payload.length,
+        'appendNewline': appendNewline,
+        if (target != null)
+          'target': {
+            'boardId': target.board.id,
+            'boardName': target.board.name,
+            'panelId': target.panel.id,
+            'panelTitle': target.panel.title,
+          },
+      });
+    }
+
     if (sub.length == 1 && sub[0] == 'messages' && method == 'GET') {
       final boardHint = request.url.queryParameters['board'];
       final panelHint = request.url.queryParameters['panel'];
@@ -1856,6 +1911,42 @@ class CliServer {
     return (board: board, panel: panel);
   }
 
+  ({BoardDocument board, BoardPanelInstance panel})? _resolveTerminalTarget(
+    BoardCubit cubit, {
+    String? boardHint,
+    String? panelHint,
+  }) {
+    BoardDocument? board;
+    if (boardHint != null && boardHint.trim().isNotEmpty) {
+      board = _findBoard(cubit, boardHint);
+    } else {
+      board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
+    }
+    if (board == null) return null;
+
+    BoardPanelInstance? panel;
+    if (panelHint != null && panelHint.trim().isNotEmpty) {
+      panel = _findPanel(board, panelHint);
+      if (panel?.type != 'board.terminal') return null;
+    } else {
+      panel = board.panels.where((p) => p.type == 'board.terminal').firstOrNull;
+    }
+    if (panel == null) return null;
+    return (board: board, panel: panel);
+  }
+
+  BoardTerminalConfig _terminalConfigForPanel(BoardPanelInstance panel) {
+    final raw = panel.state['config'];
+    if (raw is Map) {
+      return BoardTerminalConfig.fromJson(Map<String, dynamic>.from(raw));
+    }
+    return const BoardTerminalConfig(
+      sessionId: '',
+      sessionName: '',
+      workingDir: '',
+    );
+  }
+
   Future<shelf.Response> _handleBoard(
     String method,
     List<String> sub,
@@ -1889,8 +1980,7 @@ class CliServer {
     }
     // GET /api/boards/:id/screenshot
     if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
-      final forceOffscreen =
-          request.url.queryParameters['mode'] == 'offscreen';
+      final forceOffscreen = request.url.queryParameters['mode'] == 'offscreen';
       return _boardScreenshot(
         board,
         cubit: cubit,
@@ -2144,13 +2234,10 @@ class CliServer {
       png = await BoardOffscreenRenderer.instance.renderBoard(board);
     } else {
       final activeBoard = activeCubit.state.activeBoard;
-      final isActiveBoard =
-          activeBoard != null && activeBoard.id == board.id;
+      final isActiveBoard = activeBoard != null && activeBoard.id == board.id;
       if (isActiveBoard) {
         _scheduleRebuild();
-        png = await BoardScreenshotService.instance.capturePng(
-          pixelRatio: 1.5,
-        );
+        png = await BoardScreenshotService.instance.capturePng(pixelRatio: 1.5);
       } else {
         debugPrint('[CliServer] screenshot: offscreen board=${board.id}');
         png = await BoardOffscreenRenderer.instance.renderBoard(board);
@@ -2177,10 +2264,7 @@ class CliServer {
     BoardDocument board,
     BoardPanelInstance panel,
   ) async {
-    final png = await BoardOffscreenRenderer.instance.renderPanel(
-      board,
-      panel,
-    );
+    final png = await BoardOffscreenRenderer.instance.renderPanel(board, panel);
     if (png == null) {
       return _error('Failed to capture panel screenshot');
     }
@@ -3830,9 +3914,7 @@ class CliServer {
     final queryWords =
         normNeedle.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
     if (queryWords.length > 1) {
-      final allMatch = queryWords.every(
-        (w) => normHaystack.contains(w),
-      );
+      final allMatch = queryWords.every((w) => normHaystack.contains(w));
       if (allMatch) {
         // Find the first word match to anchor the snippet.
         final firstIdx = normHaystack.indexOf(queryWords.first);
@@ -4434,9 +4516,8 @@ class CliServer {
       final activeCustomId = tm.activeCustomThemeId;
       String name;
       if (activeCustomId != null) {
-        final custom = tm.customThemes
-            .where((t) => t.id == activeCustomId)
-            .firstOrNull;
+        final custom =
+            tm.customThemes.where((t) => t.id == activeCustomId).firstOrNull;
         name = custom?.name ?? 'Custom';
       } else {
         name = tm.current.label;
@@ -4448,39 +4529,57 @@ class CliServer {
         'customThemeId': activeCustomId,
         'hasOverrides': tm.hasOverrides,
         'overrides': tm.colorOverrides.map(
-          (k, v) => MapEntry(k, '#${v.value.toRadixString(16).padLeft(8, '0')}'),
+          (k, v) =>
+              MapEntry(k, '#${v.value.toRadixString(16).padLeft(8, '0')}'),
         ),
       });
     }
 
     // GET /api/theme/presets → list all presets (built-in + custom)
     if (path.length == 1 && path[0] == 'presets' && method == 'GET') {
-      final builtIn = AppThemePreset.values.map((p) => {
-        'id': p.name,
-        'name': p.label,
-        'type': 'builtin',
-        'brightness': (p.defaultBrightness ?? Brightness.dark) == Brightness.light
-            ? 'light'
-            : 'dark',
-      }).toList();
-      final custom = tm.customThemes.map((c) => {
-        'id': c.id,
-        'name': c.name,
-        'type': 'custom',
-        'brightness': c.brightness == Brightness.light ? 'light' : 'dark',
-      }).toList();
-      return _json({'presets': [...builtIn, ...custom]});
+      final builtIn =
+          AppThemePreset.values
+              .map(
+                (p) => {
+                  'id': p.name,
+                  'name': p.label,
+                  'type': 'builtin',
+                  'brightness':
+                      (p.defaultBrightness ?? Brightness.dark) ==
+                              Brightness.light
+                          ? 'light'
+                          : 'dark',
+                },
+              )
+              .toList();
+      final custom =
+          tm.customThemes
+              .map(
+                (c) => {
+                  'id': c.id,
+                  'name': c.name,
+                  'type': 'custom',
+                  'brightness':
+                      c.brightness == Brightness.light ? 'light' : 'dark',
+                },
+              )
+              .toList();
+      return _json({
+        'presets': [...builtIn, ...custom],
+      });
     }
 
     // POST /api/theme/set { preset: "neonPurple" } or { customId: "custom_xxx" }
     if (path.length == 1 && path[0] == 'set' && method == 'POST') {
-      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
       final presetName = body['preset'] as String?;
       final customId = body['customId'] as String?;
       if (presetName != null) {
-        final preset = AppThemePreset.values
-            .where((p) => p.name == presetName)
-            .firstOrNull;
+        final preset =
+            AppThemePreset.values
+                .where((p) => p.name == presetName)
+                .firstOrNull;
         if (preset == null) {
           return _json({'ok': false, 'message': 'Unknown preset: $presetName'});
         }
@@ -4490,28 +4589,36 @@ class CliServer {
       } else if (customId != null) {
         await tm.setCustomTheme(customId);
         await tm.clearColorOverrides();
-        return _json({'ok': true, 'message': 'Custom theme activated: $customId'});
+        return _json({
+          'ok': true,
+          'message': 'Custom theme activated: $customId',
+        });
       }
       return _json({'ok': false, 'message': 'Provide "preset" or "customId"'});
     }
 
     // POST /api/theme/brightness { brightness: "dark"|"light" }
     if (path.length == 1 && path[0] == 'brightness' && method == 'POST') {
-      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
       final b = body['brightness'] as String?;
       if (b == 'dark') {
         await tm.setBrightness(Brightness.dark);
       } else if (b == 'light') {
         await tm.setBrightness(Brightness.light);
       } else {
-        return _json({'ok': false, 'message': 'Provide brightness: "dark" or "light"'});
+        return _json({
+          'ok': false,
+          'message': 'Provide brightness: "dark" or "light"',
+        });
       }
       return _json({'ok': true, 'brightness': b});
     }
 
     // POST /api/theme/color { slot: "primary", color: "#FF548AF7" }
     if (path.length == 1 && path[0] == 'color' && method == 'POST') {
-      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
       final slot = body['slot'] as String?;
       final hex = body['color'] as String?;
       if (slot == null || hex == null) {
@@ -4548,13 +4655,18 @@ class CliServer {
 
     // POST /api/theme/save { name: "My Theme" } — save current as custom preset
     if (path.length == 1 && path[0] == 'save' && method == 'POST') {
-      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
       final name = body['name'] as String?;
       if (name == null || name.trim().isEmpty) {
         return _json({'ok': false, 'message': 'Provide "name"'});
       }
       final id = await tm.saveCurrentAsPreset(name.trim());
-      return _json({'ok': true, 'id': id, 'message': 'Preset saved: ${name.trim()}'});
+      return _json({
+        'ok': true,
+        'id': id,
+        'message': 'Preset saved: ${name.trim()}',
+      });
     }
 
     // GET /api/theme/export → current theme as JSON
@@ -4567,7 +4679,8 @@ class CliServer {
 
     // POST /api/theme/import { path: "/path/to/file.json" }
     if (path.length == 1 && path[0] == 'import' && method == 'POST') {
-      final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
       final filePath = body['path'] as String?;
       if (filePath == null) {
         return _json({'ok': false, 'message': 'Provide "path" to theme file'});
@@ -4575,7 +4688,11 @@ class CliServer {
       try {
         final id = await tm.importThemeFile(filePath);
         await tm.setCustomTheme(id);
-        return _json({'ok': true, 'id': id, 'message': 'Theme imported and activated'});
+        return _json({
+          'ok': true,
+          'id': id,
+          'message': 'Theme imported and activated',
+        });
       } catch (e) {
         return _json({'ok': false, 'message': 'Import failed: $e'});
       }
@@ -4599,9 +4716,11 @@ class CliServer {
 
     // GET /api/theme/slots → available color slot names grouped by category
     if (path.length == 1 && path[0] == 'slots' && method == 'GET') {
-      return _json({'categories': ThemeManager.colorCategories.map(
-        (cat, slots) => MapEntry(cat, slots.map((s) => s.key).toList()),
-      )});
+      return _json({
+        'categories': ThemeManager.colorCategories.map(
+          (cat, slots) => MapEntry(cat, slots.map((s) => s.key).toList()),
+        ),
+      });
     }
 
     return _notFound('Unknown theme route');

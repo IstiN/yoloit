@@ -73,6 +73,8 @@ bool _isImageExt(String ext) {
 
 bool _isSvgExt(String ext) => ext.toLowerCase() == 'svg';
 
+bool _isPdfExt(String ext) => ext.toLowerCase() == 'pdf';
+
 bool _isVideoExt(String ext) {
   return const {
     'mp4',
@@ -275,7 +277,9 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     final ext = path.contains('.') ? path.split('.').last : '';
     final canEdit = _isEditableFile(path, ext);
 
-    final isHtml = const {'html', 'htm'}.contains(ext.toLowerCase());
+    final lowerExt = ext.toLowerCase();
+    final isHtml = const {'html', 'htm'}.contains(lowerExt);
+    final isPdf = _isPdfExt(lowerExt);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -285,7 +289,8 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
           onEdit: canEdit ? () => _editFile(path) : null,
           onOpen: () => PlatformLauncher.instance.revealInFinder(path),
           onChange: _pickFile,
-          onOpenAsWebPage: isHtml ? () => _openAsWebPage(path) : null,
+          onOpenAsWebPage:
+              (isHtml || isPdf) ? () => _openAsWebPage(path) : null,
         ),
         const Divider(height: 1, thickness: 0.5),
         Expanded(child: _buildPreview(path, ext)),
@@ -316,6 +321,12 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     }
     if (_isAudioExt(ext)) {
       return _AudioPreview(key: mediaKey, path: path);
+    }
+    if (_isPdfExt(ext)) {
+      return _PdfPreview(
+        path: path,
+        onOpenAsWebPage: () => _openAsWebPage(path),
+      );
     }
     if (_isMarkdownExt(ext)) {
       // No key change — stateful widget handles its own reload + scroll preservation.
@@ -409,6 +420,75 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     } catch (_) {
       return false;
     }
+  }
+}
+
+class _PdfPreview extends StatelessWidget {
+  const _PdfPreview({required this.path, required this.onOpenAsWebPage});
+
+  final String path;
+  final VoidCallback onOpenAsWebPage;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final fileName = path.split(Platform.pathSeparator).last;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Card(
+          color: colors.surfaceElevated,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.picture_as_pdf_outlined,
+                  size: 54,
+                  color: colors.accentRed,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  fileName,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'PDF preview is available through a linked Web panel or the system PDF viewer.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: onOpenAsWebPage,
+                      icon: const Icon(Icons.preview_outlined, size: 16),
+                      label: const Text('Preview PDF'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => PlatformLauncher.instance.openUrl(path),
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('Open'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -13,6 +13,8 @@ import 'package:yoloit/features/board/plugins/builtin/kanban_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/run_configs_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/shape_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/sticky_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
@@ -64,6 +66,8 @@ class BoardPluginRegistry {
 
   void _registerBuiltins() {
     register(const MarkdownNotePlugin());
+    register(const StickyNotePlugin());
+    register(const ShapePlugin());
     register(const KanbanPlugin());
     register(const WebpagePlugin());
     register(const CodeSnippetPlugin());

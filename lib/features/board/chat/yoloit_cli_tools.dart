@@ -303,7 +303,9 @@ class YoloitCliToolCatalog {
   /// Only includes commands that have humanVariants defined.
   /// Also merges any extra human variants loaded from YAML assets.
   /// Output format: { commands: [...], coverage: { total, withVariants, missing } }
-  static String catalogJson([Map<String, Map<String, List<String>>>? yamlVariants]) {
+  static String catalogJson([
+    Map<String, Map<String, List<String>>>? yamlVariants,
+  ]) {
     final withVariants = <Map<String, Object?>>[];
     final missing = <String>[];
     for (final tool in _tools) {
@@ -335,7 +337,8 @@ class YoloitCliToolCatalog {
 
   /// Load human variants from bundled YAML assets asynchronously.
   /// Returns a map of command-id → {locale → [phrases]}.
-  static Future<Map<String, Map<String, List<String>>>> loadYamlVariants() async {
+  static Future<Map<String, Map<String, List<String>>>>
+  loadYamlVariants() async {
     final result = <String, Map<String, List<String>>>{};
     const yamlFiles = [
       'assets/command_catalog/note.yaml',
@@ -363,9 +366,7 @@ class YoloitCliToolCatalog {
               final locale = entry.key as String;
               final phrases = entry.value;
               if (phrases is YamlList) {
-                locales[locale] = phrases
-                    .whereType<String>()
-                    .toList();
+                locales[locale] = phrases.whereType<String>().toList();
               }
             }
           } else if (human is YamlList) {
@@ -1384,6 +1385,7 @@ YoloitCliToolParam _panelTypeParam() {
         'board.note.markdown = markdown note; '
         'board.kanban = kanban board; '
         'board.run = terminal/run configs; '
+        'board.terminal = interactive terminal panel; '
         'board.chat = AI chat panel; '
         'board.checklist = checklist; '
         'board.webpage = web browser; '
@@ -1392,6 +1394,8 @@ YoloitCliToolParam _panelTypeParam() {
         'board.code.snippet = code snippet viewer; '
         'board.files = file attachments panel; '
         'board.file.preview = file/image/video preview; '
+        'board.sticky = Miro-style sticky note; '
+        'board.shape = geometric shape or frame panel; '
         'board.timer = countdown timer; '
         'board.yolo_assistant = YoLo voice assistant; '
         'board.run_configs = run configurations; '
@@ -1402,6 +1406,7 @@ YoloitCliToolParam _panelTypeParam() {
       'board.note.markdown',
       'board.kanban',
       'board.run',
+      'board.terminal',
       'board.chat',
       'board.checklist',
       'board.webpage',
@@ -1410,6 +1415,8 @@ YoloitCliToolParam _panelTypeParam() {
       'board.code.snippet',
       'board.files',
       'board.file.preview',
+      'board.sticky',
+      'board.shape',
       'board.timer',
       'board.yolo_assistant',
       'board.run_configs',
@@ -1921,7 +1928,8 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'panel:screenshot',
     alias: 'psc',
-    description: 'Save PNG screenshot of a single panel (headless offscreen render)',
+    description:
+        'Save PNG screenshot of a single panel (headless offscreen render)',
     group: 'panel',
     params: <YoloitCliToolParam>[
       _boardParam(),
@@ -2175,7 +2183,11 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     params: <YoloitCliToolParam>[
       _p('agent', 'Agent id', shortKey: 'a'),
       _p('path', 'Workspace or folder path', required: true, shortKey: 'pth'),
-      _p('task', 'Initial task/prompt — typed into the agent automatically', shortKey: 'tsk'),
+      _p(
+        'task',
+        'Initial task/prompt — typed into the agent automatically',
+        shortKey: 'tsk',
+      ),
       _p('name', 'Optional session name', flag: '--name', shortKey: 'n'),
     ],
   ),
@@ -2185,8 +2197,17 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     description: 'Get or set the default LLM model for an agent',
     group: 'agents',
     params: <YoloitCliToolParam>[
-      _p('agent_id', 'Agent id (copilot, cursor, opencode, ...)', required: true, shortKey: 'a'),
-      _p('model_id', 'Optional model id to set (omit to read current)', shortKey: 'm'),
+      _p(
+        'agent_id',
+        'Agent id (copilot, cursor, opencode, ...)',
+        required: true,
+        shortKey: 'a',
+      ),
+      _p(
+        'model_id',
+        'Optional model id to set (omit to read current)',
+        shortKey: 'm',
+      ),
     ],
   ),
   YoloitCliTool(
@@ -2196,9 +2217,21 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     group: 'agents',
     params: <YoloitCliToolParam>[
       _p('agent_id', 'Agent id', required: true, shortKey: 'a'),
-      _p('mode', 'ASR mode: local or cloud (omit to read current)', shortKey: 'mo'),
-      _p('provider', 'Cloud provider config id (required when mode=cloud)', shortKey: 'pr'),
-      _p('model', 'Cloud ASR model, e.g. whisper-1 (optional for cloud)', shortKey: 'ml'),
+      _p(
+        'mode',
+        'ASR mode: local or cloud (omit to read current)',
+        shortKey: 'mo',
+      ),
+      _p(
+        'provider',
+        'Cloud provider config id (required when mode=cloud)',
+        shortKey: 'pr',
+      ),
+      _p(
+        'model',
+        'Cloud ASR model, e.g. whisper-1 (optional for cloud)',
+        shortKey: 'ml',
+      ),
     ],
   ),
   YoloitCliTool(
@@ -2251,6 +2284,44 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         'Provider override (for example cloud:<config-id>)',
         flag: '--provider',
         shortKey: 'pr',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'yolochat:terminal',
+    alias: 'ctm',
+    description:
+        'Send text to a board terminal session and press Enter by default. '
+        'Use this when chat needs to control an interactive terminal.',
+    group: 'yolochat',
+    params: <YoloitCliToolParam>[
+      _p('text', 'Terminal input text', required: true, shortKey: 'tx'),
+      _p(
+        'board',
+        'Target board',
+        flag: '--board',
+        runtimeDefault: YoloitCliRuntimeDefault.board,
+        shortKey: 'b',
+      ),
+      _p(
+        'panel',
+        'Target terminal panel',
+        flag: '--panel',
+        runtimeDefault: YoloitCliRuntimeDefault.panel,
+        shortKey: 'p',
+      ),
+      _p(
+        'session',
+        'Terminal session id override',
+        flag: '--session',
+        shortKey: 'sid',
+      ),
+      _p(
+        'no_enter',
+        'Send raw text without trailing Enter',
+        flag: '--no-enter',
+        kind: YoloitCliToolParamKind.boolean,
+        shortKey: 'ne',
       ),
     ],
   ),
@@ -3271,15 +3342,19 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     group: 'panel',
     params: <YoloitCliToolParam>[
       _boardParam(),
-      _p('path', 'Root directory path to display', required: true, shortKey: 'p'),
+      _p(
+        'path',
+        'Root directory path to display',
+        required: true,
+        shortKey: 'p',
+      ),
       _p('title', 'Panel title (default: folder name)', shortKey: 't'),
     ],
   ),
   YoloitCliTool(
     command: 'filetree:set-root',
     alias: 'ftsr',
-    description:
-        'Set the root directory path of an existing File Tree panel.',
+    description: 'Set the root directory path of an existing File Tree panel.',
     group: 'panel',
     params: <YoloitCliToolParam>[
       _boardParam(),
@@ -3298,7 +3373,63 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     params: <YoloitCliToolParam>[
       _p('path', 'Directory path to read', required: true, shortKey: 'p'),
       _p('depth', 'Max depth (default 3)', shortKey: 'd'),
-      _p('all', 'Show hidden files too', kind: YoloitCliToolParamKind.boolean, shortKey: 'a'),
+      _p(
+        'all',
+        'Show hidden files too',
+        kind: YoloitCliToolParamKind.boolean,
+        shortKey: 'a',
+      ),
+    ],
+  ),
+
+  // ─── Miro-style Board Panels ───────────────────────────────────────────────
+  YoloitCliTool(
+    command: 'sticky:create',
+    alias: 'stk',
+    description:
+        'Create a Miro-style sticky note panel. Board is optional and defaults to the current board.',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name (optional)', shortKey: 'b'),
+      _p('title', 'Sticky title', required: true, shortKey: 't'),
+      _p('text', 'Sticky note text', shortKey: 'tx'),
+      _p(
+        'color',
+        'Background color as #RRGGBB',
+        flag: '--color',
+        shortKey: 'c',
+      ),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'shape:create',
+    alias: 'shp',
+    description:
+        'Create a geometric board panel: rectangle, circle, diamond, triangle, hexagon, or frame.',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name (optional)', shortKey: 'b'),
+      _p(
+        'shape',
+        'rectangle | circle | diamond | triangle | hexagon | frame',
+        required: true,
+        shortKey: 's',
+      ),
+      _p('title', 'Panel title', required: true, shortKey: 't'),
+      _p('text', 'Centered label', flag: '--text', shortKey: 'tx'),
+      _p('fill', 'Fill color as #RRGGBB', flag: '--fill', shortKey: 'f'),
+      _p('stroke', 'Stroke color as #RRGGBB', flag: '--stroke', shortKey: 'st'),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'frame:create',
+    alias: 'frm',
+    description:
+        'Create a Miro-style frame panel for grouping a section of the board.',
+    group: 'panel',
+    params: <YoloitCliToolParam>[
+      _p('board', 'Board id or name (optional)', shortKey: 'b'),
+      _p('title', 'Frame title', required: true, shortKey: 't'),
     ],
   ),
 
@@ -3331,8 +3462,16 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     group: 'board',
     params: <YoloitCliToolParam>[
       _p('board', 'Board id or name (defaults to active board)', shortKey: 'b'),
-      _p('type', 'Shape type: line | circle | rect | arrow | freehand | svg', shortKey: 's'),
-      _p('color', 'Stroke color as #RRGGBB hex (default #FFFFFF)', shortKey: 'c'),
+      _p(
+        'type',
+        'Shape type: line | circle | rect | arrow | freehand | svg',
+        shortKey: 's',
+      ),
+      _p(
+        'color',
+        'Stroke color as #RRGGBB hex (default #FFFFFF)',
+        shortKey: 'c',
+      ),
       _p('width', 'Stroke width in pixels (default 3)', shortKey: 'w'),
       _p('x1', 'Start X (line/arrow)'),
       _p('y1', 'Start Y (line/arrow)'),
@@ -3343,7 +3482,10 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('r', 'Radius (circle)'),
       _p('x', 'Top-left X (rect/freehand/svg origin)'),
       _p('y', 'Top-left Y (rect/freehand/svg origin)'),
-      _p('rw', 'Shape width for rect (default 200). Use "rw" not "width" to avoid conflict with stroke width.'),
+      _p(
+        'rw',
+        'Shape width for rect (default 200). Use "rw" not "width" to avoid conflict with stroke width.',
+      ),
       _p('height', 'Height (rect, default 100)'),
       _p('points', 'JSON array of [x,y] pairs for freehand'),
       _p('d', 'SVG path data string (for svg type)'),
@@ -3475,7 +3617,12 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
         'Use theme:slots to see available slot names.',
     group: 'app',
     params: <YoloitCliToolParam>[
-      _p('slot', 'Color slot name (e.g. primary, accentGreen)', required: true, shortKey: 's'),
+      _p(
+        'slot',
+        'Color slot name (e.g. primary, accentGreen)',
+        required: true,
+        shortKey: 's',
+      ),
       _p('color', 'Hex color (e.g. #548AF7)', required: true, shortKey: 'c'),
     ],
   ),
@@ -3497,7 +3644,8 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
   YoloitCliTool(
     command: 'theme:save',
     alias: 'thmsa',
-    description: 'Save current theme (with any overrides) as a named custom preset',
+    description:
+        'Save current theme (with any overrides) as a named custom preset',
     group: 'app',
     params: <YoloitCliToolParam>[
       _p('name', 'Name for the new preset', required: true, shortKey: 'n'),
@@ -3524,9 +3672,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     description: 'Delete a custom theme by id',
     group: 'app',
     destructive: true,
-    params: <YoloitCliToolParam>[
-      _p('id', 'Custom theme id', required: true),
-    ],
+    params: <YoloitCliToolParam>[_p('id', 'Custom theme id', required: true)],
   ),
   YoloitCliTool(
     command: 'theme:colors',
