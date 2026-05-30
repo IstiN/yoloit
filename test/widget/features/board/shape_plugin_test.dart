@@ -10,6 +10,7 @@ void main() {
   test('shape uses Miro-style chrome and transparent fill by default', () {
     expect(plugin.usePanelChrome, isFalse);
     expect(plugin.showHeader, isFalse);
+    expect(plugin.hasEditor, isTrue);
     expect(plugin.initialState['fillColor'], '#00000000');
     expect(plugin.initialState['textHAlign'], 'center');
     expect(plugin.initialState['textVAlign'], 'center');
@@ -144,5 +145,57 @@ void main() {
 
     await tester.tap(find.text('V'));
     expect(state['textOrientation'], 'vertical');
+  });
+
+  testWidgets('shape editor applies grouped settings as JSON state', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    Map<String, dynamic>? saved;
+    final panel = BoardPanelInstance(
+      id: 'shape',
+      type: ShapePlugin.kTypeId,
+      title: 'Shape',
+      bounds: const BoardPanelBounds(x: 0, y: 0, width: 420, height: 260),
+      state: {...plugin.initialState},
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder:
+                (context) => TextButton(
+                  onPressed: () {
+                    plugin.showEditor(context, panel, (state) => saved = state);
+                  },
+                  child: const Text('Open editor'),
+                ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open editor'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shape settings'), findsOneWidget);
+    await tester.tap(find.text('Diamond'));
+    await tester.tap(find.text('Right'));
+    await tester.tap(find.text('Bottom'));
+    await tester.tap(find.text('Vertical'));
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+
+    expect(saved, isNotNull);
+    expect(saved!['shape'], 'diamond');
+    expect(saved!['textHAlign'], 'right');
+    expect(saved!['textVAlign'], 'bottom');
+    expect(saved!['textOrientation'], 'vertical');
+    expect(saved!.keys, containsAll(['fillColor', 'strokeColor', 'textColor']));
   });
 }

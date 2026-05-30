@@ -1855,6 +1855,36 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     },
   ),
   YoloitCliTool(
+    command: 'panel:z',
+    alias: 'pzi',
+    description:
+        'Set panel depth/layer order. Use front/back or an explicit integer zIndex.',
+    group: 'panel',
+    humanVariants: const {
+      'ru': [
+        'подними панель {panel} наверх',
+        'отправь панель {panel} назад',
+        'поставь глубину панели {panel} {zIndex}',
+      ],
+      'en': [
+        'bring panel {panel} to front',
+        'send panel {panel} to back',
+        'set panel {panel} z index {zIndex}',
+      ],
+    },
+    params: <YoloitCliToolParam>[
+      _boardParam(),
+      _panelParam(),
+      _p(
+        'front_or_back_or_zindex',
+        'Move to front/back or set explicit integer zIndex',
+        required: true,
+        aliases: const ['front|back|zIndex', 'zIndex', 'depth'],
+        shortKey: 'z',
+      ),
+    ],
+  ),
+  YoloitCliTool(
     command: 'panel:delete',
     alias: 'pdl',
     description: 'Delete a panel',

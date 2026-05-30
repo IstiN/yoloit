@@ -243,6 +243,18 @@ void main() {
       expect(r.stateUpdate!['text'], 'idea');
     });
 
+    test('set updates appearance fields', () async {
+      final r = await h.handleAction('set', {
+        'color': '#FDE68A',
+        'textColor': '#111827',
+        'fontSize': 24,
+      }, _panel('board.sticky'));
+      expect(r.ok, isTrue);
+      expect(r.stateUpdate!['color'], '#FDE68A');
+      expect(r.stateUpdate!['textColor'], '#111827');
+      expect(r.stateUpdate!['fontSize'], 24);
+    });
+
     test('append preserves current text', () async {
       final p = _panel('board.sticky', state: {'text': 'a'});
       final r = await h.handleAction('append', {'text': 'b'}, p);
@@ -258,10 +270,22 @@ void main() {
         'shape': 'diamond',
         'text': 'Decision',
         'strokeColor': '#fff',
+        'fillColor': '#00000000',
+        'textColor': '#E2E8F0',
+        'strokeWidth': 4,
+        'textHAlign': 'right',
+        'textVAlign': 'bottom',
+        'textOrientation': 'vertical',
       }, _panel('board.shape'));
       expect(r.ok, isTrue);
       expect(r.stateUpdate!['shape'], 'diamond');
       expect(r.stateUpdate!['text'], 'Decision');
+      expect(r.stateUpdate!['fillColor'], '#00000000');
+      expect(r.stateUpdate!['textColor'], '#E2E8F0');
+      expect(r.stateUpdate!['strokeWidth'], 4);
+      expect(r.stateUpdate!['textHAlign'], 'right');
+      expect(r.stateUpdate!['textVAlign'], 'bottom');
+      expect(r.stateUpdate!['textOrientation'], 'vertical');
     });
   });
 
