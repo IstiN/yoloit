@@ -143,6 +143,11 @@ class CodexCliProvider extends ChatProvider {
         },
       );
       _processes[config.sessionName] = process;
+      unawaited(
+        process.stdin.close().catchError((Object error) {
+          debugPrint('[CodexCli] Failed to close stdin: $error');
+        }),
+      );
 
       final buffer = StringBuffer();
       final stdoutDone = Completer<void>();

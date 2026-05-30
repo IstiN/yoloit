@@ -54,6 +54,19 @@ class _FakeProcess implements Process {
   }
 }
 
+class _TrackingIOSink implements IOSink {
+  bool closed = false;
+
+  @override
+  Future<void> close() {
+    closed = true;
+    return Future<void>.value();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _FakeStarter {
   final processes = <_FakeProcess>[];
   final calls = <List<String>>[];
@@ -71,12 +84,12 @@ class _FakeStarter {
 
 void main() {
   late Directory tempDir;
-  late IOSink stdinSink;
+  late _TrackingIOSink stdinSink;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     tempDir = await Directory.systemTemp.createTemp('json-cli-provider-test-');
-    stdinSink = File('${tempDir.path}/stdin.txt').openWrite();
+    stdinSink = _TrackingIOSink();
   });
 
   tearDown(() async {
@@ -121,6 +134,7 @@ void main() {
     expect(events.single.type, ChatEventType.assistantMessage);
     expect(events.single.messageContent, 'KIMI_OK');
     expect(provider.getSessionId('Smoke'), 'kimi-session');
+    expect(stdinSink.closed, isTrue);
   });
 
   test('Codex provider parses thread, assistant, and usage JSONL', () async {
@@ -156,5 +170,12 @@ void main() {
     expect(events.last.type, ChatEventType.result);
     expect(events.last.usageData?['outputTokens'], 7);
     expect(provider.getSessionId('Smoke'), 'codex-thread');
+    expect(stdinSink.closed, isTrue);
+    expect(starter.calls.single.take(4), [
+      'codex',
+      'exec',
+      '--json',
+      '--skip-git-repo-check',
+    ]);
   });
 }
