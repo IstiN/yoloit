@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -32,9 +33,7 @@ class ProviderCatalog {
       displayName: j['displayName'] as String,
       models:
           rawModels
-              .map(
-                (e) => ChatModelInfo.fromJson(e as Map<String, dynamic>),
-              )
+              .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
               .toList(),
     );
   }
@@ -119,7 +118,8 @@ class ProviderModelCatalogService {
         unawaited(_discoverCliModels());
         return;
       }
-      _loadError = 'Failed to load provider model catalog: network unavailable and no local cache.';
+      _loadError =
+          'Failed to load provider model catalog: network unavailable and no local cache.';
       _loaded = false;
       return;
     }
@@ -150,17 +150,13 @@ class ProviderModelCatalogService {
   String? defaultModelForProvider(String providerId) {
     final models = modelsForProvider(providerId);
     if (models == null || models.isEmpty) return null;
-    return models.firstWhere(
-      (m) => m.isDefault,
-      orElse: () => models.first,
-    ).id;
+    return models.firstWhere((m) => m.isDefault, orElse: () => models.first).id;
   }
 
   /// All known provider ids from the catalog.
   List<String> get providerIds => _catalogs.keys.toList();
 
-  List<ProviderCatalog> get allCatalogs =>
-      _catalogs.values.toList();
+  List<ProviderCatalog> get allCatalogs => _catalogs.values.toList();
 
   // ── Custom model management ─────────────────────────────────────────────────
 
@@ -188,7 +184,71 @@ class ProviderModelCatalogService {
   /// --list-models`). Runs in background — results silently update
   /// [modelsForProvider] once available.
   Future<void> _discoverCliModels() async {
-    await discoverCursorModels();
+    await Future.wait([discoverCursorModels(), discoverCodexModels()]);
+  }
+
+  /// Fetches the Codex model list from `codex debug models`.
+  Future<List<ChatModelInfo>?> discoverCodexModels() async {
+    try {
+      final process = await Process.start(
+        'codex',
+        const ['debug', 'models'],
+        environment: {
+          ...Platform.environment,
+          'PATH': PlatformShell.instance.enrichedPath(
+            Platform.environment['PATH'] ?? '',
+          ),
+        },
+      );
+      final stdoutFuture = process.stdout.transform(utf8.decoder).join();
+      final stderrFuture = process.stderr.transform(utf8.decoder).join();
+      final exitCode = await process.exitCode.timeout(
+        const Duration(seconds: 8),
+      );
+      final stdoutText = await stdoutFuture;
+      final stderrText = await stderrFuture;
+      if (exitCode != 0) {
+        debugPrint('[ProviderCatalog] codex models failed: $stderrText');
+        return null;
+      }
+      final models = _parseCodexModels(stdoutText);
+      if (models.isNotEmpty) {
+        _cliModels['codex'] = models;
+        debugPrint(
+          '[ProviderCatalog] codex CLI: ${models.length} models discovered',
+        );
+        unawaited(_saveCliModelsCache());
+      }
+      return models;
+    } catch (e) {
+      debugPrint('[ProviderCatalog] codex CLI discovery error: $e');
+      return null;
+    }
+  }
+
+  List<ChatModelInfo> _parseCodexModels(String jsonText) {
+    final decoded = jsonDecode(jsonText) as Map<String, dynamic>;
+    final rawModels = decoded['models'] as List? ?? const [];
+    final visibleModels =
+        rawModels
+            .whereType<Map<String, dynamic>>()
+            .where((model) => model['visibility'] == 'list')
+            .toList()
+          ..sort((a, b) {
+            final aPriority = (a['priority'] as num?)?.toInt() ?? 9999;
+            final bPriority = (b['priority'] as num?)?.toInt() ?? 9999;
+            return aPriority.compareTo(bPriority);
+          });
+    return [
+      for (var i = 0; i < visibleModels.length; i++)
+        ChatModelInfo(
+          id: visibleModels[i]['slug'] as String,
+          displayName:
+              visibleModels[i]['display_name'] as String? ??
+              visibleModels[i]['slug'] as String,
+          isDefault: i == 0,
+        ),
+    ];
   }
 
   /// Fetches the cursor model list from `cursor-agent --list-models`.
@@ -240,7 +300,10 @@ class ProviderModelCatalogService {
       req.headers.set(HttpHeaders.userAgentHeader, 'YoLoIT');
       final resp = await req.close().timeout(_fetchTimeout);
       if (resp.statusCode != 200) return null;
-      final body = await resp.transform(utf8.decoder).join().timeout(_fetchTimeout);
+      final body = await resp
+          .transform(utf8.decoder)
+          .join()
+          .timeout(_fetchTimeout);
       return jsonDecode(body) as Map<String, dynamic>;
     } catch (_) {
       return null;
@@ -288,10 +351,8 @@ class ProviderModelCatalogService {
       final file = File(_customModelsPath);
       await file.parent.create(recursive: true);
       final data = _customModels.map(
-        (providerId, models) => MapEntry(
-          providerId,
-          models.map((m) => m.toJson()).toList(),
-        ),
+        (providerId, models) =>
+            MapEntry(providerId, models.map((m) => m.toJson()).toList()),
       );
       await file.writeAsString(jsonEncode(data));
     } catch (_) {}
@@ -304,9 +365,10 @@ class ProviderModelCatalogService {
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       _customModels.clear();
       raw.forEach((providerId, models) {
-        _customModels[providerId] = (models as List)
-            .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
-            .toList();
+        _customModels[providerId] =
+            (models as List)
+                .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
+                .toList();
       });
     } catch (_) {}
   }
@@ -318,10 +380,8 @@ class ProviderModelCatalogService {
       final file = File(_cliModelsPath);
       await file.parent.create(recursive: true);
       final data = _cliModels.map(
-        (providerId, models) => MapEntry(
-          providerId,
-          models.map((m) => m.toJson()).toList(),
-        ),
+        (providerId, models) =>
+            MapEntry(providerId, models.map((m) => m.toJson()).toList()),
       );
       await file.writeAsString(jsonEncode(data));
     } catch (_) {}
@@ -331,12 +391,12 @@ class ProviderModelCatalogService {
     try {
       final file = File(_cliModelsPath);
       if (!await file.exists()) return;
-      final raw =
-          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       raw.forEach((providerId, models) {
-        _cliModels[providerId] = (models as List)
-            .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
-            .toList();
+        _cliModels[providerId] =
+            (models as List)
+                .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
+                .toList();
       });
       if (_cliModels.isNotEmpty) {
         debugPrint(

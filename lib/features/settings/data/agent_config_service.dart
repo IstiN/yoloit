@@ -184,7 +184,6 @@ class AgentConfigService {
       visible: true,
       isBuiltIn: true,
       streamAdapter: 'codex',
-      disableModel: true,
     ),
   ];
 
@@ -209,10 +208,15 @@ class AgentConfigService {
         final updatedSaved = <AgentConfig>[];
         for (final s in saved) {
           final def = _defaults.where((d) => d.id == s.id).firstOrNull;
-          if (def != null &&
-              s.streamAdapter == null &&
-              def.streamAdapter != null) {
-            updatedSaved.add(s.copyWith(streamAdapter: def.streamAdapter));
+          if (def != null) {
+            var next = s;
+            if (next.streamAdapter == null && def.streamAdapter != null) {
+              next = next.copyWith(streamAdapter: def.streamAdapter);
+            }
+            if (next.id == 'codex' && next.disableModel) {
+              next = next.copyWith(disableModel: false);
+            }
+            updatedSaved.add(next);
           } else {
             updatedSaved.add(s);
           }

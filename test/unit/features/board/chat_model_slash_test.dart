@@ -261,6 +261,40 @@ void main() {
       expect(find.byType(TextField), findsOneWidget);
     });
 
+    testWidgets('assistant bubble stays inside narrow chat panel', (
+      tester,
+    ) async {
+      final panel = _testPanel('narrow-chat').copyWith(
+        bounds: const BoardPanelBounds(x: 0, y: 0, width: 384, height: 640),
+        state: {
+          'configured': true,
+          'config': {
+            'provider': 'codex',
+            'model': 'gpt-5.5',
+            'sessionName': 'narrow-session',
+          },
+          'messages': [
+            {
+              'id': 'assistant-1',
+              'role': 'assistant',
+              'content':
+                  'Привет. Я могу помогать с кодом и текущим проектом. '
+                  'По коду: читать проект, разбираться в архитектуре, '
+                  'запускать проверки, объяснять ошибки, делать правки.',
+            },
+          ],
+        },
+      );
+
+      await tester.pumpWidget(
+        SizedBox(width: 384, height: 640, child: _buildTestApp(panel: panel)),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Привет. Я могу помогать'), findsOneWidget);
+    });
+
     testWidgets('ESC after .model hides list without clearing', (tester) async {
       await tester.pumpWidget(_buildTestApp(panel: _testPanel()));
       await tester.pump();

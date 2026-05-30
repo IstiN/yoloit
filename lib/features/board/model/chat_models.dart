@@ -885,14 +885,20 @@ const List<ChatModelInfo> kKimiModels = [
 
 const List<ChatModelInfo> kCodexModels = [
   ChatModelInfo(
-    id: 'gpt-5.3-codex',
-    displayName: 'GPT-5.3-Codex',
+    id: 'gpt-5.5',
+    displayName: 'GPT-5.5',
     costMultiplier: 1,
     isDefault: true,
   ),
+  ChatModelInfo(id: 'gpt-5.4', displayName: 'GPT-5.4', costMultiplier: 1),
   ChatModelInfo(
-    id: 'gpt-5.2-codex',
-    displayName: 'GPT-5.2-Codex',
+    id: 'gpt-5.4-mini',
+    displayName: 'GPT-5.4 Mini',
+    costMultiplier: 0.33,
+  ),
+  ChatModelInfo(
+    id: 'gpt-5.3-codex',
+    displayName: 'GPT-5.3-Codex',
     costMultiplier: 1,
   ),
   ChatModelInfo(id: 'gpt-5.2', displayName: 'GPT-5.2', costMultiplier: 1),

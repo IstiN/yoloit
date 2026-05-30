@@ -1010,7 +1010,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     final snapshotEnabled = await SessionPrefs.isBoardSnapshotEnabled();
     if (snapshotEnabled) {
       final screenshotSvc = BoardScreenshotService.instance;
-      final isCloudProvider = _session!.provider.imageMode == ChatImageMode.base64;
+      final isCloudProvider =
+          _session!.provider.imageMode == ChatImageMode.base64;
       if (isCloudProvider) {
         snapshotBase64 = await screenshotSvc.captureBase64(pixelRatio: 0.5);
       } else {
@@ -1032,9 +1033,8 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         panelTitle: widget.panel.title,
         panelType: widget.panel.type,
         availableBoardsSummary: _availableBoardsSummary(),
-        currentBoardPanelsSummary: _ctxBoardPanelsJson
-            ? _currentBoardPanelsSummary(board)
-            : null,
+        currentBoardPanelsSummary:
+            _ctxBoardPanelsJson ? _currentBoardPanelsSummary(board) : null,
         viewportScale: board?.viewport.scale,
         boardSnapshotPath: snapshotPath,
         boardSnapshotBase64: snapshotBase64,
@@ -2143,7 +2143,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   (tool.arguments['description'] as String?)?.trim() ??
                   (tool.arguments['name'] as String?)?.trim();
               final color =
-                  isAgent ? context.appColors.primaryLight : context.appColors.accentOrange;
+                  isAgent
+                      ? context.appColors.primaryLight
+                      : context.appColors.accentOrange;
               final subAgent = isAgent ? _subAgents[tool.toolCallId] : null;
               final panelId = isAgent ? _subAgentPanels[tool.toolCallId] : null;
 
@@ -2611,8 +2613,11 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   }
 
   Future<void> _handleMicInput() async {
-    final effectiveAsr = AgentConfigService.instance.effectiveAsr(_config.provider);
-    final useCloudAsr = effectiveAsr.mode == 'cloud' &&
+    final effectiveAsr = AgentConfigService.instance.effectiveAsr(
+      _config.provider,
+    );
+    final useCloudAsr =
+        effectiveAsr.mode == 'cloud' &&
         effectiveAsr.configId != null &&
         effectiveAsr.configId!.isNotEmpty;
     if (!useCloudAsr) {
@@ -2693,7 +2698,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       if (path == null || path.isEmpty) return;
 
       // Check if this agent has a cloud ASR configured (including global default).
-      final effectiveAsr = AgentConfigService.instance.effectiveAsr(_config.provider);
+      final effectiveAsr = AgentConfigService.instance.effectiveAsr(
+        _config.provider,
+      );
       final useCloud =
           effectiveAsr.mode == 'cloud' &&
           effectiveAsr.configId != null &&
@@ -2701,8 +2708,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
       String transcript;
       if (useCloud) {
-        final cloudCfg = await CloudLlmSettingsService.instance
-            .loadConfigById(effectiveAsr.configId!);
+        final cloudCfg = await CloudLlmSettingsService.instance.loadConfigById(
+          effectiveAsr.configId!,
+        );
         if (cloudCfg == null) {
           throw StateError(
             'Cloud ASR provider "${effectiveAsr.configId}" not found. '
@@ -3044,7 +3052,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   bool get _isPlainSlash {
     final t = _inputController.text;
-    return (t.startsWith('/') || t.startsWith('.')) && !_isModelSlash && !_isContextSlash;
+    return (t.startsWith('/') || t.startsWith('.')) &&
+        !_isModelSlash &&
+        !_isContextSlash;
   }
 
   double _suggestionHeight(int count) {
@@ -3187,7 +3197,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Widget _buildContextToggles(AppColorScheme colors) {
     _loadContextToggles();
-    final items = <({String id, String label, IconData icon, bool value, void Function(bool) onChanged})>[
+    final items = <
+      ({
+        String id,
+        String label,
+        IconData icon,
+        bool value,
+        void Function(bool) onChanged,
+      })
+    >[
       (
         id: 'cli_help',
         label: 'CLI Help',
@@ -3242,10 +3260,9 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         shrinkWrap: true,
         padding: const EdgeInsets.symmetric(vertical: 4),
         itemCount: items.length,
-        separatorBuilder: (_, __) => Divider(
-          height: 1,
-          color: colors.border.withValues(alpha: 0.3),
-        ),
+        separatorBuilder:
+            (_, __) =>
+                Divider(height: 1, color: colors.border.withValues(alpha: 0.3)),
         itemBuilder: (context, i) {
           final item = items[i];
           return InkWell(
@@ -3257,9 +3274,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   Icon(
                     item.icon,
                     size: 14,
-                    color: item.value
-                        ? colors.terminalPrompt
-                        : colors.textPrimary.withValues(alpha: 0.4),
+                    color:
+                        item.value
+                            ? colors.terminalPrompt
+                            : colors.textPrimary.withValues(alpha: 0.4),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -3267,9 +3285,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                       item.label,
                       style: TextStyle(
                         fontSize: 12,
-                        color: item.value
-                            ? colors.textPrimary
-                            : colors.textPrimary.withValues(alpha: 0.5),
+                        color:
+                            item.value
+                                ? colors.textPrimary
+                                : colors.textPrimary.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -3278,9 +3297,10 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                         ? Icons.check_box
                         : Icons.check_box_outline_blank,
                     size: 16,
-                    color: item.value
-                        ? colors.terminalPrompt
-                        : colors.textPrimary.withValues(alpha: 0.3),
+                    color:
+                        item.value
+                            ? colors.terminalPrompt
+                            : colors.textPrimary.withValues(alpha: 0.3),
                   ),
                 ],
               ),
@@ -3351,11 +3371,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   child: Row(
                     children: [
                       if (isActive)
-                        Icon(
-                          Icons.check,
-                          size: 14,
-                          color: colors.statusActive,
-                        )
+                        Icon(Icons.check, size: 14, color: colors.statusActive)
                       else
                         const SizedBox(width: 14),
                       const SizedBox(width: 6),
@@ -3562,10 +3578,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                     borderRadius: BorderRadius.circular(10),
                     border:
                         isCurrent
-                            ? Border.all(
-                              color: colors.statusActive,
-                              width: 0.5,
-                            )
+                            ? Border.all(color: colors.statusActive, width: 0.5)
                             : null,
                   ),
                   padding: const EdgeInsets.symmetric(
@@ -3759,6 +3772,9 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     return switch (adapter) {
       'cursor' => kCursorModels,
       'local' => kLocalModels,
+      'codex' => kCodexModels,
+      'kimi' => kKimiModels,
+      'copilot' => kCopilotModels,
       'opencode' => _opencodeModels ?? kOpencodeModels,
       _ => kCopilotModels,
     };
@@ -3835,7 +3851,8 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
       // Check if CURSOR_API_KEY is available in selected env groups.
       final envMap = await GlobalEnvGroupsService.instance
           .resolveSelectedGroups(_selectedEnvGroupIds);
-      final hasKey = envMap.containsKey('CURSOR_API_KEY') ||
+      final hasKey =
+          envMap.containsKey('CURSOR_API_KEY') ||
           Platform.environment.containsKey('CURSOR_API_KEY');
       if (mounted) setState(() => _cursorApiKeyConfigured = hasKey);
       if (!hasKey) {
@@ -3871,7 +3888,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
       if (mounted) setState(() => _providerInstalled = true);
       return;
     }
-    
+
     // Extract executable
     final parts = _splitCommand(rawCommand);
     final cmd = parts.isNotEmpty ? parts[0] : rawCommand;
@@ -3941,15 +3958,21 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     }
     // Ensure selected model is valid for the chosen provider
     final validModels = _modelsForProvider;
-    final agentConfig = AgentConfigService.instance.configForAgent(_selectedProvider);
+    final agentConfig = AgentConfigService.instance.configForAgent(
+      _selectedProvider,
+    );
     final disableModel = agentConfig?.disableModel ?? false;
-    final model = disableModel
-        ? ''
-        : (validModels.any((m) => m.id == _selectedModel)
-            ? _selectedModel
-            : (validModels
-                .firstWhere((m) => m.isDefault, orElse: () => validModels.first)
-                .id));
+    final model =
+        disableModel
+            ? ''
+            : (validModels.any((m) => m.id == _selectedModel)
+                ? _selectedModel
+                : (validModels
+                    .firstWhere(
+                      (m) => m.isDefault,
+                      orElse: () => validModels.first,
+                    )
+                    .id));
     widget.onStart(
       ChatSessionConfig(
         sessionName: sessionName,
@@ -3988,7 +4011,9 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final colorScheme = Theme.of(context).colorScheme;
-    final agentConfig = AgentConfigService.instance.configForAgent(_selectedProvider);
+    final agentConfig = AgentConfigService.instance.configForAgent(
+      _selectedProvider,
+    );
     final disableModel = agentConfig?.disableModel ?? false;
     final labelStyle = TextStyle(
       fontSize: 11,
@@ -4129,10 +4154,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             const SizedBox(height: 4),
             Text(
               'Add CURSOR_API_KEY to an env group above to authenticate.',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.orange.shade300,
-              ),
+              style: TextStyle(fontSize: 11, color: Colors.orange.shade300),
             ),
           ],
           if (_cursorModelsLoading) ...[
@@ -4229,7 +4251,10 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             GestureDetector(
               onTap: () => _showModelSearch(context, inputFill, colorScheme),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   color: inputFill,
@@ -4623,9 +4648,7 @@ class _AttachmentPreviewSection extends StatelessWidget {
     final textColor =
         onLight ? Theme.of(context).colorScheme.onSurface : colors.textPrimary;
     final iconColor =
-        onLight
-            ? Theme.of(context).colorScheme.primary
-            : colors.accentBlue;
+        onLight ? Theme.of(context).colorScheme.primary : colors.accentBlue;
 
     return Wrap(
       spacing: 4,
@@ -4744,10 +4767,7 @@ class _ImageThumbnail extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             name,
-            style: TextStyle(
-              fontSize: 9,
-              color: context.appColors.accentBlue,
-            ),
+            style: TextStyle(fontSize: 9, color: context.appColors.accentBlue),
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -4861,94 +4881,104 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
               ),
 
             if (processedContent.trim().isNotEmpty)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.65,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceElevated,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(4),
-                          topRight: Radius.circular(16),
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
-                        ),
-                      ),
-                      child: SelectionArea(
-                        child: MarkdownBody(
-                          data: processedContent,
-                          selectable: false,
-                          onTapLink: (text, href, title) {
-                            if (widget.onLinkTap != null) {
-                              widget.onLinkTap!(href);
-                            } else if (href != null && href.isNotEmpty) {
-                              PlatformLauncher.instance.openUrl(href);
-                            }
-                          },
-                          styleSheet: MarkdownStyleSheet(
-                            p: TextStyle(
-                              fontSize: 13,
-                              color: textColor,
-                              height: 1.5,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableWidth =
+                      constraints.maxWidth.isFinite
+                          ? constraints.maxWidth
+                          : MediaQuery.of(context).size.width * 0.65;
+                  final bubbleMaxWidth =
+                      availableWidth <= 158
+                          ? availableWidth
+                          : availableWidth - 38;
+                  return Row(
+                    mainAxisSize: MainAxisSize.max,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceElevated,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(4),
+                              topRight: Radius.circular(16),
+                              bottomLeft: Radius.circular(16),
+                              bottomRight: Radius.circular(16),
                             ),
-                            a: TextStyle(
-                              fontSize: 13,
-                              color: colors.primary,
-                              decoration: TextDecoration.underline,
-                            ),
-                            code: TextStyle(
-                              fontSize: 11.5,
-                              fontFamily: 'JetBrains Mono',
-                              color: colors.terminalPrompt,
-                              backgroundColor: codeBg,
-                            ),
-                            codeblockDecoration: BoxDecoration(
-                              color: codeBg,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: colors.border),
-                            ),
-                            codeblockPadding: const EdgeInsets.all(10),
-                            listBullet: TextStyle(
-                              fontSize: 13,
-                              color: mutedColor,
-                            ),
-                            h1: TextStyle(
-                              fontSize: 16,
-                              color: textColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            h2: TextStyle(
-                              fontSize: 14,
-                              color: textColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            h3: TextStyle(
-                              fontSize: 13,
-                              color: textColor,
-                              fontWeight: FontWeight.w500,
+                          ),
+                          child: SelectionArea(
+                            child: MarkdownBody(
+                              data: processedContent,
+                              selectable: false,
+                              onTapLink: (text, href, title) {
+                                if (widget.onLinkTap != null) {
+                                  widget.onLinkTap!(href);
+                                } else if (href != null && href.isNotEmpty) {
+                                  PlatformLauncher.instance.openUrl(href);
+                                }
+                              },
+                              styleSheet: MarkdownStyleSheet(
+                                p: TextStyle(
+                                  fontSize: 13,
+                                  color: textColor,
+                                  height: 1.5,
+                                ),
+                                a: TextStyle(
+                                  fontSize: 13,
+                                  color: colors.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                code: TextStyle(
+                                  fontSize: 11.5,
+                                  fontFamily: 'JetBrains Mono',
+                                  color: colors.terminalPrompt,
+                                  backgroundColor: codeBg,
+                                ),
+                                codeblockDecoration: BoxDecoration(
+                                  color: codeBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: colors.border),
+                                ),
+                                codeblockPadding: const EdgeInsets.all(10),
+                                listBullet: TextStyle(
+                                  fontSize: 13,
+                                  color: mutedColor,
+                                ),
+                                h1: TextStyle(
+                                  fontSize: 16,
+                                  color: textColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                h2: TextStyle(
+                                  fontSize: 14,
+                                  color: textColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                h3: TextStyle(
+                                  fontSize: 13,
+                                  color: textColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  Opacity(
-                    opacity: _isHovered ? 1.0 : 0.0,
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 6, bottom: 4),
-                      child: _BubbleMenu(
-                        textToCopy: processedContent,
-                        light: false,
+                      Opacity(
+                        opacity: _isHovered ? 1.0 : 0.0,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6, bottom: 4),
+                          child: _BubbleMenu(
+                            textToCopy: processedContent,
+                            light: false,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
 
             if (widget.tokenUsage != null)
@@ -5302,8 +5332,7 @@ class _ToolExecutionStatus {
           icon:
               exitCode == 0 ? Icons.check_circle_rounded : Icons.error_rounded,
           label: exitCode == 0 ? 'Done $exitCode' : 'Failed $exitCode',
-          tint:
-              exitCode == 0 ? colors.statusActive : colors.statusError,
+          tint: exitCode == 0 ? colors.statusActive : colors.statusError,
         );
       }
       if (content.trim().isNotEmpty) {
@@ -5426,11 +5455,7 @@ class _AskUserCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.help_outline,
-                  size: 16,
-                  color: colors.primaryLight,
-                ),
+                Icon(Icons.help_outline, size: 16, color: colors.primaryLight),
                 const SizedBox(width: 6),
                 Text(
                   'Agent asks:',
@@ -5718,7 +5743,10 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
                                     const SizedBox(width: 14),
                                   const SizedBox(width: 6),
                                   if (m.providerGroup != null) ...[
-                                    _buildProviderBadge(context, m.providerGroup!),
+                                    _buildProviderBadge(
+                                      context,
+                                      m.providerGroup!,
+                                    ),
                                     const SizedBox(width: 4),
                                   ],
                                   Expanded(

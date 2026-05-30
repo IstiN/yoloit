@@ -106,6 +106,17 @@ void main() {
     model: 'model-id',
   );
 
+  test('Codex fallback models mirror bundled CLI picker models', () {
+    expect(kCodexModels.map((m) => m.id), [
+      'gpt-5.5',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.3-codex',
+      'gpt-5.2',
+    ]);
+    expect(kCodexModels.first.isDefault, isTrue);
+  });
+
   test('Kimi provider parses assistant and session id JSONL', () async {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 101, stdin: stdinSink);
