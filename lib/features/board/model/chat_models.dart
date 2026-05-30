@@ -423,10 +423,10 @@ class ChatEvent extends Equatable {
   String? get messageId => data['messageId'] as String?;
 
   /// For tool.execution_start — the tool name.
-  String? get toolName => data['toolName'] as String?;
+  String? get toolName => (data['toolName'] ?? data['name']) as String?;
 
   /// For tool.execution_start — the tool call ID.
-  String? get toolCallId => data['toolCallId'] as String?;
+  String? get toolCallId => (data['toolCallId'] ?? data['id'] ?? id) as String?;
 
   /// For tool.execution_start — the arguments.
   Map<String, dynamic>? get toolArguments =>

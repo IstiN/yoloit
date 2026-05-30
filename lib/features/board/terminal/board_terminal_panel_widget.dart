@@ -1,5 +1,7 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -8,8 +10,10 @@ import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 
@@ -161,11 +165,282 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   }
 
   void _showHistoryDialog() {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder:
           (_) => BoardTerminalSessionHistoryDialog(
             currentSessionId: _config.sessionId,
+          ),
+    );
+  }
+
+  void _openFullView() {
+    if (_session == null) return;
+    final termKey = GlobalKey<TerminalWidgetState>();
+    final logs = <String>[];
+    final logScroll = ScrollController();
+    var forceAltScrollKeys = false;
+
+    void addLog(String msg) {
+      final now = DateTime.now().toIso8601String().substring(11, 23);
+      logs.add('$now $msg');
+      if (logs.length > 400) logs.removeAt(0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!logScroll.hasClients) return;
+        logScroll.jumpTo(logScroll.position.maxScrollExtent);
+      });
+    }
+
+    String escapeForLog(String data) {
+      return data
+          .replaceAll('\x1B', r'\e')
+          .replaceAll('\r', r'\r')
+          .replaceAll('\n', r'\n')
+          .replaceAll('\x02', r'\x02');
+    }
+
+    showDialog<void>(
+      context: context,
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (ctx, dialogSetState) {
+              final terminal = _session!.terminal;
+              final state = termKey.currentState;
+              final fontSize = state?.currentFontSize ?? 13.0;
+              final debugState =
+                  state?.debugStateSummary ??
+                  'alt=${terminal.isUsingAltBuffer} '
+                      'mouse=${terminal.mouseMode} '
+                      'altScroll=${terminal.altBufferMouseScrollMode} '
+                      'buf=${terminal.buffer.height} '
+                      'lines=${terminal.lines.length}';
+
+              void logAndRefresh(String msg) {
+                dialogSetState(() => addLog(msg));
+              }
+
+              void send(String seq, String label) {
+                logAndRefresh('send $label bytes="${escapeForLog(seq)}"');
+                state?.writeToPty(seq);
+              }
+
+              return Dialog(
+                insetPadding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 1000,
+                  height: 800,
+                  child: Column(
+                    children: [
+                      _BoardTerminalInfoBar(
+                        config: _config,
+                        onHistory: () {},
+                        onKill: () {},
+                        onEnvGroupsChanged: (_) {},
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: TerminalWidget(
+                          key: termKey,
+                          session: _session!,
+                          isActive: true,
+                          debugForceAltScrollKeyFallback: forceAltScrollKeys,
+                          debugLabel:
+                              'fullview:${widget.panel.id}:session:${_session!.id}',
+                          debugLogSink:
+                              (message) => logAndRefresh('scroll $message'),
+                          terminalOutputWriter: (sessionId, data) {
+                            logAndRefresh(
+                              'pty[$sessionId] "${escapeForLog(data)}"',
+                            );
+                            PtyService.instance.write(sessionId, data);
+                          },
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        color:
+                            Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    debugState,
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Dump terminal state',
+                                  icon: const Icon(Icons.bug_report, size: 16),
+                                  onPressed:
+                                      () => logAndRefresh('state $debugState'),
+                                ),
+                                IconButton(
+                                  tooltip: 'Copy logs',
+                                  icon: const Icon(Icons.copy, size: 16),
+                                  onPressed: () {
+                                    Clipboard.setData(
+                                      ClipboardData(text: logs.join('\n')),
+                                    );
+                                    logAndRefresh(
+                                      'copied ${logs.length} log lines',
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  tooltip: 'Clear logs',
+                                  icon: const Icon(Icons.clear_all, size: 16),
+                                  onPressed: () => dialogSetState(logs.clear),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () => send('\x1B[5~', 'PgUp'),
+                                  child: const Text('PgUp'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => send('\x1B[6~', 'PgDn'),
+                                  child: const Text('PgDn'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => send('\x1B[A', 'Up'),
+                                  child: const Text('↑'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => send('\x1B[B', 'Down'),
+                                  child: const Text('↓'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => send('\x02[', 'CopyMode'),
+                                  child: const Text('Copy'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => send('q', 'ExitCopy'),
+                                  child: const Text('Exit'),
+                                ),
+                                ElevatedButton(
+                                  onPressed:
+                                      () => send(
+                                        '\x1B[?1000h\x1B[?1002h\x1B[?1006h',
+                                        'MouseOn',
+                                      ),
+                                  child: const Text('MouseOn'),
+                                ),
+                                ElevatedButton(
+                                  onPressed:
+                                      () => send(
+                                        '\x1B[?1000l\x1B[?1002l\x1B[?1006l',
+                                        'MouseOff',
+                                      ),
+                                  child: const Text('MouseOff'),
+                                ),
+                                ElevatedButton(
+                                  onPressed:
+                                      () => send('\x1B[?1049l', 'NormBuf'),
+                                  child: const Text('NormBuf'),
+                                ),
+                                ElevatedButton(
+                                  onPressed:
+                                      () => send('\x1B[?1049h', 'AltBuf'),
+                                  child: const Text('AltBuf'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    dialogSetState(() {
+                                      forceAltScrollKeys = !forceAltScrollKeys;
+                                      addLog(
+                                        'forceAltScrollKeys=$forceAltScrollKeys',
+                                      );
+                                    });
+                                  },
+                                  child: Text(
+                                    forceAltScrollKeys
+                                        ? 'ForceKeysOn'
+                                        : 'ForceKeysOff',
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    state?.setFontSize(fontSize + 1);
+                                    dialogSetState(() {});
+                                  },
+                                  child: const Text('Font+'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    state?.setFontSize(fontSize - 1);
+                                    dialogSetState(() {});
+                                  },
+                                  child: const Text('Font-'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    GestureBinding.instance.handlePointerEvent(
+                                      const PointerScrollEvent(
+                                        device: 0,
+                                        position: Offset.zero,
+                                        scrollDelta: Offset(0, -50),
+                                      ),
+                                    );
+                                    addLog('sim scroll -50');
+                                  },
+                                  child: const Text('Wheel↑'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    GestureBinding.instance.handlePointerEvent(
+                                      const PointerScrollEvent(
+                                        device: 0,
+                                        position: Offset.zero,
+                                        scrollDelta: Offset(0, 50),
+                                      ),
+                                    );
+                                    addLog('sim scroll +50');
+                                  },
+                                  child: const Text('Wheel↓'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          color: Colors.black,
+                          padding: const EdgeInsets.all(4),
+                          child: ListView.builder(
+                            controller: logScroll,
+                            itemCount: logs.length,
+                            itemBuilder:
+                                (_, i) => Text(
+                                  logs[i],
+                                  style: const TextStyle(
+                                    color: Colors.lightGreenAccent,
+                                    fontSize: 10,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
     );
   }
@@ -218,12 +493,18 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
           onHistory: _showHistoryDialog,
           onKill: _killCurrentSession,
           onEnvGroupsChanged: _onEnvGroupsChanged,
+          onOpenFullView: _openFullView,
         ),
         Expanded(
-          child: TerminalWidget(
-            key: ValueKey('board-terminal-${_session!.id}'),
-            session: _session!,
-            isActive: true,
+          child: ScrollableCardMarker(
+            child: ScrollableCardRegion(
+              child: TerminalWidget(
+                key: ValueKey('board-terminal-${_session!.id}'),
+                session: _session!,
+                isActive: true,
+                debugLabel: 'board:${widget.panel.id}:session:${_session!.id}',
+              ),
+            ),
           ),
         ),
       ],
@@ -237,12 +518,14 @@ class _BoardTerminalInfoBar extends StatefulWidget {
     required this.onHistory,
     required this.onKill,
     required this.onEnvGroupsChanged,
+    this.onOpenFullView,
   });
 
   final BoardTerminalConfig config;
   final VoidCallback onHistory;
   final VoidCallback onKill;
   final ValueChanged<List<String>> onEnvGroupsChanged;
+  final VoidCallback? onOpenFullView;
 
   @override
   State<_BoardTerminalInfoBar> createState() => _BoardTerminalInfoBarState();
@@ -337,6 +620,19 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
             ),
           ),
           const SizedBox(width: 8),
+          if (widget.onOpenFullView != null)
+            GestureDetector(
+              onTap: widget.onOpenFullView,
+              child: Tooltip(
+                message: 'Open full view',
+                child: Icon(
+                  Icons.open_in_full_rounded,
+                  size: 14,
+                  color: mutedColor,
+                ),
+              ),
+            ),
+          if (widget.onOpenFullView != null) const SizedBox(width: 8),
           GestureDetector(
             onTap: widget.onKill,
             child: Tooltip(
@@ -655,7 +951,8 @@ class _BoardTerminalSessionHistoryDialogState
                 }
                 return ListView.separated(
                   itemCount: entries.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                  separatorBuilder:
+                      (context, index) => const SizedBox(height: 4),
                   itemBuilder: (context, index) {
                     final entry = entries[index];
                     final isCurrent = entry.id == widget.currentSessionId;

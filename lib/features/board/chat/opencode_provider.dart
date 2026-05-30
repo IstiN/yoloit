@@ -11,6 +11,7 @@ import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/models_dev_catalog_service.dart';
 import 'package:yoloit/features/settings/data/opencode_auth_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 
 /// [ChatProvider] implementation that wraps the OpenCode CLI.
 ///
@@ -18,7 +19,9 @@ import 'package:yoloit/features/settings/data/provider_model_catalog_service.dar
 /// and parses the NDJSON output into [ChatEvent] objects, same pattern
 /// as CopilotCliProvider and CursorAgentProvider.
 class OpencodeProvider extends ChatProvider {
-  OpencodeProvider();
+  OpencodeProvider({this.agentId = 'opencode'});
+
+  final String agentId;
 
   final Map<String, String> _sessionIds = {};
   final Map<String, Process> _processes = {};
@@ -30,22 +33,27 @@ class OpencodeProvider extends ChatProvider {
   List<ChatModelInfo>? _cachedModelsDevModels;
 
   @override
-  String get providerId => 'opencode';
+  String get providerId => agentId;
 
   @override
   String get displayName => 'OpenCode';
 
   @override
   List<ChatModelInfo> get availableModels {
+    final catalogModels =
+        ProviderModelCatalogService.instance.modelsForProvider(agentId);
+    if (catalogModels != null && catalogModels.isNotEmpty) {
+      return catalogModels;
+    }
     // 1. models.dev dynamically loaded (most up-to-date)
     if (_cachedModelsDevModels != null && _cachedModelsDevModels!.isNotEmpty) {
       return _cachedModelsDevModels!;
     }
     // 2. GitHub-hosted catalog (provider_models.json)
-    final catalogModels =
+    final opencodeCatalogModels =
         ProviderModelCatalogService.instance.modelsForProvider('opencode');
-    if (catalogModels != null && catalogModels.isNotEmpty) {
-      return catalogModels;
+    if (opencodeCatalogModels != null && opencodeCatalogModels.isNotEmpty) {
+      return opencodeCatalogModels;
     }
     // 3. Hardcoded fallback
     return kOpencodeModels;
@@ -115,66 +123,65 @@ class OpencodeProvider extends ChatProvider {
   }) async {
     await stop(config.sessionName);
 
-    final args = <String>[
-      'run',
-      '--format',
-      'json',
-      '--dangerously-skip-permissions',
-    ];
+    final configObj = AgentConfigService.instance.configForAgent(agentId);
+    final passDefault = configObj?.passDefaultArgs ?? true;
 
-    // Model
-    if (config.model.isNotEmpty) {
-      args.addAll(['--model', config.model]);
-    }
-
-    // Reasoning effort / variant
-    if (config.reasoningEffort != null &&
-        config.reasoningEffort!.isNotEmpty) {
-      args.addAll(['--variant', config.reasoningEffort!]);
-    }
-
-    // Agent mode
-    if (config.mode != null && config.mode!.isNotEmpty) {
-      args.addAll(['--agent', config.mode!]);
-    }
-
-    // Session resume — reset session if model changed since last message.
-    if (!isFirstMessage) {
-      final lastModel = _sessionModels[config.sessionName];
-      if (lastModel != null && lastModel != config.model) {
-        debugPrint(
-          '[OpenCode] Model changed ($lastModel → ${config.model}), starting new session',
-        );
-        _sessionIds.remove(config.sessionName);
+    final args = <String>[];
+    if (passDefault) {
+      // Model
+      if (!(configObj?.disableModel ?? false) && config.model.isNotEmpty) {
+        args.addAll(['--model', config.model]);
       }
-      final sessionID = _sessionIds[config.sessionName];
-      if (sessionID != null) {
-        args.addAll(['--session', sessionID]);
-        debugPrint('[OpenCode] Resuming session: $sessionID');
-      } else {
-        debugPrint(
-          '[OpenCode] No sessionID for ${config.sessionName}, creating new',
-        );
+
+      // Reasoning effort / variant
+      if (config.reasoningEffort != null &&
+          config.reasoningEffort!.isNotEmpty) {
+        args.addAll(['--variant', config.reasoningEffort!]);
       }
-    }
-    _sessionModels[config.sessionName] = config.model;
 
-    // Working directory
-    if (config.workingDir.isNotEmpty) {
-      args.addAll(['--dir', config.workingDir]);
-    }
+      // Agent mode
+      if (config.mode != null && config.mode!.isNotEmpty) {
+        args.addAll(['--agent', config.mode!]);
+      }
 
-    // Attachments via --file
-    for (final path in attachments) {
-      args.addAll(['--file', path]);
-    }
+      // Session resume — reset session if model changed since last message.
+      if (!isFirstMessage) {
+        final lastModel = _sessionModels[config.sessionName];
+        if (lastModel != null && lastModel != config.model) {
+          debugPrint(
+            '[OpenCode] Model changed ($lastModel → ${config.model}), starting new session',
+          );
+          _sessionIds.remove(config.sessionName);
+        }
+        final sessionID = _sessionIds[config.sessionName];
+        if (sessionID != null) {
+          args.addAll(['--session', sessionID]);
+          debugPrint('[OpenCode] Resuming session: $sessionID');
+        } else {
+          debugPrint(
+            '[OpenCode] No sessionID for ${config.sessionName}, creating new',
+          );
+        }
+      }
+      _sessionModels[config.sessionName] = config.model;
 
-    // Custom args
-    args.addAll(config.customArgs);
+      // Working directory
+      if (config.workingDir.isNotEmpty) {
+        args.addAll(['--dir', config.workingDir]);
+      }
 
-    // Title for session naming
-    if (isFirstMessage && config.sessionName.isNotEmpty) {
-      args.addAll(['--title', config.sessionName]);
+      // Attachments via --file
+      for (final path in attachments) {
+        args.addAll(['--file', path]);
+      }
+
+      // Custom args
+      args.addAll(config.customArgs);
+
+      // Title for session naming
+      if (isFirstMessage && config.sessionName.isNotEmpty) {
+        args.addAll(['--title', config.sessionName]);
+      }
     }
 
     // Prepend YoLoIT CLI guidance tree to first message
@@ -191,7 +198,16 @@ class OpencodeProvider extends ChatProvider {
 
     final workingDir = _resolveWorkingDir(config.workingDir);
 
-    debugPrint('[OpenCode] Running: opencode ${args.join(' ')}');
+    var rawCommand = configObj?.launchCommand.trim() ?? '';
+    if (rawCommand.isEmpty || rawCommand == 'opencode') {
+      rawCommand = AgentConfigService.defaultBoardChatCommand(configObj?.streamAdapter ?? 'opencode');
+    }
+
+    final cmdParts = _splitCommand(rawCommand);
+    final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'opencode';
+    final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+
+    debugPrint('[OpenCode] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}');
     debugPrint('[OpenCode] cwd: $workingDir');
 
     try {
@@ -205,8 +221,8 @@ class OpencodeProvider extends ChatProvider {
       );
 
       final process = await Process.start(
-        'opencode',
-        args,
+        executable,
+        [...extraCmdArgs, ...args],
         workingDirectory: workingDir,
         environment: {
           ...baseEnv,
@@ -645,6 +661,32 @@ class OpencodeProvider extends ChatProvider {
   @override
   void detach() {
     _processes.clear();
+  }
+
+  List<String> _splitCommand(String command) {
+    final parts = <String>[];
+    final sb = StringBuffer();
+    bool inDoubleQuotes = false;
+    bool inSingleQuotes = false;
+    for (int i = 0; i < command.length; i++) {
+      final char = command[i];
+      if (char == '"' && !inSingleQuotes) {
+        inDoubleQuotes = !inDoubleQuotes;
+      } else if (char == "'" && !inDoubleQuotes) {
+        inSingleQuotes = !inSingleQuotes;
+      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
+        if (sb.isNotEmpty) {
+          parts.add(sb.toString());
+          sb.clear();
+        }
+      } else {
+        sb.write(char);
+      }
+    }
+    if (sb.isNotEmpty) {
+      parts.add(sb.toString());
+    }
+    return parts;
   }
 }
 

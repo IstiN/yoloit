@@ -63,15 +63,16 @@ class TmuxService {
       // if the server is already up from a previous launch it ignores the
       // config file. Sending the command directly guarantees the green
       // status bar is hidden even on existing sessions.
-      await _applyStatusOff();
+      await _applyRuntimeSettings();
     }
   }
 
   /// Tells the running tmux server (if any) to hide the status bar.
-  Future<void> _applyStatusOff() async {
+  Future<void> _applyRuntimeSettings() async {
     if (_tmuxBin == null) return;
     try {
       await Process.run(_tmuxBin!, ['set', '-g', 'status', 'off']);
+      await Process.run(_tmuxBin!, ['set', '-g', 'mouse', 'on']);
     } catch (_) {
       // No server running yet — safe to ignore, config file covers next start.
     }
@@ -110,7 +111,7 @@ class TmuxService {
   static String get _configPath =>
       '${PlatformDirs.instance.configDir}/tmux.conf';
 
-  static const _configVersion = '# YoLoIT tmux config v2';
+  static const _configVersion = '# YoLoIT tmux config v3';
 
   /// Writes (or overwrites) the yoloit tmux config so it always reflects
   /// the current expected settings — e.g. status bar disabled.
@@ -193,7 +194,8 @@ class TmuxService {
   /// Injects environment variables into an existing tmux session.
   ///
   /// Uses `tmux setenv` so new panes/windows inherit the values, then
-  /// `tmux send-keys` to export them into the currently running shell.
+  /// `tmux show-environment` to re-export them in the currently running shell
+  /// without printing secret values into the command line.
   Future<void> injectEnv(
     String sessionId,
     Map<String, String> env,
@@ -206,19 +208,17 @@ class TmuxService {
         ['setenv', '-t', target, entry.key, entry.value],
       );
     }
-    // Build a single export command for the running shell.
-    final exports = env.entries
-        .map((e) => 'export ${e.key}=${_shellEscape(e.value)}')
-        .join('; ');
+    // Re-export from tmux's environment so the typed command never contains
+    // the actual secret values.
     await Process.run(
       _tmuxBin!,
-      ['send-keys', '-t', target, ' $exports', 'Enter'],
+      [
+        'send-keys',
+        '-t',
+        target,
+        'eval "\$(tmux show-environment -s -t $target)"',
+        'Enter',
+      ],
     );
-  }
-
-  /// Escape a value for safe use in a POSIX shell single-quoted string.
-  static String _shellEscape(String value) {
-    // Wrap in single quotes; escape any embedded single quotes.
-    return "'${value.replaceAll("'", "'\\''")}'";
   }
 }

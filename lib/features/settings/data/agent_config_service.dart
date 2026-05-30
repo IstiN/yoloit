@@ -11,6 +11,9 @@ class AgentConfig {
   final String launchCommand;
   final bool visible;
   final bool isBuiltIn;
+  final String? streamAdapter;
+  final bool passDefaultArgs;
+  final bool disableModel;
 
   /// Default model for this provider (null = use catalog/provider default).
   final String? defaultModel;
@@ -31,6 +34,9 @@ class AgentConfig {
     required this.launchCommand,
     required this.visible,
     required this.isBuiltIn,
+    this.streamAdapter,
+    this.passDefaultArgs = true,
+    this.disableModel = false,
     this.defaultModel,
     this.asrMode = 'default',
     this.asrCloudConfigId,
@@ -42,6 +48,9 @@ class AgentConfig {
     String? iconLabel,
     String? launchCommand,
     bool? visible,
+    Object? streamAdapter = _sentinel,
+    bool? passDefaultArgs,
+    bool? disableModel,
     Object? defaultModel = _sentinel,
     String? asrMode,
     Object? asrCloudConfigId = _sentinel,
@@ -53,6 +62,10 @@ class AgentConfig {
     launchCommand: launchCommand ?? this.launchCommand,
     visible: visible ?? this.visible,
     isBuiltIn: isBuiltIn,
+    streamAdapter:
+        streamAdapter == _sentinel ? this.streamAdapter : streamAdapter as String?,
+    passDefaultArgs: passDefaultArgs ?? this.passDefaultArgs,
+    disableModel: disableModel ?? this.disableModel,
     defaultModel:
         defaultModel == _sentinel ? this.defaultModel : defaultModel as String?,
     asrMode: asrMode ?? this.asrMode,
@@ -73,6 +86,9 @@ class AgentConfig {
     'launchCommand': launchCommand,
     'visible': visible,
     'isBuiltIn': isBuiltIn,
+    if (streamAdapter != null) 'streamAdapter': streamAdapter,
+    'passDefaultArgs': passDefaultArgs,
+    'disableModel': disableModel,
     if (defaultModel != null) 'defaultModel': defaultModel,
     if (asrMode != 'default') 'asrMode': asrMode,
     if (asrCloudConfigId != null) 'asrCloudConfigId': asrCloudConfigId,
@@ -86,6 +102,9 @@ class AgentConfig {
     launchCommand: j['launchCommand'] as String? ?? '',
     visible: j['visible'] as bool? ?? true,
     isBuiltIn: j['isBuiltIn'] as bool? ?? false,
+    streamAdapter: j['streamAdapter'] as String?,
+    passDefaultArgs: j['passDefaultArgs'] as bool? ?? true,
+    disableModel: j['disableModel'] as bool? ?? false,
     defaultModel: j['defaultModel'] as String?,
     asrMode: j['asrMode'] as String? ?? 'default',
     asrCloudConfigId: j['asrCloudConfigId'] as String?,
@@ -117,6 +136,11 @@ class AgentConfigService {
         launchCommand: t.launchCommand,
         visible: true,
         isBuiltIn: true,
+        streamAdapter: t.name == 'copilot'
+            ? 'copilot'
+            : t.name == 'cursor'
+                ? 'cursor'
+                : null,
       ),
     ),
     const AgentConfig(
@@ -126,6 +150,7 @@ class AgentConfigService {
       launchCommand: 'opencode',
       visible: true,
       isBuiltIn: true,
+      streamAdapter: 'opencode',
     ),
   ];
 
@@ -146,12 +171,21 @@ class AgentConfigService {
             data
                 .map((e) => AgentConfig.fromJson(e as Map<String, dynamic>))
                 .toList();
-        // Merge: ensure all built-ins are present
-        final savedIds = saved.map((c) => c.id).toSet();
-        for (final d in _defaults) {
-          if (!savedIds.contains(d.id)) saved.add(d);
+        // Merge: ensure all built-ins are present and have default stream adapters if null
+        final updatedSaved = <AgentConfig>[];
+        for (final s in saved) {
+          final def = _defaults.where((d) => d.id == s.id).firstOrNull;
+          if (def != null && s.streamAdapter == null && def.streamAdapter != null) {
+            updatedSaved.add(s.copyWith(streamAdapter: def.streamAdapter));
+          } else {
+            updatedSaved.add(s);
+          }
         }
-        _cached = saved;
+        final savedIds = updatedSaved.map((c) => c.id).toSet();
+        for (final d in _defaults) {
+          if (!savedIds.contains(d.id)) updatedSaved.add(d);
+        }
+        _cached = updatedSaved;
       }
     } catch (_) {
       _cached = _defaults;
@@ -280,4 +314,21 @@ class AgentConfigService {
 
   /// All currently loaded configs.
   List<AgentConfig> get configs => List.unmodifiable(_cached);
+
+  AgentConfig? defaultConfigForId(String id) {
+    try {
+      return _defaults.firstWhere((d) => d.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String defaultBoardChatCommand(String adapter) {
+    return switch (adapter) {
+      'opencode' => 'opencode run --format json --dangerously-skip-permissions',
+      'cursor' => 'cursor-agent --print --output-format stream-json --stream-partial-output --yolo',
+      'copilot' => 'copilot --output-format json --yolo',
+      _ => '',
+    };
+  }
 }

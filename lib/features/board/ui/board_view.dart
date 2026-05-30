@@ -33,6 +33,7 @@ import 'package:yoloit/features/board/tools/board_tool.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class BoardView extends StatefulWidget {
@@ -71,7 +72,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _isViewportInteracting = false;
   bool _isViewportZooming = false;
   double _interactionStartScale = 1.0;
+  Matrix4? _interactionStartMatrix;
+  int? _lastLoggedLockCount;
   Offset? _lastPanelDragBoardPointer;
+
   String? _syncedBoardId;
   BoardViewport? _syncedViewport;
   String? _autoFitKey;
@@ -233,294 +237,370 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       ),
                                     ),
                                   ),
-                                  InteractiveViewer(
-                                    constrained: false,
-                                    minScale: 0.2,
-                                    maxScale: 2.5,
-                                    scaleEnabled: true,
-                                    boundaryMargin: const EdgeInsets.all(
-                                      _canvasExpansionChunk,
-                                    ),
-                                    // Disable pan only while actively drawing (drawPointer held)
-                                    panEnabled:
-                                        (_activeTool != BoardToolId.draw ||
-                                            _drawPointer == null),
-                                    transformationController:
-                                        _transformController,
-                                    onInteractionStart: (details) {
-                                      _interactionStartScale =
-                                          _BoardViewState._scaleOf(
-                                            _transformController.value,
-                                          );
-                                      setState(() {
-                                        _isViewportInteracting = true;
-                                        _isViewportZooming = false;
-                                      });
-                                      _boardDebugLog('interaction.start');
-                                      _stopPanAnimation();
-                                    },
-                                    onInteractionUpdate: (details) {
-                                      // Detect zoom by comparing current scale to
-                                      // the scale at interaction start.
-                                      if (!_isViewportZooming) {
-                                        final currentScale =
-                                            _BoardViewState._scaleOf(
-                                              _transformController.value,
-                                            );
-                                        if ((currentScale -
-                                                    _interactionStartScale)
-                                                .abs() >
-                                            0.01) {
-                                          setState(
-                                            () => _isViewportZooming = true,
-                                          );
-                                        }
-                                      }
-                                    },
-                                    onInteractionEnd: (_) {
-                                      setState(() {
-                                        _isViewportInteracting = false;
-                                        _isViewportZooming = false;
-                                      });
-                                      _boardDebugLog('interaction.end');
-                                      // pageZoom is updated by Swift frame observer; just dispatch resize.
-                                      for (final panel in activeBoard.panels) {
-                                        if (panel.type != WebpagePlugin.kTypeId)
-                                          continue;
-                                        final ctrl =
-                                            WebpagePlugin.controllers[panel.id];
-                                        if (ctrl == null) continue;
-                                        ctrl.runJavaScript(
-                                          "window.dispatchEvent(new Event('resize'));",
+                                  ValueListenableBuilder<int>(
+                                    valueListenable:
+                                        CanvasInteractionLock
+                                            .instance
+                                            .activeCount,
+                                    builder: (context, activeCount, child) {
+                                      final isLocked = activeCount > 0;
+                                      if (_lastLoggedLockCount != activeCount) {
+                                        _lastLoggedLockCount = activeCount;
+                                        debugPrint(
+                                          '[BoardViewLock] activeCount=$activeCount, isLocked=$isLocked',
                                         );
                                       }
-                                      _persistViewport(context, activeBoard);
-                                    },
-                                    child: SizedBox(
-                                      width: _canvasSize.width,
-                                      height: _canvasSize.height,
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Positioned.fill(
-                                            child: IgnorePointer(
-                                              child: CustomPaint(
-                                                painter: _BoardLinksPainter(
-                                                  panels: activeBoard.panels,
-                                                  links: activeBoard.links,
-                                                  origin: _canvasOrigin,
-                                                ),
-                                              ),
-                                            ),
+                                      return Listener(
+                                        behavior: HitTestBehavior.translucent,
+                                        onPointerSignal: (event) {
+                                          if (isLocked) {
+                                            // Swallow the event here so
+                                            // InteractiveViewer never sees it.
+                                            return;
+                                          }
+                                        },
+                                        child: InteractiveViewer(
+                                          key: const ValueKey(
+                                            'board_interactive_viewer',
                                           ),
-                                          // ── Canvas background tap — clear focus ──
-                                          // Stack hit-tests children in reverse order
-                                          // (last child first).  Panels are added
-                                          // AFTER this Listener, so they absorb
-                                          // clicks first.  Only clicks on empty
-                                          // canvas reach this Listener.
-                                          Positioned.fill(
-                                            child: Listener(
-                                              behavior:
-                                                  HitTestBehavior.translucent,
-                                              onPointerDown: (_) {
-                                                if (focusedPanelId != null) {
-                                                  _boardWebFocusLog(
-                                                    'canvas tap -> clearFocusedPanel',
+                                          constrained: false,
+                                          minScale: 0.2,
+                                          maxScale: 2.5,
+                                          scaleEnabled: !isLocked,
+                                          boundaryMargin: const EdgeInsets.all(
+                                            _canvasExpansionChunk,
+                                          ),
+                                          // Disable pan only while actively drawing (drawPointer held) or canvas is locked
+                                          panEnabled:
+                                              !isLocked &&
+                                              (_activeTool != BoardToolId.draw ||
+                                                  _drawPointer == null),
+                                          transformationController:
+                                              _transformController,
+                                          onInteractionStart: (details) {
+                                            _interactionStartScale =
+                                                _BoardViewState._scaleOf(
+                                                  _transformController.value,
+                                                );
+                                            _interactionStartMatrix =
+                                                _transformController.value
+                                                    .clone();
+                                            setState(() {
+                                              _isViewportInteracting = true;
+                                              _isViewportZooming = false;
+                                            });
+                                            _boardDebugLog('interaction.start');
+                                            _stopPanAnimation();
+                                          },
+                                          onInteractionUpdate: (details) {
+                                            if (CanvasInteractionLock
+                                                    .instance
+                                                    .isLocked &&
+                                                _interactionStartMatrix != null) {
+                                              _transformController.value =
+                                                  _interactionStartMatrix!;
+                                              return;
+                                            }
+                                            // Detect zoom by comparing current scale to
+                                            // the scale at interaction start.
+                                            if (!_isViewportZooming) {
+                                              final currentScale =
+                                                  _BoardViewState._scaleOf(
+                                                    _transformController.value,
                                                   );
-                                                  context
-                                                      .read<BoardCubit>()
-                                                      .clearFocusedPanel();
-                                                }
-                                              },
-                                            ),
-                                          ),
-                                          // ── Link delete badges ─────────────────────
-                                          if (_activeTool == BoardToolId.select)
-                                            ..._buildLinkDeleteBadges(
+                                              if ((currentScale -
+                                                              _interactionStartScale)
+                                                          .abs() >
+                                                      0.01) {
+                                                setState(
+                                                  () => _isViewportZooming = true,
+                                                );
+                                              }
+                                            }
+                                          },
+                                          onInteractionEnd: (_) {
+                                            _interactionStartMatrix = null;
+                                            setState(() {
+                                              _isViewportInteracting = false;
+                                              _isViewportZooming = false;
+                                            });
+                                            _boardDebugLog('interaction.end');
+                                            // pageZoom is updated by Swift frame observer; just dispatch resize.
+                                            for (final panel
+                                                in activeBoard.panels) {
+                                              if (panel.type !=
+                                                  WebpagePlugin.kTypeId)
+                                                continue;
+                                              final ctrl =
+                                                  WebpagePlugin.controllers[panel
+                                                      .id];
+                                              if (ctrl == null) continue;
+                                              ctrl.runJavaScript(
+                                                "window.dispatchEvent(new Event('resize'));",
+                                              );
+                                            }
+                                            _persistViewport(
                                               context,
                                               activeBoard,
-                                            ),
-                                          ...(() {
-                                            final visiblePanels =
-                                                activeBoard.panels
-                                                    .where(
-                                                      (panel) => !panel.hidden,
-                                                    )
-                                                    .toList()
-                                                  ..sort(
-                                                    (a, b) => a.zIndex
-                                                        .compareTo(b.zIndex),
-                                                  );
-                                            return visiblePanels
-                                                .map(
-                                                  (panel) => _BoardPanelCard(
-                                                    key: ValueKey(panel.id),
-                                                    panel: panel,
-                                                    positionOffset:
-                                                        _canvasOrigin,
-                                                    capturingScreenshot:
-                                                        _isCapturingScreenshot,
-                                                    onTap:
-                                                        () => context
-                                                            .read<BoardCubit>()
-                                                            .focusPanel(
-                                                              panel.id,
-                                                            ),
-                                                    onMove:
-                                                        (details) =>
-                                                            _movePanelWithEdgePan(
-                                                              context,
-                                                              panel.id,
-                                                              details,
-                                                            ),
-                                                    onResize:
-                                                        (details) =>
-                                                            _resizePanelWithEdgePan(
-                                                              context,
-                                                              panel,
-                                                              details,
-                                                            ),
-                                                    onDragStart:
-                                                        (details) =>
-                                                            _handlePanelDragStart(
-                                                              panel.id,
-                                                              details,
-                                                            ),
-                                                    onDragEnd:
-                                                        _handlePanelDragEnd,
-                                                    onDelete: () async {
-                                                      if (panel.type ==
-                                                          'board.widget.custom') {
-                                                        WidgetEngineManager
-                                                            .instance
-                                                            .remove(panel.id);
-                                                      }
-                                                      await context
-                                                          .read<BoardCubit>()
-                                                          .removePanel(
-                                                            panel.id,
-                                                          );
-                                                    },
-                                                    onEditColor:
-                                                        () =>
-                                                            _showPanelColorDialog(
-                                                              context,
-                                                              panel,
-                                                            ),
-                                                    onEditNote:
-                                                        panel.type ==
-                                                                'board.note.markdown'
-                                                            ? () =>
-                                                                _showMarkdownNoteDialog(
-                                                                  context,
-                                                                  panel: panel,
-                                                                )
-                                                            : null,
-                                                    onUpdateState: (newState) {
+                                            );
+                                          },
+                                          child: SizedBox(
+                                            width: _canvasSize.width,
+                                            height: _canvasSize.height,
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                Positioned.fill(
+                                                  child: IgnorePointer(
+                                                    child: CustomPaint(
+                                                      painter: _BoardLinksPainter(
+                                                        panels:
+                                                            activeBoard.panels,
+                                                        links: activeBoard.links,
+                                                        origin: _canvasOrigin,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                // ── Canvas background tap — clear focus ──
+                                                // Stack hit-tests children in reverse order
+                                              // (last child first).  Panels are added
+                                              // AFTER this Listener, so they absorb
+                                              // clicks first.  Only clicks on empty
+                                              // canvas reach this Listener.
+                                              Positioned.fill(
+                                                child: Listener(
+                                                  behavior:
+                                                      HitTestBehavior
+                                                          .translucent,
+                                                  onPointerDown: (_) {
+                                                    if (focusedPanelId !=
+                                                        null) {
+                                                      _boardWebFocusLog(
+                                                        'canvas tap -> clearFocusedPanel',
+                                                      );
                                                       context
                                                           .read<BoardCubit>()
-                                                          .updatePanel(
-                                                            panel.id,
-                                                            (p) => p.copyWith(
-                                                              state: newState,
+                                                          .clearFocusedPanel();
+                                                    }
+                                                  },
+                                                ),
+                                              ),
+                                              // ── Link delete badges ─────────────────────
+                                              if (_activeTool ==
+                                                  BoardToolId.select)
+                                                ..._buildLinkDeleteBadges(
+                                                  context,
+                                                  activeBoard,
+                                                ),
+                                              ...(() {
+                                                final visiblePanels =
+                                                    activeBoard.panels
+                                                        .where(
+                                                          (panel) =>
+                                                              !panel.hidden,
+                                                        )
+                                                        .toList()
+                                                      ..sort(
+                                                        (a, b) =>
+                                                            a.zIndex.compareTo(
+                                                              b.zIndex,
                                                             ),
-                                                          );
-                                                    },
-                                                    onCreateLinkedPanel: (
-                                                      typeId,
-                                                      state,
-                                                      title,
-                                                    ) async {
-                                                      final cubit =
+                                                      );
+                                                return visiblePanels
+                                                    .map(
+                                                      (
+                                                        panel,
+                                                      ) => _BoardPanelCard(
+                                                        key: ValueKey(panel.id),
+                                                        panel: panel,
+                                                        positionOffset:
+                                                            _canvasOrigin,
+                                                        capturingScreenshot:
+                                                            _isCapturingScreenshot,
+                                                        onTap:
+                                                            () => context
+                                                                .read<
+                                                                  BoardCubit
+                                                                >()
+                                                                .focusPanel(
+                                                                  panel.id,
+                                                                ),
+                                                        onMove:
+                                                            (details) =>
+                                                                _movePanelWithEdgePan(
+                                                                  context,
+                                                                  panel.id,
+                                                                  details,
+                                                                ),
+                                                        onResize:
+                                                            (details) =>
+                                                                _resizePanelWithEdgePan(
+                                                                  context,
+                                                                  panel,
+                                                                  details,
+                                                                ),
+                                                        onDragStart:
+                                                            (details) =>
+                                                                _handlePanelDragStart(
+                                                                  panel.id,
+                                                                  details,
+                                                                ),
+                                                        onDragEnd:
+                                                            _handlePanelDragEnd,
+                                                        onDelete: () async {
+                                                          if (panel.type ==
+                                                              'board.widget.custom') {
+                                                            WidgetEngineManager
+                                                                .instance
+                                                                .remove(
+                                                                  panel.id,
+                                                                );
+                                                          }
+                                                          await context
+                                                              .read<
+                                                                BoardCubit
+                                                              >()
+                                                              .removePanel(
+                                                                panel.id,
+                                                              );
+                                                        },
+                                                        onEditColor:
+                                                            () =>
+                                                                _showPanelColorDialog(
+                                                                  context,
+                                                                  panel,
+                                                                ),
+                                                        onEditNote:
+                                                            panel.type ==
+                                                                    'board.note.markdown'
+                                                                ? () =>
+                                                                    _showMarkdownNoteDialog(
+                                                                      context,
+                                                                      panel:
+                                                                          panel,
+                                                                    )
+                                                                : null,
+                                                        onUpdateState: (
+                                                          newState,
+                                                        ) {
                                                           context
                                                               .read<
                                                                 BoardCubit
-                                                              >();
-                                                      final plugin =
-                                                          BoardPluginRegistry
-                                                              .instance
-                                                              .pluginFor(
-                                                                typeId,
-                                                              );
-                                                      final size =
-                                                          plugin?.defaultSize ??
-                                                          const Size(460, 380);
-                                                      final board =
-                                                          cubit
-                                                              .state
-                                                              .activeBoard;
-                                                      if (board == null)
-                                                        return null;
-                                                      final currentBounds =
-                                                          panel.bounds;
-                                                      // Place to the right of the source panel, then
-                                                      // stack downward if that slot is already taken.
-                                                      final baseX =
-                                                          currentBounds.x +
-                                                          currentBounds.width +
-                                                          40;
-                                                      var baseY =
-                                                          currentBounds.y;
-                                                      final occupiedRects =
-                                                          board.panels
-                                                              .where(
-                                                                (p) =>
-                                                                    !p.hidden,
-                                                              )
-                                                              .map(
+                                                              >()
+                                                              .updatePanel(
+                                                                panel.id,
                                                                 (
                                                                   p,
-                                                                ) => Rect.fromLTWH(
-                                                                  p.bounds.x,
-                                                                  p.bounds.y,
-                                                                  p
-                                                                      .bounds
-                                                                      .width,
-                                                                  p
-                                                                      .bounds
-                                                                      .height,
+                                                                ) => p.copyWith(
+                                                                  state:
+                                                                      newState,
                                                                 ),
-                                                              )
-                                                              .toList();
-                                                      var candidate =
-                                                          Rect.fromLTWH(
-                                                            baseX,
-                                                            baseY,
-                                                            size.width,
-                                                            size.height,
-                                                          );
-                                                      // Shift down until no overlap with existing panels.
-                                                      var attempts = 0;
-                                                      while (attempts < 50 &&
-                                                          occupiedRects.any(
-                                                            (r) => r.overlaps(
-                                                              candidate,
-                                                            ),
-                                                          )) {
-                                                        baseY +=
-                                                            size.height + 20;
-                                                        candidate =
-                                                            Rect.fromLTWH(
-                                                              baseX,
-                                                              baseY,
-                                                              size.width,
-                                                              size.height,
-                                                            );
-                                                        attempts++;
-                                                      }
-                                                      final newBounds =
-                                                          BoardPanelBounds(
-                                                            x: baseX,
-                                                            y: baseY,
-                                                            width: size.width,
-                                                            height: size.height,
-                                                          );
-                                                      final ts =
-                                                          DateTime.now()
-                                                              .microsecondsSinceEpoch;
-                                                      final newPanel =
-                                                          BoardPanelInstance(
+                                                              );
+                                                        },
+                                                        onCreateLinkedPanel: (
+                                                          typeId,
+                                                          state,
+                                                          title,
+                                                        ) async {
+                                                          final cubit =
+                                                              context
+                                                                  .read<
+                                                                    BoardCubit
+                                                                  >();
+                                                          final plugin =
+                                                              BoardPluginRegistry
+                                                                  .instance
+                                                                  .pluginFor(
+                                                                    typeId,
+                                                                  );
+                                                          final size =
+                                                              plugin
+                                                                  ?.defaultSize ??
+                                                              const Size(
+                                                                460,
+                                                                380,
+                                                              );
+                                                          final board =
+                                                              cubit
+                                                                  .state
+                                                                  .activeBoard;
+                                                          if (board == null)
+                                                            return null;
+                                                          final currentBounds =
+                                                              panel.bounds;
+                                                          // Place to the right of the source panel, then
+                                                          // stack downward if that slot is already taken.
+                                                          final baseX =
+                                                              currentBounds.x +
+                                                              currentBounds
+                                                                  .width +
+                                                              40;
+                                                          var baseY =
+                                                              currentBounds.y;
+                                                          final occupiedRects =
+                                                              board.panels
+                                                                  .where(
+                                                                    (p) =>
+                                                                        !p.hidden,
+                                                                  )
+                                                                  .map(
+                                                                    (
+                                                                      p,
+                                                                    ) => Rect.fromLTWH(
+                                                                      p.bounds.x,
+                                                                      p.bounds.y,
+                                                                      p
+                                                                          .bounds
+                                                                          .width,
+                                                                      p
+                                                                          .bounds
+                                                                          .height,
+                                                                    ),
+                                                                  )
+                                                                  .toList();
+                                                          var candidate =
+                                                              Rect.fromLTWH(
+                                                                baseX,
+                                                                baseY,
+                                                                size.width,
+                                                                size.height,
+                                                              );
+                                                          // Shift down until no overlap with existing panels.
+                                                          var attempts = 0;
+                                                          while (attempts <
+                                                                  50 &&
+                                                              occupiedRects.any(
+                                                                (r) =>
+                                                                    r.overlaps(
+                                                                      candidate,
+                                                                    ),
+                                                              )) {
+                                                            baseY +=
+                                                                size.height +
+                                                                20;
+                                                            candidate =
+                                                                Rect.fromLTWH(
+                                                                  baseX,
+                                                                  baseY,
+                                                                  size.width,
+                                                                  size.height,
+                                                                );
+                                                            attempts++;
+                                                          }
+                                                          final newBounds =
+                                                              BoardPanelBounds(
+                                                                x: baseX,
+                                                                y: baseY,
+                                                                width:
+                                                                    size.width,
+                                                                height:
+                                                                    size.height,
+                                                              );
+                                                          final ts =
+                                                              DateTime.now()
+                                                                  .microsecondsSinceEpoch;
+                                                          final newPanel = BoardPanelInstance(
                                                             id: 'panel-$ts',
                                                             type: typeId,
                                                             title: title,
@@ -539,135 +619,150 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                 ) +
                                                                 1,
                                                           );
-                                                      await cubit.addPanel(
-                                                        newPanel,
-                                                      );
-                                                      await cubit.upsertLink(
-                                                        BoardPanelLink(
-                                                          id: 'link-$ts',
-                                                          fromPanelId: panel.id,
-                                                          toPanelId:
-                                                              newPanel.id,
-                                                          style:
-                                                              BoardLinkStyle
-                                                                  .arrow,
-                                                          behavior:
-                                                              BoardLinkBehavior
-                                                                  .dynamic,
-                                                          geometry:
-                                                              BoardLinkGeometry
-                                                                  .bezier,
-                                                        ),
-                                                      );
-                                                      return newPanel.id;
-                                                    },
-                                                    connectMode:
-                                                        _activeTool ==
-                                                        BoardToolId.connect,
-                                                    connectSourceId:
-                                                        _connectSourceId,
-                                                    onConnectTap:
-                                                        _activeTool ==
-                                                                BoardToolId
-                                                                    .connect
-                                                            ? () =>
-                                                                _handleConnectTap(
-                                                                  context,
-                                                                  activeBoard,
+                                                          await cubit.addPanel(
+                                                            newPanel,
+                                                          );
+                                                          await cubit.upsertLink(
+                                                            BoardPanelLink(
+                                                              id: 'link-$ts',
+                                                              fromPanelId:
                                                                   panel.id,
-                                                                )
-                                                            : null,
-                                                  ),
-                                                )
-                                                .toList();
-                                          })(),
-                                          // ── Drawing layer (above panels visually;
-                                          //    only intercepts gestures on actual stroke
-                                          //    pixels via path-based hitTest) ──────────
-                                          ...activeBoard.drawings
-                                              .where((d) => !d.hidden)
-                                              .map(
-                                                (drawing) => Positioned(
-                                                  key: ValueKey(drawing.id),
-                                                  left:
-                                                      drawing.position.dx +
-                                                      _canvasOrigin.dx,
-                                                  top:
-                                                      drawing.position.dy +
-                                                      _canvasOrigin.dy,
-                                                  width: drawing.size.width,
-                                                  height: drawing.size.height,
-                                                  child: IgnorePointer(
-                                                    ignoring:
-                                                        _activeTool ==
-                                                        BoardToolId.connect,
-                                                    child: _BoardDrawingWidget(
-                                                      drawing: drawing,
-                                                      isSelectMode:
-                                                          _activeTool ==
-                                                          BoardToolId.select,
-                                                      onMove:
-                                                          (newPos) => context
-                                                              .read<
-                                                                BoardCubit
-                                                              >()
-                                                              .moveDrawing(
-                                                                drawing.id,
+                                                              toPanelId:
+                                                                  newPanel.id,
+                                                              style:
+                                                                  BoardLinkStyle
+                                                                      .arrow,
+                                                              behavior:
+                                                                  BoardLinkBehavior
+                                                                      .dynamic,
+                                                              geometry:
+                                                                  BoardLinkGeometry
+                                                                      .bezier,
+                                                            ),
+                                                          );
+                                                          return newPanel.id;
+                                                        },
+                                                        connectMode:
+                                                            _activeTool ==
+                                                            BoardToolId.connect,
+                                                        connectSourceId:
+                                                            _connectSourceId,
+                                                        onConnectTap:
+                                                            _activeTool ==
+                                                                    BoardToolId
+                                                                        .connect
+                                                                ? () =>
+                                                                    _handleConnectTap(
+                                                                      context,
+                                                                      activeBoard,
+                                                                      panel.id,
+                                                                    )
+                                                                : null,
+                                                      ),
+                                                    )
+                                                    .toList();
+                                              })(),
+                                              // ── Drawing layer (above panels visually;
+                                              //    only intercepts gestures on actual stroke
+                                              //    pixels via path-based hitTest) ──────────
+                                              ...activeBoard.drawings
+                                                  .where((d) => !d.hidden)
+                                                  .map(
+                                                    (drawing) => Positioned(
+                                                      key: ValueKey(drawing.id),
+                                                      left:
+                                                          drawing.position.dx +
+                                                          _canvasOrigin.dx,
+                                                      top:
+                                                          drawing.position.dy +
+                                                          _canvasOrigin.dy,
+                                                      width: drawing.size.width,
+                                                      height:
+                                                          drawing.size.height,
+                                                      child: IgnorePointer(
+                                                        ignoring:
+                                                            _activeTool ==
+                                                            BoardToolId.connect,
+                                                        child: _BoardDrawingWidget(
+                                                          drawing: drawing,
+                                                          isSelectMode:
+                                                              _activeTool ==
+                                                              BoardToolId
+                                                                  .select,
+                                                          onMove:
+                                                              (
                                                                 newPos,
-                                                              ),
-                                                      onDelete:
-                                                          () => context
-                                                              .read<
-                                                                BoardCubit
-                                                              >()
-                                                              .removeDrawing(
-                                                                drawing.id,
-                                                              ),
+                                                              ) => context
+                                                                  .read<
+                                                                    BoardCubit
+                                                                  >()
+                                                                  .moveDrawing(
+                                                                    drawing.id,
+                                                                    newPos,
+                                                                  ),
+                                                          onDelete:
+                                                              () => context
+                                                                  .read<
+                                                                    BoardCubit
+                                                                  >()
+                                                                  .removeDrawing(
+                                                                    drawing.id,
+                                                                  ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              // ── Active stroke preview ─────────────────
+                                              if (_activeStroke.isNotEmpty)
+                                                Positioned.fill(
+                                                  child: IgnorePointer(
+                                                    child: CustomPaint(
+                                                      painter:
+                                                          _ActiveStrokePainter(
+                                                            points:
+                                                                _activeStroke,
+                                                            origin:
+                                                                _canvasOrigin,
+                                                            color:
+                                                                _drawSettings
+                                                                    .strokeColor,
+                                                            strokeWidth:
+                                                                _drawSettings
+                                                                    .strokeWidth,
+                                                          ),
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                          // ── Active stroke preview ─────────────────
-                                          if (_activeStroke.isNotEmpty)
-                                            Positioned.fill(
-                                              child: IgnorePointer(
-                                                child: CustomPaint(
-                                                  painter: _ActiveStrokePainter(
-                                                    points: _activeStroke,
-                                                    origin: _canvasOrigin,
-                                                    color:
-                                                        _drawSettings
-                                                            .strokeColor,
-                                                    strokeWidth:
-                                                        _drawSettings
-                                                            .strokeWidth,
+                                              // ── Connect preview line ──────────────────
+                                              if (_activeTool ==
+                                                      BoardToolId.connect &&
+                                                  _connectSourceId != null &&
+                                                  _connectPreviewPointer !=
+                                                      null)
+                                                Positioned.fill(
+                                                  child: IgnorePointer(
+                                                    child: CustomPaint(
+                                                      painter: _ConnectPreviewPainter(
+                                                        panels:
+                                                            activeBoard.panels,
+                                                        sourceId:
+                                                            _connectSourceId!,
+                                                        targetPoint:
+                                                            _connectPreviewPointer!,
+                                                        origin: _canvasOrigin,
+                                                        color:
+                                                            _connectSettings
+                                                                .color,
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ),
-                                          // ── Connect preview line ──────────────────
-                                          if (_activeTool ==
-                                                  BoardToolId.connect &&
-                                              _connectSourceId != null &&
-                                              _connectPreviewPointer != null)
-                                            Positioned.fill(
-                                              child: IgnorePointer(
-                                                child: CustomPaint(
-                                                  painter: _ConnectPreviewPainter(
-                                                    panels: activeBoard.panels,
-                                                    sourceId: _connectSourceId!,
-                                                    targetPoint:
-                                                        _connectPreviewPointer!,
-                                                    origin: _canvasOrigin,
-                                                    color:
-                                                        _connectSettings.color,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
+                                            ],
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      );
+                                    },
                                   ),
                                   // ── WebView overlay ───────────────────────────────
                                   // Native platform views (WKWebView) inside

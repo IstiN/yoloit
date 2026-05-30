@@ -10,6 +10,7 @@ import 'package:yoloit/features/board/chat/sub_agent_event_watcher.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 
 typedef CopilotProcessStarter =
     Future<Process> Function(
@@ -77,6 +78,7 @@ DateTime _copilotSessionModifiedAt(Directory sessionDir) {
 /// the NDJSON output into [ChatEvent] objects.
 class CopilotCliProvider extends ChatProvider {
   CopilotCliProvider({
+    this.agentId = 'copilot',
     CopilotProcessStarter? processStarter,
     String? homeDirectory,
     String? sessionStateRoot,
@@ -86,6 +88,7 @@ class CopilotCliProvider extends ChatProvider {
        _sessionStateRoot = sessionStateRoot,
        _enableSubAgentWatcher = enableSubAgentWatcher;
 
+  final String agentId;
   final Map<String, Process> _processes = {};
   final Map<String, String> _sessionIds = {};
   final CopilotProcessStarter _processStarter;
@@ -95,15 +98,21 @@ class CopilotCliProvider extends ChatProvider {
   String? _cachedYoloitBin;
 
   @override
-  String get providerId => 'copilot';
+  String get providerId => agentId;
 
   @override
   String get displayName => 'GitHub Copilot';
 
   @override
-  List<ChatModelInfo> get availableModels =>
-      ProviderModelCatalogService.instance.modelsForProvider('copilot') ??
-      kCopilotModels;
+  List<ChatModelInfo> get availableModels {
+    final catalogModels =
+        ProviderModelCatalogService.instance.modelsForProvider(agentId);
+    if (catalogModels != null && catalogModels.isNotEmpty) {
+      return catalogModels;
+    }
+    return ProviderModelCatalogService.instance.modelsForProvider('copilot') ??
+        kCopilotModels;
+  }
 
   @override
   bool get supportsImages => true;
@@ -150,55 +159,57 @@ class CopilotCliProvider extends ChatProvider {
     // Kill any existing process for this session
     await stop(config.sessionName);
 
-    final args = <String>[
-      '--output-format',
-      'json',
-      '--yolo',
-      '--model',
-      config.model,
-    ];
+    final configObj = AgentConfigService.instance.configForAgent(agentId);
+    final passDefault = configObj?.passDefaultArgs ?? true;
 
-    // Reasoning effort
-    if (config.reasoningEffort != null) {
-      args.addAll(['--reasoning-effort', config.reasoningEffort!]);
+    final args = <String>[];
+    if (passDefault) {
+      if (!(configObj?.disableModel ?? false)) {
+        args.addAll(['--model', config.model]);
+      }
+
+      // Reasoning effort
+      if (config.reasoningEffort != null) {
+        args.addAll(['--reasoning-effort', config.reasoningEffort!]);
+      }
+
+      // Autopilot mode
+      if (config.autopilot) {
+        args.addAll([
+          '--autopilot',
+          '--max-autopilot-continues',
+          '${config.maxAutopilotContinues}',
+        ]);
+      }
+
+      // Agent mode
+      if (config.mode != null && config.mode!.isNotEmpty) {
+        args.addAll(['--mode', config.mode!]);
+      }
+
+      // Session name/resume — copilot binary rejects double quotes in --name.
+      // Also normalize typographic quotes to avoid provider-side validation errors.
+      final safeSessionName = config.sessionName.replaceAll(
+        RegExp(r'["“”]'),
+        "'",
+      );
+      final resumeKey =
+          resumeOverrideId ?? _sessionIds[config.sessionName] ?? safeSessionName;
+      final useResume = !isFirstMessage;
+      if (!useResume) {
+        args.addAll(['--name', safeSessionName]);
+      } else {
+        args.addAll(['--resume', resumeKey]);
+      }
+
+      // Attachments
+      for (final path in attachments) {
+        args.addAll(['--attachment', path]);
+      }
+
+      // Custom args
+      args.addAll(config.customArgs);
     }
-
-    // Autopilot mode
-    if (config.autopilot) {
-      args.addAll([
-        '--autopilot',
-        '--max-autopilot-continues',
-        '${config.maxAutopilotContinues}',
-      ]);
-    }
-
-    // Agent mode
-    if (config.mode != null && config.mode!.isNotEmpty) {
-      args.addAll(['--mode', config.mode!]);
-    }
-
-    // Session name/resume — copilot binary rejects double quotes in --name.
-    // Also normalize typographic quotes to avoid provider-side validation errors.
-    final safeSessionName = config.sessionName.replaceAll(
-      RegExp(r'["“”]'),
-      "'",
-    );
-    final resumeKey =
-        resumeOverrideId ?? _sessionIds[config.sessionName] ?? safeSessionName;
-    final useResume = !isFirstMessage;
-    if (!useResume) {
-      args.addAll(['--name', safeSessionName]);
-    } else {
-      args.addAll(['--resume', resumeKey]);
-    }
-
-    // Attachments
-    for (final path in attachments) {
-      args.addAll(['--attachment', path]);
-    }
-
-    // Custom args
-    args.addAll(config.customArgs);
 
     final effectiveMessage =
         isFirstMessage
@@ -212,10 +223,17 @@ class CopilotCliProvider extends ChatProvider {
     // Prompt
     args.addAll(['-p', effectiveMessage]);
 
+    var rawCommand = configObj?.launchCommand.trim() ?? '';
+    if (rawCommand.isEmpty || rawCommand == 'copilot' || rawCommand == 'copilot --allow-all') {
+      rawCommand = AgentConfigService.defaultBoardChatCommand(configObj?.streamAdapter ?? 'copilot');
+    }
+
+    final cmdParts = _splitCommand(rawCommand);
+    final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'copilot';
+    final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+
     debugPrint(
-      '[CopilotCli] Running: copilot --output-format json --yolo --model '
-      '${config.model} ${useResume ? '--resume' : '--name'} '
-      '${useResume ? resumeKey : safeSessionName} -p <omitted>',
+      '[CopilotCli] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}',
     );
     debugPrint('[CopilotCli] cwd: $workingDir');
 
@@ -229,8 +247,8 @@ class CopilotCliProvider extends ChatProvider {
         yoloitBin: yoloitBin,
       );
       final process = await _processStarter(
-        'copilot',
-        args,
+        executable,
+        [...extraCmdArgs, ...args],
         workingDirectory: workingDir,
         environment: {
           ...baseEnv,
@@ -532,5 +550,31 @@ class CopilotCliProvider extends ChatProvider {
       workingDirectory: workingDirectory,
       environment: environment,
     );
+  }
+
+  List<String> _splitCommand(String command) {
+    final parts = <String>[];
+    final sb = StringBuffer();
+    bool inDoubleQuotes = false;
+    bool inSingleQuotes = false;
+    for (int i = 0; i < command.length; i++) {
+      final char = command[i];
+      if (char == '"' && !inSingleQuotes) {
+        inDoubleQuotes = !inDoubleQuotes;
+      } else if (char == "'" && !inDoubleQuotes) {
+        inSingleQuotes = !inSingleQuotes;
+      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
+        if (sb.isNotEmpty) {
+          parts.add(sb.toString());
+          sb.clear();
+        }
+      } else {
+        sb.write(char);
+      }
+    }
+    if (sb.isNotEmpty) {
+      parts.add(sb.toString());
+    }
+    return parts;
   }
 }

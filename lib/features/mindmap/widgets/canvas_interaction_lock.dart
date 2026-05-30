@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
@@ -20,9 +21,19 @@ class CanvasInteractionLock {
 
   bool get isLocked => _count.value > 0;
 
-  void enter() => _count.value = _count.value + 1;
+  void enter() {
+    _count.value = _count.value + 1;
+    if (kDebugMode) {
+      debugPrint('[CanvasInteractionLock] enter activeCount=${_count.value}');
+    }
+  }
+
   void exit() {
-    if (_count.value > 0) _count.value = _count.value - 1;
+    if (_count.value == 0) return;
+    _count.value = _count.value - 1;
+    if (kDebugMode) {
+      debugPrint('[CanvasInteractionLock] exit activeCount=${_count.value}');
+    }
   }
 }
 
@@ -39,9 +50,15 @@ class ScrollableCardRegion extends StatefulWidget {
 
 class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
   bool _entered = false;
+  Timer? _exitTimer;
+  Timer? _scrollTimer;
+  bool _mousePhysicallyExited = false;
+  Offset? _lastGlobalPosition;
 
   @override
   void dispose() {
+    _exitTimer?.cancel();
+    _scrollTimer?.cancel();
     if (_entered) {
       CanvasInteractionLock.instance.exit();
       _entered = false;
@@ -49,25 +66,112 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
     super.dispose();
   }
 
-  void _enter(PointerEnterEvent _) {
+  void _enter(PointerEnterEvent event) {
+    _lastGlobalPosition = event.position;
+    _exitTimer?.cancel();
+    _mousePhysicallyExited = false;
     if (_entered) return;
     _entered = true;
     CanvasInteractionLock.instance.enter();
   }
 
-  void _exit(PointerExitEvent _) {
+  void _exit(PointerExitEvent event) {
+    _lastGlobalPosition = event.position;
+    _mousePhysicallyExited = true;
+    _exitTimer?.cancel();
+    // Short timeout: trackpad users may keep fingers stationary while
+    // scrolling, so hover exit can fire even though they’re still “over”
+    // the card. 100 ms is enough to absorb a brief exit without making
+    // the canvas feel frozen when the user moves the cursor away.
+    _exitTimer = Timer(const Duration(milliseconds: 100), () {
+      _performExit(event.position);
+    });
+  }
+
+  void _performExit(Offset globalPos) {
     if (!_entered) return;
+
+    // Check if the pointer is still physically over the card; ignore false exit.
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox != null) {
+      final localPos = renderBox.globalToLocal(globalPos);
+      final bounds = Rect.fromLTWH(
+        0,
+        0,
+        renderBox.size.width,
+        renderBox.size.height,
+      );
+      if (bounds.contains(localPos)) {
+        return;
+      }
+    }
+
+    if (_scrollTimer?.isActive == true) {
+      // Ignore exit event during active scroll!
+      return;
+    }
+
     _entered = false;
     CanvasInteractionLock.instance.exit();
   }
 
+  void _ensureEntered([Offset? globalPosition]) {
+    _lastGlobalPosition = globalPosition ?? _lastGlobalPosition;
+    _exitTimer?.cancel();
+    _mousePhysicallyExited = false;
+    if (_entered) return;
+    _entered = true;
+    CanvasInteractionLock.instance.enter();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: _enter,
-      onExit: _exit,
-      opaque: false,
-      child: widget.child,
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerSignal: (event) {
+        _ensureEntered(event.position);
+        if (event is PointerScrollEvent) {
+          _exitTimer?.cancel(); // Cancel any pending exit during scroll!
+          _scrollTimer?.cancel();
+          _scrollTimer = Timer(const Duration(milliseconds: 100), () {
+            if (_mousePhysicallyExited) {
+              // Mouse physically exited during scrolling; finalize exit now.
+              _performExit(event.position);
+            }
+          });
+        }
+      },
+      onPointerDown: (event) {
+        _ensureEntered(event.position);
+        _exitTimer?.cancel(); // Cancel any pending exit on touch/click!
+      },
+      onPointerMove: (event) {
+        _ensureEntered(event.position);
+        _exitTimer?.cancel(); // Cancel any pending exit on movement!
+      },
+      onPointerHover: (event) {
+        _ensureEntered(event.position);
+        _exitTimer?.cancel(); // Cancel any pending exit on hover!
+      },
+      onPointerPanZoomStart: (event) {
+        _ensureEntered(event.position);
+        _exitTimer?.cancel();
+      },
+      onPointerPanZoomUpdate: (event) {
+        _ensureEntered(event.position);
+        _exitTimer?.cancel();
+      },
+      onPointerPanZoomEnd: (event) {
+        _lastGlobalPosition = event.position;
+        _scrollTimer?.cancel();
+        _scrollTimer = Timer(const Duration(milliseconds: 100), () {
+          final position = _lastGlobalPosition;
+          if (_mousePhysicallyExited && position != null) {
+            _performExit(position);
+          }
+        });
+      },
+      child: MouseRegion(onEnter: _enter, onExit: _exit, child: widget.child),
     );
   }
 }
@@ -92,7 +196,6 @@ class ScrollableCardMarker extends SingleChildRenderObjectWidget {
 class RenderScrollableCardMarker extends RenderProxyBox {
   RenderScrollableCardMarker();
 }
-
 
 /// Prevents [showOnScreen] calls from inner widgets (e.g. autofocus on a
 /// CodeField / TextField) from propagating to the [InteractiveViewer] canvas

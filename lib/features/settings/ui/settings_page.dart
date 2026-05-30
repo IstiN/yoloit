@@ -582,7 +582,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
     final configs = _configs!;
     final visibleEntries = <({int index, AgentConfig config})>[
       for (var i = 0; i < configs.length; i++)
-        if (_boardChatAgentIds.contains(configs[i].id))
+        if (configs[i].streamAdapter != null)
           (index: i, config: configs[i]),
     ];
 
@@ -686,6 +686,14 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
                       onChanged: (updated) => _updateConfig(index, updated),
                       onSetDefault:
                           () => _setDefault(isDefault ? null : config.id),
+                      onDelete: config.isBuiltIn
+                          ? null
+                          : () {
+                              setState(() {
+                                _configs!.removeAt(index);
+                              });
+                              _saveConfigs();
+                            },
                     );
                   },
                 ),
@@ -693,6 +701,30 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
                   Divider(height: 1, color: colors.border),
               ],
             ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () {
+            final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+            final newAgent = AgentConfig(
+              id: id,
+              displayName: 'Custom Agent',
+              iconLabel: 'CA',
+              launchCommand: '',
+              visible: true,
+              isBuiltIn: false,
+              streamAdapter: 'opencode',
+            );
+            setState(() {
+              _configs!.add(newAgent);
+            });
+            _saveConfigs();
+          },
+          icon: const Icon(Icons.add, size: 14),
+          label: const Text('Add Custom Agent', style: TextStyle(fontSize: 12)),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
         ),
       ],
@@ -885,6 +917,7 @@ class _AgentRow extends StatefulWidget {
     required this.cloudConfigs,
     required this.onChanged,
     required this.onSetDefault,
+    this.onDelete,
   });
 
   final AgentConfig config;
@@ -892,6 +925,7 @@ class _AgentRow extends StatefulWidget {
   final List<CloudLlmConfig> cloudConfigs;
   final ValueChanged<AgentConfig> onChanged;
   final VoidCallback onSetDefault;
+  final VoidCallback? onDelete;
 
   @override
   State<_AgentRow> createState() => _AgentRowState();
@@ -902,12 +936,25 @@ class _AgentRowState extends State<_AgentRow> {
   late TextEditingController _iconCtrl;
   late TextEditingController _cmdCtrl;
 
+  String _effectiveLaunchCommand(AgentConfig cfg) {
+    final cmd = cfg.launchCommand.trim();
+    if (cfg.streamAdapter != null &&
+        (cmd.isEmpty ||
+            cmd == 'opencode' ||
+            cmd == 'cursor-agent' ||
+            cmd == 'copilot' ||
+            cmd == 'copilot --allow-all')) {
+      return AgentConfigService.defaultBoardChatCommand(cfg.streamAdapter!);
+    }
+    return cmd;
+  }
+
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.config.displayName);
     _iconCtrl = TextEditingController(text: widget.config.iconLabel);
-    _cmdCtrl = TextEditingController(text: widget.config.launchCommand);
+    _cmdCtrl = TextEditingController(text: _effectiveLaunchCommand(widget.config));
   }
 
   @override
@@ -916,7 +963,7 @@ class _AgentRowState extends State<_AgentRow> {
     if (old.config.id != widget.config.id) {
       _nameCtrl.text = widget.config.displayName;
       _iconCtrl.text = widget.config.iconLabel;
-      _cmdCtrl.text = widget.config.launchCommand;
+      _cmdCtrl.text = _effectiveLaunchCommand(widget.config);
     }
   }
 
@@ -1090,6 +1137,53 @@ class _AgentRowState extends State<_AgentRow> {
                   ),
                 ),
               ),
+              if (!widget.config.isBuiltIn && widget.onDelete != null) ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Delete custom agent',
+                  child: GestureDetector(
+                    onTap: widget.onDelete,
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Reset to defaults',
+                child: GestureDetector(
+                  onTap: () {
+                    if (widget.config.isBuiltIn) {
+                      final def = AgentConfigService.instance.defaultConfigForId(widget.config.id);
+                      if (def != null) {
+                        widget.onChanged(def);
+                        _nameCtrl.text = def.displayName;
+                        _iconCtrl.text = def.iconLabel;
+                        _cmdCtrl.text = _effectiveLaunchCommand(def);
+                      }
+                    } else {
+                      final adapter = widget.config.streamAdapter ?? 'opencode';
+                      final defaultCmd = AgentConfigService.defaultBoardChatCommand(adapter);
+                      final updated = widget.config.copyWith(
+                        launchCommand: defaultCmd,
+                        passDefaultArgs: true,
+                        disableModel: false,
+                      );
+                      widget.onChanged(updated);
+                      _cmdCtrl.text = defaultCmd;
+                    }
+                  },
+                  child: Icon(
+                    Icons.settings_backup_restore,
+                    size: 18,
+                    color: Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
             ],
           ),
@@ -1145,6 +1239,161 @@ class _AgentRowState extends State<_AgentRow> {
                         (v) => widget.onChanged(
                           widget.config.copyWith(defaultModel: v),
                         ),
+                    dropdownColor: colors.surfaceElevated,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 12,
+                    ),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: colors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: colors.border),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+              ],
+            ),
+          ],
+          // ── Launch Command override ───────────────────────────────────────
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              Text(
+                'Launch command:',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _cmdCtrl,
+                  onChanged: (_) => _emit(),
+                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    hintText: 'e.g. opencode or codemie-opencode',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+            ],
+          ),
+          // ── Pass default flags override ───────────────────────────────────
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              Text(
+                'Pass default flags:',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Switch(
+                value: widget.config.passDefaultArgs,
+                onChanged: (v) {
+                  widget.onChanged(widget.config.copyWith(passDefaultArgs: v));
+                },
+                activeColor: colors.primary,
+              ),
+              const Spacer(),
+            ],
+          ),
+          // ── Disable model selection ──────────────────────────────────────
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              Text(
+                'Disable model selection:',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).textTheme.bodySmall?.color ??
+                      Theme.of(context).colorScheme.onSurface,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Switch(
+                value: widget.config.disableModel,
+                onChanged: (v) {
+                  widget.onChanged(widget.config.copyWith(disableModel: v));
+                },
+                activeColor: colors.primary,
+              ),
+              const Spacer(),
+            ],
+          ),
+          // ── Stream Adapter ───────────────────────────────────────────────
+          if (!widget.config.isBuiltIn) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const SizedBox(width: 8),
+                Text(
+                  'Stream Adapter:',
+                  style: TextStyle(
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
+                        Theme.of(context).colorScheme.onSurface,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: widget.config.streamAdapter,
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'opencode',
+                        child: Text('OpenCode', style: TextStyle(fontSize: 12)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'cursor',
+                        child: Text('Cursor', style: TextStyle(fontSize: 12)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'copilot',
+                        child: Text('Copilot', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        widget.onChanged(widget.config.copyWith(streamAdapter: v));
+                      }
+                    },
                     dropdownColor: colors.surfaceElevated,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurface,

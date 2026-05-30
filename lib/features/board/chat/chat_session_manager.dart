@@ -9,6 +9,7 @@ import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 
 /// State of a single chat session, independent of any UI widget.
 ///
@@ -42,6 +43,11 @@ class ChatSession extends ChangeNotifier {
   String? _copilotSessionId;
   String? _cursorSessionId;
 
+  String _getAdapterFor(String providerId) {
+    final agentConfig = AgentConfigService.instance.configForAgent(providerId);
+    return agentConfig?.streamAdapter ?? providerId;
+  }
+
   // Mutable UI callbacks — nullified on detach, set on sendMessage.
   // This allows the session to keep processing events from the provider
   // even when the UI widget is detached (disposed).
@@ -72,23 +78,25 @@ class ChatSession extends ChangeNotifier {
     if (newConfig.provider != _config.provider) {
       _provider.dispose();
       _provider = _createProviderFor(newConfig.provider);
-      if (newConfig.provider == 'opencode' && _opencodeSessionId != null) {
+      final newAdapter = _getAdapterFor(newConfig.provider);
+      if (newAdapter == 'opencode' && _opencodeSessionId != null) {
         _provider.setSessionId(newConfig.sessionName, _opencodeSessionId!);
       }
-      if (newConfig.provider == 'copilot' && _copilotSessionId != null) {
+      if (newAdapter == 'copilot' && _copilotSessionId != null) {
         _provider.setSessionId(newConfig.sessionName, _copilotSessionId!);
       }
-      if (newConfig.provider == 'cursor' && _cursorSessionId != null) {
+      if (newAdapter == 'cursor' && _cursorSessionId != null) {
         _provider.setSessionId(newConfig.sessionName, _cursorSessionId!);
       }
     } else if (newConfig.sessionName != previousSessionName) {
-      if (_config.provider == 'opencode' && _opencodeSessionId != null) {
+      final currentAdapter = _getAdapterFor(_config.provider);
+      if (currentAdapter == 'opencode' && _opencodeSessionId != null) {
         _provider.setSessionId(newConfig.sessionName, _opencodeSessionId!);
       }
-      if (_config.provider == 'copilot' && _copilotSessionId != null) {
+      if (currentAdapter == 'copilot' && _copilotSessionId != null) {
         _provider.setSessionId(newConfig.sessionName, _copilotSessionId!);
       }
-      if (_config.provider == 'cursor' && _cursorSessionId != null) {
+      if (currentAdapter == 'cursor' && _cursorSessionId != null) {
         _provider.setSessionId(newConfig.sessionName, _cursorSessionId!);
       }
     }
@@ -124,7 +132,7 @@ class ChatSession extends ChangeNotifier {
   void restoreOpencodeSessionId(String? sessionId) {
     if (sessionId != null && sessionId.isNotEmpty) {
       _opencodeSessionId = sessionId;
-      if (_config.provider == 'opencode') {
+      if (_getAdapterFor(_config.provider) == 'opencode') {
         _provider.setSessionId(_config.sessionName, sessionId);
       }
     }
@@ -133,7 +141,7 @@ class ChatSession extends ChangeNotifier {
   void restoreCopilotSessionId(String? sessionId) {
     if (sessionId != null && sessionId.isNotEmpty) {
       _copilotSessionId = sessionId;
-      if (_config.provider == 'copilot') {
+      if (_getAdapterFor(_config.provider) == 'copilot') {
         _provider.setSessionId(_config.sessionName, sessionId);
       }
     }
@@ -142,7 +150,7 @@ class ChatSession extends ChangeNotifier {
   void restoreCursorSessionId(String? sessionId) {
     if (sessionId != null && sessionId.isNotEmpty) {
       _cursorSessionId = sessionId;
-      if (_config.provider == 'cursor') {
+      if (_getAdapterFor(_config.provider) == 'cursor') {
         _provider.setSessionId(_config.sessionName, sessionId);
       }
     }
@@ -285,13 +293,14 @@ class ChatSession extends ChangeNotifier {
       }
     }
 
-    if (_config.provider == 'opencode' && _opencodeSessionId != null) {
+    final currentAdapter = _getAdapterFor(_config.provider);
+    if (currentAdapter == 'opencode' && _opencodeSessionId != null) {
       _provider.setSessionId(_config.sessionName, _opencodeSessionId!);
     }
-    if (_config.provider == 'copilot' && _copilotSessionId != null) {
+    if (currentAdapter == 'copilot' && _copilotSessionId != null) {
       _provider.setSessionId(_config.sessionName, _copilotSessionId!);
     }
-    if (_config.provider == 'cursor' && _cursorSessionId != null) {
+    if (currentAdapter == 'cursor' && _cursorSessionId != null) {
       _provider.setSessionId(_config.sessionName, _cursorSessionId!);
     }
 
@@ -333,19 +342,20 @@ class ChatSession extends ChangeNotifier {
       },
       onDone: () {
         // Persist provider session IDs
-        if (_config.provider == 'opencode') {
+        final doneAdapter = _getAdapterFor(_config.provider);
+        if (doneAdapter == 'opencode') {
           final sid = _provider.getSessionId(_config.sessionName);
           if (sid != null && sid != _opencodeSessionId) {
             _opencodeSessionId = sid;
           }
         }
-        if (_config.provider == 'copilot') {
+        if (doneAdapter == 'copilot') {
           final sid = _provider.getSessionId(_config.sessionName);
           if (sid != null && sid != _copilotSessionId) {
             _copilotSessionId = sid;
           }
         }
-        if (_config.provider == 'cursor') {
+        if (doneAdapter == 'cursor') {
           final sid = _provider.getSessionId(_config.sessionName);
           if (sid != null && sid != _cursorSessionId) {
             _cursorSessionId = sid;
@@ -417,19 +427,20 @@ class ChatSession extends ChangeNotifier {
 
   void _handleCoreEvent(ChatEvent event) {
     // Capture provider session IDs early
-    if (_config.provider == 'opencode' && _opencodeSessionId == null) {
+    final coreAdapter = _getAdapterFor(_config.provider);
+    if (coreAdapter == 'opencode' && _opencodeSessionId == null) {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _opencodeSessionId = sid;
       }
     }
-    if (_config.provider == 'copilot' && _copilotSessionId == null) {
+    if (coreAdapter == 'copilot' && _copilotSessionId == null) {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _copilotSessionId = sid;
       }
     }
-    if (_config.provider == 'cursor' && _cursorSessionId == null) {
+    if (coreAdapter == 'cursor' && _cursorSessionId == null) {
       final sid = _provider.getSessionId(_config.sessionName);
       if (sid != null) {
         _cursorSessionId = sid;
@@ -663,11 +674,15 @@ class ChatSession extends ChangeNotifier {
     if (providerId.startsWith('cloud:')) {
       return _createCloudProvider(providerId);
     }
-    return switch (providerId) {
-      'cursor' => CursorAgentProvider(),
-      'local' => LocalLlmProvider(),
-      'opencode' => _createOpencodeProvider(),
-      _ => CopilotCliProvider(),
+    if (providerId == 'local') {
+      return LocalLlmProvider();
+    }
+    final agentConfig = AgentConfigService.instance.configForAgent(providerId);
+    final adapter = agentConfig?.streamAdapter ?? providerId;
+    return switch (adapter) {
+      'cursor' => CursorAgentProvider(agentId: providerId),
+      'opencode' => _createOpencodeProvider(providerId),
+      _ => CopilotCliProvider(agentId: providerId),
     };
   }
 
@@ -679,8 +694,8 @@ class ChatSession extends ChangeNotifier {
     return CloudLlmProvider.deferred(configId: configId);
   }
 
-  static OpencodeProvider _createOpencodeProvider() {
-    final provider = OpencodeProvider();
+  static OpencodeProvider _createOpencodeProvider([String agentId = 'opencode']) {
+    final provider = OpencodeProvider(agentId: agentId);
     // Kick off background refresh — result is stored in provider for next UI render
     provider.refreshModelsFromModelsDev();
     return provider;

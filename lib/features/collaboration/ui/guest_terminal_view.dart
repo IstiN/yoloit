@@ -16,11 +16,7 @@ import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 /// User keystrokes produced by xterm are forwarded via [onInput] which the
 /// enclosing card routes to the host over the `terminal.input` sync message.
 class GuestTerminalView extends StatefulWidget {
-  const GuestTerminalView({
-    super.key,
-    required this.nodeId,
-    this.onInput,
-  });
+  const GuestTerminalView({super.key, required this.nodeId, this.onInput});
 
   final String nodeId;
   final void Function(String data)? onInput;
@@ -108,7 +104,9 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
             focusNode: _focus,
             autofocus: false,
             autoResize: true,
-            simulateScroll: true,
+            // Preserve scrollback for the guest view; do not translate wheel
+            // gestures into shell arrow keys.
+            simulateScroll: false,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             // Bundled monospace font — guarantees identical metrics and full
             // Unicode coverage (cyrillic, CJK, box-drawing) on web and native.
@@ -144,22 +142,20 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: _mobileKbActive
-                    ? colors.accentBlue.withAlpha(200)
-                    : colors.surfaceElevated,
+                color:
+                    _mobileKbActive
+                        ? colors.accentBlue.withAlpha(200)
+                        : colors.surfaceElevated,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: _mobileKbActive
-                      ? colors.accentBlue
-                      : colors.border,
+                  color: _mobileKbActive ? colors.accentBlue : colors.border,
                 ),
               ),
               child: Icon(
                 Icons.keyboard,
                 size: 14,
-                color: _mobileKbActive
-                    ? colors.textPrimary
-                    : colors.textSecondary,
+                color:
+                    _mobileKbActive ? colors.textPrimary : colors.textSecondary,
               ),
             ),
           ),
@@ -269,7 +265,9 @@ class _MobileInputBar extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: 'Type command…',
                     hintStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
                       fontSize: 13,
                     ),
                     contentPadding: const EdgeInsets.symmetric(

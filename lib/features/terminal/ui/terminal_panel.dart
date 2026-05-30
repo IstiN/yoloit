@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,12 +8,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/session/session_prefs.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
-import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
+import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
@@ -20,7 +22,6 @@ import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 import 'package:yoloit/features/workspaces/ui/new_agent_session_dialog.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 
 class TerminalPanel extends StatelessWidget {
   const TerminalPanel({super.key});
@@ -54,7 +55,7 @@ class _EmptyTerminal extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colors.primary.withAlpha(20),
                       shape: BoxShape.circle,
@@ -190,9 +191,7 @@ class _TerminalHeader extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: colors.surface,
-        border: Border(
-          bottom: BorderSide(color: colors.tabBorder, width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: colors.tabBorder, width: 1)),
       ),
       child: Row(
         children: [
@@ -310,14 +309,15 @@ class _AgentTabState extends State<_AgentTab> {
   }
 
   void _commitRename() {
-    if (!_editing)
+    if (!_editing) {
       return; // guard against double-call (onSubmitted + focus lost)
+    }
     final name = _nameController.text.trim();
     setState(() => _editing = false);
     widget.onRename(name);
   }
 
-  void _showContextMenu(BuildContext context, Offset position) async {
+  Future<void> _showContextMenu(BuildContext context, Offset position) async {
     final colors = context.appColors;
     final result = await showMenu<String>(
       context: context,
@@ -397,9 +397,7 @@ class _AgentTabState extends State<_AgentTab> {
                 style: TextStyle(
                   fontSize: 12,
                   color:
-                      widget.isActive
-                          ? colors.primaryLight
-                          : colors.textMuted,
+                      widget.isActive ? colors.primaryLight : colors.textMuted,
                 ),
               ),
               const SizedBox(width: 5),
@@ -473,9 +471,7 @@ class _AgentTabState extends State<_AgentTab> {
                         Icons.close,
                         size: 12,
                         color:
-                            _hovering
-                                ? colors.textPrimary
-                                : colors.textMuted,
+                            _hovering ? colors.textPrimary : colors.textMuted,
                       ),
                     ),
                   ),
@@ -498,7 +494,7 @@ class _SessionInfoBar extends StatelessWidget {
     final colors = context.appColors;
     return Container(
       height: 28,
-      padding: EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: colors.surfaceElevated,
         border: Border(bottom: BorderSide(color: colors.border)),
@@ -538,9 +534,17 @@ class TerminalWidget extends StatefulWidget {
     required this.session,
     required this.isActive,
     this.autoRequestFocus = true,
+    this.debugLabel,
+    this.terminalOutputWriter,
+    this.debugLogSink,
+    this.debugForceAltScrollKeyFallback = false,
   });
   final AgentSession session;
   final bool isActive;
+  final String? debugLabel;
+  final void Function(String sessionId, String data)? terminalOutputWriter;
+  final void Function(String message)? debugLogSink;
+  final bool debugForceAltScrollKeyFallback;
 
   /// When false, the terminal won't auto-request focus on creation or when
   /// becoming active. This prevents focus-fighting when multiple terminals
@@ -573,6 +577,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
   final _activePointers = <int, Offset>{};
   double _pinchStartDistance = 0;
   double _pinchStartFontSize = 0;
+  double _altScrollRemainder = 0;
+  DateTime? _lastMetricsLogAt;
 
   // Search overlay state
   bool _isSearching = false;
@@ -580,6 +586,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   final _searchFocusNode = FocusNode();
   List<CellOffset> _searchHits = [];
   int _currentHitIndex = -1;
+  final _scrollController = ScrollController();
 
   // Identity-checked callbacks stored as fields so we can null them safely in
   // dispose without clobbering another TerminalWidget that rebound the same
@@ -601,16 +608,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   @override
-  void didUpdateWidget(TerminalWidget old) {
-    super.didUpdateWidget(old);
-    if (old.session.id != widget.session.id) {
-      _unbindTerminalIfOurs(old.session);
+  void didUpdateWidget(TerminalWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session.id != widget.session.id) {
+      _unbindTerminalIfOurs(oldWidget.session);
       HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
       _bindTerminal();
       HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     }
     // Request focus when this session becomes active (IndexedStack shows it).
-    if (!old.isActive && widget.isActive && widget.autoRequestFocus) {
+    if (!oldWidget.isActive && widget.isActive && widget.autoRequestFocus) {
       _requestFocusAfterFrame();
     }
   }
@@ -632,7 +639,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
 
   void _bindTerminal() {
     _boundOnOutput = (data) {
-      PtyService.instance.write(widget.session.id, data);
+      final writer = widget.terminalOutputWriter ?? PtyService.instance.write;
+      writer(widget.session.id, data);
     };
     _boundOnResize = (cols, rows, pixelWidth, pixelHeight) {
       PtyService.instance.resize(widget.session.id, cols, rows);
@@ -816,6 +824,38 @@ class TerminalWidgetState extends State<TerminalWidget> {
     PtyService.instance.write(widget.session.id, sequence);
   }
 
+  /// Public API for external widgets (e.g. full-view debug overlay) to send
+  /// raw input to the PTY without going through keyboard focus.
+  void writeToPty(String data) => _writePty(data);
+
+  double get currentFontSize => _fontSize;
+
+  String get debugStateSummary {
+    final terminal = widget.session.terminal;
+    final buffer = terminal.buffer;
+    final scroll =
+        _scrollController.hasClients
+            ? 'scroll=${_scrollController.position.pixels.toStringAsFixed(1)}/'
+                '${_scrollController.position.maxScrollExtent.toStringAsFixed(1)}'
+            : 'scroll=no-client';
+    return 'alt=${terminal.isUsingAltBuffer} '
+        'mouse=${terminal.mouseMode} '
+        'altScroll=${terminal.altBufferMouseScrollMode} '
+        'forceKeys=${widget.debugForceAltScrollKeyFallback} '
+        'view=${terminal.viewWidth}x${terminal.viewHeight} '
+        'cursor=${buffer.cursorX},${buffer.cursorY} '
+        'scrollBack=${buffer.scrollBack} '
+        'buf=${buffer.height} '
+        'lines=${terminal.lines.length} '
+        'font=${_fontSize.toStringAsFixed(1)} '
+        'size=${_terminalSize.width.toStringAsFixed(1)}x'
+        '${_terminalSize.height.toStringAsFixed(1)} $scroll';
+  }
+
+  void setFontSize(double size) {
+    if (mounted) setState(() => _fontSize = size.clamp(8.0, 32.0));
+  }
+
   /// Click-to-move cursor: when the user single-clicks on the prompt row
   /// (not in alternate buffer / vim / etc.), send arrow keys to move the
   /// cursor to the clicked column. Same behavior as Superset desktop app.
@@ -880,7 +920,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         child: Row(
           children: [
             Icon(Icons.select_all, size: 14, color: colors.textSecondary),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'Select All',
               style: TextStyle(fontSize: 13, color: colors.textPrimary),
@@ -895,7 +935,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
           child: Row(
             children: [
               Icon(Icons.copy, size: 14, color: colors.textSecondary),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Copy',
                 style: TextStyle(fontSize: 13, color: colors.textPrimary),
@@ -909,7 +949,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         child: Row(
           children: [
             Icon(Icons.content_paste, size: 14, color: colors.textSecondary),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'Paste',
               style: TextStyle(fontSize: 13, color: colors.textPrimary),
@@ -925,7 +965,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
           child: Row(
             children: [
               Icon(Icons.clear, size: 14, color: colors.textSecondary),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 'Clear selection',
                 style: TextStyle(fontSize: 13, color: colors.textPrimary),
@@ -941,7 +981,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         child: Row(
           children: [
             Icon(Icons.search, size: 14, color: colors.textSecondary),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               'Find',
               style: TextStyle(fontSize: 13, color: colors.textPrimary),
@@ -995,6 +1035,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     _unbindTerminalIfOurs(widget.session);
     _controller.dispose();
+    _scrollController.dispose();
     _focusNode.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -1110,6 +1151,111 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _highlightHit(_currentHitIndex);
   }
 
+  bool get _scrollDebugEnabled => kDebugMode && widget.debugLabel != null;
+
+  void _debugScrollLog(String message) {
+    if (!_scrollDebugEnabled) return;
+    widget.debugLogSink?.call(message);
+    debugPrint('[TerminalScroll:${widget.debugLabel}] $message');
+  }
+
+  void _debugScrollMetrics(String source) {
+    if (!_scrollDebugEnabled) return;
+    final now = DateTime.now();
+    final last = _lastMetricsLogAt;
+    if (last != null && now.difference(last).inMilliseconds < 500) return;
+    _lastMetricsLogAt = now;
+
+    final buffer = widget.session.terminal.buffer;
+    final hasClients = _scrollController.hasClients;
+    final metrics =
+        hasClients
+            ? 'pixels=${_scrollController.position.pixels.toStringAsFixed(1)} '
+                'min=${_scrollController.position.minScrollExtent.toStringAsFixed(1)} '
+                'max=${_scrollController.position.maxScrollExtent.toStringAsFixed(1)}'
+            : 'no-scroll-client';
+    _debugScrollLog(
+      '$source metrics alt=${widget.session.terminal.isUsingAltBuffer} '
+      'view=${widget.session.terminal.viewWidth}x'
+      '${widget.session.terminal.viewHeight} '
+      'bufferLines=${buffer.lines.length} scrollBack=${buffer.scrollBack} '
+      'size=${_terminalSize.width.toStringAsFixed(1)}x'
+      '${_terminalSize.height.toStringAsFixed(1)} $metrics',
+    );
+  }
+
+  void _scrollTerminalBy(double delta, String source) {
+    if (delta == 0) return;
+    _debugScrollMetrics(source);
+    if (!_scrollController.hasClients) {
+      _debugScrollLog('$source ignored: no scroll clients');
+      return;
+    }
+    final position = _scrollController.position;
+    final target =
+        (position.pixels + delta)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+    if (target == position.pixels) {
+      _debugScrollLog(
+        '$source clamped delta=${delta.toStringAsFixed(1)} '
+        'pixels=${position.pixels.toStringAsFixed(1)} '
+        'max=${position.maxScrollExtent.toStringAsFixed(1)}',
+      );
+      return;
+    }
+    position.jumpTo(target);
+    _debugScrollLog(
+      '$source jump delta=${delta.toStringAsFixed(1)} '
+      'target=${target.toStringAsFixed(1)}',
+    );
+  }
+
+  void _scrollAltBufferBy(double delta, Offset globalPosition, String source) {
+    if (delta == 0) return;
+    _debugScrollMetrics(source);
+    final state = _terminalViewKey.currentState;
+    final renderTerminal = state?.renderTerminal;
+    if (renderTerminal == null) {
+      _debugScrollLog('$source alt ignored: render terminal unavailable');
+      return;
+    }
+
+    final lineHeight = renderTerminal.lineHeight;
+    if (lineHeight <= 0) {
+      _debugScrollLog('$source alt ignored: invalid lineHeight=$lineHeight');
+      return;
+    }
+
+    _altScrollRemainder += delta;
+    final wholeLines = (_altScrollRemainder / lineHeight).truncate();
+    if (wholeLines == 0) return;
+    _altScrollRemainder -= wholeLines * lineHeight;
+
+    final localPosition = renderTerminal.globalToLocal(globalPosition);
+    final cell = renderTerminal.getCellOffset(localPosition);
+    final up = wholeLines < 0;
+    var handledByMouse = false;
+    for (var i = 0; i < wholeLines.abs(); i++) {
+      final handled = widget.session.terminal.mouseInput(
+        up ? TerminalMouseButton.wheelUp : TerminalMouseButton.wheelDown,
+        TerminalMouseButtonState.down,
+        cell,
+      );
+      handledByMouse = handledByMouse || handled;
+      if (!handled || widget.debugForceAltScrollKeyFallback) {
+        widget.session.terminal.keyInput(
+          up ? TerminalKey.arrowUp : TerminalKey.arrowDown,
+        );
+      }
+    }
+    _debugScrollLog(
+      '$source alt steps=$wholeLines up=$up cell=${cell.x},${cell.y} '
+      'mouse=$handledByMouse keyFallback='
+      '${!handledByMouse || widget.debugForceAltScrollKeyFallback}',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -1120,6 +1266,42 @@ class TerminalWidgetState extends State<TerminalWidget> {
           children: [
             Listener(
               behavior: HitTestBehavior.opaque,
+              onPointerSignal: (event) {
+                if (event is PointerScrollEvent) {
+                  GestureBinding.instance.pointerSignalResolver.register(
+                    event,
+                    (resolved) {
+                      final scrollEvent = resolved as PointerScrollEvent;
+                      if (widget.session.terminal.isUsingAltBuffer) {
+                        _scrollAltBufferBy(
+                          scrollEvent.scrollDelta.dy,
+                          scrollEvent.position,
+                          'pointer-signal',
+                        );
+                      } else {
+                        _scrollTerminalBy(
+                          scrollEvent.scrollDelta.dy,
+                          'pointer-signal',
+                        );
+                      }
+                    },
+                  );
+                }
+              },
+              onPointerPanZoomStart: (_) {
+                if (!_focusNode.hasFocus) _focusNode.requestFocus();
+              },
+              onPointerPanZoomUpdate: (event) {
+                if (widget.session.terminal.isUsingAltBuffer) {
+                  _scrollAltBufferBy(
+                    -event.panDelta.dy,
+                    event.position,
+                    'pan-zoom',
+                  );
+                } else {
+                  _scrollTerminalBy(-event.panDelta.dy, 'pan-zoom');
+                }
+              },
               onPointerDown: (event) {
                 if (!_focusNode.hasFocus) _focusNode.requestFocus();
                 // Right-click → context menu
@@ -1132,7 +1314,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
                 _dragStartGlobal = event.position;
                 _isDragSelecting = false;
                 _activePointers[event.pointer] = event.localPosition;
-                if (_activePointers.length == 2) {
+                if (_activePointers.length == 2 &&
+                    event.kind == PointerDeviceKind.touch) {
                   final positions = _activePointers.values.toList();
                   _pinchStartDistance = (positions[0] - positions[1]).distance;
                   _pinchStartFontSize = _fontSize;
@@ -1140,7 +1323,9 @@ class TerminalWidgetState extends State<TerminalWidget> {
               },
               onPointerMove: (event) {
                 _activePointers[event.pointer] = event.localPosition;
-                if (_activePointers.length == 2 && _pinchStartDistance > 0) {
+                if (_activePointers.length == 2 &&
+                    _pinchStartDistance > 0 &&
+                    event.kind == PointerDeviceKind.touch) {
                   final positions = _activePointers.values.toList();
                   final dist = (positions[0] - positions[1]).distance;
                   final newSize = (_pinchStartFontSize *
@@ -1199,6 +1384,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
                   controller: _controller,
                   focusNode: _focusNode,
                   autofocus: widget.isActive,
+                  scrollController: _scrollController,
+                  // Keep trackpad scroll for terminal scrollback instead of
+                  // turning it into up/down key presses in the shell.
+                  simulateScroll: false,
                   onKeyEvent: _onTerminalKeyEvent,
                   textStyle: TerminalStyle(
                     fontSize: _fontSize,
@@ -1279,16 +1468,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
                 child: TextField(
                   controller: _searchController,
                   focusNode: _searchFocusNode,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: colors.textPrimary,
-                  ),
+                  style: TextStyle(fontSize: 13, color: colors.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Find in terminal…',
-                    hintStyle: TextStyle(
-                      fontSize: 13,
-                      color: colors.textMuted,
-                    ),
+                    hintStyle: TextStyle(fontSize: 13, color: colors.textMuted),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -1667,11 +1850,7 @@ class _WorkspaceColorPickerDialogState
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: Icon(
-                      Icons.close,
-                      size: 16,
-                      color: colors.textMuted,
-                    ),
+                    icon: Icon(Icons.close, size: 16, color: colors.textMuted),
                     onPressed: () => Navigator.of(context).pop(),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -1814,11 +1993,11 @@ class _WorkspaceColorPickerDialogState
                   const Spacer(),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
                     style: TextButton.styleFrom(
                       foregroundColor: colors.textMuted,
                       textStyle: const TextStyle(fontSize: 12),
                     ),
+                    child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(

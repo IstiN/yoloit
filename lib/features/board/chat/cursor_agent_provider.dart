@@ -9,6 +9,7 @@ import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 
 typedef CursorProcessStarter =
     Future<Process> Function(
@@ -24,8 +25,10 @@ typedef CursorProcessStarter =
 /// the cursor-specific NDJSON events into [ChatEvent] objects understood
 /// by the common chat panel.
 class CursorAgentProvider extends ChatProvider {
-  CursorAgentProvider({CursorProcessStarter? processStarter})
+  CursorAgentProvider({this.agentId = 'cursor', CursorProcessStarter? processStarter})
     : _processStarter = processStarter ?? _defaultProcessStarter;
+
+  final String agentId;
 
   /// sessionName → cursor session_id (UUID captured from the init event).
   final Map<String, String> _sessionIds = {};
@@ -45,15 +48,21 @@ class CursorAgentProvider extends ChatProvider {
   String _cumulativeContent = '';
 
   @override
-  String get providerId => 'cursor';
+  String get providerId => agentId;
 
   @override
   String get displayName => 'Cursor Agent';
 
   @override
-  List<ChatModelInfo> get availableModels =>
-      ProviderModelCatalogService.instance.modelsForProvider('cursor') ??
-      kCursorModels;
+  List<ChatModelInfo> get availableModels {
+    final catalogModels =
+        ProviderModelCatalogService.instance.modelsForProvider(agentId);
+    if (catalogModels != null && catalogModels.isNotEmpty) {
+      return catalogModels;
+    }
+    return ProviderModelCatalogService.instance.modelsForProvider('cursor') ??
+        kCursorModels;
+  }
 
   @override
   bool get supportsImages => true;
@@ -97,44 +106,44 @@ class CursorAgentProvider extends ChatProvider {
     _currentStreamId = null;
     _cumulativeContent = '';
 
-    final args = <String>[
-      '--print',
-      '--output-format',
-      'stream-json',
-      '--stream-partial-output',
-      '--yolo',
-      '--model',
-      config.model,
-    ];
+    final configObj = AgentConfigService.instance.configForAgent(agentId);
+    final passDefault = configObj?.passDefaultArgs ?? true;
 
-    if (config.workingDir.isNotEmpty) {
-      args.addAll(['--workspace', config.workingDir]);
-    }
-
-    // Resume existing cursor session only if the model hasn't changed.
-    // Cursor ignores --model when --resume is passed (session stores its own
-    // model), so a model switch must start a fresh session.
-    if (!isFirstMessage) {
-      final cursorSessionId = _sessionIds[config.sessionName];
-      final sessionModel = _sessionModels[config.sessionName];
-      final modelChanged = sessionModel != null && sessionModel != config.model;
-      if (cursorSessionId != null && !modelChanged) {
-        args.addAll(['--resume', cursorSessionId]);
-      } else if (modelChanged) {
-        // Clear the old session so the next init event registers the new one.
-        _sessionIds.remove(config.sessionName);
-        _sessionModels.remove(config.sessionName);
+    final args = <String>[];
+    if (passDefault) {
+      if (!(configObj?.disableModel ?? false) && config.model.isNotEmpty) {
+        args.addAll(['--model', config.model]);
       }
-    }
 
-    // Agent mode (plan / ask)
-    if (config.mode != null && config.mode!.isNotEmpty) {
-      args.addAll(['--mode', config.mode!]);
-    }
+      if (config.workingDir.isNotEmpty) {
+        args.addAll(['--workspace', config.workingDir]);
+      }
 
-    // Autopilot mode
-    if (config.autopilot) {
-      args.add('--autopilot');
+      // Resume existing cursor session only if the model hasn't changed.
+      // Cursor ignores --model when --resume is passed (session stores its own
+      // model), so a model switch must start a fresh session.
+      if (!isFirstMessage) {
+        final cursorSessionId = _sessionIds[config.sessionName];
+        final sessionModel = _sessionModels[config.sessionName];
+        final modelChanged = sessionModel != null && sessionModel != config.model;
+        if (cursorSessionId != null && !modelChanged) {
+          args.addAll(['--resume', cursorSessionId]);
+        } else if (modelChanged) {
+          // Clear the old session so the next init event registers the new one.
+          _sessionIds.remove(config.sessionName);
+          _sessionModels.remove(config.sessionName);
+        }
+      }
+
+      // Agent mode (plan / ask)
+      if (config.mode != null && config.mode!.isNotEmpty) {
+        args.addAll(['--mode', config.mode!]);
+      }
+
+      // Autopilot mode
+      if (config.autopilot) {
+        args.add('--autopilot');
+      }
     }
 
     // Prompt as positional argument.
@@ -164,7 +173,16 @@ class CursorAgentProvider extends ChatProvider {
         baseEnv['PATH'] ?? '',
       );
 
-      debugPrint('[CursorAgent] Running: cursor-agent ${args.join(' ')}');
+      var rawCommand = configObj?.launchCommand.trim() ?? '';
+      if (rawCommand.isEmpty || rawCommand == 'cursor-agent') {
+        rawCommand = AgentConfigService.defaultBoardChatCommand(configObj?.streamAdapter ?? 'cursor');
+      }
+
+      final cmdParts = _splitCommand(rawCommand);
+      final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'cursor-agent';
+      final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+
+      debugPrint('[CursorAgent] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}');
 
       // On macOS, cursor-agent hardcodes `/usr/bin/security` to access the
       // login keychain. When spawned from a GUI app the security context
@@ -184,8 +202,8 @@ class CursorAgentProvider extends ChatProvider {
       };
 
       final process = await _processStarter(
-        'cursor-agent',
-        args,
+        executable,
+        [...extraCmdArgs, ...args],
         workingDirectory:
             config.workingDir.isNotEmpty ? config.workingDir : null,
         environment: processEnv,
@@ -656,5 +674,31 @@ class CursorAgentProvider extends ChatProvider {
     }
     debugPrint('[CursorAgent] parsed ${models.length} models from CLI');
     return models;
+  }
+
+  List<String> _splitCommand(String command) {
+    final parts = <String>[];
+    final sb = StringBuffer();
+    bool inDoubleQuotes = false;
+    bool inSingleQuotes = false;
+    for (int i = 0; i < command.length; i++) {
+      final char = command[i];
+      if (char == '"' && !inSingleQuotes) {
+        inDoubleQuotes = !inDoubleQuotes;
+      } else if (char == "'" && !inDoubleQuotes) {
+        inSingleQuotes = !inSingleQuotes;
+      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
+        if (sb.isNotEmpty) {
+          parts.add(sb.toString());
+          sb.clear();
+        }
+      } else {
+        sb.write(char);
+      }
+    }
+    if (sb.isNotEmpty) {
+      parts.add(sb.toString());
+    }
+    return parts;
   }
 }

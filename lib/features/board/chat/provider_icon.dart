@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 
 class ChatProviderIcon extends StatelessWidget {
   const ChatProviderIcon({
@@ -18,7 +19,29 @@ class ChatProviderIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final iconColor = color ?? colors.accentGreen;
-    return switch (provider) {
+
+    final cfg = AgentConfigService.instance.configForAgent(provider);
+    if (cfg != null && !cfg.isBuiltIn && cfg.iconLabel.isNotEmpty) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: Text(
+            cfg.iconLabel,
+            style: TextStyle(
+              fontSize: size * 0.75,
+              fontWeight: FontWeight.w700,
+              color: iconColor,
+              fontFamily: 'monospace',
+              height: 1,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final adapter = cfg?.streamAdapter ?? provider;
+    return switch (adapter) {
       'copilot' => SvgPicture.asset(
         'assets/images/copilot_mark.svg',
         width: size,

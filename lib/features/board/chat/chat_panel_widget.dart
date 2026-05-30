@@ -986,6 +986,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     // If currently processing, stop the current stream first
     if (_isProcessing) {
       await _session!.stopStreaming();
+      if (!mounted) return;
       // Sync finalized messages from session
       _messages
         ..clear()
@@ -2946,6 +2947,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         );
       },
     ).then((selected) {
+      if (!mounted) return;
       if (selected != null && selected != _config.model) {
         setState(() {
           _config = _config.copyWith(model: selected);
@@ -3194,6 +3196,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         onChanged: (v) async {
           await SessionPrefs.saveInjectCliHelpEnabled(v);
           CliGuidanceService.instance.clearCache();
+          if (!mounted) return;
           setState(() => _ctxCliHelp = v);
         },
       ),
@@ -3204,6 +3207,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         value: _ctxBoardSnapshot,
         onChanged: (v) async {
           await SessionPrefs.saveBoardSnapshotEnabled(v);
+          if (!mounted) return;
           setState(() => _ctxBoardSnapshot = v);
         },
       ),
@@ -3492,6 +3496,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
   }
 
   void _refresh() {
+    if (!mounted) return;
     setState(() {
       _entriesFuture = ChatSessionHistory.instance.loadAll();
     });
@@ -3724,45 +3729,65 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   bool _cursorModelsLoading = false;
   bool? _cursorApiKeyConfigured; // null = unknown, true/false = checked
 
-  static const _providerCommand = {
-    'copilot': 'copilot',
-    'cursor': 'cursor',
-    'opencode': 'opencode',
-    'local': null, // no CLI needed
-  };
-
-  static String _providerLabel(String id) {
-    return switch (id) {
-      'copilot' => 'GitHub Copilot',
-      'cursor' => 'Cursor Agent',
-      'opencode' => 'OpenCode',
-      'local' => 'Local LLM',
-      _ => id,
-    };
+  String _providerLabel(String id) {
+    if (id == 'local') return 'Local LLM';
+    final cfg = AgentConfigService.instance.configForAgent(id);
+    if (cfg != null) return cfg.displayName;
+    return id;
   }
 
-  static const _providers = [
-    ('copilot', 'GitHub Copilot'),
-    ('cursor', 'Cursor Agent'),
-    ('opencode', 'OpenCode'),
-    ('local', 'Local LLM'),
-  ];
+  List<(String, String)> get _providers {
+    final list = <(String, String)>[];
+    for (final cfg in AgentConfigService.instance.configs) {
+      if (cfg.streamAdapter != null && cfg.visible) {
+        list.add((cfg.id, cfg.displayName));
+      }
+    }
+    list.add(('local', 'Local LLM'));
+    return list;
+  }
 
   List<ChatModelInfo> get _modelsForProvider {
-    // Use ProviderModelCatalogService as single source of truth,
-    // falling back to hardcoded lists only if catalog is not loaded.
     final catalog = ProviderModelCatalogService.instance;
     final catalogModels = catalog.modelsForProvider(_selectedProvider);
     if (catalogModels != null && catalogModels.isNotEmpty) {
       return catalogModels;
     }
+    final cfg = AgentConfigService.instance.configForAgent(_selectedProvider);
+    final adapter = cfg?.streamAdapter ?? _selectedProvider;
     // Fallback to hardcoded lists
-    return switch (_selectedProvider) {
+    return switch (adapter) {
       'cursor' => kCursorModels,
       'local' => kLocalModels,
       'opencode' => _opencodeModels ?? kOpencodeModels,
       _ => kCopilotModels,
     };
+  }
+
+  List<String> _splitCommand(String command) {
+    final parts = <String>[];
+    final sb = StringBuffer();
+    bool inDoubleQuotes = false;
+    bool inSingleQuotes = false;
+    for (int i = 0; i < command.length; i++) {
+      final char = command[i];
+      if (char == '"' && !inSingleQuotes) {
+        inDoubleQuotes = !inDoubleQuotes;
+      } else if (char == "'" && !inDoubleQuotes) {
+        inSingleQuotes = !inSingleQuotes;
+      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
+        if (sb.isNotEmpty) {
+          parts.add(sb.toString());
+          sb.clear();
+        }
+      } else {
+        sb.write(char);
+      }
+    }
+    if (sb.isNotEmpty) {
+      parts.add(sb.toString());
+    }
+    return parts;
   }
 
   @override
@@ -3774,7 +3799,9 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     _selectedModel = widget.config.model;
     _selectedEnvGroupIds = List<String>.from(widget.config.envGroupIds);
     _checkProviderInstalled(_selectedProvider);
-    if (_selectedProvider == 'opencode') _loadOpencodeModels();
+    final cfg = AgentConfigService.instance.configForAgent(_selectedProvider);
+    final adapter = cfg?.streamAdapter ?? _selectedProvider;
+    if (adapter == 'opencode') _loadOpencodeModels();
     if (_selectedProvider == 'cursor') _loadCursorModels();
   }
 
@@ -3834,11 +3861,21 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   }
 
   Future<void> _checkProviderInstalled(String provider) async {
-    final cmd = _providerCommand[provider];
-    if (cmd == null) {
+    if (provider == 'local') {
       if (mounted) setState(() => _providerInstalled = true);
       return;
     }
+    final cfg = AgentConfigService.instance.configForAgent(provider);
+    final rawCommand = cfg?.launchCommand.trim() ?? '';
+    if (rawCommand.isEmpty) {
+      if (mounted) setState(() => _providerInstalled = true);
+      return;
+    }
+    
+    // Extract executable
+    final parts = _splitCommand(rawCommand);
+    final cmd = parts.isNotEmpty ? parts[0] : rawCommand;
+
     setState(() => _providerInstalled = null);
     try {
       final found = await SetupCheckService.isCommandAvailable(cmd);
@@ -3904,12 +3941,15 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     }
     // Ensure selected model is valid for the chosen provider
     final validModels = _modelsForProvider;
-    final model =
-        validModels.any((m) => m.id == _selectedModel)
+    final agentConfig = AgentConfigService.instance.configForAgent(_selectedProvider);
+    final disableModel = agentConfig?.disableModel ?? false;
+    final model = disableModel
+        ? ''
+        : (validModels.any((m) => m.id == _selectedModel)
             ? _selectedModel
             : (validModels
                 .firstWhere((m) => m.isDefault, orElse: () => validModels.first)
-                .id);
+                .id));
     widget.onStart(
       ChatSessionConfig(
         sessionName: sessionName,
@@ -3937,6 +3977,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
         );
       },
     ).then((selected) {
+      if (!mounted) return;
       if (selected != null) {
         setState(() => _selectedModel = selected);
       }
@@ -3947,6 +3988,8 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final colorScheme = Theme.of(context).colorScheme;
+    final agentConfig = AgentConfigService.instance.configForAgent(_selectedProvider);
+    final disableModel = agentConfig?.disableModel ?? false;
     final labelStyle = TextStyle(
       fontSize: 11,
       color:
@@ -4013,8 +4056,10 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                             .id;
                   });
                   _checkProviderInstalled(v);
-                  if (v == 'opencode') _loadOpencodeModels();
-                  if (v == 'cursor') _loadCursorModels();
+                  final cfg = AgentConfigService.instance.configForAgent(v);
+                  final adapter = cfg?.streamAdapter ?? v;
+                  if (adapter == 'opencode') _loadOpencodeModels();
+                  if (adapter == 'cursor') _loadCursorModels();
                 },
               ),
             ),
@@ -4107,6 +4152,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                     final dir = await FilePicker.getDirectoryPath(
                       dialogTitle: 'Select working directory',
                     );
+                    if (!mounted) return;
                     if (dir != null) {
                       setState(() => _dirCtrl.text = dir);
                     }
@@ -4177,56 +4223,58 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
           const SizedBox(height: 14),
 
           // Model selector
-          Text('Model', style: labelStyle),
-          const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () => _showModelSearch(context, inputFill, colorScheme),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: inputFill,
-              ),
-              child: Row(
-                children: [
-                  () {
-                    final m = _modelsForProvider
-                        .cast<ChatModelInfo?>()
-                        .firstWhere(
-                          (m) => m!.id == _selectedModel,
-                          orElse: () => null,
+          if (!disableModel) ...[
+            Text('Model', style: labelStyle),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => _showModelSearch(context, inputFill, colorScheme),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: inputFill,
+                ),
+                child: Row(
+                  children: [
+                    () {
+                      final m = _modelsForProvider
+                          .cast<ChatModelInfo?>()
+                          .firstWhere(
+                            (m) => m!.id == _selectedModel,
+                            orElse: () => null,
+                          );
+                      if (m != null && m.providerGroup != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: _buildProviderBadge(context, m.providerGroup!),
                         );
-                    if (m != null && m.providerGroup != null) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: _buildProviderBadge(context, m.providerGroup!),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  }(),
-                  Expanded(
-                    child: Text(
-                      _modelsForProvider
-                              .cast<ChatModelInfo?>()
-                              .firstWhere(
-                                (m) => m!.id == _selectedModel,
-                                orElse: () => null,
-                              )
-                              ?.displayName ??
-                          _selectedModel,
-                      style: inputTextStyle,
-                      overflow: TextOverflow.ellipsis,
+                      }
+                      return const SizedBox.shrink();
+                    }(),
+                    Expanded(
+                      child: Text(
+                        _modelsForProvider
+                                .cast<ChatModelInfo?>()
+                                .firstWhere(
+                                  (m) => m!.id == _selectedModel,
+                                  orElse: () => null,
+                                )
+                                ?.displayName ??
+                            _selectedModel,
+                        style: inputTextStyle,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  Icon(
-                    Icons.unfold_more,
-                    size: 16,
-                    color: colorScheme.onSurface.withOpacity(0.5),
-                  ),
-                ],
+                    Icon(
+                      Icons.unfold_more,
+                      size: 16,
+                      color: colorScheme.onSurface.withOpacity(0.5),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
 
           const Spacer(),
 
@@ -4386,63 +4434,77 @@ class _UserBubbleState extends State<_UserBubble> {
     final hasAttachments = resolved.paths.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 2, left: 48),
+      padding: const EdgeInsets.only(top: 6, bottom: 2, left: 16),
       child: Align(
         alignment: Alignment.centerRight,
         child: MouseRegion(
           onEnter: (_) => setState(() => _isHovered = true),
           onExit: (_) => setState(() => _isHovered = false),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.65,
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    context.appColors.accentBlue,
-                    context.appColors.primary,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Opacity(
+                opacity: _isHovered ? 1.0 : 0.0,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 6, bottom: 4),
+                  child: _BubbleMenu(textToCopy: resolved.text, light: false),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (hasAttachments)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                      child: _AttachmentPreviewSection(
-                        paths: resolved.paths,
-                        onLight: false,
-                        onOpenFile: widget.onOpenFile,
-                      ),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.65,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        context.appColors.accentBlue,
+                        context.appColors.primary,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  if (hasText)
-                    SelectionArea(
-                      child: Text(
-                        resolved.text,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: context.appColors.textPrimary,
-                          height: 1.4,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(4),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasAttachments)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                          child: _AttachmentPreviewSection(
+                            paths: resolved.paths,
+                            onLight: false,
+                            onOpenFile: widget.onOpenFile,
+                          ),
                         ),
-                      ),
-                    ),
-                  if (_isHovered)
-                    _BubbleMenu(textToCopy: resolved.text, light: true),
-                ],
+                      if (hasText)
+                        SelectionArea(
+                          child: Text(
+                            resolved.text,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: context.appColors.textPrimary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -4462,27 +4524,25 @@ class _BubbleMenu extends StatelessWidget {
         light
             ? context.appColors.textPrimary.withOpacity(0.6)
             : (Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey);
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: SizedBox(
-        width: 28,
-        height: 20,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: textToCopy));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Copied to clipboard'),
-                  duration: Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            borderRadius: BorderRadius.circular(4),
-            child: Icon(Icons.more_horiz, size: 16, color: color),
-          ),
+    return SizedBox(
+      width: 24,
+      height: 28,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: textToCopy));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Copied to clipboard'),
+                duration: Duration(seconds: 1),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(6),
+          child: Icon(Icons.more_vert, size: 16, color: color),
         ),
       ),
     );
@@ -4748,7 +4808,7 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
     );
 
     return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
+      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 16),
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
@@ -4801,26 +4861,26 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
               ),
 
             if (processedContent.trim().isNotEmpty)
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.65,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceElevated,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      topRight: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.65,
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SelectionArea(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevated,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(16),
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(16),
+                        ),
+                      ),
+                      child: SelectionArea(
                         child: MarkdownBody(
                           data: processedContent,
                           selectable: false,
@@ -4876,17 +4936,19 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                           ),
                         ),
                       ),
-                      AnimatedOpacity(
-                        opacity: _isHovered ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 100),
-                        child: _BubbleMenu(
-                          textToCopy: processedContent,
-                          light: false,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  Opacity(
+                    opacity: _isHovered ? 1.0 : 0.0,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 6, bottom: 4),
+                      child: _BubbleMenu(
+                        textToCopy: processedContent,
+                        light: false,
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
             if (widget.tokenUsage != null)
