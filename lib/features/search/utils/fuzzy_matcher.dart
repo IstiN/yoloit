@@ -25,14 +25,28 @@ class FuzzyMatcher {
     'Ь': 'M', 'Б': '<', 'Ю': '>',
   };
 
+  static final Map<String, String> _engToRus = {
+    for (final entry in _rusToEng.entries) entry.value: entry.key,
+  };
+
   /// Converts a string typed with a Russian keyboard layout to its Latin equivalent.
   /// e.g. "ЗкщзукенКуфвук" → "PropertyReader"
   static String transliterateRu(String text) =>
       text.split('').map((c) => _rusToEng[c] ?? c).join();
 
+  /// Converts a string typed with an English keyboard layout to its Russian
+  /// equivalent. e.g. "ghbdtn" → "привет".
+  static String transliterateEng(String text) =>
+      text.split('').map((c) => _engToRus[c] ?? c).join();
+
   /// Returns true if the string contains any Cyrillic characters.
   static bool isCyrillic(String text) =>
       text.runes.any((r) => (r >= 0x0400 && r <= 0x04FF));
+
+  /// Returns true if the string contains Latin characters.
+  static bool isLatin(String text) => text.runes.any(
+    (r) => (r >= 0x0041 && r <= 0x005A) || (r >= 0x0061 && r <= 0x007A),
+  );
 
   /// Returns all candidate queries to try for the given user input.
   /// If the input is Cyrillic the transliterated version is added automatically.
@@ -41,6 +55,10 @@ class FuzzyMatcher {
     if (isCyrillic(query)) {
       final eng = transliterateRu(query);
       if (eng != query) candidates.add(eng);
+    }
+    if (isLatin(query)) {
+      final rus = transliterateEng(query);
+      if (rus != query) candidates.add(rus);
     }
     return candidates;
   }

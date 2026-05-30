@@ -23,6 +23,16 @@ void main() {
     });
   });
 
+  group('FuzzyMatcher.transliterateEng', () {
+    test('converts English QWERTY layout to Russian', () {
+      expect(FuzzyMatcher.transliterateEng('ghbdtn'), 'привет');
+    });
+
+    test('preserves Cyrillic characters', () {
+      expect(FuzzyMatcher.transliterateEng('привет'), 'привет');
+    });
+  });
+
   group('FuzzyMatcher.isCyrillic', () {
     test('returns true for Russian text', () {
       expect(FuzzyMatcher.isCyrillic('Привет'), isTrue);
@@ -38,9 +48,9 @@ void main() {
   });
 
   group('FuzzyMatcher.candidates', () {
-    test('returns only original for Latin input', () {
+    test('returns original + Russian layout candidate for Latin input', () {
       final result = FuzzyMatcher.candidates('hello');
-      expect(result, ['hello']);
+      expect(result, ['hello', 'руддщ']);
     });
 
     test('returns original + transliterated for Cyrillic input', () {
@@ -48,6 +58,11 @@ void main() {
       expect(result.length, 2);
       expect(result[0], 'ЗкщзукенКуфвук');
       expect(result[1], 'PropertyReader');
+    });
+
+    test('maps mistyped Russian text from Latin layout', () {
+      final result = FuzzyMatcher.candidates('ghbdtn');
+      expect(result, containsAllInOrder(['ghbdtn', 'привет']));
     });
   });
 
@@ -101,15 +116,27 @@ void main() {
     test('shorter filename ranks higher than longer with same query', () {
       // Both start with "PropertyReader" → both prefix matches.
       // Shorter file should win via higher density bonus.
-      final shorter = FuzzyMatcher.score('PropertyReader.java', 'PropertyReader');
-      final longer = FuzzyMatcher.score('PropertyReaderConfluenceAuthTest.java', 'PropertyReader');
+      final shorter = FuzzyMatcher.score(
+        'PropertyReader.java',
+        'PropertyReader',
+      );
+      final longer = FuzzyMatcher.score(
+        'PropertyReaderConfluenceAuthTest.java',
+        'PropertyReader',
+      );
       expect(shorter!, greaterThan(longer!));
     });
 
     test('density bonus: query filling 50% ranks above 25%', () {
       // 9-char query in 18-char file vs 36-char file
-      final dense = FuzzyMatcher.score('ProReader.java', 'ProReader'); // exact match
-      final sparse = FuzzyMatcher.score('ProReaderConfluenceTest.java', 'ProReader');
+      final dense = FuzzyMatcher.score(
+        'ProReader.java',
+        'ProReader',
+      ); // exact match
+      final sparse = FuzzyMatcher.score(
+        'ProReaderConfluenceTest.java',
+        'ProReader',
+      );
       expect(dense!, greaterThan(sparse!));
     });
   });
@@ -120,6 +147,12 @@ void main() {
       final s = FuzzyMatcher.bestScore('PropertyReader.dart', queries);
       expect(s, isNotNull);
       expect(s!, greaterThanOrEqualTo(1000));
+    });
+
+    test('matches Russian text when typed in English layout', () {
+      final queries = FuzzyMatcher.candidates('ghbdtn');
+      final s = FuzzyMatcher.bestScore('привет мир', queries);
+      expect(s, isNotNull);
     });
 
     test('returns null when no query matches', () {
@@ -155,7 +188,10 @@ void main() {
     test('finds PropertyReader via Russian transliteration', () {
       final queries = FuzzyMatcher.candidates('ЗкщзукенКуфвук');
       // transliterates to "PropertyReader", which is a full substring of the filename
-      final indices = FuzzyMatcher.bestMatchIndices('PropertyReader.dart', queries);
+      final indices = FuzzyMatcher.bestMatchIndices(
+        'PropertyReader.dart',
+        queries,
+      );
       expect(indices, isNotEmpty);
       // "PropertyReader" is 14 chars → 14 highlighted indices
       expect(indices.length, 14);

@@ -2741,6 +2741,7 @@ class _BoardToolbar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 900;
+        final phone = constraints.maxWidth < 560;
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Row(
@@ -2757,24 +2758,12 @@ class _BoardToolbar extends StatelessWidget {
                   board: board,
                   onOpenBoardOverview: onOpenBoardOverview,
                 ),
-              if (!compact) ...[
+              if (!compact && board.defaultFolder.isNotEmpty) ...[
                 const SizedBox(width: 12),
                 _ToolbarChip(
-                  icon: Icons.dashboard_outlined,
-                  label: '${board.panels.length} panels',
+                  icon: Icons.folder_outlined,
+                  label: _shortToolbarPath(board.defaultFolder),
                 ),
-                const SizedBox(width: 8),
-                _ToolbarChip(
-                  icon: Icons.share_outlined,
-                  label: '${board.links.length} links',
-                ),
-                if (board.defaultFolder.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  _ToolbarChip(
-                    icon: Icons.folder_outlined,
-                    label: _shortToolbarPath(board.defaultFolder),
-                  ),
-                ],
               ],
               const SizedBox(width: 12),
               if (compact)
@@ -2790,15 +2779,15 @@ class _BoardToolbar extends StatelessWidget {
                   child: Align(
                     alignment: Alignment.center,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
+                      constraints: const BoxConstraints(maxWidth: 640),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         onTap: onSearch,
                         child: Container(
-                          height: 40,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: context.appColors.border),
                             color: context.appColors.surface,
                           ),
@@ -2817,6 +2806,7 @@ class _BoardToolbar extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: context.appColors.textMuted,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -2839,7 +2829,31 @@ class _BoardToolbar extends StatelessWidget {
                   ),
                 ),
               if (compact) const Spacer() else const SizedBox(width: 16),
-              if (compact) ...[
+              if (phone)
+                PopupMenuButton<String>(
+                  tooltip: 'Board actions',
+                  icon: const Icon(Icons.more_horiz),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'new':
+                        onCreateBoard();
+                      case 'settings':
+                        onBoardSettings();
+                      case 'delete':
+                        onDeleteBoard();
+                    }
+                  },
+                  itemBuilder:
+                      (context) => const [
+                        PopupMenuItem(value: 'new', child: Text('New board')),
+                        PopupMenuItem(
+                          value: 'settings',
+                          child: Text('Settings'),
+                        ),
+                        PopupMenuItem(value: 'delete', child: Text('Delete')),
+                      ],
+                )
+              else if (compact) ...[
                 IconButton(
                   tooltip: 'New board',
                   onPressed: onCreateBoard,
@@ -2857,18 +2871,21 @@ class _BoardToolbar extends StatelessWidget {
                 ),
               ] else ...[
                 OutlinedButton.icon(
+                  style: _toolbarButtonStyle(),
                   onPressed: onCreateBoard,
                   icon: const Icon(Icons.add),
                   label: const Text('New board'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
+                  style: _toolbarButtonStyle(),
                   onPressed: onBoardSettings,
                   icon: const Icon(Icons.settings_outlined),
                   label: const Text('Settings'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
+                  style: _toolbarButtonStyle(),
                   onPressed: onDeleteBoard,
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Delete'),
@@ -2878,6 +2895,14 @@ class _BoardToolbar extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  static ButtonStyle _toolbarButtonStyle() {
+    return OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 36),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
     );
   }
 

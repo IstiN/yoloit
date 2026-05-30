@@ -158,6 +158,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
   Future<void> _runSearch() async {
     final query = _controller.text.trim().toLowerCase();
+    final queries = FuzzyMatcher.candidates(query);
     final appColors = context.appColors;
     if (query.isEmpty) {
       setState(() {
@@ -184,9 +185,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       String? preview;
       var matched = false;
       for (final text in searchable) {
-        if (_fuzzyMatch(text, query)) {
+        if (FuzzyMatcher.bestScore(text, queries) != null) {
           matched = true;
-          preview = _snippet(text, query);
+          preview = _snippet(text, queries);
           break;
         }
       }
@@ -211,7 +212,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     for (final root in _fileTreeRoots) {
       final dir = Directory(root);
       if (!dir.existsSync()) continue;
-      _collectMatchingFiles(dir, root, query, results, maxResults: 100);
+      _collectMatchingFiles(dir, root, queries, results, maxResults: 100);
     }
 
     // 3. Also search workspace files via existing service
@@ -262,7 +263,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   void _collectMatchingFiles(
     Directory dir,
     String root,
-    String query,
+    List<String> queries,
     List<_QuickResult> results, {
     int maxResults = 100,
   }) {
@@ -276,11 +277,12 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           _collectMatchingFiles(
             entity,
             root,
-            query,
+            queries,
             results,
             maxResults: maxResults,
           );
-        } else if (entity is File && _fuzzyMatch(name, query)) {
+        } else if (entity is File &&
+            FuzzyMatcher.bestScore(name, queries) != null) {
           final relPath = p.relative(entity.path, from: root);
           final ext =
               name.contains('.') ? name.split('.').last.toLowerCase() : '';
@@ -303,17 +305,6 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     } on FileSystemException {
       // skip inaccessible
     }
-  }
-
-  bool _fuzzyMatch(String text, String query) {
-    final lower = text.toLowerCase();
-    if (lower.contains(query)) return true;
-    // Simple subsequence match
-    int qi = 0;
-    for (int i = 0; i < lower.length && qi < query.length; i++) {
-      if (lower[i] == query[qi]) qi++;
-    }
-    return qi == query.length;
   }
 
   List<String> _collectSearchStrings(dynamic value, {int depth = 0}) {
@@ -339,10 +330,16 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     return const [];
   }
 
-  String _snippet(String text, String query) {
+  String _snippet(String text, List<String> queries) {
     final compact = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (compact.length <= 96) return compact;
-    final index = compact.toLowerCase().indexOf(query.toLowerCase());
+    final lower = compact.toLowerCase();
+    final index =
+        queries
+            .map((query) => lower.indexOf(query.toLowerCase()))
+            .where((index) => index >= 0)
+            .firstOrNull ??
+        -1;
     final start = index < 0 ? 0 : (index - 24).clamp(0, compact.length);
     final end = (start + 96).clamp(0, compact.length);
     return '${start > 0 ? '…' : ''}${compact.substring(start, end)}${end < compact.length ? '…' : ''}';
@@ -375,7 +372,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
         final board = boardCubit.state.activeBoard;
         if (board != null) {
           final fileName = p.basename(result.filePath!);
-          final bounds = BoardPanelBounds(
+          const bounds = BoardPanelBounds(
             x: 200,
             y: 200,
             width: 500,
@@ -412,11 +409,20 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     });
     const itemHeight = 68.0;
     if (_scrollController.hasClients) {
-      final target = (_selectedIndex * itemHeight).clamp(
-        0.0,
-        _scrollController.position.maxScrollExtent,
-      );
-      _scrollController.jumpTo(target);
+      final position = _scrollController.position;
+      final itemTop = _selectedIndex * itemHeight;
+      final itemBottom = itemTop + itemHeight;
+      final viewportTop = position.pixels;
+      final viewportBottom = viewportTop + position.viewportDimension;
+      double? target;
+      if (itemTop < viewportTop) {
+        target = itemTop;
+      } else if (itemBottom > viewportBottom) {
+        target = itemBottom - position.viewportDimension;
+      }
+      if (target != null) {
+        _scrollController.jumpTo(target.clamp(0.0, position.maxScrollExtent));
+      }
     }
   }
 
@@ -427,20 +433,24 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       alignment: Alignment.topCenter,
       child: Padding(
         padding: const EdgeInsets.only(top: 72),
-        child: KeyboardListener(
-          focusNode: FocusNode(),
-          onKeyEvent: (event) {
+        child: Focus(
+          onKeyEvent: (node, event) {
             if (event is KeyDownEvent || event is KeyRepeatEvent) {
               if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
                 _navigate(1);
+                return KeyEventResult.handled;
               } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
                 _navigate(-1);
+                return KeyEventResult.handled;
               } else if (event.logicalKey == LogicalKeyboardKey.enter) {
                 _openSelected();
+                return KeyEventResult.handled;
               } else if (event.logicalKey == LogicalKeyboardKey.escape) {
                 Navigator.of(context).pop();
+                return KeyEventResult.handled;
               }
             }
+            return KeyEventResult.ignored;
           },
           child: Container(
             width: 600,
@@ -715,8 +725,7 @@ class _QuickResultTile extends StatelessWidget {
     final colors = context.appColors;
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 80),
+      child: Container(
         color: isSelected ? colors.primary.withAlpha(25) : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
@@ -790,10 +799,18 @@ class _QuickResultTile extends StatelessWidget {
                   ),
                 ),
               ),
-            if (isSelected) ...[
-              const SizedBox(width: 8),
-              Icon(Icons.keyboard_return, size: 12, color: colors.textMuted),
-            ],
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 12,
+              child:
+                  isSelected
+                      ? Icon(
+                        Icons.keyboard_return,
+                        size: 12,
+                        color: colors.textMuted,
+                      )
+                      : null,
+            ),
           ],
         ),
       ),
