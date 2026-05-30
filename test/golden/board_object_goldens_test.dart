@@ -4,8 +4,10 @@ import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/shape_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/sticky_note_plugin.dart';
+import 'package:yoloit/features/board/ui/board_view.dart';
 
 BoardPanelRenderContext _noopContext({bool selected = false}) {
   return BoardPanelRenderContext(
@@ -22,6 +24,7 @@ Widget _pluginShell({
   Size size = const Size(520, 360),
 }) {
   return MaterialApp(
+    key: const ValueKey('board-chrome-app'),
     theme: AppThemePreset.neonPurple.theme,
     home: Scaffold(
       backgroundColor: const Color(0xFF10131C),
@@ -53,6 +56,17 @@ BoardPanelInstance _stickyPanel({Map<String, dynamic> state = const {}}) =>
       bounds: const BoardPanelBounds(x: 0, y: 0, width: 260, height: 220),
       state: {...const StickyNotePlugin().initialState, ...state},
     );
+
+BoardPanelInstance _standardPanel() {
+  return const BoardPanelInstance(
+    id: 'note_panel',
+    type: MarkdownNotePlugin.kTypeId,
+    title: 'Weather — Spitalfields',
+    bounds: BoardPanelBounds(x: 56, y: 74, width: 520, height: 300),
+    zIndex: 7,
+    state: {'markdown': '## Partly cloudy'},
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -146,6 +160,35 @@ void main() {
       await tester.tap(find.text('Open editor'));
       await tester.pumpAndSettle();
       await screenMatchesGolden(tester, 'board_sticky_editor_dialog');
+    });
+
+    testGoldens('standard panel chrome exposes depth and settings', (
+      tester,
+    ) async {
+      await tester.pumpWidgetBuilder(
+        _pluginShell(
+          size: const Size(560, 520),
+          builder:
+              (context) => PanelSettingsDialog(
+                panel: _standardPanel(),
+                plugin: const MarkdownNotePlugin(),
+                onEditColor: () {},
+                onEditPanel: () {},
+                onBringToFront: () {},
+                onSendToBack: () {},
+              ),
+        ),
+        surfaceSize: const Size(560, 520),
+      );
+      await tester.pump();
+
+      expect(find.text('Panel settings'), findsOneWidget);
+      expect(find.text('zIndex 7'), findsOneWidget);
+      expect(find.text('Arrange'), findsOneWidget);
+      await expectLater(
+        find.byType(AlertDialog),
+        matchesGoldenFile('goldens/board_standard_panel_settings.png'),
+      );
     });
   });
 }

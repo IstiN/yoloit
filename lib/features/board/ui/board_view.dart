@@ -3693,6 +3693,44 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
     super.dispose();
   }
 
+  Future<void> _showPanelSettingsDialog(
+    BuildContext context, {
+    required BoardPanelInstance panel,
+    required BoardPanelPlugin? plugin,
+    required VoidCallback? onEditPanel,
+    required VoidCallback onEditColor,
+    required VoidCallback onBringToFront,
+    required VoidCallback onSendToBack,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder:
+          (dialogContext) => PanelSettingsDialog(
+            panel: panel,
+            plugin: plugin,
+            onEditPanel:
+                onEditPanel == null
+                    ? null
+                    : () {
+                      Navigator.of(dialogContext).pop();
+                      onEditPanel();
+                    },
+            onEditColor: () {
+              Navigator.of(dialogContext).pop();
+              onEditColor();
+            },
+            onBringToFront: () {
+              Navigator.of(dialogContext).pop();
+              onBringToFront();
+            },
+            onSendToBack: () {
+              Navigator.of(dialogContext).pop();
+              onSendToBack();
+            },
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -3951,6 +3989,30 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                               ),
                                     );
                                   }(),
+                                  _PanelHeaderIconButton(
+                                    tooltip: 'Panel settings',
+                                    icon: Icons.tune_rounded,
+                                    onPressed:
+                                        () => _showPanelSettingsDialog(
+                                          context,
+                                          panel: panel,
+                                          plugin: plugin,
+                                          onEditPanel: onEditNote,
+                                          onEditColor: onEditColor,
+                                          onBringToFront: onBringToFront,
+                                          onSendToBack: onSendToBack,
+                                        ),
+                                  ),
+                                  _PanelHeaderIconButton(
+                                    tooltip: 'Bring to front',
+                                    icon: Icons.flip_to_front_outlined,
+                                    onPressed: onBringToFront,
+                                  ),
+                                  _PanelHeaderIconButton(
+                                    tooltip: 'Send to back',
+                                    icon: Icons.flip_to_back_outlined,
+                                    onPressed: onSendToBack,
+                                  ),
                                   SizedBox(
                                     width: 28,
                                     height: 28,
@@ -4247,6 +4309,206 @@ class _HeaderlessPanelTool extends StatelessWidget {
           padding: const EdgeInsets.all(6),
           child: Icon(icon, size: 14, color: colors.textSecondary),
         ),
+      ),
+    );
+  }
+}
+
+class _PanelHeaderIconButton extends StatelessWidget {
+  const _PanelHeaderIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        splashRadius: 14,
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+class PanelSettingsDialog extends StatelessWidget {
+  const PanelSettingsDialog({
+    super.key,
+    required this.panel,
+    required this.plugin,
+    required this.onEditColor,
+    required this.onBringToFront,
+    required this.onSendToBack,
+    this.onEditPanel,
+  });
+
+  final BoardPanelInstance panel;
+  final BoardPanelPlugin? plugin;
+  final VoidCallback onEditColor;
+  final VoidCallback onBringToFront;
+  final VoidCallback onSendToBack;
+  final VoidCallback? onEditPanel;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(plugin?.icon ?? Icons.dashboard_customize_outlined),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('Panel settings', overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _PanelSettingsSection(
+                title: 'Panel',
+                children: [
+                  _PanelSettingsInfoRow(label: 'Title', value: panel.title),
+                  _PanelSettingsInfoRow(
+                    label: 'Type',
+                    value: plugin?.displayName ?? panel.type,
+                  ),
+                  _PanelSettingsInfoRow(
+                    label: 'Depth',
+                    value: 'zIndex ${panel.zIndex}',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _PanelSettingsSection(
+                title: 'Appearance',
+                children: [
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: onEditColor,
+                        icon: const Icon(Icons.palette_outlined, size: 18),
+                        label: const Text('Panel color'),
+                      ),
+                      if (onEditPanel != null)
+                        OutlinedButton.icon(
+                          onPressed: onEditPanel,
+                          icon: const Icon(Icons.tune_rounded, size: 18),
+                          label: Text(
+                            plugin?.hasEditor == true
+                                ? '${plugin?.displayName ?? 'Content'} settings'
+                                : 'Edit content',
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _PanelSettingsSection(
+                title: 'Arrange',
+                children: [
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: onBringToFront,
+                        icon: const Icon(
+                          Icons.flip_to_front_outlined,
+                          size: 18,
+                        ),
+                        label: const Text('Bring to front'),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: onSendToBack,
+                        icon: const Icon(Icons.flip_to_back_outlined, size: 18),
+                        label: const Text('Send to back'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PanelSettingsSection extends StatelessWidget {
+  const _PanelSettingsSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 10),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PanelSettingsInfoRow extends StatelessWidget {
+  const _PanelSettingsInfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(width: 82, child: Text(label, style: textTheme.labelMedium)),
+          Expanded(
+            child: Text(
+              value,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodyMedium,
+            ),
+          ),
+        ],
       ),
     );
   }
