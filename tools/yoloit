@@ -3261,7 +3261,7 @@ PYEOF
     echo "Sticky panel created: $pid"
     ;;
   shape:create|shape:new)
-    local bid_raw="" shape="" title="" text="" fill="#1E293B" stroke="#93C5FD"
+    local bid_raw="" shape="" title="" text="" fill="#00000000" stroke="#93C5FD"
     local shape_args=()
     while [[ $# -gt 0 ]]; do
       case "$1" in

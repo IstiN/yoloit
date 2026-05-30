@@ -14,7 +14,7 @@ class ShapeCliHandler extends PanelCliHandler {
   Map<String, dynamic> getContent(BoardPanelInstance panel) => {
     'shape': panel.state['shape'] ?? 'rectangle',
     'text': panel.state['text'] ?? '',
-    'fillColor': panel.state['fillColor'] ?? '#1E293B',
+    'fillColor': panel.state['fillColor'] ?? '#00000000',
     'strokeColor': panel.state['strokeColor'] ?? '#93C5FD',
     'textColor': panel.state['textColor'] ?? '#E2E8F0',
     'strokeWidth': panel.state['strokeWidth'] ?? 3.0,

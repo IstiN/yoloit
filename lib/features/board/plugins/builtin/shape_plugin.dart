@@ -29,11 +29,17 @@ class ShapePlugin extends BoardPanelPlugin {
   Map<String, dynamic> get initialState => {
     'shape': 'rectangle',
     'text': '',
-    'fillColor': '#1E293B',
+    'fillColor': '#00000000',
     'strokeColor': '#93C5FD',
     'textColor': '#E2E8F0',
     'strokeWidth': 3.0,
   };
+
+  @override
+  bool get usePanelChrome => false;
+
+  @override
+  bool get showHeader => false;
 
   @override
   Widget buildContent(
@@ -43,31 +49,115 @@ class ShapePlugin extends BoardPanelPlugin {
   ) {
     final shape =
         (panel.state['shape'] as String? ?? 'rectangle').toLowerCase();
-    final text = panel.state['text'] as String? ?? '';
     final colors = context.appColors;
     final fillColor =
-        _parseHex(panel.state['fillColor'] as String?) ?? colors.surface;
+        _parseHex(panel.state['fillColor'] as String?) ?? Colors.transparent;
     final strokeColor =
         _parseHex(panel.state['strokeColor'] as String?) ?? colors.primaryLight;
     final textColor =
         _parseHex(panel.state['textColor'] as String?) ?? colors.textPrimary;
     final strokeWidth = (panel.state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
 
+    return _ShapeContent(
+      panel: panel,
+      shape: shape,
+      fillColor: fillColor,
+      strokeColor: strokeColor,
+      textColor: textColor,
+      strokeWidth: strokeWidth,
+      onChanged: (value) {
+        renderContext.onUpdateState({...panel.state, 'text': value});
+      },
+    );
+  }
+}
+
+class _ShapeContent extends StatefulWidget {
+  const _ShapeContent({
+    required this.panel,
+    required this.shape,
+    required this.fillColor,
+    required this.strokeColor,
+    required this.textColor,
+    required this.strokeWidth,
+    required this.onChanged,
+  });
+
+  final BoardPanelInstance panel;
+  final String shape;
+  final Color fillColor;
+  final Color strokeColor;
+  final Color textColor;
+  final double strokeWidth;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_ShapeContent> createState() => _ShapeContentState();
+}
+
+class _ShapeContentState extends State<_ShapeContent> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _textFromWidget());
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShapeContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextText = _textFromWidget();
+    if (nextText != _controller.text) {
+      _controller.value = _controller.value.copyWith(
+        text: nextText,
+        selection: TextSelection.collapsed(offset: nextText.length),
+        composing: TextRange.empty,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _textFromWidget() => widget.panel.state['text'] as String? ?? '';
+
+  @override
+  Widget build(BuildContext context) {
     return CustomPaint(
       painter: _ShapePainter(
-        shape: shape,
-        fillColor: fillColor,
-        strokeColor: strokeColor,
-        strokeWidth: strokeWidth,
+        shape: widget.shape,
+        fillColor: widget.fillColor,
+        strokeColor: widget.strokeColor,
+        strokeWidth: widget.strokeWidth,
       ),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Text(
-            text,
+          child: TextField(
+            controller: _controller,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
             textAlign: TextAlign.center,
+            onChanged: widget.onChanged,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              hintText: 'Type',
+              hintStyle: TextStyle(
+                color: widget.textColor.withValues(alpha: 0.45),
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+              isCollapsed: true,
+            ),
+            cursorColor: widget.textColor,
             style: TextStyle(
-              color: textColor,
+              color: widget.textColor,
               fontSize: 18,
               fontWeight: FontWeight.w700,
               height: 1.2,
