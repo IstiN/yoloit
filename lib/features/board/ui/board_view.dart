@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -193,7 +194,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                 _BoardToolbar(
                   board: activeBoard,
                   onCreateBoard: () => _createBoard(context),
-                  onRenameBoard: () => _renameBoard(context, activeBoard),
+                  onBoardSettings:
+                      () => _showBoardSettings(context, activeBoard),
                   onDeleteBoard: () => _deleteBoard(context, activeBoard),
                   onOpenBoardOverview: () => _openBoardOverview(activeBoard),
                 ),
@@ -2308,16 +2310,81 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     await context.read<BoardCubit>().createBoard(name: name);
   }
 
-  Future<void> _renameBoard(BuildContext context, BoardDocument board) async {
-    final name = await _showTextDialog(
-      context,
-      title: 'Rename board',
-      label: 'Board name',
-      initialValue: board.name,
-      confirmLabel: 'Save',
+  Future<void> _showBoardSettings(
+    BuildContext context,
+    BoardDocument board,
+  ) async {
+    final nameController = TextEditingController(text: board.name);
+    final folderController = TextEditingController(text: board.defaultFolder);
+    final result = await showDialog<({String name, String defaultFolder})>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Board settings'),
+            content: SizedBox(
+              width: 520,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Board name'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: folderController,
+                    decoration: const InputDecoration(
+                      labelText: 'Default folder',
+                      helperText:
+                          'Used for new chats, terminals, and file trees.',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final selected = await FilePicker.getDirectoryPath();
+                          if (selected == null || !dialogContext.mounted) {
+                            return;
+                          }
+                          folderController.text = selected;
+                        },
+                        icon: const Icon(Icons.folder_open_outlined),
+                        label: const Text('Choose folder'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () => folderController.clear(),
+                        child: const Text('Clear'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed:
+                    () => Navigator.of(dialogContext).pop((
+                      name: nameController.text.trim(),
+                      defaultFolder: folderController.text.trim(),
+                    )),
+                child: const Text('Save'),
+              ),
+            ],
+          ),
     );
-    if (!context.mounted || name == null) return;
-    await context.read<BoardCubit>().renameBoard(board.id, name);
+    nameController.dispose();
+    folderController.dispose();
+    if (!context.mounted || result == null) return;
+    final cubit = context.read<BoardCubit>();
+    await cubit.renameBoard(board.id, result.name);
+    await cubit.updateBoardDefaultFolder(board.id, result.defaultFolder);
   }
 
   Future<void> _deleteBoard(BuildContext context, BoardDocument board) async {
@@ -2753,14 +2820,14 @@ class _BoardToolbar extends StatelessWidget {
   const _BoardToolbar({
     required this.board,
     required this.onCreateBoard,
-    required this.onRenameBoard,
+    required this.onBoardSettings,
     required this.onDeleteBoard,
     required this.onOpenBoardOverview,
   });
 
   final BoardDocument board;
   final VoidCallback onCreateBoard;
-  final VoidCallback onRenameBoard;
+  final VoidCallback onBoardSettings;
   final VoidCallback onDeleteBoard;
   final VoidCallback onOpenBoardOverview;
 
@@ -2784,6 +2851,13 @@ class _BoardToolbar extends StatelessWidget {
             icon: Icons.share_outlined,
             label: '${board.links.length} links',
           ),
+          if (board.defaultFolder.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            _ToolbarChip(
+              icon: Icons.folder_outlined,
+              label: _shortToolbarPath(board.defaultFolder),
+            ),
+          ],
           const Spacer(),
           OutlinedButton.icon(
             onPressed: onCreateBoard,
@@ -2792,9 +2866,9 @@ class _BoardToolbar extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
-            onPressed: onRenameBoard,
-            icon: const Icon(Icons.drive_file_rename_outline),
-            label: const Text('Rename'),
+            onPressed: onBoardSettings,
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('Settings'),
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
@@ -2805,6 +2879,14 @@ class _BoardToolbar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _shortToolbarPath(String path) {
+    final normalized = path.trim();
+    if (normalized.length <= 28) return normalized;
+    final parts = normalized.split(Platform.pathSeparator);
+    if (parts.length >= 2) return '…${Platform.pathSeparator}${parts.last}';
+    return '…${normalized.substring(normalized.length - 27)}';
   }
 }
 
@@ -5571,62 +5653,169 @@ class _BoardToolsPanel extends StatelessWidget {
                             final pos = box.localToGlobal(
                               Offset(box.size.width, 0),
                             );
-                            final pluginEntries =
-                                BoardPluginRegistry.instance.catalogPlugins.map(
-                                  (plugin) {
-                                    return PopupMenuItem<String>(
-                                      value: plugin.typeId,
-                                      height: 36,
-                                      child: Builder(
-                                        builder: (ctx) {
-                                          final svgIcon = plugin
-                                              .buildIconWidget(ctx, size: 14);
-                                          return Row(
-                                            children: [
-                                              if (svgIcon != null)
-                                                SizedBox(
-                                                  width: 14,
-                                                  height: 14,
-                                                  child: svgIcon,
-                                                )
-                                              else
-                                                Icon(
-                                                  plugin.icon,
-                                                  size: 14,
-                                                  color: plugin.accentColor
-                                                      .withAlpha(200),
-                                                ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                plugin.displayName,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: textColor,
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ),
+                            PopupMenuEntry<String> header(String label) =>
+                                PopupMenuItem<String>(
+                                  enabled: false,
+                                  height: 28,
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: mutedColor.withAlpha(180),
+                                    ),
+                                  ),
+                                );
+                            PopupMenuEntry<String> action({
+                              required String value,
+                              required IconData icon,
+                              required Color color,
+                              required String label,
+                            }) => PopupMenuItem<String>(
+                              value: value,
+                              height: 38,
+                              child: Row(
+                                children: [
+                                  Icon(icon, size: 16, color: color),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: textColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            PopupMenuEntry<String>? pluginItem(String typeId) {
+                              final plugin = BoardPluginRegistry.instance
+                                  .pluginFor(typeId);
+                              if (plugin == null) return null;
+                              return PopupMenuItem<String>(
+                                value: plugin.typeId,
+                                height: 38,
+                                child: Builder(
+                                  builder: (ctx) {
+                                    final svgIcon = plugin.buildIconWidget(
+                                      ctx,
+                                      size: 16,
+                                    );
+                                    return Row(
+                                      children: [
+                                        if (svgIcon != null)
+                                          SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: svgIcon,
+                                          )
+                                        else
+                                          Icon(
+                                            plugin.icon,
+                                            size: 16,
+                                            color: plugin.accentColor.withAlpha(
+                                              220,
+                                            ),
+                                          ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          plugin.displayName,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: textColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     );
                                   },
-                                ).toList();
+                                ),
+                              );
+                            }
+
+                            final entries = <PopupMenuEntry<String>>[
+                              header('Miro basics'),
+                              if (onAddNote != null)
+                                action(
+                                  value: '__note',
+                                  icon: Icons.sticky_note_2_outlined,
+                                  color: mutedColor,
+                                  label: 'Markdown Note',
+                                ),
+                              if (pluginItem('board.sticky') != null)
+                                pluginItem('board.sticky')!,
+                              if (pluginItem('board.shape') != null)
+                                pluginItem('board.shape')!,
+                              const PopupMenuDivider(height: 8),
+                              header('AI and terminal'),
+                              if (onAddChat != null)
+                                action(
+                                  value: '__chat',
+                                  icon: Icons.auto_awesome,
+                                  color: colors.statusActive,
+                                  label: 'AI Chat',
+                                ),
+                              if (onAddTerminal != null)
+                                action(
+                                  value: '__terminal',
+                                  icon: Icons.terminal,
+                                  color: colors.statusActive,
+                                  label: 'Terminal',
+                                ),
+                              if (pluginItem('board.yolo_assistant') != null)
+                                pluginItem('board.yolo_assistant')!,
+                              const PopupMenuDivider(height: 8),
+                              header('Files and web'),
+                              if (pluginItem('board.filetree') != null)
+                                pluginItem('board.filetree')!,
+                              if (pluginItem('board.files') != null)
+                                pluginItem('board.files')!,
+                              if (pluginItem('board.file.preview') != null)
+                                pluginItem('board.file.preview')!,
+                              if (pluginItem('board.webpage') != null)
+                                pluginItem('board.webpage')!,
+                              const PopupMenuDivider(height: 8),
+                              header('Planning'),
+                              if (pluginItem('board.kanban') != null)
+                                pluginItem('board.kanban')!,
+                              if (pluginItem('board.checklist') != null)
+                                pluginItem('board.checklist')!,
+                              if (pluginItem('board.timer') != null)
+                                pluginItem('board.timer')!,
+                              const PopupMenuDivider(height: 8),
+                              header('Advanced'),
+                              if (pluginItem('board.code.snippet') != null)
+                                pluginItem('board.code.snippet')!,
+                              if (pluginItem('board.playlist') != null)
+                                pluginItem('board.playlist')!,
+                              if (pluginItem('board.run_configs') != null)
+                                pluginItem('board.run_configs')!,
+                              if (pluginItem('board.widget.custom') != null)
+                                pluginItem('board.widget.custom')!,
+                            ];
 
                             showMenu<String>(
                               context: btnCtx,
                               position: RelativeRect.fromLTRB(
                                 pos.dx + 4,
                                 pos.dy,
-                                pos.dx + 200,
+                                pos.dx + 280,
                                 pos.dy + 100,
                               ),
                               color: colors.surfaceElevated,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              items: pluginEntries,
+                              items: entries,
                             ).then((typeId) {
-                              if (typeId != null) {
+                              if (typeId == '__note') {
+                                onAddNote?.call();
+                              } else if (typeId == '__chat') {
+                                onAddChat?.call();
+                              } else if (typeId == '__terminal') {
+                                onAddTerminal?.call();
+                              } else if (typeId != null) {
                                 onAddGeneric!(typeId);
                               }
                             });

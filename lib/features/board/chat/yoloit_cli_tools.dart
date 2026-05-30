@@ -1512,6 +1512,34 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     ],
   ),
   YoloitCliTool(
+    command: 'board:folder',
+    alias: 'bfold',
+    description:
+        'Set or clear the board default folder used by new chats, terminals, and file trees',
+    group: 'board',
+    humanVariants: const {
+      'ru': [
+        'установи папку борда {path}',
+        'задай дефолтную папку борда {path}',
+        'папка по умолчанию для доски {path}',
+      ],
+      'en': [
+        'set board default folder {path}',
+        'set default folder for board {path}',
+        'use folder {path} for this board',
+      ],
+    },
+    params: <YoloitCliToolParam>[
+      _boardParam('id_or_name'),
+      _p(
+        'path',
+        "Folder path, or 'clear' to remove the default",
+        required: true,
+        shortKey: 'p',
+      ),
+    ],
+  ),
+  YoloitCliTool(
     command: 'board:delete',
     alias: 'bdl',
     description: 'Delete a board',

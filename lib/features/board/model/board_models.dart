@@ -73,12 +73,10 @@ class BoardDrawingElement extends Equatable {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'strokes': strokes
-        .map(
-          (stroke) =>
-              stroke.map((p) => [p.dx, p.dy]).toList(),
-        )
-        .toList(),
+    'strokes':
+        strokes
+            .map((stroke) => stroke.map((p) => [p.dx, p.dy]).toList())
+            .toList(),
     'position': [position.dx, position.dy],
     'size': [size.width, size.height],
     'strokeColor': strokeColor.toARGB32(),
@@ -93,18 +91,22 @@ class BoardDrawingElement extends Equatable {
     final rawSize = json['size'] as List? ?? const [100, 100];
     return BoardDrawingElement(
       id: json['id'] as String,
-      strokes: rawStrokes
-          .map(
-            (stroke) => (stroke as List)
-                .map(
-                  (p) => Offset(
-                    (p as List)[0] is num ? (p[0] as num).toDouble() : 0,
-                    p[1] is num ? (p[1] as num).toDouble() : 0,
-                  ),
-                )
-                .toList(),
-          )
-          .toList(),
+      strokes:
+          rawStrokes
+              .map(
+                (stroke) =>
+                    (stroke as List)
+                        .map(
+                          (p) => Offset(
+                            (p as List)[0] is num
+                                ? (p[0] as num).toDouble()
+                                : 0,
+                            p[1] is num ? (p[1] as num).toDouble() : 0,
+                          ),
+                        )
+                        .toList(),
+              )
+              .toList(),
       position: Offset(
         (rawPos[0] as num).toDouble(),
         (rawPos[1] as num).toDouble(),
@@ -142,8 +144,9 @@ class BoardDrawingElement extends Equatable {
     }
     const padding = 8.0;
     final origin = Offset(minX - padding, minY - padding);
-    final relativePoints =
-        rawPoints.map((p) => p - origin).toList(growable: false);
+    final relativePoints = rawPoints
+        .map((p) => p - origin)
+        .toList(growable: false);
     return BoardDrawingElement(
       id: id,
       strokes: [relativePoints],
@@ -160,7 +163,14 @@ class BoardDrawingElement extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, strokes, position, size, strokeColor, strokeWidth, zIndex, hidden,
+    id,
+    strokes,
+    position,
+    size,
+    strokeColor,
+    strokeWidth,
+    zIndex,
+    hidden,
   ];
 }
 
@@ -175,6 +185,7 @@ class BoardViewport extends Equatable {
   final double scale;
   final Offset translation;
   final String? focusedPanelId;
+
   /// Transient flag — set by CLI/assistant focus commands to trigger zoom-to-panel.
   /// Cleared after the zoom animation is applied. Not persisted across restarts.
   final bool zoomOnFocus;
@@ -446,7 +457,13 @@ class BoardPanelLink extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, fromPanelId, toPanelId, style, behavior, color, geometry,
+    id,
+    fromPanelId,
+    toPanelId,
+    style,
+    behavior,
+    color,
+    geometry,
   ];
 }
 
@@ -468,6 +485,9 @@ class BoardDocument extends Equatable {
   final List<BoardPanelLink> links;
   final List<BoardDrawingElement> drawings;
   final Map<String, dynamic> metadata;
+
+  String get defaultFolder =>
+      (metadata['defaultFolder'] as String? ?? '').trim();
 
   BoardDocument copyWith({
     String? id,
@@ -539,6 +559,12 @@ class BoardDocument extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, name, viewport, panels, links, drawings, metadata,
+    id,
+    name,
+    viewport,
+    panels,
+    links,
+    drawings,
+    metadata,
   ];
 }

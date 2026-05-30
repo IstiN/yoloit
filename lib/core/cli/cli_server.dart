@@ -29,6 +29,7 @@ import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
+import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
@@ -294,6 +295,7 @@ class CliServer {
           'id': board.id,
           'name': board.name,
           'panelCount': board.panels.length,
+          'defaultFolder': board.defaultFolder,
         },
       });
     }
@@ -2105,6 +2107,7 @@ class CliServer {
                   'name': b.name,
                   'panelCount': b.panels.length,
                   'linkCount': b.links.length,
+                  'defaultFolder': b.defaultFolder,
                   'active': b.id == active,
                 },
               )
@@ -2138,6 +2141,7 @@ class CliServer {
       },
       'panelCount': board.panels.length,
       'linkCount': board.links.length,
+      'defaultFolder': board.defaultFolder,
       'panels': board.panels.map(_panelSummary).toList(),
     });
   }
@@ -2288,6 +2292,13 @@ class CliServer {
       await cubit.renameBoard(board.id, body['name'] as String);
       _scheduleRebuild();
     }
+    if (body.containsKey('defaultFolder')) {
+      await cubit.updateBoardDefaultFolder(
+        board.id,
+        body['defaultFolder'] as String?,
+      );
+      _scheduleRebuild();
+    }
     if (body['focus'] == true) {
       await cubit.setActiveBoard(board.id);
       _scheduleRebuild();
@@ -2363,7 +2374,11 @@ class CliServer {
     final title = body['title'] as String? ?? plugin.displayName;
     final w = (body['width'] as num?)?.toDouble() ?? plugin.defaultSize.width;
     final h = (body['height'] as num?)?.toDouble() ?? plugin.defaultSize.height;
-    final state = body['state'] as Map<String, dynamic>? ?? plugin.initialState;
+    final hasExplicitState = body['state'] is Map;
+    final state =
+        hasExplicitState
+            ? Map<String, dynamic>.from(body['state'] as Map)
+            : _initialPanelStateForBoard(plugin.initialState, typeId, board);
     final hasCustomPosition = body['x'] is num || body['y'] is num;
     final bounds =
         !hasCustomPosition
@@ -2396,6 +2411,40 @@ class CliServer {
     await cubit.addPanel(panel, boardId: board.id);
     _scheduleRebuild();
     return _json({'ok': true, 'panel': _panelSummary(panel)});
+  }
+
+  Map<String, dynamic> _initialPanelStateForBoard(
+    Map<String, dynamic> initialState,
+    String typeId,
+    BoardDocument board,
+  ) {
+    final defaultFolder = board.defaultFolder;
+    if (defaultFolder.isEmpty) return initialState;
+    if (typeId == 'board.filetree') {
+      return {...initialState, 'rootPath': defaultFolder};
+    }
+    if (typeId == ChatPanelPlugin.kTypeId) {
+      final rawConfig = initialState['config'];
+      final config = ChatSessionConfig.fromJson(
+        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
+      );
+      return {
+        ...initialState,
+        'config': config.copyWith(workingDir: defaultFolder).toJson(),
+        'configured': true,
+      };
+    }
+    if (typeId == BoardTerminalPanelPlugin.kTypeId) {
+      final rawConfig = initialState['config'];
+      final config = BoardTerminalConfig.fromJson(
+        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
+      );
+      return {
+        ...initialState,
+        'config': config.copyWith(workingDir: defaultFolder).toJson(),
+      };
+    }
+    return initialState;
   }
 
   BoardPanelBounds _nextAvailableBoundsFor(

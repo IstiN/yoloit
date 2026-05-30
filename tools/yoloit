@@ -730,6 +730,14 @@ commands = [
   },
   {
     "group": "board",
+    "name": "board:folder",
+    "aliases": ["bfold"],
+    "description": "Set or clear the board default folder for new chats, terminals, and file trees",
+    "params": [["id|name", "Board identifier or board name", True], ["path|clear", "Folder path or clear", True]],
+    "example": "yoloit board:folder \"My Board\" ~/git/project",
+  },
+  {
+    "group": "board",
     "name": "board:delete",
     "description": "Delete a board",
     "params": [["id|name", "Board identifier or board name", True]],
@@ -1900,6 +1908,16 @@ PYEOF
     [[ $# -lt 2 ]] && { echo "Usage: yoloit board:rename <board> <new>" >&2; exit 1; }
     bid=$(_encode "$1"); _use_board "$1"
     _put "/boards/${bid}" "{\"name\":\"$2\"}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:folder|bfold)
+    [[ $# -lt 2 ]] && { echo "Usage: yoloit board:folder <board> <path|clear>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"
+    folder="$2"
+    if [[ "$folder" == "clear" || "$folder" == "none" || "$folder" == "-" ]]; then
+      folder=""
+    fi
+    payload=$(python3 -c 'import json,sys; print(json.dumps({"defaultFolder": sys.argv[1]}))' "$folder")
+    _put "/boards/${bid}" "$payload" | python3 -m json.tool 2>/dev/null
     ;;
   board:delete)
     bid_raw=$(_board "${1:-}")

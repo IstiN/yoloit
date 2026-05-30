@@ -111,6 +111,22 @@ class BoardCubit extends Cubit<BoardState> {
     await _updateBoard(id, (board) => board.copyWith(name: trimmed));
   }
 
+  Future<void> updateBoardDefaultFolder(
+    String id,
+    String? defaultFolder,
+  ) async {
+    await _updateBoard(id, (board) {
+      final trimmed = defaultFolder?.trim() ?? '';
+      final metadata = Map<String, dynamic>.from(board.metadata);
+      if (trimmed.isEmpty) {
+        metadata.remove('defaultFolder');
+      } else {
+        metadata['defaultFolder'] = trimmed;
+      }
+      return board.copyWith(metadata: metadata);
+    });
+  }
+
   Future<void> deleteBoard(String id) async {
     if (state.boards.isEmpty) return;
     final board = state.boards.where((entry) => entry.id == id).firstOrNull;
@@ -254,18 +270,19 @@ class BoardCubit extends Cubit<BoardState> {
 
     // Resolve effective model: user's explicit arg → agent default model → catalog default → hardcoded default
     final effectiveModel = _resolveDefaultModel(provider, model);
+    final effectiveWorkingDir = _effectiveBoardFolder(board, workingDir);
 
     final config = ChatSessionConfig(
       sessionName:
           sessionName ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
-      workingDir: workingDir,
+      workingDir: effectiveWorkingDir,
       model: effectiveModel,
       provider: provider,
       envGroupIds: envGroupIds,
     );
     final panelState = <String, dynamic>{
       'config': config.toJson(),
-      'configured': workingDir.trim().isNotEmpty,
+      'configured': effectiveWorkingDir.trim().isNotEmpty,
     };
     if (messages != null && messages.isNotEmpty) {
       panelState['messages'] = messages;
@@ -301,10 +318,11 @@ class BoardCubit extends Cubit<BoardState> {
       preferredWidth: 520,
       preferredHeight: 360,
     );
+    final effectiveWorkingDir = _effectiveBoardFolder(board, workingDir);
     final config = BoardTerminalConfig(
       sessionId: sessionId ?? '',
       sessionName: sessionName ?? '',
-      workingDir: workingDir,
+      workingDir: effectiveWorkingDir,
       envGroupIds: envGroupIds,
     );
     final panel = BoardPanelInstance(
@@ -337,6 +355,11 @@ class BoardCubit extends Cubit<BoardState> {
     final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
     if (plugin == null) return;
     final size = plugin.defaultSize;
+    final initialState = _initialStateForBoard(
+      plugin.initialState,
+      typeId,
+      board,
+    );
     final bounds = _nextAvailableBounds(
       board,
       preferredWidth: size.width,
@@ -347,7 +370,7 @@ class BoardCubit extends Cubit<BoardState> {
       type: typeId,
       title: plugin.displayName,
       bounds: bounds,
-      state: plugin.initialState,
+      state: initialState,
       zIndex:
           board.panels.fold<int>(
             0,
@@ -602,6 +625,46 @@ class BoardCubit extends Cubit<BoardState> {
       name: name,
       metadata: const {'version': 1},
     );
+  }
+
+  String _effectiveBoardFolder(BoardDocument board, String explicitFolder) {
+    final explicit = explicitFolder.trim();
+    if (explicit.isNotEmpty) return explicit;
+    return board.defaultFolder;
+  }
+
+  Map<String, dynamic> _initialStateForBoard(
+    Map<String, dynamic> initialState,
+    String typeId,
+    BoardDocument board,
+  ) {
+    final defaultFolder = board.defaultFolder;
+    if (defaultFolder.isEmpty) return initialState;
+    if (typeId == 'board.filetree') {
+      return {...initialState, 'rootPath': defaultFolder};
+    }
+    if (typeId == ChatPanelPlugin.kTypeId) {
+      final rawConfig = initialState['config'];
+      final config = ChatSessionConfig.fromJson(
+        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
+      );
+      return {
+        ...initialState,
+        'config': config.copyWith(workingDir: defaultFolder).toJson(),
+        'configured': true,
+      };
+    }
+    if (typeId == BoardTerminalPanelPlugin.kTypeId) {
+      final rawConfig = initialState['config'];
+      final config = BoardTerminalConfig.fromJson(
+        Map<String, dynamic>.from(rawConfig is Map ? rawConfig : const {}),
+      );
+      return {
+        ...initialState,
+        'config': config.copyWith(workingDir: defaultFolder).toJson(),
+      };
+    }
+    return initialState;
   }
 
   /// Resolves the effective model for a new chat session.
