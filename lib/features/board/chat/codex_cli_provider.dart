@@ -109,7 +109,10 @@ class CodexCliProvider extends ChatProvider {
               message,
               runtimeContext: runtimeContext,
             )
-            : message;
+            : await CliGuidanceService.instance.prependBoardReminder(
+              message,
+              runtimeContext: runtimeContext,
+            );
 
     var rawCommand = configObj?.launchCommand.trim() ?? '';
     if (rawCommand.isEmpty || rawCommand == 'codex') {
@@ -218,26 +221,47 @@ class CodexCliProvider extends ChatProvider {
     required String? threadId,
   }) {
     if (threadId != null && threadId.isNotEmpty) {
+      final resumeOptionArgs = _withoutResumeUnsupportedArgs(optionArgs);
       if (extraCmdArgs.isNotEmpty && extraCmdArgs.first == 'exec') {
+        final resumeExtraArgs = _withoutResumeUnsupportedArgs(
+          extraCmdArgs.skip(1).toList(),
+        );
         return [
           'exec',
           'resume',
-          ...extraCmdArgs.skip(1),
-          ...optionArgs,
+          ...resumeExtraArgs,
+          ...resumeOptionArgs,
           threadId,
           prompt,
         ];
       }
+      final resumeExtraArgs = _withoutResumeUnsupportedArgs(extraCmdArgs);
       return [
         'exec',
         'resume',
-        ...extraCmdArgs,
-        ...optionArgs,
+        ...resumeExtraArgs,
+        ...resumeOptionArgs,
         threadId,
         prompt,
       ];
     }
     return [...extraCmdArgs, ...optionArgs, prompt];
+  }
+
+  List<String> _withoutResumeUnsupportedArgs(List<String> args) {
+    final result = <String>[];
+    for (var i = 0; i < args.length; i++) {
+      final arg = args[i];
+      if (arg == '--cd' || arg == '-C') {
+        if (i + 1 < args.length) i++;
+        continue;
+      }
+      if (arg.startsWith('--cd=') || arg.startsWith('-C=')) {
+        continue;
+      }
+      result.add(arg);
+    }
+    return result;
   }
 
   void _handleLine(

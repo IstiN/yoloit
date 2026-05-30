@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/codex_cli_provider.dart';
 import 'package:yoloit/features/board/chat/kimi_cli_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -219,5 +220,70 @@ void main() {
       '--json',
       '--skip-git-repo-check',
     ]);
+  });
+
+  test('Codex provider resumes without unsupported cd arg', () async {
+    final starter = _FakeStarter();
+    final firstProcess = _FakeProcess(pid: 203, stdin: stdinSink);
+    final secondStdinSink = _TrackingIOSink();
+    addTearDown(secondStdinSink.close);
+    final secondProcess = _FakeProcess(pid: 204, stdin: secondStdinSink);
+    starter.processes.addAll([firstProcess, secondProcess]);
+    final provider = CodexCliProvider(processStarter: starter.start);
+    const runtimeContext = ChatRuntimeContext(
+      boardId: 'board-1',
+      boardName: 'TestBoard',
+      panelId: 'chat-1',
+      panelTitle: 'AI Chat',
+    );
+
+    final firstEventsFuture =
+        provider
+            .sendMessage(
+              message: 'hello',
+              config: config('codex'),
+              isFirstMessage: true,
+              runtimeContext: runtimeContext,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+    firstProcess.addStdout(
+      '{"type":"thread.started","thread_id":"codex-thread"}\n',
+    );
+    await firstProcess.closeStdout();
+    await firstProcess.closeStderr();
+    firstProcess.completeExit(0);
+    await firstEventsFuture;
+
+    final secondEventsFuture =
+        provider
+            .sendMessage(
+              message: 'draw shapes on the board',
+              config: config('codex'),
+              isFirstMessage: false,
+              runtimeContext: runtimeContext,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+    secondProcess.addStdout(
+      '{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"OK"}}\n',
+    );
+    await secondProcess.closeStdout();
+    await secondProcess.closeStderr();
+    secondProcess.completeExit(0);
+    await secondEventsFuture;
+
+    expect(starter.calls, hasLength(2));
+    expect(starter.calls.first, contains('--cd'));
+    final resumeCall = starter.calls.last;
+    expect(resumeCall.take(3), ['codex', 'exec', 'resume']);
+    expect(resumeCall, isNot(contains('--cd')));
+    expect(resumeCall, isNot(contains('-C')));
+    expect(resumeCall, contains('codex-thread'));
+    expect(resumeCall.last, contains('YoLoIT board reminder'));
+    expect(resumeCall.last, contains('yoloit shape:create'));
+    expect(resumeCall.last, contains('Current board: `TestBoard`'));
+    expect(stdinSink.closed, isTrue);
+    expect(secondStdinSink.closed, isTrue);
   });
 }

@@ -55,6 +55,31 @@ class CliGuidanceService {
     return parts.join('\n\n');
   }
 
+  Future<String> prependBoardReminder(
+    String message, {
+    ChatRuntimeContext? runtimeContext,
+  }) async {
+    final boardName = runtimeContext?.boardName?.trim();
+    final boardId = runtimeContext?.boardId?.trim();
+    final boardRef =
+        boardName != null && boardName.isNotEmpty
+            ? boardName
+            : boardId != null && boardId.isNotEmpty
+            ? boardId
+            : null;
+    final parts = <String>[
+      'YoLoIT board reminder:',
+      '- For board/canvas/panel changes, use `yoloit` CLI commands. Do not edit project files unless the user explicitly asks to change repo files.',
+      '- If the target panel/type/action is unclear, run `yoloit panels`, `yoloit panel:types`, or `yoloit panel:help` first.',
+      '- For shape/sticky/frame requests, prefer `yoloit shape:create`, `yoloit sticky:create`, `yoloit frame:create`, or `yoloit board:apply`.',
+    ];
+    if (boardRef != null) {
+      parts.add('- Current board: `$boardRef`.');
+    }
+    parts.add('User request:\n$message');
+    return parts.join('\n');
+  }
+
   Future<String?> _fetchHelp() async {
     final bin = _resolveYoloitBin();
     try {
