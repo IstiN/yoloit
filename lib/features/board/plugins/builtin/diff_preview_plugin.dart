@@ -35,6 +35,9 @@ class DiffPreviewPlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get showInCatalog => false;
+
+  @override
   Widget buildContent(
     BuildContext context,
     BoardPanelInstance panel,

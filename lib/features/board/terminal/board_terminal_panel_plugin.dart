@@ -38,6 +38,9 @@ class BoardTerminalPanelPlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get showInCatalog => false;
+
+  @override
   bool get supportsHeadlessRender => false; // native PTY — requires live terminal session
 
   @override

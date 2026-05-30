@@ -35,6 +35,9 @@ class ChatPanelPlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get showInCatalog => false;
+
+  @override
   bool get hasEditor => false;
 
   @override

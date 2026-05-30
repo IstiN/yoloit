@@ -60,7 +60,7 @@ class BoardPluginRegistry {
   /// All plugins that should appear in the board catalog
   /// (i.e. those that are visible to the user when adding a new panel).
   List<BoardPanelPlugin> get catalogPlugins =>
-      all.whereType<BoardPanelPlugin>().toList();
+      all.where((plugin) => plugin.showInCatalog).toList();
 
   // ── Internals ──────────────────────────────────────────────────────────────
 

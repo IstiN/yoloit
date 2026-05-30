@@ -86,6 +86,9 @@ abstract class BoardPanelPlugin {
   /// Initial state map for a freshly created panel.
   Map<String, dynamic> get initialState => const {};
 
+  /// Whether this plugin should be shown in the generic Add Panel catalog.
+  bool get showInCatalog => true;
+
   /// Whether this plugin can be safely rendered in a headless offscreen context
   /// (no GPU, no platform views, no native video decoders).
   ///

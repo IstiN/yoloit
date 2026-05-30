@@ -39,6 +39,9 @@ class MarkdownNotePlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get showInCatalog => false;
+
+  @override
   bool get hasEditor => true;
 
   @override

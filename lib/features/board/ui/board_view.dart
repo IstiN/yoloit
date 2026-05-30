@@ -5081,32 +5081,11 @@ class _BoardToolsPanel extends StatelessWidget {
                             final pos = box.localToGlobal(
                               Offset(box.size.width, 0),
                             );
-                            // Build menu items from all generic plugins
-                            const genericTypes = [
-                              'board.sticky',
-                              'board.shape',
-                              'board.kanban',
-                              'board.webpage',
-                              'board.code.snippet',
-                              'board.checklist',
-                              'board.files',
-                              'board.file.preview',
-                              'board.playlist',
-                              'board.filetree',
-                              'board.run_configs',
-                              'board.yolo_assistant',
-                              'board.timer',
-                              'board.widget.custom',
-                            ];
                             final pluginEntries =
-                                genericTypes
-                                    .map((typeId) {
-                                      final plugin = BoardPluginRegistry
-                                          .instance
-                                          .pluginFor(typeId);
-                                      if (plugin == null) return null;
+                                BoardPluginRegistry.instance.catalogPlugins
+                                    .map((plugin) {
                                       return PopupMenuItem<String>(
-                                        value: typeId,
+                                        value: plugin.typeId,
                                         height: 36,
                                         child: Builder(
                                           builder: (ctx) {
@@ -5140,9 +5119,7 @@ class _BoardToolsPanel extends StatelessWidget {
                                           },
                                         ),
                                       );
-                                    })
-                                    .whereType<PopupMenuItem<String>>()
-                                    .toList();
+                                    }).toList();
 
                             showMenu<String>(
                               context: btnCtx,

@@ -111,6 +111,9 @@ class RunPlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get showInCatalog => false;
+
+  @override
   bool get supportsHeadlessRender => false; // requires live RunCubit + session state
 
   @override
