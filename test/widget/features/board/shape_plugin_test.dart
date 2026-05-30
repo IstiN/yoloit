@@ -51,4 +51,46 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Updated shape');
     expect(state['text'], 'Updated shape');
   });
+
+  testWidgets('shape shows selected variant palette', (tester) async {
+    var state = <String, dynamic>{...plugin.initialState};
+    final panel = BoardPanelInstance(
+      id: 'shape',
+      type: ShapePlugin.kTypeId,
+      title: 'Shape',
+      bounds: const BoardPanelBounds(x: 0, y: 0, width: 300, height: 220),
+      state: state,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 300,
+            height: 220,
+            child: Builder(
+              builder:
+                  (context) => plugin.buildContent(
+                    context,
+                    panel,
+                    BoardPanelRenderContext(
+                      isSelected: true,
+                      onFocus: () {},
+                      onDelete: () {},
+                      onUpdateState: (nextState) => state = nextState,
+                      onShowEditor: () {},
+                    ),
+                  ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('○'), findsOneWidget);
+    expect(find.text('◇'), findsOneWidget);
+
+    await tester.tap(find.text('◇'));
+    expect(state['shape'], 'diamond');
+  });
 }

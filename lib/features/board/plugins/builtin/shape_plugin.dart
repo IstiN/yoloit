@@ -65,8 +65,12 @@ class ShapePlugin extends BoardPanelPlugin {
       strokeColor: strokeColor,
       textColor: textColor,
       strokeWidth: strokeWidth,
+      isSelected: renderContext.isSelected,
       onChanged: (value) {
         renderContext.onUpdateState({...panel.state, 'text': value});
+      },
+      onShapeChanged: (nextShape) {
+        renderContext.onUpdateState({...panel.state, 'shape': nextShape});
       },
     );
   }
@@ -80,7 +84,9 @@ class _ShapeContent extends StatefulWidget {
     required this.strokeColor,
     required this.textColor,
     required this.strokeWidth,
+    required this.isSelected,
     required this.onChanged,
+    required this.onShapeChanged,
   });
 
   final BoardPanelInstance panel;
@@ -89,7 +95,9 @@ class _ShapeContent extends StatefulWidget {
   final Color strokeColor;
   final Color textColor;
   final double strokeWidth;
+  final bool isSelected;
   final ValueChanged<String> onChanged;
+  final ValueChanged<String> onShapeChanged;
 
   @override
   State<_ShapeContent> createState() => _ShapeContentState();
@@ -127,46 +135,157 @@ class _ShapeContentState extends State<_ShapeContent> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _ShapePainter(
-        shape: widget.shape,
-        fillColor: widget.fillColor,
-        strokeColor: widget.strokeColor,
-        strokeWidth: widget.strokeWidth,
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: TextField(
-            controller: _controller,
-            maxLines: null,
-            keyboardType: TextInputType.multiline,
-            textAlign: TextAlign.center,
-            onChanged: widget.onChanged,
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              hintText: 'Type',
-              hintStyle: TextStyle(
-                color: widget.textColor.withValues(alpha: 0.45),
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+    final colors = context.appColors;
+    return Stack(
+      children: [
+        CustomPaint(
+          painter: _ShapePainter(
+            shape: widget.shape,
+            fillColor: widget.fillColor,
+            strokeColor: widget.strokeColor,
+            strokeWidth: widget.strokeWidth,
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: TextField(
+                controller: _controller,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+                textAlign: TextAlign.center,
+                onChanged: widget.onChanged,
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  hintText: 'Type',
+                  hintStyle: TextStyle(
+                    color: widget.textColor.withValues(alpha: 0.45),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  isCollapsed: true,
+                ),
+                cursorColor: widget.textColor,
+                style: TextStyle(
+                  color: widget.textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
               ),
-              isCollapsed: true,
-            ),
-            cursorColor: widget.textColor,
-            style: TextStyle(
-              color: widget.textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
             ),
           ),
+        ),
+        if (widget.isSelected)
+          Positioned(
+            left: 10,
+            bottom: 10,
+            child: _ShapePalette(
+              selectedShape: widget.shape,
+              colors: colors,
+              onSelected: widget.onShapeChanged,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ShapePalette extends StatelessWidget {
+  const _ShapePalette({
+    required this.selectedShape,
+    required this.colors,
+    required this.onSelected,
+  });
+
+  final String selectedShape;
+  final AppColorScheme colors;
+  final ValueChanged<String> onSelected;
+
+  static const _options = [
+    _ShapeOption('rectangle', 'Rect'),
+    _ShapeOption('circle', 'Circle'),
+    _ShapeOption('diamond', 'Diamond'),
+    _ShapeOption('triangle', 'Triangle'),
+    _ShapeOption('hexagon', 'Hex'),
+    _ShapeOption('frame', 'Frame'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: colors.background.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children:
+              _options.map((option) {
+                final selected = selectedShape == option.shape;
+                return Tooltip(
+                  message: option.tooltip,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => onSelected(option.shape),
+                    child: Container(
+                      width: 34,
+                      height: 28,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color:
+                            selected
+                                ? colors.primary.withValues(alpha: 0.24)
+                                : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        option.label,
+                        style: TextStyle(
+                          color:
+                              selected
+                                  ? colors.primaryLight
+                                  : colors.textSecondary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
         ),
       ),
     );
   }
+}
+
+class _ShapeOption {
+  const _ShapeOption(this.shape, this.tooltip);
+
+  final String shape;
+  final String tooltip;
+
+  String get label => switch (shape) {
+    'rectangle' => '▭',
+    'circle' => '○',
+    'diamond' => '◇',
+    'triangle' => '△',
+    'hexagon' => '⬡',
+    'frame' => '▢',
+    _ => '?',
+  };
 }
 
 class _ShapePainter extends CustomPainter {
