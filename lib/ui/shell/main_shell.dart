@@ -49,7 +49,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
   PanelVisibility _agentsVis = PanelVisibility.open;
   PanelVisibility _fileTreeVis = PanelVisibility.open;
   SessionSnapshot? _sessionSnapshot;
-  _CanvasMode _canvasMode = _CanvasMode.panes;
+  _CanvasMode _canvasMode = _CanvasMode.board;
 
   // ── Silent auto-update state ───────────────────────────────────────────────
   UpdateInfo? _updateInfo;
@@ -85,7 +85,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
       _canvasMode = switch (snap.canvasMode) {
         'board' => _CanvasMode.board,
         'mindMap' => _CanvasMode.board,
-        _ => _CanvasMode.panes,
+        _ => _CanvasMode.board,
       };
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -164,14 +164,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
   }
 
   void _openFileSearch() {
-    showFileSearch(
-      context,
-      onFileOpened: () {
-        if (_fileTreeVis == PanelVisibility.closed) {
-          _setPanelVis('filetree', PanelVisibility.open);
-        }
-      },
-    );
+    showFileSearch(context, onFileOpened: () {});
   }
 
   void _setPanelVis(String panelId, PanelVisibility v) {
@@ -215,17 +208,6 @@ class _MainShellState extends State<MainShell> with WindowListener {
       final session = state.sessions[state.activeIndex];
       cubit.closeSession(session.id);
     }
-  }
-
-  void _toggleCanvasMode(_CanvasMode targetMode) {
-    setState(() {
-      _canvasMode = _canvasMode == targetMode ? _CanvasMode.panes : targetMode;
-    });
-    // Persist the new canvas mode so it's restored on next launch.
-    SessionPrefs.saveCanvasMode(switch (_canvasMode) {
-      _CanvasMode.board => 'board',
-      _CanvasMode.panes => 'panes',
-    });
   }
 
   @override
@@ -321,66 +303,36 @@ class _MainShellState extends State<MainShell> with WindowListener {
                   child: Scaffold(
                     backgroundColor: colors.background,
                     body: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _TitleBar(
-                        onSettings: () => SettingsPage.show(context),
-                        workspaceVis: _workspaceVis,
-                        agentsVis: _agentsVis,
-                        fileTreeVis: _fileTreeVis,
-                        canvasMode: _canvasMode,
-                        onToggleWorkspace: () {
-                          final next =
-                              _workspaceVis == PanelVisibility.open
-                                  ? PanelVisibility.closed
-                                  : PanelVisibility.open;
-                          _setPanelVis('workspace', next);
-                        },
-                        onToggleAgents: () {
-                          final next =
-                              _agentsVis == PanelVisibility.open
-                                  ? PanelVisibility.closed
-                                  : PanelVisibility.open;
-                          _setPanelVis('agents', next);
-                        },
-                        onToggleFileTree: () {
-                          final next =
-                              _fileTreeVis == PanelVisibility.open
-                                  ? PanelVisibility.closed
-                                  : PanelVisibility.open;
-                          _setPanelVis('filetree', next);
-                        },
-                        onToggleBoardView:
-                            () => _toggleCanvasMode(_CanvasMode.board),
-                        onSearch: _openFileSearch,
-                      ),
-                      if (_updatePhase != null && _updateInfo != null)
-                        AutoUpdateBanner(
-                          info: _updateInfo!,
-                          phase: _updatePhase!,
-                          progress: _updateProgress,
-                          status: _updateStatus,
-                          launchToken: _updateLaunchToken,
-                          onDismiss: () {
-                            if (mounted) setState(() => _updatePhase = null);
-                          },
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _TitleBar(onSettings: () => SettingsPage.show(context)),
+                        if (_updatePhase != null && _updateInfo != null)
+                          AutoUpdateBanner(
+                            info: _updateInfo!,
+                            phase: _updatePhase!,
+                            progress: _updateProgress,
+                            status: _updateStatus,
+                            launchToken: _updateLaunchToken,
+                            onDismiss: () {
+                              if (mounted) setState(() => _updatePhase = null);
+                            },
+                          ),
+                        Expanded(
+                          child:
+                              _canvasMode == _CanvasMode.board
+                                  ? const BoardView()
+                                  : _FourPaneLayout(
+                                    workspacePanelKey: _workspacePanelKey,
+                                    terminalFocusNode: _terminalFocusNode,
+                                    workspaceVis: _workspaceVis,
+                                    agentsVis: _agentsVis,
+                                    fileTreeVis: _fileTreeVis,
+                                    initialSnapshot: _sessionSnapshot,
+                                    onSetPanelVis: _setPanelVis,
+                                  ),
                         ),
-                      Expanded(
-                        child:
-                            _canvasMode == _CanvasMode.board
-                                ? const BoardView()
-                                : _FourPaneLayout(
-                                  workspacePanelKey: _workspacePanelKey,
-                                  terminalFocusNode: _terminalFocusNode,
-                                  workspaceVis: _workspaceVis,
-                                  agentsVis: _agentsVis,
-                                  fileTreeVis: _fileTreeVis,
-                                  initialSnapshot: _sessionSnapshot,
-                                  onSetPanelVis: _setPanelVis,
-                                ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -991,28 +943,8 @@ class _HorizontalDividerState extends State<_HorizontalDivider> {
 }
 
 class _TitleBar extends StatelessWidget {
-  const _TitleBar({
-    required this.onSettings,
-    required this.workspaceVis,
-    required this.agentsVis,
-    required this.fileTreeVis,
-    required this.canvasMode,
-    required this.onToggleWorkspace,
-    required this.onToggleAgents,
-    required this.onToggleFileTree,
-    required this.onToggleBoardView,
-    required this.onSearch,
-  });
+  const _TitleBar({required this.onSettings});
   final VoidCallback onSettings;
-  final PanelVisibility workspaceVis;
-  final PanelVisibility agentsVis;
-  final PanelVisibility fileTreeVis;
-  final _CanvasMode canvasMode;
-  final VoidCallback onToggleWorkspace;
-  final VoidCallback onToggleAgents;
-  final VoidCallback onToggleFileTree;
-  final VoidCallback onToggleBoardView;
-  final VoidCallback onSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -1029,111 +961,9 @@ class _TitleBar extends StatelessWidget {
             // macOS: reserve space for native traffic lights (close/min/max)
             // Windows/Linux: small left margin only
             SizedBox(width: isWindows || isLinux ? 12 : 82),
-            // Left panel toggle buttons (fixed, left-anchored)
-            _PanelToggleButton(
-              icon: Icons.view_sidebar,
-              tooltip: 'Toggle Workspaces (⌘\\)',
-              semanticsLabel: 'Toggle left panel',
-              active: workspaceVis == PanelVisibility.open,
-              onTap: onToggleWorkspace,
-            ),
-            const SizedBox(width: 4),
-            _PanelToggleButton(
-              icon: Icons.terminal,
-              tooltip: 'Toggle Agents / Terminal (⌘T)',
-              semanticsLabel: 'Toggle agents panel',
-              active: agentsVis == PanelVisibility.open,
-              onTap: onToggleAgents,
-            ),
-            // Center: search always centered in remaining space
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: GestureDetector(
-                    onTap: onSearch,
-                    child: Container(
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: colors.background,
-                        borderRadius: BorderRadius.circular(5),
-                        border: Border.all(color: colors.border),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.search,
-                            size: 15,
-                            color:
-                                Theme.of(context).textTheme.bodySmall?.color ??
-                                Theme.of(context).colorScheme.onSurface,
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              'Quick open…',
-                              style: TextStyle(
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color ??
-                                    Theme.of(context).colorScheme.onSurface,
-                                fontSize: 14,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isWindows ? 'Ctrl+O' : '⌘O',
-                            style: TextStyle(
-                              color: (Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall?.color ??
-                                      Theme.of(context).colorScheme.onSurface)
-                                  .withAlpha(120),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            // Right panel buttons (fixed, always right-anchored)
-            _PanelToggleButton(
-              icon: Icons.dashboard_customize_outlined,
-              tooltip: 'Board View',
-              semanticsLabel: 'Toggle board view',
-              active: canvasMode == _CanvasMode.board,
-              onTap: onToggleBoardView,
-            ),
-            const SizedBox(width: 4),
+            const Spacer(),
             const _ResourceChip(),
             const SizedBox(width: 8),
-            BlocBuilder<FileEditorCubit, FileEditorState>(
-              builder:
-                  (context, editorState) => _PanelToggleButton(
-                    icon: Icons.edit_document,
-                    tooltip: 'Toggle File Editor',
-                    semanticsLabel: 'Toggle file editor panel',
-                    active: editorState.isVisible,
-                    onTap: () => context.read<FileEditorCubit>().togglePanel(),
-                  ),
-            ),
-            const SizedBox(width: 4),
-            _PanelToggleButton(
-              icon: Icons.rate_review,
-              tooltip: 'Toggle File Tree (⌘⇧\\)',
-              semanticsLabel: 'Toggle right panel',
-              active: fileTreeVis == PanelVisibility.open,
-              onTap: onToggleFileTree,
-            ),
-            const SizedBox(width: 4),
             _PanelToggleButton(
               icon: Icons.settings_outlined,
               tooltip: 'Settings (⌘,)',
@@ -1316,7 +1146,10 @@ class _WinBtnState extends State<_WinBtn> {
             child: Icon(
               widget.icon,
               size: 14,
-              color: _hovered && widget.isClose ? colors.textPrimary : secondaryColor,
+              color:
+                  _hovered && widget.isClose
+                      ? colors.textPrimary
+                      : secondaryColor,
             ),
           ),
         ),
@@ -1501,7 +1334,10 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: colors.border),
                 boxShadow: [
-                  BoxShadow(color: colors.textPrimary.withAlpha(120), blurRadius: 16),
+                  BoxShadow(
+                    color: colors.textPrimary.withAlpha(120),
+                    blurRadius: 16,
+                  ),
                 ],
               ),
               child: Column(

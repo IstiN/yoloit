@@ -33,6 +33,7 @@ import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart'
 import 'package:yoloit/features/board/tools/board_tool.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
+import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -198,6 +199,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                       () => _showBoardSettings(context, activeBoard),
                   onDeleteBoard: () => _deleteBoard(context, activeBoard),
                   onOpenBoardOverview: () => _openBoardOverview(activeBoard),
+                  onSearch: () => _openBoardSearch(context),
                 ),
                 Expanded(
                   child: DecoratedBox(
@@ -417,91 +419,80 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                 b.zIndex,
                                                               ),
                                                         );
-                                                  return visiblePanels
-                                                      .map(
-                                                        (
-                                                          panel,
-                                                        ) => _BoardPanelCard(
-                                                          key: ValueKey(
-                                                            panel.id,
-                                                          ),
-                                                          panel: panel,
-                                                          positionOffset:
-                                                              _canvasOrigin,
-                                                          capturingScreenshot:
-                                                              _isCapturingScreenshot,
-                                                          onTap:
-                                                              () => context
-                                                                  .read<
-                                                                    BoardCubit
-                                                                  >()
-                                                                  .focusPanel(
-                                                                    panel.id,
-                                                                  ),
-                                                          onMove:
-                                                              (details) =>
-                                                                  _movePanelWithEdgePan(
-                                                                    context,
-                                                                    panel.id,
-                                                                    details,
-                                                                  ),
-                                                          onResize:
-                                                              (details) =>
-                                                                  _resizePanelWithEdgePan(
-                                                                    context,
-                                                                    panel,
-                                                                    details,
-                                                                  ),
-                                                          onDragStart:
-                                                              (details) =>
-                                                                  _handlePanelDragStart(
-                                                                    panel.id,
-                                                                    details,
-                                                                  ),
-                                                          onDragEnd:
-                                                              _handlePanelDragEnd,
-                                                          onDelete: () async {
-                                                            if (panel.type ==
-                                                                'board.widget.custom') {
-                                                              WidgetEngineManager
-                                                                  .instance
-                                                                  .remove(
-                                                                    panel.id,
-                                                                  );
-                                                            }
-                                                            await context
-                                                                .read<
-                                                                  BoardCubit
-                                                                >()
-                                                                .removePanel(
-                                                                  panel.id,
-                                                                );
-                                                          },
-                                                          onEditColor:
-                                                              () =>
-                                                                  _showPanelColorDialog(
-                                                                    context,
-                                                                    panel,
-                                                                  ),
-                                                          onEditNote:
-                                                              _editPanelCallback(
+                                                  return visiblePanels.map((
+                                                    panel,
+                                                  ) {
+                                                    final boardCubit =
+                                                        context
+                                                            .read<BoardCubit>();
+                                                    return _BoardPanelCard(
+                                                      key: ValueKey(panel.id),
+                                                      panel: panel,
+                                                      positionOffset:
+                                                          _canvasOrigin,
+                                                      capturingScreenshot:
+                                                          _isCapturingScreenshot,
+                                                      onTap:
+                                                          () => boardCubit
+                                                              .focusPanel(
+                                                                panel.id,
+                                                              ),
+                                                      onMove:
+                                                          (details) =>
+                                                              _movePanelWithEdgePan(
+                                                                context,
+                                                                panel.id,
+                                                                details,
+                                                              ),
+                                                      onResize:
+                                                          (details) =>
+                                                              _resizePanelWithEdgePan(
+                                                                context,
+                                                                panel,
+                                                                details,
+                                                              ),
+                                                      onDragStart:
+                                                          (details) =>
+                                                              _handlePanelDragStart(
+                                                                panel.id,
+                                                                details,
+                                                              ),
+                                                      onDragEnd:
+                                                          _handlePanelDragEnd,
+                                                      onDelete: () async {
+                                                        if (panel.type ==
+                                                            'board.widget.custom') {
+                                                          WidgetEngineManager
+                                                              .instance
+                                                              .remove(panel.id);
+                                                        }
+                                                        await boardCubit
+                                                            .removePanel(
+                                                              panel.id,
+                                                            );
+                                                      },
+                                                      onEditColor:
+                                                          () =>
+                                                              _showPanelColorDialog(
                                                                 context,
                                                                 panel,
                                                               ),
-                                                          onBringToFront: () {
-                                                            final board =
-                                                                context
-                                                                    .read<
-                                                                      BoardCubit
-                                                                    >()
-                                                                    .state
-                                                                    .activeBoard;
-                                                            if (board == null) {
-                                                              return;
-                                                            }
-                                                            final maxZ = board.panels.fold<
-                                                              int
-                                                            >(
+                                                      onEditNote:
+                                                          _editPanelCallback(
+                                                            context,
+                                                            panel,
+                                                          ),
+                                                      onBringToFront: () {
+                                                        final board =
+                                                            boardCubit
+                                                                .state
+                                                                .activeBoard;
+                                                        if (board == null) {
+                                                          return;
+                                                        }
+                                                        final maxZ = board
+                                                            .panels
+                                                            .fold<int>(
                                                               0,
                                                               (value, panel) =>
                                                                   panel.zIndex >
@@ -510,34 +501,24 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                           .zIndex
                                                                       : value,
                                                             );
-                                                            context
-                                                                .read<
-                                                                  BoardCubit
-                                                                >()
-                                                                .updatePanel(
-                                                                  panel.id,
-                                                                  (p) => p
-                                                                      .copyWith(
-                                                                        zIndex:
-                                                                            maxZ +
-                                                                            1,
-                                                                      ),
-                                                                );
-                                                          },
-                                                          onSendToBack: () {
-                                                            final board =
-                                                                context
-                                                                    .read<
-                                                                      BoardCubit
-                                                                    >()
-                                                                    .state
-                                                                    .activeBoard;
-                                                            if (board == null) {
-                                                              return;
-                                                            }
-                                                            final minZ = board.panels.fold<
-                                                              int
-                                                            >(
+                                                        boardCubit.updatePanel(
+                                                          panel.id,
+                                                          (p) => p.copyWith(
+                                                            zIndex: maxZ + 1,
+                                                          ),
+                                                        );
+                                                      },
+                                                      onSendToBack: () {
+                                                        final board =
+                                                            boardCubit
+                                                                .state
+                                                                .activeBoard;
+                                                        if (board == null) {
+                                                          return;
+                                                        }
+                                                        final minZ = board
+                                                            .panels
+                                                            .fold<int>(
                                                               0,
                                                               (value, panel) =>
                                                                   panel.zIndex <
@@ -546,141 +527,120 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                           .zIndex
                                                                       : value,
                                                             );
-                                                            context
-                                                                .read<
-                                                                  BoardCubit
-                                                                >()
-                                                                .updatePanel(
-                                                                  panel.id,
-                                                                  (p) => p
-                                                                      .copyWith(
-                                                                        zIndex:
-                                                                            minZ -
-                                                                            1,
-                                                                      ),
+                                                        boardCubit.updatePanel(
+                                                          panel.id,
+                                                          (p) => p.copyWith(
+                                                            zIndex: minZ - 1,
+                                                          ),
+                                                        );
+                                                      },
+                                                      onUpdateState: (
+                                                        newState,
+                                                      ) {
+                                                        boardCubit.updatePanel(
+                                                          panel.id,
+                                                          (p) => p.copyWith(
+                                                            state: newState,
+                                                          ),
+                                                        );
+                                                      },
+                                                      onCreateLinkedPanel: (
+                                                        typeId,
+                                                        state,
+                                                        title,
+                                                      ) async {
+                                                        final cubit =
+                                                            boardCubit;
+                                                        final plugin =
+                                                            BoardPluginRegistry
+                                                                .instance
+                                                                .pluginFor(
+                                                                  typeId,
                                                                 );
-                                                          },
-                                                          onUpdateState: (
-                                                            newState,
-                                                          ) {
-                                                            context
-                                                                .read<
-                                                                  BoardCubit
-                                                                >()
-                                                                .updatePanel(
-                                                                  panel.id,
+                                                        final size =
+                                                            plugin
+                                                                ?.defaultSize ??
+                                                            const Size(
+                                                              460,
+                                                              380,
+                                                            );
+                                                        final board =
+                                                            cubit
+                                                                .state
+                                                                .activeBoard;
+                                                        if (board == null)
+                                                          return null;
+                                                        final currentBounds =
+                                                            panel.bounds;
+                                                        // Place to the right of the source panel, then
+                                                        // stack downward if that slot is already taken.
+                                                        final baseX =
+                                                            currentBounds.x +
+                                                            currentBounds
+                                                                .width +
+                                                            40;
+                                                        var baseY =
+                                                            currentBounds.y;
+                                                        final occupiedRects =
+                                                            board.panels
+                                                                .where(
+                                                                  (p) =>
+                                                                      !p.hidden,
+                                                                )
+                                                                .map(
                                                                   (
                                                                     p,
-                                                                  ) => p.copyWith(
-                                                                    state:
-                                                                        newState,
+                                                                  ) => Rect.fromLTWH(
+                                                                    p.bounds.x,
+                                                                    p.bounds.y,
+                                                                    p
+                                                                        .bounds
+                                                                        .width,
+                                                                    p
+                                                                        .bounds
+                                                                        .height,
                                                                   ),
-                                                                );
-                                                          },
-                                                          onCreateLinkedPanel: (
-                                                            typeId,
-                                                            state,
-                                                            title,
-                                                          ) async {
-                                                            final cubit =
-                                                                context
-                                                                    .read<
-                                                                      BoardCubit
-                                                                    >();
-                                                            final plugin =
-                                                                BoardPluginRegistry
-                                                                    .instance
-                                                                    .pluginFor(
-                                                                      typeId,
-                                                                    );
-                                                            final size =
-                                                                plugin
-                                                                    ?.defaultSize ??
-                                                                const Size(
-                                                                  460,
-                                                                  380,
-                                                                );
-                                                            final board =
-                                                                cubit
-                                                                    .state
-                                                                    .activeBoard;
-                                                            if (board == null)
-                                                              return null;
-                                                            final currentBounds =
-                                                                panel.bounds;
-                                                            // Place to the right of the source panel, then
-                                                            // stack downward if that slot is already taken.
-                                                            final baseX =
-                                                                currentBounds
-                                                                    .x +
-                                                                currentBounds
-                                                                    .width +
-                                                                40;
-                                                            var baseY =
-                                                                currentBounds.y;
-                                                            final occupiedRects =
-                                                                board.panels
-                                                                    .where(
-                                                                      (p) =>
-                                                                          !p.hidden,
-                                                                    )
-                                                                    .map(
-                                                                      (
-                                                                        p,
-                                                                      ) => Rect.fromLTWH(
-                                                                        p.bounds.x,
-                                                                        p.bounds.y,
-                                                                        p
-                                                                            .bounds
-                                                                            .width,
-                                                                        p
-                                                                            .bounds
-                                                                            .height,
-                                                                      ),
-                                                                    )
-                                                                    .toList();
-                                                            var candidate =
-                                                                Rect.fromLTWH(
-                                                                  baseX,
-                                                                  baseY,
-                                                                  size.width,
+                                                                )
+                                                                .toList();
+                                                        var candidate =
+                                                            Rect.fromLTWH(
+                                                              baseX,
+                                                              baseY,
+                                                              size.width,
+                                                              size.height,
+                                                            );
+                                                        // Shift down until no overlap with existing panels.
+                                                        var attempts = 0;
+                                                        while (attempts < 50 &&
+                                                            occupiedRects.any(
+                                                              (r) => r.overlaps(
+                                                                candidate,
+                                                              ),
+                                                            )) {
+                                                          baseY +=
+                                                              size.height + 20;
+                                                          candidate =
+                                                              Rect.fromLTWH(
+                                                                baseX,
+                                                                baseY,
+                                                                size.width,
+                                                                size.height,
+                                                              );
+                                                          attempts++;
+                                                        }
+                                                        final newBounds =
+                                                            BoardPanelBounds(
+                                                              x: baseX,
+                                                              y: baseY,
+                                                              width: size.width,
+                                                              height:
                                                                   size.height,
-                                                                );
-                                                            // Shift down until no overlap with existing panels.
-                                                            var attempts = 0;
-                                                            while (attempts <
-                                                                    50 &&
-                                                                occupiedRects.any(
-                                                                  (r) => r
-                                                                      .overlaps(
-                                                                        candidate,
-                                                                      ),
-                                                                )) {
-                                                              baseY +=
-                                                                  size.height +
-                                                                  20;
-                                                              candidate =
-                                                                  Rect.fromLTWH(
-                                                                    baseX,
-                                                                    baseY,
-                                                                    size.width,
-                                                                    size.height,
-                                                                  );
-                                                              attempts++;
-                                                            }
-                                                            final newBounds =
-                                                                BoardPanelBounds(
-                                                                  x: baseX,
-                                                                  y: baseY,
-                                                                  width:
-                                                                      size.width,
-                                                                  height:
-                                                                      size.height,
-                                                                );
-                                                            final ts =
-                                                                DateTime.now()
-                                                                    .microsecondsSinceEpoch;
-                                                            final newPanel = BoardPanelInstance(
+                                                            );
+                                                        final ts =
+                                                            DateTime.now()
+                                                                .microsecondsSinceEpoch;
+                                                        final newPanel =
+                                                            BoardPanelInstance(
                                                               id: 'panel-$ts',
                                                               type: typeId,
                                                               title: title,
@@ -699,49 +659,47 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                   ) +
                                                                   1,
                                                             );
-                                                            await cubit
-                                                                .addPanel(
-                                                                  newPanel,
-                                                                );
-                                                            await cubit.upsertLink(
-                                                              BoardPanelLink(
-                                                                id: 'link-$ts',
-                                                                fromPanelId:
-                                                                    panel.id,
-                                                                toPanelId:
-                                                                    newPanel.id,
-                                                                style:
-                                                                    BoardLinkStyle
-                                                                        .arrow,
-                                                                behavior:
-                                                                    BoardLinkBehavior
-                                                                        .dynamic,
-                                                                geometry:
-                                                                    BoardLinkGeometry
-                                                                        .bezier,
-                                                              ),
-                                                            );
-                                                            return newPanel.id;
-                                                          },
-                                                          connectMode:
-                                                              _activeTool ==
-                                                              BoardToolId
-                                                                  .connect,
-                                                          connectSourceId:
-                                                              _connectSourceId,
-                                                          onConnectTap:
-                                                              _activeTool ==
-                                                                      BoardToolId
-                                                                          .connect
-                                                                  ? () => _handleConnectTap(
+                                                        await cubit.addPanel(
+                                                          newPanel,
+                                                        );
+                                                        await cubit.upsertLink(
+                                                          BoardPanelLink(
+                                                            id: 'link-$ts',
+                                                            fromPanelId:
+                                                                panel.id,
+                                                            toPanelId:
+                                                                newPanel.id,
+                                                            style:
+                                                                BoardLinkStyle
+                                                                    .arrow,
+                                                            behavior:
+                                                                BoardLinkBehavior
+                                                                    .dynamic,
+                                                            geometry:
+                                                                BoardLinkGeometry
+                                                                    .bezier,
+                                                          ),
+                                                        );
+                                                        return newPanel.id;
+                                                      },
+                                                      connectMode:
+                                                          _activeTool ==
+                                                          BoardToolId.connect,
+                                                      connectSourceId:
+                                                          _connectSourceId,
+                                                      onConnectTap:
+                                                          _activeTool ==
+                                                                  BoardToolId
+                                                                      .connect
+                                                              ? () =>
+                                                                  _handleConnectTap(
                                                                     context,
                                                                     activeBoard,
                                                                     panel.id,
                                                                   )
-                                                                  : null,
-                                                        ),
-                                                      )
-                                                      .toList();
+                                                              : null,
+                                                    );
+                                                  }).toList();
                                                 })(),
                                                 // ── Drawing layer (above panels visually;
                                                 //    only intercepts gestures on actual stroke
@@ -2314,77 +2272,22 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BuildContext context,
     BoardDocument board,
   ) async {
-    final nameController = TextEditingController(text: board.name);
-    final folderController = TextEditingController(text: board.defaultFolder);
     final result = await showDialog<({String name, String defaultFolder})>(
       context: context,
       builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Board settings'),
-            content: SizedBox(
-              width: 520,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Board name'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: folderController,
-                    decoration: const InputDecoration(
-                      labelText: 'Default folder',
-                      helperText:
-                          'Used for new chats, terminals, and file trees.',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          final selected = await FilePicker.getDirectoryPath();
-                          if (selected == null || !dialogContext.mounted) {
-                            return;
-                          }
-                          folderController.text = selected;
-                        },
-                        icon: const Icon(Icons.folder_open_outlined),
-                        label: const Text('Choose folder'),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () => folderController.clear(),
-                        child: const Text('Clear'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed:
-                    () => Navigator.of(dialogContext).pop((
-                      name: nameController.text.trim(),
-                      defaultFolder: folderController.text.trim(),
-                    )),
-                child: const Text('Save'),
-              ),
-            ],
+          (_) => _BoardSettingsDialog(
+            initialName: board.name,
+            initialDefaultFolder: board.defaultFolder,
           ),
     );
-    nameController.dispose();
-    folderController.dispose();
     if (!context.mounted || result == null) return;
     final cubit = context.read<BoardCubit>();
     await cubit.renameBoard(board.id, result.name);
     await cubit.updateBoardDefaultFolder(board.id, result.defaultFolder);
+  }
+
+  Future<void> _openBoardSearch(BuildContext context) {
+    return showFileSearch(context, onFileOpened: () {});
   }
 
   Future<void> _deleteBoard(BuildContext context, BoardDocument board) async {
@@ -2823,6 +2726,7 @@ class _BoardToolbar extends StatelessWidget {
     required this.onBoardSettings,
     required this.onDeleteBoard,
     required this.onOpenBoardOverview,
+    required this.onSearch,
   });
 
   final BoardDocument board;
@@ -2830,54 +2734,150 @@ class _BoardToolbar extends StatelessWidget {
   final VoidCallback onBoardSettings;
   final VoidCallback onDeleteBoard;
   final VoidCallback onOpenBoardOverview;
+  final VoidCallback onSearch;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        children: [
-          _BoardSwitcherButton(
-            board: board,
-            onOpenBoardOverview: onOpenBoardOverview,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 900;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              if (compact)
+                Flexible(
+                  child: _BoardSwitcherButton(
+                    board: board,
+                    onOpenBoardOverview: onOpenBoardOverview,
+                  ),
+                )
+              else
+                _BoardSwitcherButton(
+                  board: board,
+                  onOpenBoardOverview: onOpenBoardOverview,
+                ),
+              if (!compact) ...[
+                const SizedBox(width: 12),
+                _ToolbarChip(
+                  icon: Icons.dashboard_outlined,
+                  label: '${board.panels.length} panels',
+                ),
+                const SizedBox(width: 8),
+                _ToolbarChip(
+                  icon: Icons.share_outlined,
+                  label: '${board.links.length} links',
+                ),
+                if (board.defaultFolder.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  _ToolbarChip(
+                    icon: Icons.folder_outlined,
+                    label: _shortToolbarPath(board.defaultFolder),
+                  ),
+                ],
+              ],
+              const SizedBox(width: 12),
+              if (compact)
+                Tooltip(
+                  message: 'Search boards and panels',
+                  child: IconButton(
+                    onPressed: onSearch,
+                    icon: const Icon(Icons.search),
+                  ),
+                )
+              else
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: onSearch,
+                        child: Container(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: context.appColors.border),
+                            color: context.appColors.surface,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.search,
+                                size: 18,
+                                color: context.appColors.textMuted,
+                              ),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  'Search boards and panels…',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: context.appColors.textMuted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                Platform.isMacOS ? '⌘O' : 'Ctrl+O',
+                                style: TextStyle(
+                                  color: context.appColors.textMuted.withAlpha(
+                                    120,
+                                  ),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (compact) const Spacer() else const SizedBox(width: 16),
+              if (compact) ...[
+                IconButton(
+                  tooltip: 'New board',
+                  onPressed: onCreateBoard,
+                  icon: const Icon(Icons.add),
+                ),
+                IconButton(
+                  tooltip: 'Board settings',
+                  onPressed: onBoardSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Delete board',
+                  onPressed: onDeleteBoard,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ] else ...[
+                OutlinedButton.icon(
+                  onPressed: onCreateBoard,
+                  icon: const Icon(Icons.add),
+                  label: const Text('New board'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: onBoardSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                  label: const Text('Settings'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: onDeleteBoard,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete'),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(width: 12),
-          _ToolbarChip(
-            icon: Icons.dashboard_outlined,
-            label: '${board.panels.length} panels',
-          ),
-          const SizedBox(width: 8),
-          _ToolbarChip(
-            icon: Icons.share_outlined,
-            label: '${board.links.length} links',
-          ),
-          if (board.defaultFolder.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            _ToolbarChip(
-              icon: Icons.folder_outlined,
-              label: _shortToolbarPath(board.defaultFolder),
-            ),
-          ],
-          const Spacer(),
-          OutlinedButton.icon(
-            onPressed: onCreateBoard,
-            icon: const Icon(Icons.add),
-            label: const Text('New board'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: onBoardSettings,
-            icon: const Icon(Icons.settings_outlined),
-            label: const Text('Settings'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: onDeleteBoard,
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Delete'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -3563,6 +3563,100 @@ class _BoardOverviewPngPreview extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BoardSettingsDialog extends StatefulWidget {
+  const _BoardSettingsDialog({
+    required this.initialName,
+    required this.initialDefaultFolder,
+  });
+
+  final String initialName;
+  final String initialDefaultFolder;
+
+  @override
+  State<_BoardSettingsDialog> createState() => _BoardSettingsDialogState();
+}
+
+class _BoardSettingsDialogState extends State<_BoardSettingsDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _folderController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+    _folderController = TextEditingController(
+      text: widget.initialDefaultFolder,
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _folderController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Board settings'),
+      content: SizedBox(
+        width: 520,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Board name'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _folderController,
+              decoration: const InputDecoration(
+                labelText: 'Default folder',
+                helperText: 'Used for new chats, terminals, and file trees.',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final selected = await FilePicker.getDirectoryPath();
+                    if (!mounted || selected == null) return;
+                    _folderController.text = selected;
+                  },
+                  icon: const Icon(Icons.folder_open_outlined),
+                  label: const Text('Choose folder'),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => _folderController.clear(),
+                  child: const Text('Clear'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed:
+              () => Navigator.of(context).pop((
+                name: _nameController.text.trim(),
+                defaultFolder: _folderController.text.trim(),
+              )),
+          child: const Text('Save'),
         ),
       ],
     );

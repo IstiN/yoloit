@@ -35,21 +35,22 @@ Future<void> showFileSearch(
   await showDialog<void>(
     context: context,
     barrierColor: colors.textPrimary.withAlpha(84),
-    builder: (_) => Material(
-      type: MaterialType.transparency,
-      child: MultiBlocProvider(
-        providers: [
-          BlocProvider.value(value: boardCubit),
-          BlocProvider.value(value: workspaceCubit),
-          BlocProvider.value(value: reviewCubit),
-          BlocProvider.value(value: editorCubit),
-        ],
-        child: FileSearchOverlay(
-          onFileOpened: onFileOpened,
-          onFileSelected: onFileSelected,
+    builder:
+        (_) => Material(
+          type: MaterialType.transparency,
+          child: MultiBlocProvider(
+            providers: [
+              BlocProvider.value(value: boardCubit),
+              BlocProvider.value(value: workspaceCubit),
+              BlocProvider.value(value: reviewCubit),
+              BlocProvider.value(value: editorCubit),
+            ],
+            child: FileSearchOverlay(
+              onFileOpened: onFileOpened,
+              onFileSelected: onFileSelected,
+            ),
+          ),
         ),
-      ),
-    ),
   );
 }
 
@@ -65,7 +66,10 @@ class _QuickResult {
     required this.icon,
     required this.iconColor,
     this.panelId,
+    this.boardId,
+    this.boardName,
     this.filePath,
+    this.preview,
   });
 
   final _QuickResultKind kind;
@@ -74,7 +78,10 @@ class _QuickResult {
   final IconData icon;
   final Color iconColor;
   final String? panelId;
+  final String? boardId;
+  final String? boardName;
   final String? filePath;
+  final String? preview;
 }
 
 // ─── Overlay widget ──────────────────────────────────────────────────────────
@@ -102,8 +109,8 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   int _selectedIndex = 0;
   Timer? _debounce;
 
-  // Precomputed panels + file tree roots for searching
-  List<BoardPanelInstance> _panels = [];
+  // Precomputed panels + file tree roots for searching.
+  List<({BoardDocument board, BoardPanelInstance panel})> _panels = [];
   List<String> _fileTreeRoots = [];
 
   @override
@@ -118,16 +125,21 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
   void _loadBoardData() {
     final boardState = context.read<BoardCubit>().state;
-    final board = boardState.activeBoard;
-    if (board != null) {
-      _panels = board.panels.where((p) => !p.hidden).toList();
-      _fileTreeRoots = _panels
-          .where((p) => p.type == 'board.filetree')
-          .map((p) => p.state['rootPath'] as String? ?? '')
-          .where((p) => p.isNotEmpty)
-          .toSet()
-          .toList();
-    }
+    _panels =
+        boardState.boards
+            .expand(
+              (board) => board.panels
+                  .where((panel) => !panel.hidden)
+                  .map((panel) => (board: board, panel: panel)),
+            )
+            .toList();
+    _fileTreeRoots =
+        _panels
+            .where((entry) => entry.panel.type == 'board.filetree')
+            .map((entry) => entry.panel.state['rootPath'] as String? ?? '')
+            .where((p) => p.isNotEmpty)
+            .toSet()
+            .toList();
   }
 
   @override
@@ -160,17 +172,38 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
     final results = <_QuickResult>[];
 
-    // 1. Search open panels by title
-    for (final panel in _panels) {
-      if (_fuzzyMatch(panel.title, query)) {
-        results.add(_QuickResult(
-          kind: _QuickResultKind.panel,
-          title: panel.title,
-          subtitle: _panelTypeLabel(panel.type),
-          icon: _panelTypeIcon(panel.type),
-          iconColor: _panelTypeColor(panel.type, appColors),
-          panelId: panel.id,
-        ));
+    // 1. Search panels across all boards by title and shallow state content.
+    for (final entry in _panels) {
+      final board = entry.board;
+      final panel = entry.panel;
+      final searchable = <String>[
+        panel.title,
+        panel.id,
+        ..._collectSearchStrings(panel.state),
+      ];
+      String? preview;
+      var matched = false;
+      for (final text in searchable) {
+        if (_fuzzyMatch(text, query)) {
+          matched = true;
+          preview = _snippet(text, query);
+          break;
+        }
+      }
+      if (matched) {
+        results.add(
+          _QuickResult(
+            kind: _QuickResultKind.panel,
+            title: panel.title,
+            subtitle: '${board.name} · ${_panelTypeLabel(panel.type)}',
+            icon: _panelTypeIcon(panel.type),
+            iconColor: _panelTypeColor(panel.type, appColors),
+            panelId: panel.id,
+            boardId: board.id,
+            boardName: board.name,
+            preview: preview,
+          ),
+        );
       }
     }
 
@@ -184,9 +217,11 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     // 3. Also search workspace files via existing service
     final wsState = context.read<WorkspaceCubit>().state;
     if (wsState is WorkspaceLoaded) {
-      final active = wsState.workspaces
-          .where((w) => w.id == wsState.activeWorkspaceId)
-          .firstOrNull ?? wsState.workspaces.firstOrNull;
+      final active =
+          wsState.workspaces
+              .where((w) => w.id == wsState.activeWorkspaceId)
+              .firstOrNull ??
+          wsState.workspaces.firstOrNull;
       if (active != null) {
         // Only add workspace files that aren't already covered by file tree roots
         final wsResults = await FileSearchService.instance.searchFiles(
@@ -197,18 +232,21 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           // Skip if already in results from file tree
           if (results.any((q) => q.filePath == r.filePath)) continue;
           if (results.length >= 150) break;
-          final ext = r.fileName.contains('.')
-              ? r.fileName.split('.').last.toLowerCase()
-              : '';
+          final ext =
+              r.fileName.contains('.')
+                  ? r.fileName.split('.').last.toLowerCase()
+                  : '';
           final (icon, color) = _iconForExtension(ext, appColors);
-          results.add(_QuickResult(
-            kind: _QuickResultKind.file,
-            title: r.fileName,
-            subtitle: r.relativePath,
-            icon: icon,
-            iconColor: color,
-            filePath: r.filePath,
-          ));
+          results.add(
+            _QuickResult(
+              kind: _QuickResultKind.file,
+              title: r.fileName,
+              subtitle: r.relativePath,
+              icon: icon,
+              iconColor: color,
+              filePath: r.filePath,
+            ),
+          );
         }
       }
     }
@@ -235,24 +273,30 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
         final name = p.basename(entity.path);
         if (name.startsWith('.')) continue;
         if (entity is Directory) {
-          _collectMatchingFiles(entity, root, query, results,
-              maxResults: maxResults);
+          _collectMatchingFiles(
+            entity,
+            root,
+            query,
+            results,
+            maxResults: maxResults,
+          );
         } else if (entity is File && _fuzzyMatch(name, query)) {
           final relPath = p.relative(entity.path, from: root);
-          final ext = name.contains('.')
-              ? name.split('.').last.toLowerCase()
-              : '';
+          final ext =
+              name.contains('.') ? name.split('.').last.toLowerCase() : '';
           final (icon, color) = _iconForExtension(ext, context.appColors);
           // Avoid duplicates
           if (!results.any((r) => r.filePath == entity.path)) {
-            results.add(_QuickResult(
-              kind: _QuickResultKind.file,
-              title: name,
-              subtitle: relPath,
-              icon: icon,
-              iconColor: color,
-              filePath: entity.path,
-            ));
+            results.add(
+              _QuickResult(
+                kind: _QuickResultKind.file,
+                title: name,
+                subtitle: relPath,
+                icon: icon,
+                iconColor: color,
+                filePath: entity.path,
+              ),
+            );
           }
         }
       }
@@ -272,14 +316,57 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     return qi == query.length;
   }
 
+  List<String> _collectSearchStrings(dynamic value, {int depth = 0}) {
+    if (value == null || depth > 4) return const [];
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? const [] : <String>[trimmed];
+    }
+    if (value is num || value is bool) return <String>['$value'];
+    if (value is List) {
+      return [
+        for (final item in value)
+          ..._collectSearchStrings(item, depth: depth + 1),
+      ];
+    }
+    if (value is Map) {
+      return [
+        for (final entry in value.entries)
+          if (entry.key != 'id' && entry.key != 'timestamp')
+            ..._collectSearchStrings(entry.value, depth: depth + 1),
+      ];
+    }
+    return const [];
+  }
+
+  String _snippet(String text, String query) {
+    final compact = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.length <= 96) return compact;
+    final index = compact.toLowerCase().indexOf(query.toLowerCase());
+    final start = index < 0 ? 0 : (index - 24).clamp(0, compact.length);
+    final end = (start + 96).clamp(0, compact.length);
+    return '${start > 0 ? '…' : ''}${compact.substring(start, end)}${end < compact.length ? '…' : ''}';
+  }
+
   void _openSelected() {
     if (_results.isEmpty) return;
     final result = _results[_selectedIndex];
     Navigator.of(context).pop();
 
     if (result.kind == _QuickResultKind.panel && result.panelId != null) {
-      context.read<BoardCubit>().focusPanel(result.panelId!, zoomOnFocus: true);
-    } else if (result.kind == _QuickResultKind.file && result.filePath != null) {
+      final boardCubit = context.read<BoardCubit>();
+      unawaited(() async {
+        if (result.boardId != null) {
+          await boardCubit.setActiveBoard(result.boardId!);
+        }
+        await boardCubit.focusPanel(
+          result.panelId!,
+          boardId: result.boardId,
+          zoomOnFocus: true,
+        );
+      }());
+    } else if (result.kind == _QuickResultKind.file &&
+        result.filePath != null) {
       if (widget.onFileSelected != null) {
         widget.onFileSelected!(result.filePath!);
       } else {
@@ -300,8 +387,11 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
             title: fileName,
             bounds: bounds,
             state: {'path': result.filePath!, 'title': fileName},
-            zIndex: board.panels.fold<int>(
-                  0, (v, p) => p.zIndex > v ? p.zIndex : v) +
+            zIndex:
+                board.panels.fold<int>(
+                  0,
+                  (v, p) => p.zIndex > v ? p.zIndex : v,
+                ) +
                 1,
           );
           boardCubit.addPanel(panel);
@@ -320,10 +410,12 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     setState(() {
       _selectedIndex = (_selectedIndex + delta).clamp(0, _results.length - 1);
     });
-    const itemHeight = 52.0;
+    const itemHeight = 68.0;
     if (_scrollController.hasClients) {
-      final target = (_selectedIndex * itemHeight)
-          .clamp(0.0, _scrollController.position.maxScrollExtent);
+      final target = (_selectedIndex * itemHeight).clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
       _scrollController.jumpTo(target);
     }
   }
@@ -395,9 +487,8 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
                 focusNode: _focusNode,
                 style: TextStyle(color: colors.textPrimary, fontSize: 15),
                 decoration: InputDecoration(
-                  hintText: 'Search panels, files…',
-                  hintStyle:
-                      TextStyle(color: colors.textMuted, fontSize: 15),
+                  hintText: 'Search boards, panels, files…',
+                  hintStyle: TextStyle(color: colors.textMuted, fontSize: 15),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -420,8 +511,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
                 _controller.clear();
                 setState(() => _results = []);
               },
-              child:
-                  Icon(Icons.close, size: 16, color: colors.textMuted),
+              child: Icon(Icons.close, size: 16, color: colors.textMuted),
             ),
         ],
       ),
@@ -438,7 +528,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
             Icon(Icons.search, size: 36, color: colors.textMuted.withAlpha(80)),
             const SizedBox(height: 8),
             Text(
-              'Type to search panels & files…',
+              'Type to search boards, panels & files…',
               style: TextStyle(color: colors.textMuted, fontSize: 13),
             ),
             const SizedBox(height: 4),
@@ -467,7 +557,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       controller: _scrollController,
       padding: const EdgeInsets.only(bottom: 8),
       itemCount: _results.length,
-      itemExtent: 52,
+      itemExtent: 68,
       itemBuilder: (context, index) {
         final result = _results[index];
         final isSelected = index == _selectedIndex;
@@ -504,8 +594,10 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
               style: TextStyle(color: colors.textMuted, fontSize: 11),
             ),
           if (panelCount > 0 && fileCount > 0)
-            Text(' · ',
-                style: TextStyle(color: colors.textMuted, fontSize: 11)),
+            Text(
+              ' · ',
+              style: TextStyle(color: colors.textMuted, fontSize: 11),
+            ),
           if (fileCount > 0)
             Text(
               '$fileCount file${fileCount > 1 ? 's' : ''}',
@@ -515,7 +607,9 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           Text(
             '${_results.length} result${_results.length > 1 ? 's' : ''}',
             style: TextStyle(
-                color: colors.textMuted.withAlpha(120), fontSize: 11),
+              color: colors.textMuted.withAlpha(120),
+              fontSize: 11,
+            ),
           ),
         ],
       ),
@@ -584,10 +678,18 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       'rs' => (Icons.code, colors.accentOrange),
       'html' || 'htm' => (Icons.html, colors.accentRed),
       'css' || 'scss' || 'sass' => (Icons.style, colors.accentBlue),
-      'json' || 'yaml' || 'yml' || 'toml' => (Icons.data_object, colors.accentOrange),
+      'json' ||
+      'yaml' ||
+      'yml' ||
+      'toml' => (Icons.data_object, colors.accentOrange),
       'md' || 'mdx' => (Icons.article, colors.textMuted),
       'sh' || 'bash' || 'zsh' => (Icons.terminal, colors.accentGreen),
-      'png' || 'jpg' || 'jpeg' || 'gif' || 'svg' || 'webp' => (Icons.image, colors.primaryLight),
+      'png' ||
+      'jpg' ||
+      'jpeg' ||
+      'gif' ||
+      'svg' ||
+      'webp' => (Icons.image, colors.primaryLight),
       _ => (Icons.insert_drive_file_outlined, colors.textMuted),
     };
   }
@@ -657,13 +759,24 @@ class _QuickResultTile extends StatelessWidget {
                     style: TextStyle(color: colors.textMuted, fontSize: 11),
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (result.preview != null &&
+                      result.preview != result.title) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      result.preview!,
+                      style: TextStyle(
+                        color: colors.textMuted.withAlpha(150),
+                        fontSize: 10,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
             if (result.kind == _QuickResultKind.panel)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: result.iconColor.withAlpha(20),
                   borderRadius: BorderRadius.circular(4),
@@ -718,10 +831,12 @@ class _HighlightText extends StatelessWidget {
     final indexSet = indices.toSet();
     final spans = <TextSpan>[];
     for (int i = 0; i < text.length; i++) {
-      spans.add(TextSpan(
-        text: text[i],
-        style: indexSet.contains(i) ? highlightStyle : baseStyle,
-      ));
+      spans.add(
+        TextSpan(
+          text: text[i],
+          style: indexSet.contains(i) ? highlightStyle : baseStyle,
+        ),
+      );
     }
 
     return RichText(
