@@ -31,12 +31,17 @@ class StickyNotePlugin extends BoardPanelPlugin {
   };
 
   @override
+  bool get usePanelChrome => false;
+
+  @override
+  bool get showHeader => false;
+
+  @override
   Widget buildContent(
     BuildContext context,
     BoardPanelInstance panel,
     BoardPanelRenderContext renderContext,
   ) {
-    final text = panel.state['text'] as String? ?? '';
     final colors = context.appColors;
     final color =
         _parseHex(panel.state['color'] as String?) ??
@@ -44,9 +49,69 @@ class StickyNotePlugin extends BoardPanelPlugin {
     final textColor =
         _parseHex(panel.state['textColor'] as String?) ??
         Theme.of(context).colorScheme.onSurface;
+    return _StickyNoteContent(
+      panel: panel,
+      color: color,
+      textColor: textColor,
+      onChanged: (value) {
+        renderContext.onUpdateState({...panel.state, 'text': value});
+      },
+    );
+  }
+}
+
+class _StickyNoteContent extends StatefulWidget {
+  const _StickyNoteContent({
+    required this.panel,
+    required this.color,
+    required this.textColor,
+    required this.onChanged,
+  });
+
+  final BoardPanelInstance panel;
+  final Color color;
+  final Color textColor;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_StickyNoteContent> createState() => _StickyNoteContentState();
+}
+
+class _StickyNoteContentState extends State<_StickyNoteContent> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: _textFromWidget());
+  }
+
+  @override
+  void didUpdateWidget(covariant _StickyNoteContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextText = _textFromWidget();
+    if (nextText != _controller.text) {
+      _controller.value = _controller.value.copyWith(
+        text: nextText,
+        selection: TextSelection.collapsed(offset: nextText.length),
+        composing: TextRange.empty,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _textFromWidget() => widget.panel.state['text'] as String? ?? '';
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: color,
+        color: widget.color,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -58,15 +123,32 @@ class StickyNotePlugin extends BoardPanelPlugin {
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: SingleChildScrollView(
-          child: Text(
-            text.trim().isEmpty ? 'Sticky note' : text,
-            style: TextStyle(
-              color: textColor,
+        child: TextField(
+          controller: _controller,
+          expands: true,
+          maxLines: null,
+          minLines: null,
+          keyboardType: TextInputType.multiline,
+          textAlignVertical: TextAlignVertical.top,
+          onChanged: widget.onChanged,
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            hintText: 'Sticky note',
+            hintStyle: TextStyle(
+              color: widget.textColor.withValues(alpha: 0.55),
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              height: 1.25,
             ),
+            isCollapsed: true,
+          ),
+          cursorColor: widget.textColor,
+          style: TextStyle(
+            color: widget.textColor,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            height: 1.25,
           ),
         ),
       ),

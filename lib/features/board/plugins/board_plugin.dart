@@ -32,14 +32,15 @@ class BoardPanelRenderContext {
     String typeId,
     Map<String, dynamic> state,
     String title,
-  )? onCreateLinkedPanel;
+  )?
+  onCreateLinkedPanel;
 
   /// Finds an existing panel by [typeId] and run [group] (if available).
   final String? Function(String typeId, String group)? onFindPanelByGroup;
 
   /// Reveals a detached run [sessionId] in target [panelId].
   final Future<void> Function(String panelId, String sessionId)?
-      onRevealSessionInPanel;
+  onRevealSessionInPanel;
 
   /// Focuses an existing panel by ID.
   final Future<void> Function(String panelId)? onFocusPanelById;
@@ -88,6 +89,13 @@ abstract class BoardPanelPlugin {
 
   /// Whether this plugin should be shown in the generic Add Panel catalog.
   bool get showInCatalog => true;
+
+  /// Whether the board should draw the standard rounded panel background,
+  /// border, and shadow around this plugin.
+  bool get usePanelChrome => true;
+
+  /// Whether the board should draw the standard title/header row.
+  bool get showHeader => true;
 
   /// Whether this plugin can be safely rendered in a headless offscreen context
   /// (no GPU, no platform views, no native video decoders).

@@ -273,7 +273,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           // Disable pan only while actively drawing (drawPointer held) or canvas is locked
                                           panEnabled:
                                               !isLocked &&
-                                              (_activeTool != BoardToolId.draw ||
+                                              (_activeTool !=
+                                                      BoardToolId.draw ||
                                                   _drawPointer == null),
                                           transformationController:
                                               _transformController,
@@ -296,7 +297,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             if (CanvasInteractionLock
                                                     .instance
                                                     .isLocked &&
-                                                _interactionStartMatrix != null) {
+                                                _interactionStartMatrix !=
+                                                    null) {
                                               _transformController.value =
                                                   _interactionStartMatrix!;
                                               return;
@@ -309,11 +311,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     _transformController.value,
                                                   );
                                               if ((currentScale -
-                                                              _interactionStartScale)
-                                                          .abs() >
-                                                      0.01) {
+                                                          _interactionStartScale)
+                                                      .abs() >
+                                                  0.01) {
                                                 setState(
-                                                  () => _isViewportZooming = true,
+                                                  () =>
+                                                      _isViewportZooming = true,
                                                 );
                                               }
                                             }
@@ -332,8 +335,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   WebpagePlugin.kTypeId)
                                                 continue;
                                               final ctrl =
-                                                  WebpagePlugin.controllers[panel
-                                                      .id];
+                                                  WebpagePlugin
+                                                      .controllers[panel.id];
                                               if (ctrl == null) continue;
                                               ctrl.runJavaScript(
                                                 "window.dispatchEvent(new Event('resize'));",
@@ -353,414 +356,431 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 Positioned.fill(
                                                   child: IgnorePointer(
                                                     child: CustomPaint(
-                                                      painter: _BoardLinksPainter(
-                                                        panels:
-                                                            activeBoard.panels,
-                                                        links: activeBoard.links,
-                                                        origin: _canvasOrigin,
-                                                      ),
+                                                      painter:
+                                                          _BoardLinksPainter(
+                                                            panels:
+                                                                activeBoard
+                                                                    .panels,
+                                                            links:
+                                                                activeBoard
+                                                                    .links,
+                                                            origin:
+                                                                _canvasOrigin,
+                                                          ),
                                                     ),
                                                   ),
                                                 ),
                                                 // ── Canvas background tap — clear focus ──
                                                 // Stack hit-tests children in reverse order
-                                              // (last child first).  Panels are added
-                                              // AFTER this Listener, so they absorb
-                                              // clicks first.  Only clicks on empty
-                                              // canvas reach this Listener.
-                                              Positioned.fill(
-                                                child: Listener(
-                                                  behavior:
-                                                      HitTestBehavior
-                                                          .translucent,
-                                                  onPointerDown: (_) {
-                                                    if (focusedPanelId !=
-                                                        null) {
-                                                      _boardWebFocusLog(
-                                                        'canvas tap -> clearFocusedPanel',
-                                                      );
-                                                      context
-                                                          .read<BoardCubit>()
-                                                          .clearFocusedPanel();
-                                                    }
-                                                  },
+                                                // (last child first).  Panels are added
+                                                // AFTER this Listener, so they absorb
+                                                // clicks first.  Only clicks on empty
+                                                // canvas reach this Listener.
+                                                Positioned.fill(
+                                                  child: Listener(
+                                                    behavior:
+                                                        HitTestBehavior
+                                                            .translucent,
+                                                    onPointerDown: (_) {
+                                                      if (focusedPanelId !=
+                                                          null) {
+                                                        _boardWebFocusLog(
+                                                          'canvas tap -> clearFocusedPanel',
+                                                        );
+                                                        context
+                                                            .read<BoardCubit>()
+                                                            .clearFocusedPanel();
+                                                      }
+                                                    },
+                                                  ),
                                                 ),
-                                              ),
-                                              // ── Link delete badges ─────────────────────
-                                              if (_activeTool ==
-                                                  BoardToolId.select)
-                                                ..._buildLinkDeleteBadges(
-                                                  context,
-                                                  activeBoard,
-                                                ),
-                                              ...(() {
-                                                final visiblePanels =
-                                                    activeBoard.panels
-                                                        .where(
-                                                          (panel) =>
-                                                              !panel.hidden,
-                                                        )
-                                                        .toList()
-                                                      ..sort(
-                                                        (a, b) =>
-                                                            a.zIndex.compareTo(
-                                                              b.zIndex,
-                                                            ),
-                                                      );
-                                                return visiblePanels
-                                                    .map(
-                                                      (
-                                                        panel,
-                                                      ) => _BoardPanelCard(
-                                                        key: ValueKey(panel.id),
-                                                        panel: panel,
-                                                        positionOffset:
-                                                            _canvasOrigin,
-                                                        capturingScreenshot:
-                                                            _isCapturingScreenshot,
-                                                        onTap:
-                                                            () => context
+                                                // ── Link delete badges ─────────────────────
+                                                if (_activeTool ==
+                                                    BoardToolId.select)
+                                                  ..._buildLinkDeleteBadges(
+                                                    context,
+                                                    activeBoard,
+                                                  ),
+                                                ...(() {
+                                                  final visiblePanels =
+                                                      activeBoard.panels
+                                                          .where(
+                                                            (panel) =>
+                                                                !panel.hidden,
+                                                          )
+                                                          .toList()
+                                                        ..sort(
+                                                          (a, b) => a.zIndex
+                                                              .compareTo(
+                                                                b.zIndex,
+                                                              ),
+                                                        );
+                                                  return visiblePanels
+                                                      .map(
+                                                        (
+                                                          panel,
+                                                        ) => _BoardPanelCard(
+                                                          key: ValueKey(
+                                                            panel.id,
+                                                          ),
+                                                          panel: panel,
+                                                          positionOffset:
+                                                              _canvasOrigin,
+                                                          capturingScreenshot:
+                                                              _isCapturingScreenshot,
+                                                          onTap:
+                                                              () => context
+                                                                  .read<
+                                                                    BoardCubit
+                                                                  >()
+                                                                  .focusPanel(
+                                                                    panel.id,
+                                                                  ),
+                                                          onMove:
+                                                              (details) =>
+                                                                  _movePanelWithEdgePan(
+                                                                    context,
+                                                                    panel.id,
+                                                                    details,
+                                                                  ),
+                                                          onResize:
+                                                              (details) =>
+                                                                  _resizePanelWithEdgePan(
+                                                                    context,
+                                                                    panel,
+                                                                    details,
+                                                                  ),
+                                                          onDragStart:
+                                                              (details) =>
+                                                                  _handlePanelDragStart(
+                                                                    panel.id,
+                                                                    details,
+                                                                  ),
+                                                          onDragEnd:
+                                                              _handlePanelDragEnd,
+                                                          onDelete: () async {
+                                                            if (panel.type ==
+                                                                'board.widget.custom') {
+                                                              WidgetEngineManager
+                                                                  .instance
+                                                                  .remove(
+                                                                    panel.id,
+                                                                  );
+                                                            }
+                                                            await context
                                                                 .read<
                                                                   BoardCubit
                                                                 >()
-                                                                .focusPanel(
-                                                                  panel.id,
-                                                                ),
-                                                        onMove:
-                                                            (details) =>
-                                                                _movePanelWithEdgePan(
-                                                                  context,
-                                                                  panel.id,
-                                                                  details,
-                                                                ),
-                                                        onResize:
-                                                            (details) =>
-                                                                _resizePanelWithEdgePan(
-                                                                  context,
-                                                                  panel,
-                                                                  details,
-                                                                ),
-                                                        onDragStart:
-                                                            (details) =>
-                                                                _handlePanelDragStart(
-                                                                  panel.id,
-                                                                  details,
-                                                                ),
-                                                        onDragEnd:
-                                                            _handlePanelDragEnd,
-                                                        onDelete: () async {
-                                                          if (panel.type ==
-                                                              'board.widget.custom') {
-                                                            WidgetEngineManager
-                                                                .instance
-                                                                .remove(
+                                                                .removePanel(
                                                                   panel.id,
                                                                 );
-                                                          }
-                                                          await context
-                                                              .read<
-                                                                BoardCubit
-                                                              >()
-                                                              .removePanel(
-                                                                panel.id,
-                                                              );
-                                                        },
-                                                        onEditColor:
-                                                            () =>
-                                                                _showPanelColorDialog(
-                                                                  context,
-                                                                  panel,
-                                                                ),
-                                                        onEditNote:
-                                                            panel.type ==
-                                                                    'board.note.markdown'
-                                                                ? () =>
-                                                                    _showMarkdownNoteDialog(
-                                                                      context,
-                                                                      panel:
-                                                                          panel,
+                                                          },
+                                                          onEditColor:
+                                                              () =>
+                                                                  _showPanelColorDialog(
+                                                                    context,
+                                                                    panel,
+                                                                  ),
+                                                          onEditNote:
+                                                              panel.type ==
+                                                                      'board.note.markdown'
+                                                                  ? () =>
+                                                                      _showMarkdownNoteDialog(
+                                                                        context,
+                                                                        panel:
+                                                                            panel,
+                                                                      )
+                                                                  : null,
+                                                          onUpdateState: (
+                                                            newState,
+                                                          ) {
+                                                            context
+                                                                .read<
+                                                                  BoardCubit
+                                                                >()
+                                                                .updatePanel(
+                                                                  panel.id,
+                                                                  (
+                                                                    p,
+                                                                  ) => p.copyWith(
+                                                                    state:
+                                                                        newState,
+                                                                  ),
+                                                                );
+                                                          },
+                                                          onCreateLinkedPanel: (
+                                                            typeId,
+                                                            state,
+                                                            title,
+                                                          ) async {
+                                                            final cubit =
+                                                                context
+                                                                    .read<
+                                                                      BoardCubit
+                                                                    >();
+                                                            final plugin =
+                                                                BoardPluginRegistry
+                                                                    .instance
+                                                                    .pluginFor(
+                                                                      typeId,
+                                                                    );
+                                                            final size =
+                                                                plugin
+                                                                    ?.defaultSize ??
+                                                                const Size(
+                                                                  460,
+                                                                  380,
+                                                                );
+                                                            final board =
+                                                                cubit
+                                                                    .state
+                                                                    .activeBoard;
+                                                            if (board == null)
+                                                              return null;
+                                                            final currentBounds =
+                                                                panel.bounds;
+                                                            // Place to the right of the source panel, then
+                                                            // stack downward if that slot is already taken.
+                                                            final baseX =
+                                                                currentBounds
+                                                                    .x +
+                                                                currentBounds
+                                                                    .width +
+                                                                40;
+                                                            var baseY =
+                                                                currentBounds.y;
+                                                            final occupiedRects =
+                                                                board.panels
+                                                                    .where(
+                                                                      (p) =>
+                                                                          !p.hidden,
                                                                     )
-                                                                : null,
-                                                        onUpdateState: (
-                                                          newState,
-                                                        ) {
-                                                          context
-                                                              .read<
-                                                                BoardCubit
-                                                              >()
-                                                              .updatePanel(
-                                                                panel.id,
-                                                                (
-                                                                  p,
-                                                                ) => p.copyWith(
-                                                                  state:
-                                                                      newState,
-                                                                ),
-                                                              );
-                                                        },
-                                                        onCreateLinkedPanel: (
-                                                          typeId,
-                                                          state,
-                                                          title,
-                                                        ) async {
-                                                          final cubit =
-                                                              context
-                                                                  .read<
-                                                                    BoardCubit
-                                                                  >();
-                                                          final plugin =
-                                                              BoardPluginRegistry
-                                                                  .instance
-                                                                  .pluginFor(
-                                                                    typeId,
-                                                                  );
-                                                          final size =
-                                                              plugin
-                                                                  ?.defaultSize ??
-                                                              const Size(
-                                                                460,
-                                                                380,
-                                                              );
-                                                          final board =
-                                                              cubit
-                                                                  .state
-                                                                  .activeBoard;
-                                                          if (board == null)
-                                                            return null;
-                                                          final currentBounds =
-                                                              panel.bounds;
-                                                          // Place to the right of the source panel, then
-                                                          // stack downward if that slot is already taken.
-                                                          final baseX =
-                                                              currentBounds.x +
-                                                              currentBounds
-                                                                  .width +
-                                                              40;
-                                                          var baseY =
-                                                              currentBounds.y;
-                                                          final occupiedRects =
-                                                              board.panels
-                                                                  .where(
-                                                                    (p) =>
-                                                                        !p.hidden,
-                                                                  )
-                                                                  .map(
-                                                                    (
-                                                                      p,
-                                                                    ) => Rect.fromLTWH(
-                                                                      p.bounds.x,
-                                                                      p.bounds.y,
-                                                                      p
-                                                                          .bounds
-                                                                          .width,
-                                                                      p
-                                                                          .bounds
-                                                                          .height,
-                                                                    ),
-                                                                  )
-                                                                  .toList();
-                                                          var candidate =
-                                                              Rect.fromLTWH(
-                                                                baseX,
-                                                                baseY,
-                                                                size.width,
-                                                                size.height,
-                                                              );
-                                                          // Shift down until no overlap with existing panels.
-                                                          var attempts = 0;
-                                                          while (attempts <
-                                                                  50 &&
-                                                              occupiedRects.any(
-                                                                (r) =>
-                                                                    r.overlaps(
-                                                                      candidate,
-                                                                    ),
-                                                              )) {
-                                                            baseY +=
-                                                                size.height +
-                                                                20;
-                                                            candidate =
+                                                                    .map(
+                                                                      (
+                                                                        p,
+                                                                      ) => Rect.fromLTWH(
+                                                                        p.bounds.x,
+                                                                        p.bounds.y,
+                                                                        p
+                                                                            .bounds
+                                                                            .width,
+                                                                        p
+                                                                            .bounds
+                                                                            .height,
+                                                                      ),
+                                                                    )
+                                                                    .toList();
+                                                            var candidate =
                                                                 Rect.fromLTWH(
                                                                   baseX,
                                                                   baseY,
                                                                   size.width,
                                                                   size.height,
                                                                 );
-                                                            attempts++;
-                                                          }
-                                                          final newBounds =
-                                                              BoardPanelBounds(
-                                                                x: baseX,
-                                                                y: baseY,
-                                                                width:
+                                                            // Shift down until no overlap with existing panels.
+                                                            var attempts = 0;
+                                                            while (attempts <
+                                                                    50 &&
+                                                                occupiedRects.any(
+                                                                  (r) => r
+                                                                      .overlaps(
+                                                                        candidate,
+                                                                      ),
+                                                                )) {
+                                                              baseY +=
+                                                                  size.height +
+                                                                  20;
+                                                              candidate =
+                                                                  Rect.fromLTWH(
+                                                                    baseX,
+                                                                    baseY,
                                                                     size.width,
-                                                                height:
                                                                     size.height,
-                                                              );
-                                                          final ts =
-                                                              DateTime.now()
-                                                                  .microsecondsSinceEpoch;
-                                                          final newPanel = BoardPanelInstance(
-                                                            id: 'panel-$ts',
-                                                            type: typeId,
-                                                            title: title,
-                                                            bounds: newBounds,
-                                                            state: state,
-                                                            zIndex:
-                                                                board.panels.fold<
-                                                                  int
-                                                                >(
-                                                                  0,
-                                                                  (v, p) =>
-                                                                      p.zIndex >
-                                                                              v
-                                                                          ? p.zIndex
-                                                                          : v,
-                                                                ) +
-                                                                1,
-                                                          );
-                                                          await cubit.addPanel(
-                                                            newPanel,
-                                                          );
-                                                          await cubit.upsertLink(
-                                                            BoardPanelLink(
-                                                              id: 'link-$ts',
-                                                              fromPanelId:
-                                                                  panel.id,
-                                                              toPanelId:
-                                                                  newPanel.id,
-                                                              style:
-                                                                  BoardLinkStyle
-                                                                      .arrow,
-                                                              behavior:
-                                                                  BoardLinkBehavior
-                                                                      .dynamic,
-                                                              geometry:
-                                                                  BoardLinkGeometry
-                                                                      .bezier,
-                                                            ),
-                                                          );
-                                                          return newPanel.id;
-                                                        },
-                                                        connectMode:
-                                                            _activeTool ==
-                                                            BoardToolId.connect,
-                                                        connectSourceId:
-                                                            _connectSourceId,
-                                                        onConnectTap:
-                                                            _activeTool ==
-                                                                    BoardToolId
-                                                                        .connect
-                                                                ? () =>
-                                                                    _handleConnectTap(
-                                                                      context,
-                                                                      activeBoard,
-                                                                      panel.id,
-                                                                    )
-                                                                : null,
-                                                      ),
-                                                    )
-                                                    .toList();
-                                              })(),
-                                              // ── Drawing layer (above panels visually;
-                                              //    only intercepts gestures on actual stroke
-                                              //    pixels via path-based hitTest) ──────────
-                                              ...activeBoard.drawings
-                                                  .where((d) => !d.hidden)
-                                                  .map(
-                                                    (drawing) => Positioned(
-                                                      key: ValueKey(drawing.id),
-                                                      left:
-                                                          drawing.position.dx +
-                                                          _canvasOrigin.dx,
-                                                      top:
-                                                          drawing.position.dy +
-                                                          _canvasOrigin.dy,
-                                                      width: drawing.size.width,
-                                                      height:
-                                                          drawing.size.height,
-                                                      child: IgnorePointer(
-                                                        ignoring:
-                                                            _activeTool ==
-                                                            BoardToolId.connect,
-                                                        child: _BoardDrawingWidget(
-                                                          drawing: drawing,
-                                                          isSelectMode:
+                                                                  );
+                                                              attempts++;
+                                                            }
+                                                            final newBounds =
+                                                                BoardPanelBounds(
+                                                                  x: baseX,
+                                                                  y: baseY,
+                                                                  width:
+                                                                      size.width,
+                                                                  height:
+                                                                      size.height,
+                                                                );
+                                                            final ts =
+                                                                DateTime.now()
+                                                                    .microsecondsSinceEpoch;
+                                                            final newPanel = BoardPanelInstance(
+                                                              id: 'panel-$ts',
+                                                              type: typeId,
+                                                              title: title,
+                                                              bounds: newBounds,
+                                                              state: state,
+                                                              zIndex:
+                                                                  board.panels.fold<
+                                                                    int
+                                                                  >(
+                                                                    0,
+                                                                    (v, p) =>
+                                                                        p.zIndex >
+                                                                                v
+                                                                            ? p.zIndex
+                                                                            : v,
+                                                                  ) +
+                                                                  1,
+                                                            );
+                                                            await cubit
+                                                                .addPanel(
+                                                                  newPanel,
+                                                                );
+                                                            await cubit.upsertLink(
+                                                              BoardPanelLink(
+                                                                id: 'link-$ts',
+                                                                fromPanelId:
+                                                                    panel.id,
+                                                                toPanelId:
+                                                                    newPanel.id,
+                                                                style:
+                                                                    BoardLinkStyle
+                                                                        .arrow,
+                                                                behavior:
+                                                                    BoardLinkBehavior
+                                                                        .dynamic,
+                                                                geometry:
+                                                                    BoardLinkGeometry
+                                                                        .bezier,
+                                                              ),
+                                                            );
+                                                            return newPanel.id;
+                                                          },
+                                                          connectMode:
                                                               _activeTool ==
                                                               BoardToolId
-                                                                  .select,
-                                                          onMove:
-                                                              (
-                                                                newPos,
-                                                              ) => context
-                                                                  .read<
-                                                                    BoardCubit
-                                                                  >()
-                                                                  .moveDrawing(
-                                                                    drawing.id,
-                                                                    newPos,
-                                                                  ),
-                                                          onDelete:
-                                                              () => context
-                                                                  .read<
-                                                                    BoardCubit
-                                                                  >()
-                                                                  .removeDrawing(
-                                                                    drawing.id,
-                                                                  ),
+                                                                  .connect,
+                                                          connectSourceId:
+                                                              _connectSourceId,
+                                                          onConnectTap:
+                                                              _activeTool ==
+                                                                      BoardToolId
+                                                                          .connect
+                                                                  ? () => _handleConnectTap(
+                                                                    context,
+                                                                    activeBoard,
+                                                                    panel.id,
+                                                                  )
+                                                                  : null,
+                                                        ),
+                                                      )
+                                                      .toList();
+                                                })(),
+                                                // ── Drawing layer (above panels visually;
+                                                //    only intercepts gestures on actual stroke
+                                                //    pixels via path-based hitTest) ──────────
+                                                ...activeBoard.drawings
+                                                    .where((d) => !d.hidden)
+                                                    .map(
+                                                      (drawing) => Positioned(
+                                                        key: ValueKey(
+                                                          drawing.id,
+                                                        ),
+                                                        left:
+                                                            drawing
+                                                                .position
+                                                                .dx +
+                                                            _canvasOrigin.dx,
+                                                        top:
+                                                            drawing
+                                                                .position
+                                                                .dy +
+                                                            _canvasOrigin.dy,
+                                                        width:
+                                                            drawing.size.width,
+                                                        height:
+                                                            drawing.size.height,
+                                                        child: IgnorePointer(
+                                                          ignoring:
+                                                              _activeTool ==
+                                                              BoardToolId
+                                                                  .connect,
+                                                          child: _BoardDrawingWidget(
+                                                            drawing: drawing,
+                                                            isSelectMode:
+                                                                _activeTool ==
+                                                                BoardToolId
+                                                                    .select,
+                                                            onMove:
+                                                                (
+                                                                  newPos,
+                                                                ) => context
+                                                                    .read<
+                                                                      BoardCubit
+                                                                    >()
+                                                                    .moveDrawing(
+                                                                      drawing
+                                                                          .id,
+                                                                      newPos,
+                                                                    ),
+                                                            onDelete:
+                                                                () => context
+                                                                    .read<
+                                                                      BoardCubit
+                                                                    >()
+                                                                    .removeDrawing(
+                                                                      drawing
+                                                                          .id,
+                                                                    ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                // ── Active stroke preview ─────────────────
+                                                if (_activeStroke.isNotEmpty)
+                                                  Positioned.fill(
+                                                    child: IgnorePointer(
+                                                      child: CustomPaint(
+                                                        painter: _ActiveStrokePainter(
+                                                          points: _activeStroke,
+                                                          origin: _canvasOrigin,
+                                                          color:
+                                                              _drawSettings
+                                                                  .strokeColor,
+                                                          strokeWidth:
+                                                              _drawSettings
+                                                                  .strokeWidth,
                                                         ),
                                                       ),
                                                     ),
                                                   ),
-                                              // ── Active stroke preview ─────────────────
-                                              if (_activeStroke.isNotEmpty)
-                                                Positioned.fill(
-                                                  child: IgnorePointer(
-                                                    child: CustomPaint(
-                                                      painter:
-                                                          _ActiveStrokePainter(
-                                                            points:
-                                                                _activeStroke,
-                                                            origin:
-                                                                _canvasOrigin,
-                                                            color:
-                                                                _drawSettings
-                                                                    .strokeColor,
-                                                            strokeWidth:
-                                                                _drawSettings
-                                                                    .strokeWidth,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              // ── Connect preview line ──────────────────
-                                              if (_activeTool ==
-                                                      BoardToolId.connect &&
-                                                  _connectSourceId != null &&
-                                                  _connectPreviewPointer !=
-                                                      null)
-                                                Positioned.fill(
-                                                  child: IgnorePointer(
-                                                    child: CustomPaint(
-                                                      painter: _ConnectPreviewPainter(
-                                                        panels:
-                                                            activeBoard.panels,
-                                                        sourceId:
-                                                            _connectSourceId!,
-                                                        targetPoint:
-                                                            _connectPreviewPointer!,
-                                                        origin: _canvasOrigin,
-                                                        color:
-                                                            _connectSettings
-                                                                .color,
+                                                // ── Connect preview line ──────────────────
+                                                if (_activeTool ==
+                                                        BoardToolId.connect &&
+                                                    _connectSourceId != null &&
+                                                    _connectPreviewPointer !=
+                                                        null)
+                                                  Positioned.fill(
+                                                    child: IgnorePointer(
+                                                      child: CustomPaint(
+                                                        painter: _ConnectPreviewPainter(
+                                                          panels:
+                                                              activeBoard
+                                                                  .panels,
+                                                          sourceId:
+                                                              _connectSourceId!,
+                                                          targetPoint:
+                                                              _connectPreviewPointer!,
+                                                          origin: _canvasOrigin,
+                                                          color:
+                                                              _connectSettings
+                                                                  .color,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
                                         ),
-                                      ),
                                       );
                                     },
                                   ),
@@ -3589,10 +3609,15 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
     );
     final isFocused = panel.id == focusedPanelId;
     final isWebpage = panel.type == 'board.webpage';
+    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+    final usePanelChrome = plugin?.usePanelChrome ?? true;
+    final showHeader = plugin?.showHeader ?? true;
     final accent = panel.color;
     final isCapturing = widget.capturingScreenshot;
     final panelFill =
-        isCapturing
+        !usePanelChrome
+            ? Colors.transparent
+            : isCapturing
             ? colors.background
             : accent == null
             ? colors.surface
@@ -3605,7 +3630,9 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
             : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
                 colors.surfaceElevated;
     final borderColor =
-        isCapturing
+        !usePanelChrome
+            ? Colors.transparent
+            : isCapturing
             ? colors.background
             : accent == null
             ? colors.divider
@@ -3666,7 +3693,7 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                     width: isFocused && !isCapturing ? 1.5 : 1,
                   ),
                   boxShadow:
-                      isCapturing
+                      isCapturing || !usePanelChrome
                           ? null
                           : [
                             BoxShadow(
@@ -3681,168 +3708,177 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onPanStart: (details) {
-                            onTap();
-                            onDragStart(details);
-                          },
-                          onPanUpdate:
-                              panel.locked
-                                  ? null
-                                  : (details) => onMove(details),
-                          onPanEnd: (_) => onDragEnd(),
-                          onPanCancel: onDragEnd,
-                          child: Container(
-                            height: 44,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: panelHeaderFill,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(16),
+                        if (showHeader)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onPanStart: (details) {
+                              onTap();
+                              onDragStart(details);
+                            },
+                            onPanUpdate:
+                                panel.locked
+                                    ? null
+                                    : (details) => onMove(details),
+                            onPanEnd: (_) => onDragEnd(),
+                            onPanCancel: onDragEnd,
+                            child: Container(
+                              height: 44,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
                               ),
-                              border: Border(
-                                bottom: BorderSide(color: colors.divider),
+                              decoration: BoxDecoration(
+                                color: panelHeaderFill,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(16),
+                                ),
+                                border: Border(
+                                  bottom: BorderSide(color: colors.divider),
+                                ),
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                if (panel.type == ChatPanelPlugin.kTypeId)
-                                  ChatProviderIcon(
-                                    provider:
-                                        (panel.state['config']
-                                                as Map?)?['provider']
-                                            as String? ??
-                                        'copilot',
-                                    size: 18,
-                                  )
-                                else
-                                  Builder(
-                                    builder: (ctx) {
-                                      final plugin = BoardPluginRegistry
-                                          .instance
-                                          .pluginFor(panel.type);
-                                      final svgIcon = plugin?.buildIconWidget(
-                                        ctx,
-                                        size: 16,
-                                      );
-                                      if (svgIcon != null) return svgIcon;
-                                      return Icon(
-                                        plugin?.icon ??
-                                            Icons.dashboard_customize_outlined,
-                                        size: 16,
+                              child: Row(
+                                children: [
+                                  if (panel.type == ChatPanelPlugin.kTypeId)
+                                    ChatProviderIcon(
+                                      provider:
+                                          (panel.state['config']
+                                                  as Map?)?['provider']
+                                              as String? ??
+                                          'copilot',
+                                      size: 18,
+                                    )
+                                  else
+                                    Builder(
+                                      builder: (ctx) {
+                                        final plugin = BoardPluginRegistry
+                                            .instance
+                                            .pluginFor(panel.type);
+                                        final svgIcon = plugin?.buildIconWidget(
+                                          ctx,
+                                          size: 16,
+                                        );
+                                        if (svgIcon != null) return svgIcon;
+                                        return Icon(
+                                          plugin?.icon ??
+                                              Icons
+                                                  .dashboard_customize_outlined,
+                                          size: 16,
+                                          color:
+                                              Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall?.color ??
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                        );
+                                      },
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      panel.title,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                      style: TextStyle(
                                         color:
-                                            Theme.of(
-                                              context,
-                                            ).textTheme.bodySmall?.color ??
                                             Theme.of(
                                               context,
                                             ).colorScheme.onSurface,
-                                      );
-                                    },
-                                  ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    panel.title,
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                    style: TextStyle(
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                if (panel.type != ChatPanelPlugin.kTypeId) ...[
-                                  GestureDetector(
-                                    onTap: onEditColor,
-                                    child: Container(
-                                      width: 16,
-                                      height: 16,
-                                      decoration: BoxDecoration(
-                                        color:
-                                            accent ??
-                                            (Theme.of(
-                                                  context,
-                                                ).textTheme.bodySmall?.color ??
-                                                Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurface),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: colors.textPrimary.withAlpha(
-                                            100,
+                                  if (panel.type !=
+                                      ChatPanelPlugin.kTypeId) ...[
+                                    GestureDetector(
+                                      onTap: onEditColor,
+                                      child: Container(
+                                        width: 16,
+                                        height: 16,
+                                        decoration: BoxDecoration(
+                                          color:
+                                              accent ??
+                                              (Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.color ??
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: colors.textPrimary.withAlpha(
+                                              100,
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (onEditNote != null)
-                                    SizedBox(
-                                      width: 28,
-                                      height: 28,
-                                      child: IconButton(
-                                        tooltip: 'Edit note',
-                                        onPressed: onEditNote,
-                                        icon: const Icon(
-                                          Icons.edit_outlined,
-                                          size: 16,
+                                    const SizedBox(width: 8),
+                                    if (onEditNote != null)
+                                      SizedBox(
+                                        width: 28,
+                                        height: 28,
+                                        child: IconButton(
+                                          tooltip: 'Edit note',
+                                          onPressed: onEditNote,
+                                          icon: const Icon(
+                                            Icons.edit_outlined,
+                                            size: 16,
+                                          ),
+                                          splashRadius: 14,
+                                          padding: EdgeInsets.zero,
                                         ),
-                                        splashRadius: 14,
-                                        padding: EdgeInsets.zero,
                                       ),
+                                  ],
+                                  if (panel.type == ChatPanelPlugin.kTypeId)
+                                    _ChatHeaderMenu(
+                                      panel: panel,
+                                      onEditColor: onEditColor,
+                                      onUpdateState: onUpdateState,
                                     ),
+                                  // Plugin-specific header actions (e.g. env gear for widget panels)
+                                  ...() {
+                                    final plugin = BoardPluginRegistry.instance
+                                        .pluginFor(panel.type);
+                                    if (plugin == null ||
+                                        onUpdateState == null) {
+                                      return <Widget>[];
+                                    }
+                                    return plugin.buildHeaderActions(
+                                      context,
+                                      panel,
+                                      onUpdateState!,
+                                      onResize:
+                                          (w, h) => context
+                                              .read<BoardCubit>()
+                                              .resizePanel(
+                                                panel.id,
+                                                width: w,
+                                                height: h,
+                                              ),
+                                    );
+                                  }(),
+                                  SizedBox(
+                                    width: 28,
+                                    height: 28,
+                                    child: IconButton(
+                                      tooltip: 'Remove panel',
+                                      onPressed: onDelete,
+                                      icon: const Icon(Icons.close, size: 16),
+                                      splashRadius: 14,
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                  ),
                                 ],
-                                if (panel.type == ChatPanelPlugin.kTypeId)
-                                  _ChatHeaderMenu(
-                                    panel: panel,
-                                    onEditColor: onEditColor,
-                                    onUpdateState: onUpdateState,
-                                  ),
-                                // Plugin-specific header actions (e.g. env gear for widget panels)
-                                ...() {
-                                  final plugin = BoardPluginRegistry.instance
-                                      .pluginFor(panel.type);
-                                  if (plugin == null || onUpdateState == null)
-                                    return <Widget>[];
-                                  return plugin.buildHeaderActions(
-                                    context,
-                                    panel,
-                                    onUpdateState!,
-                                    onResize:
-                                        (w, h) => context
-                                            .read<BoardCubit>()
-                                            .resizePanel(
-                                              panel.id,
-                                              width: w,
-                                              height: h,
-                                            ),
-                                  );
-                                }(),
-                                SizedBox(
-                                  width: 28,
-                                  height: 28,
-                                  child: IconButton(
-                                    tooltip: 'Remove panel',
-                                    onPressed: onDelete,
-                                    icon: const Icon(Icons.close, size: 16),
-                                    splashRadius: 14,
-                                    padding: EdgeInsets.zero,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
                         Expanded(
                           child: Padding(
                             padding:
-                                panel.type == ChatPanelPlugin.kTypeId ||
+                                !showHeader ||
+                                        panel.type == ChatPanelPlugin.kTypeId ||
                                         panel.type ==
                                             BoardTerminalPanelPlugin.kTypeId ||
                                         panel.type == 'board.webpage'
@@ -3853,6 +3889,58 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                         ),
                       ],
                     ),
+                    if (!showHeader && isFocused && !isCapturing)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: colors.surfaceElevated.withValues(
+                              alpha: 0.82,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: colors.divider),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onPanStart: (details) {
+                                  onTap();
+                                  onDragStart(details);
+                                },
+                                onPanUpdate:
+                                    panel.locked
+                                        ? null
+                                        : (details) => onMove(details),
+                                onPanEnd: (_) => onDragEnd(),
+                                onPanCancel: onDragEnd,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: Icon(
+                                    Icons.open_with_rounded,
+                                    size: 14,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: onDelete,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    size: 14,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     Positioned(
                       right: 4,
                       bottom: 2,
@@ -5082,44 +5170,45 @@ class _BoardToolsPanel extends StatelessWidget {
                               Offset(box.size.width, 0),
                             );
                             final pluginEntries =
-                                BoardPluginRegistry.instance.catalogPlugins
-                                    .map((plugin) {
-                                      return PopupMenuItem<String>(
-                                        value: plugin.typeId,
-                                        height: 36,
-                                        child: Builder(
-                                          builder: (ctx) {
-                                            final svgIcon = plugin
-                                                .buildIconWidget(ctx, size: 14);
-                                            return Row(
-                                              children: [
-                                                if (svgIcon != null)
-                                                  SizedBox(
-                                                    width: 14,
-                                                    height: 14,
-                                                    child: svgIcon,
-                                                  )
-                                                else
-                                                  Icon(
-                                                    plugin.icon,
-                                                    size: 14,
-                                                    color: plugin.accentColor
-                                                        .withAlpha(200),
-                                                  ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  plugin.displayName,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: textColor,
-                                                  ),
+                                BoardPluginRegistry.instance.catalogPlugins.map(
+                                  (plugin) {
+                                    return PopupMenuItem<String>(
+                                      value: plugin.typeId,
+                                      height: 36,
+                                      child: Builder(
+                                        builder: (ctx) {
+                                          final svgIcon = plugin
+                                              .buildIconWidget(ctx, size: 14);
+                                          return Row(
+                                            children: [
+                                              if (svgIcon != null)
+                                                SizedBox(
+                                                  width: 14,
+                                                  height: 14,
+                                                  child: svgIcon,
+                                                )
+                                              else
+                                                Icon(
+                                                  plugin.icon,
+                                                  size: 14,
+                                                  color: plugin.accentColor
+                                                      .withAlpha(200),
                                                 ),
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                      );
-                                    }).toList();
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                plugin.displayName,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: textColor,
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ).toList();
 
                             showMenu<String>(
                               context: btnCtx,
