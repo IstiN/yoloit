@@ -676,10 +676,12 @@ class ChatModelInfo {
       'isDefault': isDefault,
     };
     if (costMultiplier != null) m['costMultiplier'] = costMultiplier;
-    if (inputCostPerMillion != null)
+    if (inputCostPerMillion != null) {
       m['inputCostPerMillion'] = inputCostPerMillion;
-    if (outputCostPerMillion != null)
+    }
+    if (outputCostPerMillion != null) {
       m['outputCostPerMillion'] = outputCostPerMillion;
+    }
     if (contextWindow != null) m['contextWindow'] = contextWindow;
     if (providerGroup != null) m['providerGroup'] = providerGroup;
     return m;
@@ -870,6 +872,30 @@ const List<ChatModelInfo> kCursorModels = [
     displayName: 'Composer 2.5',
     costMultiplier: 1,
   ),
+];
+
+const List<ChatModelInfo> kKimiModels = [
+  ChatModelInfo(
+    id: 'kimi-k2.5',
+    displayName: 'Kimi K2.5',
+    costMultiplier: 1,
+    isDefault: true,
+  ),
+];
+
+const List<ChatModelInfo> kCodexModels = [
+  ChatModelInfo(
+    id: 'gpt-5.3-codex',
+    displayName: 'GPT-5.3-Codex',
+    costMultiplier: 1,
+    isDefault: true,
+  ),
+  ChatModelInfo(
+    id: 'gpt-5.2-codex',
+    displayName: 'GPT-5.2-Codex',
+    costMultiplier: 1,
+  ),
+  ChatModelInfo(id: 'gpt-5.2', displayName: 'GPT-5.2', costMultiplier: 1),
 ];
 
 /// Local on-device chat models backed by flutter_local_models.

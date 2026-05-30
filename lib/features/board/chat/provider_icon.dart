@@ -65,7 +65,41 @@ class ChatProviderIcon extends StatelessWidget {
       ),
       'local' => Icon(Icons.memory_rounded, size: size, color: iconColor),
       'opencode' => Icon(Icons.code_rounded, size: size, color: iconColor),
+      'codex' => Icon(Icons.terminal_rounded, size: size, color: iconColor),
+      'kimi' => _TextProviderIcon(label: 'K', size: size, color: iconColor),
       _ => Icon(Icons.auto_awesome, size: size, color: iconColor),
     };
+  }
+}
+
+class _TextProviderIcon extends StatelessWidget {
+  const _TextProviderIcon({
+    required this.label,
+    required this.size,
+    required this.color,
+  });
+
+  final String label;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: size * 0.75,
+            fontWeight: FontWeight.w700,
+            color: color,
+            fontFamily: 'monospace',
+            height: 1,
+          ),
+        ),
+      ),
+    );
   }
 }

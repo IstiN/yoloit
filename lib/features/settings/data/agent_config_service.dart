@@ -166,6 +166,26 @@ class AgentConfigService {
       isBuiltIn: true,
       streamAdapter: 'opencode',
     ),
+    const AgentConfig(
+      id: 'kimi',
+      displayName: 'Kimi',
+      iconLabel: 'K',
+      launchCommand: 'kimi',
+      visible: true,
+      isBuiltIn: true,
+      streamAdapter: 'kimi',
+      disableModel: true,
+    ),
+    const AgentConfig(
+      id: 'codex',
+      displayName: 'Codex',
+      iconLabel: 'CX',
+      launchCommand: 'codex',
+      visible: true,
+      isBuiltIn: true,
+      streamAdapter: 'codex',
+      disableModel: true,
+    ),
   ];
 
   String get _configPath =>
@@ -381,6 +401,9 @@ class AgentConfigService {
       'opencode' => 'opencode run --format json --dangerously-skip-permissions',
       'cursor' =>
         'cursor-agent --print --output-format stream-json --stream-partial-output --yolo',
+      'kimi' => 'kimi --output-format stream-json',
+      'codex' =>
+        'codex exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox',
       'copilot' => 'copilot --output-format json --yolo',
       _ => '',
     };

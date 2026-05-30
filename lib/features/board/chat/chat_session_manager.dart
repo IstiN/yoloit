@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/cloud_llm_provider.dart';
+import 'package:yoloit/features/board/chat/codex_cli_provider.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
+import 'package:yoloit/features/board/chat/kimi_cli_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -680,7 +682,9 @@ class ChatSession extends ChangeNotifier {
     final agentConfig = AgentConfigService.instance.configForAgent(providerId);
     final adapter = agentConfig?.streamAdapter ?? providerId;
     return switch (adapter) {
+      'codex' => CodexCliProvider(agentId: providerId),
       'cursor' => CursorAgentProvider(agentId: providerId),
+      'kimi' => KimiCliProvider(agentId: providerId),
       'opencode' => _createOpencodeProvider(providerId),
       _ => CopilotCliProvider(agentId: providerId),
     };
@@ -694,7 +698,9 @@ class ChatSession extends ChangeNotifier {
     return CloudLlmProvider.deferred(configId: configId);
   }
 
-  static OpencodeProvider _createOpencodeProvider([String agentId = 'opencode']) {
+  static OpencodeProvider _createOpencodeProvider([
+    String agentId = 'opencode',
+  ]) {
     final provider = OpencodeProvider(agentId: agentId);
     // Kick off background refresh — result is stored in provider for next UI render
     provider.refreshModelsFromModelsDev();

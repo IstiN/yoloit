@@ -2480,7 +2480,7 @@ print(json.dumps(b))
     while [[ $# -gt 0 ]]; do
       case "$1" in
         --name) name_arg="${2:-}"; shift 2 ;;
-        copilot|claude|gemini|cursor|pi|terminal)
+        copilot|claude|gemini|cursor|pi|terminal|opencode|kimi|codex)
           if [[ -z "$agent_id" && -z "$path_arg" ]]; then
             agent_id="$1"; shift
           else
@@ -2651,7 +2651,7 @@ print(d['response'])
     if [[ -n "$provider" ]]; then
       case "$provider" in
         cloud:*) ;;
-        copilot|cursor|local|opencode) ;;
+        copilot|cursor|local|opencode|kimi|codex) ;;
         *) provider="cloud:${provider}" ;;
       esac
     fi
