@@ -235,10 +235,27 @@ jobs:
 
           if [ "$SIGNED" = "true" ] && [ -n "$MACOS_CERTIFICATE_ID" ]; then
             echo "Signing .app bundle..."
-            codesign --force --deep --sign "$MACOS_CERTIFICATE_ID" \
-              --options runtime \
-              --entitlements macos/Runner/Release.entitlements \
-              "$APP_PATH"
+            codesign_app() {
+              codesign --force --deep --sign "$MACOS_CERTIFICATE_ID" \
+                --options runtime \
+                --entitlements macos/Runner/Release.entitlements \
+                "$APP_PATH"
+            }
+
+            for attempt in 1 2 3 4 5; do
+              if codesign_app; then
+                break
+              fi
+
+              if [ "$attempt" = "5" ]; then
+                echo "codesign failed after $attempt attempts"
+                exit 1
+              fi
+
+              sleep_seconds=$((attempt * 30))
+              echo "codesign failed, retrying in ${sleep_seconds}s (attempt $attempt/5)..."
+              sleep "$sleep_seconds"
+            done
           fi
 
           # Create a staging folder with app + Applications symlink (drag-to-install DMG)
