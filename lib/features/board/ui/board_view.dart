@@ -482,15 +482,82 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                     panel,
                                                                   ),
                                                           onEditNote:
-                                                              panel.type ==
-                                                                      'board.note.markdown'
-                                                                  ? () =>
-                                                                      _showMarkdownNoteDialog(
-                                                                        context,
-                                                                        panel:
-                                                                            panel,
-                                                                      )
-                                                                  : null,
+                                                              _editPanelCallback(
+                                                                context,
+                                                                panel,
+                                                              ),
+                                                          onBringToFront: () {
+                                                            final board =
+                                                                context
+                                                                    .read<
+                                                                      BoardCubit
+                                                                    >()
+                                                                    .state
+                                                                    .activeBoard;
+                                                            if (board == null) {
+                                                              return;
+                                                            }
+                                                            final maxZ = board.panels.fold<
+                                                              int
+                                                            >(
+                                                              0,
+                                                              (value, panel) =>
+                                                                  panel.zIndex >
+                                                                          value
+                                                                      ? panel
+                                                                          .zIndex
+                                                                      : value,
+                                                            );
+                                                            context
+                                                                .read<
+                                                                  BoardCubit
+                                                                >()
+                                                                .updatePanel(
+                                                                  panel.id,
+                                                                  (p) => p
+                                                                      .copyWith(
+                                                                        zIndex:
+                                                                            maxZ +
+                                                                            1,
+                                                                      ),
+                                                                );
+                                                          },
+                                                          onSendToBack: () {
+                                                            final board =
+                                                                context
+                                                                    .read<
+                                                                      BoardCubit
+                                                                    >()
+                                                                    .state
+                                                                    .activeBoard;
+                                                            if (board == null) {
+                                                              return;
+                                                            }
+                                                            final minZ = board.panels.fold<
+                                                              int
+                                                            >(
+                                                              0,
+                                                              (value, panel) =>
+                                                                  panel.zIndex <
+                                                                          value
+                                                                      ? panel
+                                                                          .zIndex
+                                                                      : value,
+                                                            );
+                                                            context
+                                                                .read<
+                                                                  BoardCubit
+                                                                >()
+                                                                .updatePanel(
+                                                                  panel.id,
+                                                                  (p) => p
+                                                                      .copyWith(
+                                                                        zIndex:
+                                                                            minZ -
+                                                                            1,
+                                                                      ),
+                                                                );
+                                                          },
                                                           onUpdateState: (
                                                             newState,
                                                           ) {
@@ -2284,6 +2351,25 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     context.read<BoardCubit>().createTerminalPanel();
   }
 
+  VoidCallback? _editPanelCallback(
+    BuildContext context,
+    BoardPanelInstance panel,
+  ) {
+    if (panel.type == 'board.note.markdown') {
+      return () => _showMarkdownNoteDialog(context, panel: panel);
+    }
+    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
+    if (plugin?.hasEditor != true) return null;
+    return () async {
+      await plugin!.showEditor(context, panel, (newState) {
+        context.read<BoardCubit>().updatePanel(
+          panel.id,
+          (p) => p.copyWith(state: newState),
+        );
+      });
+    };
+  }
+
   Future<void> _showMarkdownNoteDialog(
     BuildContext context, {
     BoardPanelInstance? panel,
@@ -3522,6 +3608,8 @@ class _BoardPanelCard extends StatefulWidget {
     required this.onDragEnd,
     required this.onDelete,
     required this.onEditColor,
+    required this.onBringToFront,
+    required this.onSendToBack,
     this.onEditNote,
     this.onUpdateState,
     this.onCreateLinkedPanel,
@@ -3540,6 +3628,8 @@ class _BoardPanelCard extends StatefulWidget {
   final VoidCallback onDragEnd;
   final VoidCallback onDelete;
   final VoidCallback onEditColor;
+  final VoidCallback onBringToFront;
+  final VoidCallback onSendToBack;
   final VoidCallback? onEditNote;
   final ValueChanged<Map<String, dynamic>>? onUpdateState;
   final Future<String?> Function(
@@ -3573,6 +3663,8 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
   VoidCallback get onDragEnd => widget.onDragEnd;
   VoidCallback get onDelete => widget.onDelete;
   VoidCallback get onEditColor => widget.onEditColor;
+  VoidCallback get onBringToFront => widget.onBringToFront;
+  VoidCallback get onSendToBack => widget.onSendToBack;
   VoidCallback? get onEditNote => widget.onEditNote;
   ValueChanged<Map<String, dynamic>>? get onUpdateState => widget.onUpdateState;
   Future<String?> Function(String, Map<String, dynamic>, String)?
@@ -3925,6 +4017,25 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                   ),
                                 ),
                               ),
+                              if (onEditNote != null)
+                                _HeaderlessPanelTool(
+                                  tooltip: 'Edit',
+                                  icon: Icons.settings_outlined,
+                                  onTap: onEditNote!,
+                                  colors: colors,
+                                ),
+                              _HeaderlessPanelTool(
+                                tooltip: 'Bring to front',
+                                icon: Icons.flip_to_front_outlined,
+                                onTap: onBringToFront,
+                                colors: colors,
+                              ),
+                              _HeaderlessPanelTool(
+                                tooltip: 'Send to back',
+                                icon: Icons.flip_to_back_outlined,
+                                onTap: onSendToBack,
+                                colors: colors,
+                              ),
                               GestureDetector(
                                 behavior: HitTestBehavior.opaque,
                                 onTap: onDelete,
@@ -4106,6 +4217,35 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
         style: TextStyle(
           color: Theme.of(context).textTheme.bodySmall?.color,
           fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderlessPanelTool extends StatelessWidget {
+  const _HeaderlessPanelTool({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+    required this.colors,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+  final AppColorScheme colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 14, color: colors.textSecondary),
         ),
       ),
     );

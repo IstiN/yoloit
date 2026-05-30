@@ -28,6 +28,7 @@ class StickyNotePlugin extends BoardPanelPlugin {
     'text': '',
     'color': '#FEF08A',
     'textColor': '#1F2937',
+    'fontSize': 18.0,
   };
 
   @override
@@ -35,6 +36,9 @@ class StickyNotePlugin extends BoardPanelPlugin {
 
   @override
   bool get showHeader => false;
+
+  @override
+  bool get hasEditor => true;
 
   @override
   Widget buildContent(
@@ -49,14 +53,31 @@ class StickyNotePlugin extends BoardPanelPlugin {
     final textColor =
         _parseHex(panel.state['textColor'] as String?) ??
         Theme.of(context).colorScheme.onSurface;
+    final fontSize = (panel.state['fontSize'] as num?)?.toDouble() ?? 18.0;
     return _StickyNoteContent(
       panel: panel,
       color: color,
       textColor: textColor,
+      fontSize: fontSize,
       onChanged: (value) {
         renderContext.onUpdateState({...panel.state, 'text': value});
       },
     );
+  }
+
+  @override
+  Future<bool> showEditor(
+    BuildContext context,
+    BoardPanelInstance panel,
+    ValueChanged<Map<String, dynamic>> onSave,
+  ) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => _StickyEditorDialog(panel: panel),
+    );
+    if (result == null) return false;
+    onSave({...panel.state, ...result});
+    return true;
   }
 }
 
@@ -65,12 +86,14 @@ class _StickyNoteContent extends StatefulWidget {
     required this.panel,
     required this.color,
     required this.textColor,
+    required this.fontSize,
     required this.onChanged,
   });
 
   final BoardPanelInstance panel;
   final Color color;
   final Color textColor;
+  final double fontSize;
   final ValueChanged<String> onChanged;
 
   @override
@@ -138,7 +161,7 @@ class _StickyNoteContentState extends State<_StickyNoteContent> {
             hintText: 'Sticky note',
             hintStyle: TextStyle(
               color: widget.textColor.withValues(alpha: 0.55),
-              fontSize: 18,
+              fontSize: widget.fontSize,
               fontWeight: FontWeight.w600,
             ),
             isCollapsed: true,
@@ -146,12 +169,166 @@ class _StickyNoteContentState extends State<_StickyNoteContent> {
           cursorColor: widget.textColor,
           style: TextStyle(
             color: widget.textColor,
-            fontSize: 18,
+            fontSize: widget.fontSize,
             fontWeight: FontWeight.w600,
             height: 1.25,
           ),
         ),
       ),
+    );
+  }
+}
+
+class _StickyEditorDialog extends StatefulWidget {
+  const _StickyEditorDialog({required this.panel});
+
+  final BoardPanelInstance panel;
+
+  @override
+  State<_StickyEditorDialog> createState() => _StickyEditorDialogState();
+}
+
+class _StickyEditorDialogState extends State<_StickyEditorDialog> {
+  static const _noteColors = [
+    '#FEF08A',
+    '#FDE68A',
+    '#FCA5A5',
+    '#F9A8D4',
+    '#C4B5FD',
+    '#93C5FD',
+    '#86EFAC',
+    '#FFFFFF',
+  ];
+  static const _textColors = [
+    '#111827',
+    '#1F2937',
+    '#FFFFFF',
+    '#93C5FD',
+    '#FBBF24',
+    '#34D399',
+    '#F472B6',
+  ];
+
+  late String _color;
+  late String _textColor;
+  late double _fontSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _color = widget.panel.state['color'] as String? ?? '#FEF08A';
+    _textColor = widget.panel.state['textColor'] as String? ?? '#1F2937';
+    _fontSize = (widget.panel.state['fontSize'] as num?)?.toDouble() ?? 18.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Sticky note settings'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionLabel('Note color'),
+            _ColorRow(
+              colors: _noteColors,
+              selected: _color,
+              onSelected: (value) => setState(() => _color = value),
+            ),
+            const SizedBox(height: 16),
+            _SectionLabel('Text color'),
+            _ColorRow(
+              colors: _textColors,
+              selected: _textColor,
+              onSelected: (value) => setState(() => _textColor = value),
+            ),
+            const SizedBox(height: 16),
+            _SectionLabel('Text size ${_fontSize.round()}'),
+            Slider(
+              min: 12,
+              max: 36,
+              divisions: 24,
+              value: _fontSize,
+              onChanged: (value) => setState(() => _fontSize = value),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed:
+              () => Navigator.of(context).pop({
+                'color': _color,
+                'textColor': _textColor,
+                'fontSize': _fontSize,
+              }),
+          child: const Text('Apply'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+    );
+  }
+}
+
+class _ColorRow extends StatelessWidget {
+  const _ColorRow({
+    required this.colors,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> colors;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children:
+          colors.map((hex) {
+            final color = _parseHex(hex) ?? Colors.transparent;
+            final isSelected = selected.toUpperCase() == hex.toUpperCase();
+            return InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => onSelected(hex),
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color:
+                        isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).dividerColor,
+                    width: isSelected ? 3 : 1,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
     );
   }
 }

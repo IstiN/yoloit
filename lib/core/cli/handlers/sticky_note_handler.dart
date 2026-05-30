@@ -15,6 +15,7 @@ class StickyNoteCliHandler extends PanelCliHandler {
     'text': panel.state['text'] ?? '',
     'color': panel.state['color'] ?? '#FEF08A',
     'textColor': panel.state['textColor'] ?? '#1F2937',
+    'fontSize': panel.state['fontSize'] ?? 18.0,
   };
 
   @override
@@ -27,13 +28,19 @@ class StickyNoteCliHandler extends PanelCliHandler {
       case 'get':
         return CliActionResult(data: getContent(panel));
       case 'set':
-        final text = args['text'] as String?;
-        if (text == null) {
-          return const CliActionResult(ok: false, message: 'Missing "text"');
+        final update = <String, dynamic>{};
+        for (final key in ['text', 'color', 'textColor', 'fontSize']) {
+          if (args.containsKey(key)) update[key] = args[key];
+        }
+        if (update.isEmpty) {
+          return const CliActionResult(
+            ok: false,
+            message: 'Missing sticky note fields to update',
+          );
         }
         return CliActionResult(
           message: 'Sticky note updated',
-          stateUpdate: {'text': text},
+          stateUpdate: update,
         );
       case 'append':
         final text = args['text'] as String?;
@@ -60,6 +67,7 @@ class StickyNoteCliHandler extends PanelCliHandler {
           stateUpdate: {
             if (color != null) 'color': color,
             if (textColor != null) 'textColor': textColor,
+            if (args['fontSize'] != null) 'fontSize': args['fontSize'],
           },
         );
       default:
@@ -71,9 +79,15 @@ class StickyNoteCliHandler extends PanelCliHandler {
   Map<String, CliActionHelp> get actionHelp => {
     'get': const CliActionHelp(description: 'Read sticky note text and colors'),
     'set': const CliActionHelp(
-      description: 'Replace sticky note text',
-      params: {'text': 'New sticky note text'},
-      example: 'yoloit do "<board>" "<sticky>" set \'{"text":"Idea"}\'',
+      description: 'Update sticky note text, colors, or text size',
+      params: {
+        'text': 'New sticky note text',
+        'color': 'Background color as #RRGGBB',
+        'textColor': 'Text color as #RRGGBB',
+        'fontSize': 'Text size in pixels',
+      },
+      example:
+          'yoloit do "<board>" "<sticky>" set \'{"text":"Idea","color":"#FEF08A","fontSize":22}\'',
     ),
     'append': const CliActionHelp(
       description: 'Append a new line to sticky note text',
@@ -84,6 +98,7 @@ class StickyNoteCliHandler extends PanelCliHandler {
       params: {
         'color': 'Background color as #RRGGBB',
         'textColor': 'Text color as #RRGGBB',
+        'fontSize': 'Text size in pixels',
       },
     ),
   };

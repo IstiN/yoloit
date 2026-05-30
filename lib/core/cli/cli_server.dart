@@ -2538,6 +2538,15 @@ class CliServer {
       );
       _scheduleRebuild();
     }
+    if (body.containsKey('zIndex')) {
+      await cubit.updatePanel(
+        panel.id,
+        (p) =>
+            p.copyWith(zIndex: (body['zIndex'] as num?)?.toInt() ?? p.zIndex),
+        boardId: board.id,
+      );
+      _scheduleRebuild();
+    }
     return _json({'ok': true});
   }
 

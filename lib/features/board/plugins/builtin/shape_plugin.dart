@@ -45,6 +45,9 @@ class ShapePlugin extends BoardPanelPlugin {
   bool get showHeader => false;
 
   @override
+  bool get hasEditor => true;
+
+  @override
   Widget buildContent(
     BuildContext context,
     BoardPanelInstance panel,
@@ -86,6 +89,21 @@ class ShapePlugin extends BoardPanelPlugin {
         renderContext.onUpdateState({...panel.state, ...update});
       },
     );
+  }
+
+  @override
+  Future<bool> showEditor(
+    BuildContext context,
+    BoardPanelInstance panel,
+    ValueChanged<Map<String, dynamic>> onSave,
+  ) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => _ShapeEditorDialog(panel: panel),
+    );
+    if (result == null) return false;
+    onSave({...panel.state, ...result});
+    return true;
   }
 }
 
@@ -490,6 +508,241 @@ class _ShapeOption {
     'frame' => '▢',
     _ => '?',
   };
+}
+
+class _ShapeEditorDialog extends StatefulWidget {
+  const _ShapeEditorDialog({required this.panel});
+
+  final BoardPanelInstance panel;
+
+  @override
+  State<_ShapeEditorDialog> createState() => _ShapeEditorDialogState();
+}
+
+class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
+  late String _shape;
+  late String _fillColor;
+  late String _strokeColor;
+  late String _textColor;
+  late double _strokeWidth;
+  late String _textHAlign;
+  late String _textVAlign;
+  late String _textOrientation;
+
+  static const _colors = [
+    '#00000000',
+    '#93C5FD',
+    '#A78BFA',
+    '#F472B6',
+    '#FBBF24',
+    '#34D399',
+    '#F87171',
+    '#E2E8F0',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final state = widget.panel.state;
+    _shape = state['shape'] as String? ?? 'rectangle';
+    _fillColor = state['fillColor'] as String? ?? '#00000000';
+    _strokeColor = state['strokeColor'] as String? ?? '#93C5FD';
+    _textColor = state['textColor'] as String? ?? '#E2E8F0';
+    _strokeWidth = (state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
+    _textHAlign = state['textHAlign'] as String? ?? 'center';
+    _textVAlign = state['textVAlign'] as String? ?? 'center';
+    _textOrientation = state['textOrientation'] as String? ?? 'horizontal';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Shape settings'),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _EditorSectionLabel('Shape'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    _ShapePalette._options.map((option) {
+                      final selected = _shape == option.shape;
+                      return ChoiceChip(
+                        label: Text(option.tooltip),
+                        selected: selected,
+                        onSelected:
+                            (_) => setState(() => _shape = option.shape),
+                      );
+                    }).toList(),
+              ),
+              const SizedBox(height: 18),
+              _EditorSectionLabel('Stroke color'),
+              _EditorColorRow(
+                colors: _colors.where((hex) => hex != '#00000000').toList(),
+                selected: _strokeColor,
+                onSelected: (value) => setState(() => _strokeColor = value),
+              ),
+              const SizedBox(height: 18),
+              _EditorSectionLabel('Fill color'),
+              _EditorColorRow(
+                colors: _colors,
+                selected: _fillColor,
+                onSelected: (value) => setState(() => _fillColor = value),
+              ),
+              const SizedBox(height: 18),
+              _EditorSectionLabel('Text color'),
+              _EditorColorRow(
+                colors: _colors.where((hex) => hex != '#00000000').toList(),
+                selected: _textColor,
+                onSelected: (value) => setState(() => _textColor = value),
+              ),
+              const SizedBox(height: 18),
+              _EditorSectionLabel('Stroke width ${_strokeWidth.round()}'),
+              Slider(
+                min: 1,
+                max: 12,
+                divisions: 11,
+                value: _strokeWidth.clamp(1, 12),
+                onChanged: (value) => setState(() => _strokeWidth = value),
+              ),
+              const SizedBox(height: 18),
+              _EditorSectionLabel('Text alignment'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _choice('Left', _textHAlign == 'left', () {
+                    setState(() => _textHAlign = 'left');
+                  }),
+                  _choice('Center', _textHAlign == 'center', () {
+                    setState(() => _textHAlign = 'center');
+                  }),
+                  _choice('Right', _textHAlign == 'right', () {
+                    setState(() => _textHAlign = 'right');
+                  }),
+                  _choice('Top', _textVAlign == 'top', () {
+                    setState(() => _textVAlign = 'top');
+                  }),
+                  _choice('Middle', _textVAlign == 'center', () {
+                    setState(() => _textVAlign = 'center');
+                  }),
+                  _choice('Bottom', _textVAlign == 'bottom', () {
+                    setState(() => _textVAlign = 'bottom');
+                  }),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _EditorSectionLabel('Text orientation'),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _choice('Horizontal', _textOrientation == 'horizontal', () {
+                    setState(() => _textOrientation = 'horizontal');
+                  }),
+                  _choice('Vertical', _textOrientation == 'vertical', () {
+                    setState(() => _textOrientation = 'vertical');
+                  }),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed:
+              () => Navigator.of(context).pop({
+                'shape': _shape,
+                'fillColor': _fillColor,
+                'strokeColor': _strokeColor,
+                'textColor': _textColor,
+                'strokeWidth': _strokeWidth,
+                'textHAlign': _textHAlign,
+                'textVAlign': _textVAlign,
+                'textOrientation': _textOrientation,
+              }),
+          child: const Text('Apply'),
+        ),
+      ],
+    );
+  }
+
+  Widget _choice(String label, bool selected, VoidCallback onSelected) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+    );
+  }
+}
+
+class _EditorSectionLabel extends StatelessWidget {
+  const _EditorSectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+    );
+  }
+}
+
+class _EditorColorRow extends StatelessWidget {
+  const _EditorColorRow({
+    required this.colors,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> colors;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children:
+          colors.map((hex) {
+            final color = _parseHex(hex) ?? Colors.transparent;
+            final isTransparent = hex == '#00000000';
+            final isSelected = selected.toUpperCase() == hex.toUpperCase();
+            return InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => onSelected(hex),
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color:
+                        isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).dividerColor,
+                    width: isSelected ? 3 : 1,
+                  ),
+                ),
+                child: isTransparent ? const Icon(Icons.block, size: 16) : null,
+              ),
+            );
+          }).toList(),
+    );
+  }
 }
 
 Alignment _textAlignment(String hAlign, String vAlign) {

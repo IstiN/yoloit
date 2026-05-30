@@ -807,6 +807,14 @@ commands = [
   },
   {
     "group": "panel",
+    "name": "panel:z",
+    "description": "Set panel depth/layer order",
+    "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True], ["front|back|zIndex", "Move to front/back or set explicit integer zIndex", True]],
+    "example": "yoloit panel:z \"My Board\" \"Shape\" front",
+    "aliases": ["panel:front", "panel:back"],
+  },
+  {
+    "group": "panel",
     "name": "panel:delete",
     "description": "Delete a panel",
     "params": [["board", "Board id or name", True], ["panel", "Panel id or title", True]],
@@ -2326,6 +2334,36 @@ PY
       esac
     fi
     _put "/boards/${bid}/panels/${pid}" "{\"width\":$w,\"height\":$h,\"focus\":true}" | python3 -m json.tool 2>/dev/null
+    ;;
+  panel:z|panel:front|panel:back)
+    if [[ "$cmd" == "panel:front" ]]; then
+      [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:front <board> <panel>" >&2; exit 1; }
+      set -- "$1" "$2" "front"
+    elif [[ "$cmd" == "panel:back" ]]; then
+      [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:back <board> <panel>" >&2; exit 1; }
+      set -- "$1" "$2" "back"
+    fi
+    [[ $# -lt 3 ]] && { echo "Usage: yoloit panel:z <board> <panel> <front|back|zIndex>" >&2; exit 1; }
+    bid=$(_encode "$1"); _use_board "$1"; pid=$(_encode "$2")
+    target="$3"
+    case "$target" in
+      front)
+        panels_json=$(_get "/boards/${bid}/panels")
+        z=$(python3 -c 'import json,sys; d=json.load(sys.stdin); ps=d.get("panels") or []; print(max([int(p.get("zIndex") or 0) for p in ps] + [0]) + 1)' <<<"$panels_json")
+        ;;
+      back)
+        panels_json=$(_get "/boards/${bid}/panels")
+        z=$(python3 -c 'import json,sys; d=json.load(sys.stdin); ps=d.get("panels") or []; print(min([int(p.get("zIndex") or 0) for p in ps] + [0]) - 1)' <<<"$panels_json")
+        ;;
+      *)
+        if ! [[ "$target" =~ ^-?[0-9]+$ ]]; then
+          echo "Usage: yoloit panel:z <board> <panel> <front|back|zIndex>" >&2
+          exit 1
+        fi
+        z="$target"
+        ;;
+    esac
+    _put "/boards/${bid}/panels/${pid}" "{\"zIndex\":$z}" | python3 -m json.tool 2>/dev/null
     ;;
   panel:delete)
     [[ $# -lt 2 ]] && { echo "Usage: yoloit panel:delete <board> <panel>" >&2; exit 1; }
@@ -3976,6 +4014,7 @@ ALIAS = {
     'board:translate':'board:focus','note:delete':'panel:delete',
     'panel:stop':'panel:hide','run:script':'run:attach',
     'sticky:new':'sticky:create','shape:new':'shape:create','frame:new':'frame:create',
+    'panel:bring-front':'panel:front','panel:send-back':'panel:back',
 }
 if cmd in ALIAS:
     cmd = ALIAS[cmd]
