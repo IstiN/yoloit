@@ -65,6 +65,9 @@ class GlobalEnvGroupsService {
   }
 
   final _storage = _buildStorage();
+  List<GlobalEnvGroup>? _loadAllCache;
+  Future<List<GlobalEnvGroup>>? _loadAllInFlight;
+  String? _loadAllCacheSignature;
 
   File get _storageFile {
     final dir = PlatformDirs.instance.configDir;
@@ -74,6 +77,21 @@ class GlobalEnvGroupsService {
   /// Loads all env groups.  Values come from secure storage; only metadata
   /// (id, name, keys) lives in the JSON file.
   Future<List<GlobalEnvGroup>> loadAll() async {
+    final signature = _storageFileSignature();
+    final cached = _loadAllCache;
+    if (cached != null && _loadAllCacheSignature == signature) return cached;
+    return _loadAllInFlight ??= _loadAllUncached().then((groups) {
+      _loadAllCacheSignature = _storageFileSignature();
+      _loadAllCache = groups;
+      _loadAllInFlight = null;
+      return groups;
+    }, onError: (Object error, StackTrace stackTrace) {
+      _loadAllInFlight = null;
+      Error.throwWithStackTrace(error, stackTrace);
+    });
+  }
+
+  Future<List<GlobalEnvGroup>> _loadAllUncached() async {
     try {
       List<_GroupMeta> metas;
       final file = _storageFile;
@@ -177,6 +195,9 @@ class GlobalEnvGroupsService {
     }
     // Write metadata (no values) to JSON.
     await _writeMetaFile(groups);
+    _loadAllCache = List<GlobalEnvGroup>.unmodifiable(groups);
+    _loadAllCacheSignature = _storageFileSignature();
+    _loadAllInFlight = null;
   }
 
   /// Deletes a group's secure values from the credential store.
@@ -188,6 +209,9 @@ class GlobalEnvGroupsService {
       if (legacyKey != null && legacyKey != key) {
         await _storage.delete(key: legacyKey);
       }
+      _loadAllCache = null;
+      _loadAllInFlight = null;
+      _loadAllCacheSignature = null;
     } catch (e) {
       debugPrint('[EnvGroups] deleteGroupSecrets error: $e');
     }
@@ -196,6 +220,7 @@ class GlobalEnvGroupsService {
   Future<Map<String, String>> resolveSelectedGroups(
     List<String> selectedGroupIds,
   ) async {
+    if (selectedGroupIds.isEmpty) return const {};
     final all = await loadAll();
     final byId = {for (final group in all) group.id: group};
     final merged = <String, String>{};
@@ -220,6 +245,7 @@ class GlobalEnvGroupsService {
   Future<List<String>> resolveSelectedGroupNames(
     List<String> selectedGroupIds,
   ) async {
+    if (selectedGroupIds.isEmpty) return const [];
     final all = await loadAll();
     final byId = {for (final group in all) group.id: group};
     return selectedGroupIds
@@ -290,6 +316,13 @@ class GlobalEnvGroupsService {
       await dir.create(recursive: true);
     }
     await file.writeAsString(encoded, flush: true);
+  }
+
+  String _storageFileSignature() {
+    final file = _storageFile;
+    if (!file.existsSync()) return '${file.path}:missing';
+    final stat = file.statSync();
+    return '${file.path}:${stat.modified.microsecondsSinceEpoch}:${stat.size}';
   }
 
   /// Returns `true` if the write succeeded.

@@ -5083,6 +5083,8 @@ class _BoardToolsPanel extends StatelessWidget {
                             );
                             // Build menu items from all generic plugins
                             const genericTypes = [
+                              'board.sticky',
+                              'board.shape',
                               'board.kanban',
                               'board.webpage',
                               'board.code.snippet',
