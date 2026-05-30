@@ -37,8 +37,10 @@ String resolveTerminalSessionId(
 
 /// Orchestrates real-time collaboration over a local WebSocket connection.
 ///
-/// **Host mode**: starts [CollaborationServer], subscribes to [MindMapCubit]
-/// changes, and broadcasts JSON snapshots/deltas to all connected clients.
+/// **Host mode**: starts [CollaborationServer], subscribes to the legacy
+/// [MindMapCubit] collaboration backend, and broadcasts JSON snapshots/deltas
+/// to all connected clients. TODO(board-collab): move this transport to
+/// BoardCubit once Board View supports browser guests.
 ///
 /// **Guest mode**: starts [CollaborationClient], receives JSON messages, and
 /// applies them to the local [MindMapCubit].
@@ -48,9 +50,9 @@ class CollaborationCubit extends Cubit<CollaborationState> {
   /// host (macOS); leave null on web guests where PtyService is unavailable.
   ///
   /// [ensureNodesPopulated] is called before sending the first snapshot when
-  /// [mindMapCubit] has no positions (user hasn't opened Map View yet).
-  /// The host (macOS app.dart) provides a callback that reads workspace and
-  /// terminal state and calls [mindMapCubit.updateNodes]; leave null on web.
+  /// the legacy collaboration backend has no positions. The host (macOS
+  /// app.dart) provides a callback that reads workspace and terminal state and
+  /// calls [mindMapCubit.updateNodes]; leave null on web.
   CollaborationCubit({
     required this.mindMapCubit,
     this.ensureNodesPopulated,
@@ -887,8 +889,8 @@ class CollaborationCubit extends Cubit<CollaborationState> {
     }
   }
 
-  /// Ensures the mind map has nodes populated from the current workspace and
-  /// terminal state (for users who haven't opened the Map View yet), then
+  /// Ensures the legacy collaboration backend has nodes populated from the
+  /// current workspace and terminal state, then
   /// sends the full snapshot to [clientId].
   Future<void> _sendSnapshotAfterPopulate(String clientId) async {
     if (mindMapCubit.state.nodes.isEmpty) {

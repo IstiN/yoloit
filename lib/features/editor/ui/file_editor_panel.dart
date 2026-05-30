@@ -30,7 +30,6 @@ import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/editor/utils/file_type_utils.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
-import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
 import 'package:yoloit/features/review/models/review_models.dart';
 
 class FileEditorPanel extends StatefulWidget {
@@ -730,21 +729,11 @@ class _TabBar extends StatelessWidget {
                     onClose: () => context.read<FileEditorCubit>().closeTab(i),
                     onCloseOthers:
                         () => context.read<FileEditorCubit>().closeOthers(i),
-                    onPopOut: () => _popOutTab(context, state.tabs[i]),
                   ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  void _popOutTab(BuildContext context, EditorTab tab) {
-    final nodeId = 'panel:${tab.filePath.hashCode}';
-    context.read<MindMapCubit>().openFileAsPanel(
-      id: nodeId,
-      filePath: tab.filePath,
-      connectorColor: context.appColors.accentBlue.withValues(alpha: 112 / 255),
     );
   }
 }
@@ -756,7 +745,6 @@ class _Tab extends StatefulWidget {
     required this.onTap,
     required this.onClose,
     this.onCloseOthers,
-    this.onPopOut,
   });
 
   final EditorTab tab;
@@ -764,7 +752,6 @@ class _Tab extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onClose;
   final VoidCallback? onCloseOthers;
-  final VoidCallback? onPopOut;
 
   @override
   State<_Tab> createState() => _TabState();
@@ -802,14 +789,6 @@ class _TabState extends State<_Tab> {
             style: TextStyle(fontSize: 12, color: onSurface),
           ),
         ),
-        if (widget.onPopOut != null)
-          PopupMenuItem(
-            value: 'pop_out',
-            child: Text(
-              '⬡ Open in Map panel',
-              style: TextStyle(fontSize: 12, color: onSurface),
-            ),
-          ),
       ],
     );
     if (result == null) return;
@@ -818,8 +797,6 @@ class _TabState extends State<_Tab> {
         widget.onClose();
       case 'close_others':
         widget.onCloseOthers?.call();
-      case 'pop_out':
-        widget.onPopOut?.call();
     }
   }
 

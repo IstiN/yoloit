@@ -14,9 +14,8 @@ import 'package:yoloit/features/mindmap/bloc/mindmap_state.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_factory.dart';
 import 'package:yoloit/features/mindmap/sidebar/show_hide_sidebar.dart';
 
-/// Full-featured mindmap canvas for web/remote guests.
-/// Mirrors the macOS MindMapView: toolbar, minimap, sidebar, drag handles,
-/// resize handles on every card.
+/// Legacy collaboration canvas for web/remote guests.
+/// TODO(board-collab): replace this with a Board View guest surface.
 class WebMindMapCanvas extends StatefulWidget {
   const WebMindMapCanvas({super.key});
 

@@ -31,7 +31,7 @@ class SessionPrefs {
   // First-launch / setup
   static const _kSetupCompleted = 'app.setupCompleted';
 
-  // Canvas mode (panes / mindMap / board)
+  // Canvas mode (panes / board). Legacy "mindMap" values are mapped to board.
   static const _kCanvasMode = 'shell.canvasMode';
 
   // Updates
@@ -236,6 +236,7 @@ class SessionSnapshot {
   final PanelVisibility fileTreeVis;
   final PanelVisibility agentsVis;
   final PanelVisibility editorVis;
-  /// Last canvas mode: 'panes', 'mindMap', or 'board'.
+  /// Last canvas mode: 'panes' or 'board'. Legacy 'mindMap' may still exist in
+  /// persisted prefs and is mapped to board by the shell.
   final String canvasMode;
 }

@@ -12,7 +12,6 @@ import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
-import 'package:yoloit/features/mindmap/mindmap_view.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
@@ -41,7 +40,7 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-enum _CanvasMode { panes, mindMap, board }
+enum _CanvasMode { panes, board }
 
 class _MainShellState extends State<MainShell> with WindowListener {
   final _workspacePanelKey = GlobalKey<WorkspacePanelState>();
@@ -81,10 +80,11 @@ class _MainShellState extends State<MainShell> with WindowListener {
       _agentsVis = snap.agentsVis;
       _fileTreeVis = snap.fileTreeVis;
       _sessionSnapshot = snap;
-      // Restore last canvas mode (default: board so the last board opens automatically)
+      // Restore last canvas mode (default: board so the last board opens automatically).
+      // Legacy "mindMap" values are intentionally folded into Board View.
       _canvasMode = switch (snap.canvasMode) {
-        'mindMap' => _CanvasMode.mindMap,
         'board' => _CanvasMode.board,
+        'mindMap' => _CanvasMode.board,
         _ => _CanvasMode.panes,
       };
     });
@@ -223,7 +223,6 @@ class _MainShellState extends State<MainShell> with WindowListener {
     });
     // Persist the new canvas mode so it's restored on next launch.
     SessionPrefs.saveCanvasMode(switch (_canvasMode) {
-      _CanvasMode.mindMap => 'mindMap',
       _CanvasMode.board => 'board',
       _CanvasMode.panes => 'panes',
     });
@@ -351,8 +350,6 @@ class _MainShellState extends State<MainShell> with WindowListener {
                                   : PanelVisibility.open;
                           _setPanelVis('filetree', next);
                         },
-                        onToggleMapView:
-                            () => _toggleCanvasMode(_CanvasMode.mindMap),
                         onToggleBoardView:
                             () => _toggleCanvasMode(_CanvasMode.board),
                         onSearch: _openFileSearch,
@@ -370,9 +367,7 @@ class _MainShellState extends State<MainShell> with WindowListener {
                         ),
                       Expanded(
                         child:
-                            _canvasMode == _CanvasMode.mindMap
-                                ? const MindMapView()
-                                : _canvasMode == _CanvasMode.board
+                            _canvasMode == _CanvasMode.board
                                 ? const BoardView()
                                 : _FourPaneLayout(
                                   workspacePanelKey: _workspacePanelKey,
@@ -1005,7 +1000,6 @@ class _TitleBar extends StatelessWidget {
     required this.onToggleWorkspace,
     required this.onToggleAgents,
     required this.onToggleFileTree,
-    required this.onToggleMapView,
     required this.onToggleBoardView,
     required this.onSearch,
   });
@@ -1017,7 +1011,6 @@ class _TitleBar extends StatelessWidget {
   final VoidCallback onToggleWorkspace;
   final VoidCallback onToggleAgents;
   final VoidCallback onToggleFileTree;
-  final VoidCallback onToggleMapView;
   final VoidCallback onToggleBoardView;
   final VoidCallback onSearch;
 
@@ -1112,15 +1105,6 @@ class _TitleBar extends StatelessWidget {
               ),
             ),
             // Right panel buttons (fixed, always right-anchored)
-            // Map view toggle button
-            _PanelToggleButton(
-              icon: Icons.hub_outlined,
-              tooltip: 'Map View',
-              semanticsLabel: 'Toggle Miro-like map view',
-              active: canvasMode == _CanvasMode.mindMap,
-              onTap: onToggleMapView,
-            ),
-            const SizedBox(width: 4),
             _PanelToggleButton(
               icon: Icons.dashboard_customize_outlined,
               tooltip: 'Board View',

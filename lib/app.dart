@@ -70,7 +70,9 @@ class App extends StatelessWidget {
         ),
         BlocProvider(create: (_) => MindMapCubit()),
         BlocProvider(create: (_) => BoardCubit()),
-        // CollaborationCubit must come after MindMapCubit so it can read it.
+        // Collaboration/guest mode still uses the legacy MindMap state model as
+        // a compatibility backend. TODO(board-collab): migrate this to BoardCubit
+        // and remove the remaining mindmap backend after Board View supports guests.
         BlocProvider(
           create: (ctx) {
             late final CollaborationCubit collaborationCubit;
@@ -300,9 +302,9 @@ class App extends StatelessWidget {
     );
   }
 
-  /// Populates [mindMapCubit] with nodes derived from workspace and terminal
-  /// state so that browser guests see a meaningful canvas even when the user
-  /// has not yet opened the Map View in the macOS app.
+  /// Populates the legacy collaboration canvas model with nodes derived from
+  /// workspace and terminal state. TODO(board-collab): replace with BoardCubit
+  /// snapshots once Board View supports browser guests.
   static Future<void> _populateMindMap(
     MindMapCubit mindMapCubit,
     WorkspaceState wsState,
