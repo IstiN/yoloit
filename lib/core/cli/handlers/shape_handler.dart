@@ -18,6 +18,9 @@ class ShapeCliHandler extends PanelCliHandler {
     'strokeColor': panel.state['strokeColor'] ?? '#93C5FD',
     'textColor': panel.state['textColor'] ?? '#E2E8F0',
     'strokeWidth': panel.state['strokeWidth'] ?? 3.0,
+    'textHAlign': panel.state['textHAlign'] ?? 'center',
+    'textVAlign': panel.state['textVAlign'] ?? 'center',
+    'textOrientation': panel.state['textOrientation'] ?? 'horizontal',
   };
 
   @override
@@ -38,6 +41,9 @@ class ShapeCliHandler extends PanelCliHandler {
           'strokeColor',
           'textColor',
           'strokeWidth',
+          'textHAlign',
+          'textVAlign',
+          'textOrientation',
         ]) {
           if (args.containsKey(key)) update[key] = args[key];
         }
@@ -65,9 +71,12 @@ class ShapeCliHandler extends PanelCliHandler {
         'strokeColor': 'Stroke color as #RRGGBB',
         'textColor': 'Text color as #RRGGBB',
         'strokeWidth': 'Stroke width in pixels',
+        'textHAlign': 'left | center | right',
+        'textVAlign': 'top | center | bottom',
+        'textOrientation': 'horizontal | vertical',
       },
       example:
-          'yoloit do "<board>" "<shape>" set \'{"shape":"diamond","text":"Decision"}\'',
+          'yoloit do "<board>" "<shape>" set \'{"shape":"diamond","text":"Decision","textHAlign":"left"}\'',
     ),
   };
 }

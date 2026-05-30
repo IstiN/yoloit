@@ -33,6 +33,9 @@ class ShapePlugin extends BoardPanelPlugin {
     'strokeColor': '#93C5FD',
     'textColor': '#E2E8F0',
     'strokeWidth': 3.0,
+    'textHAlign': 'center',
+    'textVAlign': 'center',
+    'textOrientation': 'horizontal',
   };
 
   @override
@@ -57,6 +60,13 @@ class ShapePlugin extends BoardPanelPlugin {
     final textColor =
         _parseHex(panel.state['textColor'] as String?) ?? colors.textPrimary;
     final strokeWidth = (panel.state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
+    final textHAlign =
+        (panel.state['textHAlign'] as String? ?? 'center').toLowerCase();
+    final textVAlign =
+        (panel.state['textVAlign'] as String? ?? 'center').toLowerCase();
+    final textOrientation =
+        (panel.state['textOrientation'] as String? ?? 'horizontal')
+            .toLowerCase();
 
     return _ShapeContent(
       panel: panel,
@@ -65,12 +75,15 @@ class ShapePlugin extends BoardPanelPlugin {
       strokeColor: strokeColor,
       textColor: textColor,
       strokeWidth: strokeWidth,
+      textHAlign: textHAlign,
+      textVAlign: textVAlign,
+      textOrientation: textOrientation,
       isSelected: renderContext.isSelected,
       onChanged: (value) {
         renderContext.onUpdateState({...panel.state, 'text': value});
       },
-      onShapeChanged: (nextShape) {
-        renderContext.onUpdateState({...panel.state, 'shape': nextShape});
+      onStateChanged: (update) {
+        renderContext.onUpdateState({...panel.state, ...update});
       },
     );
   }
@@ -84,9 +97,12 @@ class _ShapeContent extends StatefulWidget {
     required this.strokeColor,
     required this.textColor,
     required this.strokeWidth,
+    required this.textHAlign,
+    required this.textVAlign,
+    required this.textOrientation,
     required this.isSelected,
     required this.onChanged,
-    required this.onShapeChanged,
+    required this.onStateChanged,
   });
 
   final BoardPanelInstance panel;
@@ -95,9 +111,12 @@ class _ShapeContent extends StatefulWidget {
   final Color strokeColor;
   final Color textColor;
   final double strokeWidth;
+  final String textHAlign;
+  final String textVAlign;
+  final String textOrientation;
   final bool isSelected;
   final ValueChanged<String> onChanged;
-  final ValueChanged<String> onShapeChanged;
+  final ValueChanged<Map<String, dynamic>> onStateChanged;
 
   @override
   State<_ShapeContent> createState() => _ShapeContentState();
@@ -136,6 +155,35 @@ class _ShapeContentState extends State<_ShapeContent> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final alignment = _textAlignment(widget.textHAlign, widget.textVAlign);
+    final textAlign = _textAlign(widget.textHAlign);
+    final isVertical = widget.textOrientation == 'vertical';
+    final editor = TextField(
+      controller: _controller,
+      maxLines: null,
+      keyboardType: TextInputType.multiline,
+      textAlign: textAlign,
+      onChanged: widget.onChanged,
+      decoration: InputDecoration(
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        hintText: 'Type',
+        hintStyle: TextStyle(
+          color: widget.textColor.withValues(alpha: 0.45),
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+        isCollapsed: true,
+      ),
+      cursorColor: widget.textColor,
+      style: TextStyle(
+        color: widget.textColor,
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        height: 1.2,
+      ),
+    );
     return Stack(
       children: [
         CustomPaint(
@@ -145,34 +193,19 @@ class _ShapeContentState extends State<_ShapeContent> {
             strokeColor: widget.strokeColor,
             strokeWidth: widget.strokeWidth,
           ),
-          child: Center(
+          child: Align(
+            alignment: alignment,
             child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                keyboardType: TextInputType.multiline,
-                textAlign: TextAlign.center,
-                onChanged: widget.onChanged,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  hintText: 'Type',
-                  hintStyle: TextStyle(
-                    color: widget.textColor.withValues(alpha: 0.45),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  isCollapsed: true,
+              padding: const EdgeInsets.all(26),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isVertical ? 160 : 220,
+                  maxHeight: isVertical ? 220 : 160,
                 ),
-                cursorColor: widget.textColor,
-                style: TextStyle(
-                  color: widget.textColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
+                child:
+                    isVertical
+                        ? RotatedBox(quarterTurns: 3, child: editor)
+                        : editor,
               ),
             ),
           ),
@@ -180,11 +213,16 @@ class _ShapeContentState extends State<_ShapeContent> {
         if (widget.isSelected)
           Positioned(
             left: 10,
+            right: 10,
             bottom: 10,
             child: _ShapePalette(
               selectedShape: widget.shape,
+              selectedColor: widget.strokeColor,
+              textHAlign: widget.textHAlign,
+              textVAlign: widget.textVAlign,
+              textOrientation: widget.textOrientation,
               colors: colors,
-              onSelected: widget.onShapeChanged,
+              onUpdate: widget.onStateChanged,
             ),
           ),
       ],
@@ -195,13 +233,21 @@ class _ShapeContentState extends State<_ShapeContent> {
 class _ShapePalette extends StatelessWidget {
   const _ShapePalette({
     required this.selectedShape,
+    required this.selectedColor,
+    required this.textHAlign,
+    required this.textVAlign,
+    required this.textOrientation,
     required this.colors,
-    required this.onSelected,
+    required this.onUpdate,
   });
 
   final String selectedShape;
+  final Color selectedColor;
+  final String textHAlign;
+  final String textVAlign;
+  final String textOrientation;
   final AppColorScheme colors;
-  final ValueChanged<String> onSelected;
+  final ValueChanged<Map<String, dynamic>> onUpdate;
 
   static const _options = [
     _ShapeOption('rectangle', 'Rect'),
@@ -210,6 +256,16 @@ class _ShapePalette extends StatelessWidget {
     _ShapeOption('triangle', 'Triangle'),
     _ShapeOption('hexagon', 'Hex'),
     _ShapeOption('frame', 'Frame'),
+  ];
+
+  static const _colorOptions = [
+    '#93C5FD',
+    '#A78BFA',
+    '#F472B6',
+    '#FBBF24',
+    '#34D399',
+    '#F87171',
+    '#E2E8F0',
   ];
 
   @override
@@ -229,42 +285,190 @@ class _ShapePalette extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children:
-              _options.map((option) {
-                final selected = selectedShape == option.shape;
-                return Tooltip(
-                  message: option.tooltip,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => onSelected(option.shape),
-                    child: Container(
-                      width: 34,
-                      height: 28,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ..._options.map((option) {
+              final selected = selectedShape == option.shape;
+              return Tooltip(
+                message: option.tooltip,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => onUpdate({'shape': option.shape}),
+                  child: Container(
+                    width: 34,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color:
+                          selected
+                              ? colors.primary.withValues(alpha: 0.24)
+                              : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      option.label,
+                      style: TextStyle(
                         color:
                             selected
-                                ? colors.primary.withValues(alpha: 0.24)
-                                : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        option.label,
-                        style: TextStyle(
-                          color:
-                              selected
-                                  ? colors.primaryLight
-                                  : colors.textSecondary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
+                                ? colors.primaryLight
+                                : colors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+              );
+            }),
+            _ToolbarDivider(colors: colors),
+            ..._colorOptions.map((hex) {
+              final color = _parseHex(hex)!;
+              final selected = _sameColor(selectedColor, color);
+              return Tooltip(
+                message: 'Color $hex',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () => onUpdate({'strokeColor': hex, 'textColor': hex}),
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected ? colors.primaryLight : colors.divider,
+                        width: selected ? 2 : 1,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+            _ToolbarDivider(colors: colors),
+            _TextToolButton(
+              label: 'L',
+              tooltip: 'Text left',
+              selected: textHAlign == 'left',
+              colors: colors,
+              onTap: () => onUpdate({'textHAlign': 'left'}),
+            ),
+            _TextToolButton(
+              label: 'C',
+              tooltip: 'Text center',
+              selected: textHAlign == 'center',
+              colors: colors,
+              onTap: () => onUpdate({'textHAlign': 'center'}),
+            ),
+            _TextToolButton(
+              label: 'R',
+              tooltip: 'Text right',
+              selected: textHAlign == 'right',
+              colors: colors,
+              onTap: () => onUpdate({'textHAlign': 'right'}),
+            ),
+            _TextToolButton(
+              label: 'T',
+              tooltip: 'Text top',
+              selected: textVAlign == 'top',
+              colors: colors,
+              onTap: () => onUpdate({'textVAlign': 'top'}),
+            ),
+            _TextToolButton(
+              label: 'M',
+              tooltip: 'Text middle',
+              selected: textVAlign == 'center',
+              colors: colors,
+              onTap: () => onUpdate({'textVAlign': 'center'}),
+            ),
+            _TextToolButton(
+              label: 'B',
+              tooltip: 'Text bottom',
+              selected: textVAlign == 'bottom',
+              colors: colors,
+              onTap: () => onUpdate({'textVAlign': 'bottom'}),
+            ),
+            _TextToolButton(
+              label: 'H',
+              tooltip: 'Horizontal text',
+              selected: textOrientation == 'horizontal',
+              colors: colors,
+              onTap: () => onUpdate({'textOrientation': 'horizontal'}),
+            ),
+            _TextToolButton(
+              label: 'V',
+              tooltip: 'Vertical text',
+              selected: textOrientation == 'vertical',
+              colors: colors,
+              onTap: () => onUpdate({'textOrientation': 'vertical'}),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolbarDivider extends StatelessWidget {
+  const _ToolbarDivider({required this.colors});
+
+  final AppColorScheme colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 22,
+      margin: const EdgeInsets.symmetric(horizontal: 3),
+      color: colors.divider,
+    );
+  }
+}
+
+class _TextToolButton extends StatelessWidget {
+  const _TextToolButton({
+    required this.label,
+    required this.tooltip,
+    required this.selected,
+    required this.colors,
+    required this.onTap,
+  });
+
+  final String label;
+  final String tooltip;
+  final bool selected;
+  final AppColorScheme colors;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          width: 26,
+          height: 24,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color:
+                selected
+                    ? colors.primary.withValues(alpha: 0.24)
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? colors.primaryLight : colors.textSecondary,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );
@@ -286,6 +490,35 @@ class _ShapeOption {
     'frame' => '▢',
     _ => '?',
   };
+}
+
+Alignment _textAlignment(String hAlign, String vAlign) {
+  final x = switch (hAlign) {
+    'left' => -1.0,
+    'right' => 1.0,
+    _ => 0.0,
+  };
+  final y = switch (vAlign) {
+    'top' => -1.0,
+    'bottom' => 1.0,
+    _ => 0.0,
+  };
+  return Alignment(x, y);
+}
+
+TextAlign _textAlign(String hAlign) {
+  return switch (hAlign) {
+    'left' => TextAlign.left,
+    'right' => TextAlign.right,
+    _ => TextAlign.center,
+  };
+}
+
+bool _sameColor(Color a, Color b) {
+  return (a.a * 255).round() == (b.a * 255).round() &&
+      (a.r * 255).round() == (b.r * 255).round() &&
+      (a.g * 255).round() == (b.g * 255).round() &&
+      (a.b * 255).round() == (b.b * 255).round();
 }
 
 class _ShapePainter extends CustomPainter {
