@@ -5,10 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/theme/app_theme.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
@@ -60,6 +62,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  void useXtermRenderer() {
+    AgentConfigService.instance.setTerminalRenderEngineForTesting(
+      TerminalRenderEngine.xterm,
+    );
+  }
 
   group('TerminalPanel widget tests', () {
     testWidgets('empty state shows AI Agents header', (tester) async {
@@ -257,6 +265,7 @@ void main() {
     testWidgets('terminal widget disables scroll-to-arrow fallback', (
       tester,
     ) async {
+      useXtermRenderer();
       final session = AgentSession(
         id: 'sess_scroll',
         type: AgentType.copilot,
@@ -281,6 +290,7 @@ void main() {
     testWidgets('terminal widget scrolls on trackpad pan-zoom updates', (
       tester,
     ) async {
+      useXtermRenderer();
       final session = AgentSession(
         id: 'sess_trackpad_scroll',
         type: AgentType.copilot,
@@ -337,6 +347,7 @@ void main() {
     testWidgets('alt-buffer pan-zoom scroll sends key fallback without mouse', (
       tester,
     ) async {
+      useXtermRenderer();
       final outputs = <String>[];
       final session = AgentSession(
         id: 'sess_alt_scroll',

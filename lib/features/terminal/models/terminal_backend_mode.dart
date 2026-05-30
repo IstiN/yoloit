@@ -16,16 +16,17 @@ extension TerminalBackendModeX on TerminalBackendMode {
   String get description => switch (this) {
     TerminalBackendMode.local => 'Best scroll UX; sessions stop with the app.',
     TerminalBackendMode.runtime =>
-      'Planned persistent YoLoIT-owned session host.',
+      'Default YoLoIT-owned persistent session host.',
     TerminalBackendMode.tmux =>
       'Legacy persistent backend; may intercept scroll.',
   };
 
   static TerminalBackendMode fromId(String? id) {
     return switch (id) {
+      'local' => TerminalBackendMode.local,
       'runtime' => TerminalBackendMode.runtime,
       'tmux' => TerminalBackendMode.tmux,
-      _ => TerminalBackendMode.local,
+      _ => TerminalBackendMode.runtime,
     };
   }
 }

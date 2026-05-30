@@ -450,7 +450,7 @@ class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
                       style: TextStyle(color: colors.textPrimary, fontSize: 13),
                     ),
                     Text(
-                      'Local is current default. Runtime will replace tmux for persistent sessions.',
+                      'Runtime is the default persistent backend. Local PTY remains available as a fallback.',
                       style: TextStyle(color: colors.textMuted, fontSize: 11),
                     ),
                   ],

@@ -131,14 +131,14 @@ class AgentConfigService {
   String _defaultAsrMode = 'local';
   String? _defaultAsrCloudConfigId;
   String? _defaultAsrCloudModel;
-  TerminalBackendMode _terminalBackendMode = TerminalBackendMode.local;
-  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.xterm;
+  TerminalBackendMode _terminalBackendMode = TerminalBackendMode.runtime;
+  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.kterm;
 
   final ValueNotifier<TerminalBackendMode> terminalBackendModeNotifier =
-      ValueNotifier<TerminalBackendMode>(TerminalBackendMode.local);
+      ValueNotifier<TerminalBackendMode>(TerminalBackendMode.runtime);
 
   final ValueNotifier<TerminalRenderEngine> terminalRenderEngineNotifier =
-      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.xterm);
+      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.kterm);
 
   static List<AgentConfig> get _defaults => [
     ...AgentType.values.map(
@@ -261,10 +261,22 @@ class AgentConfigService {
     await _savePrefs();
   }
 
+  @visibleForTesting
+  void setTerminalRenderEngineForTesting(TerminalRenderEngine engine) {
+    _terminalRenderEngine = engine;
+    terminalRenderEngineNotifier.value = engine;
+  }
+
   Future<void> setTerminalBackendMode(TerminalBackendMode mode) async {
     _terminalBackendMode = mode;
     terminalBackendModeNotifier.value = mode;
     await _savePrefs();
+  }
+
+  @visibleForTesting
+  void setTerminalBackendModeForTesting(TerminalBackendMode mode) {
+    _terminalBackendMode = mode;
+    terminalBackendModeNotifier.value = mode;
   }
 
   Future<void> _savePrefs() async {
@@ -278,9 +290,9 @@ class AgentConfigService {
           'defaultAsrCloudConfigId': _defaultAsrCloudConfigId,
         if (_defaultAsrCloudModel != null)
           'defaultAsrCloudModel': _defaultAsrCloudModel,
-        if (_terminalRenderEngine != TerminalRenderEngine.xterm)
+        if (_terminalRenderEngine != TerminalRenderEngine.kterm)
           'terminalRenderEngine': _terminalRenderEngine.id,
-        if (_terminalBackendMode != TerminalBackendMode.local)
+        if (_terminalBackendMode != TerminalBackendMode.runtime)
           'terminalBackendMode': _terminalBackendMode.id,
       }),
     );

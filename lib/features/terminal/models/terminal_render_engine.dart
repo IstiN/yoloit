@@ -12,14 +12,15 @@ extension TerminalRenderEngineX on TerminalRenderEngine {
   };
 
   String get description => switch (this) {
-    TerminalRenderEngine.xterm => 'Current renderer, stable baseline.',
-    TerminalRenderEngine.kterm => 'Experimental newer renderer for comparison.',
+    TerminalRenderEngine.xterm => 'Legacy stable baseline.',
+    TerminalRenderEngine.kterm => 'Default newer renderer.',
   };
 
   static TerminalRenderEngine fromId(String? id) {
     return switch (id) {
+      'xterm' => TerminalRenderEngine.xterm,
       'kterm' => TerminalRenderEngine.kterm,
-      _ => TerminalRenderEngine.xterm,
+      _ => TerminalRenderEngine.kterm,
     };
   }
 }
