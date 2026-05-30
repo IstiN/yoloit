@@ -107,14 +107,8 @@ void main() {
     model: 'model-id',
   );
 
-  test('Codex fallback models mirror bundled CLI picker models', () {
-    expect(kCodexModels.map((m) => m.id), [
-      'gpt-5.5',
-      'gpt-5.4',
-      'gpt-5.4-mini',
-      'gpt-5.3-codex',
-      'gpt-5.2',
-    ]);
+  test('Codex fallback models mirror current CLI picker models', () {
+    expect(kCodexModels.map((m) => m.id), ['gpt-5.5', 'gpt-5.4-mini']);
     expect(kCodexModels.first.isDefault, isTrue);
   });
 

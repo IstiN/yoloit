@@ -3740,6 +3740,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   bool? _providerInstalled; // null = checking, true = ok, false = missing
   List<ChatModelInfo>? _opencodeModels; // loaded async from models.dev
   bool _cursorModelsLoading = false;
+  bool _codexModelsLoading = false;
   bool? _cursorApiKeyConfigured; // null = unknown, true/false = checked
 
   String _providerLabel(String id) {
@@ -3819,6 +3820,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     final adapter = cfg?.streamAdapter ?? _selectedProvider;
     if (adapter == 'opencode') _loadOpencodeModels();
     if (_selectedProvider == 'cursor') _loadCursorModels();
+    if (adapter == 'codex') _loadCodexModels();
   }
 
   Future<void> _loadOpencodeModels() async {
@@ -3875,6 +3877,28 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
       debugPrint('[ChatSetup] cursor models load failed: $e');
     }
     if (mounted) setState(() => _cursorModelsLoading = false);
+  }
+
+  Future<void> _loadCodexModels() async {
+    if (_codexModelsLoading) return;
+    setState(() => _codexModelsLoading = true);
+    try {
+      final models =
+          await ProviderModelCatalogService.instance.discoverCodexModels();
+      if (models != null && models.isNotEmpty && mounted) {
+        setState(() {
+          if (!models.any((m) => m.id == _selectedModel)) {
+            _selectedModel =
+                models
+                    .firstWhere((m) => m.isDefault, orElse: () => models.first)
+                    .id;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[ChatSetup] codex models load failed: $e');
+    }
+    if (mounted) setState(() => _codexModelsLoading = false);
   }
 
   Future<void> _checkProviderInstalled(String provider) async {
@@ -4085,6 +4109,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                   final adapter = cfg?.streamAdapter ?? v;
                   if (adapter == 'opencode') _loadOpencodeModels();
                   if (adapter == 'cursor') _loadCursorModels();
+                  if (adapter == 'codex') _loadCodexModels();
                 },
               ),
             ),
@@ -4158,6 +4183,10 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             ),
           ],
           if (_cursorModelsLoading) ...[
+            const SizedBox(height: 4),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          if (_codexModelsLoading) ...[
             const SizedBox(height: 4),
             const LinearProgressIndicator(minHeight: 2),
           ],

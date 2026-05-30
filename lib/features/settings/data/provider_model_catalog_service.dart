@@ -379,7 +379,9 @@ class ProviderModelCatalogService {
     try {
       final file = File(_cliModelsPath);
       await file.parent.create(recursive: true);
-      final data = _cliModels.map(
+      final cacheableModels = Map<String, List<ChatModelInfo>>.from(_cliModels)
+        ..remove('codex');
+      final data = cacheableModels.map(
         (providerId, models) =>
             MapEntry(providerId, models.map((m) => m.toJson()).toList()),
       );
@@ -393,6 +395,7 @@ class ProviderModelCatalogService {
       if (!await file.exists()) return;
       final raw = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       raw.forEach((providerId, models) {
+        if (providerId == 'codex') return;
         _cliModels[providerId] =
             (models as List)
                 .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
