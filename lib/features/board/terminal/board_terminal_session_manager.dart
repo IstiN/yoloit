@@ -1,13 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_pty/flutter_pty.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
-import 'package:yoloit/features/terminal/data/pty_service.dart';
-import 'package:yoloit/features/terminal/data/tmux_service.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 
@@ -16,7 +14,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   static final instance = BoardTerminalSessionManager._();
 
-  final _ptyService = PtyService.instance;
+  final _backendService = TerminalBackendService.instance;
   final Map<String, AgentSession> _sessions = {};
   final Map<String, StreamSubscription<String>> _outputSubs = {};
   final Map<String, List<String>> _envGroupIdsBySession = {};
@@ -74,10 +72,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
 
   Future<void> killSession(String sessionId) async {
     _outputSubs.remove(sessionId)?.cancel();
-    _ptyService.kill(
-      sessionId,
-      onKillTmux: TmuxService.instance.killSession,
-    );
+    _backendService.kill(sessionId);
     final session = _sessions.remove(sessionId);
     if (session != null) {
       await BoardTerminalSessionHistory.instance.upsert(
@@ -120,32 +115,14 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     );
     final extraEnv = await GlobalEnvGroupsService.instance
         .resolveSelectedGroups(envGroupIds);
-    final Pty pty;
-    if (TmuxService.instance.isActive) {
-      pty = _ptyService.launchTmux(
-        sessionId: sessionId,
-        workspacePath: workingDir,
-        tmuxLauncher: TmuxService.instance.launch,
-        label: session.displayName,
-        extraEnv: extraEnv,
-      );
-      // When reattaching to an existing tmux session (-A flag), the shell
-      // inside it retains its original environment. Push env vars into the
-      // tmux session so new panes/windows inherit them, and export them into
-      // the currently running shell via send-keys.
-      if (extraEnv.isNotEmpty) {
-        await TmuxService.instance.injectEnv(sessionId, extraEnv);
-      }
-    } else {
-      pty = _ptyService.launch(
-        sessionId: sessionId,
-        workspacePath: workingDir,
-        label: session.displayName,
-        extraEnv: extraEnv,
-      );
-    }
+    final process = await _backendService.launch(
+      sessionId: sessionId,
+      workspacePath: workingDir,
+      label: session.displayName,
+      extraEnv: extraEnv,
+    );
     _sessions[sessionId] = session;
-    _attachPty(pty, session);
+    _attachProcess(process, session);
     await BoardTerminalSessionHistory.instance.upsert(
       BoardTerminalSessionEntry(
         id: session.id,
@@ -160,18 +137,15 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     return session;
   }
 
-  void _attachPty(Pty pty, AgentSession session) {
-    _outputSubs[session.id] = pty.output
-        .cast<List<int>>()
-        .transform(const Utf8Decoder(allowMalformed: true))
-        .listen(
-          (data) {
-            session.terminal.write(data);
-            session.appendOutput(data);
-          },
-          onDone: () => _onSessionEnded(session.id),
-          onError: (_) => _onSessionEnded(session.id),
-        );
+  void _attachProcess(TerminalProcess process, AgentSession session) {
+    _outputSubs[session.id] = process.output.listen(
+      (data) {
+        session.terminal.write(data);
+        session.appendOutput(data);
+      },
+      onDone: () => _onSessionEnded(session.id),
+      onError: (_) => _onSessionEnded(session.id),
+    );
   }
 
   void _onSessionEnded(String sessionId) {

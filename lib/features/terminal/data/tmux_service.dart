@@ -50,12 +50,10 @@ class TmuxService {
     _tmuxBin = await _findTmux();
     _available = _tmuxBin != null;
     final prefs = await SharedPreferences.getInstance();
-    // Enable by default if tmux is available and no explicit pref saved.
-    _enabled = prefs.getBool(_enabledKey) ?? _available;
-    // Persist the default so later reads are consistent.
-    if (!prefs.containsKey(_enabledKey) && _available) {
-      await prefs.setBool(_enabledKey, true);
-    }
+    // Keep tmux opt-in. It preserves sessions across app restarts, but it also
+    // owns alternate-buffer mouse scrolling, which makes embedded terminal
+    // scrollback hard to reason about.
+    _enabled = prefs.getBool(_enabledKey) ?? false;
     if (_available) {
       await _ensureConfig();
       // Apply status-bar setting to any already-running tmux server.

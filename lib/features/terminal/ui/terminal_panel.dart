@@ -6,16 +6,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:kterm/kterm.dart' as kterm;
 import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
-import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
@@ -559,8 +562,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
   final _controller = TerminalController(
     pointerInputs: const PointerInputs.none(),
   );
+  final _kController = kterm.TerminalController(
+    pointerInputs: const kterm.PointerInputs.none(),
+  );
   final _focusNode = FocusNode();
   final _terminalViewKey = GlobalKey<TerminalViewState>();
+  final _kTerminalViewKey = GlobalKey<kterm.TerminalViewState>();
   Timer? _focusRetryTimer;
   double _fontSize = 13.0;
   Size _terminalSize = Size.zero;
@@ -599,6 +606,9 @@ class TerminalWidgetState extends State<TerminalWidget> {
     super.initState();
     _focusNode.addListener(() {});
     _bindTerminal();
+    AgentConfigService.instance.terminalRenderEngineNotifier.addListener(
+      _rebindTerminalForActiveEngine,
+    );
     if (widget.autoRequestFocus) _requestFocusAfterFrame();
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     // Load persisted font size
@@ -622,6 +632,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
     }
   }
 
+  void _rebindTerminalForActiveEngine() {
+    _bindTerminal();
+    if (mounted) setState(() {});
+  }
+
   void _requestFocusAfterFrame() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -638,15 +653,23 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void _bindTerminal() {
+    _unbindTerminalIfOurs(widget.session);
     _boundOnOutput = (data) {
-      final writer = widget.terminalOutputWriter ?? PtyService.instance.write;
+      final writer =
+          widget.terminalOutputWriter ?? TerminalBackendService.instance.write;
       writer(widget.session.id, data);
     };
     _boundOnResize = (cols, rows, pixelWidth, pixelHeight) {
-      PtyService.instance.resize(widget.session.id, cols, rows);
+      TerminalBackendService.instance.resize(widget.session.id, cols, rows);
     };
-    widget.session.terminal.onOutput = _boundOnOutput;
-    widget.session.terminal.onResize = _boundOnResize;
+    switch (AgentConfigService.instance.terminalRenderEngine) {
+      case TerminalRenderEngine.kterm:
+        widget.session.kTerminal.onOutput = _boundOnOutput;
+        widget.session.kTerminal.onResize = _boundOnResize;
+      case TerminalRenderEngine.xterm:
+        widget.session.terminal.onOutput = _boundOnOutput;
+        widget.session.terminal.onResize = _boundOnResize;
+    }
   }
 
   void _unbindTerminalIfOurs(AgentSession session) {
@@ -658,6 +681,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
     } else {}
     if (identical(session.terminal.onResize, _boundOnResize)) {
       session.terminal.onResize = null;
+    }
+    if (identical(session.kTerminal.onOutput, _boundOnOutput)) {
+      session.kTerminal.onOutput = null;
+    }
+    if (identical(session.kTerminal.onResize, _boundOnResize)) {
+      session.kTerminal.onResize = null;
     }
   }
 
@@ -677,6 +706,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
   KeyEventResult _onTerminalKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyC &&
+        HardwareKeyboard.instance.isControlPressed &&
+        !HardwareKeyboard.instance.isMetaPressed &&
+        !HardwareKeyboard.instance.isAltPressed) {
+      _writePty('\x03');
+      return KeyEventResult.handled;
     }
     // Shift+Enter → ESC+CR (newline-in-input for Copilot/Claude Code)
     if (event.logicalKey == LogicalKeyboardKey.enter &&
@@ -718,6 +754,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
     final isCmd = HardwareKeyboard.instance.isMetaPressed;
     final isCtrl = HardwareKeyboard.instance.isControlPressed;
     final isAlt = HardwareKeyboard.instance.isAltPressed;
+
+    // Ctrl+C → SIGINT. Handle explicitly so Flutter focus/copy shortcuts cannot
+    // swallow it before the terminal backend sees ETX.
+    if (isCtrl && !isCmd && !isAlt && key == LogicalKeyboardKey.keyC) {
+      _writePty('\x03');
+      return true;
+    }
 
     // Cmd+V → paste as file ref (no raw paste)
     if (isCmd && !isCtrl && !isAlt && key == LogicalKeyboardKey.keyV) {
@@ -821,7 +864,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void _writePty(String sequence) {
-    PtyService.instance.write(widget.session.id, sequence);
+    TerminalBackendService.instance.write(widget.session.id, sequence);
   }
 
   /// Public API for external widgets (e.g. full-view debug overlay) to send
@@ -838,7 +881,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
             ? 'scroll=${_scrollController.position.pixels.toStringAsFixed(1)}/'
                 '${_scrollController.position.maxScrollExtent.toStringAsFixed(1)}'
             : 'scroll=no-client';
-    return 'alt=${terminal.isUsingAltBuffer} '
+    return 'renderer=${AgentConfigService.instance.terminalRenderEngine.label} '
+        'alt=${terminal.isUsingAltBuffer} '
         'mouse=${terminal.mouseMode} '
         'altScroll=${terminal.altBufferMouseScrollMode} '
         'forceKeys=${widget.debugForceAltScrollKeyFallback} '
@@ -899,7 +943,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         await SmartClipboardPasteService.instance
             .readInlineTextOrSavedFilePath();
     if (pasted == null || !mounted) return;
-    PtyService.instance.write(widget.session.id, pasted);
+    TerminalBackendService.instance.write(widget.session.id, pasted);
   }
 
   // ── Selection helpers ───────────────────────────────────────────────
@@ -1033,8 +1077,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void dispose() {
     _focusRetryTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
+    AgentConfigService.instance.terminalRenderEngineNotifier.removeListener(
+      _rebindTerminalForActiveEngine,
+    );
     _unbindTerminalIfOurs(widget.session);
     _controller.dispose();
+    _kController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     _searchController.dispose();
@@ -1259,176 +1307,234 @@ class TerminalWidgetState extends State<TerminalWidget> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        _terminalSize = Size(constraints.maxWidth, constraints.maxHeight);
-        return Stack(
-          children: [
-            Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerSignal: (event) {
-                if (event is PointerScrollEvent) {
-                  GestureBinding.instance.pointerSignalResolver.register(
-                    event,
-                    (resolved) {
-                      final scrollEvent = resolved as PointerScrollEvent;
-                      if (widget.session.terminal.isUsingAltBuffer) {
-                        _scrollAltBufferBy(
-                          scrollEvent.scrollDelta.dy,
-                          scrollEvent.position,
-                          'pointer-signal',
-                        );
-                      } else {
-                        _scrollTerminalBy(
-                          scrollEvent.scrollDelta.dy,
-                          'pointer-signal',
-                        );
-                      }
-                    },
-                  );
-                }
-              },
-              onPointerPanZoomStart: (_) {
-                if (!_focusNode.hasFocus) _focusNode.requestFocus();
-              },
-              onPointerPanZoomUpdate: (event) {
-                if (widget.session.terminal.isUsingAltBuffer) {
-                  _scrollAltBufferBy(
-                    -event.panDelta.dy,
-                    event.position,
-                    'pan-zoom',
-                  );
-                } else {
-                  _scrollTerminalBy(-event.panDelta.dy, 'pan-zoom');
-                }
-              },
-              onPointerDown: (event) {
-                if (!_focusNode.hasFocus) _focusNode.requestFocus();
-                // Right-click → context menu
-                if (event.buttons == kSecondaryMouseButton) {
-                  _showTerminalContextMenu(context, event.position);
-                  return;
-                }
-                if (event.buttons != kPrimaryButton) return;
-                _clickDownPosition = event.localPosition;
-                _dragStartGlobal = event.position;
-                _isDragSelecting = false;
-                _activePointers[event.pointer] = event.localPosition;
-                if (_activePointers.length == 2 &&
-                    event.kind == PointerDeviceKind.touch) {
-                  final positions = _activePointers.values.toList();
-                  _pinchStartDistance = (positions[0] - positions[1]).distance;
-                  _pinchStartFontSize = _fontSize;
-                }
-              },
-              onPointerMove: (event) {
-                _activePointers[event.pointer] = event.localPosition;
-                if (_activePointers.length == 2 &&
-                    _pinchStartDistance > 0 &&
-                    event.kind == PointerDeviceKind.touch) {
-                  final positions = _activePointers.values.toList();
-                  final dist = (positions[0] - positions[1]).distance;
-                  final newSize = (_pinchStartFontSize *
-                          dist /
-                          _pinchStartDistance)
-                      .clamp(8.0, 48.0);
-                  setState(() => _fontSize = newSize);
-                  SessionPrefs.saveTerminalFontSize(newSize);
-                  return;
-                }
-                // Drag-to-select: bypass xterm's gesture arena entirely.
-                final startGlobal = _dragStartGlobal;
-                if (startGlobal == null || _activePointers.length != 1) return;
-                final dist = (event.position - startGlobal).distance;
-                if (dist < 4.0) return;
-                final state = _terminalViewKey.currentState;
-                if (state == null) return;
-                final rt = state.renderTerminal;
-                if (!_isDragSelecting) {
-                  _isDragSelecting = true;
-                  _controller.clearSelection();
-                }
-                final localStart = rt.globalToLocal(startGlobal);
-                final localCurrent = rt.globalToLocal(event.position);
-                rt.selectCharacters(localStart, localCurrent);
-              },
-              onPointerUp: (event) {
-                _activePointers.remove(event.pointer);
-                final wasDragging = _isDragSelecting;
-                _isDragSelecting = false;
-                _dragStartGlobal = null;
-                final down = _clickDownPosition;
-                _clickDownPosition = null;
-                if (wasDragging) {
-                  return; // keep selection
-                }
-                if (down == null) return;
-                if ((event.localPosition - down).distance > 6.0) return;
-                // Single tap clears any existing selection
-                if (_controller.selection != null) {
-                  _controller.clearSelection();
-                  return;
-                }
-                _handleTerminalClick(event.localPosition);
-              },
-              onPointerCancel: (event) {
-                _activePointers.remove(event.pointer);
-                _isDragSelecting = false;
-                _dragStartGlobal = null;
-              },
-              child: MouseRegion(
-                cursor: SystemMouseCursors.text,
-                child: TerminalView(
-                  widget.session.terminal,
-                  key: _terminalViewKey,
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  autofocus: widget.isActive,
-                  scrollController: _scrollController,
-                  // Keep trackpad scroll for terminal scrollback instead of
-                  // turning it into up/down key presses in the shell.
-                  simulateScroll: false,
-                  onKeyEvent: _onTerminalKeyEvent,
-                  textStyle: TerminalStyle(
-                    fontSize: _fontSize,
-                    fontFamily: 'JetBrainsMono',
-                    height: 1.2,
+    return ValueListenableBuilder<TerminalRenderEngine>(
+      valueListenable: AgentConfigService.instance.terminalRenderEngineNotifier,
+      builder: (context, engine, _) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            _terminalSize = Size(constraints.maxWidth, constraints.maxHeight);
+            if (engine == TerminalRenderEngine.kterm) {
+              return _buildKtermTerminal(colors);
+            }
+            return Stack(
+              children: [
+                Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerSignal: (event) {
+                    if (event is PointerScrollEvent) {
+                      GestureBinding.instance.pointerSignalResolver.register(
+                        event,
+                        (resolved) {
+                          final scrollEvent = resolved as PointerScrollEvent;
+                          if (widget.session.terminal.isUsingAltBuffer) {
+                            _scrollAltBufferBy(
+                              scrollEvent.scrollDelta.dy,
+                              scrollEvent.position,
+                              'pointer-signal',
+                            );
+                          } else {
+                            _scrollTerminalBy(
+                              scrollEvent.scrollDelta.dy,
+                              'pointer-signal',
+                            );
+                          }
+                        },
+                      );
+                    }
+                  },
+                  onPointerPanZoomStart: (_) {
+                    if (!_focusNode.hasFocus) _focusNode.requestFocus();
+                  },
+                  onPointerPanZoomUpdate: (event) {
+                    if (widget.session.terminal.isUsingAltBuffer) {
+                      _scrollAltBufferBy(
+                        -event.panDelta.dy,
+                        event.position,
+                        'pan-zoom',
+                      );
+                    } else {
+                      _scrollTerminalBy(-event.panDelta.dy, 'pan-zoom');
+                    }
+                  },
+                  onPointerDown: (event) {
+                    if (!_focusNode.hasFocus) _focusNode.requestFocus();
+                    // Right-click → context menu
+                    if (event.buttons == kSecondaryMouseButton) {
+                      _showTerminalContextMenu(context, event.position);
+                      return;
+                    }
+                    if (event.buttons != kPrimaryButton) return;
+                    _clickDownPosition = event.localPosition;
+                    _dragStartGlobal = event.position;
+                    _isDragSelecting = false;
+                    _activePointers[event.pointer] = event.localPosition;
+                    if (_activePointers.length == 2 &&
+                        event.kind == PointerDeviceKind.touch) {
+                      final positions = _activePointers.values.toList();
+                      _pinchStartDistance =
+                          (positions[0] - positions[1]).distance;
+                      _pinchStartFontSize = _fontSize;
+                    }
+                  },
+                  onPointerMove: (event) {
+                    _activePointers[event.pointer] = event.localPosition;
+                    if (_activePointers.length == 2 &&
+                        _pinchStartDistance > 0 &&
+                        event.kind == PointerDeviceKind.touch) {
+                      final positions = _activePointers.values.toList();
+                      final dist = (positions[0] - positions[1]).distance;
+                      final newSize = (_pinchStartFontSize *
+                              dist /
+                              _pinchStartDistance)
+                          .clamp(8.0, 48.0);
+                      setState(() => _fontSize = newSize);
+                      SessionPrefs.saveTerminalFontSize(newSize);
+                      return;
+                    }
+                    // Drag-to-select: bypass xterm's gesture arena entirely.
+                    final startGlobal = _dragStartGlobal;
+                    if (startGlobal == null || _activePointers.length != 1)
+                      return;
+                    final dist = (event.position - startGlobal).distance;
+                    if (dist < 4.0) return;
+                    final state = _terminalViewKey.currentState;
+                    if (state == null) return;
+                    final rt = state.renderTerminal;
+                    if (!_isDragSelecting) {
+                      _isDragSelecting = true;
+                      _controller.clearSelection();
+                    }
+                    final localStart = rt.globalToLocal(startGlobal);
+                    final localCurrent = rt.globalToLocal(event.position);
+                    rt.selectCharacters(localStart, localCurrent);
+                  },
+                  onPointerUp: (event) {
+                    _activePointers.remove(event.pointer);
+                    final wasDragging = _isDragSelecting;
+                    _isDragSelecting = false;
+                    _dragStartGlobal = null;
+                    final down = _clickDownPosition;
+                    _clickDownPosition = null;
+                    if (wasDragging) {
+                      return; // keep selection
+                    }
+                    if (down == null) return;
+                    if ((event.localPosition - down).distance > 6.0) return;
+                    // Single tap clears any existing selection
+                    if (_controller.selection != null) {
+                      _controller.clearSelection();
+                      return;
+                    }
+                    _handleTerminalClick(event.localPosition);
+                  },
+                  onPointerCancel: (event) {
+                    _activePointers.remove(event.pointer);
+                    _isDragSelecting = false;
+                    _dragStartGlobal = null;
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.text,
+                    child: TerminalView(
+                      widget.session.terminal,
+                      key: _terminalViewKey,
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      autofocus: widget.isActive,
+                      scrollController: _scrollController,
+                      // Keep trackpad scroll for terminal scrollback instead of
+                      // turning it into up/down key presses in the shell.
+                      simulateScroll: false,
+                      onKeyEvent: _onTerminalKeyEvent,
+                      textStyle: TerminalStyle(
+                        fontSize: _fontSize,
+                        fontFamily: 'JetBrainsMono',
+                        height: 1.2,
+                      ),
+                      theme: TerminalTheme(
+                        cursor: colors.primary,
+                        selection: colors.primary.withAlpha(120),
+                        foreground: colors.terminalText,
+                        background: colors.terminalBackground,
+                        black: colors.surface,
+                        red: colors.accentRed,
+                        green: colors.accentGreen,
+                        yellow: colors.accentOrange,
+                        blue: colors.accentBlue,
+                        magenta: colors.primary,
+                        cyan: colors.terminalPrompt,
+                        white: colors.terminalText,
+                        brightBlack: colors.textMuted,
+                        brightRed: colors.accentRedDim,
+                        brightGreen: colors.accentGreenDim,
+                        brightYellow: colors.statusWarning,
+                        brightBlue: colors.accentBlue,
+                        brightMagenta: colors.primaryLight,
+                        brightCyan: colors.accentBlue,
+                        brightWhite: colors.textPrimary,
+                        searchHitBackground: colors.accentOrange,
+                        searchHitBackgroundCurrent: colors.statusWarning,
+                        searchHitForeground: colors.background,
+                      ),
+                      padding: const EdgeInsets.all(8),
+                    ),
                   ),
-                  theme: TerminalTheme(
-                    cursor: colors.primary,
-                    selection: colors.primary.withAlpha(120),
-                    foreground: colors.terminalText,
-                    background: colors.terminalBackground,
-                    black: colors.surface,
-                    red: colors.accentRed,
-                    green: colors.accentGreen,
-                    yellow: colors.accentOrange,
-                    blue: colors.accentBlue,
-                    magenta: colors.primary,
-                    cyan: colors.terminalPrompt,
-                    white: colors.terminalText,
-                    brightBlack: colors.textMuted,
-                    brightRed: colors.accentRedDim,
-                    brightGreen: colors.accentGreenDim,
-                    brightYellow: colors.statusWarning,
-                    brightBlue: colors.accentBlue,
-                    brightMagenta: colors.primaryLight,
-                    brightCyan: colors.accentBlue,
-                    brightWhite: colors.textPrimary,
-                    searchHitBackground: colors.accentOrange,
-                    searchHitBackgroundCurrent: colors.statusWarning,
-                    searchHitForeground: colors.background,
-                  ),
-                  padding: const EdgeInsets.all(8),
                 ),
-              ),
-            ),
-            // Search overlay
-            if (_isSearching)
-              Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
-          ],
+                // Search overlay
+                if (_isSearching)
+                  Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
+              ],
+            );
+          },
         );
       },
+    );
+  }
+
+  Widget _buildKtermTerminal(AppColorScheme colors) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.text,
+      child: kterm.TerminalView(
+        widget.session.kTerminal,
+        key: _kTerminalViewKey,
+        controller: _kController,
+        focusNode: _focusNode,
+        autofocus: widget.isActive,
+        scrollController: _scrollController,
+        simulateScroll: true,
+        showSearchBar: true,
+        onKeyEvent: _onTerminalKeyEvent,
+        textStyle: kterm.TerminalStyle(
+          fontSize: _fontSize,
+          fontFamily: 'JetBrainsMono',
+          height: 1.2,
+        ),
+        theme: kterm.TerminalTheme(
+          cursor: colors.primary,
+          selection: colors.primary.withAlpha(120),
+          foreground: colors.terminalText,
+          background: colors.terminalBackground,
+          black: colors.surface,
+          red: colors.accentRed,
+          green: colors.accentGreen,
+          yellow: colors.accentOrange,
+          blue: colors.accentBlue,
+          magenta: colors.primary,
+          cyan: colors.terminalPrompt,
+          white: colors.terminalText,
+          brightBlack: colors.textMuted,
+          brightRed: colors.accentRedDim,
+          brightGreen: colors.accentGreenDim,
+          brightYellow: colors.statusWarning,
+          brightBlue: colors.accentBlue,
+          brightMagenta: colors.primaryLight,
+          brightCyan: colors.accentBlue,
+          brightWhite: colors.textPrimary,
+          searchHitBackground: colors.accentOrange,
+          searchHitBackgroundCurrent: colors.statusWarning,
+          searchHitForeground: colors.background,
+        ),
+        padding: const EdgeInsets.all(8),
+      ),
     );
   }
 

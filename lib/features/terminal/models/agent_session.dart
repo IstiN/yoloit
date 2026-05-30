@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:kterm/kterm.dart' as kterm;
 import 'package:xterm/xterm.dart';
 import 'package:yoloit/features/terminal/data/terminal_output_bus.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
@@ -17,7 +18,8 @@ class AgentSession extends Equatable {
     this.customName,
     this.worktreeContexts,
     this.hookPhase,
-  }) : terminal = Terminal(maxLines: 10000);
+  }) : terminal = Terminal(maxLines: 10000),
+       kTerminal = kterm.Terminal(maxLines: 10000);
 
   // Private constructor that preserves an existing terminal instance.
   AgentSession._preserve({
@@ -25,6 +27,7 @@ class AgentSession extends Equatable {
     required this.type,
     required this.workspacePath,
     required this.terminal,
+    required this.kTerminal,
     this.workspaceId,
     this.status = AgentStatus.idle,
     this.sessionId,
@@ -42,6 +45,7 @@ class AgentSession extends Equatable {
   final String? sessionId;
   final String? customName;
   final Terminal terminal;
+  final kterm.Terminal kTerminal;
   /// Maps repoPath → selectedWorktreePath. Null = default workspace dir.
   final Map<String, String>? worktreeContexts;
 
@@ -63,6 +67,8 @@ class AgentSession extends Equatable {
 
   /// Append raw PTY data: strips ANSI codes, splits into lines, trims buffer.
   void appendOutput(String rawData) {
+    kTerminal.write(rawData);
+
     final plain = stripAnsi(rawData);
     final incoming = plain.split('\n');
     recentLines.addAll(incoming);
@@ -138,6 +144,7 @@ class AgentSession extends Equatable {
       workspacePath: workspacePath,
       workspaceId: workspaceId,
       terminal: terminal,
+      kTerminal: kTerminal,
       status: status ?? this.status,
       sessionId: sessionId ?? this.sessionId,
       customName: clearCustomName ? null : (customName ?? this.customName),

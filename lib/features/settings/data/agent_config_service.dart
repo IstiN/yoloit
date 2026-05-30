@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
+import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
 
 class AgentConfig {
   final String id;
@@ -63,7 +66,9 @@ class AgentConfig {
     visible: visible ?? this.visible,
     isBuiltIn: isBuiltIn,
     streamAdapter:
-        streamAdapter == _sentinel ? this.streamAdapter : streamAdapter as String?,
+        streamAdapter == _sentinel
+            ? this.streamAdapter
+            : streamAdapter as String?,
     passDefaultArgs: passDefaultArgs ?? this.passDefaultArgs,
     disableModel: disableModel ?? this.disableModel,
     defaultModel:
@@ -126,6 +131,14 @@ class AgentConfigService {
   String _defaultAsrMode = 'local';
   String? _defaultAsrCloudConfigId;
   String? _defaultAsrCloudModel;
+  TerminalBackendMode _terminalBackendMode = TerminalBackendMode.local;
+  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.xterm;
+
+  final ValueNotifier<TerminalBackendMode> terminalBackendModeNotifier =
+      ValueNotifier<TerminalBackendMode>(TerminalBackendMode.local);
+
+  final ValueNotifier<TerminalRenderEngine> terminalRenderEngineNotifier =
+      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.xterm);
 
   static List<AgentConfig> get _defaults => [
     ...AgentType.values.map(
@@ -136,9 +149,10 @@ class AgentConfigService {
         launchCommand: t.launchCommand,
         visible: true,
         isBuiltIn: true,
-        streamAdapter: t.name == 'copilot'
-            ? 'copilot'
-            : t.name == 'cursor'
+        streamAdapter:
+            t.name == 'copilot'
+                ? 'copilot'
+                : t.name == 'cursor'
                 ? 'cursor'
                 : null,
       ),
@@ -175,7 +189,9 @@ class AgentConfigService {
         final updatedSaved = <AgentConfig>[];
         for (final s in saved) {
           final def = _defaults.where((d) => d.id == s.id).firstOrNull;
-          if (def != null && s.streamAdapter == null && def.streamAdapter != null) {
+          if (def != null &&
+              s.streamAdapter == null &&
+              def.streamAdapter != null) {
             updatedSaved.add(s.copyWith(streamAdapter: def.streamAdapter));
           } else {
             updatedSaved.add(s);
@@ -198,11 +214,18 @@ class AgentConfigService {
             jsonDecode(await prefsFile.readAsString()) as Map<String, dynamic>;
         _defaultAgentId = prefs['defaultAgentId'] as String?;
         _defaultAsrMode = prefs['defaultAsrMode'] as String? ?? 'local';
-        _defaultAsrCloudConfigId =
-            prefs['defaultAsrCloudConfigId'] as String?;
+        _defaultAsrCloudConfigId = prefs['defaultAsrCloudConfigId'] as String?;
         _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
+        _terminalRenderEngine = TerminalRenderEngineX.fromId(
+          prefs['terminalRenderEngine'] as String?,
+        );
+        _terminalBackendMode = TerminalBackendModeX.fromId(
+          prefs['terminalBackendMode'] as String?,
+        );
       }
     } catch (_) {}
+    terminalBackendModeNotifier.value = _terminalBackendMode;
+    terminalRenderEngineNotifier.value = _terminalRenderEngine;
 
     return _cached;
   }
@@ -232,6 +255,18 @@ class AgentConfigService {
     await _savePrefs();
   }
 
+  Future<void> setTerminalRenderEngine(TerminalRenderEngine engine) async {
+    _terminalRenderEngine = engine;
+    terminalRenderEngineNotifier.value = engine;
+    await _savePrefs();
+  }
+
+  Future<void> setTerminalBackendMode(TerminalBackendMode mode) async {
+    _terminalBackendMode = mode;
+    terminalBackendModeNotifier.value = mode;
+    await _savePrefs();
+  }
+
   Future<void> _savePrefs() async {
     final prefsFile = File(_prefsPath);
     await prefsFile.parent.create(recursive: true);
@@ -243,6 +278,10 @@ class AgentConfigService {
           'defaultAsrCloudConfigId': _defaultAsrCloudConfigId,
         if (_defaultAsrCloudModel != null)
           'defaultAsrCloudModel': _defaultAsrCloudModel,
+        if (_terminalRenderEngine != TerminalRenderEngine.xterm)
+          'terminalRenderEngine': _terminalRenderEngine.id,
+        if (_terminalBackendMode != TerminalBackendMode.local)
+          'terminalBackendMode': _terminalBackendMode.id,
       }),
     );
   }
@@ -251,6 +290,8 @@ class AgentConfigService {
   String get defaultAsrMode => _defaultAsrMode;
   String? get defaultAsrCloudConfigId => _defaultAsrCloudConfigId;
   String? get defaultAsrCloudModel => _defaultAsrCloudModel;
+  TerminalBackendMode get terminalBackendMode => _terminalBackendMode;
+  TerminalRenderEngine get terminalRenderEngine => _terminalRenderEngine;
 
   /// Returns the AgentType for the configured default, falling back to Copilot.
   AgentType get defaultAgentType {
@@ -326,7 +367,8 @@ class AgentConfigService {
   static String defaultBoardChatCommand(String adapter) {
     return switch (adapter) {
       'opencode' => 'opencode run --format json --dangerously-skip-permissions',
-      'cursor' => 'cursor-agent --print --output-format stream-json --stream-partial-output --yolo',
+      'cursor' =>
+        'cursor-agent --print --output-format stream-json --stream-partial-output --yolo',
       'copilot' => 'copilot --output-format json --yolo',
       _ => '',
     };

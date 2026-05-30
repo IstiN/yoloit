@@ -10,6 +10,15 @@ set -euo pipefail
 PORT_FILE="${HOME}/.config/yoloit/cli.port"
 STATE_FILE="${HOME}/.config/yoloit/state.json"
 BASE=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+_runtime_home() {
+  if [[ "${YOLOIT_DEV_RUNTIME:-0}" == "1" ]]; then
+    echo "${HOME}/.config/yoloit-dev/runtime"
+  else
+    echo "${YOLOIT_RUNTIME_HOME:-${HOME}/.config/yoloit/runtime}"
+  fi
+}
 
 _board() {
   local val="${1:-}"
@@ -1638,6 +1647,119 @@ local cmd="${1:-help}"
 shift || true
 
 case "$cmd" in
+  runtime)
+    sub="${1:-status}"; shift || true
+    runtime_dir="$(_runtime_home)"
+    runtime_bin="${runtime_dir}/yoloit_runtime.py"
+    runtime_pid="${runtime_dir}/runtime.pid"
+    runtime_port="${runtime_dir}/runtime.port"
+    source_runtime="${SCRIPT_DIR}/yoloit_runtime.py"
+    mkdir -p "$runtime_dir"
+    case "$sub" in
+      status)
+        if [[ -f "$runtime_pid" ]] && kill -0 "$(cat "$runtime_pid")" 2>/dev/null; then
+          echo "{\"ok\":true,\"installed\":$(test -x "$runtime_bin" && echo true || echo false),\"running\":true,\"pid\":$(cat "$runtime_pid"),\"port\":$(cat "$runtime_port" 2>/dev/null || echo 0),\"path\":\"$runtime_bin\"}"
+        else
+          echo "{\"ok\":true,\"installed\":$(test -x "$runtime_bin" && echo true || echo false),\"running\":false,\"path\":\"$runtime_bin\"}"
+        fi
+        ;;
+      install)
+        if [[ ! -f "$source_runtime" ]]; then
+          echo "{\"ok\":false,\"error\":\"runtime source not found\",\"source\":\"$source_runtime\"}"
+          exit 2
+        fi
+        cp "$source_runtime" "$runtime_bin"
+        chmod +x "$runtime_bin"
+        echo "{\"ok\":true,\"path\":\"$runtime_bin\"}"
+        ;;
+      start)
+        if [[ -f "$source_runtime" ]] && { [[ ! -x "$runtime_bin" ]] || [[ "$source_runtime" -nt "$runtime_bin" ]]; }; then
+          "$0" runtime install >/dev/null
+        fi
+        if [[ -f "$runtime_pid" ]] && kill -0 "$(cat "$runtime_pid")" 2>/dev/null; then
+          "$0" runtime status
+          exit 0
+        fi
+        rm -f "$runtime_port" "$runtime_pid"
+        nohup python3 "$runtime_bin" --home "$runtime_dir" >"${runtime_dir}/runtime.log" 2>&1 &
+        for _ in {1..50}; do
+          if [[ -f "$runtime_port" ]] && [[ -f "$runtime_pid" ]]; then
+            "$0" runtime status
+            exit 0
+          fi
+          sleep 0.1
+        done
+        echo "{\"ok\":false,\"error\":\"runtime did not start\",\"log\":\"${runtime_dir}/runtime.log\"}"
+        exit 2
+        ;;
+      stop)
+        if [[ -f "$runtime_pid" ]] && kill -0 "$(cat "$runtime_pid")" 2>/dev/null; then
+          kill "$(cat "$runtime_pid")" 2>/dev/null || true
+          echo "{\"ok\":true,\"stopped\":true}"
+        else
+          echo "{\"ok\":true,\"stopped\":false}"
+        fi
+        ;;
+      sessions)
+        "$0" runtime start >/dev/null
+        curl -s "http://127.0.0.1:$(cat "$runtime_port")/sessions"
+        ;;
+      create)
+        session_id="${1:-runtime_$(date +%s)}"; shift || true
+        cwd="$PWD"; command="${SHELL:-/bin/sh}"; cols=120; rows=30
+        while [[ $# -gt 0 ]]; do
+          case "$1" in
+            --cwd) cwd="$2"; shift 2 ;;
+            --cmd) command="$2"; shift 2 ;;
+            --cols) cols="$2"; shift 2 ;;
+            --rows) rows="$2"; shift 2 ;;
+            *) shift ;;
+          esac
+        done
+        "$0" runtime start >/dev/null
+        payload=$(python3 - "$session_id" "$cwd" "$command" "$cols" "$rows" <<'PY'
+import json, sys
+sid, cwd, cmd, cols, rows = sys.argv[1:6]
+print(json.dumps({"id": sid, "cwd": cwd, "command": cmd, "cols": int(cols), "rows": int(rows)}))
+PY
+)
+        curl -s -X POST "http://127.0.0.1:$(cat "$runtime_port")/sessions" -H "Content-Type: application/json" -d "$payload"
+        ;;
+      input)
+        [[ $# -lt 2 ]] && { echo "Usage: yoloit runtime input <session-id> <text>" >&2; exit 1; }
+        session_id="$1"; shift
+        data="$*"
+        "$0" runtime start >/dev/null
+        payload=$(python3 - "$data" <<'PY'
+import base64, json, sys
+print(json.dumps({"data": base64.b64encode(sys.argv[1].encode()).decode()}))
+PY
+)
+        curl -s -X POST "http://127.0.0.1:$(cat "$runtime_port")/sessions/${session_id}/input" -H "Content-Type: application/json" -d "$payload"
+        ;;
+      resize)
+        [[ $# -lt 3 ]] && { echo "Usage: yoloit runtime resize <session-id> <cols> <rows>" >&2; exit 1; }
+        session_id="$1"; cols="$2"; rows="$3"
+        "$0" runtime start >/dev/null
+        curl -s -X POST "http://127.0.0.1:$(cat "$runtime_port")/sessions/${session_id}/resize" -H "Content-Type: application/json" -d "{\"cols\":${cols},\"rows\":${rows}}"
+        ;;
+      stream)
+        [[ $# -lt 1 ]] && { echo "Usage: yoloit runtime stream <session-id>" >&2; exit 1; }
+        "$0" runtime start >/dev/null
+        curl -s "http://127.0.0.1:$(cat "$runtime_port")/sessions/${1}/stream"
+        ;;
+      kill)
+        [[ $# -lt 1 ]] && { echo "Usage: yoloit runtime kill <session-id>" >&2; exit 1; }
+        "$0" runtime start >/dev/null
+        curl -s -X POST "http://127.0.0.1:$(cat "$runtime_port")/sessions/${1}/kill" -H "Content-Type: application/json" -d "{}"
+        ;;
+      *)
+        echo "Usage: yoloit runtime <status|install|start|stop|sessions|create|input|resize|stream|kill>" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+
   # ── app control ──
   reload)
     # Hot reload: recompile changed files, preserve app state
@@ -4077,6 +4199,7 @@ for entry in registry:
 implicit = {
     "help", "--help", "-h",
     "validate",
+    "runtime",
     "boards", "panels", "links",  # simple pass-through
     "*",  # catch-all
 }

@@ -1,30 +1,30 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_pty/flutter_pty.dart';
 import 'package:yoloit/core/services/agent_hook_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/skills/data/skills_install_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
-import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/data/session_persistence_service.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_pty_config.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
+import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 import 'package:yoloit/features/workspaces/data/agent_workspace_dir_service.dart';
 import 'package:yoloit/features/workspaces/data/workspace_secrets_service.dart';
 
 class TerminalCubit extends Cubit<TerminalState> {
   TerminalCubit() : super(const TerminalInitial());
 
-  final _ptyService = PtyService.instance;
+  final _backendService = TerminalBackendService.instance;
   final _persistence = SessionPersistenceService.instance;
   final _logging = LoggingService.instance;
   final _tmux = TmuxService.instance;
@@ -58,8 +58,11 @@ class TerminalCubit extends Cubit<TerminalState> {
       _allSessions.where((s) => s.workspaceId == _activeWorkspaceId).toList();
 
   /// Emits a TerminalLoaded with both visible (workspace) sessions and allSessions.
-  void _emitLoaded(List<AgentSession> visible, int activeIndex,
-      {bool requestOpenPanel = false}) {
+  void _emitLoaded(
+    List<AgentSession> visible,
+    int activeIndex, {
+    bool requestOpenPanel = false,
+  }) {
     emit(
       TerminalLoaded(
         sessions: visible,
@@ -266,28 +269,21 @@ class TerminalCubit extends Cubit<TerminalState> {
             : <String, String>{};
     final extraEnv = secrets.isEmpty ? null : secrets;
 
-    final Pty pty;
-    if (_tmux.isActive) {
-      pty = _ptyService.launchTmux(
-        sessionId: sessionId,
-        label: type.displayName,
-        workspacePath: effectivePath,
-        tmuxLauncher: _tmux.launch,
-        extraEnv: extraEnv,
-      );
-    } else {
-      pty = _ptyService.launch(
-        sessionId: sessionId,
-        label: type.displayName,
-        workspacePath: effectivePath,
-        extraEnv: extraEnv,
-      );
-    }
+    final process = await _backendService.launch(
+      sessionId: sessionId,
+      label: type.displayName,
+      workspacePath: effectivePath,
+      extraEnv: extraEnv,
+    );
+    final backendMode = _backendService.modeFor(sessionId);
+    final useTmux = backendMode == TerminalBackendMode.tmux;
+    final attachedRuntime =
+        backendMode == TerminalBackendMode.runtime && process.attachedExisting;
 
     unawaited(
       _logging.startSession(sessionId, '${type.displayName} @ $effectivePath'),
     );
-    _attachPtyToSession(pty, session);
+    _attachProcessToSession(process, session);
 
     // Install YoLoIT hooks into the workspace so Copilot CLI can pick them up.
     unawaited(AgentHookService.installHooks(effectivePath));
@@ -296,7 +292,11 @@ class TerminalCubit extends Cubit<TerminalState> {
     _allSessions.removeWhere((s) => s.id == sessionId);
     _allSessions.add(session);
     final visible = _workspaceSessions;
-    _emitLoaded(visible, visible.length - 1, requestOpenPanel: requestOpenPanel);
+    _emitLoaded(
+      visible,
+      visible.length - 1,
+      requestOpenPanel: requestOpenPanel,
+    );
 
     if (effectiveWorkspaceId != null) {
       unawaited(
@@ -313,9 +313,10 @@ class TerminalCubit extends Cubit<TerminalState> {
     final effectiveCommand = AgentConfigService.instance.effectiveLaunchCommand(
       type,
     );
-    if (effectiveCommand.isNotEmpty && !(isRestore && _tmux.isActive)) {
+    if (effectiveCommand.isNotEmpty &&
+        !(isRestore && (useTmux || attachedRuntime))) {
       await Future<void>.delayed(const Duration(milliseconds: 1200));
-      _ptyService.write(sessionId, '$effectiveCommand\n');
+      _backendService.write(sessionId, '$effectiveCommand\n');
     }
   }
 
@@ -336,7 +337,7 @@ class TerminalCubit extends Cubit<TerminalState> {
   }
 
   void sendInput(String sessionId, String text) {
-    _ptyService.write(sessionId, text);
+    _backendService.write(sessionId, text);
   }
 
   /// Switches the active session to the one with [sessionId].
@@ -403,10 +404,7 @@ class TerminalCubit extends Cubit<TerminalState> {
           ),
     );
 
-    _ptyService.kill(
-      sessionId,
-      onKillTmux: _tmux.isActive ? _tmux.killSession : null,
-    );
+    _backendService.kill(sessionId);
     unawaited(_logging.endSession(sessionId));
 
     // Delete the agent dir if one was created (session had worktree contexts).
@@ -433,7 +431,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     if (current == null) return;
     final active = current.activeSession;
     if (active == null) return;
-    _ptyService.resize(active.id, columns, rows);
+    _backendService.resize(active.id, columns, rows);
   }
 
   /// Called when the user presses plain Enter in the terminal (not Shift+Enter).
@@ -572,28 +570,25 @@ class TerminalCubit extends Cubit<TerminalState> {
     return normalized;
   }
 
-  void _attachPtyToSession(Pty pty, AgentSession session) {
-    pty.output
-        .cast<List<int>>()
-        .transform(const Utf8Decoder(allowMalformed: true))
-        .listen(
-          (data) {
-            session.terminal.write(data);
-            _logging.write(session.id, data);
-            session.appendOutput(data); // capture for browser streaming
+  void _attachProcessToSession(TerminalProcess process, AgentSession session) {
+    process.output.listen(
+      (data) {
+        session.terminal.write(data);
+        _logging.write(session.id, data);
+        session.appendOutput(data); // capture for browser streaming
 
-            // ── PTY activity detection (backup when hooks don't fire) ──────
-            final ptyConfig = session.type.ptyConfig;
-            if (ptyConfig.hasDetection) {
-              _onPtyActivity(session, data, ptyConfig);
-            }
+        // ── PTY activity detection (backup when hooks don't fire) ──────
+        final ptyConfig = session.type.ptyConfig;
+        if (ptyConfig.hasDetection) {
+          _onPtyActivity(session, data, ptyConfig);
+        }
 
-            // Done-prompt detection is now handled inside _onPtyActivity via config.
-          },
-          onDone: () => _onSessionDone(session.id),
-          // ignore: avoid_types_on_closure_parameters
-          onError: (Object e) => _onSessionDone(session.id),
-        );
+        // Done-prompt detection is now handled inside _onPtyActivity via config.
+      },
+      onDone: () => _onSessionDone(session.id),
+      // ignore: avoid_types_on_closure_parameters
+      onError: (Object e) => _onSessionDone(session.id),
+    );
   }
 
   void _onCopilotPromptDetected(String sessionId) {
@@ -804,7 +799,8 @@ class TerminalCubit extends Cubit<TerminalState> {
     }
     _approvalClearTimers.clear();
     AgentHookService.instance.stop();
-    _ptyService.killAll();
+    // Local PTY sessions are owned by their backend. Runtime sessions are
+    // intentionally left alive across app shutdowns.
     return super.close();
   }
 }

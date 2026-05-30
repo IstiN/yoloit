@@ -29,6 +29,8 @@ import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/ui/skills_panel.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
+import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
+import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 
@@ -290,6 +292,10 @@ class _SettingsPageState extends State<SettingsPage> {
         10 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _SectionHeader(title: 'Terminal'),
+            SizedBox(height: 12),
+            _TerminalRendererSettings(),
+            SizedBox(height: 24),
             _SectionHeader(title: 'Widget API Permissions'),
             SizedBox(height: 12),
             WidgetPermissionsSection(),
@@ -323,6 +329,173 @@ class _SectionHeader extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 1,
+      ),
+    );
+  }
+}
+
+class _TerminalRendererSettings extends StatefulWidget {
+  const _TerminalRendererSettings();
+
+  @override
+  State<_TerminalRendererSettings> createState() =>
+      _TerminalRendererSettingsState();
+}
+
+class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
+  final _service = AgentConfigService.instance;
+  final _tmux = TmuxService.instance;
+  TerminalRenderEngine _engine = TerminalRenderEngine.xterm;
+  TerminalBackendMode _backendMode = TerminalBackendMode.local;
+  bool _tmuxOn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _engine = _service.terminalRenderEngine;
+    _backendMode = _service.terminalBackendMode;
+    _tmuxOn = _tmux.enabled;
+    _service.load().then((_) {
+      if (mounted) {
+        setState(() {
+          _engine = _service.terminalRenderEngine;
+          _backendMode = _service.terminalBackendMode;
+        });
+      }
+    });
+  }
+
+  Future<void> _setEngine(TerminalRenderEngine engine) async {
+    setState(() => _engine = engine);
+    await _service.setTerminalRenderEngine(engine);
+  }
+
+  Future<void> _setBackendMode(TerminalBackendMode mode) async {
+    setState(() {
+      _backendMode = mode;
+      _tmuxOn = mode == TerminalBackendMode.tmux;
+    });
+    await _service.setTerminalBackendMode(mode);
+    await _tmux.setEnabled(mode == TerminalBackendMode.tmux);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Terminal renderer',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Switches the embedded terminal emulator for board/app terminal panels.',
+                      style: TextStyle(color: colors.textMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              SegmentedButton<TerminalRenderEngine>(
+                segments:
+                    TerminalRenderEngine.values
+                        .map(
+                          (engine) => ButtonSegment(
+                            value: engine,
+                            label: Text(engine.label),
+                            tooltip: engine.description,
+                          ),
+                        )
+                        .toList(),
+                selected: {_engine},
+                onSelectionChanged: (selected) => _setEngine(selected.first),
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: WidgetStateProperty.all(
+                    const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Divider(height: 24, color: colors.border),
+          Row(
+            children: [
+              Icon(Icons.history_toggle_off, size: 18, color: colors.textMuted),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Terminal backend',
+                      style: TextStyle(color: colors.textPrimary, fontSize: 13),
+                    ),
+                    Text(
+                      'Local is current default. Runtime will replace tmux for persistent sessions.',
+                      style: TextStyle(color: colors.textMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              SegmentedButton<TerminalBackendMode>(
+                segments:
+                    TerminalBackendMode.values
+                        .map(
+                          (mode) => ButtonSegment(
+                            value: mode,
+                            label: Text(mode.label),
+                            tooltip: mode.description,
+                            enabled:
+                                mode != TerminalBackendMode.tmux ||
+                                _tmux.available,
+                          ),
+                        )
+                        .toList(),
+                selected: {_backendMode},
+                onSelectionChanged:
+                    (selected) => _setBackendMode(selected.first),
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  textStyle: WidgetStateProperty.all(
+                    const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (_backendMode == TerminalBackendMode.runtime) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Runtime is dev MVP on macOS/Linux. Existing sessions stay in the backend process.',
+              style: TextStyle(color: colors.statusWarning, fontSize: 11),
+            ),
+          ] else if (_tmuxOn && _tmux.available) ...[
+            const SizedBox(height: 8),
+            Text(
+              'For scroll debugging, turn this off and start a new terminal session.',
+              style: TextStyle(color: colors.statusWarning, fontSize: 11),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -582,8 +755,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
     final configs = _configs!;
     final visibleEntries = <({int index, AgentConfig config})>[
       for (var i = 0; i < configs.length; i++)
-        if (configs[i].streamAdapter != null)
-          (index: i, config: configs[i]),
+        if (configs[i].streamAdapter != null) (index: i, config: configs[i]),
     ];
 
     return Column(
@@ -686,14 +858,15 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
                       onChanged: (updated) => _updateConfig(index, updated),
                       onSetDefault:
                           () => _setDefault(isDefault ? null : config.id),
-                      onDelete: config.isBuiltIn
-                          ? null
-                          : () {
-                              setState(() {
-                                _configs!.removeAt(index);
-                              });
-                              _saveConfigs();
-                            },
+                      onDelete:
+                          config.isBuiltIn
+                              ? null
+                              : () {
+                                setState(() {
+                                  _configs!.removeAt(index);
+                                });
+                                _saveConfigs();
+                              },
                     );
                   },
                 ),
@@ -954,7 +1127,9 @@ class _AgentRowState extends State<_AgentRow> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.config.displayName);
     _iconCtrl = TextEditingController(text: widget.config.iconLabel);
-    _cmdCtrl = TextEditingController(text: _effectiveLaunchCommand(widget.config));
+    _cmdCtrl = TextEditingController(
+      text: _effectiveLaunchCommand(widget.config),
+    );
   }
 
   @override
@@ -1157,7 +1332,8 @@ class _AgentRowState extends State<_AgentRow> {
                 child: GestureDetector(
                   onTap: () {
                     if (widget.config.isBuiltIn) {
-                      final def = AgentConfigService.instance.defaultConfigForId(widget.config.id);
+                      final def = AgentConfigService.instance
+                          .defaultConfigForId(widget.config.id);
                       if (def != null) {
                         widget.onChanged(def);
                         _nameCtrl.text = def.displayName;
@@ -1166,7 +1342,8 @@ class _AgentRowState extends State<_AgentRow> {
                       }
                     } else {
                       final adapter = widget.config.streamAdapter ?? 'opencode';
-                      final defaultCmd = AgentConfigService.defaultBoardChatCommand(adapter);
+                      final defaultCmd =
+                          AgentConfigService.defaultBoardChatCommand(adapter);
                       final updated = widget.config.copyWith(
                         launchCommand: defaultCmd,
                         passDefaultArgs: true,
@@ -1179,7 +1356,8 @@ class _AgentRowState extends State<_AgentRow> {
                   child: Icon(
                     Icons.settings_backup_restore,
                     size: 18,
-                    color: Theme.of(context).textTheme.bodySmall?.color ??
+                    color:
+                        Theme.of(context).textTheme.bodySmall?.color ??
                         Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
@@ -1391,7 +1569,9 @@ class _AgentRowState extends State<_AgentRow> {
                     ],
                     onChanged: (v) {
                       if (v != null) {
-                        widget.onChanged(widget.config.copyWith(streamAdapter: v));
+                        widget.onChanged(
+                          widget.config.copyWith(streamAdapter: v),
+                        );
                       }
                     },
                     dropdownColor: colors.surfaceElevated,
@@ -1734,10 +1914,7 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
         .replaceFirstMapped(RegExp(r'^.'), (m) => m[0]!.toUpperCase());
     final picked = await showDialog<Color>(
       context: context,
-      builder: (ctx) => _ColorPickerDialog(
-        title: label,
-        initialColor: current,
-      ),
+      builder: (ctx) => _ColorPickerDialog(title: label, initialColor: current),
     );
     if (picked != null) {
       await ThemeManager.instance.setColorOverride(slot, picked);
@@ -1749,9 +1926,10 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     // Determine default name
     String defaultName;
     if (tm.activeCustomThemeId != null) {
-      final custom = tm.customThemes
-          .where((t) => t.id == tm.activeCustomThemeId)
-          .firstOrNull;
+      final custom =
+          tm.customThemes
+              .where((t) => t.id == tm.activeCustomThemeId)
+              .firstOrNull;
       defaultName = '${custom?.name ?? "Custom"} Copy';
     } else {
       defaultName = '${tm.current.label} Custom';
@@ -1818,9 +1996,10 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     // Build a safe filename
     String themeName;
     if (tm.activeCustomThemeId != null) {
-      final custom = tm.customThemes
-          .where((t) => t.id == tm.activeCustomThemeId)
-          .firstOrNull;
+      final custom =
+          tm.customThemes
+              .where((t) => t.id == tm.activeCustomThemeId)
+              .firstOrNull;
       themeName = custom?.name ?? 'custom_theme';
     } else {
       themeName = tm.current.label;
@@ -1852,9 +2031,8 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     // Active theme label
     String activeLabel;
     if (activeCustomId != null) {
-      final custom = tm.customThemes
-          .where((t) => t.id == activeCustomId)
-          .firstOrNull;
+      final custom =
+          tm.customThemes.where((t) => t.id == activeCustomId).firstOrNull;
       activeLabel = custom?.name ?? 'Custom';
     } else {
       activeLabel = tm.current.label;
@@ -1872,7 +2050,8 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
           runSpacing: 8,
           children: [
             ...AppThemePreset.values.map((preset) {
-              final isActive = activeCustomId == null &&
+              final isActive =
+                  activeCustomId == null &&
                   preset == tm.current &&
                   !hasOverrides;
               return _PresetChip(
@@ -1887,8 +2066,7 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
               );
             }),
             ...tm.customThemes.map((custom) {
-              final isActive =
-                  activeCustomId == custom.id && !hasOverrides;
+              final isActive = activeCustomId == custom.id && !hasOverrides;
               return _PresetChip(
                 label: custom.name,
                 color: custom.scheme.primary,
@@ -1927,9 +2105,10 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
             // Dark/Light toggle (only for themes without fixed brightness)
             if (!tm.hasFixedBrightness)
               _SmallButton(
-                icon: tm.isDark
-                    ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined,
+                icon:
+                    tm.isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
                 label: tm.isDark ? 'Light Mode' : 'Dark Mode',
                 onTap: () => tm.toggleBrightness(),
               ),
@@ -2027,20 +2206,23 @@ class _OrbColorPreview extends StatelessWidget {
                 Wrap(
                   spacing: 8,
                   runSpacing: 6,
-                  children: _orbSlots.map((slot) {
-                    final currentColor = tm.colorForSlot(slot.key);
-                    final isOverridden =
-                        tm.colorOverrides.containsKey(slot.key);
-                    return _ColorSwatch(
-                      label: slot.label,
-                      color: currentColor,
-                      isOverridden: isOverridden,
-                      onTap: () => onPick(slot.key, currentColor),
-                      onReset: isOverridden
-                          ? () => tm.removeColorOverride(slot.key)
-                          : null,
-                    );
-                  }).toList(),
+                  children:
+                      _orbSlots.map((slot) {
+                        final currentColor = tm.colorForSlot(slot.key);
+                        final isOverridden = tm.colorOverrides.containsKey(
+                          slot.key,
+                        );
+                        return _ColorSwatch(
+                          label: slot.label,
+                          color: currentColor,
+                          isOverridden: isOverridden,
+                          onTap: () => onPick(slot.key, currentColor),
+                          onReset:
+                              isOverridden
+                                  ? () => tm.removeColorOverride(slot.key)
+                                  : null,
+                        );
+                      }).toList(),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -2111,10 +2293,11 @@ class _PresetChip extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: isActive
-                    ? colors.primary
-                    : Theme.of(context).textTheme.bodySmall?.color ??
-                        colors.textSecondary,
+                color:
+                    isActive
+                        ? colors.primary
+                        : Theme.of(context).textTheme.bodySmall?.color ??
+                            colors.textSecondary,
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -2166,19 +2349,21 @@ class _ColorCategoryRow extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 6,
-            children: slots.map((slot) {
-              final currentColor = tm.colorForSlot(slot.key);
-              final isOverridden = tm.colorOverrides.containsKey(slot.key);
-              return _ColorSwatch(
-                label: slot.label,
-                color: currentColor,
-                isOverridden: isOverridden,
-                onTap: () => onPick(slot.key, currentColor),
-                onReset: isOverridden
-                    ? () => tm.removeColorOverride(slot.key)
-                    : null,
-              );
-            }).toList(),
+            children:
+                slots.map((slot) {
+                  final currentColor = tm.colorForSlot(slot.key);
+                  final isOverridden = tm.colorOverrides.containsKey(slot.key);
+                  return _ColorSwatch(
+                    label: slot.label,
+                    color: currentColor,
+                    isOverridden: isOverridden,
+                    onTap: () => onPick(slot.key, currentColor),
+                    onReset:
+                        isOverridden
+                            ? () => tm.removeColorOverride(slot.key)
+                            : null,
+                  );
+                }).toList(),
           ),
         ],
       ),
@@ -2249,13 +2434,7 @@ class _ColorSwatch extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 3),
-          Text(
-            label,
-            style: TextStyle(
-              color: colors.textMuted,
-              fontSize: 9,
-            ),
-          ),
+          Text(label, style: TextStyle(color: colors.textMuted, fontSize: 9)),
         ],
       ),
     );
@@ -2292,10 +2471,7 @@ class _SmallButton extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
-                color: colors.textSecondary,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: colors.textSecondary, fontSize: 11),
             ),
           ],
         ),
@@ -2306,10 +2482,7 @@ class _SmallButton extends StatelessWidget {
 
 /// HSV-based color picker dialog.
 class _ColorPickerDialog extends StatefulWidget {
-  const _ColorPickerDialog({
-    required this.title,
-    required this.initialColor,
-  });
+  const _ColorPickerDialog({required this.title, required this.initialColor});
 
   final String title;
   final Color initialColor;
@@ -2351,16 +2524,46 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   }
 
   static const _presetColors = [
-    Color(0xFF00FF9F), Color(0xFF00DD88), Color(0xFF00CC7A), Color(0xFF067D17),
-    Color(0xFF2ECC71), Color(0xFF27AE60), Color(0xFF1ABC9C), Color(0xFF16A085),
-    Color(0xFFFF4F6A), Color(0xFFFF6B6B), Color(0xFFE74C3C), Color(0xFFC0392B),
-    Color(0xFFDE1B2E), Color(0xFFFF1744), Color(0xFFD50000), Color(0xFFB71C1C),
-    Color(0xFF00B4FF), Color(0xFF3498DB), Color(0xFF2980B9), Color(0xFF0066CC),
-    Color(0xFF548AF7), Color(0xFF2196F3), Color(0xFF1976D2), Color(0xFF0D47A1),
-    Color(0xFFFF9500), Color(0xFFF39C12), Color(0xFFE67E22), Color(0xFFD35400),
-    Color(0xFFCC7700), Color(0xFFFF6F00), Color(0xFFFF8F00), Color(0xFFFFAB00),
-    Color(0xFF9B59B6), Color(0xFF8E44AD), Color(0xFF7C3AED), Color(0xFF6C3483),
-    Color(0xFFE91E63), Color(0xFFF06292), Color(0xFFFFEB3B), Color(0xFFCDDC39),
+    Color(0xFF00FF9F),
+    Color(0xFF00DD88),
+    Color(0xFF00CC7A),
+    Color(0xFF067D17),
+    Color(0xFF2ECC71),
+    Color(0xFF27AE60),
+    Color(0xFF1ABC9C),
+    Color(0xFF16A085),
+    Color(0xFFFF4F6A),
+    Color(0xFFFF6B6B),
+    Color(0xFFE74C3C),
+    Color(0xFFC0392B),
+    Color(0xFFDE1B2E),
+    Color(0xFFFF1744),
+    Color(0xFFD50000),
+    Color(0xFFB71C1C),
+    Color(0xFF00B4FF),
+    Color(0xFF3498DB),
+    Color(0xFF2980B9),
+    Color(0xFF0066CC),
+    Color(0xFF548AF7),
+    Color(0xFF2196F3),
+    Color(0xFF1976D2),
+    Color(0xFF0D47A1),
+    Color(0xFFFF9500),
+    Color(0xFFF39C12),
+    Color(0xFFE67E22),
+    Color(0xFFD35400),
+    Color(0xFFCC7700),
+    Color(0xFFFF6F00),
+    Color(0xFFFF8F00),
+    Color(0xFFFFAB00),
+    Color(0xFF9B59B6),
+    Color(0xFF8E44AD),
+    Color(0xFF7C3AED),
+    Color(0xFF6C3483),
+    Color(0xFFE91E63),
+    Color(0xFFF06292),
+    Color(0xFFFFEB3B),
+    Color(0xFFCDDC39),
   ];
 
   @override
@@ -2442,10 +2645,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 color: _hsv.toColor(),
                 borderColor: colors.border,
                 labelColor: colors.textMuted,
-                onChanged: (v) => setState(() {
-                  _hsv = _hsv.withHue(v);
-                  _hexController.text = _colorToHex(_hsv.toColor());
-                }),
+                onChanged:
+                    (v) => setState(() {
+                      _hsv = _hsv.withHue(v);
+                      _hexController.text = _colorToHex(_hsv.toColor());
+                    }),
               ),
               const SizedBox(height: 8),
               _HsvSlider(
@@ -2455,10 +2659,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 color: _hsv.toColor(),
                 borderColor: colors.border,
                 labelColor: colors.textMuted,
-                onChanged: (v) => setState(() {
-                  _hsv = _hsv.withSaturation(v);
-                  _hexController.text = _colorToHex(_hsv.toColor());
-                }),
+                onChanged:
+                    (v) => setState(() {
+                      _hsv = _hsv.withSaturation(v);
+                      _hexController.text = _colorToHex(_hsv.toColor());
+                    }),
               ),
               const SizedBox(height: 8),
               _HsvSlider(
@@ -2468,10 +2673,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                 color: _hsv.toColor(),
                 borderColor: colors.border,
                 labelColor: colors.textMuted,
-                onChanged: (v) => setState(() {
-                  _hsv = _hsv.withValue(v);
-                  _hexController.text = _colorToHex(_hsv.toColor());
-                }),
+                onChanged:
+                    (v) => setState(() {
+                      _hsv = _hsv.withValue(v);
+                      _hexController.text = _colorToHex(_hsv.toColor());
+                    }),
               ),
               const SizedBox(height: 14),
               Text(
@@ -2482,27 +2688,31 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
               Wrap(
                 spacing: 5,
                 runSpacing: 5,
-                children: _presetColors.map((c) {
-                  return GestureDetector(
-                    onTap: () => setState(() {
-                      _hsv = HSVColor.fromColor(c);
-                      _hexController.text = _colorToHex(c);
-                    }),
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: c,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color:
-                              c == pickedColor ? Colors.white : colors.border,
-                          width: c == pickedColor ? 2 : 1,
+                children:
+                    _presetColors.map((c) {
+                      return GestureDetector(
+                        onTap:
+                            () => setState(() {
+                              _hsv = HSVColor.fromColor(c);
+                              _hexController.text = _colorToHex(c);
+                            }),
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: c,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color:
+                                  c == pickedColor
+                                      ? Colors.white
+                                      : colors.border,
+                              width: c == pickedColor ? 2 : 1,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
               const SizedBox(height: 18),
               Row(
@@ -2566,18 +2776,12 @@ class _HsvSlider extends StatelessWidget {
             data: SliderThemeData(
               trackHeight: 10,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-              overlayShape:
-                  const RoundSliderOverlayShape(overlayRadius: 12),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               activeTrackColor: color,
               inactiveTrackColor: borderColor,
               thumbColor: Colors.white,
             ),
-            child: Slider(
-              value: value,
-              min: 0,
-              max: max,
-              onChanged: onChanged,
-            ),
+            child: Slider(value: value, min: 0, max: max, onChanged: onChanged),
           ),
         ),
       ],

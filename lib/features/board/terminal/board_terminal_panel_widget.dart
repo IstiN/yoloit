@@ -13,7 +13,7 @@ import 'package:yoloit/features/board/terminal/board_terminal_session_manager.da
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
-import 'package:yoloit/features/terminal/data/pty_service.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 
@@ -252,7 +252,10 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
                             logAndRefresh(
                               'pty[$sessionId] "${escapeForLog(data)}"',
                             );
-                            PtyService.instance.write(sessionId, data);
+                            TerminalBackendService.instance.write(
+                              sessionId,
+                              data,
+                            );
                           },
                         ),
                       ),
