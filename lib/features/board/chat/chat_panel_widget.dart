@@ -4465,71 +4465,83 @@ class _UserBubbleState extends State<_UserBubble> {
         child: MouseRegion(
           onEnter: (_) => setState(() => _isHovered = true),
           onExit: (_) => setState(() => _isHovered = false),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Opacity(
-                opacity: _isHovered ? 1.0 : 0.0,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 6, bottom: 4),
-                  child: _BubbleMenu(textToCopy: resolved.text, light: false),
-                ),
-              ),
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.65,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        context.appColors.accentBlue,
-                        context.appColors.primary,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                      bottomLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(4),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availableWidth =
+                  constraints.maxWidth.isFinite
+                      ? constraints.maxWidth
+                      : MediaQuery.of(context).size.width * 0.65;
+              final bubbleMaxWidth =
+                  availableWidth <= 38 ? availableWidth : availableWidth - 30;
+              return Row(
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Opacity(
+                    opacity: _isHovered ? 1.0 : 0.0,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6, bottom: 4),
+                      child: _BubbleMenu(
+                        textToCopy: resolved.text,
+                        light: false,
+                      ),
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasAttachments)
-                        Padding(
-                          padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                          child: _AttachmentPreviewSection(
-                            paths: resolved.paths,
-                            onLight: false,
-                            onOpenFile: widget.onOpenFile,
-                          ),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            context.appColors.accentBlue,
+                            context.appColors.primary,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      if (hasText)
-                        SelectionArea(
-                          child: Text(
-                            resolved.text,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: context.appColors.textPrimary,
-                              height: 1.4,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(4),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasAttachments)
+                            Padding(
+                              padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                              child: _AttachmentPreviewSection(
+                                paths: resolved.paths,
+                                onLight: false,
+                                onOpenFile: widget.onOpenFile,
+                              ),
                             ),
-                          ),
-                        ),
-                    ],
+                          if (hasText)
+                            SelectionArea(
+                              child: Text(
+                                resolved.text,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: context.appColors.textPrimary,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),
