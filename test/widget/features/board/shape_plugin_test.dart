@@ -56,7 +56,9 @@ void main() {
     expect(state['text'], 'Updated shape');
   });
 
-  testWidgets('shape shows selected variant palette', (tester) async {
+  testWidgets('shape selection does not render a second inline palette', (
+    tester,
+  ) async {
     var state = <String, dynamic>{...plugin.initialState};
     final panel = BoardPanelInstance(
       id: 'shape',
@@ -91,60 +93,9 @@ void main() {
       ),
     );
 
-    expect(find.text('○'), findsOneWidget);
-    expect(find.text('◇'), findsOneWidget);
-
-    await tester.tap(find.text('◇'));
-    expect(state['shape'], 'diamond');
-  });
-
-  testWidgets('shape palette updates color and text placement', (tester) async {
-    var state = <String, dynamic>{...plugin.initialState};
-    final panel = BoardPanelInstance(
-      id: 'shape',
-      type: ShapePlugin.kTypeId,
-      title: 'Shape',
-      bounds: const BoardPanelBounds(x: 0, y: 0, width: 420, height: 260),
-      state: state,
-    );
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 420,
-            height: 260,
-            child: Builder(
-              builder:
-                  (context) => plugin.buildContent(
-                    context,
-                    panel,
-                    BoardPanelRenderContext(
-                      isSelected: true,
-                      onFocus: () {},
-                      onDelete: () {},
-                      onUpdateState: (nextState) => state = nextState,
-                      onShowEditor: () {},
-                    ),
-                  ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byTooltip('Color #FBBF24'));
-    expect(state['strokeColor'], '#FBBF24');
-    expect(state['textColor'], '#FBBF24');
-
-    await tester.tap(find.text('R'));
-    expect(state['textHAlign'], 'right');
-
-    await tester.tap(find.text('B'));
-    expect(state['textVAlign'], 'bottom');
-
-    await tester.tap(find.text('V'));
-    expect(state['textOrientation'], 'vertical');
+    expect(find.text('○'), findsNothing);
+    expect(find.text('◇'), findsNothing);
+    expect(state['shape'], 'rectangle');
   });
 
   testWidgets('shape editor applies grouped settings as JSON state', (

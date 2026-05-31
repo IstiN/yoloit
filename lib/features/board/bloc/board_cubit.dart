@@ -349,17 +349,21 @@ class BoardCubit extends Cubit<BoardState> {
 
   /// Creates a panel for any registered plugin type using its default size and
   /// initial state. Use for generic plugins (kanban, checklist, etc.).
-  Future<void> createGenericPanel(String typeId) async {
+  Future<void> createGenericPanel(
+    String typeId, {
+    String? title,
+    Map<String, dynamic> panelState = const {},
+    Size? preferredSize,
+  }) async {
     final board = state.activeBoard;
     if (board == null) return;
     final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
     if (plugin == null) return;
-    final size = plugin.defaultSize;
-    final initialState = _initialStateForBoard(
-      plugin.initialState,
-      typeId,
-      board,
-    );
+    final size = preferredSize ?? plugin.defaultSize;
+    final initialState = <String, dynamic>{
+      ..._initialStateForBoard(plugin.initialState, typeId, board),
+      ...panelState,
+    };
     final bounds = _nextAvailableBounds(
       board,
       preferredWidth: size.width,
@@ -368,7 +372,8 @@ class BoardCubit extends Cubit<BoardState> {
     final panel = BoardPanelInstance(
       id: _nextId('panel'),
       type: typeId,
-      title: plugin.displayName,
+      title:
+          title?.trim().isNotEmpty == true ? title!.trim() : plugin.displayName,
       bounds: bounds,
       state: initialState,
       zIndex:

@@ -33,6 +33,7 @@ class ShapePlugin extends BoardPanelPlugin {
     'strokeColor': '#93C5FD',
     'textColor': '#E2E8F0',
     'strokeWidth': 3.0,
+    'fontSize': 18.0,
     'textHAlign': 'center',
     'textVAlign': 'center',
     'textOrientation': 'horizontal',
@@ -63,6 +64,7 @@ class ShapePlugin extends BoardPanelPlugin {
     final textColor =
         _parseHex(panel.state['textColor'] as String?) ?? colors.textPrimary;
     final strokeWidth = (panel.state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
+    final fontSize = (panel.state['fontSize'] as num?)?.toDouble() ?? 18.0;
     final textHAlign =
         (panel.state['textHAlign'] as String? ?? 'center').toLowerCase();
     final textVAlign =
@@ -78,15 +80,12 @@ class ShapePlugin extends BoardPanelPlugin {
       strokeColor: strokeColor,
       textColor: textColor,
       strokeWidth: strokeWidth,
+      fontSize: fontSize,
       textHAlign: textHAlign,
       textVAlign: textVAlign,
       textOrientation: textOrientation,
-      isSelected: renderContext.isSelected,
       onChanged: (value) {
         renderContext.onUpdateState({...panel.state, 'text': value});
-      },
-      onStateChanged: (update) {
-        renderContext.onUpdateState({...panel.state, ...update});
       },
     );
   }
@@ -115,12 +114,11 @@ class _ShapeContent extends StatefulWidget {
     required this.strokeColor,
     required this.textColor,
     required this.strokeWidth,
+    required this.fontSize,
     required this.textHAlign,
     required this.textVAlign,
     required this.textOrientation,
-    required this.isSelected,
     required this.onChanged,
-    required this.onStateChanged,
   });
 
   final BoardPanelInstance panel;
@@ -129,12 +127,11 @@ class _ShapeContent extends StatefulWidget {
   final Color strokeColor;
   final Color textColor;
   final double strokeWidth;
+  final double fontSize;
   final String textHAlign;
   final String textVAlign;
   final String textOrientation;
-  final bool isSelected;
   final ValueChanged<String> onChanged;
-  final ValueChanged<Map<String, dynamic>> onStateChanged;
 
   @override
   State<_ShapeContent> createState() => _ShapeContentState();
@@ -172,7 +169,6 @@ class _ShapeContentState extends State<_ShapeContent> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     final alignment = _textAlignment(widget.textHAlign, widget.textVAlign);
     final textAlign = _textAlign(widget.textHAlign);
     final isVertical = widget.textOrientation == 'vertical';
@@ -189,7 +185,7 @@ class _ShapeContentState extends State<_ShapeContent> {
         hintText: 'Type',
         hintStyle: TextStyle(
           color: widget.textColor.withValues(alpha: 0.45),
-          fontSize: 18,
+          fontSize: widget.fontSize,
           fontWeight: FontWeight.w700,
         ),
         isCollapsed: true,
@@ -197,7 +193,7 @@ class _ShapeContentState extends State<_ShapeContent> {
       cursorColor: widget.textColor,
       style: TextStyle(
         color: widget.textColor,
-        fontSize: 18,
+        fontSize: widget.fontSize,
         fontWeight: FontWeight.w700,
         height: 1.2,
       ),
@@ -228,21 +224,6 @@ class _ShapeContentState extends State<_ShapeContent> {
             ),
           ),
         ),
-        if (widget.isSelected)
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 10,
-            child: _ShapePalette(
-              selectedShape: widget.shape,
-              selectedColor: widget.strokeColor,
-              textHAlign: widget.textHAlign,
-              textVAlign: widget.textVAlign,
-              textOrientation: widget.textOrientation,
-              colors: colors,
-              onUpdate: widget.onStateChanged,
-            ),
-          ),
       ],
     );
   }
@@ -524,10 +505,13 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
   late String _fillColor;
   late String _strokeColor;
   late String _textColor;
+  late String _text;
   late double _strokeWidth;
+  late double _fontSize;
   late String _textHAlign;
   late String _textVAlign;
   late String _textOrientation;
+  late final TextEditingController _textController;
 
   static const _colors = [
     '#00000000',
@@ -548,10 +532,19 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
     _fillColor = state['fillColor'] as String? ?? '#00000000';
     _strokeColor = state['strokeColor'] as String? ?? '#93C5FD';
     _textColor = state['textColor'] as String? ?? '#E2E8F0';
+    _text = state['text'] as String? ?? '';
+    _textController = TextEditingController(text: _text);
     _strokeWidth = (state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
+    _fontSize = (state['fontSize'] as num?)?.toDouble() ?? 18.0;
     _textHAlign = state['textHAlign'] as String? ?? 'center';
     _textVAlign = state['textVAlign'] as String? ?? 'center';
     _textOrientation = state['textOrientation'] as String? ?? 'horizontal';
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
   }
 
   @override
@@ -565,7 +558,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _EditorSectionLabel('Shape'),
+              const _EditorSectionLabel('Shape'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -581,21 +574,21 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                     }).toList(),
               ),
               const SizedBox(height: 18),
-              _EditorSectionLabel('Stroke color'),
+              const _EditorSectionLabel('Stroke color'),
               _EditorColorRow(
                 colors: _colors.where((hex) => hex != '#00000000').toList(),
                 selected: _strokeColor,
                 onSelected: (value) => setState(() => _strokeColor = value),
               ),
               const SizedBox(height: 18),
-              _EditorSectionLabel('Fill color'),
+              const _EditorSectionLabel('Fill color'),
               _EditorColorRow(
                 colors: _colors,
                 selected: _fillColor,
                 onSelected: (value) => setState(() => _fillColor = value),
               ),
               const SizedBox(height: 18),
-              _EditorSectionLabel('Text color'),
+              const _EditorSectionLabel('Text color'),
               _EditorColorRow(
                 colors: _colors.where((hex) => hex != '#00000000').toList(),
                 selected: _textColor,
@@ -611,7 +604,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 onChanged: (value) => setState(() => _strokeWidth = value),
               ),
               const SizedBox(height: 18),
-              _EditorSectionLabel('Text alignment'),
+              const _EditorSectionLabel('Text alignment'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -637,7 +630,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 ],
               ),
               const SizedBox(height: 18),
-              _EditorSectionLabel('Text orientation'),
+              const _EditorSectionLabel('Text orientation'),
               Wrap(
                 spacing: 8,
                 children: [
@@ -648,6 +641,27 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                     setState(() => _textOrientation = 'vertical');
                   }),
                 ],
+              ),
+              const SizedBox(height: 18),
+              const _EditorSectionLabel('Text'),
+              TextField(
+                minLines: 1,
+                maxLines: 4,
+                controller: _textController,
+                onChanged: (value) => _text = value,
+                decoration: const InputDecoration(
+                  hintText: 'Type custom text',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _EditorSectionLabel('Text size ${_fontSize.round()}'),
+              Slider(
+                min: 12,
+                max: 36,
+                divisions: 24,
+                value: _fontSize.clamp(12, 36),
+                onChanged: (value) => setState(() => _fontSize = value),
               ),
             ],
           ),
@@ -665,7 +679,9 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 'fillColor': _fillColor,
                 'strokeColor': _strokeColor,
                 'textColor': _textColor,
+                'text': _text,
                 'strokeWidth': _strokeWidth,
+                'fontSize': _fontSize,
                 'textHAlign': _textHAlign,
                 'textVAlign': _textVAlign,
                 'textOrientation': _textOrientation,

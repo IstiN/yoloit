@@ -445,11 +445,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                 details,
                                                               ),
                                                       onResize:
-                                                          (details) =>
+                                                          (update) =>
                                                               _resizePanelWithEdgePan(
                                                                 context,
                                                                 panel,
-                                                                details,
+                                                                update,
                                                               ),
                                                       onDragStart:
                                                           (details) =>
@@ -1088,9 +1088,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         onAddTerminal:
                                             () => _addTerminalPanel(context),
                                         onAddGeneric:
-                                            (typeId) => context
-                                                .read<BoardCubit>()
-                                                .createGenericPanel(typeId),
+                                            (typeId) =>
+                                                _handleGenericToolSelection(
+                                                  context,
+                                                  typeId,
+                                                ),
                                       ),
                                     ),
                                   // ── Cancel connection button ───────────────────────
@@ -1765,20 +1767,50 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   void _resizePanelWithEdgePan(
     BuildContext context,
     BoardPanelInstance panel,
-    DragUpdateDetails details,
+    _BoardPanelResizeUpdate update,
   ) {
-    _panViewportNearEdge(details.globalPosition);
-    final delta = _consumePanelDragDelta(details.globalPosition, details.delta);
-    var newWidth = panel.bounds.width + delta.dx;
-    // Cap webpage panels at 1440px wide.
-    if (panel.type == WebpagePlugin.kTypeId && newWidth > 1440) {
-      newWidth = 1440;
-    }
-    context.read<BoardCubit>().resizePanel(
+    _panViewportNearEdge(update.globalPosition);
+    final delta = _consumePanelDragDelta(update.globalPosition, update.delta);
+    final next = _resizeBoundsForHandle(panel, update.handle, delta);
+    context.read<BoardCubit>().updatePanel(
       panel.id,
-      width: newWidth,
-      height: panel.bounds.height + delta.dy,
+      (p) => p.copyWith(bounds: next),
     );
+  }
+
+  BoardPanelBounds _resizeBoundsForHandle(
+    BoardPanelInstance panel,
+    _BoardPanelResizeHandle handle,
+    Offset delta,
+  ) {
+    const minWidth = 220.0;
+    const minHeight = 140.0;
+    final maxWidth =
+        panel.type == WebpagePlugin.kTypeId ? 1440.0 : double.infinity;
+
+    var x = panel.bounds.x;
+    var y = panel.bounds.y;
+    var width = panel.bounds.width;
+    var height = panel.bounds.height;
+
+    if (handle.affectsLeft) {
+      final proposedWidth = (width - delta.dx).clamp(minWidth, maxWidth);
+      x += width - proposedWidth;
+      width = proposedWidth;
+    }
+    if (handle.affectsRight) {
+      width = (width + delta.dx).clamp(minWidth, maxWidth);
+    }
+    if (handle.affectsTop) {
+      final proposedHeight = math.max(minHeight, height - delta.dy);
+      y += height - proposedHeight;
+      height = proposedHeight;
+    }
+    if (handle.affectsBottom) {
+      height = math.max(minHeight, height + delta.dy);
+    }
+
+    return panel.bounds.copyWith(x: x, y: y, width: width, height: height);
   }
 
   void _handlePanelDragStart(String panelId, DragStartDetails details) {
@@ -1797,6 +1829,69 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       _persistViewport(context, board);
     }
     _scheduleCanvasExpansionIfNeeded();
+  }
+
+  void _handleGenericToolSelection(BuildContext context, String value) {
+    if (value.startsWith('__connector:')) {
+      final parts = value.split(':');
+      final geometryName = parts.length > 1 ? parts[1] : 'bezier';
+      final showArrow = parts.length <= 2 || parts[2] != 'line';
+      final geometry = switch (geometryName) {
+        'straight' => BoardLinkGeometry.straight,
+        'elbow' => BoardLinkGeometry.elbow,
+        _ => BoardLinkGeometry.bezier,
+      };
+      setState(() {
+        _activeTool = BoardToolId.connect;
+        _connectSettings = _connectSettings.copyWith(
+          geometry: geometry,
+          showArrow: showArrow,
+        );
+        _activeStroke.clear();
+        _connectSourceId = null;
+        _connectPreviewPointer = null;
+      });
+      return;
+    }
+
+    if (value.startsWith('__shape:')) {
+      final shape = value.substring('__shape:'.length);
+      final title = switch (shape) {
+        'circle' => 'Oval',
+        'diamond' => 'Rhombus',
+        'frame' => 'Frame',
+        _ => '${shape[0].toUpperCase()}${shape.substring(1)}',
+      };
+      context.read<BoardCubit>().createGenericPanel(
+        'board.shape',
+        title: title,
+        panelState: {'shape': shape},
+      );
+      return;
+    }
+
+    if (value == '__divider') {
+      context.read<BoardCubit>().createGenericPanel(
+        'board.shape',
+        title: 'Divider',
+        panelState: {'shape': 'frame', 'text': '', 'strokeWidth': 2.0},
+        preferredSize: const Size(320, 44),
+      );
+      return;
+    }
+
+    if (value == '__diagram') {
+      setState(() {
+        _activeTool = BoardToolId.connect;
+        _connectSettings = _connectSettings.copyWith(
+          geometry: BoardLinkGeometry.bezier,
+          showArrow: true,
+        );
+      });
+      return;
+    }
+
+    context.read<BoardCubit>().createGenericPanel(value);
   }
 
   Offset _consumePanelDragDelta(Offset globalPosition, Offset fallbackDelta) {
@@ -3797,6 +3892,54 @@ class _MarkdownToolButton extends StatelessWidget {
   }
 }
 
+enum _BoardPanelResizeHandle {
+  topLeft,
+  top,
+  topRight,
+  right,
+  bottomRight,
+  bottom,
+  bottomLeft,
+  left;
+
+  bool get affectsLeft => this == left || this == topLeft || this == bottomLeft;
+  bool get affectsRight =>
+      this == right || this == topRight || this == bottomRight;
+  bool get affectsTop => this == top || this == topLeft || this == topRight;
+  bool get affectsBottom =>
+      this == bottom || this == bottomLeft || this == bottomRight;
+
+  SystemMouseCursor get cursor => switch (this) {
+    topLeft || bottomRight => SystemMouseCursors.resizeUpLeftDownRight,
+    topRight || bottomLeft => SystemMouseCursors.resizeUpRightDownLeft,
+    left || right => SystemMouseCursors.resizeLeftRight,
+    top || bottom => SystemMouseCursors.resizeUpDown,
+  };
+
+  String get tooltip => switch (this) {
+    topLeft => 'Resize from top left',
+    top => 'Resize height',
+    topRight => 'Resize from top right',
+    right => 'Resize width',
+    bottomRight => 'Resize from bottom right',
+    bottom => 'Resize height',
+    bottomLeft => 'Resize from bottom left',
+    left => 'Resize width',
+  };
+}
+
+class _BoardPanelResizeUpdate {
+  const _BoardPanelResizeUpdate({
+    required this.handle,
+    required this.delta,
+    required this.globalPosition,
+  });
+
+  final _BoardPanelResizeHandle handle;
+  final Offset delta;
+  final Offset globalPosition;
+}
+
 class _BoardPanelCard extends StatefulWidget {
   const _BoardPanelCard({
     super.key,
@@ -3824,7 +3967,7 @@ class _BoardPanelCard extends StatefulWidget {
   final Offset positionOffset;
   final VoidCallback onTap;
   final ValueChanged<DragUpdateDetails> onMove;
-  final ValueChanged<DragUpdateDetails> onResize;
+  final ValueChanged<_BoardPanelResizeUpdate> onResize;
   final ValueChanged<DragStartDetails> onDragStart;
   final VoidCallback onDragEnd;
   final VoidCallback onDelete;
@@ -3853,13 +3996,14 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
   late final AnimationController _entryController;
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
+  bool _isTransformingPanel = false;
 
   // Convenience getters so build code can still use widget.panel etc.
   BoardPanelInstance get panel => widget.panel;
   Offset get positionOffset => widget.positionOffset;
   VoidCallback get onTap => widget.onTap;
   ValueChanged<DragUpdateDetails> get onMove => widget.onMove;
-  ValueChanged<DragUpdateDetails> get onResize => widget.onResize;
+  ValueChanged<_BoardPanelResizeUpdate> get onResize => widget.onResize;
   ValueChanged<DragStartDetails> get onDragStart => widget.onDragStart;
   VoidCallback get onDragEnd => widget.onDragEnd;
   VoidCallback get onDelete => widget.onDelete;
@@ -3932,6 +4076,32 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
     );
   }
 
+  void _startPanelTransform(DragStartDetails details) {
+    onTap();
+    setState(() => _isTransformingPanel = true);
+    onDragStart(details);
+  }
+
+  void _endPanelTransform() {
+    if (_isTransformingPanel) {
+      setState(() => _isTransformingPanel = false);
+    }
+    onDragEnd();
+  }
+
+  void _resizeFromHandle(
+    _BoardPanelResizeHandle handle,
+    DragUpdateDetails details,
+  ) {
+    onResize(
+      _BoardPanelResizeUpdate(
+        handle: handle,
+        delta: details.delta,
+        globalPosition: details.globalPosition,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -3968,447 +4138,469 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
             : accent == null
             ? colors.divider
             : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
+    final showSelectionChrome = isFocused && !isCapturing;
+    const selectionSideGutter = 18.0;
+    const selectionTopGutter = 62.0;
+    const selectionBottomGutter = 18.0;
+    const selectionHandleInset = 12.0;
+    final selectionToolbarMinWidth =
+        panel.type == 'board.sticky' || panel.type == 'board.shape'
+            ? 680.0
+            : 360.0;
+    final selectionToolbarWidth = math.max(
+      selectionToolbarMinWidth,
+      panel.bounds.width,
+    );
+    final selectionWrapperWidth = math.max(
+      panel.bounds.width + selectionSideGutter * 2,
+      selectionToolbarWidth + selectionSideGutter * 2,
+    );
     return AnimatedPositioned(
-      duration: const Duration(milliseconds: 320),
+      duration:
+          _isTransformingPanel
+              ? Duration.zero
+              : const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
-      left: panel.bounds.x + positionOffset.dx,
-      top: panel.bounds.y + positionOffset.dy,
-      width: panel.bounds.width,
-      height: panel.bounds.height,
+      left: panel.bounds.x + positionOffset.dx - selectionSideGutter,
+      top: panel.bounds.y + positionOffset.dy - selectionTopGutter,
+      width: selectionWrapperWidth,
+      height: panel.bounds.height + selectionTopGutter + selectionBottomGutter,
       child: FadeTransition(
         opacity: _opacity,
         child: ScaleTransition(
           scale: _scale,
           alignment: Alignment.topLeft,
-          child: _ChatGlowWrapper(
-            panelId: panel.id,
-            borderRadius: BorderRadius.circular(16),
-            child: Listener(
-              behavior: HitTestBehavior.deferToChild,
-              onPointerDown: (_) {
-                if (isWebpage) {
-                  if (!isFocused) {
-                    if (kDebugMode) {
-                      debugPrint(
-                        '[BoardWebFocus] panelPointerDown -> focus webpage panel=${panel.id}',
-                      );
-                    }
-                    onTap();
-                  } else {
-                    if (kDebugMode) {
-                      debugPrint(
-                        '[BoardWebFocus] panelPointerDown -> already focused, releasing Flutter focus panel=${panel.id}',
-                      );
-                    }
-                  }
-                  // Release ALL Flutter keyboard focus so the native WKWebView
-                  // can become firstResponder and receive keyboard input.
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  return;
-                }
-                if (!isFocused) {
-                  onTap();
-                }
-              },
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: panelFill,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: selectionSideGutter,
+                top: selectionTopGutter,
+                width: panel.bounds.width,
+                height: panel.bounds.height,
+                child: _ChatGlowWrapper(
+                  panelId: panel.id,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color:
-                        isCapturing
-                            ? colors.background
-                            : isFocused
-                            ? colors.primary
-                            : borderColor,
-                    width: isFocused && !isCapturing ? 1.5 : 1,
-                  ),
-                  boxShadow:
-                      isCapturing || !usePanelChrome
-                          ? null
-                          : [
-                            BoxShadow(
-                              color: colors.background.withAlpha(35),
-                              blurRadius: 22,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                ),
-                child: Stack(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (showHeader)
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onPanStart: (details) {
-                              onTap();
-                              onDragStart(details);
-                            },
-                            onPanUpdate:
-                                panel.locked
-                                    ? null
-                                    : (details) => onMove(details),
-                            onPanEnd: (_) => onDragEnd(),
-                            onPanCancel: onDragEnd,
-                            child: Container(
-                              height: 44,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: panelHeaderFill,
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(16),
-                                ),
-                                border: Border(
-                                  bottom: BorderSide(color: colors.divider),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  if (panel.type == ChatPanelPlugin.kTypeId)
-                                    ChatProviderIcon(
-                                      provider:
-                                          (panel.state['config']
-                                                  as Map?)?['provider']
-                                              as String? ??
-                                          'copilot',
-                                      size: 18,
-                                    )
-                                  else
-                                    Builder(
-                                      builder: (ctx) {
-                                        final plugin = BoardPluginRegistry
-                                            .instance
-                                            .pluginFor(panel.type);
-                                        final svgIcon = plugin?.buildIconWidget(
-                                          ctx,
-                                          size: 16,
-                                        );
-                                        if (svgIcon != null) return svgIcon;
-                                        return Icon(
-                                          plugin?.icon ??
-                                              Icons
-                                                  .dashboard_customize_outlined,
-                                          size: 16,
-                                          color:
-                                              Theme.of(
-                                                context,
-                                              ).textTheme.bodySmall?.color ??
-                                              Theme.of(
-                                                context,
-                                              ).colorScheme.onSurface,
-                                        );
-                                      },
-                                    ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      panel.title,
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      style: TextStyle(
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
+                  child: Listener(
+                    behavior: HitTestBehavior.deferToChild,
+                    onPointerDown: (_) {
+                      if (isWebpage) {
+                        if (!isFocused) {
+                          if (kDebugMode) {
+                            debugPrint(
+                              '[BoardWebFocus] panelPointerDown -> focus webpage panel=${panel.id}',
+                            );
+                          }
+                          onTap();
+                        } else {
+                          if (kDebugMode) {
+                            debugPrint(
+                              '[BoardWebFocus] panelPointerDown -> already focused, releasing Flutter focus panel=${panel.id}',
+                            );
+                          }
+                        }
+                        // Release ALL Flutter keyboard focus so the native WKWebView
+                        // can become firstResponder and receive keyboard input.
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        return;
+                      }
+                      if (!isFocused) {
+                        onTap();
+                      }
+                    },
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: panelFill,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color:
+                              isCapturing
+                                  ? colors.background
+                                  : isFocused
+                                  ? colors.primary
+                                  : borderColor,
+                          width: isFocused && !isCapturing ? 1.5 : 1,
+                        ),
+                        boxShadow:
+                            isCapturing || !usePanelChrome
+                                ? null
+                                : [
+                                  BoxShadow(
+                                    color: colors.background.withAlpha(35),
+                                    blurRadius: 22,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          if (isFocused && !isCapturing)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: colors.primary,
+                                      width: usePanelChrome ? 1.6 : 2.0,
                                     ),
                                   ),
-                                  if (panel.type !=
-                                      ChatPanelPlugin.kTypeId) ...[
-                                    GestureDetector(
-                                      onTap: onEditColor,
-                                      child: Container(
-                                        width: 16,
-                                        height: 16,
-                                        decoration: BoxDecoration(
-                                          color:
-                                              accent ??
-                                              (Theme.of(context)
-                                                      .textTheme
-                                                      .bodySmall
-                                                      ?.color ??
+                                ),
+                              ),
+                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (showHeader)
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onPanStart: _startPanelTransform,
+                                  onPanUpdate:
+                                      panel.locked
+                                          ? null
+                                          : (details) => onMove(details),
+                                  onPanEnd: (_) => _endPanelTransform(),
+                                  onPanCancel: _endPanelTransform,
+                                  child: Container(
+                                    height: 44,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: panelHeaderFill,
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(16),
+                                      ),
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: colors.divider,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        if (panel.type ==
+                                            ChatPanelPlugin.kTypeId)
+                                          ChatProviderIcon(
+                                            provider:
+                                                (panel.state['config']
+                                                        as Map?)?['provider']
+                                                    as String? ??
+                                                'copilot',
+                                            size: 18,
+                                          )
+                                        else
+                                          Builder(
+                                            builder: (ctx) {
+                                              final plugin = BoardPluginRegistry
+                                                  .instance
+                                                  .pluginFor(panel.type);
+                                              final svgIcon = plugin
+                                                  ?.buildIconWidget(
+                                                    ctx,
+                                                    size: 16,
+                                                  );
+                                              if (svgIcon != null)
+                                                return svgIcon;
+                                              return Icon(
+                                                plugin?.icon ??
+                                                    Icons
+                                                        .dashboard_customize_outlined,
+                                                size: 16,
+                                                color:
+                                                    Theme.of(context)
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.color ??
+                                                    Theme.of(
+                                                      context,
+                                                    ).colorScheme.onSurface,
+                                              );
+                                            },
+                                          ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            panel.title,
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              color:
                                                   Theme.of(
                                                     context,
-                                                  ).colorScheme.onSurface),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: colors.textPrimary.withAlpha(
-                                              100,
+                                                  ).colorScheme.onSurface,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    if (onEditNote != null)
-                                      SizedBox(
-                                        width: 28,
-                                        height: 28,
-                                        child: IconButton(
-                                          tooltip: 'Edit note',
-                                          onPressed: onEditNote,
-                                          icon: const Icon(
-                                            Icons.edit_outlined,
-                                            size: 16,
-                                          ),
-                                          splashRadius: 14,
-                                          padding: EdgeInsets.zero,
-                                        ),
-                                      ),
-                                  ],
-                                  if (panel.type == ChatPanelPlugin.kTypeId)
-                                    _ChatHeaderMenu(
-                                      panel: panel,
-                                      onEditColor: onEditColor,
-                                      onUpdateState: onUpdateState,
-                                    ),
-                                  // Plugin-specific header actions (e.g. env gear for widget panels)
-                                  ...() {
-                                    final plugin = BoardPluginRegistry.instance
-                                        .pluginFor(panel.type);
-                                    if (plugin == null ||
-                                        onUpdateState == null) {
-                                      return <Widget>[];
-                                    }
-                                    return plugin.buildHeaderActions(
-                                      context,
-                                      panel,
-                                      onUpdateState!,
-                                      onResize:
-                                          (w, h) => context
-                                              .read<BoardCubit>()
-                                              .resizePanel(
-                                                panel.id,
-                                                width: w,
-                                                height: h,
+                                        if (panel.type !=
+                                            ChatPanelPlugin.kTypeId) ...[
+                                          GestureDetector(
+                                            onTap: onEditColor,
+                                            child: Container(
+                                              width: 16,
+                                              height: 16,
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    accent ??
+                                                    (Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.color ??
+                                                        Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurface),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: colors.textPrimary
+                                                      .withAlpha(100),
+                                                ),
                                               ),
-                                    );
-                                  }(),
-                                  _PanelHeaderIconButton(
-                                    tooltip: 'Panel settings',
-                                    icon: Icons.tune_rounded,
-                                    onPressed:
-                                        () => _showPanelSettingsDialog(
-                                          context,
-                                          panel: panel,
-                                          plugin: plugin,
-                                          onEditPanel: onEditNote,
-                                          onEditColor: onEditColor,
-                                          onBringToFront: onBringToFront,
-                                          onSendToBack: onSendToBack,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          if (onEditNote != null)
+                                            SizedBox(
+                                              width: 28,
+                                              height: 28,
+                                              child: IconButton(
+                                                tooltip: 'Edit note',
+                                                onPressed: onEditNote,
+                                                icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 16,
+                                                ),
+                                                splashRadius: 14,
+                                                padding: EdgeInsets.zero,
+                                              ),
+                                            ),
+                                        ],
+                                        if (panel.type ==
+                                            ChatPanelPlugin.kTypeId)
+                                          _ChatHeaderMenu(
+                                            panel: panel,
+                                            onEditColor: onEditColor,
+                                            onUpdateState: onUpdateState,
+                                          ),
+                                        // Plugin-specific header actions (e.g. env gear for widget panels)
+                                        ...() {
+                                          final plugin = BoardPluginRegistry
+                                              .instance
+                                              .pluginFor(panel.type);
+                                          if (plugin == null ||
+                                              onUpdateState == null) {
+                                            return <Widget>[];
+                                          }
+                                          return plugin.buildHeaderActions(
+                                            context,
+                                            panel,
+                                            onUpdateState!,
+                                            onResize:
+                                                (w, h) => context
+                                                    .read<BoardCubit>()
+                                                    .resizePanel(
+                                                      panel.id,
+                                                      width: w,
+                                                      height: h,
+                                                    ),
+                                          );
+                                        }(),
+                                        _PanelHeaderIconButton(
+                                          tooltip: 'Panel settings',
+                                          icon: Icons.tune_rounded,
+                                          onPressed:
+                                              () => _showPanelSettingsDialog(
+                                                context,
+                                                panel: panel,
+                                                plugin: plugin,
+                                                onEditPanel: onEditNote,
+                                                onEditColor: onEditColor,
+                                                onBringToFront: onBringToFront,
+                                                onSendToBack: onSendToBack,
+                                              ),
                                         ),
-                                  ),
-                                  _PanelHeaderIconButton(
-                                    tooltip: 'Bring to front',
-                                    icon: Icons.flip_to_front_outlined,
-                                    onPressed: onBringToFront,
-                                  ),
-                                  _PanelHeaderIconButton(
-                                    tooltip: 'Send to back',
-                                    icon: Icons.flip_to_back_outlined,
-                                    onPressed: onSendToBack,
-                                  ),
-                                  SizedBox(
-                                    width: 28,
-                                    height: 28,
-                                    child: IconButton(
-                                      tooltip: 'Remove panel',
-                                      onPressed: onDelete,
-                                      icon: const Icon(Icons.close, size: 16),
-                                      splashRadius: 14,
-                                      padding: EdgeInsets.zero,
+                                        _PanelHeaderIconButton(
+                                          tooltip: 'Bring to front',
+                                          icon: Icons.flip_to_front_outlined,
+                                          onPressed: onBringToFront,
+                                        ),
+                                        _PanelHeaderIconButton(
+                                          tooltip: 'Send to back',
+                                          icon: Icons.flip_to_back_outlined,
+                                          onPressed: onSendToBack,
+                                        ),
+                                        SizedBox(
+                                          width: 28,
+                                          height: 28,
+                                          child: IconButton(
+                                            tooltip: 'Remove panel',
+                                            onPressed: onDelete,
+                                            icon: const Icon(
+                                              Icons.close,
+                                              size: 16,
+                                            ),
+                                            splashRadius: 14,
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        Expanded(
-                          child: Padding(
-                            padding:
-                                !showHeader ||
-                                        panel.type == ChatPanelPlugin.kTypeId ||
-                                        panel.type ==
-                                            BoardTerminalPanelPlugin.kTypeId ||
-                                        panel.type == 'board.webpage'
-                                    ? EdgeInsets.zero
-                                    : const EdgeInsets.all(12),
-                            child: _buildPanelContent(context, panel),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (!showHeader && isFocused && !isCapturing)
-                      Positioned(
-                        top: 6,
-                        right: 6,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: colors.surfaceElevated.withValues(
-                              alpha: 0.82,
-                            ),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: colors.divider),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onPanStart: (details) {
-                                  onTap();
-                                  onDragStart(details);
-                                },
-                                onPanUpdate:
-                                    panel.locked
-                                        ? null
-                                        : (details) => onMove(details),
-                                onPanEnd: (_) => onDragEnd(),
-                                onPanCancel: onDragEnd,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: Icon(
-                                    Icons.open_with_rounded,
-                                    size: 14,
-                                    color: colors.textSecondary,
-                                  ),
                                 ),
-                              ),
-                              if (onEditNote != null)
-                                _HeaderlessPanelTool(
-                                  tooltip: 'Edit',
-                                  icon: Icons.settings_outlined,
-                                  onTap: onEditNote!,
-                                  colors: colors,
-                                ),
-                              _HeaderlessPanelTool(
-                                tooltip: 'Bring to front',
-                                icon: Icons.flip_to_front_outlined,
-                                onTap: onBringToFront,
-                                colors: colors,
-                              ),
-                              _HeaderlessPanelTool(
-                                tooltip: 'Send to back',
-                                icon: Icons.flip_to_back_outlined,
-                                onTap: onSendToBack,
-                                colors: colors,
-                              ),
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: onDelete,
+                              Expanded(
                                 child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: Icon(
-                                    Icons.close_rounded,
-                                    size: 14,
-                                    color: colors.textSecondary,
-                                  ),
+                                  padding:
+                                      !showHeader ||
+                                              panel.type ==
+                                                  ChatPanelPlugin.kTypeId ||
+                                              panel.type ==
+                                                  BoardTerminalPanelPlugin
+                                                      .kTypeId ||
+                                              panel.type == 'board.webpage'
+                                          ? EdgeInsets.zero
+                                          : const EdgeInsets.all(12),
+                                  child: _buildPanelContent(context, panel),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                    Positioned(
-                      right: 4,
-                      bottom: 2,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onPanStart: (details) {
-                          onTap();
-                          onDragStart(details);
-                        },
-                        onPanUpdate: onResize,
-                        onPanEnd: (_) => onDragEnd(),
-                        onPanCancel: onDragEnd,
-                        child: Icon(
-                          Icons.drag_handle,
-                          size: 14,
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                        ),
+                          // ── Connect mode overlay ──────────────────────────────────────
+                          if (connectMode)
+                            Positioned.fill(
+                              child: GestureDetector(
+                                onTap: onConnectTap,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color:
+                                          connectSourceId == panel.id
+                                              ? colors.statusActive
+                                              : colors.statusActive.withAlpha(
+                                                100,
+                                              ),
+                                      width:
+                                          connectSourceId == panel.id
+                                              ? 2.5
+                                              : 1.5,
+                                    ),
+                                    color:
+                                        connectSourceId == panel.id
+                                            ? colors.statusActive.withAlpha(21)
+                                            : Colors.transparent,
+                                  ),
+                                  child:
+                                      connectSourceId == null
+                                          ? Center(
+                                            child: Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                color: colors.statusActive
+                                                    .withAlpha(102),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.add_link,
+                                                size: 18,
+                                                color: colors.statusActive,
+                                              ),
+                                            ),
+                                          )
+                                          : connectSourceId == panel.id
+                                          ? Center(
+                                            child: Text(
+                                              'Source\n(tap to cancel)',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: colors.statusActive,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          )
+                                          : Center(
+                                            child: Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                color: colors.statusActive
+                                                    .withAlpha(102),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.call_made,
+                                                size: 18,
+                                                color: colors.statusActive,
+                                              ),
+                                            ),
+                                          ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    // ── Connect mode overlay ──────────────────────────────────────
-                    if (connectMode)
-                      Positioned.fill(
-                        child: GestureDetector(
-                          onTap: onConnectTap,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color:
-                                    connectSourceId == panel.id
-                                        ? colors.statusActive
-                                        : colors.statusActive.withAlpha(100),
-                                width: connectSourceId == panel.id ? 2.5 : 1.5,
-                              ),
-                              color:
-                                  connectSourceId == panel.id
-                                      ? colors.statusActive.withAlpha(21)
-                                      : Colors.transparent,
-                            ),
-                            child:
-                                connectSourceId == null
-                                    ? Center(
-                                      child: Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: BoxDecoration(
-                                          color: colors.statusActive.withAlpha(
-                                            102,
-                                          ),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          Icons.add_link,
-                                          size: 18,
-                                          color: colors.statusActive,
-                                        ),
-                                      ),
-                                    )
-                                    : connectSourceId == panel.id
-                                    ? Center(
-                                      child: Text(
-                                        'Source\n(tap to cancel)',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: colors.statusActive,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    )
-                                    : Center(
-                                      child: Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: BoxDecoration(
-                                          color: colors.statusActive.withAlpha(
-                                            102,
-                                          ),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          Icons.call_made,
-                                          size: 18,
-                                          color: colors.statusActive,
-                                        ),
-                                      ),
-                                    ),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              if (showSelectionChrome)
+                Positioned(
+                  top: 8,
+                  left: selectionSideGutter,
+                  child: _MiroPanelToolbar(
+                    maxWidth: selectionToolbarWidth,
+                    panel: panel,
+                    plugin: plugin,
+                    canEdit: onEditNote != null,
+                    onEdit: onEditNote,
+                    onEditColor: onEditColor,
+                    onBringToFront: onBringToFront,
+                    onSendToBack: onSendToBack,
+                    onDelete: onDelete,
+                    onToggleLocked: () {
+                      context.read<BoardCubit>().updatePanel(
+                        panel.id,
+                        (p) => p.copyWith(locked: !p.locked),
+                      );
+                    },
+                    onMoveStart: _startPanelTransform,
+                    onMoveUpdate:
+                        panel.locked ? null : (details) => onMove(details),
+                    onMoveEnd: _endPanelTransform,
+                    onSettings:
+                        () => _showPanelSettingsDialog(
+                          context,
+                          panel: panel,
+                          plugin: plugin,
+                          onEditPanel: onEditNote,
+                          onEditColor: onEditColor,
+                          onBringToFront: onBringToFront,
+                          onSendToBack: onSendToBack,
+                        ),
+                    onUpdateState: onUpdateState,
+                  ),
+                ),
+              if (showSelectionChrome)
+                Positioned(
+                  left: selectionSideGutter - selectionHandleInset,
+                  top: selectionTopGutter - selectionHandleInset,
+                  width: panel.bounds.width + selectionHandleInset * 2,
+                  height: panel.bounds.height + selectionHandleInset * 2,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: _BoardPanelResizeOverlay.handles(
+                      locked: panel.locked,
+                      onStart: _startPanelTransform,
+                      onUpdate: _resizeFromHandle,
+                      onEnd: _endPanelTransform,
+                      colors: colors,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ), // ScaleTransition
       ), // FadeTransition
@@ -4486,34 +4678,982 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
   }
 }
 
-class _HeaderlessPanelTool extends StatelessWidget {
-  const _HeaderlessPanelTool({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
+class _BoardPanelResizeOverlay {
+  const _BoardPanelResizeOverlay._();
+
+  static List<Widget> handles({
+    required bool locked,
+    required ValueChanged<DragStartDetails> onStart,
+    required void Function(_BoardPanelResizeHandle, DragUpdateDetails) onUpdate,
+    required VoidCallback onEnd,
+    required AppColorScheme colors,
+  }) {
+    if (locked) return const [];
+    return _BoardPanelResizeHandle.values
+        .map(
+          (handle) => _PanelResizeHandleWidget(
+            handle: handle,
+            onStart: onStart,
+            onUpdate: (details) => onUpdate(handle, details),
+            onEnd: onEnd,
+            colors: colors,
+          ),
+        )
+        .toList(growable: false);
+  }
+}
+
+class _PanelResizeHandleWidget extends StatelessWidget {
+  const _PanelResizeHandleWidget({
+    required this.handle,
+    required this.onStart,
+    required this.onUpdate,
+    required this.onEnd,
     required this.colors,
   });
 
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onTap;
+  final _BoardPanelResizeHandle handle;
+  final ValueChanged<DragStartDetails> onStart;
+  final ValueChanged<DragUpdateDetails> onUpdate;
+  final VoidCallback onEnd;
   final AppColorScheme colors;
+
+  static const double _hitSize = 24;
+  static const double _dotSize = 10;
 
   @override
   Widget build(BuildContext context) {
+    final child = MouseRegion(
+      cursor: handle.cursor,
+      child: Tooltip(
+        message: handle.tooltip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: onStart,
+          onPanUpdate: onUpdate,
+          onPanEnd: (_) => onEnd(),
+          onPanCancel: onEnd,
+          child: SizedBox(
+            width: _hitSize,
+            height: _hitSize,
+            child: Center(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.primary, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 5,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: const SizedBox(width: _dotSize, height: _dotSize),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return switch (handle) {
+      _BoardPanelResizeHandle.topLeft => Positioned(
+        left: 0,
+        top: 0,
+        child: child,
+      ),
+      _BoardPanelResizeHandle.top => Positioned(
+        left: 0,
+        right: 0,
+        top: 0,
+        height: _hitSize,
+        child: Center(child: child),
+      ),
+      _BoardPanelResizeHandle.topRight => Positioned(
+        right: 0,
+        top: 0,
+        child: child,
+      ),
+      _BoardPanelResizeHandle.right => Positioned(
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: _hitSize,
+        child: Center(child: child),
+      ),
+      _BoardPanelResizeHandle.bottomRight => Positioned(
+        right: 0,
+        bottom: 0,
+        child: child,
+      ),
+      _BoardPanelResizeHandle.bottom => Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: _hitSize,
+        child: Center(child: child),
+      ),
+      _BoardPanelResizeHandle.bottomLeft => Positioned(
+        left: 0,
+        bottom: 0,
+        child: child,
+      ),
+      _BoardPanelResizeHandle.left => Positioned(
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: _hitSize,
+        child: Center(child: child),
+      ),
+    };
+  }
+}
+
+class _MiroPanelToolbar extends StatelessWidget {
+  const _MiroPanelToolbar({
+    required this.maxWidth,
+    required this.panel,
+    required this.plugin,
+    required this.canEdit,
+    required this.onEdit,
+    required this.onEditColor,
+    required this.onBringToFront,
+    required this.onSendToBack,
+    required this.onDelete,
+    required this.onToggleLocked,
+    required this.onMoveStart,
+    required this.onMoveUpdate,
+    required this.onMoveEnd,
+    required this.onSettings,
+    required this.onUpdateState,
+  });
+
+  final double maxWidth;
+  final BoardPanelInstance panel;
+  final BoardPanelPlugin? plugin;
+  final bool canEdit;
+  final VoidCallback? onEdit;
+  final VoidCallback onEditColor;
+  final VoidCallback onBringToFront;
+  final VoidCallback onSendToBack;
+  final VoidCallback onDelete;
+  final VoidCallback onToggleLocked;
+  final ValueChanged<DragStartDetails> onMoveStart;
+  final ValueChanged<DragUpdateDetails>? onMoveUpdate;
+  final VoidCallback onMoveEnd;
+  final VoidCallback onSettings;
+  final ValueChanged<Map<String, dynamic>>? onUpdateState;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Material(
+      color: Colors.transparent,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceElevated,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colors.divider),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.14),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            height: 42,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 6),
+                  _MiroToolbarDragIcon(
+                    tooltip: panel.locked ? 'Panel is locked' : 'Move panel',
+                    onStart: onMoveStart,
+                    onUpdate: onMoveUpdate,
+                    onEnd: onMoveEnd,
+                    color: textColor,
+                  ),
+                  ..._buildPluginQuickControls(context, colors, textColor),
+                  if (canEdit && onEdit != null)
+                    _MiroToolbarIcon(
+                      tooltip:
+                          plugin?.hasEditor == true ? 'Panel settings' : 'Edit',
+                      icon:
+                          plugin?.hasEditor == true
+                              ? Icons.tune_rounded
+                              : Icons.edit_outlined,
+                      onTap: onEdit!,
+                      color: textColor,
+                    ),
+                  _MiroToolbarIcon(
+                    tooltip: 'Panel color',
+                    icon: Icons.format_color_fill_outlined,
+                    onTap: onEditColor,
+                    color: textColor,
+                    swatch: panel.color,
+                  ),
+                  _MiroToolbarDivider(colors: colors),
+                  _MiroToolbarIcon(
+                    tooltip: panel.locked ? 'Unlock panel' : 'Lock panel',
+                    icon:
+                        panel.locked
+                            ? Icons.lock_rounded
+                            : Icons.lock_open_rounded,
+                    onTap: onToggleLocked,
+                    color: textColor,
+                  ),
+                  _MiroToolbarIcon(
+                    tooltip: 'Bring to front',
+                    icon: Icons.flip_to_front_outlined,
+                    onTap: onBringToFront,
+                    color: textColor,
+                  ),
+                  _MiroToolbarIcon(
+                    tooltip: 'Send to back',
+                    icon: Icons.flip_to_back_outlined,
+                    onTap: onSendToBack,
+                    color: textColor,
+                  ),
+                  _MiroToolbarDivider(colors: colors),
+                  _MiroToolbarIcon(
+                    tooltip: 'More panel settings',
+                    icon: Icons.more_vert_rounded,
+                    onTap: onSettings,
+                    color: textColor,
+                  ),
+                  _MiroToolbarIcon(
+                    tooltip: 'Remove panel',
+                    icon: Icons.close_rounded,
+                    onTap: onDelete,
+                    color: textColor,
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildPluginQuickControls(
+    BuildContext context,
+    AppColorScheme colors,
+    Color textColor,
+  ) {
+    final update = onUpdateState;
+    if (update == null) return const [];
+
+    void updateState(Map<String, dynamic> patch) {
+      update({...panel.state, ...patch});
+    }
+
+    if (panel.type == 'board.sticky') {
+      final fontSize = (panel.state['fontSize'] as num?)?.round() ?? 18;
+      final noteColor =
+          _miroToolbarParseHex(panel.state['color'] as String?) ??
+          const Color(0xFFFEF08A);
+      final stickyTextColor =
+          _miroToolbarParseHex(panel.state['textColor'] as String?) ??
+          const Color(0xFF1F2937);
+      return [
+        _MiroToolbarDivider(colors: colors),
+        _MiroToolbarIcon(
+          tooltip: 'Sticky note',
+          icon: Icons.sticky_note_2_outlined,
+          onTap: onEdit ?? onSettings,
+          color: textColor,
+        ),
+        _MiroToolbarValueMenu<int>(
+          tooltip: 'Text size',
+          valueLabel: fontSize.toString(),
+          values: const [14, 16, 18, 20, 24, 28, 32, 36],
+          itemLabel: (value) => value.toString(),
+          onSelected: (value) => updateState({'fontSize': value.toDouble()}),
+        ),
+        _MiroToolbarColorMenu(
+          tooltip: 'Text color',
+          icon: Icons.format_color_text_rounded,
+          selected: stickyTextColor,
+          colors: const [
+            Color(0xFF111827),
+            Color(0xFF1F2937),
+            Color(0xFFFFFFFF),
+            Color(0xFF2563EB),
+            Color(0xFFF59E0B),
+            Color(0xFF10B981),
+            Color(0xFFEC4899),
+          ],
+          onSelected:
+              (value) => updateState({'textColor': _miroToolbarHex(value)}),
+          onCustomSelected:
+              (initial) => _showMiroToolbarCustomColor(context, initial),
+        ),
+        _MiroToolbarColorMenu(
+          tooltip: 'Sticky color',
+          icon: Icons.format_color_fill_outlined,
+          selected: noteColor,
+          colors: const [
+            Color(0xFFFEF08A),
+            Color(0xFFFDE68A),
+            Color(0xFFFCA5A5),
+            Color(0xFFF9A8D4),
+            Color(0xFFC4B5FD),
+            Color(0xFF93C5FD),
+            Color(0xFF86EFAC),
+            Color(0xFFFFFFFF),
+          ],
+          onSelected: (value) => updateState({'color': _miroToolbarHex(value)}),
+          onCustomSelected:
+              (initial) => _showMiroToolbarCustomColor(context, initial),
+        ),
+      ];
+    }
+
+    if (panel.type == 'board.shape') {
+      final shape = panel.state['shape'] as String? ?? 'rectangle';
+      final fontSize = (panel.state['fontSize'] as num?)?.round() ?? 18;
+      final strokeWidth = (panel.state['strokeWidth'] as num?)?.round() ?? 3;
+      final textHAlign = panel.state['textHAlign'] as String? ?? 'center';
+      final textVAlign = panel.state['textVAlign'] as String? ?? 'center';
+      final textOrientation =
+          panel.state['textOrientation'] as String? ?? 'horizontal';
+      final strokeColor =
+          _miroToolbarParseHex(panel.state['strokeColor'] as String?) ??
+          const Color(0xFF93C5FD);
+      final fillColor =
+          _miroToolbarParseHex(panel.state['fillColor'] as String?) ??
+          Colors.transparent;
+      return [
+        _MiroToolbarDivider(colors: colors),
+        _MiroToolbarShapeMenu(
+          selectedShape: shape,
+          onSelected: (value) => updateState({'shape': value}),
+        ),
+        _MiroToolbarValueMenu<int>(
+          tooltip: 'Text size',
+          valueLabel: fontSize.toString(),
+          values: const [12, 14, 16, 18, 20, 24, 28, 32, 36],
+          itemLabel: (value) => value.toString(),
+          onSelected: (value) => updateState({'fontSize': value.toDouble()}),
+        ),
+        _MiroToolbarValueMenu<int>(
+          tooltip: 'Stroke width',
+          valueLabel: strokeWidth.toString(),
+          values: const [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+          itemLabel: (value) => 'Stroke $value',
+          onSelected: (value) => updateState({'strokeWidth': value.toDouble()}),
+        ),
+        _MiroToolbarColorMenu(
+          tooltip: 'Text and stroke color',
+          icon: Icons.format_color_text_rounded,
+          selected: strokeColor,
+          colors: const [
+            Color(0xFF111827),
+            Color(0xFF93C5FD),
+            Color(0xFFA78BFA),
+            Color(0xFFF472B6),
+            Color(0xFFFBBF24),
+            Color(0xFF34D399),
+            Color(0xFFF87171),
+            Color(0xFFE2E8F0),
+          ],
+          onSelected:
+              (value) => updateState({
+                'strokeColor': _miroToolbarHex(value),
+                'textColor': _miroToolbarHex(value),
+              }),
+          onCustomSelected:
+              (initial) => _showMiroToolbarCustomColor(context, initial),
+        ),
+        _MiroToolbarColorMenu(
+          tooltip: 'Fill color',
+          icon: Icons.format_color_fill_outlined,
+          selected: fillColor,
+          colors: const [
+            Colors.transparent,
+            Color(0xFF93C5FD),
+            Color(0xFFA78BFA),
+            Color(0xFFF472B6),
+            Color(0xFFFBBF24),
+            Color(0xFF34D399),
+            Color(0xFFF87171),
+            Color(0xFFFFFFFF),
+          ],
+          onSelected:
+              (value) => updateState({'fillColor': _miroToolbarHex(value)}),
+          onCustomSelected:
+              (initial) => _showMiroToolbarCustomColor(context, initial),
+        ),
+        _MiroToolbarIconValueMenu<String>(
+          tooltip: 'Horizontal text alignment',
+          icon: _miroToolbarHorizontalAlignIcon(textHAlign),
+          values: const ['left', 'center', 'right'],
+          itemLabel: _miroToolbarHorizontalAlignLabel,
+          itemIcon: _miroToolbarHorizontalAlignIcon,
+          onSelected: (value) => updateState({'textHAlign': value}),
+        ),
+        _MiroToolbarIconValueMenu<String>(
+          tooltip: 'Vertical text alignment',
+          icon: _miroToolbarVerticalAlignIcon(textVAlign),
+          values: const ['top', 'center', 'bottom'],
+          itemLabel: _miroToolbarVerticalAlignLabel,
+          itemIcon: _miroToolbarVerticalAlignIcon,
+          onSelected: (value) => updateState({'textVAlign': value}),
+        ),
+        _MiroToolbarIconValueMenu<String>(
+          tooltip: 'Text orientation',
+          icon: _miroToolbarTextOrientationIcon(textOrientation),
+          values: const ['horizontal', 'vertical'],
+          itemLabel: _miroToolbarTextOrientationLabel,
+          itemIcon: _miroToolbarTextOrientationIcon,
+          onSelected: (value) => updateState({'textOrientation': value}),
+        ),
+        _MiroToolbarIcon(
+          tooltip: 'Custom text settings',
+          icon: Icons.text_fields_rounded,
+          onTap: onEdit ?? onSettings,
+          color: textColor,
+        ),
+      ];
+    }
+
+    return const [];
+  }
+}
+
+class _MiroToolbarValueMenu<T> extends StatelessWidget {
+  const _MiroToolbarValueMenu({
+    required this.tooltip,
+    required this.valueLabel,
+    required this.values,
+    required this.itemLabel,
+    required this.onSelected,
+  });
+
+  final String tooltip;
+  final String valueLabel;
+  final List<T> values;
+  final String Function(T value) itemLabel;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Icon(icon, size: 14, color: colors.textSecondary),
+      child: PopupMenuButton<T>(
+        tooltip: tooltip,
+        onSelected: onSelected,
+        itemBuilder:
+            (context) => values
+                .map(
+                  (value) => PopupMenuItem<T>(
+                    value: value,
+                    child: Text(itemLabel(value)),
+                  ),
+                )
+                .toList(growable: false),
+        child: SizedBox(
+          height: 36,
+          width: 46,
+          child: Center(
+            child: Text(
+              valueLabel,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
+class _MiroToolbarColorMenu extends StatelessWidget {
+  const _MiroToolbarColorMenu({
+    required this.tooltip,
+    required this.icon,
+    required this.selected,
+    required this.colors,
+    required this.onSelected,
+    required this.onCustomSelected,
+  });
+
+  static const _customColorValue = '__custom_color__';
+
+  final String tooltip;
+  final IconData icon;
+  final Color selected;
+  final List<Color> colors;
+  final ValueChanged<Color> onSelected;
+  final Future<Color?> Function(Color initialColor) onCustomSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Tooltip(
+      message: tooltip,
+      child: PopupMenuButton<Object>(
+        tooltip: tooltip,
+        onSelected: (value) async {
+          if (value is Color) {
+            onSelected(value);
+            return;
+          }
+          if (value == _customColorValue) {
+            final color = await onCustomSelected(selected);
+            if (color != null) {
+              onSelected(color);
+            }
+          }
+        },
+        itemBuilder:
+            (context) => [
+              ...colors.map(
+                (color) => PopupMenuItem<Object>(
+                  value: color,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _MiroToolbarColorDot(
+                        color: color,
+                        selected: color.toARGB32() == selected.toARGB32(),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(_miroToolbarColorLabel(color)),
+                    ],
+                  ),
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<Object>(
+                value: _customColorValue,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.palette_outlined, size: 19, color: textColor),
+                    const SizedBox(width: 10),
+                    const Text('Custom...'),
+                  ],
+                ),
+              ),
+            ],
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(icon, size: 20, color: textColor),
+              Positioned(
+                right: 7,
+                bottom: 6,
+                child: _MiroToolbarColorDot(color: selected, size: 10),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiroToolbarIconValueMenu<T> extends StatelessWidget {
+  const _MiroToolbarIconValueMenu({
+    required this.tooltip,
+    required this.icon,
+    required this.values,
+    required this.itemLabel,
+    required this.itemIcon,
+    required this.onSelected,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final List<T> values;
+  final String Function(T value) itemLabel;
+  final IconData Function(T value) itemIcon;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Tooltip(
+      message: tooltip,
+      child: PopupMenuButton<T>(
+        tooltip: tooltip,
+        onSelected: onSelected,
+        itemBuilder:
+            (context) => values
+                .map(
+                  (value) => PopupMenuItem<T>(
+                    value: value,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(itemIcon(value), size: 19, color: textColor),
+                        const SizedBox(width: 10),
+                        Text(itemLabel(value)),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(icon, size: 20, color: textColor),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiroToolbarColorDot extends StatelessWidget {
+  const _MiroToolbarColorDot({
+    required this.color,
+    this.selected = false,
+    this.size = 18,
+  });
+
+  final Color color;
+  final bool selected;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final isTransparent = color.a == 0;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: isTransparent ? Colors.white : color,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color:
+              selected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).dividerColor,
+          width: selected ? 2 : 1,
+        ),
+      ),
+      child:
+          isTransparent
+              ? Icon(Icons.block_rounded, size: size * 0.72, color: Colors.grey)
+              : null,
+    );
+  }
+}
+
+class _MiroToolbarShapeMenu extends StatelessWidget {
+  const _MiroToolbarShapeMenu({
+    required this.selectedShape,
+    required this.onSelected,
+  });
+
+  final String selectedShape;
+  final ValueChanged<String> onSelected;
+
+  static const _shapes = <String>[
+    'rectangle',
+    'circle',
+    'diamond',
+    'triangle',
+    'hexagon',
+    'frame',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    return Tooltip(
+      message: 'Shape',
+      child: PopupMenuButton<String>(
+        tooltip: 'Shape',
+        onSelected: onSelected,
+        itemBuilder:
+            (context) => _shapes
+                .map(
+                  (shape) => PopupMenuItem<String>(
+                    value: shape,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _miroToolbarShapeIcon(shape),
+                          size: 19,
+                          color: textColor,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(_miroToolbarShapeLabel(shape)),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Icon(
+            _miroToolbarShapeIcon(selectedShape),
+            size: 22,
+            color: textColor,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiroToolbarIcon extends StatelessWidget {
+  const _MiroToolbarIcon({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+    required this.color,
+    this.swatch,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color color;
+  final Color? swatch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(icon, size: 20, color: color),
+              if (swatch != null)
+                Positioned(
+                  right: 7,
+                  bottom: 7,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: swatch,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.2),
+                    ),
+                    child: const SizedBox(width: 8, height: 8),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiroToolbarDragIcon extends StatelessWidget {
+  const _MiroToolbarDragIcon({
+    required this.tooltip,
+    required this.onStart,
+    required this.onUpdate,
+    required this.onEnd,
+    required this.color,
+  });
+
+  final String tooltip;
+  final ValueChanged<DragStartDetails> onStart;
+  final ValueChanged<DragUpdateDetails>? onUpdate;
+  final VoidCallback onEnd;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: MouseRegion(
+        cursor:
+            onUpdate == null
+                ? SystemMouseCursors.forbidden
+                : SystemMouseCursors.move,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: onStart,
+          onPanUpdate: onUpdate,
+          onPanEnd: (_) => onEnd(),
+          onPanCancel: onEnd,
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Icon(Icons.open_with_rounded, size: 20, color: color),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiroToolbarDivider extends StatelessWidget {
+  const _MiroToolbarDivider({required this.colors});
+
+  final AppColorScheme colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 26,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: colors.divider,
+    );
+  }
+}
+
+Future<Color?> _showMiroToolbarCustomColor(
+  BuildContext context,
+  Color initialColor,
+) {
+  var selectedColor =
+      initialColor.a == 0
+          ? Theme.of(context).colorScheme.primary
+          : initialColor;
+  return showDialog<Color?>(
+    context: context,
+    builder:
+        (dialogContext) => AlertDialog(
+          title: const Text('Custom color'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: ColorPicker(
+                pickerColor: selectedColor,
+                onColorChanged: (color) {
+                  selectedColor = color;
+                },
+                enableAlpha: true,
+                displayThumbColor: true,
+                portraitOnly: true,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(selectedColor),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+  );
+}
+
+Color? _miroToolbarParseHex(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final cleaned = raw.trim().replaceFirst('#', '');
+  if (cleaned.length != 6 && cleaned.length != 8) return null;
+  final value = int.tryParse(cleaned, radix: 16);
+  if (value == null) return null;
+  if (cleaned.length == 8) return Color(value);
+  return Color.fromARGB(
+    255,
+    (value >> 16) & 255,
+    (value >> 8) & 255,
+    value & 255,
+  );
+}
+
+String _miroToolbarHex(Color color) {
+  final alpha = (color.a * 255).round() & 255;
+  final red = (color.r * 255).round() & 255;
+  final green = (color.g * 255).round() & 255;
+  final blue = (color.b * 255).round() & 255;
+  if (alpha == 255) {
+    return '#${red.toRadixString(16).padLeft(2, '0')}'
+            '${green.toRadixString(16).padLeft(2, '0')}'
+            '${blue.toRadixString(16).padLeft(2, '0')}'
+        .toUpperCase();
+  }
+  return '#${alpha.toRadixString(16).padLeft(2, '0')}'
+          '${red.toRadixString(16).padLeft(2, '0')}'
+          '${green.toRadixString(16).padLeft(2, '0')}'
+          '${blue.toRadixString(16).padLeft(2, '0')}'
+      .toUpperCase();
+}
+
+String _miroToolbarColorLabel(Color color) =>
+    color.a == 0 ? 'Transparent' : _miroToolbarHex(color);
+
+IconData _miroToolbarShapeIcon(String shape) => switch (shape) {
+  'circle' => Icons.circle_outlined,
+  'diamond' => Icons.diamond_outlined,
+  'triangle' => Icons.change_history_rounded,
+  'hexagon' => Icons.hexagon_outlined,
+  'frame' => Icons.crop_square_rounded,
+  _ => Icons.rectangle_outlined,
+};
+
+String _miroToolbarShapeLabel(String shape) => switch (shape) {
+  'circle' => 'Oval',
+  'diamond' => 'Rhombus',
+  'triangle' => 'Triangle',
+  'hexagon' => 'Hexagon',
+  'frame' => 'Frame',
+  _ => 'Rectangle',
+};
+
+IconData _miroToolbarHorizontalAlignIcon(String value) => switch (value) {
+  'left' => Icons.format_align_left_rounded,
+  'right' => Icons.format_align_right_rounded,
+  _ => Icons.format_align_center_rounded,
+};
+
+String _miroToolbarHorizontalAlignLabel(String value) => switch (value) {
+  'left' => 'Left',
+  'right' => 'Right',
+  _ => 'Center',
+};
+
+IconData _miroToolbarVerticalAlignIcon(String value) => switch (value) {
+  'top' => Icons.vertical_align_top_rounded,
+  'bottom' => Icons.vertical_align_bottom_rounded,
+  _ => Icons.vertical_align_center_rounded,
+};
+
+String _miroToolbarVerticalAlignLabel(String value) => switch (value) {
+  'top' => 'Top',
+  'bottom' => 'Bottom',
+  _ => 'Middle',
+};
+
+IconData _miroToolbarTextOrientationIcon(String value) => switch (value) {
+  'vertical' => Icons.text_rotation_angleup_rounded,
+  _ => Icons.text_fields_rounded,
+};
+
+String _miroToolbarTextOrientationLabel(String value) => switch (value) {
+  'vertical' => 'Vertical',
+  _ => 'Horizontal',
+};
 
 class _PanelHeaderIconButton extends StatelessWidget {
   const _PanelHeaderIconButton({
@@ -5790,21 +6930,36 @@ class _BoardToolsPanel extends StatelessWidget {
                               required IconData icon,
                               required Color color,
                               required String label,
+                              String? shortcut,
                             }) => PopupMenuItem<String>(
                               value: value,
-                              height: 38,
+                              height: 44,
                               child: Row(
                                 children: [
-                                  Icon(icon, size: 16, color: color),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: textColor,
-                                      fontWeight: FontWeight.w600,
+                                  SizedBox(
+                                    width: 28,
+                                    child: Icon(icon, size: 20, color: color),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: textColor,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
+                                  if (shortcut != null)
+                                    Text(
+                                      shortcut,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: mutedColor.withAlpha(210),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                 ],
                               ),
                             );
@@ -5860,12 +7015,68 @@ class _BoardToolsPanel extends StatelessWidget {
                                   value: '__note',
                                   icon: Icons.sticky_note_2_outlined,
                                   color: mutedColor,
-                                  label: 'Markdown Note',
+                                  label: 'Markdown note',
                                 ),
                               if (pluginItem('board.sticky') != null)
                                 pluginItem('board.sticky')!,
-                              if (pluginItem('board.shape') != null)
-                                pluginItem('board.shape')!,
+                              action(
+                                value: '__connector:straight:line',
+                                icon: Icons.horizontal_rule_rounded,
+                                color: mutedColor,
+                                label: 'Line',
+                                shortcut: 'L',
+                              ),
+                              action(
+                                value: '__connector:bezier:arrow',
+                                icon: Icons.arrow_outward_rounded,
+                                color: colors.primary,
+                                label: 'Arrow',
+                              ),
+                              action(
+                                value: '__connector:elbow:arrow',
+                                icon: Icons.subdirectory_arrow_right_rounded,
+                                color: mutedColor,
+                                label: 'Elbow arrow',
+                              ),
+                              action(
+                                value: '__shape:rectangle',
+                                icon: Icons.crop_square_rounded,
+                                color: mutedColor,
+                                label: 'Rectangle',
+                                shortcut: 'R',
+                              ),
+                              action(
+                                value: '__shape:circle',
+                                icon: Icons.circle_outlined,
+                                color: mutedColor,
+                                label: 'Oval',
+                                shortcut: 'O',
+                              ),
+                              action(
+                                value: '__shape:diamond',
+                                icon: Icons.diamond_outlined,
+                                color: mutedColor,
+                                label: 'Rhombus',
+                              ),
+                              action(
+                                value: '__shape:triangle',
+                                icon: Icons.change_history_rounded,
+                                color: mutedColor,
+                                label: 'Triangle',
+                              ),
+                              action(
+                                value: '__divider',
+                                icon: Icons.remove_rounded,
+                                color: mutedColor,
+                                label: 'Divider',
+                              ),
+                              const PopupMenuDivider(height: 8),
+                              action(
+                                value: '__diagram',
+                                icon: Icons.account_tree_outlined,
+                                color: colors.accentOrange,
+                                label: 'Diagram',
+                              ),
                               const PopupMenuDivider(height: 8),
                               header('AI and terminal'),
                               if (onAddChat != null)
@@ -5919,7 +7130,7 @@ class _BoardToolsPanel extends StatelessWidget {
                               position: RelativeRect.fromLTRB(
                                 pos.dx + 4,
                                 pos.dy,
-                                pos.dx + 280,
+                                pos.dx + 360,
                                 pos.dy + 100,
                               ),
                               color: colors.surfaceElevated,
