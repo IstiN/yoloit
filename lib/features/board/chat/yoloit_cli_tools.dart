@@ -1573,6 +1573,28 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     params: <YoloitCliToolParam>[_boardParam('id_or_name')],
   ),
   YoloitCliTool(
+    command: 'board:undo',
+    alias: 'bundo',
+    description:
+        'Undo the latest panel history batch on a board. Resize and drag bursts are coalesced into one undo.',
+    group: 'board',
+    humanVariants: const {
+      'ru': [
+        'отмени последнее изменение на борде',
+        'откати последнее изменение панели',
+        'верни предыдущий размер панели',
+        'undo на борде',
+      ],
+      'en': [
+        'undo latest board change',
+        'undo latest panel change',
+        'revert panel resize',
+        'restore previous panel size',
+      ],
+    },
+    params: <YoloitCliToolParam>[_boardParam('id_or_name')],
+  ),
+  YoloitCliTool(
     command: 'board:use',
     alias: 'buse',
     description: 'Set default board for subsequent commands (no UI switch)',

@@ -132,13 +132,13 @@ class AgentConfigService {
   String? _defaultAsrCloudConfigId;
   String? _defaultAsrCloudModel;
   TerminalBackendMode _terminalBackendMode = TerminalBackendMode.runtime;
-  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.kterm;
+  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.xterm;
 
   final ValueNotifier<TerminalBackendMode> terminalBackendModeNotifier =
       ValueNotifier<TerminalBackendMode>(TerminalBackendMode.runtime);
 
   final ValueNotifier<TerminalRenderEngine> terminalRenderEngineNotifier =
-      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.kterm);
+      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.xterm);
 
   static List<AgentConfig> get _defaults => [
     ...AgentType.values.map(
@@ -314,7 +314,7 @@ class AgentConfigService {
           'defaultAsrCloudConfigId': _defaultAsrCloudConfigId,
         if (_defaultAsrCloudModel != null)
           'defaultAsrCloudModel': _defaultAsrCloudModel,
-        if (_terminalRenderEngine != TerminalRenderEngine.kterm)
+        if (_terminalRenderEngine != TerminalRenderEngine.xterm)
           'terminalRenderEngine': _terminalRenderEngine.id,
         if (_terminalBackendMode != TerminalBackendMode.runtime)
           'terminalBackendMode': _terminalBackendMode.id,

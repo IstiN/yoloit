@@ -143,7 +143,9 @@ void main() {
     );
   });
 
-  testWidgets('left toolbar exposes Miro basics shape menu', (tester) async {
+  testWidgets('left toolbar exposes Miro basics category directly', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(1200, 760);
     tester.view.devicePixelRatio = 1;
@@ -171,13 +173,67 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 450));
 
-    await tester.tap(find.byTooltip('Shapes and connectors'));
+    expect(find.byTooltip('Add panel'), findsNothing);
+
+    await tester.tap(find.byTooltip('Miro basics'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.text('Line'), findsOneWidget);
-    expect(find.text('Arrow'), findsOneWidget);
-    expect(find.text('Rhombus'), findsOneWidget);
-    expect(find.text('Diagram'), findsOneWidget);
+    expect(find.text('Markdown Note'), findsOneWidget);
+    expect(find.text('Sticky Note'), findsOneWidget);
+    expect(find.text('Shape / Frame'), findsOneWidget);
+    expect(find.text('Diagram'), findsNothing);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('left toolbar category buttons open concrete panel types', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1200, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final cubit = BoardCubit();
+    addTearDown(cubit.close);
+    const board = BoardDocument(
+      id: 'board',
+      name: 'Board',
+      viewport: BoardViewport(scale: 1),
+    );
+    cubit.emit(
+      const BoardState(boards: [board], activeBoardId: 'board', isLoaded: true),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppThemePreset.neonPurple.theme,
+        home: Scaffold(
+          body: BlocProvider.value(value: cubit, child: const BoardView()),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 450));
+
+    expect(find.byTooltip('Add panel'), findsNothing);
+    expect(find.byTooltip('Miro basics'), findsOneWidget);
+    expect(find.byTooltip('AI and terminal'), findsOneWidget);
+    expect(find.byTooltip('Files and web'), findsOneWidget);
+    expect(find.byTooltip('Planning'), findsOneWidget);
+    expect(find.byTooltip('Advanced'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Files and web'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('Markdown Note'), findsNothing);
+    expect(find.text('File Tree'), findsOneWidget);
+    expect(find.text('Files'), findsOneWidget);
+    expect(find.text('File Preview'), findsOneWidget);
+    expect(find.text('Webpage'), findsOneWidget);
   });
 }

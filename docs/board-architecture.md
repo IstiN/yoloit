@@ -13,11 +13,15 @@ graph TB
         BC["BoardCubit<br/>(BLoC state)"]
         PR["BoardPluginRegistry<br/>(singleton)"]
         CS["CLI Server<br/>(localhost)"]
+        SP["SharedPreferences<br/>board.documents.v1"]
+        HS["BoardHistoryStore<br/>append-only JSON events"]
     end
 
     BV -->|reads state| BC
     BV -->|looks up plugins| PR
     CS -->|dispatches actions| BC
+    BC -->|persists current board snapshots| SP
+    BC -->|appends panel events| HS
 
     subgraph Plugins["Board Plugins"]
         P1["MarkdownNotePlugin"]
@@ -46,6 +50,268 @@ graph TB
     CS -->|routes `do` command| Handlers
     Handlers -->|returns CliActionResult| CS
 ```
+
+---
+
+## Board Persistence
+
+The current Board View uses two storage layers:
+
+1. **Current board snapshots** are stored as one serialized list in
+   `SharedPreferences`.
+2. **Board history** is stored as an append-only event log on disk.
+
+The snapshot layer is still the source of truth for booting the app today.
+The history layer is used for history UI, restore, and undo. This means the app
+can recover the latest board state quickly from a single snapshot, while still
+keeping the event trail needed to restore individual panel changes.
+
+### Snapshot Storage
+
+`BoardCubit` owns board state and persists it after every board mutation.
+
+Relevant code:
+
+- `lib/features/board/bloc/board_cubit.dart`
+- `lib/features/board/model/board_models.dart`
+- `lib/app.dart`
+
+Runtime wiring:
+
+```dart
+BoardCubit(historyStore: LocalBoardHistoryStore())
+```
+
+Storage keys:
+
+| Key | Value |
+|-----|-------|
+| `board.documents.v1` | JSON array of `BoardDocument` snapshots |
+| `board.active.id.v1` | active board id |
+
+`BoardDocument` is the current board snapshot:
+
+```dart
+class BoardDocument {
+  final String id;
+  final String name;
+  final BoardViewport viewport;
+  final List<BoardPanelInstance> panels;
+  final List<BoardPanelLink> links;
+  final List<BoardDrawingElement> drawings;
+  final Map<String, dynamic> metadata;
+}
+```
+
+`metadata.historyRevision` is used as the monotonic board revision for history
+events. It is incremented by `BoardCubit._updateBoard()` when the mutation emits
+a history event.
+
+### Snapshot Write Flow
+
+```mermaid
+sequenceDiagram
+    participant UI as BoardView / CLI
+    participant BC as BoardCubit
+    participant SP as SharedPreferences
+    participant HS as BoardHistoryStore
+
+    UI->>BC: mutate board / panel
+    BC->>BC: calculate next BoardDocument
+    BC->>BC: increment metadata.historyRevision when eventful
+    BC->>SP: persist full boards list
+    BC->>HS: append BoardHistoryEvent when provided
+    BC-->>UI: emit BoardState
+```
+
+Important detail: the current snapshot is persisted before or alongside the
+history append from the same cubit mutation. If the history append fails,
+`BoardCubit` logs the error and keeps the board snapshot mutation. History is
+best-effort today; it is not yet a transactional commit log.
+
+---
+
+## Board History
+
+History is represented by `BoardHistoryEvent` and stored through the
+`BoardHistoryStore` abstraction.
+
+Relevant code:
+
+- `lib/features/board/history/board_history_event.dart`
+- `lib/features/board/history/board_history_store.dart`
+- `lib/features/board/history/board_panel_history_adapter.dart`
+
+Event schema:
+
+```dart
+class BoardHistoryEvent {
+  final String opId;
+  final String boardId;
+  final String type;
+  final String entityType;
+  final String entityId;
+  final String actorId;
+  final DateTime timestamp;
+  final int revision;
+  final Map<String, dynamic>? before;
+  final Map<String, dynamic>? after;
+  final Map<String, dynamic> patch;
+  final String? restoresOpId;
+}
+```
+
+Panel events currently emitted by `BoardCubit` include:
+
+| Type | Meaning |
+|------|---------|
+| `panel.created` | panel was added; `after` contains the new panel snapshot |
+| `panel.updated` | panel changed; `before`, `after`, and `patch` are present |
+| `panel.deleted` | panel was removed; `before` contains the deleted panel |
+| `panel.restored` | restore/undo wrote a panel snapshot back into the board |
+
+### Local History Layout
+
+`LocalBoardHistoryStore` writes one JSON file per event:
+
+```text
+<PlatformDirs.dataDir>/boards_history/
+  <safe-board-id>/
+    events/
+      YYYY/
+        MM/
+          <safe-op-id>_<safe-actor-id>.json
+```
+
+Events are read recursively and sorted by:
+
+1. `revision`
+2. `opId`
+
+This gives deterministic local playback order for a single writer. It is not a
+distributed conflict-resolution protocol yet.
+
+### Panel State Snapshots
+
+Panel state is not treated as opaque UI memory. Before a panel snapshot goes to
+history, `BoardCubit._panelSnapshot()` asks the panel plugin history adapter to
+normalize state:
+
+```dart
+plugin.historyAdapter.snapshotState(panel.state)
+```
+
+When restoring, `BoardCubit._panelFromHistorySnapshot()` calls:
+
+```dart
+plugin.historyAdapter.restoreState(snapshot.state)
+```
+
+The default adapter stores the full state map. Custom panels can override this
+when their state contains runtime-only handles, caches, session IDs, or other
+values that should not be restored literally.
+
+Rule for new panels: if a panel has custom state, it should have an explicit
+history adapter decision. Either use the default full-map behavior deliberately,
+or implement `snapshotState`, `restoreState`, and `diffState`.
+
+---
+
+## Undo and Restore
+
+History UI and CLI use the same cubit APIs:
+
+| API | Behavior |
+|-----|----------|
+| `historyForBoard(boardId)` | load event list for the history panel |
+| `restorePanelFromEvent(boardId, opId)` | restore the event's `before` or `after` panel snapshot |
+| `undoLatestPanelHistory(boardId)` | undo the latest meaningful panel event |
+
+Undo is available through:
+
+```bash
+yoloit board:undo <board>
+yoloit bundo <board>
+```
+
+And through HTTP:
+
+```http
+POST /api/boards/:id/undo
+```
+
+Undo rules:
+
+- Restore events are skipped, so undo does not bounce between current and
+  previously restored states.
+- `panel.created` is undone by deleting the panel when the current panel still
+  matches the created snapshot.
+- `panel.deleted` is undone by restoring the deleted panel from `before`.
+- `panel.updated` is undone by restoring `before`.
+- Consecutive `panel.updated` events for the same panel with the same patch
+  signature and contiguous revisions are coalesced. This makes resize/drag
+  bursts behave as one undo action instead of many tiny pointer updates.
+
+Undo writes a new `panel.restored` history event with `restoresOpId` set to the
+operation that initiated the restore. The old event is never mutated.
+
+```mermaid
+sequenceDiagram
+    participant CLI as CLI / UI
+    participant BC as BoardCubit
+    participant HS as BoardHistoryStore
+    participant SP as SharedPreferences
+
+    CLI->>BC: undoLatestPanelHistory(boardId)
+    BC->>HS: eventsForBoard(boardId)
+    BC->>BC: scan newest to oldest, skip restore events
+    BC->>BC: coalesce compatible update burst
+    BC->>BC: restore before snapshot / remove created panel
+    BC->>SP: persist new board snapshot
+    BC->>HS: append panel.restored or panel.deleted event
+```
+
+---
+
+## Multi-User Direction
+
+Current storage is intentionally simple and local-first:
+
+- Board snapshots are single-writer `SharedPreferences` JSON.
+- History is append-only local JSON files.
+- Revisions are monotonic per board in one local `BoardCubit`.
+- `actorId` already exists on history events, but the app currently uses
+  `local` unless tests or future collaboration code inject a different value.
+
+This is enough for local restore/undo. It is not enough for robust multi-user
+editing because the snapshot store would still have last-writer-wins behavior.
+
+The intended next architecture for collaboration is:
+
+1. Treat `BoardHistoryEvent` as the durable operation log.
+2. Give every client a stable `actorId`.
+3. Use globally unique operation IDs (`opId`) and per-actor sequence numbers or
+   Lamport/HLC timestamps.
+4. Make operations idempotent and replayable.
+5. Derive `BoardDocument` snapshots from the operation log, then persist compact
+   snapshots only as checkpoints.
+6. Resolve conflicts at entity level:
+   - panel bounds/title/state changes should merge by panel id;
+   - panel deletion should be tombstoned, not immediately forgotten;
+   - plugin state should define its own merge rules through the history adapter;
+   - links should validate referenced panel ids after merge.
+7. Keep undo as a new compensating operation, not as deletion or mutation of old
+   events.
+
+In that model, `SharedPreferences` becomes a local cache/checkpoint, not the
+source of truth. The source of truth becomes:
+
+```text
+board checkpoint + ordered operation log
+```
+
+This keeps local startup fast while allowing future sync engines to exchange
+operations without overwriting unrelated user edits.
 
 ---
 

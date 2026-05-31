@@ -752,6 +752,14 @@ commands = [
   },
   {
     "group": "board",
+    "name": "board:undo",
+    "aliases": ["bundo"],
+    "description": "Undo the latest panel history batch on a board",
+    "params": [["id|name", "Board identifier or board name", True]],
+    "example": "yoloit board:undo \"My Board\"",
+  },
+  {
+    "group": "board",
     "name": "board:zoom",
     "description": "Set board zoom scale",
     "params": [["id|name", "Board identifier or board name", True], ["scale", "Zoom scale", True]],
@@ -2234,6 +2242,12 @@ PYEOF
     dir="${2:-right}"
     hs="${3:-80}"; vs="${4:-60}"
     _post "/boards/${bid}/arrange" "{\"direction\":\"${dir}\",\"hSpacing\":${hs},\"vSpacing\":${vs}}" | python3 -m json.tool 2>/dev/null
+    ;;
+  board:undo|bundo)
+    bid_raw=$(_board "${1:-}")
+    [[ -z "$bid_raw" ]] && { echo "Usage: yoloit board:undo [board]" >&2; exit 1; }
+    bid=$(_encode "$bid_raw"); _use_board "$bid_raw"
+    _post "/boards/${bid}/undo" '{}' | python3 -m json.tool 2>/dev/null
     ;;
 
   # ── panels ──

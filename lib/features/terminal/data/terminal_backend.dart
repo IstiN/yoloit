@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_pty/flutter_pty.dart';
+import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
@@ -133,7 +135,7 @@ class RuntimeTerminalBackend implements TerminalBackend {
     final attachedExisting = await _client.createSession(
       sessionId: sessionId,
       cwd: workspacePath,
-      env: extraEnv ?? const {},
+      env: _runtimeEnv(extraEnv),
     );
     return TerminalProcess(
       output: _client.streamSession(sessionId),
@@ -151,4 +153,14 @@ class RuntimeTerminalBackend implements TerminalBackend {
 
   @override
   void kill(String sessionId) => _client.kill(sessionId);
+
+  Map<String, String> _runtimeEnv(Map<String, String>? extraEnv) {
+    final shell = PlatformShell.instance;
+    final merged = <String, String>{...?extraEnv};
+    final basePath = merged['PATH'] ?? Platform.environment['PATH'] ?? '';
+    merged['TERM'] = 'xterm-256color';
+    merged['COLORTERM'] = 'truecolor';
+    merged['PATH'] = shell.enrichedPath(basePath);
+    return {...merged};
+  }
 }

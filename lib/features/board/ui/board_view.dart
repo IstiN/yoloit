@@ -30,7 +30,6 @@ import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_panel_widget.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
@@ -1910,17 +1909,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       return;
     }
 
-    if (value == '__diagram') {
-      setState(() {
-        _activeTool = BoardToolId.connect;
-        _connectSettings = _connectSettings.copyWith(
-          geometry: BoardLinkGeometry.bezier,
-          showArrow: true,
-        );
-      });
-      return;
-    }
-
     context.read<BoardCubit>().createGenericPanel(value);
   }
 
@@ -1929,22 +1917,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BoardDocument board,
   ) async {
     final cubit = context.read<BoardCubit>();
-    final events = await cubit.historyForBoard(board.id);
-    BoardHistoryEvent? candidate;
-    for (final event in events.reversed) {
-      if (event.entityType == 'panel' && event.before != null) {
-        candidate = event;
-        break;
-      }
-    }
-    if (candidate == null) {
+    final undone = await cubit.undoLatestPanelHistory(board.id);
+    if (!undone) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No restorable panel history yet')),
       );
-      return;
     }
-    await cubit.restorePanelFromEvent(board.id, candidate.opId);
   }
 
   Offset _consumePanelDragDelta(Offset globalPosition, Offset fallbackDelta) {
@@ -6634,11 +6613,6 @@ class _BoardToolsPanel extends StatelessWidget {
             ? const Color(0xFF252A31)
             : (Theme.of(context).textTheme.bodySmall?.color ??
                 Theme.of(context).colorScheme.onSurface);
-    final textColor =
-        isLight
-            ? const Color(0xFF252A31)
-            : (Theme.of(context).textTheme.bodyMedium?.color ??
-                Theme.of(context).colorScheme.onSurface);
     final panelBg =
         isLight ? Colors.white : colors.surfaceElevated.withAlpha(0xF2);
     return Column(
@@ -6793,509 +6767,60 @@ class _BoardToolsPanel extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (onAddNote != null)
-                Tooltip(
-                  message: 'Add note',
-                  child: GestureDetector(
-                    onTap: onAddNote,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.note_add_outlined,
-                        size: 18,
-                        color: mutedColor,
-                      ),
-                    ),
-                  ),
-                ),
-              if (onAddGeneric != null) ...[
-                const SizedBox(height: 4),
-                _MiroBasicsMenuButton(
-                  onSelected: onAddGeneric!,
-                  color: mutedColor,
-                ),
-              ],
-              if (onAddChat != null) ...[
-                const SizedBox(height: 4),
-                Builder(
-                  builder:
-                      (btnCtx) => Tooltip(
-                        message: 'AI Chat',
-                        child: GestureDetector(
-                          onTap: () {
-                            final box = btnCtx.findRenderObject() as RenderBox?;
-                            if (box == null) return;
-                            final pos = box.localToGlobal(
-                              Offset(box.size.width, 0),
-                            );
-                            showMenu<String>(
-                              context: btnCtx,
-                              position: RelativeRect.fromLTRB(
-                                pos.dx + 4,
-                                pos.dy,
-                                pos.dx + 200,
-                                pos.dy + 100,
-                              ),
-                              color: colors.surfaceElevated,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              items: [
-                                PopupMenuItem(
-                                  value: 'new',
-                                  height: 36,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.add,
-                                        size: 14,
-                                        color: colors.statusActive,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'New chat',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: textColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'history',
-                                  height: 36,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.history,
-                                        size: 14,
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).textTheme.bodyMedium?.color ??
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Session history',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: textColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ).then((value) {
-                              if (value == 'new') {
-                                onAddChat!();
-                              } else if (value == 'history') {
-                                showDialog(
-                                  context: btnCtx,
-                                  builder:
-                                      (_) => const _ChatSessionHistoryDialog(
-                                        panelId: '',
-                                      ),
-                                );
-                              }
-                            });
-                          },
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.auto_awesome,
-                              size: 18,
-                              color: colors.statusActive,
-                            ),
-                          ),
-                        ),
-                      ),
-                ),
-              ],
-              if (onAddTerminal != null) ...[
-                const SizedBox(height: 4),
-                Builder(
-                  builder:
-                      (btnCtx) => Tooltip(
-                        message: 'Terminal',
-                        child: GestureDetector(
-                          onTap: () {
-                            final box = btnCtx.findRenderObject() as RenderBox?;
-                            if (box == null) return;
-                            final pos = box.localToGlobal(
-                              Offset(box.size.width, 0),
-                            );
-                            showMenu<String>(
-                              context: btnCtx,
-                              position: RelativeRect.fromLTRB(
-                                pos.dx + 4,
-                                pos.dy,
-                                pos.dx + 220,
-                                pos.dy + 100,
-                              ),
-                              color: colors.surfaceElevated,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              items: [
-                                PopupMenuItem(
-                                  value: 'new',
-                                  height: 36,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.add,
-                                        size: 14,
-                                        color: colors.statusActive,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'New terminal',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: textColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'history',
-                                  height: 36,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.history,
-                                        size: 14,
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).textTheme.bodyMedium?.color ??
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Terminal history',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: textColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ).then((value) {
-                              if (value == 'new') {
-                                onAddTerminal!();
-                              } else if (value == 'history') {
-                                showDialog(
-                                  context: btnCtx,
-                                  builder:
-                                      (_) =>
-                                          const BoardTerminalSessionHistoryDialog(),
-                                );
-                              }
-                            });
-                          },
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.terminal,
-                              size: 18,
-                              color: colors.statusActive,
-                            ),
-                          ),
-                        ),
-                      ),
-                ),
-              ],
-              // ── Generic plugin catalog button ────────────────────────────
-              if (onAddGeneric != null) ...[
-                const SizedBox(height: 4),
-                Builder(
-                  builder:
-                      (btnCtx) => Tooltip(
-                        message: 'Add panel',
-                        child: GestureDetector(
-                          onTap: () {
-                            final box = btnCtx.findRenderObject() as RenderBox?;
-                            if (box == null) return;
-                            final pos = box.localToGlobal(
-                              Offset(box.size.width, 0),
-                            );
-                            PopupMenuEntry<String> header(String label) =>
-                                PopupMenuItem<String>(
-                                  enabled: false,
-                                  height: 28,
-                                  child: Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: mutedColor.withAlpha(180),
-                                    ),
-                                  ),
-                                );
-                            PopupMenuEntry<String> action({
-                              required String value,
-                              required IconData icon,
-                              required Color color,
-                              required String label,
-                              String? shortcut,
-                            }) => PopupMenuItem<String>(
-                              value: value,
-                              height: 44,
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 28,
-                                    child: Icon(icon, size: 20, color: color),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      label,
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        color: textColor,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  if (shortcut != null)
-                                    Text(
-                                      shortcut,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: mutedColor.withAlpha(210),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                            PopupMenuEntry<String>? pluginItem(String typeId) {
-                              final plugin = BoardPluginRegistry.instance
-                                  .pluginFor(typeId);
-                              if (plugin == null) return null;
-                              return PopupMenuItem<String>(
-                                value: plugin.typeId,
-                                height: 38,
-                                child: Builder(
-                                  builder: (ctx) {
-                                    final svgIcon = plugin.buildIconWidget(
-                                      ctx,
-                                      size: 16,
-                                    );
-                                    return Row(
-                                      children: [
-                                        if (svgIcon != null)
-                                          SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: svgIcon,
-                                          )
-                                        else
-                                          Icon(
-                                            plugin.icon,
-                                            size: 16,
-                                            color: plugin.accentColor.withAlpha(
-                                              220,
-                                            ),
-                                          ),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          plugin.displayName,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: textColor,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              );
-                            }
-
-                            final entries = <PopupMenuEntry<String>>[
-                              header('Miro basics'),
-                              if (onAddNote != null)
-                                action(
-                                  value: '__note',
-                                  icon: Icons.sticky_note_2_outlined,
-                                  color: mutedColor,
-                                  label: 'Markdown note',
-                                ),
-                              if (pluginItem('board.sticky') != null)
-                                pluginItem('board.sticky')!,
-                              action(
-                                value: '__connector:straight:line',
-                                icon: Icons.horizontal_rule_rounded,
-                                color: mutedColor,
-                                label: 'Line',
-                                shortcut: 'L',
-                              ),
-                              action(
-                                value: '__connector:bezier:arrow',
-                                icon: Icons.arrow_outward_rounded,
-                                color: colors.primary,
-                                label: 'Arrow',
-                              ),
-                              action(
-                                value: '__connector:elbow:arrow',
-                                icon: Icons.subdirectory_arrow_right_rounded,
-                                color: mutedColor,
-                                label: 'Elbow arrow',
-                              ),
-                              action(
-                                value: '__shape:rectangle',
-                                icon: Icons.crop_square_rounded,
-                                color: mutedColor,
-                                label: 'Rectangle',
-                                shortcut: 'R',
-                              ),
-                              action(
-                                value: '__shape:circle',
-                                icon: Icons.circle_outlined,
-                                color: mutedColor,
-                                label: 'Oval',
-                                shortcut: 'O',
-                              ),
-                              action(
-                                value: '__shape:diamond',
-                                icon: Icons.diamond_outlined,
-                                color: mutedColor,
-                                label: 'Rhombus',
-                              ),
-                              action(
-                                value: '__shape:triangle',
-                                icon: Icons.change_history_rounded,
-                                color: mutedColor,
-                                label: 'Triangle',
-                              ),
-                              action(
-                                value: '__divider',
-                                icon: Icons.remove_rounded,
-                                color: mutedColor,
-                                label: 'Divider',
-                              ),
-                              const PopupMenuDivider(height: 8),
-                              action(
-                                value: '__diagram',
-                                icon: Icons.account_tree_outlined,
-                                color: colors.accentOrange,
-                                label: 'Diagram',
-                              ),
-                              const PopupMenuDivider(height: 8),
-                              header('AI and terminal'),
-                              if (onAddChat != null)
-                                action(
-                                  value: '__chat',
-                                  icon: Icons.auto_awesome,
-                                  color: colors.statusActive,
-                                  label: 'AI Chat',
-                                ),
-                              if (onAddTerminal != null)
-                                action(
-                                  value: '__terminal',
-                                  icon: Icons.terminal,
-                                  color: colors.statusActive,
-                                  label: 'Terminal',
-                                ),
-                              if (pluginItem('board.yolo_assistant') != null)
-                                pluginItem('board.yolo_assistant')!,
-                              const PopupMenuDivider(height: 8),
-                              header('Files and web'),
-                              if (pluginItem('board.filetree') != null)
-                                pluginItem('board.filetree')!,
-                              if (pluginItem('board.files') != null)
-                                pluginItem('board.files')!,
-                              if (pluginItem('board.file.preview') != null)
-                                pluginItem('board.file.preview')!,
-                              if (pluginItem('board.webpage') != null)
-                                pluginItem('board.webpage')!,
-                              const PopupMenuDivider(height: 8),
-                              header('Planning'),
-                              if (pluginItem('board.kanban') != null)
-                                pluginItem('board.kanban')!,
-                              if (pluginItem('board.checklist') != null)
-                                pluginItem('board.checklist')!,
-                              if (pluginItem('board.timer') != null)
-                                pluginItem('board.timer')!,
-                              const PopupMenuDivider(height: 8),
-                              header('Advanced'),
-                              if (pluginItem('board.code.snippet') != null)
-                                pluginItem('board.code.snippet')!,
-                              if (pluginItem('board.playlist') != null)
-                                pluginItem('board.playlist')!,
-                              if (pluginItem('board.run_configs') != null)
-                                pluginItem('board.run_configs')!,
-                              if (pluginItem('board.widget.custom') != null)
-                                pluginItem('board.widget.custom')!,
-                            ];
-
-                            showMenu<String>(
-                              context: btnCtx,
-                              position: RelativeRect.fromLTRB(
-                                pos.dx + 4,
-                                pos.dy,
-                                pos.dx + 360,
-                                pos.dy + 100,
-                              ),
-                              color: colors.surfaceElevated,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              items: entries,
-                            ).then((typeId) {
-                              if (typeId == '__note') {
-                                onAddNote?.call();
-                              } else if (typeId == '__chat') {
-                                onAddChat?.call();
-                              } else if (typeId == '__terminal') {
-                                onAddTerminal?.call();
-                              } else if (typeId != null) {
-                                onAddGeneric!(typeId);
-                              }
-                            });
-                          },
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.add_box_outlined,
-                              size: 18,
-                              color: mutedColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                ),
-              ],
+              _PanelCatalogCategoryButton(
+                category: _PanelCatalogCategory.basics,
+                icon: Icons.category_outlined,
+                tooltip: 'Miro basics',
+                color: mutedColor,
+                onAddNote: onAddNote,
+                onAddChat: onAddChat,
+                onAddTerminal: onAddTerminal,
+                onAddGeneric: onAddGeneric,
+              ),
+              const SizedBox(height: 4),
+              _PanelCatalogCategoryButton(
+                category: _PanelCatalogCategory.ai,
+                icon: Icons.auto_awesome,
+                tooltip: 'AI and terminal',
+                color: colors.statusActive,
+                onAddNote: onAddNote,
+                onAddChat: onAddChat,
+                onAddTerminal: onAddTerminal,
+                onAddGeneric: onAddGeneric,
+              ),
+              const SizedBox(height: 4),
+              _PanelCatalogCategoryButton(
+                category: _PanelCatalogCategory.files,
+                icon: Icons.folder_outlined,
+                tooltip: 'Files and web',
+                color: mutedColor,
+                onAddNote: onAddNote,
+                onAddChat: onAddChat,
+                onAddTerminal: onAddTerminal,
+                onAddGeneric: onAddGeneric,
+              ),
+              const SizedBox(height: 4),
+              _PanelCatalogCategoryButton(
+                category: _PanelCatalogCategory.planning,
+                icon: Icons.view_kanban_outlined,
+                tooltip: 'Planning',
+                color: mutedColor,
+                onAddNote: onAddNote,
+                onAddChat: onAddChat,
+                onAddTerminal: onAddTerminal,
+                onAddGeneric: onAddGeneric,
+              ),
+              const SizedBox(height: 4),
+              _PanelCatalogCategoryButton(
+                category: _PanelCatalogCategory.advanced,
+                icon: Icons.extension_outlined,
+                tooltip: 'Advanced',
+                color: mutedColor,
+                onAddNote: onAddNote,
+                onAddChat: onAddChat,
+                onAddTerminal: onAddTerminal,
+                onAddGeneric: onAddGeneric,
+              ),
             ],
           ),
         ),
@@ -7353,175 +6878,202 @@ class _MiroLeftToolbarButton extends StatelessWidget {
   }
 }
 
-class _MiroBasicsMenuButton extends StatelessWidget {
-  const _MiroBasicsMenuButton({required this.onSelected, required this.color});
+class _PanelCatalogCategoryButton extends StatelessWidget {
+  const _PanelCatalogCategoryButton({
+    required this.category,
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    this.onAddGeneric,
+    this.onAddNote,
+    this.onAddChat,
+    this.onAddTerminal,
+  });
 
-  final ValueChanged<String> onSelected;
+  final _PanelCatalogCategory category;
+  final IconData icon;
+  final String tooltip;
+  final ValueChanged<String>? onAddGeneric;
   final Color color;
+  final VoidCallback? onAddNote;
+  final VoidCallback? onAddChat;
+  final VoidCallback? onAddTerminal;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     return Builder(
       builder:
           (btnCtx) => Tooltip(
-            message: 'Shapes and connectors',
+            message: tooltip,
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                final box = btnCtx.findRenderObject() as RenderBox?;
-                if (box == null) return;
-                final pos = box.localToGlobal(Offset(box.size.width, 0));
-                showMenu<String>(
-                  context: btnCtx,
-                  position: RelativeRect.fromLTRB(
-                    pos.dx + 14,
-                    pos.dy - 46,
-                    pos.dx + 420,
-                    pos.dy + 100,
-                  ),
-                  color:
-                      Theme.of(context).brightness == Brightness.light
-                          ? Colors.white
-                          : colors.surfaceElevated,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  items: _miroBasicsMenuItems(context),
-                ).then((value) {
-                  if (value != null) onSelected(value);
-                });
-              },
+              onTap: () => _showCategoryItems(btnCtx),
               child: Container(
-                width: 42,
-                height: 42,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.category_outlined, size: 24, color: color),
+                child: Icon(icon, size: 18, color: color),
               ),
             ),
           ),
     );
   }
 
-  List<PopupMenuEntry<String>> _miroBasicsMenuItems(BuildContext context) {
-    final colors = context.appColors;
-    final textColor =
-        Theme.of(context).brightness == Brightness.light
-            ? const Color(0xFF252A31)
-            : (Theme.of(context).textTheme.bodyMedium?.color ??
-                Theme.of(context).colorScheme.onSurface);
-    final mutedColor =
-        Theme.of(context).brightness == Brightness.light
-            ? const Color(0xFF687083)
-            : context.appColors.textMuted;
+  Future<void> _showCategoryItems(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final pos = box.localToGlobal(Offset(box.size.width, 0));
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        pos.dx + 4,
+        pos.dy,
+        pos.dx + 340,
+        pos.dy + 100,
+      ),
+      color: _menuColor(context),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      items: _itemsFor(context, category),
+    );
+    if (selected == null) return;
+    if (selected == '__note') {
+      onAddNote?.call();
+      return;
+    }
+    if (selected == '__chat') {
+      onAddChat?.call();
+      return;
+    }
+    if (selected == '__terminal') {
+      onAddTerminal?.call();
+      return;
+    }
+    onAddGeneric?.call(selected);
+  }
 
-    PopupMenuEntry<String> item({
-      required String value,
-      required IconData icon,
-      required String label,
-      String? shortcut,
-      bool selected = false,
-      Color? iconColor,
-    }) {
-      final resolvedColor =
-          iconColor ?? (selected ? colors.primary : textColor);
-      return PopupMenuItem<String>(
-        value: value,
-        height: 54,
-        child: Container(
-          decoration: BoxDecoration(
-            color: selected ? colors.primary.withAlpha(22) : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Row(
-            children: [
-              Icon(icon, size: 23, color: resolvedColor),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: selected ? colors.primary : textColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              if (shortcut != null)
-                Text(
-                  shortcut,
-                  style: TextStyle(
-                    color: mutedColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-            ],
-          ),
-        ),
+  List<PopupMenuEntry<String>> _itemsFor(
+    BuildContext context,
+    _PanelCatalogCategory category,
+  ) {
+    PopupMenuEntry<String>? pluginItem(String typeId) {
+      if (onAddGeneric == null) return null;
+      final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
+      if (plugin == null) return null;
+      return _catalogItem(
+        context,
+        value: plugin.typeId,
+        icon: plugin.icon,
+        iconColor: plugin.accentColor,
+        label: plugin.displayName,
       );
     }
 
-    return [
-      item(
-        value: '__connector:straight:line',
-        icon: Icons.horizontal_rule_rounded,
-        label: 'Line',
-        shortcut: 'L',
+    final items = switch (category) {
+      _PanelCatalogCategory.basics => <PopupMenuEntry<String>?>[
+        if (onAddNote != null)
+          _catalogItem(
+            context,
+            value: '__note',
+            icon: Icons.notes_rounded,
+            iconColor: context.appColors.textMuted,
+            label: 'Markdown Note',
+          ),
+        if (onAddGeneric != null) pluginItem('board.sticky'),
+        if (onAddGeneric != null)
+          _catalogItem(
+            context,
+            value: '__shape:frame',
+            icon: Icons.interests_outlined,
+            iconColor: context.appColors.accentBlue,
+            label: 'Shape / Frame',
+          ),
+      ],
+      _PanelCatalogCategory.ai => <PopupMenuEntry<String>?>[
+        if (onAddChat != null)
+          _catalogItem(
+            context,
+            value: '__chat',
+            icon: Icons.auto_awesome,
+            iconColor: context.appColors.statusActive,
+            label: 'AI Chat',
+          ),
+        if (onAddTerminal != null)
+          _catalogItem(
+            context,
+            value: '__terminal',
+            icon: Icons.terminal,
+            iconColor: context.appColors.statusActive,
+            label: 'Terminal',
+          ),
+        pluginItem('board.yolo_assistant'),
+      ],
+      _PanelCatalogCategory.files => <PopupMenuEntry<String>?>[
+        pluginItem('board.filetree'),
+        pluginItem('board.files'),
+        pluginItem('board.file.preview'),
+        pluginItem('board.webpage'),
+      ],
+      _PanelCatalogCategory.planning => <PopupMenuEntry<String>?>[
+        pluginItem('board.kanban'),
+        pluginItem('board.checklist'),
+        pluginItem('board.timer'),
+      ],
+      _PanelCatalogCategory.advanced => <PopupMenuEntry<String>?>[
+        pluginItem('board.code.snippet'),
+        pluginItem('board.playlist'),
+        pluginItem('board.run_configs'),
+        pluginItem('board.widget.custom'),
+      ],
+    };
+    return items.whereType<PopupMenuEntry<String>>().toList();
+  }
+
+  PopupMenuItem<String> _catalogItem(
+    BuildContext context, {
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 52,
+      child: Row(
+        children: [
+          Icon(icon, size: 21, color: iconColor),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: _menuTextColor(context),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
-      item(
-        value: '__connector:bezier:arrow',
-        icon: Icons.arrow_outward_rounded,
-        label: 'Arrow',
-        selected: true,
-      ),
-      item(
-        value: '__connector:elbow:arrow',
-        icon: Icons.subdirectory_arrow_right_rounded,
-        label: 'Elbow arrow',
-      ),
-      item(
-        value: '__connector:straight:arrow',
-        icon: Icons.near_me_outlined,
-        label: 'Block arrow',
-      ),
-      const PopupMenuDivider(height: 16),
-      item(
-        value: '__shape:rectangle',
-        icon: Icons.crop_square_rounded,
-        label: 'Rectangle',
-        shortcut: 'R',
-      ),
-      item(
-        value: '__shape:circle',
-        icon: Icons.circle_outlined,
-        label: 'Oval',
-        shortcut: 'O',
-      ),
-      item(
-        value: '__shape:diamond',
-        icon: Icons.diamond_outlined,
-        label: 'Rhombus',
-      ),
-      item(
-        value: '__shape:triangle',
-        icon: Icons.change_history_rounded,
-        label: 'Triangle',
-      ),
-      item(value: '__divider', icon: Icons.remove_rounded, label: 'Divider'),
-      const PopupMenuDivider(height: 16),
-      item(
-        value: '__diagram',
-        icon: Icons.account_tree_outlined,
-        label: 'Diagram',
-        iconColor: colors.accentOrange,
-      ),
-    ];
+    );
+  }
+
+  Color _menuColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.light
+        ? context.appColors.surface
+        : context.appColors.surfaceElevated;
+  }
+
+  Color _menuTextColor(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.light
+        ? const Color(0xFF252A31)
+        : (Theme.of(context).textTheme.bodyMedium?.color ??
+            Theme.of(context).colorScheme.onSurface);
   }
 }
+
+enum _PanelCatalogCategory { basics, ai, files, planning, advanced }
 
 class _BoardHistoryPanel extends StatefulWidget {
   const _BoardHistoryPanel({required this.board, required this.onClose});
@@ -7696,25 +7248,17 @@ class _BoardHistoryEventTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     final title = _historyEventTitle(event);
+    final previewSnapshot = event.before ?? event.after;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: colors.primary.withAlpha(24),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              _historyEventIcon(event),
-              size: 17,
-              color: colors.primary,
-            ),
+          _HistoryPanelPreview(
+            event: event,
+            snapshot: previewSnapshot,
+            fallbackIcon: _historyEventIcon(event),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -7800,6 +7344,173 @@ class _BoardHistoryEventTile extends StatelessWidget {
     final local = timestamp.toLocal();
     String two(int value) => value.toString().padLeft(2, '0');
     return '${two(local.day)}.${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
+  }
+}
+
+class _HistoryPanelPreview extends StatelessWidget {
+  const _HistoryPanelPreview({
+    required this.event,
+    required this.snapshot,
+    required this.fallbackIcon,
+  });
+
+  final BoardHistoryEvent event;
+  final Map<String, dynamic>? snapshot;
+  final IconData fallbackIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final panel = _readPanel(snapshot);
+    final state = panel?.state ?? const <String, dynamic>{};
+    final shape = state['shape'] as String?;
+    final isSticky = panel?.type == 'board.sticky';
+    final color =
+        panel?.color ?? (isSticky ? colors.statusWarning : colors.primary);
+
+    return Container(
+      width: 48,
+      height: 36,
+      decoration: BoxDecoration(
+        color: colors.surface.withAlpha(190),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.border.withAlpha(180)),
+      ),
+      child: CustomPaint(
+        painter: _HistoryPanelPreviewPainter(
+          icon: panel == null ? fallbackIcon : null,
+          color: color,
+          iconColor: colors.primary,
+          shape: shape,
+          isSticky: isSticky,
+          deleted: event.type == 'panel.deleted',
+        ),
+      ),
+    );
+  }
+
+  BoardPanelInstance? _readPanel(Map<String, dynamic>? snapshot) {
+    if (snapshot == null) return null;
+    try {
+      return BoardPanelInstance.fromJson(snapshot);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class _HistoryPanelPreviewPainter extends CustomPainter {
+  const _HistoryPanelPreviewPainter({
+    required this.color,
+    required this.iconColor,
+    required this.isSticky,
+    required this.deleted,
+    this.icon,
+    this.shape,
+  });
+
+  final IconData? icon;
+  final Color color;
+  final Color iconColor;
+  final String? shape;
+  final bool isSticky;
+  final bool deleted;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (icon != null) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(icon!.codePoint),
+          style: TextStyle(
+            fontFamily: icon!.fontFamily,
+            package: icon!.fontPackage,
+            fontSize: 18,
+            color: iconColor,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          (size.width - textPainter.width) / 2,
+          (size.height - textPainter.height) / 2,
+        ),
+      );
+      return;
+    }
+
+    final rect = Rect.fromLTWH(8, 7, size.width - 16, size.height - 14);
+    final paint =
+        Paint()
+          ..color = deleted ? color.withAlpha(90) : color.withAlpha(210)
+          ..style = PaintingStyle.fill;
+    final stroke =
+        Paint()
+          ..color = deleted ? iconColor.withAlpha(120) : iconColor
+          ..strokeWidth = 1.6
+          ..style = PaintingStyle.stroke;
+
+    if (isSticky) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+        paint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+        stroke,
+      );
+    } else if (shape == 'diamond') {
+      final path =
+          Path()
+            ..moveTo(rect.center.dx, rect.top)
+            ..lineTo(rect.right, rect.center.dy)
+            ..lineTo(rect.center.dx, rect.bottom)
+            ..lineTo(rect.left, rect.center.dy)
+            ..close();
+      canvas.drawPath(path, paint);
+      canvas.drawPath(path, stroke);
+    } else if (shape == 'circle') {
+      canvas.drawOval(rect, paint);
+      canvas.drawOval(rect, stroke);
+    } else if (shape == 'triangle') {
+      final path =
+          Path()
+            ..moveTo(rect.center.dx, rect.top)
+            ..lineTo(rect.right, rect.bottom)
+            ..lineTo(rect.left, rect.bottom)
+            ..close();
+      canvas.drawPath(path, paint);
+      canvas.drawPath(path, stroke);
+    } else {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+        paint,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, const Radius.circular(3)),
+        stroke,
+      );
+    }
+
+    if (deleted) {
+      canvas.drawLine(
+        Offset(rect.left, rect.bottom),
+        Offset(rect.right, rect.top),
+        stroke,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HistoryPanelPreviewPainter oldDelegate) {
+    return oldDelegate.icon != icon ||
+        oldDelegate.color != color ||
+        oldDelegate.iconColor != iconColor ||
+        oldDelegate.shape != shape ||
+        oldDelegate.isSticky != isSticky ||
+        oldDelegate.deleted != deleted;
   }
 }
 

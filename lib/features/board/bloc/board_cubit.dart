@@ -112,12 +112,111 @@ class BoardCubit extends Cubit<BoardState> {
     return _historyStore.eventsForBoard(boardId);
   }
 
+  Future<bool> undoLatestPanelHistory(String boardId) async {
+    if (!state.boards.any((board) => board.id == boardId)) return false;
+    final events = await _historyStore.eventsForBoard(boardId);
+
+    for (var index = events.length - 1; index >= 0; index--) {
+      final event = events[index];
+      if (event.entityType != 'panel') continue;
+      if (event.restoresOpId != null || event.type == 'panel.restored') {
+        continue;
+      }
+
+      final current = state.boards
+          .firstWhereOrNull((board) => board.id == boardId)
+          ?.panels
+          .firstWhereOrNull((panel) => panel.id == event.entityId);
+      final before =
+          event.before == null
+              ? null
+              : _panelFromHistorySnapshot(event.before!);
+      final after =
+          event.after == null ? null : _panelFromHistorySnapshot(event.after!);
+
+      if (after != null &&
+          before == null &&
+          current != null &&
+          _panelSnapshotsMatch(current, after)) {
+        await removePanel(after.id);
+        return true;
+      }
+      if (before != null &&
+          current != null &&
+          !_panelSnapshotsMatch(current, before)) {
+        final coalescedEvent = _coalescedPanelUpdateStart(events, index);
+        final coalescedBefore = coalescedEvent.before;
+        final snapshot =
+            coalescedBefore == null
+                ? before
+                : _panelFromHistorySnapshot(coalescedBefore);
+        return _restorePanelSnapshot(
+          boardId: boardId,
+          panelFromEvent: snapshot,
+          restoresOpId: event.opId,
+        );
+      }
+      if (before != null && current == null && event.type == 'panel.deleted') {
+        return restorePanelFromEvent(boardId, event.opId);
+      }
+    }
+
+    return false;
+  }
+
+  BoardHistoryEvent _coalescedPanelUpdateStart(
+    List<BoardHistoryEvent> events,
+    int latestIndex,
+  ) {
+    final latest = events[latestIndex];
+    if (latest.type != 'panel.updated') return latest;
+    var start = latestIndex;
+    final signature = _patchSignature(latest);
+    while (start > 0) {
+      final previous = events[start - 1];
+      if (previous.type != latest.type ||
+          previous.entityType != latest.entityType ||
+          previous.entityId != latest.entityId ||
+          previous.restoresOpId != null ||
+          previous.revision + 1 != events[start].revision ||
+          _patchSignature(previous) != signature) {
+        break;
+      }
+      start--;
+    }
+    return events[start];
+  }
+
+  String _patchSignature(BoardHistoryEvent event) {
+    final keys = event.patch.keys.toList()..sort();
+    return keys.join('|');
+  }
+
+  bool _panelSnapshotsMatch(
+    BoardPanelInstance current,
+    BoardPanelInstance snapshot,
+  ) {
+    return jsonEncode(_panelSnapshot(current)) ==
+        jsonEncode(_panelSnapshot(snapshot));
+  }
+
   Future<bool> restorePanelFromEvent(String boardId, String opId) async {
     final event = await _historyStore.eventById(boardId, opId);
     if (event == null || event.entityType != 'panel') return false;
     final snapshot = event.before ?? event.after;
     if (snapshot == null) return false;
-    final panelFromEvent = _panelFromHistorySnapshot(snapshot);
+    return _restorePanelSnapshot(
+      boardId: boardId,
+      panelFromEvent: _panelFromHistorySnapshot(snapshot),
+      restoresOpId: opId,
+    );
+  }
+
+  Future<bool> _restorePanelSnapshot({
+    required String boardId,
+    required BoardPanelInstance panelFromEvent,
+    required String restoresOpId,
+  }) async {
     var restored = false;
     await _updateBoard(
       boardId,
@@ -164,7 +263,7 @@ class BoardCubit extends Cubit<BoardState> {
           after: _panelSnapshot(
             after.panels.firstWhere((panel) => panel.id == panelFromEvent.id),
           ),
-          restoresOpId: opId,
+          restoresOpId: restoresOpId,
         );
       },
     );

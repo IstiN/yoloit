@@ -1980,6 +1980,10 @@ class CliServer {
     if (sub.length == 1 && sub[0] == 'apply' && method == 'POST') {
       return _applyYaml(cubit, board, request);
     }
+    // POST /api/boards/:id/undo → undo latest panel history batch
+    if (sub.length == 1 && sub[0] == 'undo' && method == 'POST') {
+      return _undoBoard(cubit, board);
+    }
     // GET /api/boards/:id/screenshot
     if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
       final forceOffscreen = request.url.queryParameters['mode'] == 'offscreen';
@@ -2099,20 +2103,19 @@ class CliServer {
     final boards = cubit.state.boards;
     final active = cubit.state.activeBoardId;
     return _json({
-      'boards':
-          boards
-              .map(
-                (b) => {
-                  'id': b.id,
-                  'name': b.name,
-                  'panelCount': b.panels.length,
-                  'linkCount': b.links.length,
-                  'defaultFolder': b.defaultFolder,
-                  'active': b.id == active,
-                },
-              )
-              .toList(),
+      'boards': boards.map((b) => _boardSummary(b, activeId: active)).toList(),
     });
+  }
+
+  Map<String, dynamic> _boardSummary(BoardDocument board, {String? activeId}) {
+    return {
+      'id': board.id,
+      'name': board.name,
+      'panelCount': board.panels.length,
+      'linkCount': board.links.length,
+      'defaultFolder': board.defaultFolder,
+      if (activeId != null) 'active': board.id == activeId,
+    };
   }
 
   Future<shelf.Response> _createBoard(
@@ -2352,6 +2355,28 @@ class CliServer {
       }
     }
     return _json({'ok': true});
+  }
+
+  Future<shelf.Response> _undoBoard(
+    BoardCubit cubit,
+    BoardDocument board,
+  ) async {
+    final undone = await cubit.undoLatestPanelHistory(board.id);
+    if (undone) {
+      _scheduleRebuild();
+    }
+    final updated =
+        cubit.state.boards.where((entry) => entry.id == board.id).firstOrNull;
+    return _json({
+      'ok': undone,
+      'undone': undone,
+      'message':
+          undone
+              ? 'Undid latest panel change'
+              : 'No restorable panel history yet',
+      if (updated != null)
+        'board': _boardSummary(updated, activeId: cubit.state.activeBoardId),
+    });
   }
 
   // ── Panel implementations ──────────────────────────────────────────────
@@ -3134,6 +3159,16 @@ class CliServer {
         return _yamlTranslateBoard(cubit, board, raw, index: index);
       case 'board.arrange':
         return _yamlArrangeBoard(cubit, board, raw, index: index);
+      case 'board.undo':
+        final undone = await cubit.undoLatestPanelHistory(board.id);
+        if (undone) _scheduleRebuild();
+        return {
+          'ok': undone,
+          'message':
+              undone
+                  ? 'Undid latest panel change'
+                  : 'No restorable panel history yet',
+        };
       default:
         return {'ok': false, 'error': 'Unknown op "$op"'};
     }
