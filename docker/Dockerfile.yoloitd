@@ -1,0 +1,20 @@
+FROM ghcr.io/cirruslabs/flutter:3.35.3
+
+WORKDIR /app
+
+COPY pubspec.yaml pubspec.lock ./
+COPY packages ./packages
+COPY third_party ./third_party
+RUN flutter pub get
+
+COPY bin ./bin
+COPY lib ./lib
+
+ENV YOLOITD_HOST=0.0.0.0
+ENV YOLOITD_PORT=43110
+ENV YOLOITD_DATA_DIR=/data
+
+EXPOSE 43110
+VOLUME ["/data"]
+
+CMD ["dart", "run", "bin/yoloitd.dart"]

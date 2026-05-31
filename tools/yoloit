@@ -38,8 +38,60 @@ open(f, 'w').write(json.dumps(d))
 " "$STATE_FILE" "$1" 2>/dev/null || true
 }
 
+_state_get() {
+  local key="$1"
+  [[ -f "$STATE_FILE" ]] || return 0
+  python3 -c "import json,sys; print((json.load(open(sys.argv[1])).get(sys.argv[2]) or ''))" "$STATE_FILE" "$key" 2>/dev/null || true
+}
+
+_state_set() {
+  local key="$1" value="$2"
+  mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null || true
+  python3 -c "
+import json, sys, os
+f, key, value = sys.argv[1:4]
+d = json.load(open(f)) if os.path.exists(f) else {}
+d[key] = value
+open(f, 'w').write(json.dumps(d))
+" "$STATE_FILE" "$key" "$value" 2>/dev/null || true
+}
+
+_state_del() {
+  local key="$1"
+  [[ -f "$STATE_FILE" ]] || return 0
+  python3 -c "
+import json, sys, os
+f, key = sys.argv[1:3]
+d = json.load(open(f)) if os.path.exists(f) else {}
+d.pop(key, None)
+open(f, 'w').write(json.dumps(d))
+" "$STATE_FILE" "$key" 2>/dev/null || true
+}
+
+_remote_url() {
+  if [[ -n "${YOLOIT_REMOTE_URL:-}" ]]; then
+    printf "%s" "${YOLOIT_REMOTE_URL%/}"
+    return
+  fi
+  _state_get remoteUrl | sed 's:/*$::'
+}
+
+_remote_token() {
+  if [[ -n "${YOLOIT_REMOTE_TOKEN:-}" ]]; then
+    printf "%s" "$YOLOIT_REMOTE_TOKEN"
+    return
+  fi
+  _state_get remoteToken
+}
+
 _resolve_base() {
   if [[ -n "$BASE" ]]; then return 0; fi
+  local remote
+  remote=$(_remote_url)
+  if [[ -n "$remote" ]]; then
+    BASE="${remote%/}/api"
+    return 0
+  fi
   if [[ -n "${YOLOIT_CLI_PORT:-}" ]]; then
     BASE="http://127.0.0.1:${YOLOIT_CLI_PORT}/api"
     return 0
@@ -61,8 +113,16 @@ _curl() {
   local method=$1 path=$2
   shift 2
   local out ec
-  out=$(curl -s --max-time 30 -X "$method" "${BASE}${path}" \
-    -H "Content-Type: application/json" "$@" 2>/dev/null)
+  local token
+  token=$(_remote_token)
+  if [[ -n "$token" ]]; then
+    out=$(curl -s --max-time 30 -X "$method" "${BASE}${path}" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer ${token}" "$@" 2>/dev/null)
+  else
+    out=$(curl -s --max-time 30 -X "$method" "${BASE}${path}" \
+      -H "Content-Type: application/json" "$@" 2>/dev/null)
+  fi
   ec=$?
   if [[ $ec -ne 0 ]] || [[ -z "$out" ]]; then
     echo "{\"ok\":false,\"error\":\"CLI server not reachable — is the YoLoIT app running?\"}"
@@ -109,6 +169,30 @@ commands = [
     "description": "Show CLI help",
     "params": [["--format short|detailed|mermaid|tools", "Help output format", False]],
     "example": "yoloit help --format tools",
+  },
+  {
+    "group": "remote",
+    "name": "remote:connect",
+    "description": "Connect this CLI to a remote yoloitd daemon",
+    "params": [["url", "Remote base URL, e.g. http://127.0.0.1:43110", True], ["token", "Bearer token", False]],
+    "example": "yoloit remote:connect http://127.0.0.1:43110",
+    "aliases": ["rcon"],
+  },
+  {
+    "group": "remote",
+    "name": "remote:disconnect",
+    "description": "Return CLI to the local desktop app server",
+    "params": [],
+    "example": "yoloit remote:disconnect",
+    "aliases": ["rdisc"],
+  },
+  {
+    "group": "remote",
+    "name": "remote:status",
+    "description": "Show active remote daemon connection",
+    "params": [],
+    "example": "yoloit remote:status",
+    "aliases": ["rst"],
   },
   {
     "group": "board",
@@ -1898,6 +1982,36 @@ PYEOF
     # Wait for new port file to update
     sleep 2
     echo "Port: $(cat ${HOME}/.config/yoloit/cli.port 2>/dev/null)"
+    ;;
+  remote:connect|rcon)
+    [[ $# -lt 1 ]] && { echo "Usage: yoloit remote:connect <url> [token]" >&2; exit 1; }
+    remote="${1%/}"
+    token="${2:-}"
+    _state_set remoteUrl "$remote"
+    if [[ -n "$token" ]]; then
+      _state_set remoteToken "$token"
+    fi
+    BASE="${remote}/api"
+    health=$(_get "/health" 2>/dev/null || true)
+    if printf "%s" "$health" | python3 -m json.tool >/dev/null 2>&1; then
+      printf "%s\n" "$health" | python3 -m json.tool
+    else
+      echo "{\"ok\":true,\"remoteUrl\":\"${remote}\",\"warning\":\"saved but health check did not return JSON\"}"
+    fi
+    ;;
+  remote:disconnect|rdisc)
+    _state_del remoteUrl
+    _state_del remoteToken
+    echo '{"ok":true,"message":"Remote disconnected; using local YoLoIT desktop server"}'
+    ;;
+  remote:status|rst)
+    remote=$(_remote_url)
+    token=$(_remote_token)
+    if [[ -z "$remote" ]]; then
+      echo '{"ok":true,"connected":false,"mode":"local"}'
+    else
+      python3 -c 'import json,sys; print(json.dumps({"ok": True, "connected": True, "mode": "remote", "url": sys.argv[1], "tokenConfigured": bool(sys.argv[2])}, indent=2))' "$remote" "$token"
+    fi
     ;;
   boards)
     _get "/boards" | python3 -m json.tool 2>/dev/null || _get "/boards"

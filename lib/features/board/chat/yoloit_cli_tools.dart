@@ -1456,6 +1456,36 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     group: 'app',
   ),
   YoloitCliTool(
+    command: 'remote:connect',
+    alias: 'rcon',
+    description: 'Connect the CLI to a remote yoloitd daemon',
+    group: 'remote',
+    humanVariants: const {
+      'ru': [
+        'подключись к удаленному yoloitd',
+        'подключи удаленные борды',
+        'connect remote boards',
+      ],
+      'en': ['connect remote boards', 'connect to remote yoloitd'],
+    },
+    params: <YoloitCliToolParam>[
+      _p('url', 'Remote base URL', required: true),
+      _p('token', 'Bearer token', required: false),
+    ],
+  ),
+  YoloitCliTool(
+    command: 'remote:disconnect',
+    alias: 'rdisc',
+    description: 'Disconnect remote yoloitd and use local desktop server',
+    group: 'remote',
+  ),
+  YoloitCliTool(
+    command: 'remote:status',
+    alias: 'rst',
+    description: 'Show active remote yoloitd connection',
+    group: 'remote',
+  ),
+  YoloitCliTool(
     command: 'boards',
     alias: 'bls',
     description: 'List all boards',

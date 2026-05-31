@@ -175,6 +175,11 @@ jobs:
           # Also clean Xcode DerivedData for this project to avoid stale caches
           rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-*
 
+      - name: Ensure Xcode Metal toolchain is installed
+        run: |
+          xcodebuild -runFirstLaunch || true
+          xcodebuild -downloadComponent MetalToolchain
+
       - name: Build macOS release (universal)
         env:
           BUILD_NUMBER: ${{ github.run_number }}
