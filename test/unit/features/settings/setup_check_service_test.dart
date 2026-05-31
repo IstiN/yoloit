@@ -208,6 +208,13 @@ void main() {
       expect(hint, contains('winget'));
       expect(hint, contains('Cursor'));
     });
+
+    test('Windows codex agent uses official PowerShell installer', () {
+      const hint =
+          r'powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"';
+      expect(hint, contains('chatgpt.com/codex/install.ps1'));
+      expect(hint, contains('powershell'));
+    });
   });
 
   // ── macOS install hints ───────────────────────────────────────────────────
@@ -233,6 +240,12 @@ void main() {
       const hint = 'npm install -g @github/copilot';
       expect(hint, contains('npm'));
     });
+
+    test('macOS codex agent uses official shell installer', () {
+      const hint = 'curl -fsSL https://chatgpt.com/codex/install.sh | sh';
+      expect(hint, contains('chatgpt.com/codex/install.sh'));
+      expect(hint, contains('curl'));
+    });
   });
 
   // ── Linux install hints ───────────────────────────────────────────────────
@@ -248,6 +261,12 @@ void main() {
         expect(hint, contains('apt'));
       });
     }
+
+    test('Linux codex agent uses official shell installer', () {
+      const hint = 'curl -fsSL https://chatgpt.com/codex/install.sh | sh';
+      expect(hint, contains('chatgpt.com/codex/install.sh'));
+      expect(hint, contains('curl'));
+    });
   });
 
   group('PATH enrichment', () {

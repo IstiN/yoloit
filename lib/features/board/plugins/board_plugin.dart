@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/features/board/history/board_panel_history_adapter.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
 /// Read-only context passed to a plugin when rendering its panel content.
@@ -86,6 +87,14 @@ abstract class BoardPanelPlugin {
 
   /// Initial state map for a freshly created panel.
   Map<String, dynamic> get initialState => const {};
+
+  /// Plugin-owned state history adapter.
+  ///
+  /// All panel state must pass through this contract before being written into
+  /// board history. Override for panels with volatile fields or nested entities
+  /// that need finer-grained restore.
+  BoardPanelHistoryAdapter get historyAdapter =>
+      const JsonBoardPanelHistoryAdapter();
 
   /// Whether this plugin should be shown in the generic Add Panel catalog.
   bool get showInCatalog => true;

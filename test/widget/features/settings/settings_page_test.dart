@@ -78,7 +78,11 @@ void main() {
         MaterialApp(
           theme: AppThemePreset.neonPurple.theme,
           home: const Scaffold(
-            body: SizedBox(width: 700, height: 600, child: SettingsPage(initialCategory: 'About')),
+            body: SizedBox(
+              width: 700,
+              height: 600,
+              child: SettingsPage(initialCategory: 'About'),
+            ),
           ),
         ),
       );
@@ -101,10 +105,7 @@ void main() {
       );
       await tester.pump();
       // 'Setup Guide' appears as a sidebar category (may be off-screen in ListView)
-      expect(
-        find.text('Setup Guide', skipOffstage: false),
-        findsOneWidget,
-      );
+      expect(find.text('Setup Guide', skipOffstage: false), findsOneWidget);
     });
 
     testWidgets('close button pops dialog', (tester) async {
@@ -115,21 +116,24 @@ void main() {
             create: (_) => WorkspaceCubit(),
             child: Scaffold(
               body: Builder(
-                builder: (ctx) => TextButton(
-                  onPressed: () => SettingsPage.show(ctx),
-                  child: const Text('Open'),
-                ),
+                builder:
+                    (ctx) => TextButton(
+                      onPressed: () => SettingsPage.show(ctx),
+                      child: const Text('Open'),
+                    ),
               ),
             ),
           ),
         ),
       );
       await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
       expect(find.byType(SettingsPage), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.close).first);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
       expect(find.byType(SettingsPage), findsNothing);
     });
 
@@ -138,25 +142,25 @@ void main() {
         MaterialApp(
           theme: AppThemePreset.neonPurple.theme,
           home: const Scaffold(
-            body: SizedBox(
-              width: 600,
-              height: 560,
-              child: SettingsPage(),
-            ),
+            body: SizedBox(width: 600, height: 560, child: SettingsPage()),
           ),
         ),
       );
       await tester.pump();
       // Theme selector renders 5 colored circles
       final circles = tester.widgetList<Container>(find.byType(Container));
-      final coloredCircles = circles
-          .where((c) =>
-              c.decoration is BoxDecoration &&
-              (c.decoration as BoxDecoration).shape == BoxShape.circle &&
-              (c.decoration as BoxDecoration).color != null &&
-              (c.decoration as BoxDecoration).color != AppColors.background &&
-              (c.decoration as BoxDecoration).color != AppColors.surface)
-          .toList();
+      final coloredCircles =
+          circles
+              .where(
+                (c) =>
+                    c.decoration is BoxDecoration &&
+                    (c.decoration as BoxDecoration).shape == BoxShape.circle &&
+                    (c.decoration as BoxDecoration).color != null &&
+                    (c.decoration as BoxDecoration).color !=
+                        AppColors.background &&
+                    (c.decoration as BoxDecoration).color != AppColors.surface,
+              )
+              .toList();
       expect(coloredCircles.length, greaterThanOrEqualTo(5));
     });
   });

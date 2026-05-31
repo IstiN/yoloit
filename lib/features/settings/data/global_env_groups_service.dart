@@ -80,15 +80,18 @@ class GlobalEnvGroupsService {
     final signature = _storageFileSignature();
     final cached = _loadAllCache;
     if (cached != null && _loadAllCacheSignature == signature) return cached;
-    return _loadAllInFlight ??= _loadAllUncached().then((groups) {
-      _loadAllCacheSignature = _storageFileSignature();
-      _loadAllCache = groups;
-      _loadAllInFlight = null;
-      return groups;
-    }, onError: (Object error, StackTrace stackTrace) {
-      _loadAllInFlight = null;
-      Error.throwWithStackTrace(error, stackTrace);
-    });
+    return _loadAllInFlight ??= _loadAllUncached().then(
+      (groups) {
+        _loadAllCacheSignature = _storageFileSignature();
+        _loadAllCache = groups;
+        _loadAllInFlight = null;
+        return groups;
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        _loadAllInFlight = null;
+        Error.throwWithStackTrace(error, stackTrace);
+      },
+    );
   }
 
   Future<List<GlobalEnvGroup>> _loadAllUncached() async {
@@ -103,10 +106,11 @@ class GlobalEnvGroupsService {
       final raw = await file.readAsString();
       if (raw.trim().isEmpty) return [];
       final decoded = jsonDecode(raw) as List;
-      metas = decoded.map((e) {
-        final m = Map<String, dynamic>.from(e as Map);
-        return _GroupMeta.fromJson(m);
-      }).toList();
+      metas =
+          decoded.map((e) {
+            final m = Map<String, dynamic>.from(e as Map);
+            return _GroupMeta.fromJson(m);
+          }).toList();
 
       // If the JSON still has embedded values (pre-migration format), migrate
       // them into secure storage now.
@@ -124,11 +128,9 @@ class GlobalEnvGroupsService {
         } else {
           values = await _readSecureValues(meta.id, meta.keys);
         }
-        groups.add(GlobalEnvGroup(
-          id: meta.id,
-          name: meta.name,
-          values: values,
-        ));
+        groups.add(
+          GlobalEnvGroup(id: meta.id, name: meta.name, values: values),
+        );
       }
 
       // Only strip embedded values from JSON when ALL secure writes succeed.
@@ -158,11 +160,14 @@ class GlobalEnvGroupsService {
       final raw = prefs.getString(_prefsFallbackKey);
       if (raw == null || raw.isEmpty) return null;
       final decoded = jsonDecode(raw) as List;
-      final groups = decoded
-          .map(
-            (e) => GlobalEnvGroup.fromJson(Map<String, dynamic>.from(e as Map)),
-          )
-          .toList();
+      final groups =
+          decoded
+              .map(
+                (e) => GlobalEnvGroup.fromJson(
+                  Map<String, dynamic>.from(e as Map),
+                ),
+              )
+              .toList();
       await saveAll(groups);
       await prefs.remove(_prefsFallbackKey);
       return groups;
@@ -173,9 +178,16 @@ class GlobalEnvGroupsService {
 
   /// Persists all groups: metadata to JSON, values to secure storage.
   Future<void> saveAll(List<GlobalEnvGroup> groups) async {
+    final persistedGroups = <GlobalEnvGroup>[];
     // Write secret values to secure storage.
     for (final group in groups) {
-      final ok = await _writeSecureValues(group.id, group.values);
+      final valuesToPersist = await _mergeWithExistingSecureValues(
+        group.id,
+        group.values,
+      );
+      final persistedGroup = group.copyWith(values: valuesToPersist);
+      persistedGroups.add(persistedGroup);
+      final ok = await _writeSecureValues(group.id, valuesToPersist);
       if (!ok) {
         debugPrint(
           '[EnvGroups] WARNING: saveAll failed to persist secrets for '
@@ -185,17 +197,17 @@ class GlobalEnvGroupsService {
       // Verify the write by reading back
       final readBack = await _readSecureValues(
         group.id,
-        group.values.keys.toList(),
+        valuesToPersist.keys.toList(),
       );
       final nonEmpty = readBack.values.where((v) => v.isNotEmpty).length;
       debugPrint(
         '[EnvGroups] saveAll verify ${group.name}: '
-        '${nonEmpty}/${group.values.length} keys persisted',
+        '$nonEmpty/${valuesToPersist.length} keys persisted',
       );
     }
     // Write metadata (no values) to JSON.
-    await _writeMetaFile(groups);
-    _loadAllCache = List<GlobalEnvGroup>.unmodifiable(groups);
+    await _writeMetaFile(persistedGroups);
+    _loadAllCache = List<GlobalEnvGroup>.unmodifiable(persistedGroups);
     _loadAllCacheSignature = _storageFileSignature();
     _loadAllInFlight = null;
   }
@@ -302,13 +314,16 @@ class GlobalEnvGroupsService {
 
   /// Writes group metadata JSON (id, name, keys — no values).
   Future<void> _writeMetaFile(List<GlobalEnvGroup> groups) async {
-    final metas = groups
-        .map((g) => {
-              'id': g.id,
-              'name': g.name,
-              'keys': g.values.keys.toList(),
-            })
-        .toList();
+    final metas =
+        groups
+            .map(
+              (g) => {
+                'id': g.id,
+                'name': g.name,
+                'keys': g.values.keys.toList(),
+              },
+            )
+            .toList();
     final encoded = const JsonEncoder.withIndent('  ').convert(metas);
     final file = _storageFile;
     final dir = file.parent;
@@ -326,6 +341,27 @@ class GlobalEnvGroupsService {
   }
 
   /// Returns `true` if the write succeeded.
+  Future<Map<String, String>> _mergeWithExistingSecureValues(
+    String groupId,
+    Map<String, String> incomingValues,
+  ) async {
+    if (incomingValues.isEmpty) return incomingValues;
+    final existingValues = await _readSecureValues(
+      groupId,
+      incomingValues.keys.toList(),
+    );
+    return {
+      for (final entry in incomingValues.entries)
+        entry.key:
+            entry.value.isNotEmpty
+                ? entry.value
+                : (existingValues[entry.key]?.isNotEmpty == true
+                    ? existingValues[entry.key]!
+                    : entry.value),
+    };
+  }
+
+  /// Returns `true` if the write succeeded.
   Future<bool> _writeSecureValues(
     String groupId,
     Map<String, String> values,
@@ -337,10 +373,7 @@ class GlobalEnvGroupsService {
         '[EnvGroups] _writeSecureValues $groupId: '
         '${values.length} keys, ${encoded.length} bytes',
       );
-      await _storage.write(
-        key: key,
-        value: encoded,
-      );
+      await _storage.write(key: key, value: encoded);
       final legacyKey = _legacySecureStorageKey(groupId);
       if (legacyKey != null && legacyKey != key) {
         await _storage.delete(key: legacyKey);
@@ -384,8 +417,9 @@ class GlobalEnvGroupsService {
       final result = {
         for (final k in expectedKeys) k: (decoded[k] ?? '').toString(),
       };
-      final emptyKeys =
-          result.entries.where((e) => e.value.isEmpty).map((e) => e.key);
+      final emptyKeys = result.entries
+          .where((e) => e.value.isEmpty)
+          .map((e) => e.key);
       if (emptyKeys.isNotEmpty) {
         debugPrint(
           '[EnvGroups] _readSecureValues: empty values for $groupId '
@@ -423,8 +457,7 @@ class _GroupMeta {
 
     // New format: keys is a List<String>, no values.
     if (json.containsKey('keys') && json['keys'] is List) {
-      final keys =
-          (json['keys'] as List).map((e) => e.toString()).toList();
+      final keys = (json['keys'] as List).map((e) => e.toString()).toList();
       return _GroupMeta(
         id: id,
         name: name,

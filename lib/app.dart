@@ -23,10 +23,11 @@ import 'package:yoloit/core/cli/handlers/webpage_handler.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
+import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
-import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
 import 'package:yoloit/features/collaboration/desktop/repo_directory_listing.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
@@ -69,7 +70,9 @@ class App extends StatelessWidget {
           },
         ),
         BlocProvider(create: (_) => MindMapCubit()),
-        BlocProvider(create: (_) => BoardCubit()),
+        BlocProvider(
+          create: (_) => BoardCubit(historyStore: LocalBoardHistoryStore()),
+        ),
         // Collaboration/guest mode still uses the legacy MindMap state model as
         // a compatibility backend. TODO(board-collab): migrate this to BoardCubit
         // and remove the remaining mindmap backend after Board View supports guests.

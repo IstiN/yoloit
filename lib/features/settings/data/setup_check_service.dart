@@ -482,6 +482,43 @@ class SetupCheckService {
     required bool winget,
   }) => [
     _checkTool(
+      id: 'codex',
+      name: 'Codex CLI',
+      description: 'OpenAI coding agent that runs locally in your terminal',
+      command: 'codex',
+      versionArgs: ['--version'],
+      installHint:
+          _isWindows
+              ? r'powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"'
+              : 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+      installUrl: 'https://github.com/openai/codex',
+      isRequired: false,
+      installAction:
+          _isWindows
+              ? const InstallAction(
+                executable: 'powershell',
+                args: [
+                  '-ExecutionPolicy',
+                  'ByPass',
+                  '-c',
+                  'irm https://chatgpt.com/codex/install.ps1 | iex',
+                ],
+                requiresInteractiveTerminal: true,
+                interactiveScript:
+                    r'powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"',
+              )
+              : const InstallAction(
+                executable: 'sh',
+                args: [
+                  '-c',
+                  'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+                ],
+                requiresInteractiveTerminal: true,
+                interactiveScript:
+                    'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+              ),
+    ),
+    _checkTool(
       id: 'copilot',
       name: 'GitHub Copilot',
       description: 'AI coding agent by GitHub — autonomous agentic CLI',

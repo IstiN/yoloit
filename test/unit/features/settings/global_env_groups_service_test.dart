@@ -118,21 +118,51 @@ void main() {
       expect(decoded['TOKEN'], 'my_token');
     });
 
-    test('prefixed group ids do not produce double-prefixed secure keys', () async {
-      final data = [
-        const GlobalEnvGroup(
-          id: 'env_group_123',
-          name: 'test',
-          values: {'TOKEN': 'my_token'},
-        ),
-      ];
+    test(
+      'saveAll preserves existing secret values when incoming values are empty',
+      () async {
+        await GlobalEnvGroupsService.instance.saveAll([
+          const GlobalEnvGroup(
+            id: 'g1',
+            name: 'test',
+            values: {'TOKEN': 'my_token', 'EMPTY': ''},
+          ),
+        ]);
 
-      await GlobalEnvGroupsService.instance.saveAll(data);
+        await GlobalEnvGroupsService.instance.saveAll([
+          const GlobalEnvGroup(
+            id: 'g1',
+            name: 'test',
+            values: {'TOKEN': '', 'EMPTY': ''},
+          ),
+        ]);
 
-      const storage = FlutterSecureStorage();
-      expect(await storage.read(key: 'env_group_123'), isNotNull);
-      expect(await storage.read(key: 'env_group_env_group_123'), isNull);
-    });
+        const storage = FlutterSecureStorage();
+        final raw = await storage.read(key: 'env_group_g1');
+        final decoded = jsonDecode(raw!) as Map;
+        expect(decoded['TOKEN'], 'my_token');
+        expect(decoded['EMPTY'], '');
+      },
+    );
+
+    test(
+      'prefixed group ids do not produce double-prefixed secure keys',
+      () async {
+        final data = [
+          const GlobalEnvGroup(
+            id: 'env_group_123',
+            name: 'test',
+            values: {'TOKEN': 'my_token'},
+          ),
+        ];
+
+        await GlobalEnvGroupsService.instance.saveAll(data);
+
+        const storage = FlutterSecureStorage();
+        expect(await storage.read(key: 'env_group_123'), isNotNull);
+        expect(await storage.read(key: 'env_group_env_group_123'), isNull);
+      },
+    );
 
     test('migrates old JSON format with embedded values', () async {
       // Write old-format JSON with values embedded.
@@ -166,11 +196,7 @@ void main() {
 
     test('deleteGroupSecrets removes from secure storage', () async {
       final data = [
-        const GlobalEnvGroup(
-          id: 'g1',
-          name: 'test',
-          values: {'KEY': 'val'},
-        ),
+        const GlobalEnvGroup(id: 'g1', name: 'test', values: {'KEY': 'val'}),
       ];
 
       await GlobalEnvGroupsService.instance.saveAll(data);
