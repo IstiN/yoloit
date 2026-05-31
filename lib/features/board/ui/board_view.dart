@@ -22,6 +22,7 @@ import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
 import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
+import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
@@ -84,6 +85,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   String? _focusedPanelVisibilityKey;
   bool _showMinimap = true;
   bool _showToolsPanel = true;
+  bool _showHistoryPanel = false;
   bool _isBoardOverviewOpen = false;
   bool _cancelBgCapture = false;
   bool _boardSwitchPreviewVisible = false;
@@ -1074,11 +1076,24 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             (s) => setState(
                                               () => _connectSettings = s,
                                             ),
+                                        historyPanelVisible: _showHistoryPanel,
                                         onToggle:
                                             () => setState(
                                               () =>
                                                   _showToolsPanel =
                                                       !_showToolsPanel,
+                                            ),
+                                        onUndo:
+                                            () => _restoreLatestPanelHistory(
+                                              context,
+                                              activeBoard,
+                                            ),
+                                        onRedo: null,
+                                        onShowHistory:
+                                            () => setState(
+                                              () =>
+                                                  _showHistoryPanel =
+                                                      !_showHistoryPanel,
                                             ),
                                         onAddNote:
                                             () => _showMarkdownNoteDialog(
@@ -1093,6 +1108,21 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   context,
                                                   typeId,
                                                 ),
+                                      ),
+                                    ),
+                                  if (!_isBoardOverviewOpen &&
+                                      !_isCapturingScreenshot &&
+                                      _showHistoryPanel)
+                                    Positioned(
+                                      top: 58,
+                                      right: 12,
+                                      bottom: 24,
+                                      child: _BoardHistoryPanel(
+                                        board: activeBoard,
+                                        onClose:
+                                            () => setState(
+                                              () => _showHistoryPanel = false,
+                                            ),
                                       ),
                                     ),
                                   // ── Cancel connection button ───────────────────────
@@ -1892,6 +1922,29 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
 
     context.read<BoardCubit>().createGenericPanel(value);
+  }
+
+  Future<void> _restoreLatestPanelHistory(
+    BuildContext context,
+    BoardDocument board,
+  ) async {
+    final cubit = context.read<BoardCubit>();
+    final events = await cubit.historyForBoard(board.id);
+    BoardHistoryEvent? candidate;
+    for (final event in events.reversed) {
+      if (event.entityType == 'panel' && event.before != null) {
+        candidate = event;
+        break;
+      }
+    }
+    if (candidate == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No restorable panel history yet')),
+      );
+      return;
+    }
+    await cubit.restorePanelFromEvent(board.id, candidate.opId);
   }
 
   Offset _consumePanelDragDelta(Offset globalPosition, Offset fallbackDelta) {
@@ -6544,7 +6597,11 @@ class _BoardToolsPanel extends StatelessWidget {
     required this.onToolChanged,
     required this.onDrawSettingsChanged,
     required this.onConnectSettingsChanged,
+    required this.historyPanelVisible,
     required this.onToggle,
+    required this.onShowHistory,
+    this.onUndo,
+    this.onRedo,
     this.onAddNote,
     this.onAddChat,
     this.onAddTerminal,
@@ -6558,7 +6615,11 @@ class _BoardToolsPanel extends StatelessWidget {
   final ValueChanged<BoardToolId> onToolChanged;
   final ValueChanged<DrawSettings> onDrawSettingsChanged;
   final ValueChanged<ConnectSettings> onConnectSettingsChanged;
+  final bool historyPanelVisible;
   final VoidCallback onToggle;
+  final VoidCallback onShowHistory;
+  final VoidCallback? onUndo;
+  final VoidCallback? onRedo;
   final VoidCallback? onAddNote;
   final VoidCallback? onAddChat;
   final VoidCallback? onAddTerminal;
@@ -6567,16 +6628,19 @@ class _BoardToolsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        isLight
+            ? const Color(0xFF252A31)
+            : (Theme.of(context).textTheme.bodySmall?.color ??
+                Theme.of(context).colorScheme.onSurface);
     final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        isLight
+            ? const Color(0xFF252A31)
+            : (Theme.of(context).textTheme.bodyMedium?.color ??
+                Theme.of(context).colorScheme.onSurface);
     final panelBg =
-        Theme.of(context).brightness == Brightness.light
-            ? colors.surface
-            : colors.surface.withAlpha(0xE5);
+        isLight ? Colors.white : colors.surfaceElevated.withAlpha(0xF2);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -6595,8 +6659,15 @@ class _BoardToolsPanel extends StatelessWidget {
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: panelBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colors.border),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border.withAlpha(180)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(isLight ? 18 : 70),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -6657,6 +6728,51 @@ class _BoardToolsPanel extends StatelessWidget {
               onChanged: onConnectSettingsChanged,
             ),
           ],
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: panelBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border.withAlpha(180)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(isLight ? 18 : 70),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _MiroLeftToolbarButton(
+                  icon: Icons.undo_rounded,
+                  tooltip: 'Undo latest panel change',
+                  onTap: onUndo,
+                  color: mutedColor,
+                ),
+                const SizedBox(height: 4),
+                _MiroLeftToolbarButton(
+                  icon: Icons.redo_rounded,
+                  tooltip: 'Redo',
+                  onTap: onRedo,
+                  color: mutedColor,
+                ),
+                const SizedBox(height: 4),
+                _MiroLeftToolbarButton(
+                  icon: Icons.manage_history_rounded,
+                  tooltip:
+                      historyPanelVisible
+                          ? 'Hide board history'
+                          : 'Show board history',
+                  active: historyPanelVisible,
+                  onTap: onShowHistory,
+                  color: colors.primary,
+                ),
+              ],
+            ),
+          ),
         ],
         // ── Add panel buttons (always visible) ───────────────────────────
         const SizedBox(height: 8),
@@ -6664,8 +6780,15 @@ class _BoardToolsPanel extends StatelessWidget {
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: panelBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colors.border),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: colors.border.withAlpha(180)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(isLight ? 18 : 70),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -6689,6 +6812,13 @@ class _BoardToolsPanel extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (onAddGeneric != null) ...[
+                const SizedBox(height: 4),
+                _MiroBasicsMenuButton(
+                  onSelected: onAddGeneric!,
+                  color: mutedColor,
+                ),
+              ],
               if (onAddChat != null) ...[
                 const SizedBox(height: 4),
                 Builder(
@@ -7171,6 +7301,505 @@ class _BoardToolsPanel extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _MiroLeftToolbarButton extends StatelessWidget {
+  const _MiroLeftToolbarButton({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    this.active = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final enabled = onTap != null;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: active ? colors.primary.withAlpha(32) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            border:
+                active
+                    ? Border.all(color: colors.primary.withAlpha(180))
+                    : null,
+          ),
+          child: Icon(
+            icon,
+            size: 23,
+            color:
+                enabled
+                    ? (active ? colors.primary : color)
+                    : color.withAlpha(90),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiroBasicsMenuButton extends StatelessWidget {
+  const _MiroBasicsMenuButton({required this.onSelected, required this.color});
+
+  final ValueChanged<String> onSelected;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Builder(
+      builder:
+          (btnCtx) => Tooltip(
+            message: 'Shapes and connectors',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                final box = btnCtx.findRenderObject() as RenderBox?;
+                if (box == null) return;
+                final pos = box.localToGlobal(Offset(box.size.width, 0));
+                showMenu<String>(
+                  context: btnCtx,
+                  position: RelativeRect.fromLTRB(
+                    pos.dx + 14,
+                    pos.dy - 46,
+                    pos.dx + 420,
+                    pos.dy + 100,
+                  ),
+                  color:
+                      Theme.of(context).brightness == Brightness.light
+                          ? Colors.white
+                          : colors.surfaceElevated,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  items: _miroBasicsMenuItems(context),
+                ).then((value) {
+                  if (value != null) onSelected(value);
+                });
+              },
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.category_outlined, size: 24, color: color),
+              ),
+            ),
+          ),
+    );
+  }
+
+  List<PopupMenuEntry<String>> _miroBasicsMenuItems(BuildContext context) {
+    final colors = context.appColors;
+    final textColor =
+        Theme.of(context).brightness == Brightness.light
+            ? const Color(0xFF252A31)
+            : (Theme.of(context).textTheme.bodyMedium?.color ??
+                Theme.of(context).colorScheme.onSurface);
+    final mutedColor =
+        Theme.of(context).brightness == Brightness.light
+            ? const Color(0xFF687083)
+            : context.appColors.textMuted;
+
+    PopupMenuEntry<String> item({
+      required String value,
+      required IconData icon,
+      required String label,
+      String? shortcut,
+      bool selected = false,
+      Color? iconColor,
+    }) {
+      final resolvedColor =
+          iconColor ?? (selected ? colors.primary : textColor);
+      return PopupMenuItem<String>(
+        value: value,
+        height: 54,
+        child: Container(
+          decoration: BoxDecoration(
+            color: selected ? colors.primary.withAlpha(22) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Icon(icon, size: 23, color: resolvedColor),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? colors.primary : textColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (shortcut != null)
+                Text(
+                  shortcut,
+                  style: TextStyle(
+                    color: mutedColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return [
+      item(
+        value: '__connector:straight:line',
+        icon: Icons.horizontal_rule_rounded,
+        label: 'Line',
+        shortcut: 'L',
+      ),
+      item(
+        value: '__connector:bezier:arrow',
+        icon: Icons.arrow_outward_rounded,
+        label: 'Arrow',
+        selected: true,
+      ),
+      item(
+        value: '__connector:elbow:arrow',
+        icon: Icons.subdirectory_arrow_right_rounded,
+        label: 'Elbow arrow',
+      ),
+      item(
+        value: '__connector:straight:arrow',
+        icon: Icons.near_me_outlined,
+        label: 'Block arrow',
+      ),
+      const PopupMenuDivider(height: 16),
+      item(
+        value: '__shape:rectangle',
+        icon: Icons.crop_square_rounded,
+        label: 'Rectangle',
+        shortcut: 'R',
+      ),
+      item(
+        value: '__shape:circle',
+        icon: Icons.circle_outlined,
+        label: 'Oval',
+        shortcut: 'O',
+      ),
+      item(
+        value: '__shape:diamond',
+        icon: Icons.diamond_outlined,
+        label: 'Rhombus',
+      ),
+      item(
+        value: '__shape:triangle',
+        icon: Icons.change_history_rounded,
+        label: 'Triangle',
+      ),
+      item(value: '__divider', icon: Icons.remove_rounded, label: 'Divider'),
+      const PopupMenuDivider(height: 16),
+      item(
+        value: '__diagram',
+        icon: Icons.account_tree_outlined,
+        label: 'Diagram',
+        iconColor: colors.accentOrange,
+      ),
+    ];
+  }
+}
+
+class _BoardHistoryPanel extends StatefulWidget {
+  const _BoardHistoryPanel({required this.board, required this.onClose});
+
+  final BoardDocument board;
+  final VoidCallback onClose;
+
+  @override
+  State<_BoardHistoryPanel> createState() => _BoardHistoryPanelState();
+}
+
+class _BoardHistoryPanelState extends State<_BoardHistoryPanel> {
+  late Future<List<BoardHistoryEvent>> _eventsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _eventsFuture = _loadEvents();
+  }
+
+  @override
+  void didUpdateWidget(covariant _BoardHistoryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.board.id != widget.board.id) {
+      _eventsFuture = _loadEvents();
+    }
+  }
+
+  Future<List<BoardHistoryEvent>> _loadEvents() {
+    return context.read<BoardCubit>().historyForBoard(widget.board.id);
+  }
+
+  void _refresh() {
+    setState(() {
+      _eventsFuture = _loadEvents();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final surface = isLight ? Colors.white : colors.surfaceElevated;
+    final textColor =
+        isLight
+            ? const Color(0xFF252A31)
+            : Theme.of(context).colorScheme.onSurface;
+    final mutedColor = isLight ? const Color(0xFF687083) : colors.textMuted;
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 360,
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border.withAlpha(180)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isLight ? 28 : 110),
+              blurRadius: 24,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
+              child: Row(
+                children: [
+                  Icon(Icons.manage_history_rounded, color: colors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Board history',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh history',
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'Close history',
+                    onPressed: widget.onClose,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: colors.border.withAlpha(150)),
+            Expanded(
+              child: FutureBuilder<List<BoardHistoryEvent>>(
+                future: _eventsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final events =
+                      (snapshot.data ?? const <BoardHistoryEvent>[]).reversed
+                          .toList();
+                  if (events.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'No board changes recorded yet',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: mutedColor, fontSize: 13),
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(10),
+                    itemCount: events.length,
+                    separatorBuilder:
+                        (_, __) => Divider(
+                          height: 10,
+                          color: colors.border.withAlpha(90),
+                        ),
+                    itemBuilder:
+                        (context, index) => _BoardHistoryEventTile(
+                          event: events[index],
+                          textColor: textColor,
+                          mutedColor: mutedColor,
+                          onRestore:
+                              events[index].entityType == 'panel' &&
+                                      (events[index].before != null ||
+                                          events[index].after != null)
+                                  ? () async {
+                                    await context
+                                        .read<BoardCubit>()
+                                        .restorePanelFromEvent(
+                                          widget.board.id,
+                                          events[index].opId,
+                                        );
+                                    _refresh();
+                                  }
+                                  : null,
+                        ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardHistoryEventTile extends StatelessWidget {
+  const _BoardHistoryEventTile({
+    required this.event,
+    required this.textColor,
+    required this.mutedColor,
+    this.onRestore,
+  });
+
+  final BoardHistoryEvent event;
+  final Color textColor;
+  final Color mutedColor;
+  final VoidCallback? onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final title = _historyEventTitle(event);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: colors.primary.withAlpha(24),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              _historyEventIcon(event),
+              size: 17,
+              color: colors.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'r${event.revision} · ${_formatHistoryTime(event.timestamp)} · ${event.actorId}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: mutedColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onRestore != null) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onRestore,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 30),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('Restore'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _historyEventTitle(BoardHistoryEvent event) {
+    final snapshot = event.after ?? event.before ?? const <String, dynamic>{};
+    final rawTitle = snapshot['title'];
+    final entityTitle =
+        rawTitle is String && rawTitle.trim().isNotEmpty
+            ? rawTitle.trim()
+            : event.entityId;
+    final action = switch (event.type) {
+      'create' => 'Created',
+      'update' => 'Updated',
+      'delete' => 'Deleted',
+      'restore' => 'Restored',
+      _ =>
+        event.type.isEmpty
+            ? 'Changed'
+            : '${event.type[0].toUpperCase()}${event.type.substring(1)}',
+    };
+    return '$action $entityTitle';
+  }
+
+  static IconData _historyEventIcon(BoardHistoryEvent event) {
+    if (event.entityType == 'panel') {
+      return switch (event.type) {
+        'create' => Icons.add_box_outlined,
+        'delete' => Icons.delete_outline_rounded,
+        'restore' => Icons.restore_rounded,
+        _ => Icons.dashboard_customize_outlined,
+      };
+    }
+    if (event.entityType == 'link') return Icons.arrow_outward_rounded;
+    if (event.entityType == 'drawing') return Icons.edit_outlined;
+    return Icons.history_rounded;
+  }
+
+  static String _formatHistoryTime(DateTime timestamp) {
+    final local = timestamp.toLocal();
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(local.day)}.${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
   }
 }
 
