@@ -1,0 +1,31 @@
+services:
+  yoloitd:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.yoloitd
+    image: yoloitd:dev
+    restart: unless-stopped
+    ports:
+      - "${YOLOITD_PORT:-43110}:43110"
+    environment:
+      YOLOITD_HOST: 0.0.0.0
+      YOLOITD_PORT: 43110
+      YOLOITD_DATA_DIR: /data
+      YOLOITD_ACTOR: ${YOLOITD_ACTOR:-server}
+      YOLOITD_TOKEN: ${YOLOITD_TOKEN:?Set YOLOITD_TOKEN before starting yoloitd}
+    volumes:
+      - yoloitd-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/usr/local/bin/yoloitd_healthcheck",
+          "http://127.0.0.1:43110/api/health"
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  yoloitd-data:

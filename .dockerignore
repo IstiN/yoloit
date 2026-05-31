@@ -1,0 +1,14 @@
+.dart_tool/
+.git/
+.github/
+.idea/
+.playwright-cli/
+.run/
+.vscode/
+build/
+coverage/
+goldens/
+test/golden/failures/
+**/.DS_Store
+**/*.log
+**/node_modules/

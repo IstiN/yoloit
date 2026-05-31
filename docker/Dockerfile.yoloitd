@@ -1,4 +1,4 @@
-FROM ghcr.io/cirruslabs/flutter:3.35.3
+FROM ghcr.io/cirruslabs/flutter:3.35.3 AS build
 
 WORKDIR /app
 
@@ -10,6 +10,18 @@ RUN flutter pub get
 COPY bin ./bin
 COPY lib ./lib
 
+RUN mkdir -p /out && dart compile exe bin/yoloitd.dart -o /out/yoloitd
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /out/yoloitd /usr/local/bin/yoloitd
+RUN printf '#!/bin/sh\nif [ -n "$YOLOITD_TOKEN" ]; then\n  curl -fsS -H "Authorization: Bearer $YOLOITD_TOKEN" "$1" >/dev/null\nelse\n  curl -fsS "$1" >/dev/null\nfi\n' > /usr/local/bin/yoloitd_healthcheck \
+  && chmod +x /usr/local/bin/yoloitd_healthcheck
+
 ENV YOLOITD_HOST=0.0.0.0
 ENV YOLOITD_PORT=43110
 ENV YOLOITD_DATA_DIR=/data
@@ -17,4 +29,4 @@ ENV YOLOITD_DATA_DIR=/data
 EXPOSE 43110
 VOLUME ["/data"]
 
-CMD ["dart", "run", "bin/yoloitd.dart"]
+CMD ["/usr/local/bin/yoloitd"]

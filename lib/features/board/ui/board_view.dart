@@ -40,7 +40,12 @@ import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class BoardView extends StatefulWidget {
-  const BoardView({super.key});
+  const BoardView({super.key, this.skipOverviewPreviewCapture = false});
+
+  /// Test-only escape hatch for overview goldens. The production overview
+  /// captures live PNG previews before opening; widget tests do not always have
+  /// a real frame/image pipeline, so they can render the overview directly.
+  final bool skipOverviewPreviewCapture;
 
   @override
   State<BoardView> createState() => _BoardViewState();
@@ -1541,14 +1546,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     if (!mounted) return;
     // Load real cached PNGs from disk (from previous CLI captures or sessions).
     _loadBoardPreviewPngsFromDisk();
-    // Capture a real screenshot of the active board.
-    await _captureBoardPreviewPng(activeBoard.id);
-    if (!mounted) return;
+    if (!widget.skipOverviewPreviewCapture) {
+      // Capture a real screenshot of the active board.
+      await _captureBoardPreviewPng(activeBoard.id);
+      if (!mounted) return;
+    }
 
     // Generate synthetic previews for boards still missing a PNG
     // (instant — just canvas drawing, no widget rendering).
-    await _generateMissingBoardPreviews(activeBoard.id);
-    if (!mounted) return;
+    if (!widget.skipOverviewPreviewCapture) {
+      await _generateMissingBoardPreviews(activeBoard.id);
+      if (!mounted) return;
+    }
 
     _boardOverviewLog(
       'open.showOverlay board=${activeBoard.id} elapsed=${watch.elapsedMilliseconds}ms',
@@ -1563,7 +1572,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     // Refresh previews with real screenshots in the background.
     // The overview is already visible with synthetic/cached previews —
     // as each real screenshot arrives, the card updates live.
-    _refreshBoardPreviewsInBackground(activeBoard.id);
+    if (!widget.skipOverviewPreviewCapture) {
+      _refreshBoardPreviewsInBackground(activeBoard.id);
+    }
   }
 
   Matrix4 _matrixFromViewport(BoardViewport viewport) {

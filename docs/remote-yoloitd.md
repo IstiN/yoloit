@@ -71,6 +71,18 @@ docker run --rm -p 43110:43110 \
   yoloitd:dev
 ```
 
+The image is a small runtime image: the Flutter/Dart SDK is used only in the
+build stage, and the final container runs the compiled `yoloitd` executable.
+
+For a deployable mini-server setup, copy `docker/yoloitd.env.example`, set a
+strong token, and start the compose stack:
+
+```bash
+cp docker/yoloitd.env.example docker/yoloitd.env
+$EDITOR docker/yoloitd.env
+docker compose --env-file docker/yoloitd.env -f docker/compose.yoloitd.yml up -d --build
+```
+
 For Codespaces, expose/forward port `43110`, then connect from the local YoLoIT
 CLI or desktop client using the forwarded URL and token.
 
