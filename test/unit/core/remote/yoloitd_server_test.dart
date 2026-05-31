@@ -75,6 +75,126 @@ void main() {
     expect(bounds['width'], 120);
     expect(bounds['height'], 120);
   });
+
+  test('server accepts full board snapshots from UI clients', () async {
+    final dir = await Directory.systemTemp.createTemp('yoloitd_snapshot_');
+    addTearDown(() => dir.delete(recursive: true));
+    final server = YoloitdServer(
+      store: YoloitdStore(rootDir: dir, actorId: 'test'),
+      port: 0,
+      token: 'secret',
+    );
+    await server.start();
+    addTearDown(server.stop);
+
+    final created = await _json(
+      server.boundPort!,
+      'POST',
+      '/api/boards',
+      token: 'secret',
+      body: {'name': 'Snapshot'},
+    );
+    final board = created.body['board'] as Map<String, dynamic>;
+
+    final updated = await _json(
+      server.boundPort!,
+      'PUT',
+      '/api/boards/${board['id']}',
+      token: 'secret',
+      body: {
+        'name': 'Snapshot updated',
+        'viewport': {
+          'scale': 0.75,
+          'translation': [12, 18],
+        },
+        'panels': [
+          {
+            'id': 'shape-1',
+            'type': 'board.shape',
+            'title': 'Shape',
+            'bounds': {'x': 10, 'y': 20, 'width': 260, 'height': 180},
+            'state': {'shape': 'diamond'},
+            'params': {},
+          },
+        ],
+        'links': [
+          {
+            'id': 'link-1',
+            'fromPanelId': 'shape-1',
+            'toPanelId': 'shape-1',
+            'style': 'line',
+            'behavior': 'fixed',
+            'geometry': 'bezier',
+            'color': 4284506202,
+          },
+        ],
+        'drawings': <Object?>[],
+        'metadata': {'version': 2},
+      },
+    );
+
+    expect(updated.body['ok'], isTrue);
+    final full = await _json(
+      server.boundPort!,
+      'GET',
+      '/api/boards/${board['id']}',
+      token: 'secret',
+    );
+    expect(full.body['name'], 'Snapshot updated');
+    expect((full.body['panels'] as List), hasLength(1));
+    expect(((full.body['panels'] as List).single as Map)['title'], 'Shape');
+    expect((full.body['links'] as List), hasLength(1));
+  });
+
+  test('server rejects stale full board snapshots', () async {
+    final dir = await Directory.systemTemp.createTemp('yoloitd_conflict_');
+    addTearDown(() => dir.delete(recursive: true));
+    final server = YoloitdServer(
+      store: YoloitdStore(rootDir: dir, actorId: 'test'),
+      port: 0,
+      token: 'secret',
+    );
+    await server.start();
+    addTearDown(server.stop);
+
+    final created = await _json(
+      server.boundPort!,
+      'POST',
+      '/api/boards',
+      token: 'secret',
+      body: {'name': 'Conflict'},
+    );
+    final board = created.body['board'] as Map<String, dynamic>;
+    await _json(
+      server.boundPort!,
+      'POST',
+      '/api/boards/${board['id']}/panels',
+      token: 'secret',
+      body: {'id': 'shape-1', 'type': 'board.shape', 'title': 'Shape'},
+    );
+
+    final stale = await _request(
+      server.boundPort!,
+      'PUT',
+      '/api/boards/${board['id']}',
+      token: 'secret',
+      body: {
+        'expectedRevision': 0,
+        'panels': [
+          {
+            'id': 'shape-1',
+            'type': 'board.shape',
+            'title': 'Stale Shape',
+            'bounds': {'x': 10, 'y': 20, 'width': 260, 'height': 180},
+          },
+        ],
+      },
+    );
+
+    expect(stale.status, 409);
+    final body = jsonDecode(stale.body) as Map<String, dynamic>;
+    expect(body['currentRevision'], 1);
+  });
 }
 
 Future<({int status, String body})> _request(

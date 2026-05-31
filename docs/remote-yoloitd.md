@@ -12,6 +12,8 @@ Current MVP scope:
 - `board:undo`
 - simple run process API
 - token auth
+- desktop UI connection to remote board groups
+- optimistic board revision checks for multi-user writes
 - tiny browser dashboard at `/`
 
 ## Run Locally
@@ -41,6 +43,24 @@ YOLOIT_REMOTE_TOKEN=dev-token \
 tools/yoloit boards
 ```
 
+## Connect From The Desktop UI
+
+1. Start `yoloitd` locally, in Docker, or on a remote machine.
+2. Open the YoLoIT desktop app.
+3. Click `Remote` in the board toolbar, or open the board actions menu and
+   choose `Connect remote YoLoIT`.
+4. Enter the daemon URL, for example `http://127.0.0.1:43110`, and the token if
+   one is configured.
+
+Remote boards are shown in the board overview under `Remote boards`. They can be
+opened and edited like local boards. Before the overview opens, the app refreshes
+remote board snapshots from `yoloitd`.
+
+Remote writes use optimistic revision checks. If another client has already
+updated the same board, `yoloitd` rejects the stale write with `409`, and the
+desktop app refreshes the board from the server instead of overwriting the newer
+remote state.
+
 ## Docker
 
 ```bash
@@ -53,6 +73,25 @@ docker run --rm -p 43110:43110 \
 
 For Codespaces, expose/forward port `43110`, then connect from the local YoLoIT
 CLI or desktop client using the forwarded URL and token.
+
+For a remote Linux host:
+
+```bash
+docker run -d --restart unless-stopped \
+  --name yoloitd \
+  -p 43110:43110 \
+  -e YOLOITD_TOKEN='<strong-token>' \
+  -v yoloitd-data:/data \
+  yoloitd:dev
+```
+
+Use SSH port forwarding if the daemon should not be exposed publicly:
+
+```bash
+ssh -L 43110:127.0.0.1:43110 user@remote-host
+```
+
+Then connect the desktop UI to `http://127.0.0.1:43110`.
 
 ## Storage
 
@@ -69,6 +108,10 @@ boards_history/
 used for history/undo. This mirrors the direction described in
 `docs/board-architecture.md`: checkpoints are fast local state, and events are
 the long-term sync primitive.
+
+For multi-user editing, `metadata.historyRevision` is the server-side board
+revision. UI clients store the last seen remote revision in local board metadata
+and include it as `expectedRevision` when saving a remote board snapshot.
 
 ## API
 
@@ -100,3 +143,6 @@ When `--token`/`YOLOITD_TOKEN` is set, requests must include:
 ```text
 Authorization: Bearer <token>
 ```
+
+`PUT /api/boards/:id` accepts full board snapshots. When the request includes
+`expectedRevision`, the daemon returns `409` if the server has a newer revision.

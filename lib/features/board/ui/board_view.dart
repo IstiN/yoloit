@@ -13,6 +13,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
@@ -196,6 +197,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                 _BoardToolbar(
                   board: activeBoard,
                   onCreateBoard: () => _createBoard(context),
+                  onConnectRemote: () => _connectRemoteYoloit(context),
                   onBoardSettings:
                       () => _showBoardSettings(context, activeBoard),
                   onDeleteBoard: () => _deleteBoard(context, activeBoard),
@@ -1531,6 +1533,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _boardOverviewLog(
       'open.request board=${activeBoard.id} boards=${context.read<BoardCubit>().state.boards.length}',
     );
+    try {
+      await context.read<BoardCubit>().refreshRemoteBoards();
+    } catch (error) {
+      _boardOverviewLog('open.remoteRefresh.error $error');
+    }
+    if (!mounted) return;
     // Load real cached PNGs from disk (from previous CLI captures or sessions).
     _loadBoardPreviewPngsFromDisk();
     // Capture a real screenshot of the active board.
@@ -2395,6 +2403,33 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     await context.read<BoardCubit>().createBoard(name: name);
   }
 
+  Future<void> _connectRemoteYoloit(BuildContext context) async {
+    final result = await showDialog<_RemoteYoloitConnection>(
+      context: context,
+      builder: (_) => const _ConnectRemoteYoloitDialog(),
+    );
+    if (!context.mounted || result == null) return;
+    try {
+      final boards = await context.read<BoardCubit>().connectRemoteBoards(
+        url: result.url,
+        token: result.token,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Connected ${boards.length} remote board${boards.length == 1 ? '' : 's'}',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Remote YoLoIT connection failed: $error')),
+      );
+    }
+  }
+
   Future<void> _showBoardSettings(
     BuildContext context,
     BoardDocument board,
@@ -2846,10 +2881,96 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 }
 
+class _RemoteYoloitConnection {
+  const _RemoteYoloitConnection({required this.url, this.token});
+
+  final String url;
+  final String? token;
+}
+
+class _ConnectRemoteYoloitDialog extends StatefulWidget {
+  const _ConnectRemoteYoloitDialog();
+
+  @override
+  State<_ConnectRemoteYoloitDialog> createState() =>
+      _ConnectRemoteYoloitDialogState();
+}
+
+class _ConnectRemoteYoloitDialogState
+    extends State<_ConnectRemoteYoloitDialog> {
+  final _url = TextEditingController(text: 'http://127.0.0.1:43110');
+  final _token = TextEditingController();
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _token.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final url = _url.text.trim();
+    if (url.isEmpty) return;
+    Navigator.of(context).pop(
+      _RemoteYoloitConnection(
+        url: url,
+        token: _token.text.trim().isEmpty ? null : _token.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Connect remote YoLoIT'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _url,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Remote URL',
+                hintText: 'http://host:43110',
+              ),
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _token,
+              decoration: const InputDecoration(
+                labelText: 'Token',
+                hintText: 'Optional bearer token',
+              ),
+              obscureText: true,
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.cloud_outlined),
+          label: const Text('Connect'),
+        ),
+      ],
+    );
+  }
+}
+
 class _BoardToolbar extends StatelessWidget {
   const _BoardToolbar({
     required this.board,
     required this.onCreateBoard,
+    required this.onConnectRemote,
     required this.onBoardSettings,
     required this.onDeleteBoard,
     required this.onOpenBoardOverview,
@@ -2858,6 +2979,7 @@ class _BoardToolbar extends StatelessWidget {
 
   final BoardDocument board;
   final VoidCallback onCreateBoard;
+  final VoidCallback onConnectRemote;
   final VoidCallback onBoardSettings;
   final VoidCallback onDeleteBoard;
   final VoidCallback onOpenBoardOverview;
@@ -2964,6 +3086,8 @@ class _BoardToolbar extends StatelessWidget {
                     switch (value) {
                       case 'new':
                         onCreateBoard();
+                      case 'remote':
+                        onConnectRemote();
                       case 'settings':
                         onBoardSettings();
                       case 'delete':
@@ -2973,6 +3097,10 @@ class _BoardToolbar extends StatelessWidget {
                   itemBuilder:
                       (context) => const [
                         PopupMenuItem(value: 'new', child: Text('New board')),
+                        PopupMenuItem(
+                          value: 'remote',
+                          child: Text('Connect remote YoLoIT'),
+                        ),
                         PopupMenuItem(
                           value: 'settings',
                           child: Text('Settings'),
@@ -2985,6 +3113,11 @@ class _BoardToolbar extends StatelessWidget {
                   tooltip: 'New board',
                   onPressed: onCreateBoard,
                   icon: const Icon(Icons.add),
+                ),
+                IconButton(
+                  tooltip: 'Connect remote YoLoIT',
+                  onPressed: onConnectRemote,
+                  icon: const Icon(Icons.cloud_outlined),
                 ),
                 IconButton(
                   tooltip: 'Board settings',
@@ -3002,6 +3135,13 @@ class _BoardToolbar extends StatelessWidget {
                   onPressed: onCreateBoard,
                   icon: const Icon(Icons.add),
                   label: const Text('New board'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  style: _toolbarButtonStyle(),
+                  onPressed: onConnectRemote,
+                  icon: const Icon(Icons.cloud_outlined),
+                  label: const Text('Remote'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
@@ -3186,6 +3326,7 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
 
   Future<void> _selectBoard(String boardId) async {
     if (_closing) return;
+    final boards = _orderedBoards;
     final watch = Stopwatch()..start();
     widget.debugLog(
       'select.tap board=$boardId active=${widget.activeBoardId} '
@@ -3205,7 +3346,7 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
       'select.reverseDone board=$boardId elapsed=${watch.elapsedMilliseconds}ms',
     );
     if (!mounted) return;
-    final selected = widget.boards.firstWhere((board) => board.id == boardId);
+    final selected = boards.firstWhere((board) => board.id == boardId);
     widget.debugLog(
       'select.callback board=$boardId elapsed=${watch.elapsedMilliseconds}ms',
     );
@@ -3227,14 +3368,24 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
     if (mounted) widget.onCreateBoard();
   }
 
+  List<BoardDocument> get _orderedBoards {
+    final localBoards =
+        widget.boards.where((board) => !isRemoteBoard(board)).toList();
+    final remoteBoards =
+        widget.boards.where((board) => isRemoteBoard(board)).toList();
+    return <BoardDocument>[...localBoards, ...remoteBoards];
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final boards = _orderedBoards;
+        final firstRemoteIndex = boards.indexWhere(isRemoteBoard);
         final layout = _BoardOverviewGridLayout.compute(
           size: Size(constraints.maxWidth, constraints.maxHeight),
-          itemCount: widget.boards.length + 1,
+          itemCount: boards.length + 1,
         );
         final layoutSignature =
             '${constraints.maxWidth.toStringAsFixed(1)}x${constraints.maxHeight.toStringAsFixed(1)}:'
@@ -3278,8 +3429,27 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
               ),
             ];
 
-            for (var i = 0; i < widget.boards.length; i++) {
-              final board = widget.boards[i];
+            if (boards.isNotEmpty) {
+              widgets.add(
+                _BoardOverviewSectionLabel(
+                  rect: layout.rectFor(0),
+                  label: 'Local boards',
+                  opacity: fade,
+                ),
+              );
+            }
+            if (firstRemoteIndex >= 0) {
+              widgets.add(
+                _BoardOverviewSectionLabel(
+                  rect: layout.rectFor(firstRemoteIndex),
+                  label: 'Remote boards',
+                  opacity: fade,
+                ),
+              );
+            }
+
+            for (var i = 0; i < boards.length; i++) {
+              final board = boards[i];
               final endRect = layout.rectFor(i);
               final isZoomBoard = board.id == _zoomBoardId;
               final startRect =
@@ -3334,7 +3504,7 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
               );
             }
 
-            final createRect = layout.rectFor(widget.boards.length);
+            final createRect = layout.rectFor(boards.length);
             widgets.add(
               Positioned.fromRect(
                 rect:
@@ -3537,6 +3707,48 @@ class _BoardOverviewGridLayout {
   }
 }
 
+class _BoardOverviewSectionLabel extends StatelessWidget {
+  const _BoardOverviewSectionLabel({
+    required this.rect,
+    required this.label,
+    required this.opacity,
+  });
+
+  final Rect rect;
+  final String label;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Positioned(
+      left: rect.left,
+      top: math.max(10, rect.top - 32),
+      child: Opacity(
+        opacity: opacity,
+        child: Container(
+          height: 24,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: colors.surface.withAlpha(220),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.border),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: colors.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BoardOverviewCard extends StatelessWidget {
   const _BoardOverviewCard({
     required this.board,
@@ -3559,6 +3771,7 @@ class _BoardOverviewCard extends StatelessWidget {
     final mutedColor =
         Theme.of(context).textTheme.bodySmall?.color ??
         Theme.of(context).colorScheme.onSurface;
+    final remote = remoteInfoForBoard(board);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -3607,6 +3820,17 @@ class _BoardOverviewCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
+                        if (remote != null) ...[
+                          Tooltip(
+                            message: remote.url,
+                            child: Icon(
+                              Icons.cloud_outlined,
+                              size: 14,
+                              color: mutedColor,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
                         Text(
                           '${board.panels.length}',
                           style: TextStyle(color: mutedColor, fontSize: 11),

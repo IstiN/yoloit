@@ -134,18 +134,24 @@ class YoloitdServer {
     }
     if (sub.length == 1 && method == 'PUT') {
       final body = await _body(request);
+      final expectedRevision = _expectedRevision(body);
+      if (_isSnapshotUpdate(body) &&
+          expectedRevision != null &&
+          expectedRevision != board.historyRevision) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'board revision conflict',
+          'expectedRevision': expectedRevision,
+          'currentRevision': board.historyRevision,
+          'board': board.toJson(),
+        }, 409);
+      }
       final result = await store.updateBoard(
         board.id,
-        (current) => current.copyWith(
-          name: body['name'] as String? ?? current.name,
-          metadata:
-              body.containsKey('defaultFolder')
-                  ? <String, dynamic>{
-                    ...current.metadata,
-                    'defaultFolder': body['defaultFolder'] as String? ?? '',
-                  }
-                  : current.metadata,
-        ),
+        (current) => _updatedBoardFromBody(current, body),
+        historyEvent:
+            (before, after, revision) =>
+                _snapshotPanelHistoryEvent(before, after, revision),
       );
       return _json(<String, Object?>{
         'ok': true,
@@ -199,6 +205,147 @@ class YoloitdServer {
       return _json(<String, Object?>{'links': board.links});
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  static bool _isSnapshotUpdate(Map<String, dynamic> body) {
+    return body.containsKey('panels') ||
+        body.containsKey('links') ||
+        body.containsKey('drawings') ||
+        body.containsKey('viewport');
+  }
+
+  static int? _expectedRevision(Map<String, dynamic> body) {
+    final explicit = body['expectedRevision'];
+    if (explicit is num) return explicit.toInt();
+    final metadata = body['metadata'];
+    if (metadata is Map) {
+      final revision = metadata['historyRevision'];
+      if (revision is num) return revision.toInt();
+    }
+    return null;
+  }
+
+  static RemoteBoard _updatedBoardFromBody(
+    RemoteBoard current,
+    Map<String, dynamic> body,
+  ) {
+    var metadata =
+        body['metadata'] is Map
+            ? Map<String, dynamic>.from(body['metadata'] as Map)
+            : current.metadata;
+    if (body.containsKey('defaultFolder')) {
+      metadata = <String, dynamic>{
+        ...metadata,
+        'defaultFolder': body['defaultFolder'] as String? ?? '',
+      };
+    }
+    return current.copyWith(
+      name: body['name'] as String? ?? current.name,
+      viewport:
+          body['viewport'] is Map
+              ? Map<String, dynamic>.from(body['viewport'] as Map)
+              : current.viewport,
+      panels:
+          body['panels'] is List
+              ? (body['panels'] as List)
+                  .whereType<Map<Object?, Object?>>()
+                  .map(
+                    (entry) =>
+                        RemotePanel.fromJson(Map<String, dynamic>.from(entry)),
+                  )
+                  .toList()
+              : current.panels,
+      links:
+          body['links'] is List
+              ? (body['links'] as List)
+                  .whereType<Map<Object?, Object?>>()
+                  .map((entry) => Map<String, dynamic>.from(entry))
+                  .toList()
+              : current.links,
+      drawings:
+          body['drawings'] is List
+              ? (body['drawings'] as List)
+                  .whereType<Map<Object?, Object?>>()
+                  .map((entry) => Map<String, dynamic>.from(entry))
+                  .toList()
+              : current.drawings,
+      metadata: metadata,
+    );
+  }
+
+  RemoteHistoryEvent _snapshotPanelHistoryEvent(
+    RemoteBoard before,
+    RemoteBoard after,
+    int revision,
+  ) {
+    final beforeById = {for (final panel in before.panels) panel.id: panel};
+    final afterById = {for (final panel in after.panels) panel.id: panel};
+
+    for (final entry in afterById.entries) {
+      final beforePanel = beforeById[entry.key];
+      if (beforePanel == null) {
+        return _historyEvent(
+          boardId: before.id,
+          type: 'panel.created',
+          entityId: entry.key,
+          revision: revision,
+          after: entry.value.toJson(),
+        );
+      }
+      if (jsonEncode(beforePanel.toJson()) !=
+          jsonEncode(entry.value.toJson())) {
+        return _historyEvent(
+          boardId: before.id,
+          type: 'panel.updated',
+          entityId: entry.key,
+          revision: revision,
+          before: beforePanel.toJson(),
+          after: entry.value.toJson(),
+        );
+      }
+    }
+
+    for (final entry in beforeById.entries) {
+      if (afterById.containsKey(entry.key)) continue;
+      return _historyEvent(
+        boardId: before.id,
+        type: 'panel.deleted',
+        entityId: entry.key,
+        revision: revision,
+        before: entry.value.toJson(),
+      );
+    }
+
+    return _historyEvent(
+      boardId: before.id,
+      type: 'board.updated',
+      entityId: before.id,
+      entityType: 'board',
+      revision: revision,
+    );
+  }
+
+  RemoteHistoryEvent _historyEvent({
+    required String boardId,
+    required String type,
+    required String entityId,
+    required int revision,
+    String entityType = 'panel',
+    Map<String, dynamic>? before,
+    Map<String, dynamic>? after,
+  }) {
+    return RemoteHistoryEvent(
+      opId: _nextId('op'),
+      boardId: boardId,
+      type: type,
+      entityType: entityType,
+      entityId: entityId,
+      actorId: store.actorId,
+      timestamp: DateTime.now().toUtc(),
+      revision: revision,
+      before: before,
+      after: after,
+    );
   }
 
   Future<shelf.Response> _handlePanels(

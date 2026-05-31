@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
@@ -28,6 +29,7 @@ class BoardCubit extends Cubit<BoardState> {
 
   final BoardHistoryStore _historyStore;
   final String _actorId;
+  bool _suppressRemoteSync = false;
 
   Future<void> load() async {
     if (state.isLoaded) return;
@@ -106,6 +108,73 @@ class BoardCubit extends Cubit<BoardState> {
     final updated = [...current, board];
     await _setBoards(updated, activeBoardId: board.id);
     return board;
+  }
+
+  Future<List<BoardDocument>> connectRemoteBoards({
+    required String url,
+    String? token,
+  }) async {
+    final client = YoloitRemoteClient(baseUrl: url, token: token);
+    await client.health();
+    final summaries = await client.listBoards();
+    final remoteBoards = <BoardDocument>[];
+    for (final summary in summaries) {
+      final id = summary['id'] as String?;
+      if (id == null || id.trim().isEmpty) continue;
+      remoteBoards.add(await client.fetchBoard(id));
+    }
+    if (remoteBoards.isEmpty) {
+      remoteBoards.add(await client.createBoard('Remote Board'));
+    }
+
+    final remoteIds = remoteBoards.map((board) => board.id).toSet();
+    final retained =
+        state.boards.where((board) {
+          final remote = remoteInfoForBoard(board);
+          if (remote == null) return true;
+          if (remote.url != client.baseUri.toString()) return true;
+          return remoteIds.contains(board.id);
+        }).toList();
+    final merged = <BoardDocument>[
+      ...retained.where((board) => !remoteIds.contains(board.id)),
+      ...remoteBoards,
+    ];
+    _suppressRemoteSync = true;
+    try {
+      await _setBoards(merged, activeBoardId: remoteBoards.first.id);
+    } finally {
+      _suppressRemoteSync = false;
+    }
+    return remoteBoards;
+  }
+
+  Future<void> refreshRemoteBoards({String? url}) async {
+    final remoteBoards =
+        state.boards.where((board) {
+          final remote = remoteInfoForBoard(board);
+          if (remote == null) return false;
+          return url == null || remote.url == url;
+        }).toList();
+    if (remoteBoards.isEmpty) return;
+
+    final refreshed = <String, BoardDocument>{};
+    for (final board in remoteBoards) {
+      final remote = remoteInfoForBoard(board)!;
+      final client = YoloitRemoteClient(
+        baseUrl: remote.url,
+        token: remote.token,
+      );
+      refreshed[board.id] = await client.fetchBoard(remote.boardId);
+    }
+    final next = state.boards
+        .map((board) => refreshed[board.id] ?? board)
+        .toList(growable: false);
+    _suppressRemoteSync = true;
+    try {
+      await _setBoards(next, activeBoardId: state.activeBoardId);
+    } finally {
+      _suppressRemoteSync = false;
+    }
   }
 
   Future<List<BoardHistoryEvent>> historyForBoard(String boardId) {
@@ -1061,6 +1130,7 @@ class BoardCubit extends Cubit<BoardState> {
     List<BoardDocument> boards, {
     required String? activeBoardId,
   }) async {
+    final previousBoards = state.boards;
     emit(
       state.copyWith(
         boards: boards,
@@ -1069,6 +1139,77 @@ class BoardCubit extends Cubit<BoardState> {
       ),
     );
     await _persist(boards: boards, activeBoardId: activeBoardId);
+    if (!_suppressRemoteSync) {
+      final changedRemoteBoards = _changedRemoteBoards(
+        previousBoards: previousBoards,
+        nextBoards: boards,
+      );
+      if (changedRemoteBoards.isNotEmpty) {
+        await _syncRemoteBoards(
+          changedRemoteBoards,
+          currentBoards: boards,
+          activeBoardId: activeBoardId,
+        );
+      }
+    }
+  }
+
+  List<BoardDocument> _changedRemoteBoards({
+    required List<BoardDocument> previousBoards,
+    required List<BoardDocument> nextBoards,
+  }) {
+    final previousById = {for (final board in previousBoards) board.id: board};
+    return nextBoards
+        .where((board) {
+          if (remoteInfoForBoard(board) == null) return false;
+          final previous = previousById[board.id];
+          if (previous == null) return false;
+          return jsonEncode(previous.toJson()) != jsonEncode(board.toJson());
+        })
+        .toList(growable: false);
+  }
+
+  Future<void> _syncRemoteBoards(
+    List<BoardDocument> boards, {
+    required List<BoardDocument> currentBoards,
+    required String? activeBoardId,
+  }) async {
+    final replacements = <String, BoardDocument>{};
+    for (final board in boards) {
+      final remote = remoteInfoForBoard(board);
+      if (remote == null) continue;
+      try {
+        final synced = await YoloitRemoteClient(
+          baseUrl: remote.url,
+          token: remote.token,
+        ).putBoard(board);
+        replacements[board.id] = synced;
+      } catch (error) {
+        if (error is YoloitRemoteException && error.statusCode == 409) {
+          replacements[board.id] = await YoloitRemoteClient(
+            baseUrl: remote.url,
+            token: remote.token,
+          ).fetchBoard(remote.boardId);
+          debugPrint(
+            '[BoardCubit] refreshed stale remote board ${board.id} after revision conflict',
+          );
+          continue;
+        }
+        debugPrint(
+          '[BoardCubit] failed to sync remote board ${board.id}: $error',
+        );
+      }
+    }
+    if (replacements.isEmpty) return;
+    final nextBoards = currentBoards
+        .map((board) => replacements[board.id] ?? board)
+        .toList(growable: false);
+    _suppressRemoteSync = true;
+    try {
+      await _setBoards(nextBoards, activeBoardId: activeBoardId);
+    } finally {
+      _suppressRemoteSync = false;
+    }
   }
 
   Future<void> _persist({
