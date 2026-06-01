@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -9,6 +8,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 
 export 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart'
     show PlaylistPlayerRegistry;
@@ -496,34 +496,21 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   }
 
   Future<void> _addTracks() async {
-    final result = await FilePicker.pickFiles(
-      allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: [
-        'mp3',
-        'wav',
-        'flac',
-        'aac',
-        'm4a',
-        'ogg',
-        'mp4',
-        'mov',
-        'avi',
-        'mkv',
-        'webm',
-        'm4v',
-      ],
+    final result = await BoardFilePicker.pickFiles(
+      context,
+      remoteInfo: widget.renderContext.remoteInfo,
+      title: 'Add tracks',
     );
-    if (result == null || result.files.isEmpty) return;
+    if (result == null || result.isEmpty) return;
     final existing = _tracks;
     final existingPaths = existing.map((t) => t['path']).toSet();
     final newTracks =
-        result.files
-            .where((f) => f.path != null && !existingPaths.contains(f.path))
+        result
+            .where((f) => !existingPaths.contains(f.path))
             .map(
               (f) => {
                 'id': '${DateTime.now().millisecondsSinceEpoch}${f.name}',
-                'path': f.path!,
+                'path': f.path,
                 'name': f.name,
               },
             )

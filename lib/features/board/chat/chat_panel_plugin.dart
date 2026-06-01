@@ -50,6 +50,7 @@ class ChatPanelPlugin extends BoardPanelPlugin {
       panel: panel,
       onUpdateState: renderContext.onUpdateState,
       onCreateLinkedPanel: renderContext.onCreateLinkedPanel,
+      remoteInfo: renderContext.remoteInfo,
     );
   }
 }

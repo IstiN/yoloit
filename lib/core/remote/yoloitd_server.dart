@@ -71,7 +71,7 @@ class YoloitdServer {
         return _handleBoards(request, method, path.skip(2).toList());
       }
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'files') {
-        return _handleFiles(request, method);
+        return _handleFiles(request, method, path.skip(2).toList());
       }
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'runs') {
         return _handleRuns(request, method, path.skip(2).toList());
@@ -213,14 +213,41 @@ class YoloitdServer {
   Future<shelf.Response> _handleFiles(
     shelf.Request request,
     String method,
+    List<String> sub,
   ) async {
-    if (method != 'GET') {
-      return _json(<String, Object?>{
-        'ok': false,
-        'error': 'method not allowed',
-      }, 405);
+    if (sub.isEmpty && method == 'GET') {
+      return _listFiles(request.url.queryParameters['path']?.trim());
     }
-    final requested = request.url.queryParameters['path']?.trim();
+    if (sub.length == 1 && sub[0] == 'directories' && method == 'POST') {
+      final body = await _body(request);
+      final parentPath = (body['parentPath'] as String? ?? '').trim();
+      final name = (body['name'] as String? ?? '').trim();
+      if (!_validDirectoryName(name)) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'invalid directory name',
+        }, 400);
+      }
+      final parent = Directory(
+        parentPath.isEmpty ? store.rootDir.path : parentPath,
+      );
+      if (!await parent.exists()) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'parent directory not found',
+          'path': parent.path,
+        }, 404);
+      }
+      await Directory('${parent.path}${Platform.pathSeparator}$name').create();
+      return _listFiles(parent.path);
+    }
+    return _json(<String, Object?>{
+      'ok': false,
+      'error': 'method not allowed',
+    }, 405);
+  }
+
+  Future<shelf.Response> _listFiles(String? requested) async {
     final directory = Directory(
       requested == null || requested.isEmpty ? store.rootDir.path : requested,
     );
@@ -264,6 +291,13 @@ class YoloitdServer {
       'roots': _fileRoots(),
       'entries': entries,
     });
+  }
+
+  static bool _validDirectoryName(String name) {
+    if (name.isEmpty || name == '.' || name == '..') return false;
+    return !name.contains('/') &&
+        !name.contains('\\') &&
+        !name.contains('\x00');
   }
 
   List<Map<String, Object?>> _fileRoots() {

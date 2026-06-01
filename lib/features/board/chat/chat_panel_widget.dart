@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +9,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -31,6 +31,7 @@ import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
@@ -110,10 +111,12 @@ class ChatPanelWidget extends StatefulWidget {
     required this.panel,
     required this.onUpdateState,
     this.onCreateLinkedPanel,
+    this.remoteInfo,
   });
 
   final BoardPanelInstance panel;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
+  final RemoteBoardInfo? remoteInfo;
   final Future<String?> Function(
     String typeId,
     Map<String, dynamic> state,
@@ -1604,6 +1607,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       panelId: widget.panel.id,
       config: _config,
       models: _provider.availableModels,
+      remoteInfo: widget.remoteInfo,
       onStart: (config) {
         setState(() {
           // Update session config — it handles provider swap internally
@@ -3719,12 +3723,14 @@ class _ChatSetupView extends StatefulWidget {
     required this.panelId,
     required this.config,
     required this.models,
+    this.remoteInfo,
     required this.onStart,
   });
 
   final String panelId;
   final ChatSessionConfig config;
   final List<ChatModelInfo> models;
+  final RemoteBoardInfo? remoteInfo;
   final ValueChanged<ChatSessionConfig> onStart;
 
   @override
@@ -4200,8 +4206,11 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
               Expanded(
                 child: GestureDetector(
                   onTap: () async {
-                    final dir = await FilePicker.getDirectoryPath(
-                      dialogTitle: 'Select working directory',
+                    final dir = await BoardFilePicker.pickDirectory(
+                      context,
+                      remoteInfo: widget.remoteInfo,
+                      initialPath: _dirCtrl.text,
+                      title: 'Select working directory',
                     );
                     if (!mounted) return;
                     if (dir != null) {

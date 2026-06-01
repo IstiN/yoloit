@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/cli/cli_server.dart';
@@ -27,6 +26,7 @@ import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/history/board_history_store.dart';
 import 'package:yoloit/features/board/plugins/builtin/custom_widget_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
 import 'package:yoloit/features/collaboration/desktop/repo_directory_listing.dart';
@@ -443,8 +443,11 @@ class App extends StatelessWidget {
                   path.substring(1)
               : path;
     } else {
-      dir = await FilePicker.getDirectoryPath(
-        dialogTitle: 'Add folder to "${node.workspace.name}"',
+      final dialogContext = navigatorKey.currentContext;
+      if (dialogContext == null) return;
+      dir = await BoardFilePicker.pickDirectory(
+        dialogContext,
+        title: 'Add folder to "${node.workspace.name}"',
       );
     }
     if (dir == null) return;
@@ -544,8 +547,9 @@ class App extends StatelessWidget {
       controller.dispose();
       if (pickedName == null || pickedName.isEmpty) return;
 
-      final pickedFolder = await FilePicker.getDirectoryPath(
-        dialogTitle: 'Pick a folder for "$pickedName"',
+      final pickedFolder = await BoardFilePicker.pickDirectory(
+        dialogContext,
+        title: 'Pick a folder for "$pickedName"',
       );
       if (pickedFolder == null) return;
       name = pickedName;

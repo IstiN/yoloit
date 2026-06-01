@@ -1,7 +1,7 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 
@@ -551,8 +551,10 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
   }
 
   Future<void> _browse() async {
-    final dir = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Select Worktree Directory',
+    final dir = await BoardFilePicker.pickDirectory(
+      context,
+      initialPath: _pathController.text,
+      title: 'Select Worktree Directory',
     );
     if (dir != null && mounted) {
       _pathController.text = dir;

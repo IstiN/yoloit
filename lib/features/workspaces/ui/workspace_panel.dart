@@ -1,9 +1,10 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/utils/git_init_prompt.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/runs/bloc/run_state.dart';
@@ -20,7 +21,6 @@ import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/data/workspace_secrets_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
 import 'package:yoloit/features/workspaces/ui/worktree_section.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/workspaces/ui/workspace_inline_tree.dart';
 
 class WorkspacePanel extends StatefulWidget {
@@ -204,8 +204,9 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     if (name == null || !context.mounted) return;
 
     // Step 2: pick at least one folder
-    final folder = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Add Folder to "$name"',
+    final folder = await BoardFilePicker.pickDirectory(
+      context,
+      title: 'Add Folder to "$name"',
     );
     if (folder == null || !context.mounted) return;
 
@@ -225,8 +226,9 @@ class WorkspacePanelState extends State<WorkspacePanel> {
         isDestructive: false,
       );
       if (!addMore || !context.mounted) break;
-      final extra = await FilePicker.getDirectoryPath(
-        dialogTitle: 'Add Folder to "$name"',
+      final extra = await BoardFilePicker.pickDirectory(
+        context,
+        title: 'Add Folder to "$name"',
       );
       if (extra == null || !context.mounted) break;
       await maybePromptGitInit(context, extra);
@@ -335,8 +337,9 @@ class WorkspacePanelState extends State<WorkspacePanel> {
     BuildContext context,
     String workspaceId,
   ) async {
-    final result = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Add Folder to Workspace',
+    final result = await BoardFilePicker.pickDirectory(
+      context,
+      title: 'Add Folder to Workspace',
     );
     if (result == null || !context.mounted) return;
     await maybePromptGitInit(context, result);

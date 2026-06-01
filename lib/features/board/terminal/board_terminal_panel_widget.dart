@@ -1,13 +1,14 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
@@ -22,10 +23,12 @@ class BoardTerminalPanelWidget extends StatefulWidget {
     super.key,
     required this.panel,
     required this.onUpdateState,
+    this.remoteInfo,
   });
 
   final BoardPanelInstance panel;
   final ValueChanged<Map<String, dynamic>> onUpdateState;
+  final RemoteBoardInfo? remoteInfo;
 
   @override
   State<BoardTerminalPanelWidget> createState() =>
@@ -476,7 +479,10 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     if (!_config.isConfigured) {
-      return _BoardTerminalSetupView(onStart: _startSession);
+      return _BoardTerminalSetupView(
+        onStart: _startSession,
+        remoteInfo: widget.remoteInfo,
+      );
     }
     if (_restoring) {
       return Center(child: CircularProgressIndicator(color: colors.primary));
@@ -654,7 +660,7 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
 }
 
 class _BoardTerminalSetupView extends StatefulWidget {
-  const _BoardTerminalSetupView({required this.onStart});
+  const _BoardTerminalSetupView({required this.onStart, this.remoteInfo});
 
   final Future<void> Function(
     String workingDir,
@@ -662,6 +668,7 @@ class _BoardTerminalSetupView extends StatefulWidget {
     List<String> envGroupIds,
   )
   onStart;
+  final RemoteBoardInfo? remoteInfo;
 
   @override
   State<_BoardTerminalSetupView> createState() =>
@@ -708,8 +715,11 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
           const SizedBox(height: 4),
           GestureDetector(
             onTap: () async {
-              final dir = await FilePicker.getDirectoryPath(
-                dialogTitle: 'Select terminal working directory',
+              final dir = await BoardFilePicker.pickDirectory(
+                context,
+                remoteInfo: widget.remoteInfo,
+                initialPath: _dirCtrl.text,
+                title: 'Select terminal working directory',
               );
               if (dir == null || !mounted) return;
               setState(() {

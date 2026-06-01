@@ -71,6 +71,18 @@ class YoloitRemoteClient {
     return RemoteDirectoryListing.fromJson(response);
   }
 
+  Future<RemoteDirectoryListing> createDirectory({
+    required String parentPath,
+    required String name,
+  }) async {
+    final response = await _json(
+      'POST',
+      '/api/files/directories',
+      body: {'parentPath': parentPath, 'name': name},
+    );
+    return RemoteDirectoryListing.fromJson(response);
+  }
+
   Future<Map<String, dynamic>> _json(
     String method,
     String path, {
@@ -191,8 +203,10 @@ class RemoteDirectoryEntry {
   }
 }
 
-({String url, String? token, String boardId, int? revision})?
-remoteInfoForBoard(BoardDocument board) {
+typedef RemoteBoardInfo =
+    ({String url, String? token, String boardId, int? revision});
+
+RemoteBoardInfo? remoteInfoForBoard(BoardDocument board) {
   final raw = board.metadata['remote'];
   if (raw is! Map) return null;
   final remote = Map<String, dynamic>.from(raw);

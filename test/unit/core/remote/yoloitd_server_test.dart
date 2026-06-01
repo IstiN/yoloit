@@ -239,6 +239,37 @@ void main() {
       );
     },
   );
+
+  test('server creates remote directories for folder picking', () async {
+    final dir = await Directory.systemTemp.createTemp('yoloitd_mkdir_');
+    addTearDown(() => dir.delete(recursive: true));
+
+    final store = YoloitdStore(rootDir: dir, actorId: 'tester');
+    final server = YoloitdServer(store: store, port: 0, token: 'secret');
+    await server.start();
+    addTearDown(server.stop);
+
+    final response = await _json(
+      server.boundPort!,
+      'POST',
+      '/api/files/directories',
+      token: 'secret',
+      body: {'parentPath': dir.path, 'name': 'created-from-picker'},
+    );
+
+    expect(response.status, 200);
+    expect(await Directory('${dir.path}/created-from-picker').exists(), isTrue);
+    expect(response.body['path'], dir.path);
+    expect(
+      response.body['entries'],
+      contains(
+        allOf(
+          containsPair('name', 'created-from-picker'),
+          containsPair('isDirectory', true),
+        ),
+      ),
+    );
+  });
 }
 
 Future<({int status, String body})> _request(

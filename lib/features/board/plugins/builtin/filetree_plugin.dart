@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -8,7 +7,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
-
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 
 class FileTreePlugin extends BoardPanelPlugin {
   const FileTreePlugin();
@@ -138,8 +137,11 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   }
 
   Future<void> _pickFolder() async {
-    final dirPath = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Select root folder',
+    final dirPath = await BoardFilePicker.pickDirectory(
+      context,
+      remoteInfo: widget.renderContext.remoteInfo,
+      initialPath: _rootPath,
+      title: 'Select root folder',
     );
     if (dirPath == null) return;
     _updateState({
@@ -187,7 +189,10 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
-        globalPos.dx, globalPos.dy, globalPos.dx, globalPos.dy,
+        globalPos.dx,
+        globalPos.dy,
+        globalPos.dx,
+        globalPos.dy,
       ),
       color: colors.background,
       shape: RoundedRectangleBorder(
@@ -198,40 +203,54 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         if (isDir)
           PopupMenuItem(
             value: 'new_folder',
-            child: Text('📁 New Folder',
-                style: TextStyle(fontSize: 12, color: colors.textPrimary)),
+            child: Text(
+              '📁 New Folder',
+              style: TextStyle(fontSize: 12, color: colors.textPrimary),
+            ),
           ),
         if (isDir)
           PopupMenuItem(
             value: 'new_file',
-            child: Text('📄 New File',
-                style: TextStyle(fontSize: 12, color: colors.textPrimary)),
+            child: Text(
+              '📄 New File',
+              style: TextStyle(fontSize: 12, color: colors.textPrimary),
+            ),
           ),
         PopupMenuItem(
           value: 'rename',
-          child: Text('✏️ Rename',
-              style: TextStyle(fontSize: 12, color: colors.textPrimary)),
+          child: Text(
+            '✏️ Rename',
+            style: TextStyle(fontSize: 12, color: colors.textPrimary),
+          ),
         ),
         PopupMenuItem(
           value: 'copy_path',
-          child: Text('📋 Copy path',
-              style: TextStyle(fontSize: 12, color: colors.textPrimary)),
+          child: Text(
+            '📋 Copy path',
+            style: TextStyle(fontSize: 12, color: colors.textPrimary),
+          ),
         ),
         PopupMenuItem(
           value: 'copy_name',
-          child: Text('📄 Copy filename',
-              style: TextStyle(fontSize: 12, color: colors.textPrimary)),
+          child: Text(
+            '📄 Copy filename',
+            style: TextStyle(fontSize: 12, color: colors.textPrimary),
+          ),
         ),
         PopupMenuItem(
           value: 'show_finder',
-          child: Text('📂 Show in Finder',
-              style: TextStyle(fontSize: 12, color: colors.textPrimary)),
+          child: Text(
+            '📂 Show in Finder',
+            style: TextStyle(fontSize: 12, color: colors.textPrimary),
+          ),
         ),
         const PopupMenuDivider(),
         PopupMenuItem(
           value: 'delete',
-          child: Text('🗑️ Delete',
-              style: TextStyle(fontSize: 12, color: colors.accentRed)),
+          child: Text(
+            '🗑️ Delete',
+            style: TextStyle(fontSize: 12, color: colors.accentRed),
+          ),
         ),
       ],
     );
@@ -276,14 +295,18 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
   Future<void> _promptRename(String entityPath, String currentName) async {
     final newName = await _showInputDialog('Rename', 'New name', currentName);
-    if (newName == null || newName.trim().isEmpty || newName.trim() == currentName) return;
+    if (newName == null ||
+        newName.trim().isEmpty ||
+        newName.trim() == currentName)
+      return;
     final parent = p.dirname(entityPath);
     final newPath = p.join(parent, newName.trim());
     try {
-      final entity = FileSystemEntity.typeSync(entityPath) ==
-              FileSystemEntityType.directory
-          ? Directory(entityPath)
-          : File(entityPath) as FileSystemEntity;
+      final entity =
+          FileSystemEntity.typeSync(entityPath) ==
+                  FileSystemEntityType.directory
+              ? Directory(entityPath)
+              : File(entityPath) as FileSystemEntity;
       await entity.rename(newPath);
     } catch (_) {}
     _refresh();
@@ -293,25 +316,26 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     final colors = context.appColors;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: colors.background,
-        title: const Text('Delete', style: TextStyle(fontSize: 14)),
-        content: Text(
-          'Delete "$name"? This cannot be undone.',
-          style: const TextStyle(fontSize: 12),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: colors.background,
+            title: const Text('Delete', style: TextStyle(fontSize: 14)),
+            content: Text(
+              'Delete "$name"? This cannot be undone.',
+              style: const TextStyle(fontSize: 12),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: colors.accentRed),
+                child: const Text('Delete'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: colors.accentRed),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
     );
     if (confirmed != true) return;
     try {
@@ -333,31 +357,32 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     final controller = TextEditingController(text: initialValue);
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: colors.background,
-        title: Text(title, style: const TextStyle(fontSize: 14)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(fontSize: 12),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(fontSize: 12, color: colors.textMuted),
-            isDense: true,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: colors.background,
+            title: Text(title, style: const TextStyle(fontSize: 14)),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              style: const TextStyle(fontSize: 12),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(fontSize: 12, color: colors.textMuted),
+                isDense: true,
+              ),
+              onSubmitted: (v) => Navigator.pop(ctx, v),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, controller.text),
+                child: const Text('OK'),
+              ),
+            ],
           ),
-          onSubmitted: (v) => Navigator.pop(ctx, v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
     );
     controller.dispose();
     return result;
@@ -401,9 +426,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color:
-                    rootPath.isEmpty
-                        ? colors.textMuted
-                        : colors.textSecondary,
+                    rootPath.isEmpty ? colors.textMuted : colors.textSecondary,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -427,13 +450,14 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                 size: 16,
               ),
               tooltip: 'Search files',
-              onPressed: () => setState(() {
-                _showSearch = !_showSearch;
-                if (!_showSearch) {
-                  _searchController.clear();
-                  _searchQuery = '';
-                }
-              }),
+              onPressed:
+                  () => setState(() {
+                    _showSearch = !_showSearch;
+                    if (!_showSearch) {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    }
+                  }),
               padding: const EdgeInsets.all(4),
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               color: _showSearch ? colors.textPrimary : colors.textSecondary,
@@ -473,7 +497,10 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                 decoration: BoxDecoration(
                   border: Border(
                     bottom: BorderSide(
-                      color: _activeTab == tab ? colors.textSecondary : Colors.transparent,
+                      color:
+                          _activeTab == tab
+                              ? colors.textSecondary
+                              : Colors.transparent,
                       width: 2,
                     ),
                   ),
@@ -485,7 +512,9 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color:
-                        _activeTab == tab ? colors.textSecondary : colors.textMuted,
+                        _activeTab == tab
+                            ? colors.textSecondary
+                            : colors.textMuted,
                   ),
                 ),
               ),
@@ -507,26 +536,37 @@ class _FileTreeContentState extends State<_FileTreeContent> {
           hintText: 'Filter files…',
           hintStyle: TextStyle(fontSize: 12, color: colors.textMuted),
           prefixIcon: Icon(Icons.search, size: 14, color: colors.textMuted),
-          prefixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 0),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                  child: Icon(Icons.close, size: 14, color: colors.textMuted),
-                )
-              : null,
-          suffixIconConstraints: const BoxConstraints(minWidth: 28, minHeight: 0),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 28,
+            minHeight: 0,
+          ),
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    child: Icon(Icons.close, size: 14, color: colors.textMuted),
+                  )
+                  : null,
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 28,
+            minHeight: 0,
+          ),
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(vertical: 6),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: colors.textSecondary.withOpacity(0.3)),
+            borderSide: BorderSide(
+              color: colors.textSecondary.withOpacity(0.3),
+            ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(color: colors.textSecondary.withOpacity(0.3)),
+            borderSide: BorderSide(
+              color: colors.textSecondary.withOpacity(0.3),
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
@@ -622,28 +662,29 @@ class _FileTreeContentState extends State<_FileTreeContent> {
         final relPath = p.relative(entity.path, from: _rootPath);
         final isDir = entity is Directory;
         return GestureDetector(
-          onSecondaryTapDown: (d) =>
-              _showContextMenu(context, d.globalPosition, entity),
+          onSecondaryTapDown:
+              (d) => _showContextMenu(context, d.globalPosition, entity),
           child: InkWell(
-            onTap: isDir
-                ? () {
-                    final expanded = _expandedDirs;
-                    expanded.add(entity.path);
-                    // Also expand parents so the folder is visible in tree
-                    var parent = entity.parent;
-                    while (parent.path != _rootPath &&
-                        parent.path.startsWith(_rootPath)) {
-                      expanded.add(parent.path);
-                      parent = parent.parent;
+            onTap:
+                isDir
+                    ? () {
+                      final expanded = _expandedDirs;
+                      expanded.add(entity.path);
+                      // Also expand parents so the folder is visible in tree
+                      var parent = entity.parent;
+                      while (parent.path != _rootPath &&
+                          parent.path.startsWith(_rootPath)) {
+                        expanded.add(parent.path);
+                        parent = parent.parent;
+                      }
+                      _updateState({'expandedDirs': expanded.toList()});
+                      setState(() {
+                        _showSearch = false;
+                        _searchController.clear();
+                        _searchQuery = '';
+                      });
                     }
-                    _updateState({'expandedDirs': expanded.toList()});
-                    setState(() {
-                      _showSearch = false;
-                      _searchController.clear();
-                      _searchQuery = '';
-                    });
-                  }
-                : () => _selectFile(entity.path, name),
+                    : () => _selectFile(entity.path, name),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: SizedBox(
@@ -661,9 +702,10 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                         relPath,
                         style: TextStyle(
                           fontSize: 12,
-                          color: _selectedFile == entity.path
-                              ? colors.textPrimary
-                              : colors.textSecondary,
+                          color:
+                              _selectedFile == entity.path
+                                  ? colors.textPrimary
+                                  : colors.textSecondary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -678,16 +720,24 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     );
   }
 
-  void _collectMatchingEntries(Directory dir, List<FileSystemEntity> results, {int maxResults = 200}) {
+  void _collectMatchingEntries(
+    Directory dir,
+    List<FileSystemEntity> results, {
+    int maxResults = 200,
+  }) {
     if (results.length >= maxResults) return;
     try {
-      final contents = dir.listSync()..sort((a, b) {
-        final aIsDir = a is Directory;
-        final bIsDir = b is Directory;
-        if (aIsDir && !bIsDir) return -1;
-        if (!aIsDir && bIsDir) return 1;
-        return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
-      });
+      final contents =
+          dir.listSync()..sort((a, b) {
+            final aIsDir = a is Directory;
+            final bIsDir = b is Directory;
+            if (aIsDir && !bIsDir) return -1;
+            if (!aIsDir && bIsDir) return 1;
+            return p
+                .basename(a.path)
+                .toLowerCase()
+                .compareTo(p.basename(b.path).toLowerCase());
+          });
       for (final entity in contents) {
         if (results.length >= maxResults) return;
         final name = p.basename(entity.path);
@@ -756,8 +806,8 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   Widget _buildDirTile(Directory dir, String name, int depth, bool isExpanded) {
     final colors = context.appColors;
     return GestureDetector(
-      onSecondaryTapDown: (d) =>
-          _showContextMenu(context, d.globalPosition, dir),
+      onSecondaryTapDown:
+          (d) => _showContextMenu(context, d.globalPosition, dir),
       child: InkWell(
         onTap: () => _toggleDir(dir.path),
         child: Padding(
@@ -799,13 +849,16 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     final colors = context.appColors;
     final isSelected = _selectedFile == file.path;
     return GestureDetector(
-      onSecondaryTapDown: (d) =>
-          _showContextMenu(context, d.globalPosition, file),
+      onSecondaryTapDown:
+          (d) => _showContextMenu(context, d.globalPosition, file),
       child: InkWell(
         onTap: () => _selectFile(file.path, name),
         child: Container(
           padding: EdgeInsets.only(left: 28.0 + depth * 16, right: 8),
-          color: isSelected ? colors.textSecondary.withOpacity(0.1) : Colors.transparent,
+          color:
+              isSelected
+                  ? colors.textSecondary.withOpacity(0.1)
+                  : Colors.transparent,
           height: 28,
           child: Row(
             children: [
@@ -855,11 +908,11 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       rootPath: rootPath,
       onOpenDiff: (filePath, root) {
         final fileName = filePath.split('/').last;
-        widget.renderContext.onCreateLinkedPanel?.call(
-          'board.diff.preview',
-          {'filePath': filePath, 'rootPath': root, 'title': fileName},
-          'Diff: $fileName',
-        );
+        widget.renderContext.onCreateLinkedPanel?.call('board.diff.preview', {
+          'filePath': filePath,
+          'rootPath': root,
+          'title': fileName,
+        }, 'Diff: $fileName');
       },
     );
   }
@@ -903,11 +956,10 @@ class _GitDiffViewState extends State<_GitDiffView> {
       _error = null;
     });
     try {
-      final result = await Process.run(
-        'git',
-        ['status', '--porcelain'],
-        workingDirectory: widget.rootPath,
-      );
+      final result = await Process.run('git', [
+        'status',
+        '--porcelain',
+      ], workingDirectory: widget.rootPath);
       if (result.exitCode != 0) {
         if (!mounted) return;
         setState(() {
@@ -916,7 +968,9 @@ class _GitDiffViewState extends State<_GitDiffView> {
         });
         return;
       }
-      final lines = (result.stdout as String).split('\n').where((l) => l.trim().isNotEmpty);
+      final lines = (result.stdout as String)
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty);
       final entries = <_DiffEntry>[];
       for (final line in lines) {
         if (line.length < 4) continue;
@@ -1091,7 +1145,9 @@ class _GitDiffViewState extends State<_GitDiffView> {
                   ),
                   const SizedBox(width: 4),
                   Icon(
-                    isExpanded ? Icons.folder_open_outlined : Icons.folder_outlined,
+                    isExpanded
+                        ? Icons.folder_open_outlined
+                        : Icons.folder_outlined,
                     size: 14,
                     color: colors.accentOrange,
                   ),
@@ -1105,10 +1161,7 @@ class _GitDiffViewState extends State<_GitDiffView> {
                   ),
                   Text(
                     '$fileCount',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: colors.textMuted,
-                    ),
+                    style: TextStyle(fontSize: 10, color: colors.textMuted),
                   ),
                 ],
               ),
@@ -1163,11 +1216,7 @@ class _GitDiffViewState extends State<_GitDiffView> {
               ),
             ),
             const SizedBox(width: 6),
-            Icon(
-              _iconForFile(fileName),
-              size: 14,
-              color: colors.textSecondary,
-            ),
+            Icon(_iconForFile(fileName), size: 14, color: colors.textSecondary),
             const SizedBox(width: 6),
             Expanded(
               child: Text(

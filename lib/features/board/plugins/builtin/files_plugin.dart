@@ -1,9 +1,9 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 
 final _filesDefaultColors = AppColorScheme.fromAccent(Colors.pink);
 
@@ -123,19 +123,23 @@ class _FilesContentState extends State<_FilesContent> {
   }
 
   Future<void> _addFiles() async {
-    final result = await FilePicker.pickFiles(allowMultiple: true);
-    if (result == null || result.files.isEmpty) return;
+    final result = await BoardFilePicker.pickFiles(
+      context,
+      remoteInfo: widget.renderContext.remoteInfo,
+      title: 'Add files',
+    );
+    if (result == null || result.isEmpty) return;
 
     final current = _files;
     final existingPaths = current.map((f) => f['path'] as String?).toSet();
 
     final newEntries =
-        result.files
-            .where((f) => f.path != null && !existingPaths.contains(f.path))
+        result
+            .where((f) => !existingPaths.contains(f.path))
             .map(
               (f) => {
                 'id': DateTime.now().millisecondsSinceEpoch.toString() + f.name,
-                'path': f.path!,
+                'path': f.path,
                 'name': f.name,
                 'addedAt': DateTime.now().toIso8601String(),
               },

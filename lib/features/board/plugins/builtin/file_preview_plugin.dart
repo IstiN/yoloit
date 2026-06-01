@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,11 +13,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
@@ -205,13 +206,16 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(allowMultiple: false);
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    if (file.path == null) return;
+    final file = await BoardFilePicker.pickFile(
+      context,
+      remoteInfo: widget.renderContext.remoteInfo,
+      initialPath: _path.isEmpty ? null : p.dirname(_path),
+      title: 'Select file',
+    );
+    if (file == null) return;
     widget.renderContext.onUpdateState({
       ...widget.panel.state,
-      'path': file.path!,
+      'path': file.path,
       'title': file.name,
     });
   }

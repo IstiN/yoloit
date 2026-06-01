@@ -16,6 +16,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
@@ -1988,8 +1989,9 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
   Future<void> _exportTheme() async {
     final tm = ThemeManager.instance;
     final json = tm.exportCurrentAsJson();
-    final dirPath = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Export Theme — Choose Folder',
+    final dirPath = await BoardFilePicker.pickDirectory(
+      context,
+      title: 'Export Theme - Choose Folder',
     );
     if (dirPath == null) return;
 
@@ -4266,8 +4268,10 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
   }
 
   Future<void> _pickDirectory(BuildContext context) async {
-    final result = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Choose workspace storage folder',
+    final result = await BoardFilePicker.pickDirectory(
+      context,
+      initialPath: p.dirname(_currentPath),
+      title: 'Choose workspace storage folder',
     );
     if (result == null) return;
     final newPath = '$result/workspaces.json';

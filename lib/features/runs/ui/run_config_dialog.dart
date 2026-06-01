@@ -1,8 +1,8 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
@@ -202,157 +202,157 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Text(
-                widget.initial == null
-                    ? 'New Run Configuration'
-                    : 'Edit Run Configuration',
-                style: TextStyle(
-                  color: colors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                Text(
+                  widget.initial == null
+                      ? 'New Run Configuration'
+                      : 'Edit Run Configuration',
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _Field(
-                label: 'Name',
-                controller: _nameCtrl,
-                hint: 'e.g. Flutter Run',
-              ),
-              const SizedBox(height: 12),
-              _Field(
-                label: 'Command',
-                controller: _commandCtrl,
-                hint: 'e.g. flutter run -d macos',
-                fontFamily: 'monospace',
-              ),
-              const SizedBox(height: 12),
-              _WorkingDirField(controller: _workingDirCtrl),
-              const SizedBox(height: 16),
-              Text(
-                'Preset',
-                style: TextStyle(
-                  color: colors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 16),
+                _Field(
+                  label: 'Name',
+                  controller: _nameCtrl,
+                  hint: 'e.g. Flutter Run',
                 ),
-              ),
-              const SizedBox(height: 4),
-              DropdownButtonFormField<_RunPreset>(
-                initialValue: _preset,
-                dropdownColor: colors.surfaceElevated,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: colors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(color: colors.primary),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  isDense: true,
+                const SizedBox(height: 12),
+                _Field(
+                  label: 'Command',
+                  controller: _commandCtrl,
+                  hint: 'e.g. flutter run -d macos',
+                  fontFamily: 'monospace',
                 ),
-                items: const [
-                  DropdownMenuItem(
-                    value: _RunPreset.custom,
-                    child: Text('No preset'),
+                const SizedBox(height: 12),
+                _WorkingDirField(controller: _workingDirCtrl),
+                const SizedBox(height: 16),
+                Text(
+                  'Preset',
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
-                  DropdownMenuItem(
-                    value: _RunPreset.flutterApp,
-                    child: Text('Flutter App (Hot Reload / Restart preset)'),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _applyPreset(value));
-                },
-              ),
-              const SizedBox(height: 16),
-              _QuickActionsEditor(
-                actions: _quickActions,
-                onChanged: () => setState(() {}),
-                onAdd: () {
-                  setState(() {
-                    _quickActions.add(_QuickActionDraft.empty());
-                  });
-                },
-                onRemove: (index) {
-                  setState(() {
-                    final removed = _quickActions.removeAt(index);
-                    removed.dispose();
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Color',
-                style: TextStyle(
-                  color: colors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: [
-                  GestureDetector(
-                    onTap: () => setState(() => _selectedColor = null),
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.transparent,
-                        border: Border.all(
-                          color:
-                              _selectedColor == null
-                                  ? colors.textPrimary
-                                  : colors.textMuted,
-                          width: _selectedColor == null ? 2 : 1,
-                        ),
-                      ),
-                      child:
-                          _selectedColor == null
-                              ? Icon(
-                                Icons.close,
-                                size: 10,
-                                color: colors.textPrimary,
-                              )
-                              : null,
+                const SizedBox(height: 4),
+                DropdownButtonFormField<_RunPreset>(
+                  initialValue: _preset,
+                  dropdownColor: colors.surfaceElevated,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: colors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: colors.border),
                     ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: colors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: colors.primary),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    isDense: true,
                   ),
-                  ..._colorChips(colors).map(
-                    (c) => GestureDetector(
-                      onTap: () => setState(() => _selectedColor = c),
+                  items: const [
+                    DropdownMenuItem(
+                      value: _RunPreset.custom,
+                      child: Text('No preset'),
+                    ),
+                    DropdownMenuItem(
+                      value: _RunPreset.flutterApp,
+                      child: Text('Flutter App (Hot Reload / Restart preset)'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _applyPreset(value));
+                  },
+                ),
+                const SizedBox(height: 16),
+                _QuickActionsEditor(
+                  actions: _quickActions,
+                  onChanged: () => setState(() {}),
+                  onAdd: () {
+                    setState(() {
+                      _quickActions.add(_QuickActionDraft.empty());
+                    });
+                  },
+                  onRemove: (index) {
+                    setState(() {
+                      final removed = _quickActions.removeAt(index);
+                      removed.dispose();
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Color',
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    GestureDetector(
+                      onTap: () => setState(() => _selectedColor = null),
                       child: Container(
                         width: 20,
                         height: 20,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: c,
-                          border:
-                              _selectedColor?.toARGB32() == c.toARGB32()
-                                  ? Border.all(
-                                    color: colors.textPrimary,
-                                    width: 2,
-                                  )
-                                  : null,
+                          color: Colors.transparent,
+                          border: Border.all(
+                            color:
+                                _selectedColor == null
+                                    ? colors.textPrimary
+                                    : colors.textMuted,
+                            width: _selectedColor == null ? 2 : 1,
+                          ),
+                        ),
+                        child:
+                            _selectedColor == null
+                                ? Icon(
+                                  Icons.close,
+                                  size: 10,
+                                  color: colors.textPrimary,
+                                )
+                                : null,
+                      ),
+                    ),
+                    ..._colorChips(colors).map(
+                      (c) => GestureDetector(
+                        onTap: () => setState(() => _selectedColor = c),
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: c,
+                            border:
+                                _selectedColor?.toARGB32() == c.toARGB32()
+                                    ? Border.all(
+                                      color: colors.textPrimary,
+                                      width: 2,
+                                    )
+                                    : null,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -741,8 +741,10 @@ class _WorkingDirFieldState extends State<_WorkingDirField> {
   TextEditingController get controller => widget.controller;
 
   Future<void> _browse() async {
-    final dir = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Select Working Directory',
+    final dir = await BoardFilePicker.pickDirectory(
+      context,
+      initialPath: controller.text,
+      title: 'Select Working Directory',
     );
     if (dir != null && mounted) controller.text = dir;
   }
@@ -783,10 +785,7 @@ class _WorkingDirFieldState extends State<_WorkingDirField> {
                 ),
                 decoration: InputDecoration(
                   hintText: 'Leave empty to use workspace root',
-                  hintStyle: TextStyle(
-                    color: colors.textMuted,
-                    fontSize: 12,
-                  ),
+                  hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
                   filled: true,
                   fillColor: colors.surface,
                   border: OutlineInputBorder(
@@ -863,8 +862,7 @@ class _WorkingDirFieldState extends State<_WorkingDirField> {
                         label,
                         style: TextStyle(
                           fontSize: 11,
-                          color:
-                              isSelected ? colors.primary : colors.textMuted,
+                          color: isSelected ? colors.primary : colors.textMuted,
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -915,10 +913,7 @@ class _Field extends StatelessWidget {
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(
-              color: colors.textMuted,
-              fontSize: 12,
-            ),
+            hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
             filled: true,
             fillColor: colors.surface,
             border: OutlineInputBorder(

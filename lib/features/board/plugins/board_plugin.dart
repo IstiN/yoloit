@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/features/board/history/board_panel_history_adapter.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
@@ -15,6 +16,7 @@ class BoardPanelRenderContext {
     this.onFindPanelByGroup,
     this.onRevealSessionInPanel,
     this.onFocusPanelById,
+    this.remoteInfo,
   });
 
   final bool isSelected;
@@ -45,6 +47,10 @@ class BoardPanelRenderContext {
 
   /// Focuses an existing panel by ID.
   final Future<void> Function(String panelId)? onFocusPanelById;
+
+  /// Remote board connection metadata. Null means the panel belongs to a local
+  /// board and filesystem actions should use the local machine.
+  final RemoteBoardInfo? remoteInfo;
 }
 
 /// Abstract base class for board panel plugins.

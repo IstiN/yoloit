@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -29,6 +28,7 @@ import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
@@ -4024,17 +4024,15 @@ class _BoardSettingsDialogState extends State<_BoardSettingsDialog> {
               children: [
                 OutlinedButton.icon(
                   onPressed: () async {
-                    final selected =
-                        widget.remoteInfo == null
-                            ? await FilePicker.getDirectoryPath()
-                            : await showDialog<String>(
-                              context: context,
-                              builder:
-                                  (_) => _RemoteDirectoryPickerDialog(
-                                    remoteInfo: widget.remoteInfo!,
-                                    initialPath: _folderController.text,
-                                  ),
-                            );
+                    final selected = await BoardFilePicker.pickDirectory(
+                      context,
+                      remoteInfo: widget.remoteInfo,
+                      initialPath: _folderController.text,
+                      title:
+                          widget.remoteInfo == null
+                              ? 'Choose folder'
+                              : 'Choose remote folder',
+                    );
                     if (!mounted || selected == null) return;
                     _folderController.text = selected;
                   },
@@ -4071,196 +4069,6 @@ class _BoardSettingsDialogState extends State<_BoardSettingsDialog> {
                 defaultFolder: _folderController.text.trim(),
               )),
           child: const Text('Save'),
-        ),
-      ],
-    );
-  }
-}
-
-class _RemoteDirectoryPickerDialog extends StatefulWidget {
-  const _RemoteDirectoryPickerDialog({
-    required this.remoteInfo,
-    required this.initialPath,
-  });
-
-  final ({String url, String? token, String boardId, int? revision}) remoteInfo;
-  final String initialPath;
-
-  @override
-  State<_RemoteDirectoryPickerDialog> createState() =>
-      _RemoteDirectoryPickerDialogState();
-}
-
-class _RemoteDirectoryPickerDialogState
-    extends State<_RemoteDirectoryPickerDialog> {
-  late final YoloitRemoteClient _client;
-  RemoteDirectoryListing? _listing;
-  Object? _error;
-  bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _client = YoloitRemoteClient(
-      baseUrl: widget.remoteInfo.url,
-      token: widget.remoteInfo.token,
-    );
-    _load(widget.initialPath.trim().isEmpty ? null : widget.initialPath);
-  }
-
-  Future<void> _load(String? path) async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final listing = await _client.listDirectory(path);
-      if (!mounted) return;
-      setState(() {
-        _listing = listing;
-        _loading = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _error = error;
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final listing = _listing;
-    return AlertDialog(
-      title: const Text('Choose remote folder'),
-      content: SizedBox(
-        width: 640,
-        height: 520,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              widget.remoteInfo.url,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: colors.textMuted, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            if (listing != null)
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      listing.path,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Parent folder',
-                    onPressed:
-                        listing.parent == null
-                            ? null
-                            : () => _load(listing.parent),
-                    icon: const Icon(Icons.arrow_upward),
-                  ),
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: () => _load(listing.path),
-                    icon: const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-            if (listing != null && listing.roots.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final root in listing.roots)
-                    ActionChip(
-                      avatar: const Icon(Icons.folder_outlined, size: 16),
-                      label: Text(_BoardToolbar._shortToolbarPath(root.name)),
-                      onPressed: () => _load(root.path),
-                    ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            Expanded(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(color: colors.border),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child:
-                    _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _error != null
-                        ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(
-                              'Failed to load remote folder: $_error',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        )
-                        : listing == null
-                        ? const SizedBox.shrink()
-                        : ListView(
-                          children: [
-                            for (final entry in listing.entries)
-                              ListTile(
-                                dense: true,
-                                enabled: entry.isDirectory,
-                                leading: Icon(
-                                  entry.isDirectory
-                                      ? Icons.folder_outlined
-                                      : Icons.insert_drive_file_outlined,
-                                ),
-                                title: Text(
-                                  entry.name,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  entry.path,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                onTap:
-                                    entry.isDirectory
-                                        ? () => _load(entry.path)
-                                        : null,
-                                trailing:
-                                    entry.isDirectory
-                                        ? TextButton(
-                                          onPressed:
-                                              () => Navigator.of(
-                                                context,
-                                              ).pop(entry.path),
-                                          child: const Text('Select'),
-                                        )
-                                        : null,
-                              ),
-                          ],
-                        ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed:
-              listing == null
-                  ? null
-                  : () => Navigator.of(context).pop(listing.path),
-          child: const Text('Use current folder'),
         ),
       ],
     );
@@ -5094,6 +4902,7 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
   Widget _buildPanelContent(BuildContext context, BoardPanelInstance panel) {
     final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
     if (plugin != null) {
+      final activeBoard = context.read<BoardCubit>().state.activeBoard;
       return plugin.buildContent(
         context,
         panel,
@@ -5107,6 +4916,8 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
           onDelete: onDelete,
           onUpdateState: onUpdateState ?? (_) {},
           onShowEditor: onEditNote ?? () {},
+          remoteInfo:
+              activeBoard == null ? null : remoteInfoForBoard(activeBoard),
           onCreateLinkedPanel: onCreateLinkedPanel,
           onFindPanelByGroup: (typeId, group) {
             final board = context.read<BoardCubit>().state.activeBoard;

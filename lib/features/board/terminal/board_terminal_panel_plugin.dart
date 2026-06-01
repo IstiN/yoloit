@@ -52,6 +52,7 @@ class BoardTerminalPanelPlugin extends BoardPanelPlugin {
     return BoardTerminalPanelWidget(
       panel: panel,
       onUpdateState: renderContext.onUpdateState,
+      remoteInfo: renderContext.remoteInfo,
     );
   }
 }
