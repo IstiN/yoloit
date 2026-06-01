@@ -56,6 +56,11 @@ Remote boards are shown in the board overview under `Remote boards`. They can be
 opened and edited like local boards. Before the overview opens, the app refreshes
 remote board snapshots from `yoloitd`.
 
+After a successful connection the desktop app opens the board overview so all
+boards from that remote are visible immediately. Remote board settings use the
+daemon filesystem browser for `Default folder`; local file pickers are used only
+for local boards.
+
 Remote writes use optimistic revision checks. If another client has already
 updated the same board, `yoloitd` rejects the stale write with `409`, and the
 desktop app refreshes the board from the server instead of overwriting the newer
@@ -148,6 +153,8 @@ GET  /api/runs
 POST /api/runs
 GET  /api/runs/:id/log
 POST /api/runs/:id/stop
+
+GET  /api/files?path=<remote-directory>
 ```
 
 When `--token`/`YOLOITD_TOKEN` is set, requests must include:

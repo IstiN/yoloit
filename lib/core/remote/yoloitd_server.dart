@@ -70,6 +70,9 @@ class YoloitdServer {
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'boards') {
         return _handleBoards(request, method, path.skip(2).toList());
       }
+      if (path.length >= 2 && path[0] == 'api' && path[1] == 'files') {
+        return _handleFiles(request, method);
+      }
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'runs') {
         return _handleRuns(request, method, path.skip(2).toList());
       }
@@ -205,6 +208,87 @@ class YoloitdServer {
       return _json(<String, Object?>{'links': board.links});
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _handleFiles(
+    shelf.Request request,
+    String method,
+  ) async {
+    if (method != 'GET') {
+      return _json(<String, Object?>{
+        'ok': false,
+        'error': 'method not allowed',
+      }, 405);
+    }
+    final requested = request.url.queryParameters['path']?.trim();
+    final directory = Directory(
+      requested == null || requested.isEmpty ? store.rootDir.path : requested,
+    );
+    if (!await directory.exists()) {
+      return _json(<String, Object?>{
+        'ok': false,
+        'error': 'directory not found',
+        'path': directory.path,
+      }, 404);
+    }
+
+    final entries = <Map<String, Object?>>[];
+    await for (final entity in directory.list(followLinks: false)) {
+      final stat = await entity.stat();
+      if (stat.type != FileSystemEntityType.directory &&
+          stat.type != FileSystemEntityType.file) {
+        continue;
+      }
+      entries.add(<String, Object?>{
+        'name': _fileName(entity.path),
+        'path': entity.path,
+        'isDirectory': stat.type == FileSystemEntityType.directory,
+      });
+    }
+    entries.sort((a, b) {
+      final aDir = a['isDirectory'] == true;
+      final bDir = b['isDirectory'] == true;
+      if (aDir != bDir) return aDir ? -1 : 1;
+      return (a['name'] as String).toLowerCase().compareTo(
+        (b['name'] as String).toLowerCase(),
+      );
+    });
+
+    return _json(<String, Object?>{
+      'ok': true,
+      'path': directory.path,
+      'parent':
+          directory.parent.path == directory.path
+              ? null
+              : directory.parent.path,
+      'roots': _fileRoots(),
+      'entries': entries,
+    });
+  }
+
+  List<Map<String, Object?>> _fileRoots() {
+    final roots = <String>{store.rootDir.path, Directory.current.path};
+    final home = Platform.environment['HOME'];
+    if (home != null && home.trim().isNotEmpty) roots.add(home.trim());
+    return roots
+        .map(
+          (path) => <String, Object?>{
+            'name': path == store.rootDir.path ? 'YoLoIT data' : path,
+            'path': path,
+            'isDirectory': true,
+          },
+        )
+        .toList();
+  }
+
+  static String _fileName(String path) {
+    final normalized =
+        path.endsWith(Platform.pathSeparator)
+            ? path.substring(0, path.length - 1)
+            : path;
+    final index = normalized.lastIndexOf(Platform.pathSeparator);
+    if (index == -1) return normalized;
+    return normalized.substring(index + 1);
   }
 
   static bool _isSnapshotUpdate(Map<String, dynamic> body) {

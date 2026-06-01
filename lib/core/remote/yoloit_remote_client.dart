@@ -62,6 +62,15 @@ class YoloitRemoteClient {
     return fetchBoard(summary['id'] as String);
   }
 
+  Future<RemoteDirectoryListing> listDirectory(String? path) async {
+    final query =
+        path == null || path.trim().isEmpty
+            ? ''
+            : '?path=${Uri.encodeQueryComponent(path.trim())}';
+    final response = await _json('GET', '/api/files$query');
+    return RemoteDirectoryListing.fromJson(response);
+  }
+
   Future<Map<String, dynamic>> _json(
     String method,
     String path, {
@@ -121,6 +130,65 @@ class YoloitRemoteException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class RemoteDirectoryListing {
+  const RemoteDirectoryListing({
+    required this.path,
+    required this.parent,
+    required this.entries,
+    required this.roots,
+  });
+
+  final String path;
+  final String? parent;
+  final List<RemoteDirectoryEntry> entries;
+  final List<RemoteDirectoryEntry> roots;
+
+  factory RemoteDirectoryListing.fromJson(Map<String, dynamic> json) {
+    return RemoteDirectoryListing(
+      path: json['path'] as String? ?? '',
+      parent: json['parent'] as String?,
+      entries:
+          (json['entries'] as List? ?? const <Object?>[])
+              .whereType<Map<Object?, Object?>>()
+              .map(
+                (entry) => RemoteDirectoryEntry.fromJson(
+                  Map<String, dynamic>.from(entry),
+                ),
+              )
+              .toList(),
+      roots:
+          (json['roots'] as List? ?? const <Object?>[])
+              .whereType<Map<Object?, Object?>>()
+              .map(
+                (entry) => RemoteDirectoryEntry.fromJson(
+                  Map<String, dynamic>.from(entry),
+                ),
+              )
+              .toList(),
+    );
+  }
+}
+
+class RemoteDirectoryEntry {
+  const RemoteDirectoryEntry({
+    required this.name,
+    required this.path,
+    required this.isDirectory,
+  });
+
+  final String name;
+  final String path;
+  final bool isDirectory;
+
+  factory RemoteDirectoryEntry.fromJson(Map<String, dynamic> json) {
+    return RemoteDirectoryEntry(
+      name: json['name'] as String? ?? '',
+      path: json['path'] as String? ?? '',
+      isDirectory: json['isDirectory'] == true,
+    );
+  }
 }
 
 ({String url, String? token, String boardId, int? revision})?

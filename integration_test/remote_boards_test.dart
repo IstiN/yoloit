@@ -80,8 +80,6 @@ void main() {
     await tester.pump();
 
     expect(cubit.state.activeBoard?.name, 'Remote Integration');
-
-    await tester.tap(find.byTooltip('Open boards overview'));
     await tester.pump(const Duration(milliseconds: 420));
     await tester.pump();
 

@@ -114,7 +114,7 @@ void main() {
             'title': 'Shape',
             'bounds': {'x': 10, 'y': 20, 'width': 260, 'height': 180},
             'state': {'shape': 'diamond'},
-            'params': {},
+            'params': <String, Object?>{},
           },
         ],
         'links': [
@@ -195,6 +195,50 @@ void main() {
     final body = jsonDecode(stale.body) as Map<String, dynamic>;
     expect(body['currentRevision'], 1);
   });
+
+  test(
+    'server lists remote filesystem directories for folder picking',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('yoloitd_files_');
+      addTearDown(() => dir.delete(recursive: true));
+      await Directory('${dir.path}/project').create();
+      await File('${dir.path}/notes.md').writeAsString('hello');
+
+      final store = YoloitdStore(rootDir: dir, actorId: 'tester');
+      final server = YoloitdServer(store: store, port: 0, token: 'secret');
+      await server.start();
+      addTearDown(server.stop);
+
+      final response = await _json(
+        server.boundPort!,
+        'GET',
+        '/api/files?path=${Uri.encodeQueryComponent(dir.path)}',
+        token: 'secret',
+      );
+
+      expect(response.status, 200);
+      expect(response.body['path'], dir.path);
+      final entries = response.body['entries'] as List;
+      expect(
+        entries,
+        contains(
+          allOf(
+            containsPair('name', 'project'),
+            containsPair('isDirectory', true),
+          ),
+        ),
+      );
+      expect(
+        entries,
+        contains(
+          allOf(
+            containsPair('name', 'notes.md'),
+            containsPair('isDirectory', false),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 Future<({int status, String body})> _request(
@@ -223,6 +267,7 @@ Future<({int status, String body})> _request(
     <int>[],
     (buffer, chunk) => buffer..addAll(chunk),
   );
+  await socket.close();
   final raw = utf8.decode(bytes);
   final split = raw.indexOf('\r\n\r\n');
   expect(split, greaterThanOrEqualTo(0));
