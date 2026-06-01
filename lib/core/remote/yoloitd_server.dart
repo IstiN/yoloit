@@ -6,6 +6,7 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
+import 'package:yoloit/core/setup/setup_catalog.dart';
 
 class YoloitdServer {
   YoloitdServer({
@@ -82,6 +83,9 @@ class YoloitdServer {
       }
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'runs') {
         return _handleRuns(request, method, path.skip(2).toList());
+      }
+      if (path.length >= 2 && path[0] == 'api' && path[1] == 'setup') {
+        return _handleSetup(request, method, path.skip(2).toList());
       }
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'terminals') {
         return _handleTerminals(request, method, path.skip(2).toList());
@@ -644,6 +648,67 @@ class YoloitdServer {
       final process = _runs.remove(sub[0]);
       final ok = process?.kill() ?? false;
       return _json(<String, Object?>{'ok': ok});
+    }
+    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _handleSetup(
+    shelf.Request request,
+    String method,
+    List<String> sub,
+  ) async {
+    if (sub.isEmpty && method == 'GET') {
+      final snapshot = await SetupCatalog.check();
+      return _json(snapshot.toJson());
+    }
+    if (sub.length == 1 && sub[0] == 'install' && method == 'POST') {
+      final body = await _body(request);
+      final ids =
+          (body['packageIds'] as List? ?? const <Object?>[])
+              .map((value) => value.toString().trim())
+              .where((value) => value.isNotEmpty)
+              .toList();
+      if (ids.isEmpty) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'packageIds required',
+        }, 400);
+      }
+      final runtime = await SetupCatalog.detectRuntime();
+      final script = SetupCatalog.installScript(ids, runtime.os);
+      if (script.trim().isEmpty) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'no install command for selected packages on this OS',
+        }, 400);
+      }
+      if (body['dryRun'] == true) {
+        return _json(<String, Object?>{'ok': true, 'script': script});
+      }
+      final id = body['id'] as String? ?? _nextId('setup');
+      final process = await Process.start(
+        Platform.environment['SHELL'] ?? '/bin/sh',
+        <String>['-lc', script],
+        workingDirectory: store.rootDir.path,
+      );
+      _runs[id] = process;
+      _runLogs[id] = <String>['\$ $script'];
+      unawaited(_collectRun(id, process));
+      return _json(<String, Object?>{
+        'ok': true,
+        'id': id,
+        'pid': process.pid,
+        'script': script,
+      });
+    }
+    if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
+      return _json(<String, Object?>{
+        'id': sub[0],
+        'lines': _runLogs[sub[0]] ?? const <String>[],
+        'running': _runs.containsKey(sub[0]),
+        if (_runExitCodes.containsKey(sub[0]))
+          'exitCode': _runExitCodes[sub[0]],
+      });
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }

@@ -13,6 +13,7 @@ import 'package:yoloit/features/board/plugins/builtin/kanban_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/run_configs_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/setup_guide_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/shape_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/sticky_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_plugin.dart';
@@ -77,6 +78,7 @@ class BoardPluginRegistry {
     register(const PlaylistPlugin());
     register(const RunPlugin());
     register(const RunConfigsPlugin());
+    register(const SetupGuidePlugin());
     register(const ChatPanelPlugin());
     register(const BoardTerminalPanelPlugin());
     register(const FileTreePlugin());

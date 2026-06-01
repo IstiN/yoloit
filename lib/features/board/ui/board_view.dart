@@ -7284,6 +7284,7 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
         pluginItem('board.timer'),
       ],
       _PanelCatalogCategory.advanced => <PopupMenuEntry<String>?>[
+        pluginItem('board.setup_guide'),
         pluginItem('board.code.snippet'),
         pluginItem('board.playlist'),
         pluginItem('board.run_configs'),

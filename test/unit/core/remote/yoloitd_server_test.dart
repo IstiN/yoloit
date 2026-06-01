@@ -311,6 +311,48 @@ void main() {
     }
     expect((log['chunks'] as List).join(), contains(dir.path));
   });
+
+  test(
+    'server exposes setup snapshot and rejects empty install requests',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('yoloitd_setup_');
+      addTearDown(() => dir.delete(recursive: true));
+
+      final store = YoloitdStore(rootDir: dir, actorId: 'tester');
+      final server = YoloitdServer(store: store, port: 0, token: 'secret');
+      await server.start();
+      addTearDown(server.stop);
+
+      final snapshot = await _json(
+        server.boundPort!,
+        'GET',
+        '/api/setup',
+        token: 'secret',
+      );
+      expect(snapshot.status, 200);
+      expect(snapshot.body['runtime'], isA<Map<String, dynamic>>());
+      expect(snapshot.body['packages'], isA<List<dynamic>>());
+      final packages = snapshot.body['packages'] as List<dynamic>;
+      expect(
+        packages.any(
+          (entry) =>
+              entry is Map &&
+              entry['id'] == 'codex' &&
+              entry['installAction'] is Map,
+        ),
+        isTrue,
+      );
+
+      final install = await _request(
+        server.boundPort!,
+        'POST',
+        '/api/setup/install',
+        token: 'secret',
+        body: {'packageIds': <String>[]},
+      );
+      expect(install.status, 400);
+    },
+  );
 }
 
 Future<({int status, String body})> _request(

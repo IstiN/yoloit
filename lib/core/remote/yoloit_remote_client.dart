@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/setup/setup_catalog.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
 class YoloitRemoteClient {
@@ -115,6 +116,30 @@ class YoloitRemoteClient {
     await _json('POST', '/api/terminals/${Uri.encodeComponent(id)}/stop');
   }
 
+  Future<SetupCheckSnapshot> setupCheck() async {
+    final response = await _json('GET', '/api/setup');
+    return SetupCheckSnapshot.fromJson(response);
+  }
+
+  Future<RemoteSetupInstallRun> startSetupInstall(
+    List<String> packageIds,
+  ) async {
+    final response = await _json(
+      'POST',
+      '/api/setup/install',
+      body: {'packageIds': packageIds},
+    );
+    return RemoteSetupInstallRun.fromJson(response);
+  }
+
+  Future<RemoteSetupInstallLog> setupInstallLog(String id) async {
+    final response = await _json(
+      'GET',
+      '/api/setup/${Uri.encodeComponent(id)}/log',
+    );
+    return RemoteSetupInstallLog.fromJson(response);
+  }
+
   Future<Map<String, dynamic>> _json(
     String method,
     String path, {
@@ -174,6 +199,47 @@ class YoloitRemoteException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class RemoteSetupInstallRun {
+  const RemoteSetupInstallRun({required this.id, required this.script});
+
+  final String id;
+  final String script;
+
+  factory RemoteSetupInstallRun.fromJson(Map<String, dynamic> json) {
+    return RemoteSetupInstallRun(
+      id: json['id'] as String? ?? '',
+      script: json['script'] as String? ?? '',
+    );
+  }
+}
+
+class RemoteSetupInstallLog {
+  const RemoteSetupInstallLog({
+    required this.id,
+    required this.lines,
+    required this.running,
+    this.exitCode,
+  });
+
+  final String id;
+  final List<String> lines;
+  final bool running;
+  final int? exitCode;
+
+  factory RemoteSetupInstallLog.fromJson(Map<String, dynamic> json) {
+    return RemoteSetupInstallLog(
+      id: json['id'] as String? ?? '',
+      lines:
+          (json['lines'] as List? ?? const <Object?>[])
+              .map((value) => value.toString())
+              .toList(),
+      running: json['running'] == true,
+      exitCode:
+          json['exitCode'] is num ? (json['exitCode'] as num).toInt() : null,
+    );
+  }
 }
 
 class RemoteDirectoryListing {
