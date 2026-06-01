@@ -394,8 +394,6 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
         final selected = _selectedFiles.contains(entry.path);
         final canSelectFile =
             !entry.isDirectory && widget.mode != BoardFilePickerMode.directory;
-        final canSelectDirectory =
-            entry.isDirectory && widget.mode == BoardFilePickerMode.directory;
         return ListTile(
           key: Key('board-file-picker-entry-${entry.path}'),
           leading: Icon(
@@ -414,11 +412,7 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
                   : null,
           onTap: () {
             if (entry.isDirectory) {
-              if (canSelectDirectory) {
-                setState(() => _path = entry.path);
-              } else {
-                unawaited(_load(entry.path));
-              }
+              unawaited(_load(entry.path));
               return;
             }
             if (canSelectFile) _toggleFile(entry);

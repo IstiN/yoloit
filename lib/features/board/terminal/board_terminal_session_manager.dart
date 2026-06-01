@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
+import 'package:yoloit/features/terminal/data/remote_yoloit_terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
@@ -22,7 +24,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   AgentSession? sessionFor(String id) => _sessions[id];
   bool isLive(String id) => _sessions.containsKey(id);
 
-  Future<AgentSession> ensureSession(BoardTerminalConfig config) async {
+  Future<AgentSession> ensureSession(
+    BoardTerminalConfig config, {
+    RemoteBoardInfo? remoteInfo,
+  }) async {
     final existing = _sessions[config.sessionId];
     if (existing != null) return existing;
     return _spawn(
@@ -30,6 +35,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       sessionName: config.sessionName,
       workingDir: config.workingDir,
       envGroupIds: config.envGroupIds,
+      remoteInfo: remoteInfo,
     );
   }
 
@@ -37,6 +43,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     required String sessionName,
     required String workingDir,
     List<String> envGroupIds = const [],
+    RemoteBoardInfo? remoteInfo,
   }) async {
     final sessionId = 'board_terminal_${DateTime.now().millisecondsSinceEpoch}';
     return _spawn(
@@ -44,6 +51,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       sessionName: sessionName,
       workingDir: workingDir,
       envGroupIds: envGroupIds,
+      remoteInfo: remoteInfo,
     );
   }
 
@@ -103,6 +111,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     required String sessionName,
     required String workingDir,
     required List<String> envGroupIds,
+    RemoteBoardInfo? remoteInfo,
   }) async {
     _outputSubs.remove(sessionId)?.cancel();
     _envGroupIdsBySession[sessionId] = List<String>.from(envGroupIds);
@@ -120,6 +129,10 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       workspacePath: workingDir,
       label: session.displayName,
       extraEnv: extraEnv,
+      backendOverride:
+          remoteInfo == null
+              ? null
+              : RemoteYoloitTerminalBackend(remoteInfo: remoteInfo),
     );
     _sessions[sessionId] = session;
     _attachProcess(process, session);

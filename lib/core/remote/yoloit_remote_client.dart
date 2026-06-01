@@ -83,6 +83,38 @@ class YoloitRemoteClient {
     return RemoteDirectoryListing.fromJson(response);
   }
 
+  Future<void> createTerminal({
+    required String id,
+    required String cwd,
+    Map<String, String> env = const {},
+  }) async {
+    await _json(
+      'POST',
+      '/api/terminals',
+      body: {'id': id, 'cwd': cwd, 'env': env},
+    );
+  }
+
+  Future<RemoteTerminalLog> terminalLog(String id, {int since = 0}) async {
+    final response = await _json(
+      'GET',
+      '/api/terminals/${Uri.encodeComponent(id)}/log?since=$since',
+    );
+    return RemoteTerminalLog.fromJson(response);
+  }
+
+  Future<void> writeTerminal(String id, String data) async {
+    await _json(
+      'POST',
+      '/api/terminals/${Uri.encodeComponent(id)}/input',
+      body: {'data': data},
+    );
+  }
+
+  Future<void> stopTerminal(String id) async {
+    await _json('POST', '/api/terminals/${Uri.encodeComponent(id)}/stop');
+  }
+
   Future<Map<String, dynamic>> _json(
     String method,
     String path, {
@@ -199,6 +231,33 @@ class RemoteDirectoryEntry {
       name: json['name'] as String? ?? '',
       path: json['path'] as String? ?? '',
       isDirectory: json['isDirectory'] == true,
+    );
+  }
+}
+
+class RemoteTerminalLog {
+  const RemoteTerminalLog({
+    required this.next,
+    required this.chunks,
+    required this.running,
+    this.exitCode,
+  });
+
+  final int next;
+  final List<String> chunks;
+  final bool running;
+  final int? exitCode;
+
+  factory RemoteTerminalLog.fromJson(Map<String, dynamic> json) {
+    return RemoteTerminalLog(
+      next: (json['next'] as num? ?? 0).toInt(),
+      chunks:
+          (json['chunks'] as List? ?? const <Object?>[])
+              .whereType<String>()
+              .toList(),
+      running: json['running'] == true,
+      exitCode:
+          json['exitCode'] is num ? (json['exitCode'] as num).toInt() : null,
     );
   }
 }

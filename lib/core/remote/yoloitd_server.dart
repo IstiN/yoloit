@@ -24,6 +24,9 @@ class YoloitdServer {
   final Map<String, Process> _runs = <String, Process>{};
   final Map<String, List<String>> _runLogs = <String, List<String>>{};
   final Map<String, int> _runExitCodes = <String, int>{};
+  final Map<String, Process> _terminals = <String, Process>{};
+  final Map<String, List<String>> _terminalChunks = <String, List<String>>{};
+  final Map<String, int> _terminalExitCodes = <String, int>{};
 
   int? get boundPort => _server?.port;
 
@@ -40,6 +43,10 @@ class YoloitdServer {
       process.kill();
     }
     _runs.clear();
+    for (final process in _terminals.values) {
+      process.kill();
+    }
+    _terminals.clear();
     await _server?.close(force: true);
     _server = null;
   }
@@ -75,6 +82,9 @@ class YoloitdServer {
       }
       if (path.length >= 2 && path[0] == 'api' && path[1] == 'runs') {
         return _handleRuns(request, method, path.skip(2).toList());
+      }
+      if (path.length >= 2 && path[0] == 'api' && path[1] == 'terminals') {
+        return _handleTerminals(request, method, path.skip(2).toList());
       }
       return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
     } catch (error, stackTrace) {
@@ -636,6 +646,100 @@ class YoloitdServer {
       return _json(<String, Object?>{'ok': ok});
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<shelf.Response> _handleTerminals(
+    shelf.Request request,
+    String method,
+    List<String> sub,
+  ) async {
+    if (sub.isEmpty && method == 'POST') {
+      final body = await _body(request);
+      final id = (body['id'] as String? ?? _nextId('terminal')).trim();
+      final cwd = (body['cwd'] as String? ?? store.rootDir.path).trim();
+      if (id.isEmpty) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'id required',
+        }, 400);
+      }
+      final directory = Directory(cwd.isEmpty ? store.rootDir.path : cwd);
+      if (!await directory.exists()) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'working directory not found',
+          'path': directory.path,
+        }, 404);
+      }
+      _terminals.remove(id)?.kill();
+      final rawEnv = body['env'];
+      final env =
+          rawEnv is Map
+              ? rawEnv.map(
+                (key, value) => MapEntry(key.toString(), value.toString()),
+              )
+              : const <String, String>{};
+      final shell = Platform.environment['SHELL'] ?? '/bin/sh';
+      final process = await Process.start(
+        shell,
+        <String>['-i'],
+        workingDirectory: directory.path,
+        environment: env.isEmpty ? null : env,
+      );
+      _terminals[id] = process;
+      _terminalChunks[id] = <String>[];
+      _terminalExitCodes.remove(id);
+      unawaited(_collectTerminal(id, process));
+      return _json(<String, Object?>{'ok': true, 'id': id, 'pid': process.pid});
+    }
+    if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
+      final since =
+          int.tryParse(request.url.queryParameters['since'] ?? '0') ?? 0;
+      final chunks = _terminalChunks[sub[0]] ?? const <String>[];
+      final start = since.clamp(0, chunks.length);
+      return _json(<String, Object?>{
+        'id': sub[0],
+        'next': chunks.length,
+        'chunks': chunks.skip(start).toList(),
+        'running': _terminals.containsKey(sub[0]),
+        if (_terminalExitCodes.containsKey(sub[0]))
+          'exitCode': _terminalExitCodes[sub[0]],
+      });
+    }
+    if (sub.length == 2 && sub[1] == 'input' && method == 'POST') {
+      final process = _terminals[sub[0]];
+      if (process == null) {
+        return _json(<String, Object?>{
+          'ok': false,
+          'error': 'terminal not found',
+        }, 404);
+      }
+      final body = await _body(request);
+      process.stdin.write(body['data'] as String? ?? '');
+      await process.stdin.flush();
+      return _json(<String, Object?>{'ok': true});
+    }
+    if (sub.length == 2 && sub[1] == 'stop' && method == 'POST') {
+      final process = _terminals.remove(sub[0]);
+      final ok = process?.kill() ?? false;
+      return _json(<String, Object?>{'ok': ok});
+    }
+    return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
+  }
+
+  Future<void> _collectTerminal(String id, Process process) async {
+    void add(String chunk) {
+      final chunks = _terminalChunks[id] ??= <String>[];
+      chunks.add(chunk);
+      if (chunks.length > 2000) chunks.removeRange(0, chunks.length - 2000);
+    }
+
+    process.stdout.transform(utf8.decoder).listen(add);
+    process.stderr.transform(utf8.decoder).listen(add);
+    final exitCode = await process.exitCode;
+    add('\n[exit $exitCode]\n');
+    _terminals.remove(id);
+    _terminalExitCodes[id] = exitCode;
   }
 
   Future<void> _collectRun(String id, Process process) async {

@@ -270,6 +270,47 @@ void main() {
       ),
     );
   });
+
+  test('server starts remote terminal and accepts input', () async {
+    final dir = await Directory.systemTemp.createTemp('yoloitd_terminal_');
+    addTearDown(() => dir.delete(recursive: true));
+
+    final store = YoloitdStore(rootDir: dir, actorId: 'tester');
+    final server = YoloitdServer(store: store, port: 0, token: 'secret');
+    await server.start();
+    addTearDown(server.stop);
+
+    final started = await _json(
+      server.boundPort!,
+      'POST',
+      '/api/terminals',
+      token: 'secret',
+      body: {'id': 'term-1', 'cwd': dir.path},
+    );
+    expect(started.status, 200);
+
+    await _json(
+      server.boundPort!,
+      'POST',
+      '/api/terminals/term-1/input',
+      token: 'secret',
+      body: {'data': 'pwd\nexit\n'},
+    );
+
+    Map<String, dynamic> log = const <String, dynamic>{};
+    for (var i = 0; i < 20; i++) {
+      log =
+          (await _json(
+            server.boundPort!,
+            'GET',
+            '/api/terminals/term-1/log',
+            token: 'secret',
+          )).body;
+      if ((log['chunks'] as List).join().contains(dir.path)) break;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    expect((log['chunks'] as List).join(), contains(dir.path));
+  });
 }
 
 Future<({int status, String body})> _request(

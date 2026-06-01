@@ -40,6 +40,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   late BoardTerminalConfig _config;
   AgentSession? _session;
   bool _restoring = false;
+  bool _starting = false;
 
   @override
   void initState() {
@@ -93,7 +94,10 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
       return;
     }
     setState(() => _restoring = true);
-    final restored = await _manager.ensureSession(_config);
+    final restored = await _manager.ensureSession(
+      _config,
+      remoteInfo: widget.remoteInfo,
+    );
     if (!mounted) return;
     setState(() {
       _session = restored;
@@ -123,11 +127,23 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
         sessionName.trim().isEmpty
             ? p.basename(trimmedDir)
             : sessionName.trim();
-    final session = await _manager.createSession(
-      sessionName: trimmedName,
-      workingDir: trimmedDir,
-      envGroupIds: envGroupIds,
-    );
+    setState(() => _starting = true);
+    late final AgentSession session;
+    try {
+      session = await _manager.createSession(
+        sessionName: trimmedName,
+        workingDir: trimmedDir,
+        envGroupIds: envGroupIds,
+        remoteInfo: widget.remoteInfo,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _starting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not start terminal: $error')),
+      );
+      return;
+    }
     if (!mounted) return;
     final nextConfig = BoardTerminalConfig(
       sessionId: session.id,
@@ -142,6 +158,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     setState(() {
       _config = nextConfig;
       _session = session;
+      _starting = false;
     });
     widget.onUpdateState({
       ...widget.panel.state,
@@ -152,7 +169,10 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   Future<void> _restartSession() async {
     if (!_config.isConfigured) return;
     setState(() => _restoring = true);
-    final session = await _manager.ensureSession(_config);
+    final session = await _manager.ensureSession(
+      _config,
+      remoteInfo: widget.remoteInfo,
+    );
     if (!mounted) return;
     setState(() {
       _session = session;
@@ -463,6 +483,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
         sessionName: _config.sessionName,
         workingDir: _config.workingDir,
         envGroupIds: envGroupIds,
+        remoteInfo: widget.remoteInfo,
       );
       if (!mounted) return;
       final updatedConfig = _config.copyWith(sessionId: session.id);
@@ -482,6 +503,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
       return _BoardTerminalSetupView(
         onStart: _startSession,
         remoteInfo: widget.remoteInfo,
+        starting: _starting,
       );
     }
     if (_restoring) {
@@ -660,7 +682,11 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
 }
 
 class _BoardTerminalSetupView extends StatefulWidget {
-  const _BoardTerminalSetupView({required this.onStart, this.remoteInfo});
+  const _BoardTerminalSetupView({
+    required this.onStart,
+    required this.starting,
+    this.remoteInfo,
+  });
 
   final Future<void> Function(
     String workingDir,
@@ -668,6 +694,7 @@ class _BoardTerminalSetupView extends StatefulWidget {
     List<String> envGroupIds,
   )
   onStart;
+  final bool starting;
   final RemoteBoardInfo? remoteInfo;
 
   @override
@@ -792,13 +819,24 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
           const Spacer(),
           FilledButton(
             onPressed:
-                _dirCtrl.text.trim().isEmpty
+                widget.starting || _dirCtrl.text.trim().isEmpty
                     ? null
-                    : () => widget.onStart(
-                      _dirCtrl.text,
-                      _nameCtrl.text,
-                      _selectedEnvGroupIds,
-                    ),
+                    : () async {
+                      try {
+                        await widget.onStart(
+                          _dirCtrl.text,
+                          _nameCtrl.text,
+                          _selectedEnvGroupIds,
+                        );
+                      } catch (error) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Could not start terminal: $error'),
+                          ),
+                        );
+                      }
+                    },
             style: FilledButton.styleFrom(
               backgroundColor: colors.accentGreen,
               foregroundColor: colors.background,
@@ -807,10 +845,17 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
-              'Start Terminal',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            child:
+                widget.starting
+                    ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text(
+                      'Start Terminal',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
           ),
         ],
       ),

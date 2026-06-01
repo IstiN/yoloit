@@ -17,8 +17,9 @@ class TerminalBackendService {
     required String workspacePath,
     String? label,
     Map<String, String>? extraEnv,
+    TerminalBackend? backendOverride,
   }) async {
-    final backend = _selectBackend();
+    final backend = backendOverride ?? _selectBackend();
     _bySession[sessionId] = backend;
     return backend.launch(
       sessionId: sessionId,
