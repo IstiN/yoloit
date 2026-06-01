@@ -680,11 +680,15 @@ class YoloitdServer {
               )
               : const <String, String>{};
       final shell = Platform.environment['SHELL'] ?? '/bin/sh';
+      final launcher = await _terminalLauncher(shell);
       final process = await Process.start(
-        shell,
-        <String>['-i'],
+        launcher.executable,
+        launcher.arguments,
         workingDirectory: directory.path,
-        environment: env.isEmpty ? null : env,
+        environment: <String, String>{
+          'TERM': 'xterm-256color',
+          if (env.isNotEmpty) ...env,
+        },
       );
       _terminals[id] = process;
       _terminalChunks[id] = <String>[];
@@ -726,6 +730,32 @@ class YoloitdServer {
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
+
+  Future<({String executable, List<String> arguments})> _terminalLauncher(
+    String shell,
+  ) async {
+    final script = Platform.isLinux ? await _findExecutable('script') : null;
+    if (script != null) {
+      return (
+        executable: script,
+        arguments: <String>['-q', '-f', '-c', shell, '/dev/null'],
+      );
+    }
+    return (executable: shell, arguments: <String>['-i']);
+  }
+
+  Future<String?> _findExecutable(String name) async {
+    final result = await Process.run(
+      Platform.environment['SHELL'] ?? '/bin/sh',
+      <String>['-lc', 'command -v ${_shellQuote(name)}'],
+    );
+    if (result.exitCode != 0) return null;
+    final path = (result.stdout as String).trim();
+    return path.isEmpty ? null : path.split('\n').first.trim();
+  }
+
+  static String _shellQuote(String value) =>
+      "'${value.replaceAll("'", "'\\''")}'";
 
   Future<void> _collectTerminal(String id, Process process) async {
     void add(String chunk) {
