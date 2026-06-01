@@ -12,6 +12,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
+import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -150,6 +151,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _panController.dispose();
     _transformController.dispose();
     _boardFocus.dispose();
+    unawaited(BoardShareServer.instance.stop());
     super.dispose();
   }
 
@@ -203,6 +205,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                   board: activeBoard,
                   onCreateBoard: () => _createBoard(context),
                   onConnectRemote: () => _connectRemoteYoloit(context),
+                  onShareBoard: () => _shareBoard(context),
                   onBoardSettings:
                       () => _showBoardSettings(context, activeBoard),
                   onDeleteBoard: () => _deleteBoard(context, activeBoard),
@@ -2445,6 +2448,24 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _shareBoard(BuildContext context) async {
+    try {
+      final info = await BoardShareServer.instance.start(
+        context.read<BoardCubit>(),
+      );
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _ShareBoardDialog(info: info),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Board share failed: $error')));
+    }
+  }
+
   Future<void> _showBoardSettings(
     BuildContext context,
     BoardDocument board,
@@ -2983,11 +3004,158 @@ class _ConnectRemoteYoloitDialogState
   }
 }
 
+class _ShareBoardDialog extends StatefulWidget {
+  const _ShareBoardDialog({required this.info});
+
+  final BoardShareServerInfo info;
+
+  @override
+  State<_ShareBoardDialog> createState() => _ShareBoardDialogState();
+}
+
+class _ShareBoardDialogState extends State<_ShareBoardDialog> {
+  bool _copiedUrl = false;
+  bool _copiedToken = false;
+  bool _stopping = false;
+
+  Future<void> _copy(String text, ValueChanged<bool> setCopied) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    setState(() => setCopied(true));
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => setCopied(false));
+  }
+
+  Future<void> _stopSharing() async {
+    setState(() => _stopping = true);
+    await BoardShareServer.instance.stop();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AlertDialog(
+      title: const Text('Share board'),
+      content: SizedBox(
+        width: 520,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Use Connect remote YoLoIT on another device and paste this URL and token.',
+              style: TextStyle(color: colors.textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            _ShareValueRow(
+              label: 'URL',
+              value: widget.info.url,
+              copied: _copiedUrl,
+              onCopy:
+                  () => _copy(widget.info.url, (value) => _copiedUrl = value),
+            ),
+            const SizedBox(height: 10),
+            _ShareValueRow(
+              label: 'Token',
+              value: widget.info.token,
+              copied: _copiedToken,
+              onCopy:
+                  () =>
+                      _copy(widget.info.token, (value) => _copiedToken = value),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The app must stay open. If the other Mac cannot connect, allow incoming connections in macOS Firewall.',
+              style: TextStyle(color: colors.textMuted, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _stopping ? null : _stopSharing,
+          child: Text(_stopping ? 'Stopping...' : 'Stop sharing'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Done'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShareValueRow extends StatelessWidget {
+  const _ShareValueRow({
+    required this.label,
+    required this.value,
+    required this.copied,
+    required this.onCopy,
+  });
+
+  final String label;
+  final String value;
+  final bool copied;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: colors.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  border: Border.all(color: colors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SelectableText(
+                  value,
+                  style: TextStyle(
+                    color: colors.textPrimary,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: copied ? 'Copied' : 'Copy $label',
+              onPressed: onCopy,
+              icon: Icon(copied ? Icons.check : Icons.copy, size: 18),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _BoardToolbar extends StatelessWidget {
   const _BoardToolbar({
     required this.board,
     required this.onCreateBoard,
     required this.onConnectRemote,
+    required this.onShareBoard,
     required this.onBoardSettings,
     required this.onDeleteBoard,
     required this.onOpenBoardOverview,
@@ -2997,6 +3165,7 @@ class _BoardToolbar extends StatelessWidget {
   final BoardDocument board;
   final VoidCallback onCreateBoard;
   final VoidCallback onConnectRemote;
+  final VoidCallback onShareBoard;
   final VoidCallback onBoardSettings;
   final VoidCallback onDeleteBoard;
   final VoidCallback onOpenBoardOverview;
@@ -3105,6 +3274,8 @@ class _BoardToolbar extends StatelessWidget {
                         onCreateBoard();
                       case 'remote':
                         onConnectRemote();
+                      case 'share':
+                        onShareBoard();
                       case 'settings':
                         onBoardSettings();
                       case 'delete':
@@ -3117,6 +3288,10 @@ class _BoardToolbar extends StatelessWidget {
                         PopupMenuItem(
                           value: 'remote',
                           child: Text('Connect remote YoLoIT'),
+                        ),
+                        PopupMenuItem(
+                          value: 'share',
+                          child: Text('Share board'),
                         ),
                         PopupMenuItem(
                           value: 'settings',
@@ -3135,6 +3310,11 @@ class _BoardToolbar extends StatelessWidget {
                   tooltip: 'Connect remote YoLoIT',
                   onPressed: onConnectRemote,
                   icon: const Icon(Icons.cloud_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Share board',
+                  onPressed: onShareBoard,
+                  icon: const Icon(Icons.ios_share_outlined),
                 ),
                 IconButton(
                   tooltip: 'Board settings',
@@ -3159,6 +3339,13 @@ class _BoardToolbar extends StatelessWidget {
                   onPressed: onConnectRemote,
                   icon: const Icon(Icons.cloud_outlined),
                   label: const Text('Remote'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  style: _toolbarButtonStyle(),
+                  onPressed: onShareBoard,
+                  icon: const Icon(Icons.ios_share_outlined),
+                  label: const Text('Share'),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(

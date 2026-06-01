@@ -392,6 +392,38 @@ class BoardCubit extends Cubit<BoardState> {
     );
   }
 
+  Future<BoardDocument?> replaceBoardSnapshotFromShare(
+    BoardDocument snapshot,
+  ) async {
+    final boards = state.boards;
+    final index = boards.indexWhere((board) => board.id == snapshot.id);
+    if (index == -1) return null;
+
+    final before = boards[index];
+    final revision = _historyRevision(before) + 1;
+    final metadata =
+        Map<String, dynamic>.from(snapshot.metadata)
+          ..remove('remote')
+          ..remove('remoteSource')
+          ..['historyRevision'] = revision;
+    final after = snapshot.copyWith(metadata: metadata);
+    final updated = [...boards]..[index] = after;
+
+    await _setBoards(updated, activeBoardId: state.activeBoardId ?? after.id);
+    await _appendHistory(
+      _historyEvent(
+        boardId: after.id,
+        type: 'board.sharedSnapshotUpdated',
+        entityType: 'board',
+        entityId: after.id,
+        revision: revision,
+        before: before.toJson(),
+        after: after.toJson(),
+      ),
+    );
+    return after;
+  }
+
   Future<void> deleteBoard(String id) async {
     if (state.boards.isEmpty) return;
     final board = state.boards.where((entry) => entry.id == id).firstOrNull;
