@@ -87,7 +87,11 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   }
 
   Future<void> _ensureConfiguredSession() async {
-    if (!_config.isConfigured || _config.sessionId.isEmpty) return;
+    if (!_config.isConfigured || _restoring || _starting) return;
+    if (_config.sessionId.isEmpty) {
+      await _createConfiguredSession();
+      return;
+    }
     final existing = _manager.sessionFor(_config.sessionId);
     if (existing != null) {
       if (mounted) setState(() => _session = existing);
@@ -102,6 +106,51 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     setState(() {
       _session = restored;
       _restoring = false;
+    });
+  }
+
+  Future<void> _createConfiguredSession() async {
+    final workingDir = _config.workingDir.trim();
+    if (workingDir.isEmpty) return;
+    final sessionName =
+        _config.sessionName.trim().isEmpty
+            ? p.basename(workingDir)
+            : _config.sessionName.trim();
+    setState(() => _starting = true);
+    late final AgentSession session;
+    try {
+      session = await _manager.createSession(
+        sessionName: sessionName,
+        workingDir: workingDir,
+        envGroupIds: _config.envGroupIds,
+        remoteInfo: widget.remoteInfo,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _starting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not start terminal: $error')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final nextConfig = _config.copyWith(
+      sessionId: session.id,
+      sessionName: session.displayName,
+      workingDir: workingDir,
+    );
+    context.read<BoardCubit>().updatePanelTitle(
+      widget.panel.id,
+      session.displayName,
+    );
+    setState(() {
+      _config = nextConfig;
+      _session = session;
+      _starting = false;
+    });
+    widget.onUpdateState({
+      ...widget.panel.state,
+      'config': nextConfig.toJson(),
     });
   }
 
@@ -168,6 +217,10 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
 
   Future<void> _restartSession() async {
     if (!_config.isConfigured) return;
+    if (_config.sessionId.isEmpty) {
+      await _createConfiguredSession();
+      return;
+    }
     setState(() => _restoring = true);
     final session = await _manager.ensureSession(
       _config,
