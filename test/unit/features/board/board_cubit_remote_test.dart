@@ -1,12 +1,11 @@
 import 'dart:io';
 
+import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:test/test.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_server.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
-import 'package:yoloit/features/board/model/board_models.dart';
 
 void main() {
   setUp(() {
@@ -55,6 +54,7 @@ void main() {
           bounds: panel.bounds.copyWith(width: 260, height: 180),
         ),
       );
+      await cubit.flushRemoteSync();
 
       final updated = await store.findBoard(remoteBoard.id);
       expect(updated!.panels.single.bounds.width, 260);
@@ -111,6 +111,7 @@ void main() {
           bounds: panel.bounds.copyWith(width: 260, height: 180),
         ),
       );
+      await cubit.flushRemoteSync();
 
       final serverBoard = await store.findBoard(remoteBoard.id);
       expect(serverBoard!.panels.single.bounds.width, 500);

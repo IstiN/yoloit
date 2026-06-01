@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -30,6 +31,11 @@ class BoardCubit extends Cubit<BoardState> {
   final BoardHistoryStore _historyStore;
   final String _actorId;
   bool _suppressRemoteSync = false;
+  Timer? _remoteSyncDebounce;
+  List<BoardDocument>? _pendingRemoteSyncBoards;
+  List<BoardDocument>? _pendingRemoteSyncCurrentBoards;
+  String? _pendingRemoteSyncActiveBoardId;
+  bool _remoteSyncInFlight = false;
 
   Future<void> load() async {
     if (state.isLoaded) return;
@@ -1177,7 +1183,7 @@ class BoardCubit extends Cubit<BoardState> {
         nextBoards: boards,
       );
       if (changedRemoteBoards.isNotEmpty) {
-        await _syncRemoteBoards(
+        _scheduleRemoteSync(
           changedRemoteBoards,
           currentBoards: boards,
           activeBoardId: activeBoardId,
@@ -1199,6 +1205,47 @@ class BoardCubit extends Cubit<BoardState> {
           return jsonEncode(previous.toJson()) != jsonEncode(board.toJson());
         })
         .toList(growable: false);
+  }
+
+  void _scheduleRemoteSync(
+    List<BoardDocument> boards, {
+    required List<BoardDocument> currentBoards,
+    required String? activeBoardId,
+  }) {
+    _pendingRemoteSyncBoards = boards;
+    _pendingRemoteSyncCurrentBoards = currentBoards;
+    _pendingRemoteSyncActiveBoardId = activeBoardId;
+    _remoteSyncDebounce?.cancel();
+    _remoteSyncDebounce = Timer(const Duration(milliseconds: 350), () {
+      unawaited(flushRemoteSync());
+    });
+  }
+
+  Future<void> flushRemoteSync() async {
+    _remoteSyncDebounce?.cancel();
+    _remoteSyncDebounce = null;
+    if (_remoteSyncInFlight) return;
+    final boards = _pendingRemoteSyncBoards;
+    final currentBoards = _pendingRemoteSyncCurrentBoards;
+    final activeBoardId = _pendingRemoteSyncActiveBoardId;
+    if (boards == null || boards.isEmpty || currentBoards == null) return;
+
+    _pendingRemoteSyncBoards = null;
+    _pendingRemoteSyncCurrentBoards = null;
+    _pendingRemoteSyncActiveBoardId = null;
+    _remoteSyncInFlight = true;
+    try {
+      await _syncRemoteBoards(
+        boards,
+        currentBoards: currentBoards,
+        activeBoardId: activeBoardId,
+      );
+    } finally {
+      _remoteSyncInFlight = false;
+    }
+    if (_pendingRemoteSyncBoards != null) {
+      await flushRemoteSync();
+    }
   }
 
   Future<void> _syncRemoteBoards(
@@ -1258,6 +1305,13 @@ class BoardCubit extends Cubit<BoardState> {
     } else {
       await prefs.setString(_activeBoardStorageKey, activeBoardId);
     }
+  }
+
+  @override
+  Future<void> close() async {
+    await flushRemoteSync();
+    _remoteSyncDebounce?.cancel();
+    return super.close();
   }
 
   BoardDocument _buildDefaultBoard({required String name}) {

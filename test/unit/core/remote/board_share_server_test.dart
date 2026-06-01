@@ -36,4 +36,31 @@ void main() {
     expect(renamed.name, 'Edited');
     expect(cubit.state.activeBoard!.name, 'Edited');
   });
+
+  test(
+    'share server exposes setup and filesystem APIs used by remote panels',
+    () async {
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      await cubit.load();
+
+      final info = await BoardShareServer.instance.start(cubit, port: 0);
+      addTearDown(BoardShareServer.instance.stop);
+
+      final client = YoloitRemoteClient(
+        baseUrl: 'http://127.0.0.1:${info.port}',
+        token: info.token,
+      );
+
+      final setup = await client.setupCheck();
+      expect(setup.packages, isNotEmpty);
+
+      final listing = await client.listDirectory(Directory.current.path);
+      expect(listing.path, Directory.current.path);
+      expect(
+        listing.entries.map((entry) => entry.name),
+        contains('pubspec.yaml'),
+      );
+    },
+  );
 }
