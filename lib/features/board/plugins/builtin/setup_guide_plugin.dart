@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/setup/setup_catalog.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -67,6 +68,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
   bool _installing = false;
   String? _error;
   String? _remoteRunId;
+  String? _lastScript;
   late Set<String> _selectedIds;
 
   bool get _isRemote => widget.renderContext.remoteInfo != null;
@@ -176,6 +178,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
             'No install command for selected packages on this OS.',
           );
         }
+        _lastScript = script;
         _appendLog('\$ $script');
         await for (final line in runSetupInstallScript(script)) {
           if (!mounted) return;
@@ -191,6 +194,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
           _selectedIds.toList()..sort(),
         );
         _remoteRunId = run.id;
+        _lastScript = run.script;
         _appendLog('\$ ${run.script}');
         _pollRemoteInstall(client, run.id);
       }
@@ -248,6 +252,17 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
     });
   }
 
+  String? _scriptFor(SetupCheckSnapshot snapshot) {
+    final commands =
+        snapshot.packages
+            .where((pkg) => _selectedIds.contains(pkg.id))
+            .map((pkg) => pkg.installAction?.command.trim() ?? '')
+            .where((command) => command.isNotEmpty)
+            .toList();
+    if (commands.isEmpty) return null;
+    return _lastScript ?? SetupCatalog.installBatchScript(commands);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -279,6 +294,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
             onRefresh: _refresh,
             onInstall:
                 _selectedIds.isEmpty || _installing ? null : _installSelected,
+            installScript: _scriptFor(snapshot),
           ),
           if (_error != null)
             Padding(
@@ -349,7 +365,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
   }
 }
 
-class _SetupHeader extends StatelessWidget {
+class _SetupHeader extends StatefulWidget {
   const _SetupHeader({
     required this.snapshot,
     required this.isRemote,
@@ -357,6 +373,7 @@ class _SetupHeader extends StatelessWidget {
     required this.selectedCount,
     required this.onRefresh,
     required this.onInstall,
+    required this.installScript,
   });
 
   final SetupCheckSnapshot snapshot;
@@ -365,11 +382,19 @@ class _SetupHeader extends StatelessWidget {
   final int selectedCount;
   final VoidCallback onRefresh;
   final VoidCallback? onInstall;
+  final String? installScript;
+
+  @override
+  State<_SetupHeader> createState() => _SetupHeaderState();
+}
+
+class _SetupHeaderState extends State<_SetupHeader> {
+  bool _copied = false;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final runtime = snapshot.runtime;
+    final runtime = widget.snapshot.runtime;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Column(
@@ -385,7 +410,9 @@ class _SetupHeader extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  isRemote ? 'Remote machine setup' : 'Local machine setup',
+                  widget.isRemote
+                      ? 'Remote machine setup'
+                      : 'Local machine setup',
                   style: TextStyle(
                     color: colors.textPrimary,
                     fontSize: 14,
@@ -395,7 +422,7 @@ class _SetupHeader extends StatelessWidget {
               ),
               IconButton(
                 tooltip: 'Refresh',
-                onPressed: installing ? null : onRefresh,
+                onPressed: widget.installing ? null : widget.onRefresh,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 color: colors.textMuted,
               ),
@@ -412,11 +439,11 @@ class _SetupHeader extends StatelessWidget {
               _Badge(label: runtime.packageManager),
               _Badge(
                 label:
-                    snapshot.allRequiredAvailable
+                    widget.snapshot.allRequiredAvailable
                         ? 'required ready'
                         : 'required missing',
                 color:
-                    snapshot.allRequiredAvailable
+                    widget.snapshot.allRequiredAvailable
                         ? colors.accentGreen
                         : colors.accentOrange,
               ),
@@ -426,9 +453,9 @@ class _SetupHeader extends StatelessWidget {
           SizedBox(
             height: 34,
             child: ElevatedButton.icon(
-              onPressed: onInstall,
+              onPressed: widget.onInstall,
               icon:
-                  installing
+                  widget.installing
                       ? SizedBox(
                         width: 14,
                         height: 14,
@@ -439,9 +466,9 @@ class _SetupHeader extends StatelessWidget {
                       )
                       : const Icon(Icons.play_arrow_rounded, size: 17),
               label: Text(
-                installing
+                widget.installing
                     ? 'Installing...'
-                    : 'Install selected ($selectedCount)',
+                    : 'Install selected (${widget.selectedCount})',
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.accentBlue,
@@ -452,6 +479,42 @@ class _SetupHeader extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Output log is read-only. Copy command if you want to inspect or run it manually.',
+                  style: TextStyle(color: colors.textMuted, fontSize: 10),
+                ),
+              ),
+              TextButton.icon(
+                onPressed:
+                    widget.installScript == null
+                        ? null
+                        : () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: widget.installScript!),
+                          );
+                          if (!mounted) return;
+                          setState(() => _copied = true);
+                          await Future<void>.delayed(
+                            const Duration(seconds: 2),
+                          );
+                          if (mounted) setState(() => _copied = false);
+                        },
+                icon: Icon(_copied ? Icons.check : Icons.copy, size: 14),
+                label: Text(_copied ? 'Copied' : 'Copy command'),
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.accentBlue,
+                  textStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

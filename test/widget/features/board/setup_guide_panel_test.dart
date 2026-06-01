@@ -67,5 +67,7 @@ void main() {
 
     expect(find.text('Codex CLI'), findsOneWidget);
     expect(find.textContaining('Install selected'), findsOneWidget);
+    expect(find.text('Copy command'), findsOneWidget);
+    expect(find.textContaining('read-only'), findsOneWidget);
   });
 }

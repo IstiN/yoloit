@@ -9,7 +9,11 @@ void main() {
     ], SetupTargetOs.linux);
 
     expect(linuxScript, contains('apt-get install -y git'));
+    expect(linuxScript, contains('npm install -g @openai/codex'));
     expect(linuxScript, contains('chatgpt.com/codex/install.sh'));
+    expect(linuxScript, contains('==> [1]'));
+    expect(linuxScript, contains('==> [2]'));
+    expect(linuxScript, contains(r'failed: $code'));
   });
 
   test('check snapshot serializes package install metadata', () {

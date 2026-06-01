@@ -266,7 +266,8 @@ class SetupCatalog {
           command: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
         ),
         SetupTargetOs.linux: SetupInstallAction(
-          command: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+          command:
+              'if command -v npm >/dev/null 2>&1; then npm install -g @openai/codex; else curl -fsSL https://chatgpt.com/codex/install.sh | sh; fi',
         ),
         SetupTargetOs.windows: SetupInstallAction(
           command:
@@ -405,14 +406,31 @@ class SetupCatalog {
   }
 
   static String installScript(Iterable<String> packageIds, SetupTargetOs os) {
+    final selected = packageIds.map((id) => id.trim()).toSet();
     final commands = <String>[];
-    for (final id in packageIds) {
-      final spec = packages.where((pkg) => pkg.id == id).firstOrNull;
-      final action = spec?.installAction(os);
+    for (final spec in packages) {
+      if (!selected.contains(spec.id)) continue;
+      final action = spec.installAction(os);
       if (action == null || action.command.trim().isEmpty) continue;
       commands.add(_normalizeInstallCommand(action.command.trim(), os));
     }
-    return commands.join(' && ');
+    return installBatchScript(commands);
+  }
+
+  static String installBatchScript(Iterable<String> commands) {
+    final buffer = StringBuffer('set +e\n');
+    var index = 0;
+    for (final command in commands) {
+      final trimmed = command.trim();
+      if (trimmed.isEmpty) continue;
+      index++;
+      buffer.writeln('echo "==> [$index] ${_escapeDoubleQuoted(trimmed)}"');
+      buffer.writeln('($trimmed)');
+      buffer.writeln(
+        'code=\$?; if [ \$code -eq 0 ]; then echo "==> [$index] ok"; else echo "==> [$index] failed: \$code"; fi',
+      );
+    }
+    return buffer.toString().trim();
   }
 
   static String _normalizeInstallCommand(String command, SetupTargetOs os) {
@@ -432,6 +450,17 @@ class SetupCatalog {
         !File('/bin/sudo').existsSync();
   }
 
+  static SetupInstallAction? _normalizedAction(
+    SetupInstallAction? action,
+    SetupTargetOs os,
+  ) {
+    if (action == null) return null;
+    return SetupInstallAction(
+      command: _normalizeInstallCommand(action.command, os),
+      requiresInteraction: action.requiresInteraction,
+    );
+  }
+
   static Future<SetupPackageStatus> _checkPackage(
     SetupPackageSpec spec,
     SetupTargetOs os,
@@ -446,7 +475,7 @@ class SetupCatalog {
         command: spec.command,
         required: spec.required,
         available: false,
-        installAction: spec.installAction(os),
+        installAction: _normalizedAction(spec.installAction(os), os),
       );
     }
     final version = await _version(path, spec.versionArgs);
@@ -459,7 +488,7 @@ class SetupCatalog {
       required: spec.required,
       available: true,
       version: version,
-      installAction: spec.installAction(os),
+      installAction: _normalizedAction(spec.installAction(os), os),
     );
   }
 
@@ -588,10 +617,11 @@ class SetupCatalog {
 
   static String _shellQuote(String value) =>
       "'${value.replaceAll("'", "'\\''")}'";
-}
 
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
+  static String _escapeDoubleQuoted(String value) => value
+      .replaceAll(r'\', r'\\')
+      .replaceAll('"', r'\"')
+      .replaceAll(r'$', r'\$');
 }
 
 Stream<String> runSetupInstallScript(
