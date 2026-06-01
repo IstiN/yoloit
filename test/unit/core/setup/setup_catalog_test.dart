@@ -16,6 +16,21 @@ void main() {
     expect(linuxScript, contains(r'failed: $code'));
   });
 
+  test('catalog includes Kimi Code CLI install actions', () {
+    final kimi = SetupCatalog.packages.singleWhere((pkg) => pkg.id == 'kimi');
+
+    expect(kimi.name, 'Kimi Code CLI');
+    expect(kimi.command, 'kimi');
+    expect(
+      kimi.installAction(SetupTargetOs.linux)?.command,
+      contains('https://code.kimi.com/kimi-code/install.sh'),
+    );
+    expect(
+      kimi.installAction(SetupTargetOs.windows)?.command,
+      contains('https://code.kimi.com/kimi-code/install.ps1'),
+    );
+  });
+
   test('check snapshot serializes package install metadata', () {
     const snapshot = SetupCheckSnapshot(
       runtime: SetupRuntimeInfo(

@@ -48,6 +48,16 @@ void main() {
                     available: false,
                     installAction: SetupInstallAction(command: 'install codex'),
                   ),
+                  SetupPackageStatus(
+                    id: 'kimi',
+                    name: 'Kimi Code CLI',
+                    category: SetupPackageCategory.agents,
+                    description: 'Moonshot AI terminal coding agent',
+                    command: 'kimi',
+                    required: false,
+                    available: false,
+                    installAction: SetupInstallAction(command: 'install kimi'),
+                  ),
                 ],
               ),
               renderContext: BoardPanelRenderContext(
@@ -66,6 +76,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Codex CLI'), findsOneWidget);
+    expect(find.text('Kimi Code CLI'), findsOneWidget);
     expect(find.textContaining('Install selected'), findsOneWidget);
     expect(find.text('Copy command'), findsOneWidget);
     expect(find.textContaining('read-only'), findsOneWidget);

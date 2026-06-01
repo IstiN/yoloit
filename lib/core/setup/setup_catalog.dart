@@ -315,6 +315,29 @@ class SetupCatalog {
       },
     ),
     SetupPackageSpec(
+      id: 'kimi',
+      name: 'Kimi Code CLI',
+      category: SetupPackageCategory.agents,
+      description: 'Moonshot AI terminal coding agent.',
+      command: 'kimi',
+      versionArgs: <String>['--version'],
+      install: <SetupTargetOs, SetupInstallAction>{
+        SetupTargetOs.macos: SetupInstallAction(
+          command:
+              'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+        ),
+        SetupTargetOs.linux: SetupInstallAction(
+          command:
+              'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash',
+        ),
+        SetupTargetOs.windows: SetupInstallAction(
+          command:
+              'powershell -ExecutionPolicy ByPass -c "irm https://code.kimi.com/kimi-code/install.ps1 | iex"',
+          requiresInteraction: true,
+        ),
+      },
+    ),
+    SetupPackageSpec(
       id: 'opencode',
       name: 'OpenCode',
       category: SetupPackageCategory.agents,

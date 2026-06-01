@@ -347,7 +347,11 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
                   onToggle: _toggle,
                 ),
                 if (_log.isNotEmpty)
-                  _InstallLog(lines: _log, controller: _logScroll),
+                  _InstallLog(
+                    lines: _log,
+                    controller: _logScroll,
+                    onCopy: () => _copyText(_log.join('\n')),
+                  ),
                 if (_remoteRunId != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -360,6 +364,17 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _copyText(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(
+        content: Text('Copied log'),
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -672,10 +687,15 @@ class _PackageTile extends StatelessWidget {
 }
 
 class _InstallLog extends StatelessWidget {
-  const _InstallLog({required this.lines, required this.controller});
+  const _InstallLog({
+    required this.lines,
+    required this.controller,
+    required this.onCopy,
+  });
 
   final List<String> lines;
   final ScrollController controller;
+  final VoidCallback onCopy;
 
   @override
   Widget build(BuildContext context) {
@@ -689,25 +709,66 @@ class _InstallLog extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: colors.border),
       ),
-      child: ListView.builder(
-        controller: controller,
-        itemCount: lines.length,
-        itemBuilder: (_, index) {
-          final line = lines[index];
-          return Text(
-            line,
-            style: TextStyle(
-              color:
-                  line.startsWith('[exit 0]')
-                      ? colors.accentGreen
-                      : line.startsWith('[error]') || line.contains('[exit ')
-                      ? Colors.red.shade300
-                      : colors.textPrimary,
-              fontFamily: 'monospace',
-              fontSize: 10,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Output log',
+                  style: TextStyle(
+                    color: colors.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 26,
+                child: TextButton.icon(
+                  onPressed: lines.isEmpty ? null : onCopy,
+                  icon: const Icon(Icons.copy, size: 13),
+                  label: const Text('Copy log'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: colors.accentBlue,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    textStyle: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: SelectionArea(
+              child: ListView.builder(
+                controller: controller,
+                itemCount: lines.length,
+                itemBuilder: (_, index) {
+                  final line = lines[index];
+                  return Text(
+                    line,
+                    style: TextStyle(
+                      color:
+                          line.startsWith('[exit 0]')
+                              ? colors.accentGreen
+                              : line.startsWith('[error]') ||
+                                  line.contains('[exit ')
+                              ? Colors.red.shade300
+                              : colors.textPrimary,
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                    ),
+                  );
+                },
+              ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
