@@ -416,7 +416,7 @@ class AgentConfigService {
       'kimi' => 'kimi --output-format stream-json',
       'codex' =>
         'codex exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox',
-      'copilot' => 'copilot --output-format json --yolo',
+      'copilot' => 'copilot --output-format json',
       _ => '',
     };
   }

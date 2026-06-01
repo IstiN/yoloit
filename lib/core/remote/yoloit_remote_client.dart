@@ -28,7 +28,10 @@ class YoloitRemoteClient {
         .toList();
   }
 
-  Future<BoardDocument> fetchBoard(String remoteBoardId) async {
+  Future<BoardDocument> fetchBoard(
+    String remoteBoardId, {
+    BoardViewport? viewportOverride,
+  }) async {
     final response = await _json(
       'GET',
       '/api/boards/${Uri.encodeComponent(remoteBoardId)}',
@@ -37,6 +40,7 @@ class YoloitRemoteClient {
       response,
       baseUrl: baseUri.toString(),
       token: token,
+      viewportOverride: viewportOverride,
     );
   }
 
@@ -54,6 +58,7 @@ class YoloitRemoteClient {
       Map<String, dynamic>.from(updated),
       baseUrl: remote.url,
       token: remote.token,
+      viewportOverride: board.viewport,
     );
   }
 
@@ -354,6 +359,7 @@ BoardDocument remoteBoardFromJson(
   Map<String, dynamic> json, {
   required String baseUrl,
   String? token,
+  BoardViewport? viewportOverride,
 }) {
   final remoteId = json['id'] as String;
   final metadata = Map<String, dynamic>.from(json['metadata'] as Map? ?? {});
@@ -368,7 +374,7 @@ BoardDocument remoteBoardFromJson(
   return BoardDocument(
     id: remoteLocalBoardId(baseUrl, remoteId),
     name: json['name'] as String? ?? 'Remote board',
-    viewport: _remoteViewport(json['viewport']),
+    viewport: viewportOverride ?? _remoteViewport(json['viewport']),
     panels: _remotePanels(json['panels']),
     links: _remoteLinks(json['links']),
     drawings: _remoteDrawings(json['drawings']),
@@ -387,7 +393,6 @@ Map<String, dynamic> boardToRemoteJson(BoardDocument board) {
     if (remote != null) 'id': remote.boardId,
     if (remote?.revision != null) 'expectedRevision': remote!.revision,
     'name': board.name,
-    'viewport': board.viewport.toJson(),
     'panels': board.panels.map((panel) => panel.toJson()).toList(),
     'links': board.links.map((link) => link.toJson()).toList(),
     'drawings': board.drawings.map((drawing) => drawing.toJson()).toList(),

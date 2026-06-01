@@ -355,8 +355,7 @@ class YoloitdServer {
   static bool _isSnapshotUpdate(Map<String, dynamic> body) {
     return body.containsKey('panels') ||
         body.containsKey('links') ||
-        body.containsKey('drawings') ||
-        body.containsKey('viewport');
+        body.containsKey('drawings');
   }
 
   static int? _expectedRevision(Map<String, dynamic> body) {
@@ -386,10 +385,7 @@ class YoloitdServer {
     }
     return current.copyWith(
       name: body['name'] as String? ?? current.name,
-      viewport:
-          body['viewport'] is Map
-              ? Map<String, dynamic>.from(body['viewport'] as Map)
-              : current.viewport,
+      viewport: current.viewport,
       panels:
           body['panels'] is List
               ? (body['panels'] as List)
@@ -812,8 +808,17 @@ class YoloitdServer {
   Future<({String executable, List<String> arguments})> _terminalLauncher(
     String shell,
   ) async {
-    final script = Platform.isLinux ? await _findExecutable('script') : null;
+    final script =
+        (Platform.isLinux || Platform.isMacOS)
+            ? await _findExecutable('script')
+            : null;
     if (script != null) {
+      if (Platform.isMacOS) {
+        return (
+          executable: script,
+          arguments: <String>['-q', '/dev/null', shell, '-i'],
+        );
+      }
       return (
         executable: script,
         arguments: <String>['-q', '-f', '-c', shell, '/dev/null'],

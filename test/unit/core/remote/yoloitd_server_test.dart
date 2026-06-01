@@ -141,9 +141,55 @@ void main() {
       token: 'secret',
     );
     expect(full.body['name'], 'Snapshot updated');
+    final viewport = full.body['viewport'] as Map<String, dynamic>;
+    expect(viewport['scale'], 1.0);
     expect((full.body['panels'] as List), hasLength(1));
     expect(((full.body['panels'] as List).single as Map)['title'], 'Shape');
     expect((full.body['links'] as List), hasLength(1));
+  });
+
+  test('server ignores viewport-only updates from UI clients', () async {
+    final dir = await Directory.systemTemp.createTemp('yoloitd_viewport_');
+    addTearDown(() => dir.delete(recursive: true));
+    final server = YoloitdServer(
+      store: YoloitdStore(rootDir: dir, actorId: 'test'),
+      port: 0,
+      token: 'secret',
+    );
+    await server.start();
+    addTearDown(server.stop);
+
+    final created = await _json(
+      server.boundPort!,
+      'POST',
+      '/api/boards',
+      token: 'secret',
+      body: {'name': 'Viewport'},
+    );
+    final board = created.body['board'] as Map<String, dynamic>;
+
+    await _json(
+      server.boundPort!,
+      'PUT',
+      '/api/boards/${board['id']}',
+      token: 'secret',
+      body: {
+        'viewport': {
+          'scale': 0.25,
+          'translation': {'dx': 400, 'dy': -200},
+        },
+      },
+    );
+
+    final full = await _json(
+      server.boundPort!,
+      'GET',
+      '/api/boards/${board['id']}',
+      token: 'secret',
+    );
+    final viewport = full.body['viewport'] as Map<String, dynamic>;
+    expect(viewport['scale'], 1.0);
+    expect(full.body['metadata'], isNot(contains('historyRevision')));
   });
 
   test('server rejects stale full board snapshots', () async {

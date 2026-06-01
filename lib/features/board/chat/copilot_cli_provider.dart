@@ -74,7 +74,7 @@ DateTime _copilotSessionModifiedAt(Directory sessionDir) {
 
 /// [ChatProvider] implementation that wraps the GitHub Copilot CLI.
 ///
-/// Runs `copilot` with `--output-format json --yolo` and parses
+/// Runs `copilot` with `--output-format json` and parses
 /// the NDJSON output into [ChatEvent] objects.
 class CopilotCliProvider extends ChatProvider {
   CopilotCliProvider({
@@ -105,8 +105,8 @@ class CopilotCliProvider extends ChatProvider {
 
   @override
   List<ChatModelInfo> get availableModels {
-    final catalogModels =
-        ProviderModelCatalogService.instance.modelsForProvider(agentId);
+    final catalogModels = ProviderModelCatalogService.instance
+        .modelsForProvider(agentId);
     if (catalogModels != null && catalogModels.isNotEmpty) {
       return catalogModels;
     }
@@ -194,7 +194,9 @@ class CopilotCliProvider extends ChatProvider {
         "'",
       );
       final resumeKey =
-          resumeOverrideId ?? _sessionIds[config.sessionName] ?? safeSessionName;
+          resumeOverrideId ??
+          _sessionIds[config.sessionName] ??
+          safeSessionName;
       final useResume = !isFirstMessage;
       if (!useResume) {
         args.addAll(['--name', safeSessionName]);
@@ -224,8 +226,12 @@ class CopilotCliProvider extends ChatProvider {
     args.addAll(['-p', effectiveMessage]);
 
     var rawCommand = configObj?.launchCommand.trim() ?? '';
-    if (rawCommand.isEmpty || rawCommand == 'copilot' || rawCommand == 'copilot --allow-all') {
-      rawCommand = AgentConfigService.defaultBoardChatCommand(configObj?.streamAdapter ?? 'copilot');
+    if (rawCommand.isEmpty ||
+        rawCommand == 'copilot' ||
+        rawCommand == 'copilot --allow-all') {
+      rawCommand = AgentConfigService.defaultBoardChatCommand(
+        configObj?.streamAdapter ?? 'copilot',
+      );
     }
 
     final cmdParts = _splitCommand(rawCommand);
@@ -420,7 +426,9 @@ class CopilotCliProvider extends ChatProvider {
         onTimeout: () => -1,
       );
       if (exitCode == -1) {
-        debugPrint('[CopilotCli] SIGTERM ignored, sending SIGKILL: $sessionName');
+        debugPrint(
+          '[CopilotCli] SIGTERM ignored, sending SIGKILL: $sessionName',
+        );
         process.kill(ProcessSignal.sigkill);
         await process.exitCode.timeout(
           const Duration(seconds: 1),

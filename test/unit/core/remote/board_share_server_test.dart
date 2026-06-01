@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/model/board_models.dart';
 
 void main() {
   setUp(() {
@@ -32,9 +33,16 @@ void main() {
     final remoteBoard = await client.fetchBoard(sourceBoard.id);
     expect(remoteBoard.name, 'Shared board');
 
-    final renamed = await client.putBoard(remoteBoard.copyWith(name: 'Edited'));
+    final renamed = await client.putBoard(
+      remoteBoard.copyWith(
+        name: 'Edited',
+        viewport: const BoardViewport(scale: 0.4),
+      ),
+    );
     expect(renamed.name, 'Edited');
+    expect(renamed.viewport.scale, 0.4);
     expect(cubit.state.activeBoard!.name, 'Edited');
+    expect(cubit.state.activeBoard!.viewport.scale, sourceBoard.viewport.scale);
   });
 
   test(

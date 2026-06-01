@@ -1202,7 +1202,8 @@ class BoardCubit extends Cubit<BoardState> {
           if (remoteInfoForBoard(board) == null) return false;
           final previous = previousById[board.id];
           if (previous == null) return false;
-          return jsonEncode(previous.toJson()) != jsonEncode(board.toJson());
+          return jsonEncode(boardToRemoteJson(previous)) !=
+              jsonEncode(boardToRemoteJson(board));
         })
         .toList(growable: false);
   }
@@ -1268,7 +1269,7 @@ class BoardCubit extends Cubit<BoardState> {
           replacements[board.id] = await YoloitRemoteClient(
             baseUrl: remote.url,
             token: remote.token,
-          ).fetchBoard(remote.boardId);
+          ).fetchBoard(remote.boardId, viewportOverride: board.viewport);
           debugPrint(
             '[BoardCubit] refreshed stale remote board ${board.id} after revision conflict',
           );

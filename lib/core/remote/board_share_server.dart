@@ -212,7 +212,7 @@ class BoardShareServer {
       }
       final snapshot = BoardDocument.fromJson(
         Map<String, dynamic>.from(body)..['id'] = board.id,
-      );
+      ).copyWith(viewport: board.viewport);
       final updated = await cubit.replaceBoardSnapshotFromShare(snapshot);
       if (updated == null) {
         return _json(<String, Object?>{
@@ -530,8 +530,17 @@ class BoardShareServer {
   Future<({String executable, List<String> arguments})> _terminalLauncher(
     String shell,
   ) async {
-    final script = Platform.isLinux ? await _findExecutable('script') : null;
+    final script =
+        (Platform.isLinux || Platform.isMacOS)
+            ? await _findExecutable('script')
+            : null;
     if (script != null) {
+      if (Platform.isMacOS) {
+        return (
+          executable: script,
+          arguments: <String>['-q', '/dev/null', shell, '-i'],
+        );
+      }
       return (
         executable: script,
         arguments: <String>['-q', '-f', '-c', shell, '/dev/null'],
