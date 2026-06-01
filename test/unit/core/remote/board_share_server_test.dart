@@ -61,6 +61,17 @@ void main() {
         listing.entries.map((entry) => entry.name),
         contains('pubspec.yaml'),
       );
+
+      final defaultListing = await client.listDirectory(null);
+      final home =
+          Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+      if (home != null && home.trim().isNotEmpty) {
+        expect(defaultListing.path, home.trim());
+        expect(
+          defaultListing.roots.map((entry) => entry.name),
+          contains('Home'),
+        );
+      }
     },
   );
 }

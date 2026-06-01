@@ -240,6 +240,39 @@ void main() {
     },
   );
 
+  test('server lists user home by default for folder picking', () async {
+    final dir = await Directory.systemTemp.createTemp('yoloitd_files_home_');
+    addTearDown(() => dir.delete(recursive: true));
+
+    final store = YoloitdStore(rootDir: dir, actorId: 'tester');
+    final server = YoloitdServer(store: store, port: 0, token: 'secret');
+    await server.start();
+    addTearDown(server.stop);
+
+    final response = await _json(
+      server.boundPort!,
+      'GET',
+      '/api/files',
+      token: 'secret',
+    );
+
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    expect(response.status, 200);
+    if (home != null && home.trim().isNotEmpty) {
+      expect(response.body['path'], home.trim());
+      expect(
+        response.body['roots'],
+        contains(
+          allOf(
+            containsPair('name', 'Home'),
+            containsPair('path', home.trim()),
+          ),
+        ),
+      );
+    }
+  });
+
   test('server creates remote directories for folder picking', () async {
     final dir = await Directory.systemTemp.createTemp('yoloitd_mkdir_');
     addTearDown(() => dir.delete(recursive: true));

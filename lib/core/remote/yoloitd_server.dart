@@ -243,7 +243,7 @@ class YoloitdServer {
         }, 400);
       }
       final parent = Directory(
-        parentPath.isEmpty ? store.rootDir.path : parentPath,
+        parentPath.isEmpty ? _defaultFileRoot() : parentPath,
       );
       if (!await parent.exists()) {
         return _json(<String, Object?>{
@@ -263,7 +263,7 @@ class YoloitdServer {
 
   Future<shelf.Response> _listFiles(String? requested) async {
     final directory = Directory(
-      requested == null || requested.isEmpty ? store.rootDir.path : requested,
+      requested == null || requested.isEmpty ? _defaultFileRoot() : requested,
     );
     if (!await directory.exists()) {
       return _json(<String, Object?>{
@@ -315,18 +315,31 @@ class YoloitdServer {
   }
 
   List<Map<String, Object?>> _fileRoots() {
-    final roots = <String>{store.rootDir.path, Directory.current.path};
-    final home = Platform.environment['HOME'];
-    if (home != null && home.trim().isNotEmpty) roots.add(home.trim());
-    return roots
-        .map(
-          (path) => <String, Object?>{
-            'name': path == store.rootDir.path ? 'YoLoIT data' : path,
-            'path': path,
-            'isDirectory': true,
-          },
-        )
-        .toList();
+    final roots = <Map<String, Object?>>[];
+    final seen = <String>{};
+    void addRoot(String name, String? path) {
+      final value = path?.trim();
+      if (value == null || value.isEmpty || !seen.add(value)) return;
+      roots.add(<String, Object?>{
+        'name': name,
+        'path': value,
+        'isDirectory': true,
+      });
+    }
+
+    addRoot('Home', _homePath());
+    addRoot('YoLoIT data', store.rootDir.path);
+    addRoot('Current', Directory.current.path);
+    return roots;
+  }
+
+  String _defaultFileRoot() => _homePath() ?? store.rootDir.path;
+
+  static String? _homePath() {
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final trimmed = home?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   static String _fileName(String path) {

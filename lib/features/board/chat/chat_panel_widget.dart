@@ -102,6 +102,28 @@ Widget _buildProviderBadge(BuildContext context, String providerName) {
   );
 }
 
+@visibleForTesting
+List<(String, String)> buildChatProviderOptions(Iterable<AgentConfig> configs) {
+  final byId = <String, String>{};
+  for (final cfg in configs) {
+    if (cfg.streamAdapter == null || !cfg.visible) continue;
+    byId[cfg.id] = cfg.displayName;
+  }
+  byId.putIfAbsent('local', () => 'Local LLM');
+  return byId.entries.map((e) => (e.key, e.value)).toList();
+}
+
+@visibleForTesting
+String? resolveChatProviderSelection(
+  String selectedProvider,
+  List<(String, String)> providers,
+) {
+  if (providers.any((p) => p.$1 == selectedProvider)) {
+    return selectedProvider;
+  }
+  return providers.firstOrNull?.$1;
+}
+
 /// The chat UI rendered inside a board panel.
 ///
 /// Manages its own [ChatProvider] instance, message list, and streaming state.
@@ -3757,14 +3779,24 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
   }
 
   List<(String, String)> get _providers {
-    final list = <(String, String)>[];
-    for (final cfg in AgentConfigService.instance.configs) {
-      if (cfg.streamAdapter != null && cfg.visible) {
-        list.add((cfg.id, cfg.displayName));
+    return buildChatProviderOptions(AgentConfigService.instance.configs);
+  }
+
+  void _normalizeProviderSelection() {
+    final provider = resolveChatProviderSelection(
+      _selectedProvider,
+      _providers,
+    );
+    if (provider != null && provider != _selectedProvider) {
+      _selectedProvider = provider;
+      final models = _modelsForProvider;
+      if (models.isNotEmpty && !models.any((m) => m.id == _selectedModel)) {
+        _selectedModel =
+            models
+                .firstWhere((m) => m.isDefault, orElse: () => models.first)
+                .id;
       }
     }
-    list.add(('local', 'Local LLM'));
-    return list;
   }
 
   List<ChatModelInfo> get _modelsForProvider {
@@ -3821,6 +3853,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     _selectedProvider = widget.config.provider;
     _selectedModel = widget.config.model;
     _selectedEnvGroupIds = List<String>.from(widget.config.envGroupIds);
+    _normalizeProviderSelection();
     _checkProviderInstalled(_selectedProvider);
     final cfg = AgentConfigService.instance.configForAgent(_selectedProvider);
     final adapter = cfg?.streamAdapter ?? _selectedProvider;
@@ -4061,6 +4094,11 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     );
     final inputFill = colors.surfaceElevated;
     final dropdownFill = colors.surface;
+    final providers = _providers;
+    final selectedProvider = resolveChatProviderSelection(
+      _selectedProvider,
+      providers,
+    );
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -4077,12 +4115,12 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: _selectedProvider,
+                value: selectedProvider,
                 isExpanded: true,
                 dropdownColor: dropdownFill,
                 style: inputTextStyle,
                 items:
-                    _providers
+                    providers
                         .map(
                           (p) => DropdownMenuItem(
                             value: p.$1,

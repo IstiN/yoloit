@@ -94,6 +94,8 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   Object? _error;
   bool _loading = false;
   late String _path;
+  late final TextEditingController _searchController;
+  String _query = '';
   final Set<String> _selectedFiles = <String>{};
 
   bool get _isRemote => widget.remoteInfo != null;
@@ -101,8 +103,25 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   @override
   void initState() {
     super.initState();
-    _path = widget.initialPath?.trim() ?? '';
+    _searchController =
+        TextEditingController()..addListener(() {
+          setState(() => _query = _searchController.text.trim());
+        });
+    _path = _initialPath();
     unawaited(_load(_path));
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  String _initialPath() {
+    final explicit = widget.initialPath?.trim();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    if (_isRemote) return '';
+    return _localHomePath() ?? Directory.current.path;
   }
 
   Future<void> _load(String path) async {
@@ -119,6 +138,7 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
       setState(() {
         _listing = listing;
         _path = listing.path;
+        _searchController.clear();
         _selectedFiles.clear();
       });
     } catch (error) {
@@ -162,7 +182,7 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   }
 
   Future<_DirectoryListing> _loadLocal(String rawPath) async {
-    final directory = Directory(rawPath);
+    final directory = Directory(_expandLocalPath(rawPath));
     if (!await directory.exists()) {
       throw FileSystemException('Directory not found', directory.path);
     }
@@ -194,19 +214,37 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   }
 
   List<_FileEntry> _localRoots() {
-    final roots = <String>{Directory.current.path};
-    final home = Platform.environment['HOME'];
-    if (home != null && home.trim().isNotEmpty) roots.add(home.trim());
-    roots.add(Platform.pathSeparator);
-    return roots
-        .map(
-          (path) => _FileEntry(
-            name: path == Platform.pathSeparator ? path : p.basename(path),
-            path: path,
-            isDirectory: true,
-          ),
-        )
-        .toList();
+    final roots = <_FileEntry>[];
+    final seen = <String>{};
+    void addRoot(String name, String? path) {
+      final value = path?.trim();
+      if (value == null || value.isEmpty || !seen.add(value)) return;
+      roots.add(_FileEntry(name: name, path: value, isDirectory: true));
+    }
+
+    addRoot('Home', _localHomePath());
+    addRoot('Current', Directory.current.path);
+    addRoot('Root', Platform.pathSeparator);
+    return roots.toList();
+  }
+
+  String? _localHomePath() {
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final trimmed = home?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  String _expandLocalPath(String rawPath) {
+    final trimmed = rawPath.trim();
+    if (trimmed == '~') return _localHomePath() ?? trimmed;
+    if (trimmed.startsWith('~/')) {
+      final home = _localHomePath();
+      if (home != null) return p.join(home, trimmed.substring(2));
+    }
+    return trimmed.isEmpty
+        ? _localHomePath() ?? Directory.current.path
+        : trimmed;
   }
 
   Future<void> _createFolder() async {
@@ -285,6 +323,26 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
     }
   }
 
+  void _submitSearch(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return;
+    if (trimmed == '~') {
+      String? home;
+      for (final entry in _listing?.roots ?? const <_FileEntry>[]) {
+        if (entry.name.toLowerCase() == 'home') {
+          home = entry.path;
+          break;
+        }
+      }
+      if (home != null) unawaited(_load(home));
+      return;
+    }
+    if (_looksLikePath(trimmed)) {
+      unawaited(_load(trimmed));
+      return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final listing = _listing;
@@ -346,11 +404,33 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
                       onPressed: () => _load(root.path),
                     );
                   },
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder:
+                      (context, index) => const SizedBox(width: 8),
                   itemCount: listing!.roots.length,
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('board-file-picker-search'),
+              controller: _searchController,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon:
+                    _query.isEmpty
+                        ? null
+                        : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: _searchController.clear,
+                          icon: const Icon(Icons.close),
+                        ),
+                hintText: 'Quick search or paste a path...',
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+              onSubmitted: _submitSearch,
+            ),
             const Divider(height: 24),
             Expanded(child: _buildEntries(listing)),
           ],
@@ -387,10 +467,14 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
     if (listing.entries.isEmpty) {
       return const Center(child: Text('No files here yet.'));
     }
+    final entries = _filteredEntries(listing);
+    if (entries.isEmpty) {
+      return const Center(child: Text('No matches in this folder.'));
+    }
     return ListView.builder(
-      itemCount: listing.entries.length,
+      itemCount: entries.length,
       itemBuilder: (context, index) {
-        final entry = listing.entries[index];
+        final entry = entries[index];
         final selected = _selectedFiles.contains(entry.path);
         final canSelectFile =
             !entry.isDirectory && widget.mode != BoardFilePickerMode.directory;
@@ -432,6 +516,27 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
         _selectedFiles.remove(entry.path);
       }
     });
+  }
+
+  List<_FileEntry> _filteredEntries(_DirectoryListing listing) {
+    final query = _query.toLowerCase();
+    if (query.isEmpty || _looksLikePath(_query)) {
+      return listing.entries;
+    }
+    return listing.entries
+        .where((entry) {
+          return entry.name.toLowerCase().contains(query) ||
+              entry.path.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
+  }
+
+  bool _looksLikePath(String value) {
+    return value.startsWith('/') ||
+        value.startsWith('~/') ||
+        value.startsWith('~\\') ||
+        p.isAbsolute(value) ||
+        RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(value);
   }
 }
 

@@ -193,6 +193,14 @@ class AgentConfigService {
   String get _prefsPath =>
       p.join(PlatformDirs.instance.configDir, 'agent_prefs.json');
 
+  static List<AgentConfig> _dedupeById(Iterable<AgentConfig> configs) {
+    final byId = <String, AgentConfig>{};
+    for (final config in configs) {
+      byId[config.id] = config;
+    }
+    return byId.values.toList();
+  }
+
   Future<List<AgentConfig>> load() async {
     try {
       final file = File(_configPath);
@@ -225,10 +233,10 @@ class AgentConfigService {
         for (final d in _defaults) {
           if (!savedIds.contains(d.id)) updatedSaved.add(d);
         }
-        _cached = updatedSaved;
+        _cached = _dedupeById(updatedSaved);
       }
     } catch (_) {
-      _cached = _defaults;
+      _cached = _dedupeById(_defaults);
     }
 
     try {
@@ -255,11 +263,11 @@ class AgentConfigService {
   }
 
   Future<void> save(List<AgentConfig> configs) async {
-    _cached = configs;
+    _cached = _dedupeById(configs);
     final file = File(_configPath);
     await file.parent.create(recursive: true);
     await file.writeAsString(
-      jsonEncode(configs.map((c) => c.toJson()).toList()),
+      jsonEncode(_cached.map((c) => c.toJson()).toList()),
     );
   }
 
