@@ -644,6 +644,25 @@ void main() {
       expect(terminalUrlAtCell(line, 0), isNull);
     });
 
+    test('terminalUrlAtWrappedCell joins soft-wrapped URL lines', () {
+      const lines = [
+        TerminalUrlLine('Release https://github.com/IstiN/yol'),
+        TerminalUrlLine('oit/releases/tag/v1.0.146', isWrapped: true),
+        TerminalUrlLine('. done', isWrapped: true),
+      ];
+
+      expect(
+        terminalUrlAtWrappedCell(lines, 1, 4),
+        'https://github.com/IstiN/yoloit/releases/tag/v1.0.146',
+      );
+      expect(
+        terminalUrlAtWrappedCell(lines, 1, 12),
+        'https://github.com/IstiN/yoloit/releases/tag/v1.0.146',
+      );
+      expect(terminalUrlAtWrappedCell(lines, 2, 0), isNull);
+      expect(terminalUrlAtWrappedCell(lines, 0, 0), isNull);
+    });
+
     testWidgets('terminal single click opens URL under pointer', (
       tester,
     ) async {
@@ -684,6 +703,75 @@ void main() {
       const cell = CellOffset(18, 0);
       final local =
           renderTerminal.getOffset(cell) +
+          const Offset(2, 0) +
+          Offset(0, renderTerminal.lineHeight / 2);
+      final global = renderTerminal.localToGlobal(local);
+
+      await tester.tapAt(global);
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(opened, [url]);
+      expect(outputs, isEmpty);
+    });
+
+    testWidgets('terminal click opens soft-wrapped URL under pointer', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final opened = <String>[];
+      final outputs = <String>[];
+      final session = AgentSession(
+        id: 'sess_click_wrapped_url',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+      const url = 'https://github.com/IstiN/yoloit/releases/tag/v1.0.146';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 260,
+              height: 180,
+              child: TerminalWidget(
+                session: session,
+                isActive: true,
+                terminalOutputWriter: (sessionId, data) => outputs.add(data),
+                linkOpener: (url) => opened.add(url),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      session.terminal.write('Release $url.\r\n');
+      await tester.pump();
+
+      final bufferLines = session.terminal.buffer.lines;
+      final lines = List<TerminalUrlLine>.generate(bufferLines.length, (index) {
+        final line = bufferLines[index];
+        return TerminalUrlLine(line.toString(), isWrapped: line.isWrapped);
+      }, growable: false);
+      CellOffset? clickedCell;
+      for (var y = 0; y < lines.length && clickedCell == null; y++) {
+        for (var x = 0; x < lines[y].text.length; x++) {
+          if (terminalUrlAtWrappedCell(lines, y, x) == url &&
+              lines[y].isWrapped) {
+            clickedCell = CellOffset(x, y);
+            break;
+          }
+        }
+      }
+      expect(clickedCell, isNotNull);
+
+      final viewState = tester.state<TerminalViewState>(
+        find.byType(TerminalView),
+      );
+      final renderTerminal = viewState.renderTerminal;
+      // This cell is inside a continuation row of the same soft-wrapped
+      // URL. The opener must receive the entire URL, not only row 1.
+      final local =
+          renderTerminal.getOffset(clickedCell!) +
           const Offset(2, 0) +
           Offset(0, renderTerminal.lineHeight / 2);
       final global = renderTerminal.localToGlobal(local);

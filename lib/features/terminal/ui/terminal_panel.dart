@@ -569,6 +569,14 @@ final terminalUrlPattern = RegExp(
 );
 
 @visibleForTesting
+class TerminalUrlLine {
+  const TerminalUrlLine(this.text, {this.isWrapped = false});
+
+  final String text;
+  final bool isWrapped;
+}
+
+@visibleForTesting
 String? terminalUrlAtCell(String line, int cellX) {
   for (final match in terminalUrlPattern.allMatches(line)) {
     var end = match.end;
@@ -582,6 +590,35 @@ String? terminalUrlAtCell(String line, int cellX) {
     }
   }
   return null;
+}
+
+@visibleForTesting
+String? terminalUrlAtWrappedCell(
+  List<TerminalUrlLine> lines,
+  int lineY,
+  int cellX,
+) {
+  if (lineY < 0 || lineY >= lines.length) return null;
+
+  var start = lineY;
+  while (start > 0 && lines[start].isWrapped) {
+    start--;
+  }
+
+  var end = lineY;
+  while (end + 1 < lines.length && lines[end + 1].isWrapped) {
+    end++;
+  }
+
+  final buffer = StringBuffer();
+  var logicalCellX = cellX;
+  for (var y = start; y <= end; y++) {
+    final text = lines[y].text;
+    if (y < lineY) logicalCellX += text.length;
+    buffer.write(text);
+  }
+
+  return terminalUrlAtCell(buffer.toString(), logicalCellX);
 }
 
 const _terminalUrlTrailingChars = '.,;:)]}';
@@ -1450,8 +1487,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (cell.y < 0 || cell.y >= widget.session.terminal.buffer.lines.length) {
       return false;
     }
-    final line = widget.session.terminal.buffer.lines[cell.y].toString();
-    final url = terminalUrlAtCell(line, cell.x);
+    final bufferLines = widget.session.terminal.buffer.lines;
+    final lines = List<TerminalUrlLine>.generate(bufferLines.length, (index) {
+      final line = bufferLines[index];
+      return TerminalUrlLine(line.toString(), isWrapped: line.isWrapped);
+    }, growable: false);
+    final url = terminalUrlAtWrappedCell(lines, cell.y, cell.x);
     if (url == null) return false;
     unawaited(_openTerminalUrl(url));
     return true;
@@ -1467,8 +1508,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (cell.y < 0 || cell.y >= widget.session.kTerminal.buffer.lines.length) {
       return false;
     }
-    final line = widget.session.kTerminal.buffer.lines[cell.y].toString();
-    final url = terminalUrlAtCell(line, cell.x);
+    final bufferLines = widget.session.kTerminal.buffer.lines;
+    final lines = List<TerminalUrlLine>.generate(bufferLines.length, (index) {
+      final line = bufferLines[index];
+      return TerminalUrlLine(line.toString(), isWrapped: line.isWrapped);
+    }, growable: false);
+    final url = terminalUrlAtWrappedCell(lines, cell.y, cell.x);
     if (url == null) return false;
     unawaited(_openTerminalUrl(url));
     return true;
