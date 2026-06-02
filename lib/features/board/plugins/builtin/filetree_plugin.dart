@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -86,15 +87,6 @@ IconData _iconForFile(String name) {
   };
 }
 
-bool _isPreviewable(String name) {
-  final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
-  return const {
-    'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', //
-    'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v',
-    'mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg',
-  }.contains(ext);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 enum _TreeTab { files, diff }
@@ -115,9 +107,16 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   String _searchQuery = '';
   bool _showSearch = false;
   bool _showHidden = true;
+  Timer? _searchDebounce;
+  int _searchGeneration = 0;
+  bool _searchLoading = false;
+  List<FileSystemEntity> _searchResults = const <FileSystemEntity>[];
+  String? _searchError;
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchGeneration++;
     _searchController.dispose();
     super.dispose();
   }
@@ -144,6 +143,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       title: 'Select root folder',
     );
     if (dirPath == null) return;
+    _clearSearch();
     _updateState({
       'rootPath': dirPath,
       'expandedDirs': <String>[],
@@ -171,8 +171,89 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   }
 
   void _refresh() {
+    if (_searchQuery.isNotEmpty) {
+      _scheduleSearch(immediate: true);
+    }
     // Trigger rebuild by touching state without changing rootPath.
     _updateState({'_refreshAt': DateTime.now().toIso8601String()});
+  }
+
+  void _setShowHidden(bool value) {
+    setState(() => _showHidden = value);
+    if (_searchQuery.isNotEmpty) {
+      _scheduleSearch(immediate: true);
+    }
+  }
+
+  void _setSearchQuery(String value) {
+    final next = value.trim().toLowerCase();
+    setState(() => _searchQuery = next);
+    _scheduleSearch();
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchGeneration++;
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+      _searchLoading = false;
+      _searchResults = const <FileSystemEntity>[];
+      _searchError = null;
+    });
+  }
+
+  void _scheduleSearch({bool immediate = false}) {
+    _searchDebounce?.cancel();
+    final query = _searchQuery;
+    if (query.isEmpty || _rootPath.isEmpty) {
+      _searchGeneration++;
+      setState(() {
+        _searchLoading = false;
+        _searchResults = const <FileSystemEntity>[];
+        _searchError = null;
+      });
+      return;
+    }
+    if (immediate) {
+      unawaited(_runSearch(query, _rootPath, _showHidden));
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 220), () {
+      unawaited(_runSearch(query, _rootPath, _showHidden));
+    });
+  }
+
+  Future<void> _runSearch(
+    String query,
+    String rootPath,
+    bool showHidden,
+  ) async {
+    final generation = ++_searchGeneration;
+    setState(() {
+      _searchLoading = true;
+      _searchError = null;
+      _searchResults = const <FileSystemEntity>[];
+    });
+    try {
+      final results = await _collectMatchingEntriesAsync(
+        Directory(rootPath),
+        query: query,
+        showHidden: showHidden,
+        generation: generation,
+      );
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _searchResults = results;
+        _searchLoading = false;
+      });
+    } catch (error) {
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _searchError = error.toString();
+        _searchLoading = false;
+      });
+    }
   }
 
   // ── Context menu ──────────────────────────────────────────────────────────
@@ -297,8 +378,9 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     final newName = await _showInputDialog('Rename', 'New name', currentName);
     if (newName == null ||
         newName.trim().isEmpty ||
-        newName.trim() == currentName)
+        newName.trim() == currentName) {
       return;
+    }
     final parent = p.dirname(entityPath);
     final newPath = p.join(parent, newName.trim());
     try {
@@ -438,7 +520,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                 size: 16,
               ),
               tooltip: _showHidden ? 'Hide dotfiles' : 'Show dotfiles',
-              onPressed: () => setState(() => _showHidden = !_showHidden),
+              onPressed: () => _setShowHidden(!_showHidden),
               padding: const EdgeInsets.all(4),
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               color: _showHidden ? colors.textPrimary : colors.textSecondary,
@@ -450,14 +532,13 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                 size: 16,
               ),
               tooltip: 'Search files',
-              onPressed:
-                  () => setState(() {
-                    _showSearch = !_showSearch;
-                    if (!_showSearch) {
-                      _searchController.clear();
-                      _searchQuery = '';
-                    }
-                  }),
+              onPressed: () {
+                final next = !_showSearch;
+                if (!next) {
+                  _clearSearch();
+                }
+                setState(() => _showSearch = next);
+              },
               padding: const EdgeInsets.all(4),
               constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               color: _showSearch ? colors.textPrimary : colors.textSecondary,
@@ -559,13 +640,13 @@ class _FileTreeContentState extends State<_FileTreeContent> {
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
             borderSide: BorderSide(
-              color: colors.textSecondary.withOpacity(0.3),
+              color: colors.textSecondary.withValues(alpha: 0.3),
             ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
             borderSide: BorderSide(
-              color: colors.textSecondary.withOpacity(0.3),
+              color: colors.textSecondary.withValues(alpha: 0.3),
             ),
           ),
           focusedBorder: OutlineInputBorder(
@@ -573,7 +654,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
             borderSide: BorderSide(color: colors.textSecondary),
           ),
         ),
-        onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+        onChanged: _setSearchQuery,
       ),
     );
   }
@@ -588,7 +669,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
             Icon(
               Icons.account_tree,
               size: 40,
-              color: colors.textSecondary.withOpacity(0.35),
+              color: colors.textSecondary.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 8),
             Text(
@@ -639,9 +720,38 @@ class _FileTreeContentState extends State<_FileTreeContent> {
 
   Widget _buildSearchResults(Directory rootDir) {
     final colors = context.appColors;
-    final matches = <FileSystemEntity>[];
-    _collectMatchingEntries(rootDir, matches);
-    if (matches.isEmpty) {
+    if (_searchLoading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Searching...',
+              style: TextStyle(color: colors.textMuted, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_searchError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Search failed: $_searchError',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.accentRed, fontSize: 12),
+          ),
+        ),
+      );
+    }
+    if (_searchResults.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -654,10 +764,10 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      itemCount: matches.length,
+      itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final colors = context.appColors;
-        final entity = matches[index];
+        final entity = _searchResults[index];
         final name = p.basename(entity.path);
         final relPath = p.relative(entity.path, from: _rootPath);
         final isDir = entity is Directory;
@@ -680,9 +790,8 @@ class _FileTreeContentState extends State<_FileTreeContent> {
                       _updateState({'expandedDirs': expanded.toList()});
                       setState(() {
                         _showSearch = false;
-                        _searchController.clear();
-                        _searchQuery = '';
                       });
+                      _clearSearch();
                     }
                     : () => _selectFile(entity.path, name),
             child: Padding(
@@ -720,42 +829,62 @@ class _FileTreeContentState extends State<_FileTreeContent> {
     );
   }
 
-  void _collectMatchingEntries(
-    Directory dir,
-    List<FileSystemEntity> results, {
+  Future<List<FileSystemEntity>> _collectMatchingEntriesAsync(
+    Directory rootDir, {
+    required String query,
+    required bool showHidden,
+    required int generation,
     int maxResults = 200,
-  }) {
-    if (results.length >= maxResults) return;
-    try {
-      final contents =
-          dir.listSync()..sort((a, b) {
-            final aIsDir = a is Directory;
-            final bIsDir = b is Directory;
-            if (aIsDir && !bIsDir) return -1;
-            if (!aIsDir && bIsDir) return 1;
-            return p
-                .basename(a.path)
-                .toLowerCase()
-                .compareTo(p.basename(b.path).toLowerCase());
-          });
+    int maxVisited = 12000,
+  }) async {
+    final results = <FileSystemEntity>[];
+    final queue = <Directory>[rootDir];
+    var visited = 0;
+
+    while (queue.isNotEmpty &&
+        results.length < maxResults &&
+        visited < maxVisited) {
+      if (generation != _searchGeneration) return results;
+      final dir = queue.removeAt(0);
+      List<FileSystemEntity> contents;
+      try {
+        contents = await dir.list(followLinks: false).toList();
+      } on FileSystemException {
+        continue;
+      }
+      contents.sort((a, b) {
+        final aIsDir = a is Directory;
+        final bIsDir = b is Directory;
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+        return p
+            .basename(a.path)
+            .toLowerCase()
+            .compareTo(p.basename(b.path).toLowerCase());
+      });
+
       for (final entity in contents) {
-        if (results.length >= maxResults) return;
+        if (generation != _searchGeneration ||
+            results.length >= maxResults ||
+            visited >= maxVisited) {
+          return results;
+        }
+        visited++;
         final name = p.basename(entity.path);
-        if (!_showHidden && name.startsWith('.')) continue;
+        if (!showHidden && name.startsWith('.')) continue;
+        final matches = name.toLowerCase().contains(query);
         if (entity is Directory) {
-          if (name.toLowerCase().contains(_searchQuery)) {
-            results.add(entity);
-          }
-          _collectMatchingEntries(entity, results, maxResults: maxResults);
-        } else if (entity is File) {
-          if (name.toLowerCase().contains(_searchQuery)) {
-            results.add(entity);
-          }
+          if (matches) results.add(entity);
+          queue.add(entity);
+        } else if (entity is File && matches) {
+          results.add(entity);
         }
       }
-    } on FileSystemException {
-      // skip inaccessible dirs
+      if (visited % 400 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
     }
+    return results;
   }
 
   List<Widget> _buildTreeEntries(Directory dir, int depth) {
@@ -857,7 +986,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
           padding: EdgeInsets.only(left: 28.0 + depth * 16, right: 8),
           color:
               isSelected
-                  ? colors.textSecondary.withOpacity(0.1)
+                  ? colors.textSecondary.withValues(alpha: 0.1)
                   : Colors.transparent,
           height: 28,
           child: Row(
@@ -893,7 +1022,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
             Icon(
               Icons.difference_outlined,
               size: 40,
-              color: colors.textSecondary.withOpacity(0.35),
+              color: colors.textSecondary.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 8),
             Text(

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart' as native;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
+import 'package:yoloit/core/ui/adaptive_dialog.dart';
 
 enum BoardFilePickerMode { directory, file, files }
 
@@ -23,6 +25,12 @@ class BoardFilePicker {
     String? initialPath,
     String title = 'Choose folder',
   }) {
+    if (remoteInfo == null) {
+      return native.FilePicker.getDirectoryPath(
+        dialogTitle: title,
+        initialDirectory: _nativeInitialDirectory(initialPath),
+      );
+    }
     return showDialog<String>(
       context: context,
       builder:
@@ -41,6 +49,9 @@ class BoardFilePicker {
     String? initialPath,
     String title = 'Choose file',
   }) {
+    if (remoteInfo == null) {
+      return _pickNativeFile(initialPath: initialPath, title: title);
+    }
     return showDialog<BoardFileSelection>(
       context: context,
       builder:
@@ -59,6 +70,9 @@ class BoardFilePicker {
     String? initialPath,
     String title = 'Choose files',
   }) {
+    if (remoteInfo == null) {
+      return _pickNativeFiles(initialPath: initialPath, title: title);
+    }
     return showDialog<List<BoardFileSelection>>(
       context: context,
       builder:
@@ -69,6 +83,73 @@ class BoardFilePicker {
             initialPath: initialPath,
           ),
     );
+  }
+
+  static Future<BoardFileSelection?> _pickNativeFile({
+    required String? initialPath,
+    required String title,
+  }) async {
+    final result = await native.FilePicker.pickFiles(
+      dialogTitle: title,
+      initialDirectory: _nativeInitialDirectory(initialPath),
+      allowMultiple: false,
+      withData: false,
+      withReadStream: false,
+    );
+    final file = result?.files.firstOrNull;
+    final path = file?.path;
+    if (path == null || path.trim().isEmpty) return null;
+    return BoardFileSelection(path: path, name: file?.name ?? p.basename(path));
+  }
+
+  static Future<List<BoardFileSelection>?> _pickNativeFiles({
+    required String? initialPath,
+    required String title,
+  }) async {
+    final result = await native.FilePicker.pickFiles(
+      dialogTitle: title,
+      initialDirectory: _nativeInitialDirectory(initialPath),
+      allowMultiple: true,
+      withData: false,
+      withReadStream: false,
+    );
+    final files = result?.files
+        .where((file) => file.path != null && file.path!.trim().isNotEmpty)
+        .map(
+          (file) => BoardFileSelection(
+            path: file.path!,
+            name: file.name.isEmpty ? p.basename(file.path!) : file.name,
+          ),
+        )
+        .toList(growable: false);
+    return files == null || files.isEmpty ? null : files;
+  }
+
+  static String? _nativeInitialDirectory(String? initialPath) {
+    final value = initialPath?.trim();
+    if (value == null || value.isEmpty) return null;
+    final expanded = _expandLocalPathForNative(value);
+    final type = FileSystemEntity.typeSync(expanded, followLinks: false);
+    if (type == FileSystemEntityType.directory) return expanded;
+    if (type == FileSystemEntityType.file) return p.dirname(expanded);
+    return null;
+  }
+
+  static String _expandLocalPathForNative(String rawPath) {
+    final trimmed = rawPath.trim();
+    if (trimmed == '~') return _localHomePathForNative() ?? trimmed;
+    if (trimmed.startsWith('~/')) {
+      final home = _localHomePathForNative();
+      if (home != null) return p.join(home, trimmed.substring(2));
+    }
+    return trimmed;
+  }
+
+  static String? _localHomePathForNative() {
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final trimmed = home?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 }
 
@@ -346,95 +427,87 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   @override
   Widget build(BuildContext context) {
     final listing = _listing;
-    return AlertDialog(
-      title: Row(
+    return AdaptiveDialogScaffold(
+      title: widget.title,
+      icon: Icon(_isRemote ? Icons.cloud_queue : Icons.folder_open_outlined),
+      maxWidth: 680,
+      maxHeight: 520,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(_isRemote ? Icons.cloud_queue : Icons.folder_open_outlined),
-          const SizedBox(width: 8),
-          Expanded(child: Text(widget.title)),
-        ],
-      ),
-      content: SizedBox(
-        width: 680,
-        height: 520,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  tooltip: 'Parent folder',
-                  onPressed:
-                      listing?.parent == null
-                          ? null
-                          : () => _load(listing!.parent!),
-                  icon: const Icon(Icons.arrow_upward),
+          Row(
+            children: [
+              IconButton(
+                tooltip: 'Parent folder',
+                onPressed:
+                    listing?.parent == null
+                        ? null
+                        : () => _load(listing!.parent!),
+                icon: const Icon(Icons.arrow_upward),
+              ),
+              Expanded(
+                child: Text(
+                  listing?.path ?? _path,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                Expanded(
-                  child: Text(
-                    listing?.path ?? _path,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  key: const Key('board-file-picker-new-folder'),
-                  tooltip: 'New folder',
-                  onPressed: listing == null ? null : _createFolder,
-                  icon: const Icon(Icons.create_new_folder_outlined),
-                ),
-                IconButton(
-                  tooltip: 'Refresh',
-                  onPressed: () => _load(_path),
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            ),
-            if ((listing?.roots ?? const <_FileEntry>[]).isNotEmpty) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemBuilder: (context, index) {
-                    final root = listing.roots[index];
-                    return ActionChip(
-                      avatar: const Icon(Icons.folder_outlined, size: 16),
-                      label: Text(root.name),
-                      onPressed: () => _load(root.path),
-                    );
-                  },
-                  separatorBuilder:
-                      (context, index) => const SizedBox(width: 8),
-                  itemCount: listing!.roots.length,
-                ),
+              ),
+              IconButton(
+                key: const Key('board-file-picker-new-folder'),
+                tooltip: 'New folder',
+                onPressed: listing == null ? null : _createFolder,
+                icon: const Icon(Icons.create_new_folder_outlined),
+              ),
+              IconButton(
+                tooltip: 'Refresh',
+                onPressed: () => _load(_path),
+                icon: const Icon(Icons.refresh),
               ),
             ],
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('board-file-picker-search'),
-              controller: _searchController,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon:
-                    _query.isEmpty
-                        ? null
-                        : IconButton(
-                          tooltip: 'Clear search',
-                          onPressed: _searchController.clear,
-                          icon: const Icon(Icons.close),
-                        ),
-                hintText: 'Quick search or paste a path...',
-                isDense: true,
-                border: const OutlineInputBorder(),
+          ),
+          if ((listing?.roots ?? const <_FileEntry>[]).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemBuilder: (context, index) {
+                  final root = listing.roots[index];
+                  return ActionChip(
+                    avatar: const Icon(Icons.folder_outlined, size: 16),
+                    label: Text(root.name),
+                    onPressed: () => _load(root.path),
+                  );
+                },
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemCount: listing!.roots.length,
               ),
-              onSubmitted: _submitSearch,
             ),
-            const Divider(height: 24),
-            Expanded(child: _buildEntries(listing)),
           ],
-        ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('board-file-picker-search'),
+            controller: _searchController,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon:
+                  _query.isEmpty
+                      ? null
+                      : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: _searchController.clear,
+                        icon: const Icon(Icons.close),
+                      ),
+              hintText: 'Quick search or paste a path...',
+              isDense: true,
+              border: const OutlineInputBorder(),
+            ),
+            onSubmitted: _submitSearch,
+          ),
+          const Divider(height: 24),
+          Expanded(child: _buildEntries(listing)),
+        ],
       ),
       actions: [
         TextButton(

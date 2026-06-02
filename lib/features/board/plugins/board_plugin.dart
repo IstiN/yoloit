@@ -17,6 +17,7 @@ class BoardPanelRenderContext {
     this.onRevealSessionInPanel,
     this.onFocusPanelById,
     this.remoteInfo,
+    this.isHeadlessPreview = false,
   });
 
   final bool isSelected;
@@ -51,6 +52,10 @@ class BoardPanelRenderContext {
   /// Remote board connection metadata. Null means the panel belongs to a local
   /// board and filesystem actions should use the local machine.
   final RemoteBoardInfo? remoteInfo;
+
+  /// True when a panel is rendered by the offscreen board preview/screenshot
+  /// pipeline instead of the interactive board UI.
+  final bool isHeadlessPreview;
 }
 
 /// Abstract base class for board panel plugins.

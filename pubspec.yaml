@@ -82,9 +82,14 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  test: ^1.25.15
   bloc_test: ^10.0.0
   mocktail: ^1.0.4
   golden_toolkit: ^0.15.0
+
+dependency_overrides:
+  volume_controller:
+    path: third_party/volume_controller
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

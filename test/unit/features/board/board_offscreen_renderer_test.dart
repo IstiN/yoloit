@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Size;
@@ -134,4 +135,76 @@ void main() {
     expect(png, isNotNull);
     expect(png!.length, greaterThan(100));
   });
+
+  test('renderPanel paints SVG file previews in offscreen snapshots', () async {
+    final tmp = await Directory.systemTemp.createTemp('yoloit-svg-preview-');
+    addTearDown(() async {
+      if (await tmp.exists()) {
+        await tmp.delete(recursive: true);
+      }
+    });
+    final svgFile = File('${tmp.path}/preview.svg');
+    await svgFile.writeAsString('''
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="160" viewBox="0 0 220 160">
+  <rect width="220" height="160" fill="#f21616"/>
+  <circle cx="110" cy="80" r="44" fill="#ffffff"/>
+</svg>
+''');
+
+    final panel = _panel(
+      'board.file.preview',
+      state: {'path': svgFile.path, 'title': 'preview.svg'},
+      width: 320,
+      height: 260,
+    );
+    final board = _boardWithPanels([panel]);
+
+    final png = await BoardOffscreenRenderer.instance.renderPanel(
+      board,
+      panel,
+      pixelRatio: 1.0,
+    );
+
+    expect(png, isNotNull);
+    final redPixels = await _countRedPixels(png!);
+    expect(redPixels, greaterThan(250));
+
+    final boardPng = await BoardOffscreenRenderer.instance.renderBoard(
+      board,
+      size: const Size(480, 320),
+      pixelRatio: 1.0,
+    );
+
+    expect(boardPng, isNotNull);
+    final boardRedPixels = await _countRedPixels(boardPng!);
+    expect(boardRedPixels, greaterThan(250));
+  });
+}
+
+Future<int> _countRedPixels(Uint8List png) async {
+  final codec = await ui.instantiateImageCodec(png);
+  try {
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      if (data == null) return 0;
+      final bytes = data.buffer.asUint8List();
+      var count = 0;
+      for (var i = 0; i < bytes.length; i += 4) {
+        final r = bytes[i];
+        final g = bytes[i + 1];
+        final b = bytes[i + 2];
+        final a = bytes[i + 3];
+        if (a > 180 && r > 190 && g < 80 && b < 80) {
+          count++;
+        }
+      }
+      return count;
+    } finally {
+      image.dispose();
+    }
+  } finally {
+    codec.dispose();
+  }
 }

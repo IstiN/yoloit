@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
+import 'package:yoloit/core/skills/yoloit_global_skills_service.dart';
 
 // ── InstallAction ─────────────────────────────────────────────────────────────
 
@@ -648,6 +649,7 @@ class SetupCheckService {
                 requiresInteractiveTerminal: true,
               ),
     ),
+    _checkYoloitGlobalSkills(),
   ];
 
   // ── Install (streaming) ──────────────────────────────────────────────────
@@ -658,6 +660,16 @@ class SetupCheckService {
 
     () async {
       try {
+        if (action.executable == '__yoloit_global_skills__') {
+          await for (final line
+              in YoloitGlobalSkillsService.instance.installOrUpdate()) {
+            controller.add(line);
+          }
+          controller.add('\nInstallation complete');
+          await controller.close();
+          return;
+        }
+
         if (action.requiresInteractiveTerminal) {
           await _openInTerminal(action.displayCommand);
           controller.add('ℹ️  Opened Terminal to run the installer.');
@@ -705,6 +717,24 @@ class SetupCheckService {
     }();
 
     return controller.stream;
+  }
+
+  static Future<DependencyStatus> _checkYoloitGlobalSkills() async {
+    final status = await YoloitGlobalSkillsService.instance.check();
+    return DependencyStatus(
+      id: 'yoloit-skills',
+      name: 'YoLoIT Global Skills',
+      description:
+          'Global YoLoIT skills for Codex, Claude Code, Cursor, Copilot, Gemini, and Windsurf',
+      installHint: 'Install/update YoLoIT global skills',
+      isAvailable: status.installed,
+      version: status.summary,
+      isRequired: false,
+      installAction: const InstallAction(
+        executable: '__yoloit_global_skills__',
+        args: <String>[],
+      ),
+    );
   }
 
   static Future<void> _openInTerminal(String command) async {

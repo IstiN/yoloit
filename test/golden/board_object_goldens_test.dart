@@ -186,7 +186,7 @@ void main() {
       expect(find.text('zIndex 7'), findsOneWidget);
       expect(find.text('Arrange'), findsOneWidget);
       await expectLater(
-        find.byType(AlertDialog),
+        find.byType(PanelSettingsDialog),
         matchesGoldenFile('goldens/board_standard_panel_settings.png'),
       );
     });

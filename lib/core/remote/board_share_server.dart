@@ -35,6 +35,7 @@ class BoardShareServer {
   String _host = '0.0.0.0';
   String _advertisedHost = '127.0.0.1';
   final Map<String, Process> _runs = <String, Process>{};
+  final Set<String> _activeTaskRuns = <String>{};
   final Map<String, List<String>> _runLogs = <String, List<String>>{};
   final Map<String, int> _runExitCodes = <String, int>{};
   final Map<String, Process> _terminals = <String, Process>{};
@@ -89,6 +90,7 @@ class BoardShareServer {
       process.kill();
     }
     _runs.clear();
+    _activeTaskRuns.clear();
     for (final process in _terminals.values) {
       process.kill();
     }
@@ -334,38 +336,41 @@ class BoardShareServer {
         }, 400);
       }
       final runtime = await SetupCatalog.detectRuntime();
+      final specialIds =
+          ids.where(SetupCatalog.isSpecialInstallTask).toList()..sort();
       final script = SetupCatalog.installScript(ids, runtime.os);
-      if (script.trim().isEmpty) {
+      if (script.trim().isEmpty && specialIds.isEmpty) {
         return _json(<String, Object?>{
           'ok': false,
           'error': 'no install command for selected packages on this OS',
         }, 400);
       }
+      final displayScript = <String>[
+        for (final id in specialIds) SetupCatalog.specialInstallLabel(id),
+        if (script.trim().isNotEmpty) script,
+      ].join('\n');
       if (body['dryRun'] == true) {
-        return _json(<String, Object?>{'ok': true, 'script': script});
+        return _json(<String, Object?>{'ok': true, 'script': displayScript});
       }
       final id = body['id'] as String? ?? _nextId('setup');
-      final process = await Process.start(
-        Platform.environment['SHELL'] ?? '/bin/sh',
-        <String>['-lc', script],
-        workingDirectory: Directory.current.path,
-      );
-      _runs[id] = process;
-      _runLogs[id] = <String>['\$ $script'];
+      _runLogs[id] = <String>['\$ $displayScript'];
       _runExitCodes.remove(id);
-      unawaited(_collectRun(id, process));
+      _activeTaskRuns.add(id);
+      unawaited(
+        _runSetupInstallTasks(id, specialIds, script, Directory.current.path),
+      );
       return _json(<String, Object?>{
         'ok': true,
         'id': id,
-        'pid': process.pid,
-        'script': script,
+        'script': displayScript,
       });
     }
     if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
       return _json(<String, Object?>{
         'id': sub[0],
         'lines': _runLogs[sub[0]] ?? const <String>[],
-        'running': _runs.containsKey(sub[0]),
+        'running':
+            _runs.containsKey(sub[0]) || _activeTaskRuns.contains(sub[0]),
         if (_runExitCodes.containsKey(sub[0]))
           'exitCode': _runExitCodes[sub[0]],
       });
@@ -596,6 +601,44 @@ class BoardShareServer {
     add('[exit $exitCode]');
     _runs.remove(id);
     _runExitCodes[id] = exitCode;
+  }
+
+  Future<void> _runSetupInstallTasks(
+    String id,
+    List<String> specialIds,
+    String script,
+    String workingDirectory,
+  ) async {
+    final lines = _runLogs[id] ??= <String>[];
+    var exitCode = 0;
+    try {
+      for (final specialId in specialIds) {
+        await for (final line in SetupCatalog.runSpecialInstallTask(
+          specialId,
+        )) {
+          lines.add(line);
+        }
+      }
+      if (script.trim().isNotEmpty) {
+        final process = await Process.start(
+          Platform.environment['SHELL'] ?? '/bin/sh',
+          <String>['-lc', script],
+          workingDirectory: workingDirectory,
+        );
+        _runs[id] = process;
+        await _collectRun(id, process);
+        return;
+      }
+    } catch (error) {
+      exitCode = 1;
+      lines.add('[error] $error');
+    } finally {
+      _activeTaskRuns.remove(id);
+      if (!_runExitCodes.containsKey(id)) {
+        _runExitCodes[id] = exitCode;
+        lines.add('[exit $exitCode]');
+      }
+    }
   }
 
   Future<Map<String, dynamic>> _body(shelf.Request request) async {

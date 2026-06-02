@@ -1,0 +1,59 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
+
+void main() {
+  test(
+    'host-backed widgets are unavailable locally on ios but available remotely',
+    () {
+      for (final type in <String>[
+        'board.terminal',
+        'board.webpage',
+        'board.files',
+        'board.file.preview',
+        'board.filetree',
+        'board.chat',
+        'board.setup_guide',
+        'board.run',
+        'board.run_configs',
+      ]) {
+        expect(
+          yoloitdPanelTypeAvailableOn(type, platform: 'ios', remote: false),
+          isFalse,
+          reason: type,
+        );
+        expect(
+          yoloitdPanelTypeAvailableOn(type, platform: 'ios', remote: true),
+          isTrue,
+          reason: type,
+        );
+      }
+    },
+  );
+
+  test('portable widgets remain available locally on ios', () {
+    for (final type in <String>[
+      'board.note.markdown',
+      'board.sticky',
+      'board.shape',
+      'board.kanban',
+      'board.checklist',
+      'board.code.snippet',
+      'board.widget.custom',
+      'board.timer',
+    ]) {
+      expect(
+        yoloitdPanelTypeAvailableOn(type, platform: 'ios', remote: false),
+        isTrue,
+        reason: type,
+      );
+    }
+  });
+
+  test('descriptors serialize actions and platform capabilities', () {
+    final terminal = yoloitdPanelDescriptorFor('board.terminal')!;
+    final json = terminal.toJson();
+    expect(json['actions'], containsAll(<String>['config', 'set-dir']));
+    expect(json['capabilities'], containsPair('requiresNativeHost', true));
+    expect((json['capabilities'] as Map)['remotePlatforms'], contains('ios'));
+  });
+}

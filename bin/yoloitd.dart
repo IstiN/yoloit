@@ -121,4 +121,10 @@ Options:
 
 Environment:
   YOLOITD_HOST, YOLOITD_PORT, YOLOITD_DATA_DIR, YOLOITD_ACTOR, YOLOITD_TOKEN
+
+Core API:
+  GET  /api/boards/:id/panel-types
+  POST /api/boards/:id/panels/:panel/action
+  POST /api/terminals, /api/terminals/:id/input
+  GET  /api/files?path=<remote-directory>
 ''';

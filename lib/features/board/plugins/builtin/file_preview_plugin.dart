@@ -19,6 +19,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
@@ -311,13 +312,21 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     if (_isSvgExt(ext)) {
       return Padding(
         padding: const EdgeInsets.all(8),
-        child: SvgPicture.file(File(path), key: mediaKey, fit: BoxFit.contain),
+        child: _SvgFilePreview(
+          key: mediaKey,
+          path: path,
+          headless: widget.renderContext.isHeadlessPreview,
+        ),
       );
     }
     if (_isImageExt(ext)) {
       return Padding(
         padding: const EdgeInsets.all(8),
-        child: Image.file(File(path), key: mediaKey, fit: BoxFit.contain),
+        child: _RasterImagePreview(
+          key: mediaKey,
+          path: path,
+          onChange: _pickFile,
+        ),
       );
     }
     if (_isVideoExt(ext)) {
@@ -424,6 +433,250 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
     } catch (_) {
       return false;
     }
+  }
+}
+
+class _RasterImagePreview extends StatefulWidget {
+  const _RasterImagePreview({super.key, required this.path, this.onChange});
+
+  final String path;
+  final VoidCallback? onChange;
+
+  @override
+  State<_RasterImagePreview> createState() => _RasterImagePreviewState();
+}
+
+class _RasterImagePreviewState extends State<_RasterImagePreview> {
+  Uint8List? _bytes;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load(notify: false);
+  }
+
+  @override
+  void didUpdateWidget(_RasterImagePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      _load();
+    }
+  }
+
+  void _load({bool notify = true}) {
+    Uint8List? nextBytes;
+    Object? nextError;
+    try {
+      final file = File(widget.path);
+      if (!file.existsSync()) {
+        nextError = 'File not found';
+      } else {
+        nextBytes = file.readAsBytesSync();
+      }
+    } catch (error) {
+      nextError = error;
+    }
+
+    void apply() {
+      _bytes = nextBytes;
+      _error = nextError;
+    }
+
+    if (notify && mounted) {
+      setState(() {
+        apply();
+      });
+    } else {
+      apply();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _bytes;
+    if (bytes != null) {
+      return Image.memory(
+        bytes,
+        fit: BoxFit.contain,
+        errorBuilder:
+            (context, error, stackTrace) => _FilePreviewError(
+              title: 'Cannot decode image',
+              details: error.toString(),
+              path: widget.path,
+              actionLabel: 'Change file',
+              onAction: widget.onChange,
+            ),
+      );
+    }
+
+    return _FilePreviewError(
+      title: _error?.toString() ?? 'Cannot load image',
+      path: widget.path,
+      actionLabel: 'Change file',
+      onAction: widget.onChange,
+    );
+  }
+}
+
+class _FilePreviewError extends StatelessWidget {
+  const _FilePreviewError({
+    required this.title,
+    required this.path,
+    this.details,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String title;
+  final String path;
+  final String? details;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.broken_image_outlined,
+              size: 42,
+              color: colors.textMuted.withValues(alpha: 0.78),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              path,
+              style: TextStyle(color: colors.textSecondary, fontSize: 11),
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (details != null && details!.trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                details!,
+                style: TextStyle(color: colors.textMuted, fontSize: 10),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.folder_open_outlined, size: 15),
+                label: Text(actionLabel!),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SvgFilePreview extends StatefulWidget {
+  const _SvgFilePreview({
+    super.key,
+    required this.path,
+    required this.headless,
+  });
+
+  final String path;
+  final bool headless;
+
+  @override
+  State<_SvgFilePreview> createState() => _SvgFilePreviewState();
+}
+
+class _SvgFilePreviewState extends State<_SvgFilePreview> {
+  String? _svg;
+  Object? _error;
+  late String _taskKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _taskKey = _headlessTaskKey();
+    if (widget.headless) {
+      HeadlessRenderRegistry.activeTasks.add(_taskKey);
+    }
+    _loadSvg();
+  }
+
+  @override
+  void didUpdateWidget(_SvgFilePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path ||
+        oldWidget.headless != widget.headless) {
+      if (oldWidget.headless) {
+        HeadlessRenderRegistry.activeTasks.remove(_taskKey);
+      }
+      _taskKey = _headlessTaskKey();
+      if (widget.headless) {
+        HeadlessRenderRegistry.activeTasks.add(_taskKey);
+      }
+      _loadSvg();
+    }
+  }
+
+  @override
+  void dispose() {
+    HeadlessRenderRegistry.activeTasks.remove(_taskKey);
+    super.dispose();
+  }
+
+  String _headlessTaskKey() =>
+      'file_preview_svg:${widget.path.hashCode}:$hashCode';
+
+  void _loadSvg() {
+    try {
+      final file = File(widget.path);
+      _svg = file.existsSync() ? file.readAsStringSync() : null;
+      _error = _svg == null ? 'File not found' : null;
+    } catch (error) {
+      _svg = null;
+      _error = error;
+    } finally {
+      if (widget.headless) {
+        scheduleMicrotask(() {
+          HeadlessRenderRegistry.activeTasks.remove(_taskKey);
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final svg = _svg;
+    if (svg != null && svg.trim().isNotEmpty) {
+      return SvgPicture.string(svg, fit: BoxFit.contain);
+    }
+
+    return Center(
+      child: Icon(
+        Icons.broken_image_outlined,
+        size: 42,
+        color: context.appColors.textMuted.withValues(alpha: 0.72),
+        semanticLabel: _error?.toString(),
+      ),
+    );
   }
 }
 

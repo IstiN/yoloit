@@ -348,6 +348,7 @@ class BoardOverviewPanelContent extends StatelessWidget {
     onDelete: () {},
     onUpdateState: (_) {},
     onShowEditor: () {},
+    isHeadlessPreview: true,
   );
 
   @override

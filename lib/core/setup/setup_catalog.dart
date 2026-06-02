@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:yoloit/core/skills/yoloit_global_skills_service.dart';
+
 enum SetupTargetOs { macos, linux, windows, unknown }
 
 enum SetupPackageCategory { system, agents, optional }
@@ -181,6 +183,8 @@ class SetupCheckSnapshot {
 
 class SetupCatalog {
   const SetupCatalog._();
+
+  static const String yoloitSkillsPackageId = 'yoloit-skills';
 
   static const List<SetupPackageSpec> packages = <SetupPackageSpec>[
     SetupPackageSpec(
@@ -376,6 +380,26 @@ class SetupCatalog {
       },
     ),
     SetupPackageSpec(
+      id: yoloitSkillsPackageId,
+      name: 'YoLoIT Global Skills',
+      category: SetupPackageCategory.agents,
+      description:
+          'Installs and updates YoLoIT skills globally for Codex, Claude Code, Cursor, Copilot, Gemini, and Windsurf.',
+      command: '__yoloit_global_skills__',
+      versionArgs: <String>[],
+      install: <SetupTargetOs, SetupInstallAction>{
+        SetupTargetOs.macos: SetupInstallAction(
+          command: 'YoLoIT built-in task: install/update global skills',
+        ),
+        SetupTargetOs.linux: SetupInstallAction(
+          command: 'YoLoIT built-in task: install/update global skills',
+        ),
+        SetupTargetOs.windows: SetupInstallAction(
+          command: 'YoLoIT built-in task: install/update global skills',
+        ),
+      },
+    ),
+    SetupPackageSpec(
       id: 'docker',
       name: 'Docker',
       category: SetupPackageCategory.optional,
@@ -433,11 +457,32 @@ class SetupCatalog {
     final commands = <String>[];
     for (final spec in packages) {
       if (!selected.contains(spec.id)) continue;
+      if (isSpecialInstallTask(spec.id)) continue;
       final action = spec.installAction(os);
       if (action == null || action.command.trim().isEmpty) continue;
       commands.add(_normalizeInstallCommand(action.command.trim(), os));
     }
     return installBatchScript(commands);
+  }
+
+  static bool isSpecialInstallTask(String packageId) =>
+      packageId == yoloitSkillsPackageId;
+
+  static String specialInstallLabel(String packageId) {
+    if (packageId == yoloitSkillsPackageId) {
+      return 'YoLoIT built-in task: install/update global skills';
+    }
+    return '';
+  }
+
+  static Stream<String> runSpecialInstallTask(String packageId) {
+    if (packageId == yoloitSkillsPackageId) {
+      return YoloitGlobalSkillsService.instance.installOrUpdate();
+    }
+    final controller = StreamController<String>();
+    controller.add('[error] Unknown special install task: $packageId');
+    unawaited(controller.close());
+    return controller.stream;
   }
 
   static String installBatchScript(Iterable<String> commands) {
@@ -488,6 +533,20 @@ class SetupCatalog {
     SetupPackageSpec spec,
     SetupTargetOs os,
   ) async {
+    if (spec.id == yoloitSkillsPackageId) {
+      final status = await YoloitGlobalSkillsService.instance.check();
+      return SetupPackageStatus(
+        id: spec.id,
+        name: spec.name,
+        category: spec.category,
+        description: spec.description,
+        command: spec.command,
+        required: spec.required,
+        available: status.installed,
+        version: status.summary,
+        installAction: _normalizedAction(spec.installAction(os), os),
+      );
+    }
     final path = await _findPath(spec.command);
     if (path == null) {
       return SetupPackageStatus(

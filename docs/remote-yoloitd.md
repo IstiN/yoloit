@@ -8,6 +8,8 @@ Current MVP scope:
 
 - board list/create/read/update/delete
 - panel list/create/read/update/delete
+- panel type catalog with local/remote platform capabilities
+- typed panel state actions for all built-in widget types
 - append-only panel history
 - `board:undo`
 - simple run process API
@@ -110,6 +112,70 @@ ssh -L 43110:127.0.0.1:43110 user@remote-host
 
 Then connect the desktop UI to `http://127.0.0.1:43110`.
 
+## Mobile / iOS Client
+
+The iOS app uses the mobile board entry point:
+
+```bash
+flutter run -d <ios-device-id> --target lib/main_mobile.dart
+```
+
+To auto-connect the mobile app to a daemon at launch, pass the remote URL and
+token as Dart defines:
+
+```bash
+flutter run -d <ios-device-id> \
+  --target lib/main_mobile.dart \
+  --dart-define=YOLOIT_REMOTE_URL=http://127.0.0.1:43110 \
+  --dart-define=YOLOIT_REMOTE_TOKEN=dev-token
+```
+
+For an iOS Simulator talking to a Docker daemon published on the Mac,
+`127.0.0.1:<published-port>` reaches the Mac host. For a physical iPhone, use
+the Mac or server LAN address instead.
+
+For CI/build validation without signing:
+
+```bash
+flutter build ios --no-codesign --target lib/main_mobile.dart
+```
+
+The mobile app starts only the board client shell. It does not start the desktop
+window manager, local CLI HTTP server, tmux bootstrap, or host run services.
+Remote boards are connected from the board toolbar with `Connect remote YoLoIT`,
+using the same daemon URL/token as the desktop client.
+
+Widget availability is driven by `lib/core/remote/yoloitd_panel_catalog.dart`:
+
+- local iOS boards expose only portable widgets
+- remote iOS boards expose host-backed widgets through `yoloitd`
+- the daemon remains the source of truth for remote panel actions and state
+
+Example iOS-to-Docker flow:
+
+```bash
+docker build -f docker/Dockerfile.yoloitd -t yoloitd:dev .
+docker run --rm -p 43110:43110 \
+  -e YOLOITD_TOKEN=dev-token \
+  -v yoloitd-data:/data \
+  yoloitd:dev
+
+flutter run -d <ios-device-id> \
+  --target lib/main_mobile.dart \
+  --dart-define=YOLOIT_REMOTE_URL=http://127.0.0.1:43110 \
+  --dart-define=YOLOIT_REMOTE_TOKEN=dev-token
+```
+
+On a physical iPhone, connect to the Mac's LAN IP rather than `127.0.0.1`, for
+example `http://192.168.1.20:43110`. If the daemon is on a remote machine, expose
+the port through SSH forwarding, a private network, or a protected HTTPS reverse
+proxy.
+
+Known local build prerequisite: Xcode must have the iOS platform/runtime that
+matches the connected device. If `xcodebuild -showdestinations` reports
+`iOS <version> is not installed`, install that platform in
+`Xcode > Settings > Components` before running to the device.
+
 ## Storage
 
 The daemon stores data under `YOLOITD_DATA_DIR`:
@@ -142,9 +208,11 @@ DELETE /api/boards/:id
 
 GET  /api/boards/:id/panels
 POST /api/boards/:id/panels
+GET  /api/boards/:id/panel-types
 GET  /api/boards/:id/panels/:panel
 PUT  /api/boards/:id/panels/:panel
 DELETE /api/boards/:id/panels/:panel
+POST /api/boards/:id/panels/:panel/action
 
 GET  /api/boards/:id/history
 POST /api/boards/:id/undo
@@ -165,3 +233,78 @@ Authorization: Bearer <token>
 
 `PUT /api/boards/:id` accepts full board snapshots. When the request includes
 `expectedRevision`, the daemon returns `409` if the server has a newer revision.
+
+### Panel Type Capabilities
+
+`GET /api/boards/:id/panel-types` returns one descriptor per built-in widget:
+
+```json
+{
+  "type": "board.terminal",
+  "displayName": "Terminal",
+  "defaultSize": {"width": 520, "height": 360},
+  "actions": ["config", "set-dir", "set-session"],
+  "capabilities": {
+    "localPlatforms": ["macos", "linux", "windows"],
+    "remotePlatforms": ["macos", "linux", "windows", "ios"],
+    "requiresNativeHost": true,
+    "supportsRemoteState": true,
+    "supportsHeadlessPreview": false
+  }
+}
+```
+
+The important distinction for iOS is:
+
+- `localPlatforms` means the widget can run directly on the current device.
+- `remotePlatforms` means the widget can be shown and controlled when the board
+  is backed by `yoloitd`.
+- `requiresNativeHost: true` means live work happens on the daemon machine:
+  terminal processes, filesystem access, WebView/browser state, setup commands,
+  run sessions, and similar host-bound behavior.
+
+This lets an iOS client hide unsupported local widgets while still allowing the
+same widgets on remote boards.
+
+### Panel Actions
+
+Use `POST /api/boards/:id/panels/:panel/action` to mutate a widget's declarative
+state on the daemon. The request body always includes an `action` field plus
+action-specific arguments:
+
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $YOLOITD_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"set","shape":"diamond","text":"Decision"}' \
+  "$YOLOITD_URL/api/boards/$BOARD_ID/panels/$PANEL_ID/action"
+```
+
+Supported examples:
+
+```text
+board.note.markdown: set, append, wrap, nowrap
+board.sticky:        set, append, color
+board.shape:         set
+board.kanban:        add-column, rename-column, add-card, move-card, update-card
+board.checklist:     add, check, uncheck, rename, remove
+board.code.snippet:  set
+board.webpage:       open
+board.playlist:      add, play, pause, stop, next, prev
+board.files:         open, add, remove, clear
+board.file.preview:  open
+board.filetree:      set-root, expand, collapse, open, refresh
+board.terminal:      set-dir, set-session
+board.chat:          config, send, messages, clear, status
+board.setup_guide:   select, unselect, set-selected
+board.run*:          set-group, select-session, clear-session
+board.diff.preview:  set-root, open
+board.yolo_assistant:set-mode, set-status, clear
+board.widget.custom: set-widget, set-config, set
+board.timer:         set, start, pause, resume, reset
+```
+
+Remote panel actions are intentionally state-first. They persist the panel state
+that all connected clients render. Live side effects such as actually typing
+into a terminal, running a setup install, or executing WebView JavaScript remain
+separate daemon APIs because they target host processes rather than panel JSON.

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -14,7 +15,10 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
+import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
@@ -102,6 +106,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   /// When true, panel chrome (borders, accents, sidebar, minimap) is hidden
   /// to produce a clean screenshot without purple-tinted decorations.
   bool _isCapturingScreenshot = false;
+
+  String get _currentPanelPlatform {
+    if (kIsWeb) return 'web';
+    if (Platform.isIOS) return 'ios';
+    if (Platform.isMacOS) return 'macos';
+    if (Platform.isLinux) return 'linux';
+    if (Platform.isWindows) return 'windows';
+    if (Platform.isAndroid) return 'android';
+    return 'unknown';
+  }
 
   /// Suppresses focused-panel auto-centering for one rebuild cycle after
   /// switching boards so the restored viewport position is preserved.
@@ -268,11 +282,58 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       return Listener(
                                         behavior: HitTestBehavior.translucent,
                                         onPointerSignal: (event) {
+                                          if (event is PointerScrollEvent) {
+                                            final scale =
+                                                _BoardViewState._scaleOf(
+                                                  _transformController.value,
+                                                );
+                                            _boardSupportLog(
+                                              'pointerScroll locked=$isLocked '
+                                              'tool=${_activeTool.name} '
+                                              'kind=${event.kind.name} '
+                                              'delta=${_fmtOffset(event.scrollDelta)} '
+                                              'pos=${_fmtOffset(event.position)} '
+                                              'scale=${_fmt(scale)}',
+                                            );
+                                          } else {
+                                            _boardSupportLog(
+                                              'pointerSignal locked=$isLocked '
+                                              'tool=${_activeTool.name} '
+                                              'type=${event.runtimeType} '
+                                              'pos=${_fmtOffset(event.position)}',
+                                            );
+                                          }
                                           if (isLocked) {
                                             // Swallow the event here so
                                             // InteractiveViewer never sees it.
                                             return;
                                           }
+                                        },
+                                        onPointerPanZoomStart: (event) {
+                                          _boardSupportLog(
+                                            'panZoom.start locked=$isLocked '
+                                            'tool=${_activeTool.name} '
+                                            'pos=${_fmtOffset(event.position)} '
+                                            'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                          );
+                                        },
+                                        onPointerPanZoomUpdate: (event) {
+                                          _boardSupportLog(
+                                            'panZoom.update locked=$isLocked '
+                                            'tool=${_activeTool.name} '
+                                            'pan=${_fmtOffset(event.pan)} '
+                                            'panDelta=${_fmtOffset(event.panDelta)} '
+                                            'scale=${_fmt(event.scale)} '
+                                            'rotation=${event.rotation.toStringAsFixed(3)} '
+                                            'viewScale=${_fmt(_scaleOf(_transformController.value))}',
+                                          );
+                                        },
+                                        onPointerPanZoomEnd: (event) {
+                                          _boardSupportLog(
+                                            'panZoom.end locked=$isLocked '
+                                            'tool=${_activeTool.name} '
+                                            'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                          );
                                         },
                                         child: InteractiveViewer(
                                           key: const ValueKey(
@@ -294,6 +355,18 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           transformationController:
                                               _transformController,
                                           onInteractionStart: (details) {
+                                            final startScale =
+                                                _BoardViewState._scaleOf(
+                                                  _transformController.value,
+                                                );
+                                            _boardSupportLog(
+                                              'interaction.start locked=$isLocked '
+                                              'tool=${_activeTool.name} '
+                                              'pointerCount=${details.pointerCount} '
+                                              'focal=${_fmtOffset(details.focalPoint)} '
+                                              'local=${_fmtOffset(details.localFocalPoint)} '
+                                              'scale=${_fmt(startScale)}',
+                                            );
                                             _interactionStartScale =
                                                 _BoardViewState._scaleOf(
                                                   _transformController.value,
@@ -314,17 +387,31 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     .isLocked &&
                                                 _interactionStartMatrix !=
                                                     null) {
+                                              _boardSupportLog(
+                                                'interaction.update.reverted '
+                                                'reason=canvasLock '
+                                                'pointerCount=${details.pointerCount} '
+                                                'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                              );
                                               _transformController.value =
                                                   _interactionStartMatrix!;
                                               return;
                                             }
+                                            final currentScale =
+                                                _BoardViewState._scaleOf(
+                                                  _transformController.value,
+                                                );
+                                            _boardSupportLog(
+                                              'interaction.update locked=$isLocked '
+                                              'tool=${_activeTool.name} '
+                                              'pointerCount=${details.pointerCount} '
+                                              'scaleDelta=${_fmt(details.scale)} '
+                                              'currentScale=${_fmt(currentScale)} '
+                                              'focalDelta=${_fmtOffset(details.focalPointDelta)}',
+                                            );
                                             // Detect zoom by comparing current scale to
                                             // the scale at interaction start.
                                             if (!_isViewportZooming) {
-                                              final currentScale =
-                                                  _BoardViewState._scaleOf(
-                                                    _transformController.value,
-                                                  );
                                               if ((currentScale -
                                                           _interactionStartScale)
                                                       .abs() >
@@ -336,7 +423,13 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               }
                                             }
                                           },
-                                          onInteractionEnd: (_) {
+                                          onInteractionEnd: (details) {
+                                            _boardSupportLog(
+                                              'interaction.end locked=$isLocked '
+                                              'tool=${_activeTool.name} '
+                                              'velocity=${_fmtOffset(details.velocity.pixelsPerSecond)} '
+                                              'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                            );
                                             _interactionStartMatrix = null;
                                             setState(() {
                                               _isViewportInteracting = false;
@@ -1066,6 +1159,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       left: 12,
                                       top: 12,
                                       child: _BoardToolsPanel(
+                                        board: activeBoard,
+                                        platform: _currentPanelPlatform,
                                         visible: _showToolsPanel,
                                         activeTool: _activeTool,
                                         drawSettings: _drawSettings,
@@ -1206,6 +1301,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   boards: state.boards,
                                   previewPngs: _boardPreviewPngs,
                                   debugLog: _boardOverviewLog,
+                                  onDisconnectRemoteBoard:
+                                      (board) => context
+                                          .read<BoardCubit>()
+                                          .disconnectRemoteBoard(board.id),
+                                  onDisconnectRemoteUrl:
+                                      (url) => context
+                                          .read<BoardCubit>()
+                                          .disconnectRemoteBoardsForUrl(url),
                                   onClose: () {
                                     if (!mounted) return;
                                     _boardOverviewLog('close.parent');
@@ -2191,6 +2294,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     debugPrint('[BoardView] $message');
   }
 
+  void _boardSupportLog(String message) {
+    SupportLogService.instance.add('board-scroll', message);
+  }
+
   void _boardOverviewLog(String message) {
     if (!kDebugMode) return;
     debugPrint('[BoardOverview] $message');
@@ -2399,7 +2506,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   Future<_LinkStyleChoice?> _showConnectStyleDialog(
     BuildContext context,
   ) async {
-    return showDialog<_LinkStyleChoice>(
+    return showAdaptiveYoloDialog<_LinkStyleChoice>(
       context: context,
       builder: (ctx) => _LinkStyleDialog(initialSettings: _connectSettings),
     );
@@ -2418,7 +2525,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   Future<void> _connectRemoteYoloit(BuildContext context) async {
-    final result = await showDialog<_RemoteYoloitConnection>(
+    final result = await showAdaptiveYoloDialog<_RemoteYoloitConnection>(
       context: context,
       builder: (_) => const _ConnectRemoteYoloitDialog(),
     );
@@ -2454,7 +2561,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         context.read<BoardCubit>(),
       );
       if (!context.mounted) return;
-      await showDialog<void>(
+      await showAdaptiveYoloDialog<void>(
         context: context,
         builder: (_) => _ShareBoardDialog(info: info),
       );
@@ -2471,15 +2578,16 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     BoardDocument board,
   ) async {
     final remote = remoteInfoForBoard(board);
-    final result = await showDialog<({String name, String defaultFolder})>(
-      context: context,
-      builder:
-          (_) => _BoardSettingsDialog(
-            initialName: board.name,
-            initialDefaultFolder: board.defaultFolder,
-            remoteInfo: remote,
-          ),
-    );
+    final result =
+        await showAdaptiveYoloDialog<({String name, String defaultFolder})>(
+          context: context,
+          builder:
+              (_) => _BoardSettingsDialog(
+                initialName: board.name,
+                initialDefaultFolder: board.defaultFolder,
+                remoteInfo: remote,
+              ),
+        );
     if (!context.mounted || result == null) return;
     final cubit = context.read<BoardCubit>();
     await cubit.renameBoard(board.id, result.name);
@@ -2491,7 +2599,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   Future<void> _deleteBoard(BuildContext context, BoardDocument board) async {
-    final shouldDelete = await showDialog<bool>(
+    final shouldDelete = await showAdaptiveYoloDialog<bool>(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
@@ -2549,7 +2657,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     Color? selectedColor = panel?.color;
     final titleController = TextEditingController(text: initialTitle);
     final markdownController = TextEditingController(text: initialMarkdown);
-    final result = await showDialog<
+    final result = await showAdaptiveYoloDialog<
       ({String title, String markdown, Color? color})
     >(
       context: context,
@@ -2800,7 +2908,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     Color? initialColor,
   ) {
     var selectedColor = initialColor ?? context.appColors.primary;
-    return showDialog<Color?>(
+    return showAdaptiveYoloDialog<Color?>(
       context: context,
       builder:
           (dialogContext) => AlertDialog(
@@ -2844,7 +2952,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     required String initialValue,
     required String confirmLabel,
   }) {
-    return showDialog<String>(
+    return showAdaptiveYoloDialog<String>(
       context: context,
       builder: (dialogContext) {
         final controller = TextEditingController(text: initialValue);
@@ -2959,10 +3067,11 @@ class _ConnectRemoteYoloitDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Connect remote YoLoIT'),
-      content: SizedBox(
-        width: 420,
+    return AdaptiveDialogScaffold(
+      title: 'Connect remote YoLoIT',
+      icon: const Icon(Icons.cloud_outlined),
+      maxWidth: 420,
+      body: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -3035,10 +3144,11 @@ class _ShareBoardDialogState extends State<_ShareBoardDialog> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return AlertDialog(
-      title: const Text('Share board'),
-      content: SizedBox(
-        width: 520,
+    return AdaptiveDialogScaffold(
+      title: 'Share board',
+      icon: const Icon(Icons.ios_share_outlined),
+      maxWidth: 520,
+      body: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3177,8 +3287,15 @@ class _BoardToolbar extends StatelessWidget {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 900;
         final phone = constraints.maxWidth < 560;
+        final horizontalPadding = phone ? 8.0 : 16.0;
+        final gap = phone ? 6.0 : 12.0;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            phone ? 8 : 12,
+            horizontalPadding,
+            phone ? 8 : 12,
+          ),
           child: Row(
             children: [
               if (compact)
@@ -3186,6 +3303,7 @@ class _BoardToolbar extends StatelessWidget {
                   child: _BoardSwitcherButton(
                     board: board,
                     onOpenBoardOverview: onOpenBoardOverview,
+                    compact: phone,
                   ),
                 )
               else
@@ -3200,16 +3318,8 @@ class _BoardToolbar extends StatelessWidget {
                   label: _shortToolbarPath(board.defaultFolder),
                 ),
               ],
-              const SizedBox(width: 12),
-              if (compact)
-                Tooltip(
-                  message: 'Search boards and panels',
-                  child: IconButton(
-                    onPressed: onSearch,
-                    icon: const Icon(Icons.search),
-                  ),
-                )
-              else
+              SizedBox(width: gap),
+              if (!compact)
                 Expanded(
                   child: Align(
                     alignment: Alignment.center,
@@ -3262,6 +3372,14 @@ class _BoardToolbar extends StatelessWidget {
                       ),
                     ),
                   ),
+                )
+              else if (!phone)
+                Tooltip(
+                  message: 'Search boards and panels',
+                  child: IconButton(
+                    onPressed: onSearch,
+                    icon: const Icon(Icons.search),
+                  ),
                 ),
               if (compact) const Spacer() else const SizedBox(width: 16),
               if (phone)
@@ -3270,6 +3388,8 @@ class _BoardToolbar extends StatelessWidget {
                   icon: const Icon(Icons.more_horiz),
                   onSelected: (value) {
                     switch (value) {
+                      case 'search':
+                        onSearch();
                       case 'new':
                         onCreateBoard();
                       case 'remote':
@@ -3284,6 +3404,10 @@ class _BoardToolbar extends StatelessWidget {
                   },
                   itemBuilder:
                       (context) => const [
+                        PopupMenuItem(
+                          value: 'search',
+                          child: Text('Search boards and panels'),
+                        ),
                         PopupMenuItem(value: 'new', child: Text('New board')),
                         PopupMenuItem(
                           value: 'remote',
@@ -3390,10 +3514,12 @@ class _BoardSwitcherButton extends StatelessWidget {
   const _BoardSwitcherButton({
     required this.board,
     required this.onOpenBoardOverview,
+    this.compact = false,
   });
 
   final BoardDocument board;
   final VoidCallback onOpenBoardOverview;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -3411,8 +3537,11 @@ class _BoardSwitcherButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         child: Container(
           height: 36,
-          constraints: const BoxConstraints(minWidth: 160, maxWidth: 260),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          constraints: BoxConstraints(
+            minWidth: compact ? 0 : 160,
+            maxWidth: compact ? 220 : 260,
+          ),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 12),
           decoration: BoxDecoration(
             color: colors.surface,
             borderRadius: BorderRadius.circular(10),
@@ -3455,6 +3584,8 @@ class _BoardOverviewLayer extends StatefulWidget {
     required this.previewPngs,
     required this.onSelectedBoard,
     required this.onCreateBoard,
+    required this.onDisconnectRemoteBoard,
+    required this.onDisconnectRemoteUrl,
     required this.onClose,
     required this.debugLog,
   });
@@ -3465,6 +3596,8 @@ class _BoardOverviewLayer extends StatefulWidget {
   final void Function(BoardDocument board, Uint8List? previewPng)
   onSelectedBoard;
   final VoidCallback onCreateBoard;
+  final ValueChanged<BoardDocument> onDisconnectRemoteBoard;
+  final ValueChanged<String> onDisconnectRemoteUrl;
   final VoidCallback onClose;
   final ValueChanged<String> debugLog;
 
@@ -3580,16 +3713,50 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
     return <BoardDocument>[...localBoards, ...remoteBoards];
   }
 
+  List<_BoardOverviewSection> get _sections {
+    final localBoards =
+        widget.boards.where((board) => !isRemoteBoard(board)).toList();
+    final sections = <_BoardOverviewSection>[
+      _BoardOverviewSection(
+        label: 'Local boards',
+        boards: localBoards,
+        includesCreate: true,
+      ),
+    ];
+    final remoteGroups = <String, List<BoardDocument>>{};
+    for (final board in widget.boards.where(isRemoteBoard)) {
+      final remote = remoteInfoForBoard(board);
+      if (remote == null) continue;
+      remoteGroups.putIfAbsent(remote.url, () => <BoardDocument>[]).add(board);
+    }
+    for (final entry in remoteGroups.entries) {
+      sections.add(
+        _BoardOverviewSection(
+          label: 'Remote boards',
+          subtitle: Uri.tryParse(entry.key)?.authority ?? entry.key,
+          remoteUrl: entry.key,
+          boards: entry.value,
+        ),
+      );
+    }
+    return sections;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final sections = _sections;
         final boards = _orderedBoards;
-        final firstRemoteIndex = boards.indexWhere(isRemoteBoard);
-        final layout = _BoardOverviewGridLayout.compute(
+        final layout = _BoardOverviewSectionedLayout.compute(
           size: Size(constraints.maxWidth, constraints.maxHeight),
-          itemCount: boards.length + 1,
+          itemCounts: sections
+              .map(
+                (section) =>
+                    section.boards.length + (section.includesCreate ? 1 : 0),
+              )
+              .toList(growable: false),
         );
         final layoutSignature =
             '${constraints.maxWidth.toStringAsFixed(1)}x${constraints.maxHeight.toStringAsFixed(1)}:'
@@ -3633,28 +3800,42 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
               ),
             ];
 
-            if (boards.isNotEmpty) {
+            for (
+              var sectionIndex = 0;
+              sectionIndex < sections.length;
+              sectionIndex++
+            ) {
+              final section = sections[sectionIndex];
+              if (layout.itemCountForSection(sectionIndex) == 0) continue;
               widgets.add(
                 _BoardOverviewSectionLabel(
-                  rect: layout.rectFor(0),
-                  label: 'Local boards',
+                  rect: layout.rectFor(sectionIndex, 0),
+                  label: section.label,
+                  subtitle: section.subtitle,
                   opacity: fade,
-                ),
-              );
-            }
-            if (firstRemoteIndex >= 0) {
-              widgets.add(
-                _BoardOverviewSectionLabel(
-                  rect: layout.rectFor(firstRemoteIndex),
-                  label: 'Remote boards',
-                  opacity: fade,
+                  disconnectKey:
+                      section.remoteUrl == null
+                          ? null
+                          : Key(
+                            'board-overview-disconnect-remote-${section.remoteUrl}',
+                          ),
+                  onDisconnect:
+                      section.remoteUrl == null
+                          ? null
+                          : () =>
+                              widget.onDisconnectRemoteUrl(section.remoteUrl!),
                 ),
               );
             }
 
             for (var i = 0; i < boards.length; i++) {
               final board = boards[i];
-              final endRect = layout.rectFor(i);
+              final location = layout.locationForBoard(sections, board.id);
+              if (location == null) continue;
+              final endRect = layout.rectFor(
+                location.sectionIndex,
+                location.itemIndex,
+              );
               final isZoomBoard = board.id == _zoomBoardId;
               final startRect =
                   isZoomBoard
@@ -3683,6 +3864,11 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
                                   board.id == highlightedBoardId && t >= 0.92,
                               previewPng: widget.previewPngs[board.id],
                               onTap: () => _selectBoard(board.id),
+                              onDisconnect:
+                                  remoteInfoForBoard(board) == null
+                                      ? null
+                                      : () =>
+                                          widget.onDisconnectRemoteBoard(board),
                             )
                             : GestureDetector(
                               onTap: () => _selectBoard(board.id),
@@ -3708,7 +3894,14 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
               );
             }
 
-            final createRect = layout.rectFor(boards.length);
+            final createLocation = layout.createLocation(sections);
+            final createRect =
+                createLocation == null
+                    ? Rect.zero
+                    : layout.rectFor(
+                      createLocation.sectionIndex,
+                      createLocation.itemIndex,
+                    );
             widgets.add(
               Positioned.fromRect(
                 rect:
@@ -3838,50 +4031,123 @@ class _BoardOverviewBackdropPainter extends CustomPainter {
   }
 }
 
-class _BoardOverviewGridLayout {
-  const _BoardOverviewGridLayout({
+class _BoardOverviewSection {
+  const _BoardOverviewSection({
+    required this.label,
+    required this.boards,
+    this.subtitle,
+    this.remoteUrl,
+    this.includesCreate = false,
+  });
+
+  final String label;
+  final String? subtitle;
+  final String? remoteUrl;
+  final List<BoardDocument> boards;
+  final bool includesCreate;
+}
+
+class _BoardOverviewItemLocation {
+  const _BoardOverviewItemLocation(this.sectionIndex, this.itemIndex);
+
+  final int sectionIndex;
+  final int itemIndex;
+}
+
+class _BoardOverviewSectionedLayout {
+  const _BoardOverviewSectionedLayout({
     required this.columns,
     required this.cardSize,
     required this.start,
     required this.spacing,
+    required this.sectionGap,
+    required this.itemCounts,
+    required this.sectionTops,
   });
 
   static const _aspectRatio = 1.55;
   static const _padding = 22.0;
   static const _spacing = 16.0;
+  static const _sectionGap = 54.0;
+  static const _firstSectionLabelClearance = 34.0;
 
   final int columns;
   final Size cardSize;
   final Offset start;
   final double spacing;
+  final double sectionGap;
+  final List<int> itemCounts;
+  final List<double> sectionTops;
 
-  Rect rectFor(int index) {
+  int itemCountForSection(int sectionIndex) => itemCounts[sectionIndex];
+
+  Rect rectFor(int sectionIndex, int index) {
     final col = index % columns;
     final row = index ~/ columns;
     return Rect.fromLTWH(
       start.dx + col * (cardSize.width + spacing),
-      start.dy + row * (cardSize.height + spacing),
+      sectionTops[sectionIndex] + row * (cardSize.height + spacing),
       cardSize.width,
       cardSize.height,
     );
   }
 
-  static _BoardOverviewGridLayout compute({
+  _BoardOverviewItemLocation? locationForBoard(
+    List<_BoardOverviewSection> sections,
+    String boardId,
+  ) {
+    for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+      final section = sections[sectionIndex];
+      final itemIndex = section.boards.indexWhere(
+        (board) => board.id == boardId,
+      );
+      if (itemIndex >= 0) {
+        return _BoardOverviewItemLocation(sectionIndex, itemIndex);
+      }
+    }
+    return null;
+  }
+
+  _BoardOverviewItemLocation? createLocation(
+    List<_BoardOverviewSection> sections,
+  ) {
+    for (var sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+      final section = sections[sectionIndex];
+      if (section.includesCreate) {
+        return _BoardOverviewItemLocation(sectionIndex, section.boards.length);
+      }
+    }
+    return null;
+  }
+
+  static _BoardOverviewSectionedLayout compute({
     required Size size,
-    required int itemCount,
+    required List<int> itemCounts,
   }) {
-    final maxColumns = math.max(1, math.min(5, itemCount));
+    final totalItemCount = itemCounts.fold<int>(0, (sum, count) => sum + count);
+    final maxColumns = math.max(1, math.min(5, totalItemCount));
     final availableWidth = math.max(1.0, size.width - (_padding * 2));
-    final availableHeight = math.max(1.0, size.height - (_padding * 2));
+    final availableHeight = math.max(
+      1.0,
+      size.height - (_padding * 2) - _firstSectionLabelClearance,
+    );
     var bestColumns = 1;
     var bestSize = const Size(1, 1);
     var bestArea = 0.0;
 
     for (var columns = 1; columns <= maxColumns; columns++) {
-      final rows = (itemCount / columns).ceil();
+      final sectionRows =
+          itemCounts.map((count) => (count / columns).ceil()).toList();
+      final totalRows = sectionRows.fold<int>(0, (sum, rows) => sum + rows);
+      final activeSections = sectionRows.where((rows) => rows > 0).length;
+      final gapHeight = math.max(0, activeSections - 1) * _sectionGap;
       final maxCardWidth =
           (availableWidth - ((columns - 1) * _spacing)) / columns;
-      final maxCardHeight = (availableHeight - ((rows - 1) * _spacing)) / rows;
+      final maxCardHeight =
+          (availableHeight -
+              math.max(0, totalRows - activeSections) * _spacing -
+              gapHeight) /
+          math.max(1, totalRows);
       final cardWidth = math.max(
         1.0,
         math.min(maxCardWidth, maxCardHeight * _aspectRatio),
@@ -3895,18 +4161,41 @@ class _BoardOverviewGridLayout {
       }
     }
 
-    final rows = (itemCount / bestColumns).ceil();
+    final sectionRows =
+        itemCounts.map((count) => (count / bestColumns).ceil()).toList();
+    final activeSections = sectionRows.where((rows) => rows > 0).length;
+    final totalRows = sectionRows.fold<int>(0, (sum, rows) => sum + rows);
     final gridWidth =
         (bestColumns * bestSize.width) + ((bestColumns - 1) * _spacing);
-    final gridHeight = (rows * bestSize.height) + ((rows - 1) * _spacing);
-    return _BoardOverviewGridLayout(
+    final gridHeight =
+        (totalRows * bestSize.height) +
+        (math.max(0, totalRows - activeSections) * _spacing) +
+        (math.max(0, activeSections - 1) * _sectionGap);
+    final start = Offset(
+      math.max(_padding, (size.width - gridWidth) / 2),
+      math.max(
+        _padding + _firstSectionLabelClearance,
+        (size.height - gridHeight) / 2 + (_firstSectionLabelClearance / 2),
+      ),
+    );
+    final sectionTops = <double>[];
+    var top = start.dy;
+    for (final rows in sectionRows) {
+      sectionTops.add(top);
+      if (rows <= 0) continue;
+      top +=
+          (rows * bestSize.height) +
+          (math.max(0, rows - 1) * _spacing) +
+          _sectionGap;
+    }
+    return _BoardOverviewSectionedLayout(
       columns: bestColumns,
       cardSize: bestSize,
-      start: Offset(
-        math.max(_padding, (size.width - gridWidth) / 2),
-        math.max(_padding, (size.height - gridHeight) / 2),
-      ),
+      start: start,
       spacing: _spacing,
+      sectionGap: _sectionGap,
+      itemCounts: itemCounts,
+      sectionTops: sectionTops,
     );
   }
 }
@@ -3916,11 +4205,17 @@ class _BoardOverviewSectionLabel extends StatelessWidget {
     required this.rect,
     required this.label,
     required this.opacity,
+    this.subtitle,
+    this.disconnectKey,
+    this.onDisconnect,
   });
 
   final Rect rect;
   final String label;
+  final String? subtitle;
   final double opacity;
+  final Key? disconnectKey;
+  final VoidCallback? onDisconnect;
 
   @override
   Widget build(BuildContext context) {
@@ -3939,13 +4234,49 @@ class _BoardOverviewSectionLabel extends StatelessWidget {
             border: Border.all(color: colors.border),
           ),
           alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: colors.textMuted,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                    color: colors.textMuted.withAlpha(150),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (onDisconnect != null) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: Tooltip(
+                    message: 'Disconnect remote boards',
+                    child: InkWell(
+                      key: disconnectKey,
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: onDisconnect,
+                      child: Icon(
+                        Icons.link_off_rounded,
+                        size: 14,
+                        color: colors.textMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -3959,12 +4290,14 @@ class _BoardOverviewCard extends StatelessWidget {
     required this.active,
     required this.previewPng,
     required this.onTap,
+    this.onDisconnect,
   });
 
   final BoardDocument board;
   final bool active;
   final Uint8List? previewPng;
   final VoidCallback onTap;
+  final VoidCallback? onDisconnect;
 
   @override
   Widget build(BuildContext context) {
@@ -4045,6 +4378,22 @@ class _BoardOverviewCard extends StatelessWidget {
                           size: 13,
                           color: mutedColor,
                         ),
+                        if (onDisconnect != null) ...[
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message: 'Disconnect remote board',
+                            child: InkResponse(
+                              key: Key('board-overview-disconnect-${board.id}'),
+                              radius: 14,
+                              onTap: onDisconnect,
+                              child: Icon(
+                                Icons.link_off_rounded,
+                                size: 14,
+                                color: mutedColor,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -4187,10 +4536,11 @@ class _BoardSettingsDialogState extends State<_BoardSettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Board settings'),
-      content: SizedBox(
-        width: 520,
+    return AdaptiveDialogScaffold(
+      title: 'Board settings',
+      icon: const Icon(Icons.settings_outlined),
+      maxWidth: 520,
+      body: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -4526,7 +4876,7 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
     required VoidCallback onBringToFront,
     required VoidCallback onSendToBack,
   }) async {
-    await showDialog<void>(
+    await showAdaptiveYoloDialog<void>(
       context: context,
       builder:
           (dialogContext) => PanelSettingsDialog(
@@ -6184,91 +6534,79 @@ class PanelSettingsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(plugin?.icon ?? Icons.dashboard_customize_outlined),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text('Panel settings', overflow: TextOverflow.ellipsis),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 460,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _PanelSettingsSection(
-                title: 'Panel',
-                children: [
-                  _PanelSettingsInfoRow(label: 'Title', value: panel.title),
-                  _PanelSettingsInfoRow(
-                    label: 'Type',
-                    value: plugin?.displayName ?? panel.type,
-                  ),
-                  _PanelSettingsInfoRow(
-                    label: 'Depth',
-                    value: 'zIndex ${panel.zIndex}',
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _PanelSettingsSection(
-                title: 'Appearance',
-                children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
+    return AdaptiveDialogScaffold(
+      title: 'Panel settings',
+      icon: Icon(plugin?.icon ?? Icons.dashboard_customize_outlined),
+      maxWidth: 460,
+      body: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _PanelSettingsSection(
+              title: 'Panel',
+              children: [
+                _PanelSettingsInfoRow(label: 'Title', value: panel.title),
+                _PanelSettingsInfoRow(
+                  label: 'Type',
+                  value: plugin?.displayName ?? panel.type,
+                ),
+                _PanelSettingsInfoRow(
+                  label: 'Depth',
+                  value: 'zIndex ${panel.zIndex}',
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _PanelSettingsSection(
+              title: 'Appearance',
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: onEditColor,
+                      icon: const Icon(Icons.palette_outlined, size: 18),
+                      label: const Text('Panel color'),
+                    ),
+                    if (onEditPanel != null)
                       OutlinedButton.icon(
-                        onPressed: onEditColor,
-                        icon: const Icon(Icons.palette_outlined, size: 18),
-                        label: const Text('Panel color'),
-                      ),
-                      if (onEditPanel != null)
-                        OutlinedButton.icon(
-                          onPressed: onEditPanel,
-                          icon: const Icon(Icons.tune_rounded, size: 18),
-                          label: Text(
-                            plugin?.hasEditor == true
-                                ? '${plugin?.displayName ?? 'Content'} settings'
-                                : 'Edit content',
-                          ),
+                        onPressed: onEditPanel,
+                        icon: const Icon(Icons.tune_rounded, size: 18),
+                        label: Text(
+                          plugin?.hasEditor == true
+                              ? '${plugin?.displayName ?? 'Content'} settings'
+                              : 'Edit content',
                         ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _PanelSettingsSection(
-                title: 'Arrange',
-                children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: onBringToFront,
-                        icon: const Icon(
-                          Icons.flip_to_front_outlined,
-                          size: 18,
-                        ),
-                        label: const Text('Bring to front'),
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: onSendToBack,
-                        icon: const Icon(Icons.flip_to_back_outlined, size: 18),
-                        label: const Text('Send to back'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _PanelSettingsSection(
+              title: 'Arrange',
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: onBringToFront,
+                      icon: const Icon(Icons.flip_to_front_outlined, size: 18),
+                      label: const Text('Bring to front'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: onSendToBack,
+                      icon: const Icon(Icons.flip_to_back_outlined, size: 18),
+                      label: const Text('Send to back'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
       actions: [
@@ -7019,6 +7357,8 @@ class _BoardMiniMapPainter extends CustomPainter {
 
 class _BoardToolsPanel extends StatelessWidget {
   const _BoardToolsPanel({
+    required this.board,
+    required this.platform,
     required this.visible,
     required this.activeTool,
     required this.drawSettings,
@@ -7037,6 +7377,8 @@ class _BoardToolsPanel extends StatelessWidget {
     this.onAddGeneric,
   });
 
+  final BoardDocument board;
+  final String platform;
   final bool visible;
   final BoardToolId activeTool;
   final DrawSettings drawSettings;
@@ -7218,6 +7560,8 @@ class _BoardToolsPanel extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _PanelCatalogCategoryButton(
+                board: board,
+                platform: platform,
                 category: _PanelCatalogCategory.basics,
                 icon: Icons.category_outlined,
                 tooltip: 'Miro basics',
@@ -7229,6 +7573,8 @@ class _BoardToolsPanel extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _PanelCatalogCategoryButton(
+                board: board,
+                platform: platform,
                 category: _PanelCatalogCategory.ai,
                 icon: Icons.auto_awesome,
                 tooltip: 'AI and terminal',
@@ -7240,6 +7586,8 @@ class _BoardToolsPanel extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _PanelCatalogCategoryButton(
+                board: board,
+                platform: platform,
                 category: _PanelCatalogCategory.files,
                 icon: Icons.folder_outlined,
                 tooltip: 'Files and web',
@@ -7251,6 +7599,8 @@ class _BoardToolsPanel extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _PanelCatalogCategoryButton(
+                board: board,
+                platform: platform,
                 category: _PanelCatalogCategory.planning,
                 icon: Icons.view_kanban_outlined,
                 tooltip: 'Planning',
@@ -7262,6 +7612,8 @@ class _BoardToolsPanel extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               _PanelCatalogCategoryButton(
+                board: board,
+                platform: platform,
                 category: _PanelCatalogCategory.advanced,
                 icon: Icons.extension_outlined,
                 tooltip: 'Advanced',
@@ -7330,6 +7682,8 @@ class _MiroLeftToolbarButton extends StatelessWidget {
 
 class _PanelCatalogCategoryButton extends StatelessWidget {
   const _PanelCatalogCategoryButton({
+    required this.board,
+    required this.platform,
     required this.category,
     required this.icon,
     required this.tooltip,
@@ -7340,6 +7694,8 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
     this.onAddTerminal,
   });
 
+  final BoardDocument board;
+  final String platform;
   final _PanelCatalogCategory category;
   final IconData icon;
   final String tooltip;
@@ -7351,20 +7707,25 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasItems = _itemsFor(context, category).isNotEmpty;
     return Builder(
       builder:
           (btnCtx) => Tooltip(
-            message: tooltip,
+            message: hasItems ? tooltip : '$tooltip unavailable on this board',
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: () => _showCategoryItems(btnCtx),
+              onTap: hasItems ? () => _showCategoryItems(btnCtx) : null,
               child: Container(
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, size: 18, color: color),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: hasItems ? color : color.withAlpha(80),
+                ),
               ),
             ),
           ),
@@ -7409,6 +7770,7 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
   ) {
     PopupMenuEntry<String>? pluginItem(String typeId) {
       if (onAddGeneric == null) return null;
+      if (!_isPanelTypeAvailable(typeId)) return null;
       final plugin = BoardPluginRegistry.instance.pluginFor(typeId);
       if (plugin == null) return null;
       return _catalogItem(
@@ -7422,7 +7784,7 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
 
     final items = switch (category) {
       _PanelCatalogCategory.basics => <PopupMenuEntry<String>?>[
-        if (onAddNote != null)
+        if (onAddNote != null && _isPanelTypeAvailable('board.note.markdown'))
           _catalogItem(
             context,
             value: '__note',
@@ -7430,8 +7792,8 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
             iconColor: context.appColors.textMuted,
             label: 'Markdown Note',
           ),
-        if (onAddGeneric != null) pluginItem('board.sticky'),
-        if (onAddGeneric != null)
+        pluginItem('board.sticky'),
+        if (onAddGeneric != null && _isPanelTypeAvailable('board.shape'))
           _catalogItem(
             context,
             value: '__shape:frame',
@@ -7441,7 +7803,7 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
           ),
       ],
       _PanelCatalogCategory.ai => <PopupMenuEntry<String>?>[
-        if (onAddChat != null)
+        if (onAddChat != null && _isPanelTypeAvailable('board.chat'))
           _catalogItem(
             context,
             value: '__chat',
@@ -7449,7 +7811,7 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
             iconColor: context.appColors.statusActive,
             label: 'AI Chat',
           ),
-        if (onAddTerminal != null)
+        if (onAddTerminal != null && _isPanelTypeAvailable('board.terminal'))
           _catalogItem(
             context,
             value: '__terminal',
@@ -7479,6 +7841,14 @@ class _PanelCatalogCategoryButton extends StatelessWidget {
       ],
     };
     return items.whereType<PopupMenuEntry<String>>().toList();
+  }
+
+  bool _isPanelTypeAvailable(String typeId) {
+    return yoloitdPanelTypeAvailableOn(
+      typeId,
+      platform: platform,
+      remote: isRemoteBoard(board),
+    );
   }
 
   PopupMenuItem<String> _catalogItem(
@@ -9962,10 +10332,16 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
                         ),
                       );
                     },
-                    child: SizedBox(
-                      width: 380,
-                      height: 480,
-                      child: _buildChatPanel(),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final availableWidth =
+                            MediaQuery.sizeOf(context).width - 44;
+                        return SizedBox(
+                          width: availableWidth.clamp(260.0, 380.0),
+                          height: 480,
+                          child: _buildChatPanel(),
+                        );
+                      },
                     ),
                   ),
                 ],

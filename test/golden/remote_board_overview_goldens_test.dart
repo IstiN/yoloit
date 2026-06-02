@@ -16,8 +16,21 @@ class _SeededBoardCubit extends BoardCubit {
     emit(state);
   }
 
+  String? disconnectedRemoteUrl;
+  String? disconnectedRemoteBoardId;
+
   @override
   Future<void> refreshRemoteBoards({String? url}) async {}
+
+  @override
+  Future<void> disconnectRemoteBoardsForUrl(String url) async {
+    disconnectedRemoteUrl = url;
+  }
+
+  @override
+  Future<void> disconnectRemoteBoard(String boardId) async {
+    disconnectedRemoteBoardId = boardId;
+  }
 }
 
 BoardPanelInstance _panel({
@@ -145,9 +158,49 @@ void main() {
 
     expect(find.text('Local boards'), findsOneWidget);
     expect(find.text('Remote boards'), findsOneWidget);
+    expect(find.text('remote.yoloit.test:43110'), findsOneWidget);
     expect(find.text('Remote Shared'), findsOneWidget);
     expect(find.byIcon(Icons.cloud_outlined), findsWidgets);
 
     await screenMatchesGolden(tester, 'board_overview_remote_group');
+  });
+
+  testWidgets('board overview exposes remote disconnect controls', (
+    tester,
+  ) async {
+    final cubit = _SeededBoardCubit(
+      BoardState(
+        boards: [_localBoard(), _remoteBoard()],
+        activeBoardId: 'local-alpha',
+        isLoaded: true,
+      ),
+    );
+    addTearDown(cubit.close);
+
+    await tester.pumpWidget(_harness(cubit));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Open boards overview'));
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pump(const Duration(milliseconds: 420));
+    await tester.pump();
+
+    await tester.tap(
+      find.byKey(
+        const Key(
+          'board-overview-disconnect-remote-http://remote.yoloit.test:43110/',
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(cubit.disconnectedRemoteUrl, 'http://remote.yoloit.test:43110/');
+
+    await tester.tap(
+      find.byKey(
+        const Key('board-overview-disconnect-remote_demo_remote-shared'),
+      ),
+    );
+    await tester.pump();
+    expect(cubit.disconnectedRemoteBoardId, 'remote_demo_remote-shared');
   });
 }

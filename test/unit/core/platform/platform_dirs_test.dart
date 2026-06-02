@@ -62,13 +62,30 @@ void main() {
     });
   });
 
+  group('IosPlatformDirs', () {
+    late IosPlatformDirs dirs;
+
+    setUp(() => dirs = const IosPlatformDirs(homeOverride: '/ios/sandbox'));
+
+    test('config and data dirs live inside app Documents', () {
+      expect(dirs.configDir, '/ios/sandbox/Documents/yoloit');
+      expect(dirs.dataDir, '/ios/sandbox/Documents/yoloit');
+    });
+
+    test('logs and skills dirs live under the sandbox root', () {
+      expect(dirs.logsDir, '/ios/sandbox/Documents/yoloit/logs');
+      expect(dirs.skillsDir, '/ios/sandbox/Documents/yoloit/skills');
+    });
+  });
+
   group('WindowsPlatformDirs', () {
     late WindowsPlatformDirs dirs;
 
     setUp(
-      () => dirs = const WindowsPlatformDirs(
-        appDataOverride: r'C:\Users\test\AppData\Roaming',
-      ),
+      () =>
+          dirs = const WindowsPlatformDirs(
+            appDataOverride: r'C:\Users\test\AppData\Roaming',
+          ),
     );
 
     test('configDir returns APPDATA\\yoloit', () {
@@ -86,7 +103,7 @@ void main() {
 
   group('PlatformDirs.instance', () {
     test('can be overridden for testing', () {
-      final fake = const LinuxPlatformDirs(homeOverride: '/override');
+      const fake = LinuxPlatformDirs(homeOverride: '/override');
       PlatformDirs.setInstance(fake);
       expect(PlatformDirs.instance.configDir, '/override/.config/yoloit');
     });

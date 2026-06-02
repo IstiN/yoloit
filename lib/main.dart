@@ -43,13 +43,14 @@ void main(List<String> args) async {
     exit(await RealLlmToolTestRunner.run(args));
   }
 
-  // On macOS, media_kit's default `DynamicLibrary.open('Mpv.framework/Mpv')`
-  // collides with media_kit_video's linked `@rpath/Mpv.framework/Versions/A/Mpv`
+  // media_kit's default `DynamicLibrary.open('Mpv.framework/Mpv')` can fail
+  // in Flutter debug launches because the relative framework path is not
+  // always resolved from the app bundle. On macOS it can also collide with
+  // media_kit_video's linked `@rpath/Mpv.framework/Versions/A/Mpv`
   // because dyld treats them as different lookup keys → loads Mpv twice →
   // duplicate ObjC class registration → SIGABRT in mpv core threads.
   //
-  // Force absolute path matching the linker's resolved @rpath so dyld
-  // deduplicates the dylib.
+  // Force an absolute app-bundle path when available.
   String? libmpvPath;
   if (Platform.isMacOS) {
     final exe = Platform.resolvedExecutable;
@@ -59,8 +60,21 @@ void main(List<String> args) async {
     if (File(candidate).existsSync()) {
       libmpvPath = candidate;
     }
+  } else if (Platform.isIOS) {
+    final exe = Platform.resolvedExecutable;
+    // .../Runner.app/Runner  →  .../Runner.app/Frameworks/Mpv.framework/Mpv
+    final exeDir = File(exe).parent.path;
+    final candidate = '$exeDir/Frameworks/Mpv.framework/Mpv';
+    if (File(candidate).existsSync()) {
+      libmpvPath = candidate;
+    }
   }
-  MediaKit.ensureInitialized(libmpv: libmpvPath);
+  try {
+    MediaKit.ensureInitialized(libmpv: libmpvPath);
+  } catch (error, stackTrace) {
+    debugPrint('MediaKit initialization failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 
   // Init app-level file logger early (before FlutterError hook) so it can
   // capture errors that occur during startup.

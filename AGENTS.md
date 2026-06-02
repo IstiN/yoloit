@@ -41,6 +41,28 @@ This guide outlines non-obvious developer commands, compilation pipelines, stric
 
 ---
 
+## 🧭 CodeGraph Usage: CLI Only
+
+- **Do not rely on the CodeGraph MCP server for this repository.**
+  - The repo is large enough that the CodeGraph file watcher can hit macOS file descriptor limits (`EMFILE: too many open files, watch`) and make MCP startup time out.
+  - Prefer explicit `codegraph` CLI calls from the terminal. They are deterministic, easy to retry, and do not block Codex startup.
+- **Use CodeGraph CLI for structural code questions before falling back to text search:**
+  - Symbol or API context: `codegraph context "task or area"`
+  - Symbol lookup: `codegraph query "SymbolName"`
+  - Callers: `codegraph callers "SymbolName"`
+  - Callees: `codegraph callees "SymbolName"`
+  - Impact analysis: `codegraph impact "SymbolName"`
+  - File list from index: `codegraph files`
+  - Index health: `codegraph status --json`
+- **Keep the index fresh manually:**
+  - Run `codegraph sync` after meaningful edits before asking structural questions.
+  - If the index looks stale or locked, run `codegraph status` first and follow its output; do not start or debug the MCP server.
+- **When using CLI output in answers or implementation work:**
+  - Treat CodeGraph CLI results as the structural source of truth for definitions, call relationships, and impact.
+  - Use `rg` only for literal text, comments, log messages, config keys, and after CodeGraph has already identified specific files.
+
+---
+
 ## 🛡️ Coding Conventions & Strict Analysis Constraints
 
 - **Strict Analysis Rules** (Violations are treated as build/CI errors):

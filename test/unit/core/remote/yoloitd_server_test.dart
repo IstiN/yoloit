@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/remote/yoloitd_server.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
+
+import '../../../helpers/remote_widget_smoke_data.dart';
 
 void main() {
   test('server exposes board API with token auth', () async {
@@ -350,6 +353,144 @@ void main() {
     );
   });
 
+  test(
+    'server exposes and round-trips all remote widget panel types',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('yoloitd_widgets_');
+      addTearDown(() => dir.delete(recursive: true));
+      final server = YoloitdServer(
+        store: YoloitdStore(rootDir: dir, actorId: 'test'),
+        port: 0,
+        token: 'secret',
+      );
+      await server.start();
+      addTearDown(server.stop);
+
+      final created = await _json(
+        server.boundPort!,
+        'POST',
+        '/api/boards',
+        token: 'secret',
+        body: {'name': 'Widget Smoke'},
+      );
+      final board = created.body['board'] as Map<String, dynamic>;
+      final boardId = board['id'] as String;
+
+      final panelTypes = await _json(
+        server.boundPort!,
+        'GET',
+        '/api/boards/$boardId/panel-types',
+        token: 'secret',
+      );
+      final remoteTypes =
+          (panelTypes.body['types'] as List<dynamic>)
+              .whereType<Map<dynamic, dynamic>>()
+              .map((entry) => entry['type'])
+              .whereType<String>()
+              .toSet();
+      expect(
+        remoteTypes,
+        containsAll(yoloitdPanelTypes.map((entry) => entry['type'] as String)),
+      );
+      final terminalType = (panelTypes.body['types'] as List<dynamic>)
+          .whereType<Map<dynamic, dynamic>>()
+          .singleWhere((entry) => entry['type'] == 'board.terminal');
+      expect(terminalType['actions'], contains('set-dir'));
+      final terminalCapabilities = terminalType['capabilities'] as Map;
+      expect(terminalCapabilities['requiresNativeHost'], isTrue);
+      expect(terminalCapabilities['remotePlatforms'], contains('ios'));
+
+      for (var i = 0; i < yoloitdPanelTypes.length; i++) {
+        final type = yoloitdPanelTypes[i]['type'] as String;
+        final panelId = 'panel-$i';
+        final createdPanel = await _json(
+          server.boundPort!,
+          'POST',
+          '/api/boards/$boardId/panels',
+          token: 'secret',
+          body: {
+            'id': panelId,
+            'type': type,
+            'title': 'Remote $type',
+            'x': 80 + (i % 5) * 280,
+            'y': 80 + (i ~/ 5) * 220,
+            'width': _defaultWidth(type),
+            'height': _defaultHeight(type),
+            'state': _sampleState(type),
+          },
+        );
+        expect(createdPanel.body['ok'], isTrue, reason: type);
+
+        final fetchedBeforeActions = await _json(
+          server.boundPort!,
+          'GET',
+          '/api/boards/$boardId/panels/$panelId',
+          token: 'secret',
+        );
+        expect(
+          fetchedBeforeActions.body['supportedActions'],
+          containsAll(
+            (yoloitdPanelDescriptorFor(type)?.actions ?? const <String>[]),
+          ),
+          reason: type,
+        );
+
+        for (final action in remoteWidgetSmokeActions(type)) {
+          final response = await _json(
+            server.boundPort!,
+            'POST',
+            '/api/boards/$boardId/panels/$panelId/action',
+            token: 'secret',
+            body: action,
+          );
+          expect(
+            response.body['ok'],
+            isTrue,
+            reason: '$type ${action['action']}',
+          );
+          expect(
+            response.body['panel'],
+            isA<Map<String, dynamic>>(),
+            reason: '$type ${action['action']}',
+          );
+        }
+
+        final resized = await _json(
+          server.boundPort!,
+          'PUT',
+          '/api/boards/$boardId/panels/$panelId',
+          token: 'secret',
+          body: {'width': 444, 'height': 333},
+        );
+        expect(resized.body['ok'], isTrue, reason: type);
+
+        final fetched = await _json(
+          server.boundPort!,
+          'GET',
+          '/api/boards/$boardId/panels/$panelId',
+          token: 'secret',
+        );
+        expect(fetched.body['type'], type);
+        final bounds = fetched.body['bounds'] as Map<String, dynamic>;
+        expect(bounds['width'], 444);
+        expect(bounds['height'], 333);
+        final content = fetched.body['content'] as Map<String, dynamic>;
+        _expectRemoteActionState(type, content);
+      }
+
+      final snapshot = await _request(
+        server.boundPort!,
+        'GET',
+        '/api/boards/$boardId/snapshot',
+        token: 'secret',
+      );
+      expect(snapshot.status, 200);
+      for (final entry in yoloitdPanelTypes) {
+        expect(snapshot.body, contains(entry['type'] as String));
+      }
+    },
+  );
+
   test('server starts remote terminal and accepts input', () async {
     final dir = await Directory.systemTemp.createTemp('yoloitd_terminal_');
     addTearDown(() => dir.delete(recursive: true));
@@ -385,10 +526,10 @@ void main() {
             '/api/terminals/term-1/log',
             token: 'secret',
           )).body;
-      if ((log['chunks'] as List).join().contains(dir.path)) break;
+      if ((log['chunks'] as List<dynamic>).join().contains(dir.path)) break;
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
-    expect((log['chunks'] as List).join(), contains(dir.path));
+    expect((log['chunks'] as List<dynamic>).join(), contains(dir.path));
   });
 
   test(
@@ -415,9 +556,9 @@ void main() {
       expect(
         packages.any(
           (entry) =>
-              entry is Map &&
+              entry is Map<String, dynamic> &&
               entry['id'] == 'codex' &&
-              entry['installAction'] is Map,
+              entry['installAction'] is Map<String, dynamic>,
         ),
         isTrue,
       );
@@ -432,6 +573,196 @@ void main() {
       expect(install.status, 400);
     },
   );
+}
+
+double _defaultWidth(String type) {
+  final entry = yoloitdPanelTypes.firstWhere((entry) => entry['type'] == type);
+  final size = entry['defaultSize'] as Map<String, dynamic>;
+  return (size['width'] as num).toDouble();
+}
+
+double _defaultHeight(String type) {
+  final entry = yoloitdPanelTypes.firstWhere((entry) => entry['type'] == type);
+  final size = entry['defaultSize'] as Map<String, dynamic>;
+  return (size['height'] as num).toDouble();
+}
+
+void _expectRemoteActionState(String type, Map<String, dynamic> content) {
+  switch (type) {
+    case 'board.note.markdown':
+      expect(content['markdown'], contains('Appended over remote'));
+      expect(content['autoHeight'], isTrue);
+    case 'board.sticky':
+      expect(content['text'], contains('Second line'));
+      expect(content['color'], '#F472B6');
+    case 'board.shape':
+      expect(content['shape'], 'triangle');
+      expect(content['strokeWidth'], 7);
+    case 'board.kanban':
+      expect(content['cards'], isA<List<dynamic>>());
+      expect(
+        (content['cards'] as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .singleWhere(
+              (card) => card['id'] == 'remote-card-1',
+            )['description'],
+        'Done remotely',
+      );
+    case 'board.webpage':
+      expect(content['url'], 'https://example.org');
+    case 'board.code.snippet':
+      expect(content['language'], 'python');
+      expect(content['code'], contains('remote'));
+    case 'board.checklist':
+      expect(
+        (content['items'] as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .singleWhere((item) => item['id'] == 'remote-item-2')['text'],
+        'Remote item renamed',
+      );
+    case 'board.files':
+      expect(content['selectedPath'], '/data');
+      expect(
+        (content['files'] as List<dynamic>)
+            .whereType<Map<String, dynamic>>()
+            .any((file) => file['id'] == 'remote-file-2'),
+        isTrue,
+      );
+    case 'board.file.preview':
+      expect(content['path'], '/data/TODO.md');
+    case 'board.playlist':
+      expect(content['tracks'], isNotEmpty);
+      expect(content['playing'], isFalse);
+    case 'board.run':
+    case 'board.run_configs':
+      expect(content['group'], 'remote');
+      expect(content['activeSessionId'], 'session-remote');
+    case 'board.setup_guide':
+      expect(content['selectedPackageIds'], contains('node'));
+      expect(content['selectedPackageIds'], isNot(contains('tmux')));
+    case 'board.chat':
+      expect(content['configured'], isTrue);
+      expect(content['messages'], isNotEmpty);
+    case 'board.terminal':
+      final config = content['config'] as Map;
+      expect(config['workingDir'], '/workspace');
+      expect(config['sessionId'], 'remote-terminal');
+    case 'board.filetree':
+      expect(content['rootPath'], '/workspace');
+      expect(content['expandedDirs'], contains('/workspace/lib'));
+      expect(content['selectedFile'], '/workspace/lib/main.dart');
+    case 'board.diff.preview':
+      expect(content['rootPath'], '/workspace');
+      expect(content['filePath'], '/workspace/lib/main.dart');
+    case 'board.yolo_assistant':
+      expect(content['mode'], 'voice');
+      expect(content['assistantStatus'], 'ready');
+    case 'board.widget.custom':
+      expect(content['widgetId'], 'remote-widget');
+      expect(content['config'], containsPair('theme', 'remote'));
+    case 'board.timer':
+      expect(content['duration'], 900);
+      expect(content['isPaused'], isTrue);
+    default:
+      expect(content, isNotEmpty);
+  }
+}
+
+Map<String, Object?> _sampleState(String type) {
+  return switch (type) {
+    'board.note.markdown' => {
+      'markdown': '## Remote markdown\nDocker smoke',
+      'autoHeight': false,
+      'autoScroll': false,
+    },
+    'board.sticky' => {
+      'text': 'Remote sticky',
+      'color': '#FEF08A',
+      'textColor': '#1F2937',
+      'fontSize': 18,
+    },
+    'board.shape' => {
+      'shape': 'diamond',
+      'text': 'Remote shape',
+      'fillColor': '#00000000',
+      'strokeColor': '#93C5FD',
+      'textColor': '#E2E8F0',
+      'strokeWidth': 3,
+      'fontSize': 18,
+      'textHAlign': 'center',
+      'textVAlign': 'center',
+      'textOrientation': 'horizontal',
+    },
+    'board.kanban' => {
+      'columns': ['Todo', 'Done'],
+      'cards': [
+        {'id': 'card-1', 'title': 'Remote card', 'column': 'Todo'},
+      ],
+    },
+    'board.webpage' => {
+      'url': 'https://example.com',
+      'title': 'Example',
+      'favicon': '',
+    },
+    'board.code.snippet' => {'code': 'void main() {}', 'language': 'dart'},
+    'board.checklist' => {
+      'title': 'Remote checklist',
+      'items': [
+        {'id': 'item-1', 'text': 'Round trip state', 'done': true},
+      ],
+    },
+    'board.files' => {
+      'files': [
+        {'path': '/data/README.md', 'name': 'README.md'},
+      ],
+    },
+    'board.file.preview' => {'path': '/data/README.md', 'title': 'README.md'},
+    'board.playlist' => {
+      'tracks': <Map<String, Object?>>[],
+      'currentIndex': 0,
+      'repeat': false,
+      'shuffle': false,
+    },
+    'board.run' => {'group': 'default', 'activeSessionId': null},
+    'board.run_configs' => {'group': 'default'},
+    'board.setup_guide' => {
+      'selectedPackageIds': ['git', 'tmux', 'codex'],
+    },
+    'board.chat' => {
+      'configured': false,
+      'config': {'sessionName': '', 'workingDir': ''},
+    },
+    'board.terminal' => {
+      'config': {'sessionId': '', 'sessionName': '', 'workingDir': ''},
+    },
+    'board.filetree' => {
+      'rootPath': '/data',
+      'expandedDirs': <String>[],
+      'selectedFile': '',
+    },
+    'board.diff.preview' => {'filePath': '', 'rootPath': '', 'title': 'Diff'},
+    'board.yolo_assistant' => {
+      'messages': <Map<String, Object?>>[],
+      'activeSkills': ['Terminal', 'Board Control', 'Web Search'],
+      'mode': 'text',
+      'isListening': false,
+      'isSpeaking': false,
+    },
+    'board.widget.custom' => {
+      'widgetId': 'yolo-hello',
+      'config': <String, Object?>{},
+    },
+    'board.timer' => {
+      'duration': 300,
+      'remaining': 300,
+      'isRunning': false,
+      'isPaused': false,
+      'completed': false,
+      'label': 'Remote timer',
+      'lastTick': 0,
+    },
+    _ => <String, Object?>{},
+  };
 }
 
 Future<({int status, String body})> _request(

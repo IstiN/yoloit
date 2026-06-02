@@ -30,7 +30,12 @@ class SetupGuidePlugin extends BoardPanelPlugin {
 
   @override
   Map<String, dynamic> get initialState => const {
-    'selectedPackageIds': <String>['git', 'tmux', 'codex'],
+    'selectedPackageIds': <String>[
+      'git',
+      'tmux',
+      'codex',
+      SetupCatalog.yoloitSkillsPackageId,
+    ],
   };
 
   @override
@@ -108,7 +113,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
       final ids = raw.map((value) => value.toString()).toSet();
       if (ids.isNotEmpty) return ids;
     }
-    return <String>{'git', 'tmux', 'codex'};
+    return <String>{'git', 'tmux', 'codex', SetupCatalog.yoloitSkillsPackageId};
   }
 
   Future<void> _refresh() async {
@@ -169,20 +174,32 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
     try {
       final remote = widget.renderContext.remoteInfo;
       if (remote == null) {
+        final specialIds =
+            _selectedIds.where(SetupCatalog.isSpecialInstallTask).toList()
+              ..sort();
+        for (final id in specialIds) {
+          _appendLog('\$ ${SetupCatalog.specialInstallLabel(id)}');
+          await for (final line in SetupCatalog.runSpecialInstallTask(id)) {
+            if (!mounted) return;
+            _appendLog(line);
+          }
+        }
         final script = SetupCatalog.installScript(
           _selectedIds,
           snapshot.runtime.os,
         );
-        if (script.trim().isEmpty) {
+        if (script.trim().isEmpty && specialIds.isEmpty) {
           throw StateError(
             'No install command for selected packages on this OS.',
           );
         }
         _lastScript = script;
-        _appendLog('\$ $script');
-        await for (final line in runSetupInstallScript(script)) {
-          if (!mounted) return;
-          _appendLog(line);
+        if (script.trim().isNotEmpty) {
+          _appendLog('\$ $script');
+          await for (final line in runSetupInstallScript(script)) {
+            if (!mounted) return;
+            _appendLog(line);
+          }
         }
         await _refresh();
       } else {
@@ -256,7 +273,12 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
     final commands =
         snapshot.packages
             .where((pkg) => _selectedIds.contains(pkg.id))
-            .map((pkg) => pkg.installAction?.command.trim() ?? '')
+            .map(
+              (pkg) =>
+                  SetupCatalog.isSpecialInstallTask(pkg.id)
+                      ? SetupCatalog.specialInstallLabel(pkg.id)
+                      : pkg.installAction?.command.trim() ?? '',
+            )
             .where((command) => command.isNotEmpty)
             .toList();
     if (commands.isEmpty) return null;

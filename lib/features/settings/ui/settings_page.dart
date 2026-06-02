@@ -11,10 +11,12 @@ import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/core/hotkeys/hotkey_definition.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
+import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -47,6 +49,7 @@ const _kCategories = [
   'Sync',
   'Setup Guide',
   'Apps & Widgets',
+  'Support',
   'About',
 ];
 
@@ -70,14 +73,19 @@ class SettingsPage extends StatefulWidget {
             create: (_) => SkillsCubit(),
             child: BlocProvider.value(
               value: wsCubit,
-              child: Dialog(
-                backgroundColor: Colors.transparent,
-                insetPadding: EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 40,
-                ),
-                child: SettingsPage(initialCategory: initialCategory),
-              ),
+              child:
+                  useFullscreenDialogs(context)
+                      ? Dialog.fullscreen(
+                        child: SettingsPage(initialCategory: initialCategory),
+                      )
+                      : Dialog(
+                        backgroundColor: Colors.transparent,
+                        insetPadding: const EdgeInsets.symmetric(
+                          horizontal: 60,
+                          vertical: 40,
+                        ),
+                        child: SettingsPage(initialCategory: initialCategory),
+                      ),
             ),
           ),
     );
@@ -106,18 +114,23 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final fullscreen = useFullscreenDialogs(context);
     return Container(
-      constraints: const BoxConstraints(maxWidth: 900, maxHeight: 780),
+      constraints:
+          fullscreen
+              ? null
+              : const BoxConstraints(maxWidth: 900, maxHeight: 780),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.border),
+        borderRadius: BorderRadius.circular(fullscreen ? 0 : 12),
+        border: fullscreen ? null : Border.all(color: colors.border),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(120),
-            blurRadius: 32,
-            offset: const Offset(0, 8),
-          ),
+          if (!fullscreen)
+            BoxShadow(
+              color: Colors.black.withAlpha(120),
+              blurRadius: 32,
+              offset: const Offset(0, 8),
+            ),
         ],
       ),
       child: Column(
@@ -302,7 +315,15 @@ class _SettingsPageState extends State<SettingsPage> {
             WidgetPermissionsSection(),
           ],
         ),
-        11 => Column(
+        11 => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionHeader(title: 'Support'),
+            SizedBox(height: 12),
+            _SupportSection(),
+          ],
+        ),
+        12 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionHeader(title: 'About'),
@@ -331,6 +352,149 @@ class _SectionHeader extends StatelessWidget {
         fontWeight: FontWeight.w700,
         letterSpacing: 1,
       ),
+    );
+  }
+}
+
+class _SupportSection extends StatefulWidget {
+  const _SupportSection();
+
+  @override
+  State<_SupportSection> createState() => _SupportSectionState();
+}
+
+class _SupportSectionState extends State<_SupportSection> {
+  bool _copying = false;
+  String? _logPath;
+
+  @override
+  void initState() {
+    super.initState();
+    AppLogger.instance.logPath.then((path) {
+      if (mounted) setState(() => _logPath = path);
+    });
+  }
+
+  Future<void> _copyLogs() async {
+    setState(() => _copying = true);
+    try {
+      final payload = await SupportLogService.instance.buildCopyPayload();
+      await Clipboard.setData(ClipboardData(text: payload));
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Support logs copied')));
+    } finally {
+      if (mounted) setState(() => _copying = false);
+    }
+  }
+
+  void _clearRecentEvents() {
+    SupportLogService.instance.clearMemoryLog();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Recent support events cleared')),
+    );
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final recent = SupportLogService.instance.memoryLog;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.support_outlined, size: 18, color: colors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Diagnostics',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _copying ? null : _copyLogs,
+                    icon:
+                        _copying
+                            ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Icon(Icons.copy, size: 16),
+                    label: Text(_copying ? 'Copying...' : 'Copy logs'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Board navigation diagnostics capture trackpad scroll, pan/zoom, canvas locks, and viewport interaction events.',
+                style: TextStyle(color: colors.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'App log: ${_logPath ?? 'loading...'}',
+                style: TextStyle(color: colors.textMuted, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(
+              'Recent support events',
+              style: TextStyle(
+                color: colors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _clearRecentEvents,
+              icon: const Icon(Icons.delete_outline, size: 16),
+              label: const Text('Clear recent'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          constraints: const BoxConstraints(minHeight: 180, maxHeight: 320),
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.border),
+          ),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              recent,
+              style: TextStyle(
+                color: colors.textMuted,
+                fontSize: 11,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

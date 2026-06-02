@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yoloit/core/remote/yoloitd_models.dart';
+import 'package:yoloit/core/remote/yoloitd_panel_actions.dart';
+import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
 import 'package:yoloit/core/setup/setup_catalog.dart';
 
@@ -23,6 +25,7 @@ class YoloitdServer {
 
   HttpServer? _server;
   final Map<String, Process> _runs = <String, Process>{};
+  final Set<String> _activeTaskRuns = <String>{};
   final Map<String, List<String>> _runLogs = <String, List<String>>{};
   final Map<String, int> _runExitCodes = <String, int>{};
   final Map<String, Process> _terminals = <String, Process>{};
@@ -44,6 +47,7 @@ class YoloitdServer {
       process.kill();
     }
     _runs.clear();
+    _activeTaskRuns.clear();
     for (final process in _terminals.values) {
       process.kill();
     }
@@ -207,7 +211,7 @@ class YoloitdServer {
       });
     }
     if (sub.length == 2 && sub[1] == 'panel-types' && method == 'GET') {
-      return _json(<String, Object?>{'types': _panelTypes});
+      return _json(<String, Object?>{'types': yoloitdPanelTypes});
     }
     if (sub.length == 2 && sub[1] == 'snapshot' && method == 'GET') {
       return shelf.Response.ok(
@@ -540,8 +544,10 @@ class YoloitdServer {
         ...panel.toJson(),
         'typeName': panel.type,
         'content': panel.state,
-        'supportedActions': const <String>['get', 'set'],
-        'actionHelp': const <String, Object?>{},
+        'supportedActions':
+            yoloitdPanelDescriptorFor(panel.type)?.actions ??
+            const <String>['get', 'set'],
+        'actionHelp': remotePanelActionHelp(panel),
       });
     }
     if (sub.length == 1 && method == 'DELETE') {
@@ -578,23 +584,26 @@ class YoloitdServer {
     if (sub.length == 2 && sub[1] == 'action' && method == 'POST') {
       final body = await _body(request);
       final action = body['action'] as String? ?? 'get';
-      if (action == 'get') {
-        return _json(<String, Object?>{'ok': true, 'content': panel.state});
+      final result = handleRemotePanelAction(panel, action, body);
+      if (!result.ok) {
+        return _json(result.toJson(), 400);
       }
-      if (action == 'set') {
-        final nextState = <String, dynamic>{...panel.state, ...body}
-          ..remove('action');
-        final updated = await store.updatePanel(
-          board.id,
-          panel.id,
-          (current) => current.copyWith(state: nextState),
-        );
-        return _json(<String, Object?>{'ok': true, 'panel': updated?.toJson()});
+      if (result.stateUpdate.isEmpty) {
+        return _json(<String, Object?>{
+          ...result.toJson(),
+          'content': result.data.isEmpty ? panel.state : result.data,
+        });
       }
-      return _json(<String, Object?>{
-        'ok': false,
-        'error': 'unknown action',
-      }, 400);
+      final nextState = <String, dynamic>{
+        ...panel.state,
+        ...result.stateUpdate,
+      };
+      final updated = await store.updatePanel(
+        board.id,
+        panel.id,
+        (current) => current.copyWith(state: nextState),
+      );
+      return _json(result.toJson(panel: updated));
     }
     return _json(<String, Object?>{'ok': false, 'error': 'not found'}, 404);
   }
@@ -618,7 +627,8 @@ class YoloitdServer {
                 .map(
                   (id) => <String, Object?>{
                     'id': id,
-                    'running': _runs.containsKey(id),
+                    'running':
+                        _runs.containsKey(id) || _activeTaskRuns.contains(id),
                     if (_runExitCodes.containsKey(id))
                       'exitCode': _runExitCodes[id],
                     'logLines': _runLogs[id]?.length ?? 0,
@@ -684,37 +694,41 @@ class YoloitdServer {
         }, 400);
       }
       final runtime = await SetupCatalog.detectRuntime();
+      final specialIds =
+          ids.where(SetupCatalog.isSpecialInstallTask).toList()..sort();
       final script = SetupCatalog.installScript(ids, runtime.os);
-      if (script.trim().isEmpty) {
+      if (script.trim().isEmpty && specialIds.isEmpty) {
         return _json(<String, Object?>{
           'ok': false,
           'error': 'no install command for selected packages on this OS',
         }, 400);
       }
+      final displayScript = <String>[
+        for (final id in specialIds) SetupCatalog.specialInstallLabel(id),
+        if (script.trim().isNotEmpty) script,
+      ].join('\n');
       if (body['dryRun'] == true) {
-        return _json(<String, Object?>{'ok': true, 'script': script});
+        return _json(<String, Object?>{'ok': true, 'script': displayScript});
       }
       final id = body['id'] as String? ?? _nextId('setup');
-      final process = await Process.start(
-        Platform.environment['SHELL'] ?? '/bin/sh',
-        <String>['-lc', script],
-        workingDirectory: store.rootDir.path,
+      _runLogs[id] = <String>['\$ $displayScript'];
+      _runExitCodes.remove(id);
+      _activeTaskRuns.add(id);
+      unawaited(
+        _runSetupInstallTasks(id, specialIds, script, store.rootDir.path),
       );
-      _runs[id] = process;
-      _runLogs[id] = <String>['\$ $script'];
-      unawaited(_collectRun(id, process));
       return _json(<String, Object?>{
         'ok': true,
         'id': id,
-        'pid': process.pid,
-        'script': script,
+        'script': displayScript,
       });
     }
     if (sub.length == 2 && sub[1] == 'log' && method == 'GET') {
       return _json(<String, Object?>{
         'id': sub[0],
         'lines': _runLogs[sub[0]] ?? const <String>[],
-        'running': _runs.containsKey(sub[0]),
+        'running':
+            _runs.containsKey(sub[0]) || _activeTaskRuns.contains(sub[0]),
         if (_runExitCodes.containsKey(sub[0]))
           'exitCode': _runExitCodes[sub[0]],
       });
@@ -876,6 +890,44 @@ class YoloitdServer {
     _runExitCodes[id] = exitCode;
   }
 
+  Future<void> _runSetupInstallTasks(
+    String id,
+    List<String> specialIds,
+    String script,
+    String workingDirectory,
+  ) async {
+    final lines = _runLogs[id] ??= <String>[];
+    var exitCode = 0;
+    try {
+      for (final specialId in specialIds) {
+        await for (final line in SetupCatalog.runSpecialInstallTask(
+          specialId,
+        )) {
+          lines.add(line);
+        }
+      }
+      if (script.trim().isNotEmpty) {
+        final process = await Process.start(
+          Platform.environment['SHELL'] ?? '/bin/sh',
+          <String>['-lc', script],
+          workingDirectory: workingDirectory,
+        );
+        _runs[id] = process;
+        await _collectRun(id, process);
+        return;
+      }
+    } catch (error) {
+      exitCode = 1;
+      lines.add('[error] $error');
+    } finally {
+      _activeTaskRuns.remove(id);
+      if (!_runExitCodes.containsKey(id)) {
+        _runExitCodes[id] = exitCode;
+        lines.add('[exit $exitCode]');
+      }
+    }
+  }
+
   bool _authorized(shelf.Request request) {
     final expected = token?.trim();
     if (expected == null || expected.isEmpty) return true;
@@ -975,29 +1027,6 @@ class YoloitdServer {
 
   static String _nextId(String prefix) =>
       '$prefix-${DateTime.now().microsecondsSinceEpoch}';
-
-  static const List<Map<String, dynamic>> _panelTypes = <Map<String, dynamic>>[
-    <String, dynamic>{
-      'type': 'board.note.markdown',
-      'displayName': 'Markdown Note',
-      'defaultSize': <String, dynamic>{'width': 300, 'height': 240},
-    },
-    <String, dynamic>{
-      'type': 'board.sticky',
-      'displayName': 'Sticky Note',
-      'defaultSize': <String, dynamic>{'width': 300, 'height': 260},
-    },
-    <String, dynamic>{
-      'type': 'board.shape',
-      'displayName': 'Shape / Frame',
-      'defaultSize': <String, dynamic>{'width': 300, 'height': 220},
-    },
-    <String, dynamic>{
-      'type': 'board.terminal',
-      'displayName': 'Terminal',
-      'defaultSize': <String, dynamic>{'width': 520, 'height': 360},
-    },
-  ];
 }
 
 extension _FirstOrNull<T> on Iterable<T> {

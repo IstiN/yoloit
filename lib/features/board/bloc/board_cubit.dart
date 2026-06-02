@@ -183,6 +183,49 @@ class BoardCubit extends Cubit<BoardState> {
     }
   }
 
+  Future<void> disconnectRemoteBoard(String boardId) async {
+    final board =
+        state.boards.where((entry) => entry.id == boardId).firstOrNull;
+    if (board == null || remoteInfoForBoard(board) == null) return;
+    await _disconnectRemoteBoards((entry) => entry.id == boardId);
+  }
+
+  Future<void> disconnectRemoteBoardsForUrl(String url) async {
+    await _disconnectRemoteBoards((entry) {
+      final remote = remoteInfoForBoard(entry);
+      return remote != null && remote.url == url;
+    });
+  }
+
+  Future<void> _disconnectRemoteBoards(
+    bool Function(BoardDocument) remove,
+  ) async {
+    if (state.boards.isEmpty) return;
+    final removed = state.boards.where(remove).toList(growable: false);
+    if (removed.isEmpty) return;
+    for (final board in removed) {
+      for (final panel in board.panels) {
+        WebViewManager.instance.remove(panel.id);
+      }
+    }
+    var updated = state.boards.where((board) => !remove(board)).toList();
+    String? activeBoardId = state.activeBoardId;
+    if (updated.isEmpty) {
+      final replacement = _buildDefaultBoard(name: 'Board 1');
+      updated = [replacement];
+      activeBoardId = replacement.id;
+    } else if (activeBoardId == null ||
+        !updated.any((board) => board.id == activeBoardId)) {
+      activeBoardId = updated.first.id;
+    }
+    _suppressRemoteSync = true;
+    try {
+      await _setBoards(updated, activeBoardId: activeBoardId);
+    } finally {
+      _suppressRemoteSync = false;
+    }
+  }
+
   Future<List<BoardHistoryEvent>> historyForBoard(String boardId) {
     return _historyStore.eventsForBoard(boardId);
   }

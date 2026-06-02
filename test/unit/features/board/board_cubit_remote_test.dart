@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 import 'package:yoloit/core/remote/yoloitd_server.dart';
 import 'package:yoloit/core/remote/yoloitd_store.dart';
@@ -116,6 +117,34 @@ void main() {
       final serverBoard = await store.findBoard(remoteBoard.id);
       expect(serverBoard!.panels.single.bounds.width, 500);
       expect(cubit.state.activeBoard!.panels.single.bounds.width, 500);
+    },
+  );
+
+  test(
+    'disconnectRemoteBoardsForUrl removes local remote copies only',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('yoloitd_disconnect_');
+      addTearDown(() => dir.delete(recursive: true));
+      final store = YoloitdStore(rootDir: dir, actorId: 'remote-test');
+      final remoteBoard = await store.createBoard('Remote UI');
+      final server = YoloitdServer(store: store, port: 0, token: 'secret');
+      await server.start();
+      addTearDown(server.stop);
+
+      final cubit = BoardCubit();
+      addTearDown(cubit.close);
+      await cubit.load();
+      await cubit.connectRemoteBoards(
+        url: 'http://127.0.0.1:${server.boundPort}',
+        token: 'secret',
+      );
+
+      final remoteUrl = remoteInfoForBoard(cubit.state.activeBoard!)!.url;
+      await cubit.disconnectRemoteBoardsForUrl(remoteUrl);
+
+      expect(cubit.state.boards.where(isRemoteBoard), isEmpty);
+      expect(cubit.state.boards, isNotEmpty);
+      expect(await store.findBoard(remoteBoard.id), isNotNull);
     },
   );
 }
