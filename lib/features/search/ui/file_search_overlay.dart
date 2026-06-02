@@ -108,6 +108,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   bool _loading = false;
   int _selectedIndex = 0;
   Timer? _debounce;
+  int _searchGeneration = 0;
 
   // Precomputed panels + file tree roots for searching.
   List<({BoardDocument board, BoardPanelInstance panel})> _panels = [];
@@ -157,9 +158,11 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
   }
 
   Future<void> _runSearch() async {
+    final generation = ++_searchGeneration;
     final query = _controller.text.trim().toLowerCase();
     final queries = FuzzyMatcher.candidates(query);
     final appColors = context.appColors;
+    final wsState = context.read<WorkspaceCubit>().state;
     if (query.isEmpty) {
       setState(() {
         _results = [];
@@ -210,14 +213,22 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
 
     // 2. Search files inside file-tree directories
     for (final root in _fileTreeRoots) {
+      if (generation != _searchGeneration) return;
       final dir = Directory(root);
-      if (!dir.existsSync()) continue;
-      _collectMatchingFiles(dir, root, queries, results, maxResults: 100);
+      if (!await dir.exists()) continue;
+      await _collectMatchingFiles(
+        dir,
+        root,
+        queries,
+        results,
+        appColors: appColors,
+        maxResults: 100,
+      );
     }
 
     // 3. Also search workspace files via existing service
-    final wsState = context.read<WorkspaceCubit>().state;
     if (wsState is WorkspaceLoaded) {
+      if (generation != _searchGeneration) return;
       final active =
           wsState.workspaces
               .where((w) => w.id == wsState.activeWorkspaceId)
@@ -252,7 +263,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       }
     }
 
-    if (!mounted) return;
+    if (!mounted || generation != _searchGeneration) return;
     setState(() {
       _results = results;
       _loading = false;
@@ -260,33 +271,32 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     });
   }
 
-  void _collectMatchingFiles(
+  Future<void> _collectMatchingFiles(
     Directory dir,
     String root,
     List<String> queries,
     List<_QuickResult> results, {
+    required AppColorScheme appColors,
     int maxResults = 100,
-  }) {
+  }) async {
     if (results.length >= maxResults) return;
+    var visited = 0;
     try {
-      for (final entity in dir.listSync()) {
+      await for (final entity in dir.list(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (results.length >= maxResults) return;
+        if (++visited % 80 == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
         final name = p.basename(entity.path);
         if (name.startsWith('.')) continue;
-        if (entity is Directory) {
-          _collectMatchingFiles(
-            entity,
-            root,
-            queries,
-            results,
-            maxResults: maxResults,
-          );
-        } else if (entity is File &&
-            FuzzyMatcher.bestScore(name, queries) != null) {
+        if (entity is File && FuzzyMatcher.bestScore(name, queries) != null) {
           final relPath = p.relative(entity.path, from: root);
           final ext =
               name.contains('.') ? name.split('.').last.toLowerCase() : '';
-          final (icon, color) = _iconForExtension(ext, context.appColors);
+          final (icon, color) = _iconForExtension(ext, appColors);
           // Avoid duplicates
           if (!results.any((r) => r.filePath == entity.path)) {
             results.add(

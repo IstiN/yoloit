@@ -18,6 +18,7 @@ class _SeededBoardCubit extends BoardCubit {
 
   String? disconnectedRemoteUrl;
   String? disconnectedRemoteBoardId;
+  String? deletedRemoteBoardId;
 
   @override
   Future<void> refreshRemoteBoards({String? url}) async {}
@@ -30,6 +31,11 @@ class _SeededBoardCubit extends BoardCubit {
   @override
   Future<void> disconnectRemoteBoard(String boardId) async {
     disconnectedRemoteBoardId = boardId;
+  }
+
+  @override
+  Future<void> deleteRemoteBoardOnServer(String boardId) async {
+    deletedRemoteBoardId = boardId;
   }
 }
 
@@ -184,6 +190,14 @@ void main() {
     await tester.pump(const Duration(seconds: 8));
     await tester.pump(const Duration(milliseconds: 420));
     await tester.pump();
+
+    await tester.tap(find.byTooltip('Delete board on remote server'));
+    await tester.pump();
+    expect(find.text('Delete remote board?'), findsOneWidget);
+
+    await tester.tap(find.text('Delete remote'));
+    await tester.pump();
+    expect(cubit.deletedRemoteBoardId, 'remote_demo_remote-shared');
 
     await tester.tap(
       find.byKey(

@@ -1646,12 +1646,14 @@ class _CodePreview extends StatefulWidget {
 
 class _CodePreviewState extends State<_CodePreview> {
   late List<String> _lines;
+  late String _extension;
   final _scrollCtrl = ScrollController();
   StreamSubscription<BoardFileModifiedEvent>? _fileSub;
 
   @override
   void initState() {
     super.initState();
+    _extension = p.extension(widget.path).replaceFirst('.', '').toLowerCase();
     _lines = _readLines();
     _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(
       _onFileModified,
@@ -1662,6 +1664,7 @@ class _CodePreviewState extends State<_CodePreview> {
   void didUpdateWidget(_CodePreview old) {
     super.didUpdateWidget(old);
     if (old.path != widget.path) {
+      _extension = p.extension(widget.path).replaceFirst('.', '').toLowerCase();
       _lines = _readLines();
     }
   }
@@ -1731,13 +1734,19 @@ class _CodePreviewState extends State<_CodePreview> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: SelectableText(
-                    _lines[i],
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      color: colors.terminalPrompt,
-                      height: 1.5,
+                  child: SelectableText.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: colors.terminalPrompt,
+                        height: 1.5,
+                      ),
+                      children: filePreviewCodeSyntaxSpans(
+                        _lines[i],
+                        extension: _extension,
+                        colors: colors,
+                      ),
                     ),
                   ),
                 ),
@@ -1748,6 +1757,59 @@ class _CodePreviewState extends State<_CodePreview> {
       ),
     );
   }
+}
+
+@visibleForTesting
+List<TextSpan> filePreviewCodeSyntaxSpans(
+  String line, {
+  required String extension,
+  required AppColorScheme colors,
+}) {
+  if (extension != 'json') {
+    return [TextSpan(text: line)];
+  }
+  return _jsonSyntaxSpans(line, colors);
+}
+
+List<TextSpan> _jsonSyntaxSpans(String line, AppColorScheme colors) {
+  final spans = <TextSpan>[];
+  final tokenRe = RegExp(
+    r'"(?:\\.|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\b(?:true|false|null)\b|[{}\[\]:,]',
+  );
+  var cursor = 0;
+  for (final match in tokenRe.allMatches(line)) {
+    if (match.start > cursor) {
+      spans.add(TextSpan(text: line.substring(cursor, match.start)));
+    }
+    final token = match.group(0)!;
+    spans.add(
+      TextSpan(
+        text: token,
+        style: TextStyle(color: _jsonTokenColor(token, line, match, colors)),
+      ),
+    );
+    cursor = match.end;
+  }
+  if (cursor < line.length) {
+    spans.add(TextSpan(text: line.substring(cursor)));
+  }
+  return spans.isEmpty ? [TextSpan(text: line)] : spans;
+}
+
+Color _jsonTokenColor(
+  String token,
+  String line,
+  RegExpMatch match,
+  AppColorScheme colors,
+) {
+  if (token.startsWith('"')) {
+    final rest = line.substring(match.end).trimLeft();
+    return rest.startsWith(':') ? colors.primaryLight : colors.accentGreen;
+  }
+  if (token == 'true' || token == 'false') return colors.accentBlue;
+  if (token == 'null') return colors.textMuted;
+  if (RegExp(r'^-?\d').hasMatch(token)) return colors.accentOrange;
+  return colors.textMuted;
 }
 
 // ─── Video Player ─────────────────────────────────────────────────────────────

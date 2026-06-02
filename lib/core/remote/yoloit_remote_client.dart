@@ -68,6 +68,10 @@ class YoloitRemoteClient {
     return fetchBoard(summary['id'] as String);
   }
 
+  Future<void> deleteBoard(String remoteBoardId) async {
+    await _json('DELETE', '/api/boards/${Uri.encodeComponent(remoteBoardId)}');
+  }
+
   Future<RemoteDirectoryListing> listDirectory(String? path) async {
     final query =
         path == null || path.trim().isEmpty

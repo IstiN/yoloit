@@ -1324,6 +1324,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       (board) => context
                                           .read<BoardCubit>()
                                           .disconnectRemoteBoard(board.id),
+                                  onDeleteRemoteBoard:
+                                      (board) => _deleteRemoteBoardOnServer(
+                                        context,
+                                        board,
+                                      ),
                                   onDisconnectRemoteUrl:
                                       (url) => context
                                           .read<BoardCubit>()
@@ -2618,6 +2623,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   Future<void> _deleteBoard(BuildContext context, BoardDocument board) async {
+    if (isRemoteBoard(board)) {
+      await _disconnectRemoteBoard(context, board);
+      return;
+    }
     final shouldDelete = await showAdaptiveYoloDialog<bool>(
       context: context,
       builder:
@@ -2638,6 +2647,70 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     );
     if (!context.mounted || shouldDelete != true) return;
     await context.read<BoardCubit>().deleteBoard(board.id);
+  }
+
+  Future<void> _disconnectRemoteBoard(
+    BuildContext context,
+    BoardDocument board,
+  ) async {
+    final shouldDisconnect = await showAdaptiveYoloDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Disconnect remote board?'),
+            content: Text(
+              'Remove "${board.name}" from this device only? '
+              'The board will remain on the remote YoLoIT server.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Disconnect'),
+              ),
+            ],
+          ),
+    );
+    if (!context.mounted || shouldDisconnect != true) return;
+    await context.read<BoardCubit>().disconnectRemoteBoard(board.id);
+  }
+
+  Future<void> _deleteRemoteBoardOnServer(
+    BuildContext context,
+    BoardDocument board,
+  ) async {
+    final remote = remoteInfoForBoard(board);
+    if (remote == null) return;
+    final remoteLabel = Uri.tryParse(remote.url)?.authority ?? remote.url;
+    final shouldDelete = await showAdaptiveYoloDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Delete remote board?'),
+            content: Text(
+              'Delete "${board.name}" from $remoteLabel? '
+              'This removes it from the remote machine for everyone connected to that server.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.appColors.accentRed,
+                ),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Delete remote'),
+              ),
+            ],
+          ),
+    );
+    if (!context.mounted || shouldDelete != true) return;
+    await context.read<BoardCubit>().deleteRemoteBoardOnServer(board.id);
   }
 
   void _addChatPanel(BuildContext context) {
@@ -3302,6 +3375,12 @@ class _BoardToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final remoteBoard = isRemoteBoard(board);
+    final deleteTooltip =
+        remoteBoard ? 'Disconnect remote board' : 'Delete board';
+    final deleteLabel = remoteBoard ? 'Disconnect' : 'Delete';
+    final deleteIcon =
+        remoteBoard ? Icons.link_off_rounded : Icons.delete_outline;
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 900;
@@ -3422,25 +3501,31 @@ class _BoardToolbar extends StatelessWidget {
                     }
                   },
                   itemBuilder:
-                      (context) => const [
-                        PopupMenuItem(
+                      (context) => [
+                        const PopupMenuItem(
                           value: 'search',
                           child: Text('Search boards and panels'),
                         ),
-                        PopupMenuItem(value: 'new', child: Text('New board')),
-                        PopupMenuItem(
+                        const PopupMenuItem(
+                          value: 'new',
+                          child: Text('New board'),
+                        ),
+                        const PopupMenuItem(
                           value: 'remote',
                           child: Text('Connect remote YoLoIT'),
                         ),
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'share',
                           child: Text('Share board'),
                         ),
-                        PopupMenuItem(
+                        const PopupMenuItem(
                           value: 'settings',
                           child: Text('Settings'),
                         ),
-                        PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Text(deleteLabel),
+                        ),
                       ],
                 )
               else if (compact) ...[
@@ -3465,9 +3550,9 @@ class _BoardToolbar extends StatelessWidget {
                   icon: const Icon(Icons.settings_outlined),
                 ),
                 IconButton(
-                  tooltip: 'Delete board',
+                  tooltip: deleteTooltip,
                   onPressed: onDeleteBoard,
-                  icon: const Icon(Icons.delete_outline),
+                  icon: Icon(deleteIcon),
                 ),
               ] else ...[
                 OutlinedButton.icon(
@@ -3501,8 +3586,8 @@ class _BoardToolbar extends StatelessWidget {
                 OutlinedButton.icon(
                   style: _toolbarButtonStyle(),
                   onPressed: onDeleteBoard,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Delete'),
+                  icon: Icon(deleteIcon),
+                  label: Text(deleteLabel),
                 ),
               ],
             ],
@@ -3604,6 +3689,7 @@ class _BoardOverviewLayer extends StatefulWidget {
     required this.onSelectedBoard,
     required this.onCreateBoard,
     required this.onDisconnectRemoteBoard,
+    required this.onDeleteRemoteBoard,
     required this.onDisconnectRemoteUrl,
     required this.onClose,
     required this.debugLog,
@@ -3616,6 +3702,7 @@ class _BoardOverviewLayer extends StatefulWidget {
   onSelectedBoard;
   final VoidCallback onCreateBoard;
   final ValueChanged<BoardDocument> onDisconnectRemoteBoard;
+  final ValueChanged<BoardDocument> onDeleteRemoteBoard;
   final ValueChanged<String> onDisconnectRemoteUrl;
   final VoidCallback onClose;
   final ValueChanged<String> debugLog;
@@ -3888,6 +3975,10 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
                                       ? null
                                       : () =>
                                           widget.onDisconnectRemoteBoard(board),
+                              onDeleteRemote:
+                                  remoteInfoForBoard(board) == null
+                                      ? null
+                                      : () => widget.onDeleteRemoteBoard(board),
                             )
                             : GestureDetector(
                               onTap: () => _selectBoard(board.id),
@@ -4310,6 +4401,7 @@ class _BoardOverviewCard extends StatelessWidget {
     required this.previewPng,
     required this.onTap,
     this.onDisconnect,
+    this.onDeleteRemote,
   });
 
   final BoardDocument board;
@@ -4317,6 +4409,7 @@ class _BoardOverviewCard extends StatelessWidget {
   final Uint8List? previewPng;
   final VoidCallback onTap;
   final VoidCallback? onDisconnect;
+  final VoidCallback? onDeleteRemote;
 
   @override
   Widget build(BuildContext context) {
@@ -4409,6 +4502,24 @@ class _BoardOverviewCard extends StatelessWidget {
                                 Icons.link_off_rounded,
                                 size: 14,
                                 color: mutedColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (onDeleteRemote != null) ...[
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message: 'Delete board on remote server',
+                            child: InkResponse(
+                              key: Key(
+                                'board-overview-delete-remote-${board.id}',
+                              ),
+                              radius: 14,
+                              onTap: onDeleteRemote,
+                              child: Icon(
+                                Icons.delete_outline,
+                                size: 14,
+                                color: colors.accentRed,
                               ),
                             ),
                           ),

@@ -190,6 +190,16 @@ class BoardCubit extends Cubit<BoardState> {
     await _disconnectRemoteBoards((entry) => entry.id == boardId);
   }
 
+  Future<void> deleteRemoteBoardOnServer(String boardId) async {
+    final board =
+        state.boards.where((entry) => entry.id == boardId).firstOrNull;
+    final remote = board == null ? null : remoteInfoForBoard(board);
+    if (remote == null) return;
+    final client = YoloitRemoteClient(baseUrl: remote.url, token: remote.token);
+    await client.deleteBoard(remote.boardId);
+    await _disconnectRemoteBoards((entry) => entry.id == boardId);
+  }
+
   Future<void> disconnectRemoteBoardsForUrl(String url) async {
     await _disconnectRemoteBoards((entry) {
       final remote = remoteInfoForBoard(entry);

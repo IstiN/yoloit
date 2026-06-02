@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/file_preview_plugin.dart';
@@ -18,6 +19,25 @@ void main() {
 
     expect(find.text('File not found'), findsOneWidget);
     expect(find.text(missingPath), findsOneWidget);
+  });
+
+  test('highlights JSON keys, strings, numbers, booleans, and nulls', () {
+    final colors = AppColorScheme.fromAccent(Colors.deepPurple);
+    final spans = filePreviewCodeSyntaxSpans(
+      '"name": "Teammate", "active": true, "score": 42, "meta": null',
+      extension: 'json',
+      colors: colors,
+    );
+
+    final styled = spans.where((span) => span.style?.color != null).toList();
+    expect(
+      styled.map((span) => span.text),
+      containsAll(['"name"', '"Teammate"', 'true', '42', 'null']),
+    );
+    expect(
+      styled.map((span) => span.style!.color).toSet().length,
+      greaterThanOrEqualTo(4),
+    );
   });
 }
 
