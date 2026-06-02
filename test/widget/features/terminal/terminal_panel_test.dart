@@ -344,6 +344,59 @@ void main() {
       expect(scrollController.offset, lessThan(before));
     });
 
+    testWidgets('terminal widget quick actions scroll scrollback locally', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final outputs = <String>[];
+      final key = GlobalKey<TerminalWidgetState>();
+      final session = AgentSession(
+        id: 'sess_quick_scroll',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 140,
+              child: TerminalWidget(
+                key: key,
+                session: session,
+                isActive: true,
+                terminalOutputWriter: (sessionId, data) => outputs.add(data),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (var i = 0; i < 80; i++) {
+        session.terminal.write('line $i\r\n');
+      }
+      await tester.pump();
+
+      final terminalView = tester.widget<TerminalView>(
+        find.byType(TerminalView),
+      );
+      final scrollController = terminalView.scrollController!;
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+
+      final bottom = scrollController.offset;
+      key.currentState!.scrollPageUp();
+      await tester.pump();
+      expect(scrollController.offset, lessThan(bottom));
+
+      key.currentState!.scrollPageDown();
+      await tester.pump();
+      expect(scrollController.offset, bottom);
+      expect(outputs, isEmpty);
+    });
+
     testWidgets('alt-buffer pan-zoom scroll sends key fallback without mouse', (
       tester,
     ) async {

@@ -8,9 +8,9 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
-import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
@@ -37,6 +37,7 @@ class BoardTerminalPanelWidget extends StatefulWidget {
 
 class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
   final _manager = BoardTerminalSessionManager.instance;
+  final _terminalKey = GlobalKey<TerminalWidgetState>();
   late BoardTerminalConfig _config;
   AgentSession? _session;
   bool _restoring = false;
@@ -578,12 +579,14 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
           onKill: _killCurrentSession,
           onEnvGroupsChanged: _onEnvGroupsChanged,
           onOpenFullView: _openFullView,
+          onScrollUp: () => _terminalKey.currentState?.scrollPageUp(),
+          onScrollDown: () => _terminalKey.currentState?.scrollPageDown(),
         ),
         Expanded(
           child: ScrollableCardMarker(
             child: ScrollableCardRegion(
               child: TerminalWidget(
-                key: ValueKey('board-terminal-${_session!.id}'),
+                key: _terminalKey,
                 session: _session!,
                 isActive: true,
                 debugLabel: 'board:${widget.panel.id}:session:${_session!.id}',
@@ -603,6 +606,8 @@ class _BoardTerminalInfoBar extends StatefulWidget {
     required this.onKill,
     required this.onEnvGroupsChanged,
     this.onOpenFullView,
+    this.onScrollUp,
+    this.onScrollDown,
   });
 
   final BoardTerminalConfig config;
@@ -610,6 +615,8 @@ class _BoardTerminalInfoBar extends StatefulWidget {
   final VoidCallback onKill;
   final ValueChanged<List<String>> onEnvGroupsChanged;
   final VoidCallback? onOpenFullView;
+  final VoidCallback? onScrollUp;
+  final VoidCallback? onScrollDown;
 
   @override
   State<_BoardTerminalInfoBar> createState() => _BoardTerminalInfoBarState();
@@ -696,6 +703,32 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
             },
           ),
           const SizedBox(width: 8),
+          if (widget.onScrollUp != null)
+            GestureDetector(
+              onTap: widget.onScrollUp,
+              child: Tooltip(
+                message: 'Scroll up',
+                child: Icon(
+                  Icons.keyboard_arrow_up,
+                  size: 16,
+                  color: mutedColor,
+                ),
+              ),
+            ),
+          if (widget.onScrollUp != null) const SizedBox(width: 8),
+          if (widget.onScrollDown != null)
+            GestureDetector(
+              onTap: widget.onScrollDown,
+              child: Tooltip(
+                message: 'Scroll down',
+                child: Icon(
+                  Icons.keyboard_arrow_down,
+                  size: 16,
+                  color: mutedColor,
+                ),
+              ),
+            ),
+          if (widget.onScrollDown != null) const SizedBox(width: 8),
           GestureDetector(
             onTap: widget.onHistory,
             child: Tooltip(
@@ -882,7 +915,7 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
                           _selectedEnvGroupIds,
                         );
                       } catch (error) {
-                        if (!mounted) return;
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Could not start terminal: $error'),

@@ -871,6 +871,26 @@ class TerminalWidgetState extends State<TerminalWidget> {
   /// raw input to the PTY without going through keyboard focus.
   void writeToPty(String data) => _writePty(data);
 
+  /// Public API for panel chrome actions to move through terminal scrollback
+  /// without sending PageUp/PageDown bytes to the running shell or agent.
+  void scrollPageUp() {
+    _scrollTerminalBy(-_quickScrollExtent, 'quick-action.page-up');
+  }
+
+  /// Public API for panel chrome actions to move through terminal scrollback
+  /// without sending PageUp/PageDown bytes to the running shell or agent.
+  void scrollPageDown() {
+    _scrollTerminalBy(_quickScrollExtent, 'quick-action.page-down');
+  }
+
+  double get _quickScrollExtent {
+    if (!_scrollController.hasClients) return 0;
+    return (_scrollController.position.viewportDimension * 0.85).clamp(
+      120.0,
+      720.0,
+    );
+  }
+
   double get currentFontSize => _fontSize;
 
   String get debugStateSummary {
@@ -1393,8 +1413,9 @@ class TerminalWidgetState extends State<TerminalWidget> {
                     }
                     // Drag-to-select: bypass xterm's gesture arena entirely.
                     final startGlobal = _dragStartGlobal;
-                    if (startGlobal == null || _activePointers.length != 1)
+                    if (startGlobal == null || _activePointers.length != 1) {
                       return;
+                    }
                     final dist = (event.position - startGlobal).distance;
                     if (dist < 4.0) return;
                     final state = _terminalViewKey.currentState;
