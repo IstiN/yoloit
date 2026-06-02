@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
+import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -25,14 +26,17 @@ typedef CursorProcessStarter =
 /// the cursor-specific NDJSON events into [ChatEvent] objects understood
 /// by the common chat panel.
 class CursorAgentProvider extends ChatProvider {
-  CursorAgentProvider({this.agentId = 'cursor', CursorProcessStarter? processStarter})
-    : _processStarter = processStarter ?? _defaultProcessStarter;
+  CursorAgentProvider({
+    this.agentId = 'cursor',
+    CursorProcessStarter? processStarter,
+  }) : _processStarter = processStarter ?? _defaultProcessStarter;
 
   final String agentId;
 
   /// sessionName → cursor session_id (UUID captured from the init event).
   final Map<String, String> _sessionIds = {};
   final Map<String, Process> _processes = {};
+
   /// sessionName → model used when the session was started.
   final Map<String, String> _sessionModels = {};
   final CursorProcessStarter _processStarter;
@@ -55,8 +59,8 @@ class CursorAgentProvider extends ChatProvider {
 
   @override
   List<ChatModelInfo> get availableModels {
-    final catalogModels =
-        ProviderModelCatalogService.instance.modelsForProvider(agentId);
+    final catalogModels = ProviderModelCatalogService.instance
+        .modelsForProvider(agentId);
     if (catalogModels != null && catalogModels.isNotEmpty) {
       return catalogModels;
     }
@@ -125,7 +129,8 @@ class CursorAgentProvider extends ChatProvider {
       if (!isFirstMessage) {
         final cursorSessionId = _sessionIds[config.sessionName];
         final sessionModel = _sessionModels[config.sessionName];
-        final modelChanged = sessionModel != null && sessionModel != config.model;
+        final modelChanged =
+            sessionModel != null && sessionModel != config.model;
         if (cursorSessionId != null && !modelChanged) {
           args.addAll(['--resume', cursorSessionId]);
         } else if (modelChanged) {
@@ -175,14 +180,19 @@ class CursorAgentProvider extends ChatProvider {
 
       var rawCommand = configObj?.launchCommand.trim() ?? '';
       if (rawCommand.isEmpty || rawCommand == 'cursor-agent') {
-        rawCommand = AgentConfigService.defaultBoardChatCommand(configObj?.streamAdapter ?? 'cursor');
+        rawCommand = AgentConfigService.defaultBoardChatCommand(
+          configObj?.streamAdapter ?? 'cursor',
+        );
       }
 
       final cmdParts = _splitCommand(rawCommand);
       final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'cursor-agent';
-      final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+      final extraCmdArgs =
+          cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
 
-      debugPrint('[CursorAgent] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}');
+      debugPrint(
+        '[CursorAgent] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}',
+      );
 
       // On macOS, cursor-agent hardcodes `/usr/bin/security` to access the
       // login keychain. When spawned from a GUI app the security context
@@ -209,6 +219,12 @@ class CursorAgentProvider extends ChatProvider {
         environment: processEnv,
       );
       _processes[config.sessionName] = process;
+      registerChatProcessResource(
+        process: process,
+        providerId: agentId,
+        config: config,
+        runtimeContext: runtimeContext,
+      );
 
       final buffer = StringBuffer();
 
@@ -311,6 +327,7 @@ class CursorAgentProvider extends ChatProvider {
       if (_processes[config.sessionName] == process) {
         _processes.remove(config.sessionName);
       }
+      unregisterChatProcessResource(process);
       await controller.close();
     } catch (e, st) {
       debugPrint('[CursorAgent] Failed to start: $e\n$st');
@@ -566,6 +583,7 @@ class CursorAgentProvider extends ChatProvider {
     final process = _processes.remove(sessionName);
     if (process != null) {
       debugPrint('[CursorAgent] Killing process for: $sessionName');
+      unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
       await process.exitCode.timeout(
         const Duration(seconds: 3),
@@ -577,6 +595,7 @@ class CursorAgentProvider extends ChatProvider {
   @override
   void dispose() {
     for (final process in _processes.values) {
+      unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
     }
     _processes.clear();
@@ -633,15 +652,11 @@ class CursorAgentProvider extends ChatProvider {
         'PATH': enrichedPath,
         if (Platform.isMacOS) 'AGENT_CLI_CREDENTIAL_STORE': 'memory',
       };
-      final result = await Process.run(
-        'cursor-agent',
-        ['--list-models'],
-        environment: env,
-      ).timeout(const Duration(seconds: 10));
+      final result = await Process.run('cursor-agent', [
+        '--list-models',
+      ], environment: env).timeout(const Duration(seconds: 10));
       if (result.exitCode != 0) {
-        debugPrint(
-          '[CursorAgent] --list-models failed: ${result.stderr}',
-        );
+        debugPrint('[CursorAgent] --list-models failed: ${result.stderr}');
         return null;
       }
       final output = (result.stdout as String).trim();
@@ -666,11 +681,13 @@ class CursorAgentProvider extends ChatProvider {
       final id = trimmed.substring(0, dashIdx).trim();
       final displayName = trimmed.substring(dashIdx + 3).trim();
       if (id.isEmpty || displayName.isEmpty) continue;
-      models.add(ChatModelInfo(
-        id: id,
-        displayName: displayName,
-        isDefault: id == 'auto',
-      ));
+      models.add(
+        ChatModelInfo(
+          id: id,
+          displayName: displayName,
+          isDefault: id == 'auto',
+        ),
+      );
     }
     debugPrint('[CursorAgent] parsed ${models.length} models from CLI');
     return models;

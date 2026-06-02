@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
+import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -145,6 +146,12 @@ class KimiCliProvider extends ChatProvider {
         },
       );
       _processes[config.sessionName] = process;
+      registerChatProcessResource(
+        process: process,
+        providerId: agentId,
+        config: config,
+        runtimeContext: runtimeContext,
+      );
       unawaited(
         process.stdin.close().catchError((Object error) {
           debugPrint('[KimiCli] Failed to close stdin: $error');
@@ -204,6 +211,7 @@ class KimiCliProvider extends ChatProvider {
       if (_processes[config.sessionName] == process) {
         _processes.remove(config.sessionName);
       }
+      unregisterChatProcessResource(process);
       await controller.close();
     } catch (error, stack) {
       debugPrint('[KimiCli] Failed to start process: $error');
@@ -271,6 +279,7 @@ class KimiCliProvider extends ChatProvider {
   Future<void> stop(String sessionName) async {
     final process = _processes.remove(sessionName);
     if (process == null) return;
+    unregisterChatProcessResource(process);
     process.kill(ProcessSignal.sigterm);
     await process.exitCode.timeout(
       const Duration(seconds: 2),
@@ -292,6 +301,7 @@ class KimiCliProvider extends ChatProvider {
   @override
   void dispose() {
     for (final process in _processes.values) {
+      unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
     }
     _processes.clear();

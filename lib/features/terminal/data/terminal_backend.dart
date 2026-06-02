@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_pty/flutter_pty.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
@@ -37,6 +38,7 @@ abstract class TerminalBackend {
     required String sessionId,
     required String workspacePath,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   });
 
@@ -61,12 +63,14 @@ class LocalPtyTerminalBackend implements TerminalBackend {
     required String sessionId,
     required String workspacePath,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) async {
     final pty = ptyService.launch(
       sessionId: sessionId,
       workspacePath: workspacePath,
       label: label,
+      metadata: metadata,
       extraEnv: extraEnv,
     );
     return TerminalProcess.fromPty(pty);
@@ -99,6 +103,7 @@ class TmuxTerminalBackend extends LocalPtyTerminalBackend {
     required String sessionId,
     required String workspacePath,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) async {
     final pty = ptyService.launchTmux(
@@ -106,6 +111,7 @@ class TmuxTerminalBackend extends LocalPtyTerminalBackend {
       workspacePath: workspacePath,
       tmuxLauncher: _tmuxService.launch,
       label: label,
+      metadata: metadata,
       extraEnv: extraEnv,
     );
     if (extraEnv != null && extraEnv.isNotEmpty) {
@@ -129,6 +135,7 @@ class RuntimeTerminalBackend implements TerminalBackend {
     required String sessionId,
     required String workspacePath,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) async {
     await _client.ensureStarted();

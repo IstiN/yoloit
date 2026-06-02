@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_history.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -27,6 +28,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
   Future<AgentSession> ensureSession(
     BoardTerminalConfig config, {
     RemoteBoardInfo? remoteInfo,
+    ResourceSessionMetadata? metadata,
   }) async {
     final existing = _sessions[config.sessionId];
     if (existing != null) return existing;
@@ -36,6 +38,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       workingDir: config.workingDir,
       envGroupIds: config.envGroupIds,
       remoteInfo: remoteInfo,
+      metadata: metadata,
     );
   }
 
@@ -44,6 +47,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     required String workingDir,
     List<String> envGroupIds = const [],
     RemoteBoardInfo? remoteInfo,
+    ResourceSessionMetadata? metadata,
   }) async {
     final sessionId = 'board_terminal_${DateTime.now().millisecondsSinceEpoch}';
     return _spawn(
@@ -52,6 +56,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       workingDir: workingDir,
       envGroupIds: envGroupIds,
       remoteInfo: remoteInfo,
+      metadata: metadata,
     );
   }
 
@@ -112,6 +117,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
     required String workingDir,
     required List<String> envGroupIds,
     RemoteBoardInfo? remoteInfo,
+    ResourceSessionMetadata? metadata,
   }) async {
     _outputSubs.remove(sessionId)?.cancel();
     _envGroupIdsBySession[sessionId] = List<String>.from(envGroupIds);
@@ -128,6 +134,7 @@ class BoardTerminalSessionManager extends ChangeNotifier {
       sessionId: sessionId,
       workspacePath: workingDir,
       label: session.displayName,
+      metadata: metadata,
       extraEnv: extraEnv,
       backendOverride:
           remoteInfo == null

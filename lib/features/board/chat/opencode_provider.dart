@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
+import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
@@ -40,8 +41,8 @@ class OpencodeProvider extends ChatProvider {
 
   @override
   List<ChatModelInfo> get availableModels {
-    final catalogModels =
-        ProviderModelCatalogService.instance.modelsForProvider(agentId);
+    final catalogModels = ProviderModelCatalogService.instance
+        .modelsForProvider(agentId);
     if (catalogModels != null && catalogModels.isNotEmpty) {
       return catalogModels;
     }
@@ -50,8 +51,8 @@ class OpencodeProvider extends ChatProvider {
       return _cachedModelsDevModels!;
     }
     // 2. GitHub-hosted catalog (provider_models.json)
-    final opencodeCatalogModels =
-        ProviderModelCatalogService.instance.modelsForProvider('opencode');
+    final opencodeCatalogModels = ProviderModelCatalogService.instance
+        .modelsForProvider('opencode');
     if (opencodeCatalogModels != null && opencodeCatalogModels.isNotEmpty) {
       return opencodeCatalogModels;
     }
@@ -200,14 +201,18 @@ class OpencodeProvider extends ChatProvider {
 
     var rawCommand = configObj?.launchCommand.trim() ?? '';
     if (rawCommand.isEmpty || rawCommand == 'opencode') {
-      rawCommand = AgentConfigService.defaultBoardChatCommand(configObj?.streamAdapter ?? 'opencode');
+      rawCommand = AgentConfigService.defaultBoardChatCommand(
+        configObj?.streamAdapter ?? 'opencode',
+      );
     }
 
     final cmdParts = _splitCommand(rawCommand);
     final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'opencode';
     final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
 
-    debugPrint('[OpenCode] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}');
+    debugPrint(
+      '[OpenCode] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}',
+    );
     debugPrint('[OpenCode] cwd: $workingDir');
 
     try {
@@ -233,6 +238,12 @@ class OpencodeProvider extends ChatProvider {
       // Close stdin so opencode doesn't wait for interactive input
       process.stdin.close();
       _processes[config.sessionName] = process;
+      registerChatProcessResource(
+        process: process,
+        providerId: agentId,
+        config: config,
+        runtimeContext: runtimeContext,
+      );
 
       // Emit user message event
       controller.add(
@@ -304,7 +315,8 @@ class OpencodeProvider extends ChatProvider {
                   // Capture sessionID from first event (for first message)
                   if (isFirstMessage) {
                     final sid = json['sessionID'] as String?;
-                    if (sid != null && !_sessionIds.containsKey(config.sessionName)) {
+                    if (sid != null &&
+                        !_sessionIds.containsKey(config.sessionName)) {
                       _sessionIds[config.sessionName] = sid;
                       debugPrint('[OpenCode] Captured sessionID: $sid');
                     }
@@ -382,6 +394,7 @@ class OpencodeProvider extends ChatProvider {
       if (_processes[config.sessionName] == process) {
         _processes.remove(config.sessionName);
       }
+      unregisterChatProcessResource(process);
       await controller.close();
     } catch (e, st) {
       debugPrint('[OpenCode] Failed to start: $e\n$st');
@@ -494,7 +507,8 @@ class OpencodeProvider extends ChatProvider {
       case 'error':
         final errorObj = json['error'] as Map<String, dynamic>?;
         final errorData = errorObj?['data'] as Map<String, dynamic>?;
-        final message = errorData?['message'] as String? ??
+        final message =
+            errorData?['message'] as String? ??
             errorObj?['name'] as String? ??
             'Unknown error';
         // Emit as assistant message so it's visible in chat (sessionStatus is ignored by UI)
@@ -513,9 +527,7 @@ class OpencodeProvider extends ChatProvider {
 
   Map<String, dynamic> _extractData(Map<String, dynamic> json) {
     final part = json['part'] as Map<String, dynamic>?;
-    return part != null
-        ? Map<String, dynamic>.from(part)
-        : <String, dynamic>{};
+    return part != null ? Map<String, dynamic>.from(part) : <String, dynamic>{};
   }
 
   // ── helpers ────────────────────────────────────────────────────────────
@@ -525,7 +537,8 @@ class OpencodeProvider extends ChatProvider {
   static bool _looksLikeError(String line) {
     if (line.length < 4) return false;
     // Strip ANSI escape sequences before checking
-    final clean = line.replaceAll(RegExp(r'\x1B\[[0-9;]*[mGKHF]'), '').toLowerCase();
+    final clean =
+        line.replaceAll(RegExp(r'\x1B\[[0-9;]*[mGKHF]'), '').toLowerCase();
     return clean.contains('exceeded') ||
         clean.contains('rate limit') ||
         clean.contains('retrying') ||
@@ -545,10 +558,11 @@ class OpencodeProvider extends ChatProvider {
   ) {
     if (controller.isClosed) return;
     // Strip ANSI escapes and dots-only lines before showing
-    final clean = message
-        .replaceAll(RegExp(r'\x1B\[[0-9;]*[mGKHF]'), '')
-        .replaceAll(RegExp(r'^[.\s]+'), '')
-        .trim();
+    final clean =
+        message
+            .replaceAll(RegExp(r'\x1B\[[0-9;]*[mGKHF]'), '')
+            .replaceAll(RegExp(r'^[.\s]+'), '')
+            .trim();
     if (clean.isEmpty) return;
     controller.add(
       ChatEvent(
@@ -637,6 +651,7 @@ class OpencodeProvider extends ChatProvider {
     final process = _processes.remove(sessionName);
     if (process != null) {
       debugPrint('[OpenCode] Killing process for: $sessionName');
+      unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
       await process.exitCode.timeout(
         const Duration(seconds: 3),
@@ -648,6 +663,7 @@ class OpencodeProvider extends ChatProvider {
   @override
   void dispose() {
     for (final process in _processes.values) {
+      unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
     }
     _processes.clear();
@@ -709,8 +725,7 @@ class _OpenCodeLogWatcher {
     final home = Platform.environment['HOME'] ?? '';
     if (home.isEmpty) return null;
     final xdgDataHome =
-        Platform.environment['XDG_DATA_HOME'] ??
-        '$home/.local/share';
+        Platform.environment['XDG_DATA_HOME'] ?? '$home/.local/share';
     final dir = Directory('$xdgDataHome/opencode/log');
     return dir.existsSync() ? dir : null;
   }
@@ -724,12 +739,15 @@ class _OpenCodeLogWatcher {
     final now = DateTime.now();
     for (int attempt = 0; attempt < 10 && !_stopped; attempt++) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      final files = dir
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.endsWith('.log'))
-          .toList()
-        ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      final files =
+          dir
+              .listSync()
+              .whereType<File>()
+              .where((f) => f.path.endsWith('.log'))
+              .toList()
+            ..sort(
+              (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+            );
       if (files.isNotEmpty) {
         final newest = files.first;
         if (now.difference(newest.statSync().modified).abs() <
@@ -772,7 +790,8 @@ class _OpenCodeLogWatcher {
     // Search raw content directly — log lines can be 37KB+ and may arrive
     // across multiple polls, so don't rely on complete line boundaries.
     final statusMatch = RegExp(r'"statusCode":(\d+)').firstMatch(content);
-    final statusCode = statusMatch != null ? int.tryParse(statusMatch.group(1)!) : null;
+    final statusCode =
+        statusMatch != null ? int.tryParse(statusMatch.group(1)!) : null;
 
     final msgMatch = RegExp(r'"message":"([^"]+)"').firstMatch(content);
     final msg = msgMatch?.group(1);

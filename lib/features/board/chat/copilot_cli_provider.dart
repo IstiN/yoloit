@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
+import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/sub_agent_event_watcher.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -273,6 +274,12 @@ class CopilotCliProvider extends ChatProvider {
         },
       );
       _processes[config.sessionName] = process;
+      registerChatProcessResource(
+        process: process,
+        providerId: agentId,
+        config: config,
+        runtimeContext: runtimeContext,
+      );
 
       // Merge sub-agent events (from events.jsonl) into the main stream.
       // SubAgentEventWatcher discovers the session folder via the process PID
@@ -387,6 +394,7 @@ class CopilotCliProvider extends ChatProvider {
           if (_processes[config.sessionName] == process) {
             _processes.remove(config.sessionName);
           }
+          unregisterChatProcessResource(process);
           await subAgentSub?.cancel();
           await subAgentWatcher?.dispose();
           await _runProcess(
@@ -414,6 +422,7 @@ class CopilotCliProvider extends ChatProvider {
           if (_processes[config.sessionName] == process) {
             _processes.remove(config.sessionName);
           }
+          unregisterChatProcessResource(process);
           await subAgentSub?.cancel();
           await subAgentWatcher?.dispose();
           await _runProcess(
@@ -439,6 +448,7 @@ class CopilotCliProvider extends ChatProvider {
       if (_processes[config.sessionName] == process) {
         _processes.remove(config.sessionName);
       }
+      unregisterChatProcessResource(process);
       await subAgentSub?.cancel();
       await subAgentWatcher?.dispose();
       await controller.close();
@@ -455,6 +465,7 @@ class CopilotCliProvider extends ChatProvider {
     final process = _processes.remove(sessionName);
     if (process != null) {
       debugPrint('[CopilotCli] Killing process for session: $sessionName');
+      unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
       // Give SIGTERM up to 2 seconds; escalate to SIGKILL if still alive.
       final exitCode = await process.exitCode.timeout(
@@ -477,6 +488,7 @@ class CopilotCliProvider extends ChatProvider {
   @override
   void dispose() {
     for (final process in _processes.values) {
+      unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
     }
     _processes.clear();

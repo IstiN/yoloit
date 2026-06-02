@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 
@@ -25,6 +26,7 @@ class RemoteYoloitTerminalBackend implements TerminalBackend {
     required String sessionId,
     required String workspacePath,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) async {
     await _client.createTerminal(

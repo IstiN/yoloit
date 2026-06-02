@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -102,6 +103,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     final restored = await _manager.ensureSession(
       _config,
       remoteInfo: widget.remoteInfo,
+      metadata: _resourceMetadata(sessionName: _config.sessionName),
     );
     if (!mounted) return;
     setState(() {
@@ -125,6 +127,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
         workingDir: workingDir,
         envGroupIds: _config.envGroupIds,
         remoteInfo: widget.remoteInfo,
+        metadata: _resourceMetadata(sessionName: sessionName),
       );
     } catch (error) {
       if (!mounted) return;
@@ -185,6 +188,10 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
         workingDir: trimmedDir,
         envGroupIds: envGroupIds,
         remoteInfo: widget.remoteInfo,
+        metadata: _resourceMetadata(
+          sessionName: trimmedName,
+          workingDirOverride: trimmedDir,
+        ),
       );
     } catch (error) {
       if (!mounted) return;
@@ -226,6 +233,7 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     final session = await _manager.ensureSession(
       _config,
       remoteInfo: widget.remoteInfo,
+      metadata: _resourceMetadata(sessionName: _config.sessionName),
     );
     if (!mounted) return;
     setState(() {
@@ -239,6 +247,26 @@ class _BoardTerminalPanelWidgetState extends State<BoardTerminalPanelWidget> {
     await _manager.killSession(_config.sessionId);
     if (!mounted) return;
     setState(() => _session = null);
+  }
+
+  ResourceSessionMetadata _resourceMetadata({
+    required String sessionName,
+    String? workingDirOverride,
+  }) {
+    final board = context.read<BoardCubit>().state.activeBoard;
+    return ResourceSessionMetadata(
+      kind: 'terminal',
+      boardId: board?.id,
+      boardName: board?.name,
+      panelId: widget.panel.id,
+      panelTitle:
+          widget.panel.title.trim().isEmpty
+              ? (sessionName.trim().isEmpty ? 'Terminal' : sessionName.trim())
+              : widget.panel.title,
+      panelType: widget.panel.type,
+      workspacePath: (workingDirOverride ?? _config.workingDir).trim(),
+      provider: 'terminal',
+    );
   }
 
   void _showHistoryDialog() {

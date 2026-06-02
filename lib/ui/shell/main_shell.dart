@@ -1746,49 +1746,204 @@ class _SessionRow extends StatelessWidget {
   const _SessionRow({required this.session});
   final SessionStat session;
 
+  Future<void> _open(BuildContext context) async {
+    final metadata = session.metadata;
+    final panelId = metadata?.panelId;
+    if (panelId != null && panelId.isNotEmpty) {
+      final boardCubit = context.read<BoardCubit>();
+      final boardId = metadata?.boardId;
+      if (boardId != null &&
+          boardId.isNotEmpty &&
+          boardCubit.state.activeBoardId != boardId) {
+        await boardCubit.setActiveBoard(boardId);
+      }
+      await boardCubit.focusPanel(panelId, boardId: boardId, zoomOnFocus: true);
+      return;
+    }
+    _showResourceSessionDetails(context, session);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor =
         Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 3, 14, 3),
-      child: Row(
-        children: [
-          Icon(Icons.circle, size: 5, color: colors.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              formatSessionLabel(session.label),
-              style: TextStyle(color: onSurface, fontSize: 11),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${session.cpuPercent.toStringAsFixed(1)}%',
-            style: TextStyle(
-              color: mutedColor,
-              fontSize: 10,
-              fontFamily: 'monospace',
-            ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 56,
-            child: Text(
-              formatBytes(session.memoryBytes),
-              style: TextStyle(
-                color: mutedColor,
-                fontSize: 10,
-                fontFamily: 'monospace',
+    final metadata = session.metadata;
+    final label = metadata?.displayLabel ?? formatSessionLabel(session.label);
+    final details = [
+      if (metadata?.boardName?.trim().isNotEmpty ?? false)
+        metadata!.boardName!.trim(),
+      if (metadata?.workspacePath?.trim().isNotEmpty ?? false)
+        metadata!.workspacePath!.trim(),
+      'pid ${session.pid}',
+    ].join(' · ');
+    return Tooltip(
+      message:
+          metadata?.panelId?.isNotEmpty ?? false
+              ? 'Show on board\n$details'
+              : 'Show process details\n$details',
+      waitDuration: const Duration(milliseconds: 350),
+      child: InkWell(
+        onTap: () => _open(context),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 3, 14, 3),
+          child: Row(
+            children: [
+              Icon(
+                metadata?.panelId?.isNotEmpty ?? false
+                    ? Icons.center_focus_strong_outlined
+                    : Icons.circle,
+                size: metadata?.panelId?.isNotEmpty ?? false ? 9 : 5,
+                color: colors.primary,
               ),
-              textAlign: TextAlign.right,
-            ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(color: onSurface, fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (metadata != null)
+                      Text(
+                        [
+                          if (metadata.provider?.trim().isNotEmpty ?? false)
+                            formatSessionLabel(metadata.provider!),
+                          'pid ${session.pid}',
+                        ].join(' · '),
+                        style: TextStyle(color: mutedColor, fontSize: 8.5),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${session.cpuPercent.toStringAsFixed(1)}%',
+                style: TextStyle(
+                  color: mutedColor,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 56,
+                child: Text(
+                  formatBytes(session.memoryBytes),
+                  style: TextStyle(
+                    color: mutedColor,
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+void _showResourceSessionDetails(BuildContext context, SessionStat session) {
+  final colors = context.appColors;
+  final metadata = session.metadata;
+  final lines = <MapEntry<String, String>>[
+    MapEntry('PID', session.pid.toString()),
+    MapEntry('Label', formatSessionLabel(session.label)),
+    MapEntry('CPU', '${session.cpuPercent.toStringAsFixed(1)}%'),
+    MapEntry('Memory', formatBytes(session.memoryBytes)),
+    if (metadata?.provider?.trim().isNotEmpty ?? false)
+      MapEntry('Provider', formatSessionLabel(metadata!.provider!)),
+    if (metadata?.boardName?.trim().isNotEmpty ?? false)
+      MapEntry('Board', metadata!.boardName!.trim()),
+    if (metadata?.panelTitle?.trim().isNotEmpty ?? false)
+      MapEntry('Panel', metadata!.panelTitle!.trim()),
+    if (metadata?.workspacePath?.trim().isNotEmpty ?? false)
+      MapEntry('Working dir', metadata!.workspacePath!.trim()),
+  ];
+  showDialog<void>(
+    context: context,
+    builder:
+        (dialogContext) => Dialog(
+          backgroundColor: colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: colors.border),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.memory_outlined,
+                        color: colors.primary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          metadata?.displayLabel ??
+                              formatSessionLabel(session.label),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ...lines.map(
+                    (line) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 92,
+                            child: Text(
+                              line.key,
+                              style: TextStyle(
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: SelectableText(
+                              line.value,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+  );
 }

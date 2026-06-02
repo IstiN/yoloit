@@ -1,3 +1,4 @@
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
@@ -16,6 +17,7 @@ class TerminalBackendService {
     required String sessionId,
     required String workspacePath,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
     TerminalBackend? backendOverride,
   }) async {
@@ -25,6 +27,7 @@ class TerminalBackendService {
       sessionId: sessionId,
       workspacePath: workspacePath,
       label: label,
+      metadata: metadata,
       extraEnv: extraEnv,
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/ui/shell/main_shell.dart';
 
@@ -33,5 +34,20 @@ void main() {
   test('resourcePanelTypeLabel uses plugin names with readable fallback', () {
     expect(resourcePanelTypeLabel('board.terminal'), 'Terminal');
     expect(resourcePanelTypeLabel('board.custom_unknown'), 'custom unknown');
+  });
+
+  test('resource session metadata builds panel-aware labels', () {
+    const metadata = ResourceSessionMetadata(
+      kind: 'ai chat',
+      boardId: 'board-1',
+      boardName: 'Work',
+      panelId: 'panel-1',
+      panelTitle: 'Release helper',
+      panelType: 'board.chat',
+      workspacePath: '/repo',
+      provider: 'copilot',
+    );
+
+    expect(metadata.displayLabel, 'AI Chat · Release helper');
   });
 }

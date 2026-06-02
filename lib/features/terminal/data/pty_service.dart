@@ -18,6 +18,7 @@ class PtyService {
     required String sessionId,
     required String workspacePath,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) {
     final existing = _ptys[sessionId];
@@ -46,7 +47,11 @@ class PtyService {
     );
 
     _ptys[sessionId] = pty;
-    ResourceMonitorService.instance.registerSession(pty.pid, label ?? sessionId);
+    ResourceMonitorService.instance.registerSession(
+      pty.pid,
+      label ?? sessionId,
+      metadata: metadata,
+    );
     return pty;
   }
 
@@ -60,8 +65,10 @@ class PtyService {
       required Map<String, String> env,
       int columns,
       int rows,
-    }) tmuxLauncher,
+    })
+    tmuxLauncher,
     String? label,
+    ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) {
     final existing = _ptys[sessionId];
@@ -88,15 +95,18 @@ class PtyService {
 
     _ptys[sessionId] = pty;
     _tmuxSessions.add(sessionId);
-    ResourceMonitorService.instance.registerSession(pty.pid, label ?? sessionId);
+    ResourceMonitorService.instance.registerSession(
+      pty.pid,
+      label ?? sessionId,
+      metadata: metadata,
+    );
     return pty;
   }
 
   /// Builds a PATH that includes common tool locations missed by GUI apps.
-  static String _enrichedPath() =>
-      PlatformShell.instance.enrichedPath(
-        Platform.environment['PATH'] ?? '/usr/bin:/bin',
-      );
+  static String _enrichedPath() => PlatformShell.instance.enrichedPath(
+    Platform.environment['PATH'] ?? '/usr/bin:/bin',
+  );
 
   void write(String sessionId, String data) {
     final pty = _ptys[sessionId];

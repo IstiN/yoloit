@@ -15,8 +15,8 @@ class ProcessInfo {
 
   final int pid;
   final int ppid;
-  final double cpu;       // percent
-  final int memoryBytes;  // RSS bytes
+  final double cpu; // percent
+  final int memoryBytes; // RSS bytes
 }
 
 /// Stats for a single process — kept for backward-compatibility with UI widgets.
@@ -41,12 +41,49 @@ class SessionStat {
     required this.label,
     required this.cpuPercent,
     required this.memoryBytes,
+    this.metadata,
   });
 
   final int pid;
-  final String label;    // e.g. "copilot_session_1" or agent type
+  final String label; // e.g. "copilot_session_1" or agent type
   final double cpuPercent;
   final int memoryBytes; // subtree RSS bytes
+  final ResourceSessionMetadata? metadata;
+}
+
+/// Optional board context attached by the component that spawned a process.
+class ResourceSessionMetadata {
+  const ResourceSessionMetadata({
+    required this.kind,
+    this.boardId,
+    this.boardName,
+    this.panelId,
+    this.panelTitle,
+    this.panelType,
+    this.workspacePath,
+    this.provider,
+  });
+
+  final String kind;
+  final String? boardId;
+  final String? boardName;
+  final String? panelId;
+  final String? panelTitle;
+  final String? panelType;
+  final String? workspacePath;
+  final String? provider;
+
+  String get displayLabel {
+    final title = panelTitle?.trim();
+    if (title != null && title.isNotEmpty) {
+      return '${formatResourceKindLabel(kind)} · $title';
+    }
+    final providerLabel = provider?.trim();
+    if (providerLabel != null && providerLabel.isNotEmpty) {
+      return '${formatResourceKindLabel(kind)} · ${formatSessionLabel(providerLabel)}';
+    }
+    return formatResourceKindLabel(kind);
+  }
 }
 
 /// Host-level metrics collected alongside process data.
@@ -92,20 +129,23 @@ class ResourceSnapshot {
   final double appCpuPercent;
   final List<SessionStat> sessions;
   final HostMetrics host;
-  final int totalMemoryBytes;    // app + all sessions subtrees
-  final double totalCpuPercent;  // app + all sessions
+  final int totalMemoryBytes; // app + all sessions subtrees
+  final double totalCpuPercent; // app + all sessions
 
   // Backward compatibility ──────────────────────────────────────────────────
 
   /// Unregistered agent processes discovered by name scanning.
-  List<ProcessStat> get agents => sessions
-      .map((s) => ProcessStat(
-            pid: s.pid,
-            name: s.label,
-            cpuPercent: s.cpuPercent,
-            memoryBytes: s.memoryBytes,
-          ))
-      .toList();
+  List<ProcessStat> get agents =>
+      sessions
+          .map(
+            (s) => ProcessStat(
+              pid: s.pid,
+              name: s.label,
+              cpuPercent: s.cpuPercent,
+              memoryBytes: s.memoryBytes,
+            ),
+          )
+          .toList();
 
   int get totalSystemMemoryBytes => host.totalBytes;
 
@@ -149,6 +189,7 @@ class ResourceMonitorService {
 
   /// Registered PTY / run sessions: pid → label.
   final Map<int, String> _sessions = {};
+  final Map<int, ResourceSessionMetadata> _sessionMetadata = {};
 
   // Process-tree maps rebuilt each poll.
   Map<int, ProcessInfo> _byPid = {};
@@ -165,9 +206,23 @@ class ResourceMonitorService {
 
   // ── Session registration ────────────────────────────────────────────────
 
-  void registerSession(int pid, String label) => _sessions[pid] = label;
+  void registerSession(
+    int pid,
+    String label, {
+    ResourceSessionMetadata? metadata,
+  }) {
+    _sessions[pid] = label;
+    if (metadata != null) {
+      _sessionMetadata[pid] = metadata;
+    } else {
+      _sessionMetadata.remove(pid);
+    }
+  }
 
-  void unregisterSession(int pid) => _sessions.remove(pid);
+  void unregisterSession(int pid) {
+    _sessions.remove(pid);
+    _sessionMetadata.remove(pid);
+  }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -265,12 +320,15 @@ class ResourceMonitorService {
       final sessionPid = entry.key;
       final label = entry.value;
       final res = _getSubtreeResources(sessionPid);
-      registeredSessions.add(SessionStat(
-        pid: sessionPid,
-        label: label,
-        cpuPercent: res.cpu,
-        memoryBytes: res.mem,
-      ));
+      registeredSessions.add(
+        SessionStat(
+          pid: sessionPid,
+          label: label,
+          cpuPercent: res.cpu,
+          memoryBytes: res.mem,
+          metadata: _sessionMetadata[sessionPid],
+        ),
+      );
       registeredPids.addAll(_getSubtreePids(sessionPid));
     }
 
@@ -285,12 +343,14 @@ class ResourceMonitorService {
       if (_agentNames.any((a) => name.toLowerCase().contains(a))) {
         seenPids.add(p);
         final res = _getSubtreeResources(p);
-        agentSessions.add(SessionStat(
-          pid: p,
-          label: name.split('/').last,
-          cpuPercent: res.cpu,
-          memoryBytes: res.mem,
-        ));
+        agentSessions.add(
+          SessionStat(
+            pid: p,
+            label: name.split('/').last,
+            cpuPercent: res.cpu,
+            memoryBytes: res.mem,
+          ),
+        );
       }
     }
 
@@ -313,6 +373,7 @@ class ResourceMonitorService {
   final Map<int, String> _processNames = {};
 
   Future<void> _collectProcessesPosix() async {
+    _processNames.clear();
     // Single ps call: pid ppid cpu rss.
     final psResult = await Process.run('ps', ['-eo', 'pid=,ppid=,pcpu=,rss=']);
     if (psResult.exitCode == 0) {
@@ -324,7 +385,12 @@ class ResourceMonitorService {
         if (p == null || pp == null) continue;
         final cpu = math.max(0.0, double.tryParse(parts[2]) ?? 0.0);
         final rssKb = math.max(0, int.tryParse(parts[3]) ?? 0);
-        _byPid[p] = ProcessInfo(pid: p, ppid: pp, cpu: cpu, memoryBytes: rssKb * 1024);
+        _byPid[p] = ProcessInfo(
+          pid: p,
+          ppid: pp,
+          cpu: cpu,
+          memoryBytes: rssKb * 1024,
+        );
         _childrenOf.putIfAbsent(pp, () => []).add(p);
       }
     }
@@ -348,11 +414,12 @@ class ResourceMonitorService {
     try {
       // wmic process get ProcessId,ParentProcessId,Name,WorkingSetSize /format:csv
       // Output: Node,Name,ParentProcessId,ProcessId,WorkingSetSize
-      final result = await Process.run(
-        'wmic',
-        ['process', 'get', 'ProcessId,ParentProcessId,Name,WorkingSetSize', '/format:csv'],
-        runInShell: true,
-      );
+      final result = await Process.run('wmic', [
+        'process',
+        'get',
+        'ProcessId,ParentProcessId,Name,WorkingSetSize',
+        '/format:csv',
+      ], runInShell: true);
       if (result.exitCode != 0) return;
       final lines = (result.stdout as String).split('\n');
       // First non-empty line is the header: Node,Name,ParentProcessId,ProcessId,WorkingSetSize
@@ -369,13 +436,26 @@ class ResourceMonitorService {
           memIdx = cols.indexOf('WorkingSetSize');
           continue;
         }
-        if (cols.length <= math.max(pidIdx, math.max(ppidIdx ?? 0, math.max(nameIdx ?? 0, memIdx ?? 0)))) continue;
+        if (cols.length <=
+            math.max(
+              pidIdx,
+              math.max(ppidIdx ?? 0, math.max(nameIdx ?? 0, memIdx ?? 0)),
+            ))
+          continue;
         final p = int.tryParse(cols[pidIdx].trim());
         final pp = int.tryParse(cols[ppidIdx ?? 0].trim());
         final name = nameIdx != null ? cols[nameIdx].trim() : '';
-        final memBytes = math.max(0, int.tryParse(cols[memIdx ?? 0].trim()) ?? 0);
+        final memBytes = math.max(
+          0,
+          int.tryParse(cols[memIdx ?? 0].trim()) ?? 0,
+        );
         if (p == null || pp == null) continue;
-        _byPid[p] = ProcessInfo(pid: p, ppid: pp, cpu: 0.0, memoryBytes: memBytes);
+        _byPid[p] = ProcessInfo(
+          pid: p,
+          ppid: pp,
+          cpu: 0.0,
+          memoryBytes: memBytes,
+        );
         _childrenOf.putIfAbsent(pp, () => []).add(p);
         _processNames[p] = name;
       }
@@ -422,7 +502,9 @@ class ResourceMonitorService {
 
       final usedBytes = math.max(0, totalBytes - freeBytes);
       final usedPercent =
-          totalBytes > 0 ? (usedBytes / totalBytes * 100).clamp(0.0, 100.0) : 0.0;
+          totalBytes > 0
+              ? (usedBytes / totalBytes * 100).clamp(0.0, 100.0)
+              : 0.0;
 
       return HostMetrics(
         totalBytes: totalBytes,
@@ -440,11 +522,12 @@ class ResourceMonitorService {
   Future<HostMetrics> _collectHostWindows() async {
     try {
       // Memory: wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /value  (KB)
-      final memResult = await Process.run(
-        'wmic',
-        ['OS', 'get', 'FreePhysicalMemory,TotalVisibleMemorySize', '/value'],
-        runInShell: true,
-      );
+      final memResult = await Process.run('wmic', [
+        'OS',
+        'get',
+        'FreePhysicalMemory,TotalVisibleMemorySize',
+        '/value',
+      ], runInShell: true);
       int freeKb = 0, totalKb = 0;
       if (memResult.exitCode == 0) {
         for (final line in (memResult.stdout as String).split('\n')) {
@@ -460,14 +543,17 @@ class ResourceMonitorService {
       final totalBytes = math.max(0, totalKb * 1024);
       final usedBytes = math.max(0, totalBytes - freeBytes);
       final usedPercent =
-          totalBytes > 0 ? (usedBytes / totalBytes * 100).clamp(0.0, 100.0) : 0.0;
+          totalBytes > 0
+              ? (usedBytes / totalBytes * 100).clamp(0.0, 100.0)
+              : 0.0;
 
       // CPU load: wmic cpu get LoadPercentage /value
-      final cpuResult = await Process.run(
-        'wmic',
-        ['cpu', 'get', 'LoadPercentage', '/value'],
-        runInShell: true,
-      );
+      final cpuResult = await Process.run('wmic', [
+        'cpu',
+        'get',
+        'LoadPercentage',
+        '/value',
+      ], runInShell: true);
       double cpuLoad = 0.0;
       if (cpuResult.exitCode == 0) {
         for (final line in (cpuResult.stdout as String).split('\n')) {
@@ -479,11 +565,12 @@ class ResourceMonitorService {
       }
 
       // Core count: wmic cpu get NumberOfLogicalProcessors /value
-      final coreResult = await Process.run(
-        'wmic',
-        ['cpu', 'get', 'NumberOfLogicalProcessors', '/value'],
-        runInShell: true,
-      );
+      final coreResult = await Process.run('wmic', [
+        'cpu',
+        'get',
+        'NumberOfLogicalProcessors',
+        '/value',
+      ], runInShell: true);
       int coreCount = 0;
       if (coreResult.exitCode == 0) {
         for (final line in (coreResult.stdout as String).split('\n')) {
@@ -500,7 +587,8 @@ class ResourceMonitorService {
         usedBytes: usedBytes,
         usedPercent: usedPercent,
         cpuCoreCount: coreCount,
-        loadAverage1m: cpuLoad, // load average not a concept on Windows; repurpose for overall CPU %
+        loadAverage1m:
+            cpuLoad, // load average not a concept on Windows; repurpose for overall CPU %
       );
     } catch (_) {
       return HostMetrics.empty;
@@ -529,4 +617,12 @@ String formatSessionLabel(String label) {
       .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
       .join(' ')
       .trim();
+}
+
+String formatResourceKindLabel(String kind) {
+  final normalized = kind.trim().toLowerCase();
+  return switch (normalized) {
+    'ai chat' => 'AI Chat',
+    _ => formatSessionLabel(kind),
+  };
 }
