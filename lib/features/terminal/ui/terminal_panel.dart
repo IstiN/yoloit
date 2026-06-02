@@ -8,6 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:kterm/kterm.dart' as kterm;
 import 'package:xterm/xterm.dart' hide TerminalState;
+import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -541,6 +542,7 @@ class TerminalWidget extends StatefulWidget {
     this.terminalOutputWriter,
     this.debugLogSink,
     this.debugForceAltScrollKeyFallback = false,
+    this.linkOpener,
   });
   final AgentSession session;
   final bool isActive;
@@ -548,6 +550,7 @@ class TerminalWidget extends StatefulWidget {
   final void Function(String sessionId, String data)? terminalOutputWriter;
   final void Function(String message)? debugLogSink;
   final bool debugForceAltScrollKeyFallback;
+  final FutureOr<void> Function(String url)? linkOpener;
 
   /// When false, the terminal won't auto-request focus on creation or when
   /// becoming active. This prevents focus-fighting when multiple terminals
@@ -557,6 +560,30 @@ class TerminalWidget extends StatefulWidget {
   @override
   State<TerminalWidget> createState() => TerminalWidgetState();
 }
+
+@visibleForTesting
+final terminalUrlPattern = RegExp(
+  r'(?:https?|file)://[^\s<>"'
+  ']+',
+);
+
+@visibleForTesting
+String? terminalUrlAtCell(String line, int cellX) {
+  for (final match in terminalUrlPattern.allMatches(line)) {
+    var end = match.end;
+    while (end > match.start &&
+        _terminalUrlTrailingChars.contains(line[end - 1])) {
+      end--;
+    }
+    if (end <= match.start) continue;
+    if (cellX >= match.start && cellX < end) {
+      return line.substring(match.start, end);
+    }
+  }
+  return null;
+}
+
+const _terminalUrlTrailingChars = '.,;:)]}';
 
 class _TerminalScrollChrome extends StatelessWidget {
   const _TerminalScrollChrome({
@@ -1316,6 +1343,49 @@ class TerminalWidgetState extends State<TerminalWidget> {
     );
   }
 
+  bool _openXtermUrlAt(Offset globalPosition) {
+    final state = _terminalViewKey.currentState;
+    if (state == null) return false;
+    final renderTerminal = state.renderTerminal;
+    final cell = renderTerminal.getCellOffset(
+      renderTerminal.globalToLocal(globalPosition),
+    );
+    if (cell.y < 0 || cell.y >= widget.session.terminal.buffer.lines.length) {
+      return false;
+    }
+    final line = widget.session.terminal.buffer.lines[cell.y].toString();
+    final url = terminalUrlAtCell(line, cell.x);
+    if (url == null) return false;
+    unawaited(_openTerminalUrl(url));
+    return true;
+  }
+
+  bool _openKtermUrlAt(Offset globalPosition) {
+    final state = _kTerminalViewKey.currentState;
+    if (state == null) return false;
+    final renderTerminal = state.renderTerminal;
+    final cell = renderTerminal.getCellOffset(
+      renderTerminal.globalToLocal(globalPosition),
+    );
+    if (cell.y < 0 || cell.y >= widget.session.kTerminal.buffer.lines.length) {
+      return false;
+    }
+    final line = widget.session.kTerminal.buffer.lines[cell.y].toString();
+    final url = terminalUrlAtCell(line, cell.x);
+    if (url == null) return false;
+    unawaited(_openTerminalUrl(url));
+    return true;
+  }
+
+  Future<void> _openTerminalUrl(String url) async {
+    final opener = widget.linkOpener;
+    if (opener != null) {
+      await opener(url);
+      return;
+    }
+    await PlatformLauncher.instance.openUrl(url);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -1433,6 +1503,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
                     }
                     if (down == null) return;
                     if ((event.localPosition - down).distance > 6.0) return;
+                    if (_openXtermUrlAt(event.position)) return;
                     // Single tap clears any existing selection
                     if (_controller.selection != null) {
                       _controller.clearSelection();
@@ -1507,52 +1578,70 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   Widget _buildKtermTerminal(AppColorScheme colors) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.text,
-      child: _TerminalScrollChrome(
-        controller: _scrollController,
-        colors: colors,
-        child: kterm.TerminalView(
-          widget.session.kTerminal,
-          key: _kTerminalViewKey,
-          controller: _kController,
-          focusNode: _focusNode,
-          autofocus: widget.isActive,
-          scrollController: _scrollController,
-          simulateScroll: true,
-          showSearchBar: true,
-          onKeyEvent: _onTerminalKeyEvent,
-          textStyle: kterm.TerminalStyle(
-            fontSize: _fontSize,
-            fontFamily: 'JetBrainsMono',
-            height: 1.2,
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (event) {
+        if (!_focusNode.hasFocus) _focusNode.requestFocus();
+        if (event.buttons != kPrimaryButton) return;
+        _clickDownPosition = event.localPosition;
+      },
+      onPointerUp: (event) {
+        final down = _clickDownPosition;
+        _clickDownPosition = null;
+        if (down == null) return;
+        if ((event.localPosition - down).distance > 6.0) return;
+        _openKtermUrlAt(event.position);
+      },
+      onPointerCancel: (_) {
+        _clickDownPosition = null;
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.text,
+        child: _TerminalScrollChrome(
+          controller: _scrollController,
+          colors: colors,
+          child: kterm.TerminalView(
+            widget.session.kTerminal,
+            key: _kTerminalViewKey,
+            controller: _kController,
+            focusNode: _focusNode,
+            autofocus: widget.isActive,
+            scrollController: _scrollController,
+            simulateScroll: true,
+            showSearchBar: true,
+            onKeyEvent: _onTerminalKeyEvent,
+            textStyle: kterm.TerminalStyle(
+              fontSize: _fontSize,
+              fontFamily: 'JetBrainsMono',
+              height: 1.2,
+            ),
+            theme: kterm.TerminalTheme(
+              cursor: colors.primary,
+              selection: colors.primary.withAlpha(120),
+              foreground: colors.terminalText,
+              background: colors.terminalBackground,
+              black: colors.surface,
+              red: colors.accentRed,
+              green: colors.accentGreen,
+              yellow: colors.accentOrange,
+              blue: colors.accentBlue,
+              magenta: colors.primary,
+              cyan: colors.terminalPrompt,
+              white: colors.terminalText,
+              brightBlack: colors.textMuted,
+              brightRed: colors.accentRedDim,
+              brightGreen: colors.accentGreenDim,
+              brightYellow: colors.statusWarning,
+              brightBlue: colors.accentBlue,
+              brightMagenta: colors.primaryLight,
+              brightCyan: colors.accentBlue,
+              brightWhite: colors.textPrimary,
+              searchHitBackground: colors.accentOrange,
+              searchHitBackgroundCurrent: colors.statusWarning,
+              searchHitForeground: colors.background,
+            ),
+            padding: const EdgeInsets.all(8),
           ),
-          theme: kterm.TerminalTheme(
-            cursor: colors.primary,
-            selection: colors.primary.withAlpha(120),
-            foreground: colors.terminalText,
-            background: colors.terminalBackground,
-            black: colors.surface,
-            red: colors.accentRed,
-            green: colors.accentGreen,
-            yellow: colors.accentOrange,
-            blue: colors.accentBlue,
-            magenta: colors.primary,
-            cyan: colors.terminalPrompt,
-            white: colors.terminalText,
-            brightBlack: colors.textMuted,
-            brightRed: colors.accentRedDim,
-            brightGreen: colors.accentGreenDim,
-            brightYellow: colors.statusWarning,
-            brightBlue: colors.accentBlue,
-            brightMagenta: colors.primaryLight,
-            brightCyan: colors.accentBlue,
-            brightWhite: colors.textPrimary,
-            searchHitBackground: colors.accentOrange,
-            searchHitBackgroundCurrent: colors.statusWarning,
-            searchHitForeground: colors.background,
-          ),
-          padding: const EdgeInsets.all(8),
         ),
       ),
     );

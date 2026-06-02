@@ -471,6 +471,68 @@ void main() {
       expect(outputs, isEmpty);
     });
 
+    test('terminalUrlAtCell returns trimmed URL under clicked cell', () {
+      const line =
+          'Release https://github.com/IstiN/yoloit/releases/tag/v1.0.146.';
+
+      expect(
+        terminalUrlAtCell(line, line.indexOf('github.com') + 2),
+        'https://github.com/IstiN/yoloit/releases/tag/v1.0.146',
+      );
+      expect(terminalUrlAtCell(line, 0), isNull);
+    });
+
+    testWidgets('terminal single click opens URL under pointer', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final opened = <String>[];
+      final outputs = <String>[];
+      final session = AgentSession(
+        id: 'sess_click_url',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+      const url = 'https://github.com/IstiN/yoloit/releases/tag/v1.0.146';
+      session.terminal.write('Release $url.\r\n');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 900,
+              height: 180,
+              child: TerminalWidget(
+                session: session,
+                isActive: true,
+                terminalOutputWriter: (sessionId, data) => outputs.add(data),
+                linkOpener: (url) => opened.add(url),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final viewState = tester.state<TerminalViewState>(
+        find.byType(TerminalView),
+      );
+      final renderTerminal = viewState.renderTerminal;
+      // Column 18 sits inside the URL after "Release https://".
+      const cell = CellOffset(18, 0);
+      final local =
+          renderTerminal.getOffset(cell) +
+          const Offset(2, 0) +
+          Offset(0, renderTerminal.lineHeight / 2);
+      final global = renderTerminal.localToGlobal(local);
+
+      await tester.tapAt(global);
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(opened, [url]);
+      expect(outputs, isEmpty);
+    });
+
     testWidgets('alt-buffer pan-zoom scroll sends key fallback without mouse', (
       tester,
     ) async {
