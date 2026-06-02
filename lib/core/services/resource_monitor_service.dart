@@ -224,6 +224,20 @@ class ResourceMonitorService {
     _sessionMetadata.remove(pid);
   }
 
+  bool stopProcess(int processPid) {
+    if (processPid <= 0 || processPid == pid) return false;
+    try {
+      final stopped = Process.killPid(processPid);
+      if (stopped) {
+        unregisterSession(processPid);
+        _poll();
+      }
+      return stopped;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
   void start() {
@@ -440,8 +454,9 @@ class ResourceMonitorService {
             math.max(
               pidIdx,
               math.max(ppidIdx ?? 0, math.max(nameIdx ?? 0, memIdx ?? 0)),
-            ))
+            )) {
           continue;
+        }
         final p = int.tryParse(cols[pidIdx].trim());
         final pp = int.tryParse(cols[ppidIdx ?? 0].trim());
         final name = nameIdx != null ? cols[nameIdx].trim() : '';

@@ -1771,6 +1771,7 @@ class _SessionRow extends StatelessWidget {
         Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
     final metadata = session.metadata;
     final label = metadata?.displayLabel ?? formatSessionLabel(session.label);
+    final canStop = resourceSessionCanStop(session);
     final details = [
       if (metadata?.boardName?.trim().isNotEmpty ?? false)
         metadata!.boardName!.trim(),
@@ -1842,6 +1843,10 @@ class _SessionRow extends StatelessWidget {
                   textAlign: TextAlign.right,
                 ),
               ),
+              if (canStop) ...[
+                const SizedBox(width: 4),
+                _StopResourceSessionButton(session: session),
+              ],
             ],
           ),
         ),
@@ -1850,9 +1855,72 @@ class _SessionRow extends StatelessWidget {
   }
 }
 
+class _StopResourceSessionButton extends StatelessWidget {
+  const _StopResourceSessionButton({required this.session});
+
+  final SessionStat session;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Stop session',
+      waitDuration: const Duration(milliseconds: 350),
+      child: IconButton(
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+        iconSize: 14,
+        color: Theme.of(context).colorScheme.error,
+        onPressed: () => _confirmStopResourceSession(context, session),
+        icon: const Icon(Icons.stop_circle_outlined),
+      ),
+    );
+  }
+}
+
+Future<void> _confirmStopResourceSession(
+  BuildContext context,
+  SessionStat session,
+) async {
+  final label =
+      session.metadata?.displayLabel ?? formatSessionLabel(session.label);
+  final shouldStop = await showDialog<bool>(
+    context: context,
+    builder:
+        (dialogContext) => AlertDialog(
+          title: const Text('Stop session?'),
+          content: Text('Stop $label (pid ${session.pid})?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              icon: const Icon(Icons.stop_circle_outlined),
+              label: const Text('Stop'),
+            ),
+          ],
+        ),
+  );
+  if (shouldStop != true || !context.mounted) return;
+  final stopped = ResourceMonitorService.instance.stopProcess(session.pid);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        stopped
+            ? 'Stopped $label'
+            : 'Could not stop $label. It may have already exited.',
+      ),
+    ),
+  );
+}
+
 void _showResourceSessionDetails(BuildContext context, SessionStat session) {
   final colors = context.appColors;
   final metadata = session.metadata;
+  final canStop = resourceSessionCanStop(session);
   final lines = <MapEntry<String, String>>[
     MapEntry('PID', session.pid.toString()),
     MapEntry('Label', formatSessionLabel(session.label)),
@@ -1940,10 +2008,47 @@ void _showResourceSessionDetails(BuildContext context, SessionStat session) {
                       ),
                     ),
                   ),
+                  if (canStop) ...[
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.icon(
+                        onPressed: () async {
+                          Navigator.of(dialogContext).pop();
+                          await _confirmStopResourceSession(context, session);
+                        },
+                        icon: const Icon(Icons.stop_circle_outlined),
+                        label: const Text('Stop session'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         ),
   );
+}
+
+@visibleForTesting
+bool resourceSessionCanStop(SessionStat session) {
+  final metadata = session.metadata;
+  if (metadata != null) {
+    final kind = metadata.kind.toLowerCase();
+    if (kind == 'terminal') return false;
+    if (kind == 'ai chat') return true;
+  }
+  final label = session.label.toLowerCase();
+  return const [
+    'copilot',
+    'claude',
+    'cursor',
+    'cursor-agent',
+    'codex',
+    'opencode',
+    'kimi',
+    'gemini',
+    'node',
+    'python',
+  ].any(label.contains);
 }

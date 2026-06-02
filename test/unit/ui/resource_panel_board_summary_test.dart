@@ -50,4 +50,31 @@ void main() {
 
     expect(metadata.displayLabel, 'AI Chat · Release helper');
   });
+
+  test('resourceSessionCanStop allows AI/tool sessions but not terminals', () {
+    const aiSession = SessionStat(
+      pid: 10,
+      label: 'AI Chat',
+      cpuPercent: 0,
+      memoryBytes: 0,
+      metadata: ResourceSessionMetadata(kind: 'ai chat'),
+    );
+    const terminalSession = SessionStat(
+      pid: 11,
+      label: 'Terminal',
+      cpuPercent: 0,
+      memoryBytes: 0,
+      metadata: ResourceSessionMetadata(kind: 'terminal'),
+    );
+    const detachedCopilot = SessionStat(
+      pid: 12,
+      label: 'copilot',
+      cpuPercent: 0,
+      memoryBytes: 0,
+    );
+
+    expect(resourceSessionCanStop(aiSession), isTrue);
+    expect(resourceSessionCanStop(detachedCopilot), isTrue);
+    expect(resourceSessionCanStop(terminalSession), isFalse);
+  });
 }
