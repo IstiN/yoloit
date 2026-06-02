@@ -72,6 +72,13 @@ DateTime _copilotSessionModifiedAt(Directory sessionDir) {
   return latest;
 }
 
+@visibleForTesting
+String normaliseCopilotCommandArg(String arg) {
+  // Early alpha builds could persist this typo in custom launch commands.
+  // Normalize at launch time so saved settings don't break chat startup.
+  return arg == '--yollo' ? '--yolo' : arg;
+}
+
 /// [ChatProvider] implementation that wraps the GitHub Copilot CLI.
 ///
 /// Runs `copilot` with `--output-format json` and parses
@@ -236,7 +243,10 @@ class CopilotCliProvider extends ChatProvider {
 
     final cmdParts = _splitCommand(rawCommand);
     final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'copilot';
-    final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+    final extraCmdArgs =
+        cmdParts.length > 1
+            ? cmdParts.sublist(1).map(normaliseCopilotCommandArg).toList()
+            : <String>[];
 
     debugPrint(
       '[CopilotCli] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}',

@@ -1616,7 +1616,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   @override
   Widget build(BuildContext context) {
     final configured = widget.panel.state['configured'] == true;
-    if (!configured && _messages.isEmpty) {
+    if (!configured) {
       return _buildSetupView();
     }
     return _buildChatView();

@@ -397,6 +397,41 @@ void main() {
       expect(outputs, isEmpty);
     });
 
+    testWidgets('terminal single click does not send cursor movement', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final outputs = <String>[];
+      final session = AgentSession(
+        id: 'sess_click_no_cursor_jump',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+      session.terminal.write('prompt> abc');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 140,
+              child: TerminalWidget(
+                session: session,
+                isActive: true,
+                terminalOutputWriter: (sessionId, data) => outputs.add(data),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tapAt(tester.getCenter(find.byType(TerminalView)));
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(outputs, isEmpty);
+    });
+
     testWidgets('alt-buffer pan-zoom scroll sends key fallback without mouse', (
       tester,
     ) async {

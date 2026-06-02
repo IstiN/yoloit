@@ -107,6 +107,11 @@ void main() {
   );
 
   group('CopilotCliProvider helpers', () {
+    test('normalizes legacy misspelled yolo flag', () {
+      expect(normaliseCopilotCommandArg('--yollo'), '--yolo');
+      expect(normaliseCopilotCommandArg('--output-format'), '--output-format');
+    });
+
     test('extracts matching session ids from multisession error', () {
       final ids = extractCopilotMultiSessionIds('''
 Error: Multiple sessions match the name 'Hello'.
@@ -137,11 +142,6 @@ Matching sessions:
       final now = DateTime.now();
       olderFile.setLastModifiedSync(now.subtract(const Duration(days: 1)));
       newerFile.setLastModifiedSync(now);
-      final recoveredId = pickMostRecentCopilotSessionId([
-        newerId,
-        olderId,
-      ], sessionStateRoot: sessionStateRoot.path);
-
       expect(
         pickMostRecentCopilotSessionId([
           olderId,

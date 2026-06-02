@@ -920,44 +920,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (mounted) setState(() => _fontSize = size.clamp(8.0, 32.0));
   }
 
-  /// Click-to-move cursor: when the user single-clicks on the prompt row
-  /// (not in alternate buffer / vim / etc.), send arrow keys to move the
-  /// cursor to the clicked column. Same behavior as Superset desktop app.
-  void _handleTerminalClick(Offset localPosition) {
-    final terminal = widget.session.terminal;
-    // Don't interfere with vim/less/etc. (alternate screen)
-    if (terminal.isUsingAltBuffer) return;
-    // Don't interfere with active text selection
-    if (_controller.selection != null) return;
-
-    const padding = 8.0;
-    final innerWidth = _terminalSize.width - padding * 2;
-    final innerHeight = _terminalSize.height - padding * 2;
-    if (innerWidth <= 0 || innerHeight <= 0) return;
-
-    final cellWidth = innerWidth / terminal.viewWidth;
-    final cellHeight = innerHeight / terminal.viewHeight;
-
-    final clickCol = ((localPosition.dx - padding) / cellWidth).floor().clamp(
-      0,
-      terminal.viewWidth - 1,
-    );
-    final clickRow = ((localPosition.dy - padding) / cellHeight).floor().clamp(
-      0,
-      terminal.viewHeight - 1,
-    );
-
-    // Only move when click is on the same row as the cursor
-    if (clickRow != terminal.buffer.cursorY) return;
-
-    final delta = clickCol - terminal.buffer.cursorX;
-    if (delta == 0) return;
-
-    // Right arrow: \x1b[C  Left arrow: \x1b[D
-    final arrow = delta > 0 ? '\x1b[C' : '\x1b[D';
-    _writePty(arrow * delta.abs());
-  }
-
   Future<void> _pasteAsFileRef() async {
     final pasted =
         await SmartClipboardPasteService.instance
@@ -1446,7 +1408,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
                       _controller.clearSelection();
                       return;
                     }
-                    _handleTerminalClick(event.localPosition);
                   },
                   onPointerCancel: (event) {
                     _activePointers.remove(event.pointer);
