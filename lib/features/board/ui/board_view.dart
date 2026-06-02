@@ -56,6 +56,14 @@ class BoardView extends StatefulWidget {
   State<BoardView> createState() => _BoardViewState();
 }
 
+@visibleForTesting
+bool boardShouldRevertInteractionForCanvasLock({
+  required bool interactionStartedLocked,
+  required bool currentlyLocked,
+}) {
+  return interactionStartedLocked && currentlyLocked;
+}
+
 class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   static const Size _initialCanvasSize = Size(40000, 30000);
   static const double _canvasExpansionMargin = 6000;
@@ -86,6 +94,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   bool _isViewportZooming = false;
   double _interactionStartScale = 1.0;
   Matrix4? _interactionStartMatrix;
+  bool _interactionStartedLocked = false;
   int? _lastLoggedLockCount;
   Offset? _lastPanelDragBoardPointer;
 
@@ -374,6 +383,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             _interactionStartMatrix =
                                                 _transformController.value
                                                     .clone();
+                                            _interactionStartedLocked =
+                                                CanvasInteractionLock
+                                                    .instance
+                                                    .isLocked;
                                             setState(() {
                                               _isViewportInteracting = true;
                                               _isViewportZooming = false;
@@ -382,9 +395,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             _stopPanAnimation();
                                           },
                                           onInteractionUpdate: (details) {
-                                            if (CanvasInteractionLock
-                                                    .instance
-                                                    .isLocked &&
+                                            if (boardShouldRevertInteractionForCanvasLock(
+                                                  interactionStartedLocked:
+                                                      _interactionStartedLocked,
+                                                  currentlyLocked:
+                                                      CanvasInteractionLock
+                                                          .instance
+                                                          .isLocked,
+                                                ) &&
                                                 _interactionStartMatrix !=
                                                     null) {
                                               _boardSupportLog(
@@ -431,6 +449,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               'scale=${_fmt(_scaleOf(_transformController.value))}',
                                             );
                                             _interactionStartMatrix = null;
+                                            _interactionStartedLocked = false;
                                             setState(() {
                                               _isViewportInteracting = false;
                                               _isViewportZooming = false;

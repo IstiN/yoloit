@@ -401,6 +401,32 @@ class CopilotCliProvider extends ChatProvider {
           );
           return;
         }
+        final shouldCreateReplacementSession =
+            !recoveryAttempted &&
+            !isFirstMessage &&
+            _isMissingCopilotSessionError(errText);
+        if (shouldCreateReplacementSession) {
+          _sessionIds.remove(config.sessionName);
+          debugPrint(
+            '[CopilotCli] Resume target for "${config.sessionName}" is stale; '
+            'creating a replacement named session.',
+          );
+          if (_processes[config.sessionName] == process) {
+            _processes.remove(config.sessionName);
+          }
+          await subAgentSub?.cancel();
+          await subAgentWatcher?.dispose();
+          await _runProcess(
+            message: message,
+            config: config,
+            isFirstMessage: true,
+            attachments: attachments,
+            runtimeContext: runtimeContext,
+            controller: controller,
+            recoveryAttempted: true,
+          );
+          return;
+        }
         controller.addError(
           errText.isNotEmpty
               ? errText
@@ -554,6 +580,12 @@ class CopilotCliProvider extends ChatProvider {
       matches,
       sessionStateRoot: sessionStateRoot,
     );
+  }
+
+  bool _isMissingCopilotSessionError(String errorText) {
+    final normalized = errorText.toLowerCase();
+    return normalized.contains('no session, task, or name matched') ||
+        normalized.contains('to start a new session with id');
   }
 
   static Future<Process> _defaultProcessStarter(

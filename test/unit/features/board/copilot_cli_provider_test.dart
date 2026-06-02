@@ -364,5 +364,70 @@ Specify the session ID directly: copilot --resume=<id>
       );
       expect(capturedError, 'still broken');
     });
+
+    test(
+      'creates a replacement named session when saved resume target is missing',
+      () async {
+        final starter = _FakeProcessStarter();
+        final failedProcess = _FakeProcess(pid: 401, stdin: stdinSink);
+        final replacementProcess = _FakeProcess(pid: 402, stdin: stdinSink);
+        starter.queuedProcesses
+          ..add(failedProcess)
+          ..add(replacementProcess);
+
+        final provider = CopilotCliProvider(
+          processStarter: starter.start,
+          homeDirectory: tempDir.path,
+          sessionStateRoot: sessionStateRoot.path,
+          enableSubAgentWatcher: false,
+        );
+        addTearDown(provider.dispose);
+        provider.setSessionId('Hello', 'chat-1780396890900');
+
+        final events = <ChatEvent>[];
+        final done = Completer<void>();
+        provider
+            .sendMessage(
+              message: 'ghbdt',
+              config: _config(),
+              isFirstMessage: false,
+            )
+            .listen(events.add, onDone: () => done.complete());
+
+        failedProcess.addStderr('''
+Error: No session, task, or name matched 'chat-1780396890900'.
+
+To resume by session or task ID: copilot --resume=<id>
+To resume by name:                copilot --resume=<name>
+To name a new session:            copilot --name=<name>
+To pick from existing sessions:   copilot --resume
+To start a new session with ID:   copilot --session-id=<valid-uuid>
+''');
+        failedProcess.completeExit(1);
+        await failedProcess.closeStdout();
+        await failedProcess.closeStderr();
+
+        replacementProcess.addStdout(
+          '{"type":"assistant.message","id":"msg-1","data":{"content":"Привет"}}\n',
+        );
+        replacementProcess.addStdout(
+          '{"type":"result","sessionId":"new-session-id","exitCode":0}\n',
+        );
+        replacementProcess.completeExit(0);
+        await replacementProcess.closeStdout();
+        await replacementProcess.closeStderr();
+        await done.future;
+
+        expect(starter.calls, hasLength(2));
+        expect(
+          starter.calls.first.arguments,
+          containsAll(['--resume', 'chat-1780396890900']),
+        );
+        expect(starter.calls.last.arguments, containsAll(['--name', 'Hello']));
+        expect(starter.calls.last.arguments, isNot(contains('--resume')));
+        expect(provider.getSessionId('Hello'), 'new-session-id');
+        expect(events.map((e) => e.type), contains(ChatEventType.result));
+      },
+    );
   });
 }
