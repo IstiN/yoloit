@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -185,6 +186,16 @@ void main() {
       await tester.pump();
       expect(find.text('YAML'), findsAtLeastNWidgets(1));
     });
+
+    testWidgets('language label shows ENV for dotenv files', (tester) async {
+      await tester.pumpWidget(
+        _buildEditor(
+          _dartTab(name: '.env.local', content: 'OPENAI_API_KEY=test'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('ENV'), findsAtLeastNWidgets(1));
+    });
   });
 
   // ── Find bar ────────────────────────────────────────────────────────────────
@@ -204,6 +215,89 @@ void main() {
       await tester.pump();
 
       expect(find.text('Find'), findsAtLeastNWidgets(1));
+    });
+
+    testWidgets('Cmd+F opens the app find bar', (tester) async {
+      await tester.pumpWidget(_buildEditor(_dartTab()));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(find.widgetWithText(TextField, 'Find'), findsOneWidget);
+    });
+
+    testWidgets('Find bar selects the first match while typing', (
+      tester,
+    ) async {
+      const content = 'alpha\nbeta target\nsecond target';
+      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.search).first);
+      await tester.pump();
+      await tester.enterText(find.widgetWithText(TextField, 'Find'), 'target');
+      await tester.pump();
+
+      final codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.selection.start, content.indexOf('target'));
+      expect(codeField.controller.selection.end, content.indexOf('target') + 6);
+      expect(find.text('1 / 2'), findsOneWidget);
+    });
+
+    testWidgets('Find next moves the editor selection to the next match', (
+      tester,
+    ) async {
+      const content = 'target\nmiddle\ntarget';
+      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.search).first);
+      await tester.pump();
+      await tester.enterText(find.widgetWithText(TextField, 'Find'), 'target');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Next  Enter'));
+      await tester.pump();
+
+      final codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(
+        codeField.controller.selection.start,
+        content.lastIndexOf('target'),
+      );
+      expect(find.text('2 / 2'), findsOneWidget);
+    });
+
+    testWidgets('Cmd+J opens quick find and arrow navigation works', (
+      tester,
+    ) async {
+      const content = 'one apple\ntwo apple';
+      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(find.byKey(const Key('editor-quick-find-input')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('editor-quick-find-input')),
+        'apple',
+      );
+      await tester.pump();
+      expect(find.text('1 / 2'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+
+      final codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(
+        codeField.controller.selection.start,
+        content.lastIndexOf('apple'),
+      );
+      expect(find.text('2 / 2'), findsOneWidget);
     });
 
     testWidgets('Find bar disappears after tapping close', (tester) async {
@@ -372,13 +466,13 @@ void main() {
     testWidgets('does not build a CodeField while content is still loading', (
       tester,
     ) async {
-      final cubit = FileEditorCubit()
-        ..emit(
-          const FileEditorState(
-            isVisible: true,
-            tabs: [EditorTab(filePath: '/ws/loading.dart', isLoading: true)],
-          ),
-        );
+      final cubit =
+          FileEditorCubit()..emit(
+            const FileEditorState(
+              isVisible: true,
+              tabs: [EditorTab(filePath: '/ws/loading.dart', isLoading: true)],
+            ),
+          );
       addTearDown(cubit.close);
 
       await tester.pumpWidget(
@@ -399,18 +493,18 @@ void main() {
     testWidgets(
       'creates the CodeField with hydrated content after loading finishes',
       (tester) async {
-        final cubit = FileEditorCubit()
-          ..emit(
-            const FileEditorState(
-              isVisible: true,
-              tabs: [
-                EditorTab(
-                  filePath: '/ws/analysis_options.yaml',
-                  isLoading: true,
-                ),
-              ],
-            ),
-          );
+        final cubit =
+            FileEditorCubit()..emit(
+              const FileEditorState(
+                isVisible: true,
+                tabs: [
+                  EditorTab(
+                    filePath: '/ws/analysis_options.yaml',
+                    isLoading: true,
+                  ),
+                ],
+              ),
+            );
         addTearDown(cubit.close);
 
         await tester.pumpWidget(

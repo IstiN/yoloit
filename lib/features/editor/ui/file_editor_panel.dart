@@ -7,27 +7,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:highlight/highlight_core.dart' show Mode;
-import 'package:highlight/languages/bash.dart';
-import 'package:highlight/languages/cpp.dart';
-import 'package:highlight/languages/css.dart';
-import 'package:highlight/languages/dart.dart';
-import 'package:highlight/languages/go.dart';
-import 'package:highlight/languages/java.dart';
-import 'package:highlight/languages/javascript.dart';
-import 'package:highlight/languages/json.dart';
-import 'package:highlight/languages/kotlin.dart';
-import 'package:highlight/languages/python.dart';
-import 'package:highlight/languages/rust.dart';
-import 'package:highlight/languages/sql.dart';
-import 'package:highlight/languages/swift.dart';
-import 'package:highlight/languages/typescript.dart';
-import 'package:highlight/languages/xml.dart';
-import 'package:highlight/languages/yaml.dart';
 import 'package:yoloit/core/services/git_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
+import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
 import 'package:yoloit/features/editor/utils/file_type_utils.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/review/models/review_models.dart';
@@ -107,28 +92,9 @@ class _FileEditorPanelState extends State<FileEditorPanel>
   }
 
   static Mode? _modeFor(String path) {
-    final lang = FileTypeUtils.languageFor(path);
-    return switch (lang) {
-      'dart' => dart,
-      'javascript' => javascript,
-      'typescript' => typescript,
-      'python' => python,
-      'java' => java,
-      'kotlin' => kotlin,
-      'go' => go,
-      'rust' => rust,
-      'bash' => bash,
-      'cpp' => cpp,
-      'css' => css,
-      'json' => json,
-      'yaml' => yaml,
-      'xml' => xml,
-      'sql' => sql,
-      'markdown' =>
-        null, // markdown has preview mode — skip slow syntax parsing
-      'swift' => swift,
-      _ => null,
-    };
+    final spec = EditorLanguageRegistry.forPath(path);
+    if (spec.id == 'markdown') return null;
+    return spec.mode;
   }
 
   /// Returns the controller for [tab], creating it if needed.
@@ -337,11 +303,7 @@ class _FileEditorPanelState extends State<FileEditorPanel>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.code,
-              size: 40,
-              color: colors.textMuted.withAlpha(60),
-            ),
+            Icon(Icons.code, size: 40, color: colors.textMuted.withAlpha(60)),
             const SizedBox(height: 12),
             Text(
               'Open a file to edit',
@@ -657,7 +619,7 @@ class _ImagePreview extends StatelessWidget {
                 child: Image.file(
                   File(filePath),
                   errorBuilder:
-                      (_, __, ___) => Center(
+                      (context, error, stackTrace) => Center(
                         child: Text(
                           'Cannot load image',
                           style: TextStyle(
@@ -970,13 +932,17 @@ class _EditorBodyState extends State<_EditorBody> {
   // ── Find / Replace ──────────────────────────────────────────────────────
   bool _showFind = false;
   bool _showReplace = false;
+  bool _showQuickFind = false;
   bool _caseSensitive = false;
   String _findQuery = '';
   List<int> _matchOffsets = [];
   int _currentMatch = 0;
   final _findCtrl = TextEditingController();
+  final _quickFindCtrl = TextEditingController();
   final _replaceCtrl = TextEditingController();
   final _findFocus = FocusNode();
+  final _quickFindFocus = FocusNode();
+  final _codeFocus = FocusNode();
 
   // ── Editor options ───────────────────────────────────────────────────────
   bool _wordWrap = false;
@@ -1014,8 +980,11 @@ class _EditorBodyState extends State<_EditorBody> {
   void dispose() {
     widget.codeController.removeListener(_onTextChanged);
     _findCtrl.dispose();
+    _quickFindCtrl.dispose();
     _replaceCtrl.dispose();
     _findFocus.dispose();
+    _quickFindFocus.dispose();
+    _codeFocus.dispose();
     super.dispose();
   }
 
@@ -1104,40 +1073,11 @@ class _EditorBodyState extends State<_EditorBody> {
   }
 
   // ── Language helpers ────────────────────────────────────────────────────
-  static String _languageName(String filePath) {
-    final ext = filePath.split('.').last.toLowerCase();
-    return switch (ext) {
-      'dart' => 'Dart',
-      'js' => 'JavaScript',
-      'ts' => 'TypeScript',
-      'jsx' || 'tsx' => 'React',
-      'py' => 'Python',
-      'java' => 'Java',
-      'kt' => 'Kotlin',
-      'go' => 'Go',
-      'rs' => 'Rust',
-      'sh' || 'bash' => 'Shell',
-      'cpp' || 'cc' || 'cxx' => 'C++',
-      'c' => 'C',
-      'css' => 'CSS',
-      'json' => 'JSON',
-      'yaml' || 'yml' => 'YAML',
-      'xml' => 'XML',
-      'sql' => 'SQL',
-      'md' => 'Markdown',
-      'swift' => 'Swift',
-      'html' => 'HTML',
-      _ => ext.isEmpty ? 'Plain Text' : ext.toUpperCase(),
-    };
-  }
+  static String _languageName(String filePath) =>
+      EditorLanguageRegistry.forPath(filePath).label;
 
   static String _commentPrefix(String filePath) {
-    final ext = filePath.split('.').last.toLowerCase();
-    return switch (ext) {
-      'py' || 'rb' || 'sh' || 'bash' || 'yaml' || 'yml' || 'toml' => '# ',
-      'css' => '/* ',
-      _ => '// ',
-    };
+    return EditorLanguageRegistry.forPath(filePath).commentPrefix;
   }
 
   // ── Line helpers ────────────────────────────────────────────────────────
@@ -1151,6 +1091,9 @@ class _EditorBodyState extends State<_EditorBody> {
   void _openFind() => setState(() {
     _showFind = true;
     _showReplace = false;
+    _showQuickFind = false;
+    _findCtrl.text = _findQuery;
+    _updateMatches(selectCurrent: true);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) _findFocus.requestFocus();
     });
@@ -1158,6 +1101,9 @@ class _EditorBodyState extends State<_EditorBody> {
   void _openReplace() => setState(() {
     _showFind = true;
     _showReplace = true;
+    _showQuickFind = false;
+    _findCtrl.text = _findQuery;
+    _updateMatches(selectCurrent: true);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) _findFocus.requestFocus();
     });
@@ -1167,7 +1113,25 @@ class _EditorBodyState extends State<_EditorBody> {
     _showReplace = false;
   });
 
-  void _updateMatches() {
+  void _openQuickFind() => setState(() {
+    _showFind = false;
+    _showReplace = false;
+    _showQuickFind = true;
+    _quickFindCtrl.text = _findQuery;
+    _updateMatches(selectCurrent: true, returnFocus: _quickFindFocus);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _quickFindFocus.requestFocus();
+      _quickFindCtrl.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _quickFindCtrl.text.length,
+      );
+    });
+  });
+
+  void _closeQuickFind() => setState(() => _showQuickFind = false);
+
+  void _updateMatches({bool selectCurrent = false, FocusNode? returnFocus}) {
     if (_findQuery.isEmpty) {
       _matchOffsets = [];
       _currentMatch = 0;
@@ -1186,31 +1150,38 @@ class _EditorBodyState extends State<_EditorBody> {
     }
     _matchOffsets = offsets;
     if (_currentMatch >= offsets.length) _currentMatch = 0;
+    if (selectCurrent) _selectCurrentMatch(returnFocus: returnFocus);
   }
 
-  void _selectCurrentMatch() {
+  void _selectCurrentMatch({FocusNode? returnFocus}) {
     if (_matchOffsets.isEmpty) return;
     final off = _matchOffsets[_currentMatch];
+    _codeFocus.requestFocus();
     widget.codeController.selection = TextSelection(
       baseOffset: off,
       extentOffset: off + _findQuery.length,
     );
+    if (returnFocus != null) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) returnFocus.requestFocus();
+      });
+    }
   }
 
-  void _findNext() {
+  void _findNext({FocusNode? returnFocus}) {
     if (_matchOffsets.isEmpty) return;
     setState(() => _currentMatch = (_currentMatch + 1) % _matchOffsets.length);
-    _selectCurrentMatch();
+    _selectCurrentMatch(returnFocus: returnFocus);
   }
 
-  void _findPrev() {
+  void _findPrev({FocusNode? returnFocus}) {
     if (_matchOffsets.isEmpty) return;
     setState(
       () =>
           _currentMatch =
               (_currentMatch - 1 + _matchOffsets.length) % _matchOffsets.length,
     );
-    _selectCurrentMatch();
+    _selectCurrentMatch(returnFocus: returnFocus);
   }
 
   void _replaceOne() {
@@ -1469,8 +1440,9 @@ class _EditorBodyState extends State<_EditorBody> {
                   ),
                   onSubmitted: (v) {
                     final n = int.tryParse(v);
-                    if (n != null && n >= 1 && n <= lineCount)
+                    if (n != null && n >= 1 && n <= lineCount) {
                       _jumpToLine(ctrl, n);
+                    }
                     Navigator.of(dctx).pop();
                   },
                 ),
@@ -1508,6 +1480,8 @@ class _EditorBodyState extends State<_EditorBody> {
         const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _openFind,
         const SingleActivator(LogicalKeyboardKey.keyH, meta: true):
             _openReplace,
+        const SingleActivator(LogicalKeyboardKey.keyJ, meta: true):
+            _openQuickFind,
         const SingleActivator(LogicalKeyboardKey.slash, meta: true):
             _toggleComment,
         const SingleActivator(LogicalKeyboardKey.keyD, meta: true):
@@ -1528,7 +1502,10 @@ class _EditorBodyState extends State<_EditorBody> {
             _formatDocument,
         const SingleActivator(LogicalKeyboardKey.keyO, meta: true, shift: true):
             _toggleOutline,
-        const SingleActivator(LogicalKeyboardKey.escape): _closeFind,
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          _closeFind();
+          _closeQuickFind();
+        },
       },
       child: Focus(
         autofocus: true,
@@ -1560,7 +1537,7 @@ class _EditorBodyState extends State<_EditorBody> {
                 onReplaceAll: _replaceAll,
                 onToggleCase: () {
                   setState(() => _caseSensitive = !_caseSensitive);
-                  _updateMatches();
+                  _updateMatches(selectCurrent: true, returnFocus: _findFocus);
                   setState(() {});
                 },
                 onToggleReplace:
@@ -1568,93 +1545,131 @@ class _EditorBodyState extends State<_EditorBody> {
                 onQueryChanged: (q) {
                   setState(() {
                     _findQuery = q;
-                    _updateMatches();
+                    _quickFindCtrl.text = q;
+                    _updateMatches(
+                      selectCurrent: true,
+                      returnFocus: _findFocus,
+                    );
                   });
                 },
               ),
             Expanded(
-              child: Row(
+              child: Stack(
                 children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: ValueListenableBuilder<double>(
-                            valueListenable: widget.fontSizeNotifier,
-                            builder: (context, fontSize, _) {
-                              final lineHeight = fontSize * 1.5;
-                              return NotificationListener<ScrollNotification>(
-                                onNotification: (n) {
-                                  if (n.metrics.axis == Axis.vertical) {
-                                    setState(
-                                      () =>
-                                          _codeScrollOffset = n.metrics.pixels,
-                                    );
-                                  }
-                                  return false;
-                                },
-                                child: Stack(
-                                  children: [
-                                    CodeTheme(
-                                      data: CodeThemeData(
-                                        styles: _buildDarkTheme(colors),
-                                      ),
-                                      child: CodeField(
-                                        controller: widget.codeController,
-                                        expands: true,
-                                        wrap: _wordWrap,
-                                        textStyle: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: fontSize,
-                                          height: 1.5,
-                                        ),
-                                        background: colors.background,
-                                        gutterStyle: GutterStyle(
-                                          width: 72,
-                                          margin: 8,
-                                          textStyle: TextStyle(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withAlpha(100),
-                                            fontFamily: 'monospace',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: ValueListenableBuilder<double>(
+                                valueListenable: widget.fontSizeNotifier,
+                                builder: (context, fontSize, _) {
+                                  final lineHeight = fontSize * 1.5;
+                                  return NotificationListener<
+                                    ScrollNotification
+                                  >(
+                                    onNotification: (n) {
+                                      if (n.metrics.axis == Axis.vertical) {
+                                        setState(
+                                          () =>
+                                              _codeScrollOffset =
+                                                  n.metrics.pixels,
+                                        );
+                                      }
+                                      return false;
+                                    },
+                                    child: Stack(
+                                      children: [
+                                        CodeTheme(
+                                          data: CodeThemeData(
+                                            styles: _buildDarkTheme(colors),
                                           ),
-                                          background: colors.surfaceElevated,
+                                          child: CodeField(
+                                            focusNode: _codeFocus,
+                                            controller: widget.codeController,
+                                            expands: true,
+                                            wrap: _wordWrap,
+                                            textStyle: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: fontSize,
+                                              height: 1.5,
+                                            ),
+                                            background: colors.background,
+                                            gutterStyle: GutterStyle(
+                                              width: 72,
+                                              margin: 8,
+                                              textStyle: TextStyle(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withAlpha(100),
+                                                fontFamily: 'monospace',
+                                              ),
+                                              background:
+                                                  colors.surfaceElevated,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        // Git gutter overlay — 3px strip at left edge of gutter.
+                                        if (_gitMarkers.isNotEmpty)
+                                          Positioned(
+                                            left: 0,
+                                            top: 0,
+                                            bottom: 0,
+                                            width: 3,
+                                            child: _GitGutterPainter(
+                                              markers: _gitMarkers,
+                                              lineHeight: lineHeight,
+                                              scrollOffset: _codeScrollOffset,
+                                            ),
+                                          ),
+                                      ],
                                     ),
-                                    // Git gutter overlay — 3px strip at left edge of gutter.
-                                    if (_gitMarkers.isNotEmpty)
-                                      Positioned(
-                                        left: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        width: 3,
-                                        child: _GitGutterPainter(
-                                          markers: _gitMarkers,
-                                          lineHeight: lineHeight,
-                                          scrollOffset: _codeScrollOffset,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                                  );
+                                },
+                              ),
+                            ),
+                            _EditorStatusBar(
+                              controller: widget.codeController,
+                              language: language,
+                            ),
+                          ],
                         ),
-                        _EditorStatusBar(
-                          controller: widget.codeController,
-                          language: language,
+                      ),
+                      if (_showOutline)
+                        _SymbolOutline(
+                          content: widget.codeController.text,
+                          filePath: widget.tab.filePath,
+                          onJumpToLine:
+                              (line) =>
+                                  _jumpToLine(widget.codeController, line),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-                  if (_showOutline)
-                    _SymbolOutline(
-                      content: widget.codeController.text,
-                      filePath: widget.tab.filePath,
-                      onJumpToLine:
-                          (line) => _jumpToLine(widget.codeController, line),
+                  if (_showQuickFind)
+                    Positioned(
+                      top: 10,
+                      right: 14,
+                      child: _QuickFindHint(
+                        controller: _quickFindCtrl,
+                        focusNode: _quickFindFocus,
+                        matchCount: _matchOffsets.length,
+                        currentMatch: _currentMatch,
+                        onClose: _closeQuickFind,
+                        onNext: () => _findNext(returnFocus: _quickFindFocus),
+                        onPrev: () => _findPrev(returnFocus: _quickFindFocus),
+                        onQueryChanged: (q) {
+                          setState(() {
+                            _findQuery = q;
+                            _findCtrl.text = q;
+                            _updateMatches(
+                              selectCurrent: true,
+                              returnFocus: _quickFindFocus,
+                            );
+                          });
+                        },
+                      ),
                     ),
                 ],
               ),
@@ -1670,10 +1685,7 @@ class _EditorBodyState extends State<_EditorBody> {
       color: colors.textPrimary,
       backgroundColor: Colors.transparent,
     ),
-    'comment': TextStyle(
-      color: colors.textMuted,
-      fontStyle: FontStyle.italic,
-    ),
+    'comment': TextStyle(color: colors.textMuted, fontStyle: FontStyle.italic),
     'keyword': TextStyle(color: colors.primaryLight),
     'built_in': TextStyle(color: colors.accentOrange),
     'type': TextStyle(color: colors.accentOrange),
@@ -1706,16 +1718,121 @@ class _EditorBodyState extends State<_EditorBody> {
       color: colors.accentBlue,
       decoration: TextDecoration.underline,
     ),
-    'section': TextStyle(
-      color: colors.accentRed,
-      fontWeight: FontWeight.bold,
-    ),
+    'section': TextStyle(color: colors.accentRed, fontWeight: FontWeight.bold),
     'selector-tag': TextStyle(color: colors.accentRed),
     'selector-id': TextStyle(color: colors.accentBlue),
     'selector-class': TextStyle(color: colors.accentOrange),
     'addition': TextStyle(color: colors.diffAddText),
     'deletion': TextStyle(color: colors.diffRemoveText),
   };
+}
+
+class _QuickFindHint extends StatelessWidget {
+  const _QuickFindHint({
+    required this.controller,
+    required this.focusNode,
+    required this.matchCount,
+    required this.currentMatch,
+    required this.onClose,
+    required this.onNext,
+    required this.onPrev,
+    required this.onQueryChanged,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final int matchCount;
+  final int currentMatch;
+  final VoidCallback onClose;
+  final VoidCallback onNext;
+  final VoidCallback onPrev;
+  final ValueChanged<String> onQueryChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final hasQuery = controller.text.isNotEmpty;
+    final counter =
+        !hasQuery
+            ? 'Type to search'
+            : matchCount == 0
+            ? 'No results'
+            : '${currentMatch + 1} / $matchCount';
+    return Material(
+      color: Colors.transparent,
+      child: Focus(
+        onKeyEvent: (_, event) {
+          if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+            return KeyEventResult.ignored;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.escape) {
+            onClose();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+              event.logicalKey == LogicalKeyboardKey.enter) {
+            onNext();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            onPrev();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Container(
+          width: 260,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: colors.surfaceElevated,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colors.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(70),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 14, color: colors.primaryLight),
+              const SizedBox(width: 6),
+              Expanded(
+                child: TextField(
+                  key: const Key('editor-quick-find-input'),
+                  controller: controller,
+                  focusNode: focusNode,
+                  onChanged: onQueryChanged,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => onNext(),
+                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: 'Quick find',
+                    hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                counter,
+                style: TextStyle(
+                  color:
+                      matchCount == 0 && hasQuery
+                          ? colors.statusError
+                          : colors.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Git gutter types & painter ────────────────────────────────────────────────
@@ -1964,18 +2081,12 @@ class _FindBar extends StatelessWidget {
                   controller: findCtrl,
                   focusNode: findFocus,
                   onChanged: onQueryChanged,
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
                   decoration: InputDecoration(
                     hintText: 'Find',
-                    hintStyle: TextStyle(
-                      color: colors.textMuted,
-                      fontSize: 12,
-                    ),
+                    hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 4,
                       vertical: 2,
                     ),
@@ -1987,10 +2098,7 @@ class _FindBar extends StatelessWidget {
               if (hasQuery && matchCount > 0)
                 Text(
                   '${currentMatch + 1} / $matchCount',
-                  style: TextStyle(
-                    color: colors.textMuted,
-                    fontSize: 10,
-                  ),
+                  style: TextStyle(color: colors.textMuted, fontSize: 10),
                 ),
               if (hasQuery && matchCount == 0)
                 Text(
@@ -2035,10 +2143,7 @@ class _FindBar extends StatelessWidget {
                   height: 24,
                   child: TextField(
                     controller: replaceCtrl,
-                    style: TextStyle(
-                      color: colors.textPrimary,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: colors.textPrimary, fontSize: 12),
                     decoration: InputDecoration(
                       hintText: 'Replace',
                       hintStyle: TextStyle(
@@ -2046,7 +2151,7 @@ class _FindBar extends StatelessWidget {
                         fontSize: 12,
                       ),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 4,
                         vertical: 2,
                       ),
@@ -2195,10 +2300,7 @@ class _EditorStatusBarState extends State<_EditorStatusBar> {
             style: TextStyle(color: colors.textMuted, fontSize: 10),
           ),
           _SBar(),
-          Text(
-            'LF',
-            style: TextStyle(color: colors.textMuted, fontSize: 10),
-          ),
+          Text('LF', style: TextStyle(color: colors.textMuted, fontSize: 10)),
           _SBar(),
           Text(
             widget.language,
@@ -2378,10 +2480,7 @@ class _SymbolOutline extends StatelessWidget {
                     ? Center(
                       child: Text(
                         'No symbols',
-                        style: TextStyle(
-                          color: colors.textMuted,
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: colors.textMuted, fontSize: 11),
                       ),
                     )
                     : ListView.builder(
