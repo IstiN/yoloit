@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/theme/app_theme.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
@@ -61,7 +62,14 @@ Widget _buildTerminalTest({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    CanvasInteractionLock.instance.resetForTesting();
+  });
+
+  tearDown(() {
+    CanvasInteractionLock.instance.resetForTesting();
+  });
 
   void useXtermRenderer() {
     AgentConfigService.instance.setTerminalRenderEngineForTesting(
@@ -344,6 +352,109 @@ void main() {
       expect(scrollController.offset, lessThan(before));
     });
 
+    testWidgets('terminal ignores horizontal trackpad pan-zoom scrollback', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'sess_horizontal_trackpad_scroll',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 140,
+              child: TerminalWidget(session: session, isActive: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (var i = 0; i < 80; i++) {
+        session.terminal.write('line $i\r\n');
+      }
+      await tester.pump();
+
+      final terminalView = tester.widget<TerminalView>(
+        find.byType(TerminalView),
+      );
+      final scrollController = terminalView.scrollController!;
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+
+      final before = scrollController.offset;
+      final position = tester.getCenter(find.byType(TerminalView));
+
+      await tester.sendEventToBinding(
+        PointerPanZoomStartEvent(pointer: 1, position: position),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomUpdateEvent(
+          pointer: 1,
+          position: position,
+          panDelta: const Offset(80, 4),
+        ),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomEndEvent(pointer: 1, position: position),
+      );
+      await tester.pump(const Duration(milliseconds: 220));
+
+      expect(scrollController.offset, before);
+    });
+
+    testWidgets('terminal ignores horizontal pointer signal scrollback', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'sess_horizontal_pointer_signal',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 140,
+              child: TerminalWidget(session: session, isActive: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (var i = 0; i < 80; i++) {
+        session.terminal.write('line $i\r\n');
+      }
+      await tester.pump();
+
+      final terminalView = tester.widget<TerminalView>(
+        find.byType(TerminalView),
+      );
+      final scrollController = terminalView.scrollController!;
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+
+      final before = scrollController.offset;
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: tester.getCenter(find.byType(TerminalView)),
+          scrollDelta: const Offset(80, 4),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 220));
+
+      expect(scrollController.offset, before);
+    });
+
     testWidgets('terminal widget quick actions scroll scrollback locally', (
       tester,
     ) async {
@@ -434,6 +545,57 @@ void main() {
       expect(scrollbar.trackVisibility, isTrue);
       expect(scrollbar.thickness, 14);
       expect(scrollbar.controller, same(terminalView.scrollController));
+    });
+
+    testWidgets('terminal resize keeps scrollback anchored to bottom', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'sess_resize_scroll_anchor',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+
+      Widget buildTerminal(double height) {
+        return MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: height,
+              child: TerminalWidget(session: session, isActive: true),
+            ),
+          ),
+        );
+      }
+
+      await tester.pumpWidget(buildTerminal(140));
+      await tester.pump();
+
+      for (var i = 0; i < 100; i++) {
+        session.terminal.write('line $i\r\n');
+      }
+      await tester.pump();
+
+      var terminalView = tester.widget<TerminalView>(find.byType(TerminalView));
+      final scrollController = terminalView.scrollController!;
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
+
+      await tester.pumpWidget(buildTerminal(260));
+      await tester.pump();
+      await tester.pump();
+
+      terminalView = tester.widget<TerminalView>(find.byType(TerminalView));
+      expect(terminalView.scrollController, same(scrollController));
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
     });
 
     testWidgets('terminal single click does not send cursor movement', (
@@ -531,6 +693,121 @@ void main() {
 
       expect(opened, [url]);
       expect(outputs, isEmpty);
+    });
+
+    testWidgets('canvas-owned pan zoom does not scroll terminal scrollback', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'terminal_canvas_pan_guard',
+        type: AgentType.terminal,
+        workspacePath: '/project',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemePreset.neonPurple.theme,
+          home: Scaffold(
+            body: SizedBox(
+              width: 520,
+              height: 180,
+              child: TerminalWidget(session: session, isActive: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (var i = 0; i < 90; i++) {
+        session.terminal.write('history-line-$i\r\n');
+      }
+      await tester.pump();
+
+      final terminalView = tester.widget<TerminalView>(
+        find.byType(TerminalView),
+      );
+      final scrollController = terminalView.scrollController!;
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+
+      final before = scrollController.offset;
+      final position = tester.getCenter(find.byType(TerminalView));
+      CanvasInteractionLock.instance.beginCanvasGesture();
+      await tester.sendEventToBinding(
+        PointerPanZoomStartEvent(pointer: 1, position: position),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomUpdateEvent(
+          pointer: 1,
+          position: position,
+          panDelta: const Offset(0, 96),
+        ),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomEndEvent(pointer: 1, position: position),
+      );
+      await tester.pump();
+      CanvasInteractionLock.instance.endCanvasGesture();
+
+      expect(scrollController.offset, before);
+    });
+
+    testWidgets('pinch scale over terminal does not scroll scrollback', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'terminal_pinch_zoom_guard',
+        type: AgentType.terminal,
+        workspacePath: '/project',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemePreset.neonPurple.theme,
+          home: Scaffold(
+            body: SizedBox(
+              width: 520,
+              height: 180,
+              child: TerminalWidget(session: session, isActive: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (var i = 0; i < 90; i++) {
+        session.terminal.write('history-line-$i\r\n');
+      }
+      await tester.pump();
+
+      final terminalView = tester.widget<TerminalView>(
+        find.byType(TerminalView),
+      );
+      final scrollController = terminalView.scrollController!;
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+
+      final before = scrollController.offset;
+      final position = tester.getCenter(find.byType(TerminalView));
+      await tester.sendEventToBinding(
+        PointerPanZoomStartEvent(pointer: 1, position: position),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomUpdateEvent(
+          pointer: 1,
+          position: position,
+          panDelta: const Offset(0, 96),
+          scale: 1.2,
+        ),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomEndEvent(pointer: 1, position: position),
+      );
+      await tester.pump(const Duration(milliseconds: 220));
+
+      expect(scrollController.offset, before);
     });
 
     testWidgets('alt-buffer pan-zoom scroll sends key fallback without mouse', (

@@ -60,8 +60,9 @@ class BoardView extends StatefulWidget {
 bool boardShouldRevertInteractionForCanvasLock({
   required bool interactionStartedLocked,
   required bool currentlyLocked,
+  bool isScaleChanging = false,
 }) {
-  return interactionStartedLocked && currentlyLocked;
+  return interactionStartedLocked && currentlyLocked && !isScaleChanging;
 }
 
 class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
@@ -77,6 +78,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   static double _scaleOf(Matrix4 m) {
     final s = m.storage;
     return math.sqrt(s[0] * s[0] + s[1] * s[1]);
+  }
+
+  static bool _isPointerOverScrollableCard(Offset position, int viewId) {
+    final result = HitTestResult();
+    WidgetsBinding.instance.hitTestInView(result, position, viewId);
+    return result.path.any(
+      (entry) => entry.target is RenderScrollableCardMarker,
+    );
   }
 
   final FocusNode _boardFocus = FocusNode();
@@ -279,11 +288,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                     valueListenable:
                                         CanvasInteractionLock
                                             .instance
-                                            .activeCount,
-                                    builder: (context, activeCount, child) {
-                                      final isLocked = activeCount > 0;
-                                      if (_lastLoggedLockCount != activeCount) {
-                                        _lastLoggedLockCount = activeCount;
+                                            .lockStateVersion,
+                                    builder: (context, lockVersion, child) {
+                                      final activeCount =
+                                          CanvasInteractionLock
+                                              .instance
+                                              .activeCount
+                                              .value;
+                                      final isLocked =
+                                          CanvasInteractionLock
+                                              .instance
+                                              .isLocked;
+                                      if (_lastLoggedLockCount != lockVersion) {
+                                        _lastLoggedLockCount = lockVersion;
                                         debugPrint(
                                           '[BoardViewLock] activeCount=$activeCount, isLocked=$isLocked',
                                         );
@@ -292,21 +309,33 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                         behavior: HitTestBehavior.translucent,
                                         onPointerSignal: (event) {
                                           if (event is PointerScrollEvent) {
+                                            final overScrollable =
+                                                _isPointerOverScrollableCard(
+                                                  event.position,
+                                                  event.viewId,
+                                                );
                                             final scale =
                                                 _BoardViewState._scaleOf(
                                                   _transformController.value,
                                                 );
                                             _boardSupportLog(
                                               'pointerScroll locked=$isLocked '
+                                              'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
+                                              'overScrollable=$overScrollable '
                                               'tool=${_activeTool.name} '
                                               'kind=${event.kind.name} '
                                               'delta=${_fmtOffset(event.scrollDelta)} '
                                               'pos=${_fmtOffset(event.position)} '
                                               'scale=${_fmt(scale)}',
                                             );
+                                            if (!isLocked && !overScrollable) {
+                                              CanvasInteractionLock.instance
+                                                  .markCanvasSignalGesture();
+                                            }
                                           } else {
                                             _boardSupportLog(
                                               'pointerSignal locked=$isLocked '
+                                              'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
                                               'tool=${_activeTool.name} '
                                               'type=${event.runtimeType} '
                                               'pos=${_fmtOffset(event.position)}',
@@ -319,8 +348,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           }
                                         },
                                         onPointerPanZoomStart: (event) {
+                                          final overScrollable =
+                                              _isPointerOverScrollableCard(
+                                                event.position,
+                                                event.viewId,
+                                              );
+                                          if (!isLocked && !overScrollable) {
+                                            CanvasInteractionLock.instance
+                                                .beginCanvasGesture();
+                                          }
                                           _boardSupportLog(
                                             'panZoom.start locked=$isLocked '
+                                            'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
+                                            'overScrollable=$overScrollable '
                                             'tool=${_activeTool.name} '
                                             'pos=${_fmtOffset(event.position)} '
                                             'scale=${_fmt(_scaleOf(_transformController.value))}',
@@ -338,8 +378,15 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           );
                                         },
                                         onPointerPanZoomEnd: (event) {
+                                          if (CanvasInteractionLock
+                                              .instance
+                                              .isCanvasGestureActive) {
+                                            CanvasInteractionLock.instance
+                                                .endCanvasGesture();
+                                          }
                                           _boardSupportLog(
                                             'panZoom.end locked=$isLocked '
+                                            'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
                                             'tool=${_activeTool.name} '
                                             'scale=${_fmt(_scaleOf(_transformController.value))}',
                                           );
@@ -351,13 +398,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           constrained: false,
                                           minScale: 0.2,
                                           maxScale: 2.5,
-                                          scaleEnabled: !isLocked,
+                                          scaleEnabled: true,
                                           boundaryMargin: const EdgeInsets.all(
                                             _canvasExpansionChunk,
                                           ),
                                           // Disable pan only while actively drawing (drawPointer held) or canvas is locked
                                           panEnabled:
-                                              !isLocked &&
                                               (_activeTool !=
                                                       BoardToolId.draw ||
                                                   _drawPointer == null),
@@ -395,6 +441,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             _stopPanAnimation();
                                           },
                                           onInteractionUpdate: (details) {
+                                            final currentScale =
+                                                _BoardViewState._scaleOf(
+                                                  _transformController.value,
+                                                );
                                             if (boardShouldRevertInteractionForCanvasLock(
                                                   interactionStartedLocked:
                                                       _interactionStartedLocked,
@@ -402,6 +452,11 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                       CanvasInteractionLock
                                                           .instance
                                                           .isLocked,
+                                                  isScaleChanging:
+                                                      (currentScale -
+                                                              _interactionStartScale)
+                                                          .abs() >
+                                                      0.01,
                                                 ) &&
                                                 _interactionStartMatrix !=
                                                     null) {
@@ -415,10 +470,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   _interactionStartMatrix!;
                                               return;
                                             }
-                                            final currentScale =
-                                                _BoardViewState._scaleOf(
-                                                  _transformController.value,
-                                                );
                                             _boardSupportLog(
                                               'interaction.update locked=$isLocked '
                                               'tool=${_activeTool.name} '

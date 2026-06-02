@@ -11,6 +11,9 @@ import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/bloc/board_state.dart';
+import 'package:yoloit/features/board/model/board_models.dart';
+import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
@@ -1482,6 +1485,19 @@ class _ResourcePanelState extends State<_ResourcePanel> {
                     ),
                   ),
 
+                  BlocBuilder<BoardCubit, BoardState>(
+                    builder: (context, boardState) {
+                      final activeBoard = boardState.activeBoard;
+                      if (!boardState.isLoaded && activeBoard == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return _BoardResourceSection(
+                        boards: boardState.boards,
+                        activeBoard: activeBoard,
+                      );
+                    },
+                  ),
+
                   // SESSIONS section (registered PTYs)
                   if (registeredSessions.isNotEmpty) ...[
                     Divider(height: 1, color: colors.border),
@@ -1562,6 +1578,168 @@ class _StatCell extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BoardResourceSection extends StatelessWidget {
+  const _BoardResourceSection({
+    required this.boards,
+    required this.activeBoard,
+  });
+
+  final List<BoardDocument> boards;
+  final BoardDocument? activeBoard;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+    final totalPanels = boards.fold<int>(
+      0,
+      (sum, board) => sum + board.panels.length,
+    );
+    final activePanels = activeBoard?.panels.length ?? 0;
+    final typeCounts = resourcePanelTypeCounts(activeBoard?.panels ?? const []);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 1, color: colors.border),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+          child: Text(
+            'BOARDS & PANELS',
+            style: TextStyle(
+              color: mutedColor,
+              fontSize: 9,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
+          child: Row(
+            children: [
+              Icon(Icons.dashboard_outlined, size: 11, color: colors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  activeBoard?.name ?? 'No active board',
+                  style: TextStyle(color: onSurface, fontSize: 11),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$activePanels / $totalPanels panels',
+                style: TextStyle(
+                  color: mutedColor,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 2, 14, 6),
+          child: Row(
+            children: [
+              Icon(Icons.view_carousel_outlined, size: 11, color: mutedColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${boards.length} boards',
+                  style: TextStyle(color: mutedColor, fontSize: 10),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (typeCounts.isNotEmpty)
+          ...typeCounts.entries
+              .take(5)
+              .map(
+                (entry) => _PanelTypeRow(type: entry.key, count: entry.value),
+              ),
+        if (typeCounts.length > 5)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(33, 2, 14, 6),
+            child: Text(
+              '+${typeCounts.length - 5} more types',
+              style: TextStyle(color: mutedColor, fontSize: 10),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _PanelTypeRow extends StatelessWidget {
+  const _PanelTypeRow({required this.type, required this.count});
+
+  final String type;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor =
+        Theme.of(context).textTheme.bodySmall?.color ??
+        Theme.of(context).colorScheme.onSurface;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 5, color: colors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              resourcePanelTypeLabel(type),
+              style: TextStyle(color: mutedColor, fontSize: 10),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '$count',
+            style: TextStyle(
+              color: mutedColor,
+              fontSize: 10,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+@visibleForTesting
+Map<String, int> resourcePanelTypeCounts(List<BoardPanelInstance> panels) {
+  final counts = <String, int>{};
+  for (final panel in panels) {
+    counts.update(panel.type, (count) => count + 1, ifAbsent: () => 1);
+  }
+  final entries =
+      counts.entries.toList()..sort((a, b) {
+        final byCount = b.value.compareTo(a.value);
+        if (byCount != 0) return byCount;
+        return resourcePanelTypeLabel(
+          a.key,
+        ).compareTo(resourcePanelTypeLabel(b.key));
+      });
+  return Map.fromEntries(entries);
+}
+
+@visibleForTesting
+String resourcePanelTypeLabel(String type) {
+  final plugin = BoardPluginRegistry.instance.pluginFor(type);
+  if (plugin != null) return plugin.displayName;
+  return type
+      .replaceFirst(RegExp(r'^board\.'), '')
+      .replaceAll('.', ' ')
+      .replaceAll('_', ' ');
 }
 
 class _SessionRow extends StatelessWidget {

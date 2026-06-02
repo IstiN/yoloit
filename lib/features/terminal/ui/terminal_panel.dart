@@ -20,6 +20,7 @@ import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
@@ -615,6 +616,33 @@ class _TerminalScrollChrome extends StatelessWidget {
   }
 }
 
+class _CanvasGestureAbsorbPointer extends StatelessWidget {
+  const _CanvasGestureAbsorbPointer({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: CanvasInteractionLock.instance.canvasGestureCount,
+      builder:
+          (context, activeCount, child) =>
+              AbsorbPointer(absorbing: activeCount > 0, child: child),
+      child: child,
+    );
+  }
+}
+
+class _TerminalScrollAnchor {
+  const _TerminalScrollAnchor({
+    required this.fraction,
+    required this.stickToBottom,
+  });
+
+  final double fraction;
+  final bool stickToBottom;
+}
+
 class TerminalWidgetState extends State<TerminalWidget> {
   final _controller = TerminalController(
     pointerInputs: const PointerInputs.none(),
@@ -628,6 +656,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   Timer? _focusRetryTimer;
   double _fontSize = 13.0;
   Size _terminalSize = Size.zero;
+  _TerminalScrollAnchor? _resizeScrollAnchor;
   Offset? _clickDownPosition;
 
   // Manual drag-to-select: xterm 4.x's PanGestureRecognizer fails to win the
@@ -717,7 +746,9 @@ class TerminalWidgetState extends State<TerminalWidget> {
       writer(widget.session.id, data);
     };
     _boundOnResize = (cols, rows, pixelWidth, pixelHeight) {
+      _captureResizeScrollAnchor();
       TerminalBackendService.instance.resize(widget.session.id, cols, rows);
+      _restoreResizeScrollAnchor();
     };
     switch (AgentConfigService.instance.terminalRenderEngine) {
       case TerminalRenderEngine.kterm:
@@ -1298,6 +1329,72 @@ class TerminalWidgetState extends State<TerminalWidget> {
     );
   }
 
+  void _preserveScrollForCanvasGesture() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final offset = position.pixels;
+    scheduleMicrotask(() {
+      if (!mounted || !_scrollController.hasClients) return;
+      final nextPosition = _scrollController.position;
+      final clamped =
+          offset
+              .clamp(nextPosition.minScrollExtent, nextPosition.maxScrollExtent)
+              .toDouble();
+      if ((nextPosition.pixels - clamped).abs() < 0.5) return;
+      nextPosition.jumpTo(clamped);
+    });
+  }
+
+  _TerminalScrollAnchor? _captureScrollAnchor() {
+    if (!_scrollController.hasClients) return null;
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions) return null;
+    final max = position.maxScrollExtent;
+    final pixels = position.pixels.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    final distanceToBottom = max - pixels;
+    return _TerminalScrollAnchor(
+      fraction: max <= 0 ? 1 : (pixels / max).clamp(0.0, 1.0).toDouble(),
+      stickToBottom: distanceToBottom <= 24,
+    );
+  }
+
+  void _captureResizeScrollAnchor() {
+    _resizeScrollAnchor = _captureScrollAnchor();
+  }
+
+  void _restoreResizeScrollAnchor() {
+    final anchor = _resizeScrollAnchor;
+    if (anchor == null) return;
+    void restore() {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      final target =
+          anchor.stickToBottom
+              ? position.maxScrollExtent
+              : position.maxScrollExtent * anchor.fraction;
+      position.jumpTo(
+        target
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+      );
+    }
+
+    scheduleMicrotask(restore);
+    WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+    });
+  }
+
+  bool _isHorizontalTrackpadGesture(Offset delta) {
+    final dx = delta.dx.abs();
+    final dy = delta.dy.abs();
+    return dx > 4 && dx >= dy * 1.1;
+  }
+
   void _scrollAltBufferBy(double delta, Offset globalPosition, String source) {
     if (delta == 0) return;
     _debugScrollMetrics(source);
@@ -1394,7 +1491,14 @@ class TerminalWidgetState extends State<TerminalWidget> {
       builder: (context, engine, _) {
         return LayoutBuilder(
           builder: (context, constraints) {
-            _terminalSize = Size(constraints.maxWidth, constraints.maxHeight);
+            final nextSize = Size(constraints.maxWidth, constraints.maxHeight);
+            if (_terminalSize != Size.zero && _terminalSize != nextSize) {
+              _captureResizeScrollAnchor();
+              _terminalSize = nextSize;
+              _restoreResizeScrollAnchor();
+            } else {
+              _terminalSize = nextSize;
+            }
             if (engine == TerminalRenderEngine.kterm) {
               return _buildKtermTerminal(colors);
             }
@@ -1403,7 +1507,17 @@ class TerminalWidgetState extends State<TerminalWidget> {
                 Listener(
                   behavior: HitTestBehavior.opaque,
                   onPointerSignal: (event) {
+                    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+                      _preserveScrollForCanvasGesture();
+                      return;
+                    }
                     if (event is PointerScrollEvent) {
+                      if (_isHorizontalTrackpadGesture(event.scrollDelta)) {
+                        CanvasInteractionLock.instance
+                            .markCanvasSignalGesture();
+                        _preserveScrollForCanvasGesture();
+                        return;
+                      }
                       GestureBinding.instance.pointerSignalResolver.register(
                         event,
                         (resolved) {
@@ -1425,9 +1539,26 @@ class TerminalWidgetState extends State<TerminalWidget> {
                     }
                   },
                   onPointerPanZoomStart: (_) {
-                    if (!_focusNode.hasFocus) _focusNode.requestFocus();
+                    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+                      _preserveScrollForCanvasGesture();
+                      return;
+                    }
                   },
                   onPointerPanZoomUpdate: (event) {
+                    if ((event.scale - 1.0).abs() > 0.01) {
+                      CanvasInteractionLock.instance.markCanvasSignalGesture();
+                      _preserveScrollForCanvasGesture();
+                      return;
+                    }
+                    if (_isHorizontalTrackpadGesture(event.panDelta)) {
+                      CanvasInteractionLock.instance.markCanvasSignalGesture();
+                      _preserveScrollForCanvasGesture();
+                      return;
+                    }
+                    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+                      _preserveScrollForCanvasGesture();
+                      return;
+                    }
                     if (widget.session.terminal.isUsingAltBuffer) {
                       _scrollAltBufferBy(
                         -event.panDelta.dy,
@@ -1515,53 +1646,55 @@ class TerminalWidgetState extends State<TerminalWidget> {
                     _isDragSelecting = false;
                     _dragStartGlobal = null;
                   },
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.text,
-                    child: _TerminalScrollChrome(
-                      controller: _scrollController,
-                      colors: colors,
-                      child: TerminalView(
-                        widget.session.terminal,
-                        key: _terminalViewKey,
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        autofocus: widget.isActive,
-                        scrollController: _scrollController,
-                        // Keep trackpad scroll for terminal scrollback instead of
-                        // turning it into up/down key presses in the shell.
-                        simulateScroll: false,
-                        onKeyEvent: _onTerminalKeyEvent,
-                        textStyle: TerminalStyle(
-                          fontSize: _fontSize,
-                          fontFamily: 'JetBrainsMono',
-                          height: 1.2,
+                  child: _CanvasGestureAbsorbPointer(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.text,
+                      child: _TerminalScrollChrome(
+                        controller: _scrollController,
+                        colors: colors,
+                        child: TerminalView(
+                          widget.session.terminal,
+                          key: _terminalViewKey,
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          autofocus: widget.isActive,
+                          scrollController: _scrollController,
+                          // Keep trackpad scroll for terminal scrollback instead of
+                          // turning it into up/down key presses in the shell.
+                          simulateScroll: false,
+                          onKeyEvent: _onTerminalKeyEvent,
+                          textStyle: TerminalStyle(
+                            fontSize: _fontSize,
+                            fontFamily: 'JetBrainsMono',
+                            height: 1.2,
+                          ),
+                          theme: TerminalTheme(
+                            cursor: colors.primary,
+                            selection: colors.primary.withAlpha(120),
+                            foreground: colors.terminalText,
+                            background: colors.terminalBackground,
+                            black: colors.surface,
+                            red: colors.accentRed,
+                            green: colors.accentGreen,
+                            yellow: colors.accentOrange,
+                            blue: colors.accentBlue,
+                            magenta: colors.primary,
+                            cyan: colors.terminalPrompt,
+                            white: colors.terminalText,
+                            brightBlack: colors.textMuted,
+                            brightRed: colors.accentRedDim,
+                            brightGreen: colors.accentGreenDim,
+                            brightYellow: colors.statusWarning,
+                            brightBlue: colors.accentBlue,
+                            brightMagenta: colors.primaryLight,
+                            brightCyan: colors.accentBlue,
+                            brightWhite: colors.textPrimary,
+                            searchHitBackground: colors.accentOrange,
+                            searchHitBackgroundCurrent: colors.statusWarning,
+                            searchHitForeground: colors.background,
+                          ),
+                          padding: const EdgeInsets.all(8),
                         ),
-                        theme: TerminalTheme(
-                          cursor: colors.primary,
-                          selection: colors.primary.withAlpha(120),
-                          foreground: colors.terminalText,
-                          background: colors.terminalBackground,
-                          black: colors.surface,
-                          red: colors.accentRed,
-                          green: colors.accentGreen,
-                          yellow: colors.accentOrange,
-                          blue: colors.accentBlue,
-                          magenta: colors.primary,
-                          cyan: colors.terminalPrompt,
-                          white: colors.terminalText,
-                          brightBlack: colors.textMuted,
-                          brightRed: colors.accentRedDim,
-                          brightGreen: colors.accentGreenDim,
-                          brightYellow: colors.statusWarning,
-                          brightBlue: colors.accentBlue,
-                          brightMagenta: colors.primaryLight,
-                          brightCyan: colors.accentBlue,
-                          brightWhite: colors.textPrimary,
-                          searchHitBackground: colors.accentOrange,
-                          searchHitBackgroundCurrent: colors.statusWarning,
-                          searchHitForeground: colors.background,
-                        ),
-                        padding: const EdgeInsets.all(8),
                       ),
                     ),
                   ),
@@ -1595,52 +1728,54 @@ class TerminalWidgetState extends State<TerminalWidget> {
       onPointerCancel: (_) {
         _clickDownPosition = null;
       },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.text,
-        child: _TerminalScrollChrome(
-          controller: _scrollController,
-          colors: colors,
-          child: kterm.TerminalView(
-            widget.session.kTerminal,
-            key: _kTerminalViewKey,
-            controller: _kController,
-            focusNode: _focusNode,
-            autofocus: widget.isActive,
-            scrollController: _scrollController,
-            simulateScroll: true,
-            showSearchBar: true,
-            onKeyEvent: _onTerminalKeyEvent,
-            textStyle: kterm.TerminalStyle(
-              fontSize: _fontSize,
-              fontFamily: 'JetBrainsMono',
-              height: 1.2,
+      child: _CanvasGestureAbsorbPointer(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.text,
+          child: _TerminalScrollChrome(
+            controller: _scrollController,
+            colors: colors,
+            child: kterm.TerminalView(
+              widget.session.kTerminal,
+              key: _kTerminalViewKey,
+              controller: _kController,
+              focusNode: _focusNode,
+              autofocus: widget.isActive,
+              scrollController: _scrollController,
+              simulateScroll: true,
+              showSearchBar: true,
+              onKeyEvent: _onTerminalKeyEvent,
+              textStyle: kterm.TerminalStyle(
+                fontSize: _fontSize,
+                fontFamily: 'JetBrainsMono',
+                height: 1.2,
+              ),
+              theme: kterm.TerminalTheme(
+                cursor: colors.primary,
+                selection: colors.primary.withAlpha(120),
+                foreground: colors.terminalText,
+                background: colors.terminalBackground,
+                black: colors.surface,
+                red: colors.accentRed,
+                green: colors.accentGreen,
+                yellow: colors.accentOrange,
+                blue: colors.accentBlue,
+                magenta: colors.primary,
+                cyan: colors.terminalPrompt,
+                white: colors.terminalText,
+                brightBlack: colors.textMuted,
+                brightRed: colors.accentRedDim,
+                brightGreen: colors.accentGreenDim,
+                brightYellow: colors.statusWarning,
+                brightBlue: colors.accentBlue,
+                brightMagenta: colors.primaryLight,
+                brightCyan: colors.accentBlue,
+                brightWhite: colors.textPrimary,
+                searchHitBackground: colors.accentOrange,
+                searchHitBackgroundCurrent: colors.statusWarning,
+                searchHitForeground: colors.background,
+              ),
+              padding: const EdgeInsets.all(8),
             ),
-            theme: kterm.TerminalTheme(
-              cursor: colors.primary,
-              selection: colors.primary.withAlpha(120),
-              foreground: colors.terminalText,
-              background: colors.terminalBackground,
-              black: colors.surface,
-              red: colors.accentRed,
-              green: colors.accentGreen,
-              yellow: colors.accentOrange,
-              blue: colors.accentBlue,
-              magenta: colors.primary,
-              cyan: colors.terminalPrompt,
-              white: colors.terminalText,
-              brightBlack: colors.textMuted,
-              brightRed: colors.accentRedDim,
-              brightGreen: colors.accentGreenDim,
-              brightYellow: colors.statusWarning,
-              brightBlue: colors.accentBlue,
-              brightMagenta: colors.primaryLight,
-              brightCyan: colors.accentBlue,
-              brightWhite: colors.textPrimary,
-              searchHitBackground: colors.accentOrange,
-              searchHitBackgroundCurrent: colors.statusWarning,
-              searchHitForeground: colors.background,
-            ),
-            padding: const EdgeInsets.all(8),
           ),
         ),
       ),

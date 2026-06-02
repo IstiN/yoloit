@@ -16,13 +16,25 @@ class CanvasInteractionLock {
   /// A counter (not a bool) tolerates overlapping MouseRegions and fast
   /// enter/exit events during drags.
   final ValueNotifier<int> _count = ValueNotifier<int>(0);
+  final ValueNotifier<int> _canvasGestureCount = ValueNotifier<int>(0);
+  final ValueNotifier<int> _lockStateVersion = ValueNotifier<int>(0);
+  Timer? _canvasSignalTimer;
 
   ValueListenable<int> get activeCount => _count;
+  ValueListenable<int> get canvasGestureCount => _canvasGestureCount;
+  ValueListenable<int> get lockStateVersion => _lockStateVersion;
 
-  bool get isLocked => _count.value > 0;
+  bool get isLocked => _count.value > 0 && !isCanvasGestureActive;
+  bool get isCanvasGestureActive => _canvasGestureCount.value > 0;
+
+  void _notifyLockStateChanged() {
+    _lockStateVersion.value = _lockStateVersion.value + 1;
+  }
 
   void enter() {
+    if (isCanvasGestureActive) return;
     _count.value = _count.value + 1;
+    _notifyLockStateChanged();
     if (kDebugMode) {
       debugPrint('[CanvasInteractionLock] enter activeCount=${_count.value}');
     }
@@ -31,9 +43,62 @@ class CanvasInteractionLock {
   void exit() {
     if (_count.value == 0) return;
     _count.value = _count.value - 1;
+    _notifyLockStateChanged();
     if (kDebugMode) {
       debugPrint('[CanvasInteractionLock] exit activeCount=${_count.value}');
     }
+  }
+
+  void beginCanvasGesture() {
+    _canvasSignalTimer?.cancel();
+    _canvasGestureCount.value = _canvasGestureCount.value + 1;
+    _notifyLockStateChanged();
+    if (kDebugMode) {
+      debugPrint(
+        '[CanvasInteractionLock] canvas enter activeCount=${_canvasGestureCount.value}',
+      );
+    }
+  }
+
+  void endCanvasGesture() {
+    _canvasSignalTimer?.cancel();
+    if (_canvasGestureCount.value == 0) return;
+    _canvasGestureCount.value = _canvasGestureCount.value - 1;
+    _notifyLockStateChanged();
+    if (kDebugMode) {
+      debugPrint(
+        '[CanvasInteractionLock] canvas exit activeCount=${_canvasGestureCount.value}',
+      );
+    }
+  }
+
+  void markCanvasSignalGesture({
+    Duration hold = const Duration(milliseconds: 180),
+  }) {
+    _canvasSignalTimer?.cancel();
+    if (_canvasGestureCount.value == 0) {
+      _canvasGestureCount.value = 1;
+      _notifyLockStateChanged();
+      if (kDebugMode) {
+        debugPrint('[CanvasInteractionLock] canvas signal enter');
+      }
+    }
+    _canvasSignalTimer = Timer(hold, () {
+      _canvasGestureCount.value = 0;
+      _notifyLockStateChanged();
+      if (kDebugMode) {
+        debugPrint('[CanvasInteractionLock] canvas signal exit');
+      }
+    });
+  }
+
+  @visibleForTesting
+  void resetForTesting() {
+    _canvasSignalTimer?.cancel();
+    _canvasSignalTimer = null;
+    _count.value = 0;
+    _canvasGestureCount.value = 0;
+    _notifyLockStateChanged();
   }
 }
 
@@ -117,6 +182,7 @@ class _ScrollableCardRegionState extends State<ScrollableCardRegion> {
 
   void _ensureEntered([Offset? globalPosition]) {
     _lastGlobalPosition = globalPosition ?? _lastGlobalPosition;
+    if (CanvasInteractionLock.instance.isCanvasGestureActive) return;
     _exitTimer?.cancel();
     _mousePhysicallyExited = false;
     if (_entered) return;
