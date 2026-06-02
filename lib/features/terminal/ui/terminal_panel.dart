@@ -558,6 +558,36 @@ class TerminalWidget extends StatefulWidget {
   State<TerminalWidget> createState() => TerminalWidgetState();
 }
 
+class _TerminalScrollChrome extends StatelessWidget {
+  const _TerminalScrollChrome({
+    required this.controller,
+    required this.colors,
+    required this.child,
+  });
+
+  final ScrollController controller;
+  final AppColorScheme colors;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return RawScrollbar(
+      controller: controller,
+      thumbVisibility: true,
+      trackVisibility: true,
+      interactive: true,
+      thickness: 14,
+      minThumbLength: 44,
+      radius: const Radius.circular(8),
+      trackRadius: const Radius.circular(8),
+      thumbColor: colors.primary.withAlpha(190),
+      trackColor: colors.surfaceElevated.withAlpha(180),
+      trackBorderColor: colors.border.withAlpha(160),
+      child: child,
+    );
+  }
+}
+
 class TerminalWidgetState extends State<TerminalWidget> {
   final _controller = TerminalController(
     pointerInputs: const PointerInputs.none(),
@@ -1416,48 +1446,52 @@ class TerminalWidgetState extends State<TerminalWidget> {
                   },
                   child: MouseRegion(
                     cursor: SystemMouseCursors.text,
-                    child: TerminalView(
-                      widget.session.terminal,
-                      key: _terminalViewKey,
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      autofocus: widget.isActive,
-                      scrollController: _scrollController,
-                      // Keep trackpad scroll for terminal scrollback instead of
-                      // turning it into up/down key presses in the shell.
-                      simulateScroll: false,
-                      onKeyEvent: _onTerminalKeyEvent,
-                      textStyle: TerminalStyle(
-                        fontSize: _fontSize,
-                        fontFamily: 'JetBrainsMono',
-                        height: 1.2,
+                    child: _TerminalScrollChrome(
+                      controller: _scrollController,
+                      colors: colors,
+                      child: TerminalView(
+                        widget.session.terminal,
+                        key: _terminalViewKey,
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        autofocus: widget.isActive,
+                        scrollController: _scrollController,
+                        // Keep trackpad scroll for terminal scrollback instead of
+                        // turning it into up/down key presses in the shell.
+                        simulateScroll: false,
+                        onKeyEvent: _onTerminalKeyEvent,
+                        textStyle: TerminalStyle(
+                          fontSize: _fontSize,
+                          fontFamily: 'JetBrainsMono',
+                          height: 1.2,
+                        ),
+                        theme: TerminalTheme(
+                          cursor: colors.primary,
+                          selection: colors.primary.withAlpha(120),
+                          foreground: colors.terminalText,
+                          background: colors.terminalBackground,
+                          black: colors.surface,
+                          red: colors.accentRed,
+                          green: colors.accentGreen,
+                          yellow: colors.accentOrange,
+                          blue: colors.accentBlue,
+                          magenta: colors.primary,
+                          cyan: colors.terminalPrompt,
+                          white: colors.terminalText,
+                          brightBlack: colors.textMuted,
+                          brightRed: colors.accentRedDim,
+                          brightGreen: colors.accentGreenDim,
+                          brightYellow: colors.statusWarning,
+                          brightBlue: colors.accentBlue,
+                          brightMagenta: colors.primaryLight,
+                          brightCyan: colors.accentBlue,
+                          brightWhite: colors.textPrimary,
+                          searchHitBackground: colors.accentOrange,
+                          searchHitBackgroundCurrent: colors.statusWarning,
+                          searchHitForeground: colors.background,
+                        ),
+                        padding: const EdgeInsets.all(8),
                       ),
-                      theme: TerminalTheme(
-                        cursor: colors.primary,
-                        selection: colors.primary.withAlpha(120),
-                        foreground: colors.terminalText,
-                        background: colors.terminalBackground,
-                        black: colors.surface,
-                        red: colors.accentRed,
-                        green: colors.accentGreen,
-                        yellow: colors.accentOrange,
-                        blue: colors.accentBlue,
-                        magenta: colors.primary,
-                        cyan: colors.terminalPrompt,
-                        white: colors.terminalText,
-                        brightBlack: colors.textMuted,
-                        brightRed: colors.accentRedDim,
-                        brightGreen: colors.accentGreenDim,
-                        brightYellow: colors.statusWarning,
-                        brightBlue: colors.accentBlue,
-                        brightMagenta: colors.primaryLight,
-                        brightCyan: colors.accentBlue,
-                        brightWhite: colors.textPrimary,
-                        searchHitBackground: colors.accentOrange,
-                        searchHitBackgroundCurrent: colors.statusWarning,
-                        searchHitForeground: colors.background,
-                      ),
-                      padding: const EdgeInsets.all(8),
                     ),
                   ),
                 ),
@@ -1475,47 +1509,51 @@ class TerminalWidgetState extends State<TerminalWidget> {
   Widget _buildKtermTerminal(AppColorScheme colors) {
     return MouseRegion(
       cursor: SystemMouseCursors.text,
-      child: kterm.TerminalView(
-        widget.session.kTerminal,
-        key: _kTerminalViewKey,
-        controller: _kController,
-        focusNode: _focusNode,
-        autofocus: widget.isActive,
-        scrollController: _scrollController,
-        simulateScroll: true,
-        showSearchBar: true,
-        onKeyEvent: _onTerminalKeyEvent,
-        textStyle: kterm.TerminalStyle(
-          fontSize: _fontSize,
-          fontFamily: 'JetBrainsMono',
-          height: 1.2,
+      child: _TerminalScrollChrome(
+        controller: _scrollController,
+        colors: colors,
+        child: kterm.TerminalView(
+          widget.session.kTerminal,
+          key: _kTerminalViewKey,
+          controller: _kController,
+          focusNode: _focusNode,
+          autofocus: widget.isActive,
+          scrollController: _scrollController,
+          simulateScroll: true,
+          showSearchBar: true,
+          onKeyEvent: _onTerminalKeyEvent,
+          textStyle: kterm.TerminalStyle(
+            fontSize: _fontSize,
+            fontFamily: 'JetBrainsMono',
+            height: 1.2,
+          ),
+          theme: kterm.TerminalTheme(
+            cursor: colors.primary,
+            selection: colors.primary.withAlpha(120),
+            foreground: colors.terminalText,
+            background: colors.terminalBackground,
+            black: colors.surface,
+            red: colors.accentRed,
+            green: colors.accentGreen,
+            yellow: colors.accentOrange,
+            blue: colors.accentBlue,
+            magenta: colors.primary,
+            cyan: colors.terminalPrompt,
+            white: colors.terminalText,
+            brightBlack: colors.textMuted,
+            brightRed: colors.accentRedDim,
+            brightGreen: colors.accentGreenDim,
+            brightYellow: colors.statusWarning,
+            brightBlue: colors.accentBlue,
+            brightMagenta: colors.primaryLight,
+            brightCyan: colors.accentBlue,
+            brightWhite: colors.textPrimary,
+            searchHitBackground: colors.accentOrange,
+            searchHitBackgroundCurrent: colors.statusWarning,
+            searchHitForeground: colors.background,
+          ),
+          padding: const EdgeInsets.all(8),
         ),
-        theme: kterm.TerminalTheme(
-          cursor: colors.primary,
-          selection: colors.primary.withAlpha(120),
-          foreground: colors.terminalText,
-          background: colors.terminalBackground,
-          black: colors.surface,
-          red: colors.accentRed,
-          green: colors.accentGreen,
-          yellow: colors.accentOrange,
-          blue: colors.accentBlue,
-          magenta: colors.primary,
-          cyan: colors.terminalPrompt,
-          white: colors.terminalText,
-          brightBlack: colors.textMuted,
-          brightRed: colors.accentRedDim,
-          brightGreen: colors.accentGreenDim,
-          brightYellow: colors.statusWarning,
-          brightBlue: colors.accentBlue,
-          brightMagenta: colors.primaryLight,
-          brightCyan: colors.accentBlue,
-          brightWhite: colors.textPrimary,
-          searchHitBackground: colors.accentOrange,
-          searchHitBackgroundCurrent: colors.statusWarning,
-          searchHitForeground: colors.background,
-        ),
-        padding: const EdgeInsets.all(8),
       ),
     );
   }

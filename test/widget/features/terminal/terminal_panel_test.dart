@@ -397,6 +397,45 @@ void main() {
       expect(outputs, isEmpty);
     });
 
+    testWidgets('terminal widget exposes a wide draggable scrollbar', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'sess_scrollbar',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 140,
+              child: TerminalWidget(session: session, isActive: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (var i = 0; i < 80; i++) {
+        session.terminal.write('line $i\r\n');
+      }
+      await tester.pump();
+
+      final scrollbar = tester.widget<RawScrollbar>(find.byType(RawScrollbar));
+      final terminalView = tester.widget<TerminalView>(
+        find.byType(TerminalView),
+      );
+      expect(scrollbar.interactive, isTrue);
+      expect(scrollbar.thumbVisibility, isTrue);
+      expect(scrollbar.trackVisibility, isTrue);
+      expect(scrollbar.thickness, 14);
+      expect(scrollbar.controller, same(terminalView.scrollController));
+    });
+
     testWidgets('terminal single click does not send cursor movement', (
       tester,
     ) async {
