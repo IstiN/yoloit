@@ -30,46 +30,50 @@ class _DebugUIShellState extends State<DebugUIShell> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Sub-menu chips
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              for (var i = 0; i < _sections.length; i++)
-                ChoiceChip(
-                  label: Text(_sections[i].$1),
-                  selected: _selectedIndex == i,
-                  onSelected: (_) => setState(() => _selectedIndex = i),
-                  selectedColor: colors.primary,
-                  labelStyle: TextStyle(
-                    color: _selectedIndex == i ? colors.textHighlight : colors.textSecondary,
-                    fontSize: 12,
-                  ),
-                  backgroundColor: colors.surface,
-                  side: BorderSide(
-                    color: _selectedIndex == i ? colors.primary : colors.border,
-                  ),
-                ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hasBoundedHeight = constraints.hasBoundedHeight;
+        final content = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: KeyedSubtree(
+            key: ValueKey<int>(_selectedIndex),
+            child: _sections[_selectedIndex].$2,
           ),
-        ),
-        const Divider(height: 1),
-        // Active section
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: KeyedSubtree(
-              key: ValueKey<int>(_selectedIndex),
-              child: _sections[_selectedIndex].$2,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Sub-menu chips
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (var i = 0; i < _sections.length; i++)
+                    ChoiceChip(
+                      label: Text(_sections[i].$1),
+                      selected: _selectedIndex == i,
+                      onSelected: (_) => setState(() => _selectedIndex = i),
+                      selectedColor: colors.primary,
+                      labelStyle: TextStyle(
+                        color: _selectedIndex == i ? colors.textHighlight : colors.textSecondary,
+                        fontSize: 12,
+                      ),
+                      backgroundColor: colors.surface,
+                      side: BorderSide(
+                        color: _selectedIndex == i ? colors.primary : colors.border,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ),
-      ],
+            const Divider(height: 1),
+            // Active section — Expanded only when parent gives bounded height
+            if (hasBoundedHeight) Expanded(child: content) else content,
+          ],
+        );
+      },
     );
   }
 }
