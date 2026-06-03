@@ -13,6 +13,7 @@ import 'package:yoloit/features/review/models/review_models.dart';
 import 'package:yoloit/features/runs/ui/run_panel.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 enum _FileTreeTab { files, diff }
 
@@ -43,16 +44,13 @@ class _EmptyReview extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.rate_review_outlined, size: 32, color: colors.textMuted),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               'Changes & Review',
               style: TextStyle(color: colors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
             ),
-            SizedBox(height: 6),
-            Text(
-              'Open a workspace to see file changes',
-              style: TextStyle(color: colors.textMuted, fontSize: 12),
-            ),
+            const SizedBox(height: 6),
+            const Caption('Open a workspace to see file changes', fontSize: 12),
           ],
         ),
       ),
@@ -339,18 +337,15 @@ class _GitChangesSection extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.check_circle_outline, size: 28, color: colors.textMuted),
-            SizedBox(height: 10),
-            Text(
-              'No changes',
-              style: TextStyle(color: colors.textMuted, fontSize: 12),
-            ),
+            const SizedBox(height: 10),
+            const Caption('No changes', fontSize: 12),
           ],
         ),
       );
     }
 
     // Group files by repoPath, preserving insertion order.
-    Map<String?, List<FileChange>> _groupByRepo(List<FileChange> files) {
+    Map<String?, List<FileChange>> groupByRepo(List<FileChange> files) {
       final map = <String?, List<FileChange>>{};
       for (final f in files) {
         (map[f.repoPath] ??= []).add(f);
@@ -358,8 +353,8 @@ class _GitChangesSection extends StatelessWidget {
       return map;
     }
 
-    final stagedByRepo = _groupByRepo(staged);
-    final unstagedByRepo = _groupByRepo(unstaged);
+    final stagedByRepo = groupByRepo(staged);
+    final unstagedByRepo = groupByRepo(unstaged);
     final multipleRepos = state.fileTree.length > 1;
 
     Widget buildGroup(
@@ -498,18 +493,15 @@ class _FileTreeSection extends StatelessWidget {
                   letterSpacing: 0.8,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               Icon(Icons.unfold_more, size: 12, color: colors.textMuted),
             ],
           ),
         ),
         Expanded(
           child: state.fileTree.isEmpty
-              ? Center(
-                  child: Text(
-                    'No files',
-                    style: TextStyle(color: colors.textMuted, fontSize: 12),
-                  ),
+              ? const Center(
+                  child: Caption('No files', fontSize: 12),
                 )
               : ListView.builder(
                   itemCount: state.fileTree.length,
@@ -619,7 +611,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('Cancel', style: TextStyle(color: colors.textMuted, fontSize: 13)),
+            child: const Caption('Cancel', fontSize: 13),
           ),
           TextButton(
             onPressed: () {
@@ -657,7 +649,7 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
     }
   }
 
-  void _showContextMenu(BuildContext context, Offset position) async {
+  Future<void> _showContextMenu(BuildContext context, Offset position) async {
     final colors = context.appColors;
     final node = widget.node;
     final result = await showMenu<String>(
@@ -923,8 +915,8 @@ class _ChangedFileTileState extends State<_ChangedFileTile> {
           } catch (_) {}
         },
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 100),
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          duration: const Duration(milliseconds: 100),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           color: _hovering ? colors.surfaceHighlight : Colors.transparent,
           child: Row(
             children: [
@@ -1011,21 +1003,15 @@ class _PrStatusSection extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              Text(
-                'Status: ',
-                style: TextStyle(color: colors.textMuted, fontSize: 10),
-              ),
+              const Caption('Status: ', fontSize: 10),
               Text(
                 pr.status,
                 style: TextStyle(color: colors.accentOrange, fontSize: 10),
               ),
-              Text(
-                '  ·  Reviewers: ${pr.reviewers} Pending',
-                style: TextStyle(color: colors.textMuted, fontSize: 10),
-              ),
+              Caption('  ·  Reviewers: ${pr.reviewers} Pending', fontSize: 10),
             ],
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Row(
             children: [
               _PrButton(

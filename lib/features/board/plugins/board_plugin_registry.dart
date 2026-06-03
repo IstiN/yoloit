@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/checklist_plugin.dart';
@@ -20,6 +19,7 @@ import 'package:yoloit/features/board/plugins/builtin/timer_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/yolo_assistant_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// Global registry for [BoardPanelPlugin] implementations.
 ///
@@ -107,13 +107,8 @@ class _UnknownPanelPlugin extends BoardPanelPlugin {
 
   @override
   Widget buildContent(context, panel, renderContext) {
-    final colors = context.appColors;
     return Center(
-      child: Text(
-        'Unknown panel type: ${panel.type}',
-        style: TextStyle(color: colors.textMuted, fontSize: 12),
-        textAlign: TextAlign.center,
-      ),
+      child: Caption('Unknown panel type: ${panel.type}', textAlign: TextAlign.center, fontSize: 12),
     );
   }
 }

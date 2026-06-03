@@ -9,6 +9,7 @@ import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 import 'package:yoloit/features/workspaces/ui/new_agent_session_dialog.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class WorkspaceInlineTree extends StatefulWidget {
   const WorkspaceInlineTree({super.key, required this.workspace});
@@ -309,7 +310,7 @@ class _AddBranchField extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 2, 8, 2),
       child: Row(
         children: [
-          Text('└─ ', style: TextStyle(color: context.appColors.textMuted, fontSize: 10)),
+          const Caption('└─ ', fontSize: 10),
           Expanded(
             child: TextField(
               controller: controller,

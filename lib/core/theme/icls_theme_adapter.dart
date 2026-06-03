@@ -141,13 +141,9 @@ class IclsThemeAdapter {
             : null,
         accentBlue: blueFg ?? modifiedColor,
         accentOrange: orangeFg,
-        diffAddBg: addedColor != null
-            ? addedColor.withAlpha(isDark ? 40 : 30)
-            : null,
+        diffAddBg: addedColor?.withAlpha(isDark ? 40 : 30),
         diffAddText: greenFg ?? addedColor,
-        diffRemoveBg: deletedColor != null
-            ? deletedColor.withAlpha(isDark ? 40 : 30)
-            : null,
+        diffRemoveBg: deletedColor?.withAlpha(isDark ? 40 : 30),
         diffRemoveText: redFg ?? deletedColor,
         diffContextBg: diffModBg ?? caretRow,
         statusActive: greenFg ?? addedColor,

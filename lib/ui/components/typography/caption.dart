@@ -13,6 +13,7 @@ class Caption extends StatelessWidget {
     super.key,
     this.fontSize = 11,
     this.fontWeight = FontWeight.w400,
+    this.letterSpacing,
     this.overflow,
     this.maxLines,
     this.textAlign,
@@ -21,6 +22,7 @@ class Caption extends StatelessWidget {
   final String data;
   final double fontSize;
   final FontWeight fontWeight;
+  final double? letterSpacing;
   final TextOverflow? overflow;
   final int? maxLines;
   final TextAlign? textAlign;
@@ -36,6 +38,7 @@ class Caption extends StatelessWidget {
         color: context.appColors.textMuted,
         fontSize: fontSize,
         fontWeight: fontWeight,
+        letterSpacing: letterSpacing,
       ),
     );
   }

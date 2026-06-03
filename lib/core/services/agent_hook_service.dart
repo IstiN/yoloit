@@ -88,7 +88,7 @@ class AgentHookService {
       Platform.environment['USERPROFILE'] ??
       '';
 
-  Directory get _hooksDir => Directory('${_homeDir}/.yoloit/hooks');
+  Directory get _hooksDir => Directory('$_homeDir/.yoloit/hooks');
 
   void start() {
     _timer?.cancel();

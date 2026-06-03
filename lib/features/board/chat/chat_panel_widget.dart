@@ -7,37 +7,37 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:record/record.dart';
+import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
-import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
+import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
-import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_session_naming.dart';
-import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
+import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
 import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
-import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
-import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
-import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
-import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
+import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/data/models_dev_catalog_service.dart';
 import 'package:yoloit/features/settings/data/opencode_auth_service.dart';
+import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
@@ -467,7 +467,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     if (raw is Map) {
       _config = ChatSessionConfig.fromJson(Map<String, dynamic>.from(raw));
     } else {
-      _config = ChatSessionConfig(sessionName: '', workingDir: '');
+      _config = const ChatSessionConfig(sessionName: '', workingDir: '');
     }
     // Restore saved messages
     final savedMessages = widget.panel.state['messages'];
@@ -1180,7 +1180,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _streamingContent = '';
           _assistantInsertIndex ??= _messages.length;
         });
-        break;
 
       case ChatEventType.assistantDelta:
         final delta = event.deltaContent;
@@ -1190,7 +1189,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           });
           _scrollToBottom();
         }
-        break;
 
       case ChatEventType.assistantMessage:
         final content = event.messageContent ?? _streamingContent;
@@ -1262,7 +1260,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _assistantInsertIndex = null;
         });
         _scrollToBottom();
-        break;
 
       case ChatEventType.toolStart:
         final toolCallId = event.toolCallId ?? '';
@@ -1283,7 +1280,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           );
         });
         _scrollToBottom();
-        break;
 
       case ChatEventType.toolComplete:
         var toolCallId = event.data['toolCallId'] as String? ?? '';
@@ -1349,7 +1345,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           );
         });
         _scrollToBottom();
-        break;
 
       case ChatEventType.result:
         final usage = event.usageData;
@@ -1374,7 +1369,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             );
           });
         }
-        break;
 
       case ChatEventType.askUser:
         final question = event.data['question'] as String? ?? '';
@@ -1400,7 +1394,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           });
           _scrollToBottom();
         }
-        break;
       case ChatEventType.sessionStatus:
       case ChatEventType.userMessage:
       case ChatEventType.assistantTurnStart:
@@ -1424,7 +1417,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         setState(() => _subAgents[agentId] = state);
         // Create a linked board panel (to the right, with arrow) for the agent log
         unawaited(_createAgentLogPanel(agentId, agentName, agentDesc));
-        break;
 
       case ChatEventType.subagentToolStart:
         final agentId = event.agentId ?? '';
@@ -1440,7 +1432,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           );
         });
         unawaited(_updateAgentPanel(agentId));
-        break;
 
       case ChatEventType.subagentToolComplete:
         final agentId = event.agentId ?? '';
@@ -1464,7 +1455,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           );
         });
         unawaited(_updateAgentPanel(agentId));
-        break;
 
       case ChatEventType.subagentMessage:
         final agentId = event.agentId ?? '';
@@ -1485,7 +1475,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           );
         });
         unawaited(_updateAgentPanel(agentId));
-        break;
 
       case ChatEventType.subagentCompleted:
         final agentId = event.agentId ?? event.toolCallId ?? '';
@@ -1502,7 +1491,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           }
         });
         unawaited(_updateAgentPanel(agentId));
-        break;
     }
   }
 
@@ -1770,7 +1758,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           if (_totalOutputTokens > 0) ...[
             const SizedBox(width: 6),
             Text(
-              '∑${_totalOutputTokens}',
+              '∑$_totalOutputTokens',
               style: TextStyle(fontSize: 9, color: colors.primary),
             ),
           ],
@@ -2062,7 +2050,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: context.appColors.surfaceElevated,
-                borderRadius: BorderRadius.only(
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(4),
                   topRight: Radius.circular(16),
                   bottomLeft: Radius.circular(16),
@@ -2295,7 +2283,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: colors.surfaceElevated,
-          borderRadius: BorderRadius.only(
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(4),
             topRight: Radius.circular(16),
             bottomLeft: Radius.circular(16),
@@ -2346,7 +2334,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       padding: const EdgeInsets.fromLTRB(10, 8, 22, 12),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: BorderRadius.only(
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(14),
           bottomRight: Radius.circular(14),
         ),

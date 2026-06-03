@@ -4,9 +4,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
@@ -3594,17 +3594,21 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
         ),
       );
       final loadMs = swift['swiftLoadMs'] as num?;
-      if (loadMs != null)
+      if (loadMs != null) {
         buf.writeln(row('     ', 'load time', ms(loadMs.toInt())));
+      }
       final ttft = swift['swiftFirstTokenMs'] as num?;
-      if (ttft != null)
+      if (ttft != null) {
         buf.writeln(row('     ', 'first token (TTFT)', ms(ttft.toInt())));
+      }
       final genMs = swift['swiftGenerateMs'] as num?;
-      if (genMs != null)
+      if (genMs != null) {
         buf.writeln(row('     ', 'generation', ms(genMs.toInt())));
+      }
       final totalMs = swift['swiftTotalMs'] as num?;
-      if (totalMs != null)
+      if (totalMs != null) {
         buf.writeln(row('     ', 'swift total', ms(totalMs.toInt())));
+      }
     }
 
     // ── model settings ────────────────────────────────────────────────────────
@@ -3836,7 +3840,7 @@ class _AssistantToolExecutor implements YoloitToolExecutor {
     ChatRuntimeContext? runtimeContext,
   ) async {
     final tokens = _searchTokens(userMessage);
-    final hintedBoardId = '${runtimeContext?.boardId ?? ''}'.trim();
+    final hintedBoardId = (runtimeContext?.boardId ?? '').trim();
     try {
       final boardsRaw = await delegate.invoke(
         'yoloit_boards',

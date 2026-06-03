@@ -223,14 +223,14 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              _SectionLabel('Agent Type'),
+              const _SectionLabel('Agent Type'),
               const SizedBox(height: 6),
               _agentTypeSelector(colors),
               ...widget.worktrees.entries.map(
                 (e) => _buildRepoPicker(e.key, e.value, colors),
               ),
               const SizedBox(height: 12),
-              _SectionLabel('Session Name (optional)'),
+              const _SectionLabel('Session Name (optional)'),
               const SizedBox(height: 6),
               _styledField(
                 controller: _nameController,
@@ -592,9 +592,9 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 children: [
                   if (filtered.isEmpty && !showCreate)
-                    Padding(
+                    const Padding(
                       padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       child: Caption('No branches found'),
                     ),
                   ...filtered.map((branch) {
@@ -708,11 +708,7 @@ class _CreateRow extends StatelessWidget {
           children: [
             Icon(Icons.add_circle_outline, size: 12, color: colors.primary),
             const SizedBox(width: 8),
-            Text(
-              'Create ',
-              style: TextStyle(
-                  color: context.appColors.textMuted, fontSize: 12),
-            ),
+            const Caption('Create ', fontSize: 12),
             Expanded(
               child: Text(
                 '"$branchName"',
@@ -740,11 +736,7 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-          color: context.appColors.textMuted, fontSize: 10, letterSpacing: 0.8),
-    );
+    return Caption(text, fontSize: 10, letterSpacing: 0.8);
   }
 }
 
@@ -765,8 +757,7 @@ class _BusyRow extends StatelessWidget {
                 strokeWidth: 1.5, color: colors.primary),
           ),
           const SizedBox(width: 8),
-          Text('Creating worktree…',
-              style: TextStyle(color: context.appColors.textMuted, fontSize: 12)),
+          const Caption('Creating worktree…', fontSize: 12),
         ],
       ),
     );

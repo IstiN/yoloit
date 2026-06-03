@@ -181,7 +181,7 @@ class _ModelCard extends StatelessWidget {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  initialValue: selected.id,
+                  value: selected.id,
                   items:
                       options
                           .map(

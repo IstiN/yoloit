@@ -201,7 +201,9 @@ class _PlaylistContentState extends State<_PlaylistContent> {
   }
 
   void _subscribeToPlayer() {
-    for (final s in _subs) s.cancel();
+    for (final s in _subs) {
+      s.cancel();
+    }
     _subs.clear();
     _subs.add(
       _player.stream.position.listen((p) {
@@ -267,7 +269,9 @@ class _PlaylistContentState extends State<_PlaylistContent> {
     // Cancel stream subscriptions but do NOT dispose the player —
     // PlaylistPlayerRegistry keeps it alive so music continues when the
     // user switches to another board and this widget is removed from the tree.
-    for (final s in _subs) s.cancel();
+    for (final s in _subs) {
+      s.cancel();
+    }
     super.dispose();
   }
 
@@ -291,7 +295,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
 
   // ── Track management ───────────────────────────────────────────────────────
 
-  void _showAddMenu(BuildContext btnCtx) async {
+  Future<void> _showAddMenu(BuildContext btnCtx) async {
     final colors = btnCtx.appColors;
     final box = btnCtx.findRenderObject() as RenderBox?;
     if (box == null) return;
@@ -714,7 +718,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                     ),
                   ),
                   child: Slider(
-                    value: progress as double,
+                    value: progress,
                     onChanged:
                         (v) => _player.seek(
                           Duration(

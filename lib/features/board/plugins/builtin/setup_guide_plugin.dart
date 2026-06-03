@@ -7,6 +7,7 @@ import 'package:yoloit/core/setup/setup_catalog.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class SetupGuidePlugin extends BoardPanelPlugin {
   const SetupGuidePlugin();
@@ -377,10 +378,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
                 if (_remoteRunId != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Run: $_remoteRunId',
-                      style: TextStyle(color: colors.textMuted, fontSize: 10),
-                    ),
+                    child: Caption('Run: $_remoteRunId', fontSize: 10),
                   ),
               ],
             ),
@@ -520,11 +518,8 @@ class _SetupHeaderState extends State<_SetupHeader> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  'Output log is read-only. Copy command if you want to inspect or run it manually.',
-                  style: TextStyle(color: colors.textMuted, fontSize: 10),
-                ),
+              const Expanded(
+                child: Caption('Output log is read-only. Copy command if you want to inspect or run it manually.', fontSize: 10),
               ),
               TextButton.icon(
                 onPressed:
@@ -679,10 +674,7 @@ class _PackageTile extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              pkg.description,
-              style: TextStyle(color: colors.textMuted, fontSize: 10),
-            ),
+            Caption(pkg.description, fontSize: 10),
             if (pkg.version != null)
               Text(
                 pkg.version!,
@@ -829,7 +821,6 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -838,11 +829,7 @@ class _ErrorView extends StatelessWidget {
           children: [
             Icon(Icons.error_outline, color: Colors.red.shade300, size: 28),
             const SizedBox(height: 10),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colors.textMuted, fontSize: 12),
-            ),
+            Caption(error, textAlign: TextAlign.center, fontSize: 12),
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: onRetry,

@@ -55,7 +55,7 @@ class JsWidgetEngine {
   /// Absolute path to the app's folder — used by loadAsset bridge.
   final String? appDir;
 
-  Map<String, dynamic> _storage;
+  final Map<String, dynamic> _storage;
   final Map<String, dynamic> _initialTheme;
   JavascriptRuntime? _runtime;
   bool _disposed = false;
@@ -141,7 +141,7 @@ class JsWidgetEngine {
         debugPrint('[JsWidgetEngine] widget eval error: ${result.stringResult}');
       }
       runtime.executePendingJob();
-      debugPrint('[JsWidgetEngine] widget code done, uiTree set: ${_disposed}');
+      debugPrint('[JsWidgetEngine] widget code done, uiTree set: $_disposed');
     } catch (e) {
       debugPrint('[JsWidgetEngine] startup error: $e');
       rethrow;

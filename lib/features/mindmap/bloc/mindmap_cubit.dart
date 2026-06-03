@@ -31,12 +31,12 @@ class MindMapCubit extends Cubit<MindMapState> {
     final hiddenTypesRaw = prefs.getStringList(_kHiddenTypes);
     final savedViewsJson = prefs.getString(_kSavedViews);
 
-    Map<String, Offset> positions = {};
+    final Map<String, Offset> positions = {};
     Set<String> locked = {};
     Set<String> hidden = {};
     Set<String> hiddenTypes = {};
-    Map<String, Size> sizes = {};
-    Map<String, MindMapViewSnapshot> savedViews = {};
+    final Map<String, Size> sizes = {};
+    final Map<String, MindMapViewSnapshot> savedViews = {};
 
     if (posJson != null) {
       final map = jsonDecode(posJson) as Map<String, dynamic>;

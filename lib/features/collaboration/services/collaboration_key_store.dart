@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'collaboration_cipher.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_cipher.dart';
 
 /// Manages the AES-256 space key and stable client identity in the
 /// device's secure storage (Keychain on macOS/iOS, Keystore on Android).

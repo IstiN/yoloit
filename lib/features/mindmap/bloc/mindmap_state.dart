@@ -29,8 +29,8 @@ class MindMapViewSnapshot {
   };
 
   factory MindMapViewSnapshot.fromJson(Map<String, dynamic> j) {
-    Map<String, Offset> positions = {};
-    Map<String, Size> sizes = {};
+    final Map<String, Offset> positions = {};
+    final Map<String, Size> sizes = {};
     (j['positions'] as Map<String, dynamic>? ?? {}).forEach((k, v) {
       final l = (v as List).cast<double>();
       positions[k] = Offset(l[0], l[1]);

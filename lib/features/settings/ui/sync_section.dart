@@ -132,7 +132,7 @@ class _SyncSectionState extends State<SyncSection> {
             Switch(
               value: _autoPush,
               onChanged: (v) => setState(() => _autoPush = v),
-              activeColor: colors.primary,
+              activeThumbColor: colors.primary,
             ),
             const SizedBox(width: 8),
             Text(

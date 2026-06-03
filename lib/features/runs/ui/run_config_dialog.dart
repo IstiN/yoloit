@@ -238,7 +238,7 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                 ),
                 const SizedBox(height: 4),
                 DropdownButtonFormField<_RunPreset>(
-                  initialValue: _preset,
+                  value: _preset,
                   dropdownColor: colors.surfaceElevated,
                   decoration: InputDecoration(
                     filled: true,

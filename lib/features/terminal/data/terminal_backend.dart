@@ -5,8 +5,8 @@ import 'dart:io';
 import 'package:flutter_pty/flutter_pty.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
-import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
+import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 
@@ -89,9 +89,8 @@ class LocalPtyTerminalBackend implements TerminalBackend {
 }
 
 class TmuxTerminalBackend extends LocalPtyTerminalBackend {
-  TmuxTerminalBackend({PtyService? ptyService, TmuxService? tmuxService})
-    : _tmuxService = tmuxService ?? TmuxService.instance,
-      super(ptyService: ptyService);
+  TmuxTerminalBackend({super.ptyService, TmuxService? tmuxService})
+    : _tmuxService = tmuxService ?? TmuxService.instance;
 
   final TmuxService _tmuxService;
 

@@ -4,24 +4,23 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
-import '../../mindmap/bloc/mindmap_cubit.dart';
-import '../../mindmap/bloc/mindmap_state.dart';
-import '../../mindmap/model/mindmap_node_model.dart';
-import '../../mindmap/nodes/presentation/agent_card_props_builder.dart';
-import '../../mindmap/nodes/presentation/editor_card_props_builder.dart';
-import '../../mindmap/nodes/presentation/review_card_props_builder.dart';
-import '../../terminal/data/terminal_output_bus.dart';
-import '../../terminal/models/agent_session.dart';
-import '../../runs/models/run_session.dart';
-import '../collaboration_ports.dart';
-import '../model/sync_message.dart';
-import '../services/collaboration_cipher.dart';
-import '../services/collaboration_client.dart';
-import '../services/collaboration_key_store.dart';
-import '../services/collaboration_server_platform.dart';
-import '../services/guest_terminal_registry.dart';
-import 'collaboration_state.dart';
+import 'package:yoloit/features/collaboration/bloc/collaboration_state.dart';
+import 'package:yoloit/features/collaboration/collaboration_ports.dart';
+import 'package:yoloit/features/collaboration/model/sync_message.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_cipher.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_client.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_key_store.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_server_platform.dart';
+import 'package:yoloit/features/collaboration/services/guest_terminal_registry.dart';
+import 'package:yoloit/features/mindmap/bloc/mindmap_cubit.dart';
+import 'package:yoloit/features/mindmap/bloc/mindmap_state.dart';
+import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
+import 'package:yoloit/features/mindmap/nodes/presentation/agent_card_props_builder.dart';
+import 'package:yoloit/features/mindmap/nodes/presentation/editor_card_props_builder.dart';
+import 'package:yoloit/features/mindmap/nodes/presentation/review_card_props_builder.dart';
+import 'package:yoloit/features/runs/models/run_session.dart';
+import 'package:yoloit/features/terminal/data/terminal_output_bus.dart';
+import 'package:yoloit/features/terminal/models/agent_session.dart';
 
 /// Resolves a collaboration terminal target to the underlying PTY session id.
 String resolveTerminalSessionId(
@@ -362,15 +361,15 @@ class CollaborationCubit extends Cubit<CollaborationState> {
 
   Map<String, dynamic> _serializeNodeContent(MindMapNodeData node) {
     return switch (node) {
-      AgentNodeData d => _serializeAgent(d),
-      WorkspaceNodeData d => {
+      final AgentNodeData d => _serializeAgent(d),
+      final WorkspaceNodeData d => {
         'type': 'workspace',
         'name': d.workspace.name,
         'path': d.workspace.path,
         'paths': d.workspace.paths,
         'color': d.workspace.color?.value,
       },
-      SessionNodeData d => {
+      final SessionNodeData d => {
         'type': 'session',
         'name': d.session.customName ?? d.session.id,
         'typeName': d.session.type.name,
@@ -380,29 +379,29 @@ class CollaborationCubit extends Cubit<CollaborationState> {
         'workspaceId': d.workspaceId,
         'lastLines': d.session.lastLines(80),
       },
-      RepoNodeData d => {
+      final RepoNodeData d => {
         'type': 'repo',
         'name': d.repoName,
         'path': d.repoPath,
         'branch': d.branch,
       },
-      BranchNodeData d => {
+      final BranchNodeData d => {
         'type': 'branch',
         'name': d.branch,
         'repoName': d.repoName,
         'commitHash': d.commitHash,
       },
-      EditorNodeData d => _serializeEditor(d),
-      FilePanelNodeData d => {
+      final EditorNodeData d => _serializeEditor(d),
+      final FilePanelNodeData d => {
         'type': 'panel',
         'filePath': d.filePath,
       },
-      FileDiffPanelNodeData d => {
+      final FileDiffPanelNodeData d => {
         'type': 'filediff',
         'filePath': d.filePath,
         'repoPath': d.repoPath,
       },
-      FilesNodeData d => {
+      final FilesNodeData d => {
         'type': 'files',
         'repoPath': d.repoPath,
         'files': d.changedFiles
@@ -416,21 +415,21 @@ class CollaborationCubit extends Cubit<CollaborationState> {
             )
             .toList(),
       },
-      FileTreeNodeData d => {
+      final FileTreeNodeData d => {
         'type': 'tree',
         'workspaceId': d.workspaceId,
         'repoPath': d.repoPath,
         'repoName': d.repoName,
         'entries': _serializeFileTree(d.repoPath ?? '', repoName: d.repoName),
       },
-      DiffNodeData d => {
+      final DiffNodeData d => {
         'type': 'diff',
         'workspaceId': d.workspaceId,
         'repoPath': d.repoPath,
         'repoName': d.repoName,
         'hunks': _serializeDiffHunks(d.repoPath ?? '', repoName: d.repoName),
       },
-      RunNodeData d => {
+      final RunNodeData d => {
         'type': 'run',
         'name': d.session.config.name,
         'status': d.session.status.name,
@@ -448,7 +447,7 @@ class CollaborationCubit extends Cubit<CollaborationState> {
             .map((l) => l.text)
             .toList(),
       },
-      MindMapPluginNodeData d => {
+      final MindMapPluginNodeData d => {
         'type': 'plugin',
         'pluginId': d.pluginId,
         'payload': d.payload,

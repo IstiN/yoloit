@@ -548,10 +548,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           children: [
             Icon(Icons.search, size: 36, color: colors.textMuted.withAlpha(80)),
             const SizedBox(height: 8),
-            Text(
-              'Type to search boards, panels & files…',
-              style: TextStyle(color: colors.textMuted, fontSize: 13),
-            ),
+            const Caption('Type to search boards, panels & files…', fontSize: 13),
             const SizedBox(height: 4),
             Text(
               '↑↓ navigate  ↵ open  esc close',
@@ -566,11 +563,8 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
     }
 
     if (_results.isEmpty && !_loading) {
-      return Center(
-        child: Text(
-          'No results found',
-          style: TextStyle(color: colors.textMuted, fontSize: 13),
-        ),
+      return const Center(
+        child: Caption('No results found', fontSize: 13),
       );
     }
 
@@ -612,7 +606,7 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
           if (panelCount > 0)
             Caption('$panelCount panel${panelCount > 1 ? 's' : ''}',),
           if (panelCount > 0 && fileCount > 0)
-            Caption(' · '),
+            const Caption(' · '),
           if (fileCount > 0)
             Caption('$fileCount file${fileCount > 1 ? 's' : ''}',),
           const Spacer(),

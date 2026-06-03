@@ -18,20 +18,20 @@ import 'package:yoloit/features/board/ui/board_view.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
+import 'package:yoloit/features/review/bloc/review_cubit.dart';
+import 'package:yoloit/features/review/ui/review_panel.dart';
+import 'package:yoloit/features/runs/bloc/run_cubit.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
-import 'package:yoloit/features/review/bloc/review_cubit.dart';
-import 'package:yoloit/features/review/ui/review_panel.dart';
-import 'package:yoloit/features/runs/bloc/run_cubit.dart';
+import 'package:yoloit/features/updates/data/update_service.dart';
+import 'package:yoloit/features/updates/ui/update_banner.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/ui/workspace_panel.dart';
-import 'package:yoloit/features/updates/data/update_service.dart';
-import 'package:yoloit/features/updates/ui/update_banner.dart';
 import 'package:yoloit/ui/widgets/activity_rail.dart';
 import 'package:yoloit/ui/widgets/panel_shell.dart';
 import 'package:yoloit/ui/widgets/panel_visibility.dart';
@@ -576,7 +576,7 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
                                       'agents',
                                       PanelVisibility.closed,
                                     ),
-                                child: _AgentsContent(),
+                                child: const _AgentsContent(),
                               ),
                             ),
                             _HorizontalDivider(

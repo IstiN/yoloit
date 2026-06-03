@@ -267,7 +267,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                 ),
               ),
               const SizedBox(height: 6),
-              Caption('Later groups override earlier groups when the same key appears multiple times.'),
+              const Caption('Later groups override earlier groups when the same key appears multiple times.'),
               const SizedBox(height: 14),
               if (_loading)
                 const Expanded(

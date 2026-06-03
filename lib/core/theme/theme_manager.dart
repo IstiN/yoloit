@@ -323,7 +323,7 @@ class ThemeManager extends ChangeNotifier {
   void _loadColorOverrides(SharedPreferences prefs) {
     _colorOverrides = {};
     // Migrate old key
-    var json = prefs.getString('color_overrides') ??
+    final json = prefs.getString('color_overrides') ??
         prefs.getString('accent_overrides');
     if (json == null) return;
     try {

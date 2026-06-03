@@ -89,7 +89,7 @@ class AssistantCliHandler extends PanelCliHandler {
           },
         );
       case 'voice-start':
-        return CliActionResult(
+        return const CliActionResult(
           message: 'Listening started',
           stateUpdate: {
             'mode': 'voice',
@@ -98,7 +98,7 @@ class AssistantCliHandler extends PanelCliHandler {
           },
         );
       case 'voice-stop':
-        return CliActionResult(
+        return const CliActionResult(
           message: 'Listening stopped',
           stateUpdate: {'isListening': false, 'isSpeaking': false},
         );

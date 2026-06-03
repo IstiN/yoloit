@@ -153,7 +153,7 @@ class ChatCliHandler extends PanelCliHandler {
     );
 
     if (!accepted) {
-      return CliActionResult(
+      return const CliActionResult(
         ok: false,
         message:
             'Already processing a previous message — wait or call yolochat:stop first',

@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/config/app_config.dart';
-import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/core/hotkeys/hotkey_definition.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
@@ -17,6 +16,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -24,10 +24,9 @@ import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
+import 'package:yoloit/features/settings/ui/debug_ui/debug_ui_shell.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
-import 'package:yoloit/features/settings/ui/debug_ui/debug_ui_shell.dart';
-import 'package:yoloit/ui/components/typography/caption.dart';
 import 'package:yoloit/features/settings/ui/sync_section.dart';
 import 'package:yoloit/features/settings/ui/widget_permissions_section.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
@@ -38,6 +37,7 @@ import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 const _kCategories = [
   'Appearance',
@@ -444,10 +444,7 @@ class _SupportSectionState extends State<_SupportSection> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                'Board navigation diagnostics capture trackpad scroll, pan/zoom, canvas locks, and viewport interaction events.',
-                style: TextStyle(color: colors.textMuted, fontSize: 12),
-              ),
+              const Caption('Board navigation diagnostics capture trackpad scroll, pan/zoom, canvas locks, and viewport interaction events.', fontSize: 12),
               const SizedBox(height: 8),
               Caption('App log: ${_logPath ?? 'loading...'}'),
             ],
@@ -570,7 +567,7 @@ class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Caption(
+                    const Caption(
                       'Switches the embedded terminal emulator for board/app terminal panels.',
                     ),
                   ],
@@ -612,7 +609,7 @@ class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
                       'Terminal backend',
                       style: TextStyle(color: colors.textPrimary, fontSize: 13),
                     ),
-                    Caption(
+                    const Caption(
                       'Runtime is the default persistent backend. Local PTY remains available as a fallback.',
                     ),
                   ],
@@ -858,7 +855,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
     await _catalogService.load();
     final configs = await _service.load();
     final cloudCfgs = await CloudLlmSettingsService.instance.loadConfigs();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _configs = configs;
         _defaultAgentId = _service.defaultAgentId;
@@ -868,6 +865,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
         _cloudConfigs = cloudCfgs;
         _loading = false;
       });
+    }
   }
 
   Future<void> _saveConfigs() async {
@@ -1380,7 +1378,7 @@ class _AgentRowState extends State<_AgentRow> {
                 value: widget.config.visible,
                 onChanged:
                     (v) => widget.onChanged(widget.config.copyWith(visible: v)),
-                activeColor: colors.primary,
+                activeThumbColor: colors.primary,
               ),
               const SizedBox(width: 8),
               // Icon label
@@ -1657,7 +1655,7 @@ class _AgentRowState extends State<_AgentRow> {
                 onChanged: (v) {
                   widget.onChanged(widget.config.copyWith(passDefaultArgs: v));
                 },
-                activeColor: colors.primary,
+                activeThumbColor: colors.primary,
               ),
               const Spacer(),
             ],
@@ -1681,7 +1679,7 @@ class _AgentRowState extends State<_AgentRow> {
                 onChanged: (v) {
                   widget.onChanged(widget.config.copyWith(disableModel: v));
                 },
-                activeColor: colors.primary,
+                activeThumbColor: colors.primary,
               ),
               const Spacer(),
             ],
@@ -2338,7 +2336,7 @@ class _OrbColorPreview extends StatelessWidget {
       child: Row(
         children: [
           // Animated orb
-          YoloOrbPreview(size: 80),
+          const YoloOrbPreview(size: 80),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -2830,10 +2828,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     }),
               ),
               const SizedBox(height: 14),
-              Text(
-                'Presets',
-                style: TextStyle(color: colors.textMuted, fontSize: 10),
-              ),
+              const Caption('Presets', fontSize: 10),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 5,
@@ -3407,9 +3402,10 @@ class _AboutSectionState extends State<_AboutSection> {
     setState(() {
       _checking = false;
       _updateInfo = info;
-      if (info == null)
+      if (info == null) {
         _upToDateMsg =
             'You are on the latest version (${UpdateService.currentVersion}).';
+      }
     });
   }
 
@@ -3423,11 +3419,12 @@ class _AboutSectionState extends State<_AboutSection> {
       await UpdateService.downloadAndInstall(
         info,
         onProgress: (progress, status) {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _installProgress = progress;
               _installStatus = status;
             });
+          }
         },
       );
       // If we get here without exit(), the installer opened browser fallback.
@@ -3582,7 +3579,7 @@ class _AboutSectionState extends State<_AboutSection> {
                   ),
                   Switch(
                     value: _autoCheck,
-                    activeColor: colors.accentBlue,
+                    activeThumbColor: colors.accentBlue,
                     onChanged: (v) {
                       setState(() => _autoCheck = v);
                       SessionPrefs.saveAutoUpdateCheckEnabled(v);
@@ -3824,11 +3821,12 @@ class _SessionSettingsState extends State<_SessionSettings> {
   Future<void> _loadLogs() async {
     setState(() => _logsLoading = true);
     final logs = await _logging.listLogs();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _logs = logs;
         _logsLoading = false;
       });
+    }
   }
 
   Future<void> _deleteLog(String path) async {
@@ -3906,7 +3904,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                       color:
                           context.appColors.textMuted,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       'View log files',
                       style: TextStyle(color: colors.primary, fontSize: 13),
@@ -3927,11 +3925,12 @@ class _SessionSettingsState extends State<_SessionSettings> {
             value: _appLoggingOn,
             onChanged: (v) async {
               await AppLogger.instance.setEnabled(v);
-              if (mounted)
+              if (mounted) {
                 setState(() {
                   _appLoggingOn = v;
                   if (!v) _showAppLog = false;
                 });
+              }
             },
           ),
           if (_appLoggingOn) ...[
@@ -3986,11 +3985,12 @@ class _SessionSettingsState extends State<_SessionSettings> {
   Future<void> _loadAppLog() async {
     setState(() => _appLogLoading = true);
     final content = await AppLogger.instance.readLog();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _appLogContent = content;
         _appLogLoading = false;
       });
+    }
   }
 
   Widget _buildAppLogSection(BuildContext context) {
@@ -4105,7 +4105,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
             )
           else if (_logs.isEmpty)
             Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
                 'No logs yet.',
                 style: TextStyle(
@@ -4206,7 +4206,7 @@ class _ToggleRow extends StatelessWidget {
           Switch(
             value: value && enabled,
             onChanged: enabled ? onChanged : null,
-            activeColor: colors.primary,
+            activeThumbColor: colors.primary,
           ),
         ],
       ),
@@ -4335,7 +4335,7 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                   ),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
-                  constraints: BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                 ),
               ],
             ),
@@ -4511,11 +4511,12 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading)
+    if (_loading) {
       return const SizedBox(
         height: 48,
         child: Center(child: CircularProgressIndicator()),
       );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4627,7 +4628,7 @@ class _SettingsToggle extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: colors.primary,
+            activeThumbColor: colors.primary,
           ),
         ],
       ),

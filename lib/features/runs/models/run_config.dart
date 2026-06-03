@@ -149,7 +149,7 @@ class RunConfig extends Equatable {
     name: 'Flutter Test',
     command: 'flutter test',
     group: group,
-    color: Color(0xFF00FF9F),
+    color: const Color(0xFF00FF9F),
   );
 
   static RunConfig flutterBuildMacos({String group = 'default'}) => RunConfig(
@@ -157,7 +157,7 @@ class RunConfig extends Equatable {
     name: 'Flutter Build (macOS)',
     command: 'flutter build macos',
     group: group,
-    color: Color(0xFFFFD700),
+    color: const Color(0xFFFFD700),
   );
 
   @override

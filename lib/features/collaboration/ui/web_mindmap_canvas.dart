@@ -1445,7 +1445,6 @@ class _SidebarRow extends StatelessWidget {
     required this.hidden,
     required this.expanded,
     required this.hasChildren,
-    this.onToggleExpand,
     required this.onToggleHide,
     required this.onFocus,
   });
@@ -1595,8 +1594,9 @@ class _ConnectorsPainter extends CustomPainter {
 
     for (final conn in state.connections) {
       if (state.hidden.contains(conn.fromId) ||
-          state.hidden.contains(conn.toId))
+          state.hidden.contains(conn.toId)) {
         continue;
+      }
       final fp = state.positions[conn.fromId];
       final tp2 = state.positions[conn.toId];
       if (fp == null || tp2 == null) continue;

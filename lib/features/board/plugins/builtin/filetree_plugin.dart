@@ -673,10 +673,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
               color: colors.textSecondary.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Select a folder to browse',
-              style: TextStyle(color: colors.textMuted, fontSize: 13),
-            ),
+            const Caption('Select a folder to browse', fontSize: 13),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: _pickFolder,
@@ -722,20 +719,17 @@ class _FileTreeContentState extends State<_FileTreeContent> {
   Widget _buildSearchResults(Directory rootDir) {
     final colors = context.appColors;
     if (_searchLoading) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 22,
               height: 22,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Searching...',
-              style: TextStyle(color: colors.textMuted, fontSize: 12),
-            ),
+            SizedBox(height: 10),
+            Caption('Searching...', fontSize: 12),
           ],
         ),
       );
@@ -753,13 +747,10 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       );
     }
     if (_searchResults.isEmpty) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            'No matching files',
-            style: TextStyle(color: colors.textMuted, fontSize: 12),
-          ),
+          padding: EdgeInsets.all(16),
+          child: Caption('No matching files', fontSize: 12),
         ),
       );
     }
@@ -1026,10 +1017,7 @@ class _FileTreeContentState extends State<_FileTreeContent> {
               color: colors.textSecondary.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Select a folder to see changes',
-              style: TextStyle(color: colors.textMuted, fontSize: 13),
-            ),
+            const Caption('Select a folder to see changes', fontSize: 13),
           ],
         ),
       );
@@ -1161,10 +1149,7 @@ class _GitDiffViewState extends State<_GitDiffView> {
     }
     if (_error != null) {
       return Center(
-        child: Text(
-          _error!,
-          style: TextStyle(color: colors.textMuted, fontSize: 13),
-        ),
+        child: Caption(_error!, fontSize: 13),
       );
     }
     final entries = _entries ?? [];
@@ -1179,10 +1164,7 @@ class _GitDiffViewState extends State<_GitDiffView> {
               color: colors.accentGreen.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Working tree clean',
-              style: TextStyle(color: colors.textMuted, fontSize: 13),
-            ),
+            const Caption('Working tree clean', fontSize: 13),
           ],
         ),
       );
@@ -1286,10 +1268,7 @@ class _GitDiffViewState extends State<_GitDiffView> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Text(
-                    '$fileCount',
-                    style: TextStyle(fontSize: 10, color: colors.textMuted),
-                  ),
+                  Caption('$fileCount', fontSize: 10),
                 ],
               ),
             ),

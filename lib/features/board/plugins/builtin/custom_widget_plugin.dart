@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/widgets/js_widget_engine.dart';
 import 'package:yoloit/features/board/widgets/json_widget_renderer.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
@@ -540,11 +540,12 @@ class CustomWidgetCliHandler extends PanelCliHandler {
     switch (action) {
       case 'setState':
         final state = args['state'] as Map?;
-        if (state == null)
+        if (state == null) {
           return const CliActionResult(
             ok: false,
             message: 'Missing "state" field',
           );
+        }
         return CliActionResult(
           ok: true,
           message: 'State updated',
@@ -563,11 +564,12 @@ class CustomWidgetCliHandler extends PanelCliHandler {
       case 'execute':
         final widgetId = panel.state['widgetId'] as String? ?? '';
         final actionId = args['actionId'] as String?;
-        if (actionId == null)
+        if (actionId == null) {
           return const CliActionResult(
             ok: false,
             message: 'Missing "actionId" field',
           );
+        }
         final payload = args['payload'] as Map<String, dynamic>?;
         final engine = WidgetEngineManager.instance.engine(panel.id);
         if (engine == null) {

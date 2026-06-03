@@ -1,6 +1,6 @@
-import '../collaboration_ports.dart';
-import '../model/sync_message.dart';
-import 'collaboration_cipher.dart';
+import 'package:yoloit/features/collaboration/collaboration_ports.dart';
+import 'package:yoloit/features/collaboration/model/sync_message.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_cipher.dart';
 
 /// Web stub — the browser cannot host a WebSocket server.
 class CollaborationServer {

@@ -316,8 +316,8 @@ class _WorktreeTileState extends State<_WorktreeTile> {
       onExit: (_) => setState(() => _hovering = false),
       child: Container(
         height: 36,
-        margin: EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-        padding: EdgeInsets.symmetric(horizontal: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: _hovering ? colors.surfaceHighlight : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
@@ -362,9 +362,9 @@ class _WorktreeTileState extends State<_WorktreeTile> {
                         ),
                       ),
                       if (entry.isMain) ...[
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Container(
-                          padding: EdgeInsets.symmetric(
+                          padding: const EdgeInsets.symmetric(
                             horizontal: 4,
                             vertical: 1,
                           ),
@@ -749,11 +749,11 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(color: colors.border),
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: DropdownButton<String>(
                       value: _selectedBranch,
                       isExpanded: true,
-                      underline: SizedBox.shrink(),
+                      underline: const SizedBox.shrink(),
                       dropdownColor: colors.surfaceElevated,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
@@ -785,7 +785,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     style: ElevatedButton.styleFrom(
@@ -825,7 +825,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
             context.appColors.textMuted,
         fontSize: 12,
       ),
-      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       isDense: true,
       filled: true,
       fillColor: colors.surfaceElevated,
@@ -857,7 +857,7 @@ class _OutlineButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           border: Border.all(color: colors.border),
           borderRadius: BorderRadius.circular(4),

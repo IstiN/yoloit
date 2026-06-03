@@ -5,9 +5,9 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
-import '../collaboration_ports.dart';
-import '../model/sync_message.dart';
-import 'collaboration_cipher.dart';
+import 'package:yoloit/features/collaboration/collaboration_ports.dart';
+import 'package:yoloit/features/collaboration/model/sync_message.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_cipher.dart';
 
 /// WebSocket server (port [port]) + static HTTP server (port [httpPort]).
 ///
@@ -333,7 +333,7 @@ class CollaborationServer {
   Future<void> _triggerLocalNetworkPermission() async {
     await Future<void>.delayed(const Duration(milliseconds: 500));
     final ip = _resolvedIp;
-    if (ip == null || ip == 'localhost' || ip == '127.0.0.1') return;
+    if (ip == 'localhost' || ip == '127.0.0.1') return;
     try {
       final s = await Socket.connect(
         ip, httpPort,
@@ -401,8 +401,9 @@ class CollaborationServer {
       return;
     }
 
-    if (path == '/' || path.isEmpty || !path.contains('.'))
+    if (path == '/' || path.isEmpty || !path.contains('.')) {
       path = '/index.html';
+    }
     final safePath = Uri.decodeFull(path.split('?').first)
         .replaceAll(RegExp(r'\.\.[\\/]'), '');
 

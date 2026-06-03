@@ -1,17 +1,16 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
@@ -19,30 +18,29 @@ import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
+import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
-import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
-import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
+import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
-import 'package:yoloit/features/board/ui/board_file_picker.dart';
-import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
-import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
+import 'package:yoloit/features/board/ui/board_file_picker.dart';
+import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
-import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 class BoardView extends StatefulWidget {
@@ -146,8 +144,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   // ── Tool state ────────────────────────────────────────────────────────────
   BoardToolId _activeTool = BoardToolId.select;
-  DrawSettings _drawSettings = DrawSettings();
-  ConnectSettings _connectSettings = ConnectSettings();
+  DrawSettings _drawSettings = const DrawSettings();
+  ConnectSettings _connectSettings = const ConnectSettings();
 
   /// Link id currently hovered (for showing delete badge).
   String? _hoveredLinkId;
@@ -511,8 +509,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             for (final panel
                                                 in activeBoard.panels) {
                                               if (panel.type !=
-                                                  WebpagePlugin.kTypeId)
+                                                  WebpagePlugin.kTypeId) {
                                                 continue;
+                                              }
                                               final ctrl =
                                                   WebpagePlugin
                                                       .controllers[panel.id];
@@ -743,8 +742,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                             cubit
                                                                 .state
                                                                 .activeBoard;
-                                                        if (board == null)
+                                                        if (board == null) {
                                                           return null;
+                                                        }
                                                         final currentBounds =
                                                             panel.bounds;
                                                         // Place to the right of the source panel, then
@@ -1477,7 +1477,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               ),
                             // ── YOLO badge fixed overlay (bottom-right) ────────────
                             if (!_isBoardOverviewOpen)
-                              Positioned(
+                              const Positioned(
                                 left: 0,
                                 right: 0,
                                 bottom: 22,
@@ -1825,7 +1825,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           break;
         }
       }
-      if (fp != null && size != null) {
+      if (fp != null) {
         _focusedPanelVisibilityKey =
             '${board.id}:${fp.id}:${fp.bounds.x}:${fp.bounds.y}:${fp.bounds.width}:${fp.bounds.height}:${size.width}:${size.height}:z${board.viewport.zoomOnFocus}';
       }
@@ -2505,7 +2505,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         final cx2 = end.dx - (end.dx - start.dx) * 0.35;
         final cy2 = end.dy;
         const t = 0.5;
-        final mt = 1 - t;
+        const mt = 1 - t;
         return Offset(
           mt * mt * mt * start.dx +
               3 * mt * mt * t * cx1 +
@@ -3287,7 +3287,6 @@ class _ShareBoardDialogState extends State<_ShareBoardDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     return AdaptiveDialogScaffold(
       title: 'Share board',
       icon: const Icon(Icons.ios_share_outlined),
@@ -3297,10 +3296,7 @@ class _ShareBoardDialogState extends State<_ShareBoardDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Use Connect remote YoLoIT on another device and paste this URL and token.',
-              style: TextStyle(color: colors.textMuted, fontSize: 12),
-            ),
+            const Caption('Use Connect remote YoLoIT on another device and paste this URL and token.', fontSize: 12),
             const SizedBox(height: 16),
             _ShareValueRow(
               label: 'URL',
@@ -3319,7 +3315,7 @@ class _ShareBoardDialogState extends State<_ShareBoardDialog> {
                       _copy(widget.info.token, (value) => _copiedToken = value),
             ),
             const SizedBox(height: 12),
-            Caption('The app must stay open. If the other Mac cannot connect, allow incoming connections in macOS Firewall.'),
+            const Caption('The app must stay open. If the other Mac cannot connect, allow incoming connections in macOS Firewall.'),
           ],
         ),
       ),
@@ -5305,8 +5301,9 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                                     ctx,
                                                     size: 16,
                                                   );
-                                              if (svgIcon != null)
+                                              if (svgIcon != null) {
                                                 return svgIcon;
+                                              }
                                               return Icon(
                                                 plugin?.icon ??
                                                     Icons
@@ -6941,7 +6938,6 @@ class _WebViewOverlays extends StatelessWidget {
               if (!WebpagePlugin.pendingCssZoom.containsKey(panel.id)) {
                 WebpagePlugin.pendingCssZoom[panel.id] = 1.0;
               }
-              ;
 
               children.add(
                 Positioned(
@@ -7008,7 +7004,6 @@ class _WebViewOverlays extends StatelessWidget {
                 )) {
                   WebpagePlugin.pendingCssZoom[focusedPanel.id] = 1.0;
                 }
-                ;
 
                 children.add(
                   Positioned(
@@ -8847,7 +8842,6 @@ class _ConnectSettingsPanel extends StatelessWidget {
 
 class _BoardDrawingWidget extends StatefulWidget {
   const _BoardDrawingWidget({
-    super.key,
     required this.drawing,
     required this.isSelectMode,
     required this.onMove,
@@ -10343,24 +10337,20 @@ class _YoloBadgeWithChatState extends State<_YoloBadgeWithChat>
     switch (_assistantStatus) {
       case 'listening':
         await _assistantController.stopMic(sendAfterTranscription: true);
-        break;
       case 'processing':
       case 'thinking':
       case 'responding':
         return;
       case 'output':
         await _activateVoiceOverlay();
-        break;
       case 'ready':
         if (_voiceDraft.trim().isNotEmpty) {
           await _assistantController.sendDraft();
         } else {
           await _activateVoiceOverlay();
         }
-        break;
       default:
         await _activateVoiceOverlay();
-        break;
     }
     if (mounted) _voiceOverlayFocusNode.requestFocus();
   }

@@ -8,6 +8,7 @@ import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
+import 'package:yoloit/ui/components/typography/label.dart';
 
 // ── Embedded (Settings panel) ─────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ class _Header extends StatelessWidget {
               children: [
                 Text('Welcome to YoLoIT 👋',
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.w600)),
-                Caption('Check dependencies and configure AI agents'),
+                const Caption('Check dependencies and configure AI agents'),
               ],
             ),
           ),
@@ -215,7 +216,7 @@ class _LoadingView extends StatelessWidget {
       children: [
         SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: colors.accentBlue)),
         const SizedBox(height: 12),
-        Text('Checking your environment...', style: TextStyle(color: context.appColors.textMuted, fontSize: 12)),
+        const Caption('Checking your environment...', fontSize: 12),
       ],
     );
   }
@@ -377,10 +378,7 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 1),
-                  Text(
-                    'Allow YoLoIT in System Settings → Privacy & Security → Files and Folders',
-                    style: TextStyle(color: context.appColors.textMuted, fontSize: 10),
-                  ),
+                  const Caption('Allow YoLoIT in System Settings → Privacy & Security → Files and Folders', fontSize: 10),
                 ],
               ),
             ),
@@ -461,7 +459,7 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: colors.accentBlue),
         const SizedBox(width: 8),
-        Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12, fontWeight: FontWeight.w600)),
+        Label(label),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -626,12 +624,12 @@ class _DependencyCardState extends State<_DependencyCard> {
                             ),
                           if ((ok || _phase == _Phase.done) && dep.version != null) ...[
                             const SizedBox(width: 8),
-                            Text(dep.version!, style: TextStyle(color: context.appColors.textMuted, fontSize: 10)),
+                            Caption(dep.version!, fontSize: 10),
                           ],
                         ],
                       ),
                       const SizedBox(height: 1),
-                      Text(dep.description, style: TextStyle(color: context.appColors.textMuted, fontSize: 10)),
+                      Caption(dep.description, fontSize: 10),
                     ],
                   ),
                 ),
@@ -677,7 +675,7 @@ class _DependencyCardState extends State<_DependencyCard> {
                 children: [
                   TextButton(
                     onPressed: () => setState(() { _phase = _Phase.idle; _output.clear(); _showOutput = false; }),
-                    child: Text('Dismiss', style: TextStyle(fontSize: 10, color: context.appColors.textMuted)),
+                    child: const Caption('Dismiss', fontSize: 10),
                   ),
                   const SizedBox(width: 4),
                   TextButton(

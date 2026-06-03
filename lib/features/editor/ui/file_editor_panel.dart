@@ -324,10 +324,7 @@ class _FileEditorPanelState extends State<FileEditorPanel>
           children: [
             Icon(Icons.code, size: 40, color: colors.textMuted.withAlpha(60)),
             const SizedBox(height: 12),
-            Text(
-              'Open a file to edit',
-              style: TextStyle(color: colors.textMuted, fontSize: 13),
-            ),
+            const Caption('Open a file to edit', fontSize: 13),
           ],
         ),
       ),
@@ -2014,10 +2011,7 @@ class _EditorToolbar extends StatelessWidget {
           const Spacer(),
           Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: Text(
-              language,
-              style: TextStyle(color: colors.textMuted, fontSize: 10),
-            ),
+            child: Caption(language, fontSize: 10),
           ),
         ],
       ),
@@ -2386,11 +2380,12 @@ class _EditorStatusBarState extends State<_EditorStatusBar> {
     final lines = before.split('\n');
     final l = lines.length;
     final c = lines.last.length + 1;
-    if (l != _line || c != _col)
+    if (l != _line || c != _col) {
       setState(() {
         _line = l;
         _col = c;
       });
+    }
   }
 
   @override
@@ -2405,22 +2400,13 @@ class _EditorStatusBarState extends State<_EditorStatusBar> {
       child: Row(
         children: [
           const SizedBox(width: 10),
-          Text(
-            'Ln $_line, Col $_col',
-            style: TextStyle(color: colors.textMuted, fontSize: 10),
-          ),
+          Caption('Ln $_line, Col $_col', fontSize: 10),
           _SBar(),
-          Text(
-            'UTF-8',
-            style: TextStyle(color: colors.textMuted, fontSize: 10),
-          ),
+          const Caption('UTF-8', fontSize: 10),
           _SBar(),
-          Text('LF', style: TextStyle(color: colors.textMuted, fontSize: 10)),
+          const Caption('LF', fontSize: 10),
           _SBar(),
-          Text(
-            widget.language,
-            style: TextStyle(color: colors.textMuted, fontSize: 10),
-          ),
+          Caption(widget.language, fontSize: 10),
           const SizedBox(width: 8),
         ],
       ),
@@ -2468,10 +2454,11 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
           final m = RegExp(
             r'(?:class|enum|mixin|extension)\s+(\w+)',
           ).firstMatch(t);
-          if (m != null)
+          if (m != null) {
             symbols.add(
               _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
             );
+          }
         } else {
           final m = RegExp(
             r'(?:Future(?:<[^>]*>)?|Widget|void|String|int|bool|double|List|Map|dynamic)\s+(\w+)\s*[\(<]',
@@ -2496,15 +2483,16 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
       case 'js' || 'ts' || 'jsx' || 'tsx':
         if (t.startsWith('class ')) {
           final m = RegExp(r'class\s+(\w+)').firstMatch(t);
-          if (m != null)
+          if (m != null) {
             symbols.add(
               _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
             );
+          }
         } else if (RegExp(
           r'^(?:export\s+)?(?:async\s+)?function\s+\w+',
         ).hasMatch(t)) {
           final m = RegExp(r'function\s+(\w+)').firstMatch(t);
-          if (m != null)
+          if (m != null) {
             symbols.add(
               _OutlineSymbol(
                 name: '${m.group(1)!}()',
@@ -2512,11 +2500,12 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
                 isClass: false,
               ),
             );
+          }
         } else if (RegExp(
           r'^(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\(',
         ).hasMatch(t)) {
           final m = RegExp(r'(?:const|let|var)\s+(\w+)').firstMatch(t);
-          if (m != null)
+          if (m != null) {
             symbols.add(
               _OutlineSymbol(
                 name: '${m.group(1)!}()',
@@ -2524,17 +2513,19 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
                 isClass: false,
               ),
             );
+          }
         }
       case 'py':
         if (t.startsWith('class ')) {
           final m = RegExp(r'class\s+(\w+)').firstMatch(t);
-          if (m != null)
+          if (m != null) {
             symbols.add(
               _OutlineSymbol(name: m.group(1)!, line: i + 1, isClass: true),
             );
+          }
         } else if (t.startsWith('def ') || t.startsWith('async def ')) {
           final m = RegExp(r'def\s+(\w+)').firstMatch(t);
-          if (m != null)
+          if (m != null) {
             symbols.add(
               _OutlineSymbol(
                 name: '${m.group(1)!}()',
@@ -2542,6 +2533,7 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
                 isClass: false,
               ),
             );
+          }
         }
     }
   }
@@ -2592,7 +2584,7 @@ class _SymbolOutline extends StatelessWidget {
           Expanded(
             child:
                 symbols.isEmpty
-                    ? Center(
+                    ? const Center(
                       child: Caption('No symbols'),
                     )
                     : ListView.builder(

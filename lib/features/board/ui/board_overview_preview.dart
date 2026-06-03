@@ -7,7 +7,7 @@ import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 
 class BoardOverviewPreview extends StatelessWidget {
-  const BoardOverviewPreview({required this.board});
+  const BoardOverviewPreview({super.key, required this.board});
 
   final BoardDocument board;
 
@@ -95,7 +95,7 @@ class BoardOverviewPreview extends StatelessWidget {
 /// Canvas-style preview for offscreen PNG capture: panels at board coordinates
 /// with full plugin content (no overview card headers / tiny-mode blanks).
 class BoardCanvasPreview extends StatelessWidget {
-  const BoardCanvasPreview({required this.board, this.useViewport = false});
+  const BoardCanvasPreview({super.key, required this.board, this.useViewport = false});
 
   final BoardDocument board;
   final bool useViewport;
@@ -257,7 +257,7 @@ class BoardOverviewLinksPainter extends CustomPainter {
 }
 
 class BoardOverviewPanelPreview extends StatelessWidget {
-  const BoardOverviewPanelPreview({required this.panel});
+  const BoardOverviewPanelPreview({super.key, required this.panel});
 
   final BoardPanelInstance panel;
 
@@ -335,7 +335,7 @@ class BoardOverviewPanelPreview extends StatelessWidget {
 /// Any exceptions thrown during build are surfaced via [ErrorWidget.builder]
 /// (overridden in [BoardOffscreenRenderer] to log + return a grey box).
 class BoardOverviewPanelContent extends StatelessWidget {
-  const BoardOverviewPanelContent({required this.panel, this.headerHeight = 0.0});
+  const BoardOverviewPanelContent({super.key, required this.panel, this.headerHeight = 0.0});
 
   final BoardPanelInstance panel;
   final double headerHeight;
@@ -693,7 +693,7 @@ Widget _buildHeadlessMockup(
 
   if (type == 'board.playlist') {
     final rawTracks = panel.state['tracks'] as List? ?? [];
-    final tracks = rawTracks.where((e) => e is Map).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final tracks = rawTracks.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     final currentIndex = panel.state['currentIndex'] as int? ?? 0;
     return Container(
       color: colors.terminalBackground,

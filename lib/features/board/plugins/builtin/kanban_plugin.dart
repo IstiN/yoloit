@@ -996,7 +996,7 @@ class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
               const SizedBox(height: 10),
               if (widget.columns.isNotEmpty)
                 DropdownButtonFormField<int>(
-                  initialValue: _columnIndex,
+                  value: _columnIndex,
                   decoration: const InputDecoration(
                     labelText: 'Column',
                     isDense: true,

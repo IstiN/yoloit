@@ -20,6 +20,7 @@ import 'package:yoloit/features/editor/bloc/file_editor_cubit.dart';
 import 'package:yoloit/features/editor/ui/file_editor_panel.dart';
 import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 final _filePreviewDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
@@ -572,13 +573,7 @@ class _FilePreviewError extends StatelessWidget {
             ),
             if (details != null && details!.trim().isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(
-                details!,
-                style: TextStyle(color: colors.textMuted, fontSize: 10),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Caption(details!, fontSize: 10, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis),
             ],
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 12),

@@ -231,14 +231,14 @@ class _StickyEditorDialogState extends State<_StickyEditorDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionLabel('Note color'),
+            const _SectionLabel('Note color'),
             _ColorRow(
               colors: _noteColors,
               selected: _color,
               onSelected: (value) => setState(() => _color = value),
             ),
             const SizedBox(height: 16),
-            _SectionLabel('Text color'),
+            const _SectionLabel('Text color'),
             _ColorRow(
               colors: _textColors,
               selected: _textColor,

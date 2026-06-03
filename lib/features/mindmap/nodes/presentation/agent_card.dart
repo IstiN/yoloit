@@ -594,7 +594,7 @@ class _TerminalLines extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     if (lines.isEmpty) {
-      return Center(
+      return const Center(
         child: Caption('No output'),
       );
     }

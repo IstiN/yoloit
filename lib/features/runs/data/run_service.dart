@@ -24,7 +24,7 @@ class RunService {
   static Future<String> logPath(String configId) async {
     final dir = Directory('${PlatformDirs.instance.configDir}/runs');
     await dir.create(recursive: true);
-    return "${dir.path}/${tmuxName(configId)}.log";
+    return '${dir.path}/${tmuxName(configId)}.log';
   }
 
   /// Builds PATH with common GUI-app-missing tool dirs, including flutter.
@@ -72,13 +72,13 @@ class RunService {
 
     final tmux = await _tmux();
 
-    await File(log).writeAsString("");
-    await Process.run(tmux, ["kill-session", "-t", name]);
+    await File(log).writeAsString('');
+    await Process.run(tmux, ['kill-session', '-t', name]);
 
     final envStr = env.entries
-        .map((e) => "export ${e.key}=\"${e.value}\"")
-        .join("; ");
-    final prefix = envStr.isNotEmpty ? "$envStr; " : "";
+        .map((e) => 'export ${e.key}="${e.value}"')
+        .join('; ');
+    final prefix = envStr.isNotEmpty ? '$envStr; ' : '';
     // Inline workingDir and log directly into the bash string so they are
     // available even when the tmux server does not inherit the client's env.
     final enrichedPath = _enrichedPath();
@@ -90,13 +90,13 @@ class RunService {
       // io.stdout.hasTerminal stays true and hot reload/restart work.
       // tmux pipe-pane (set up below) mirrors all output to the log file.
       // kill-session will SIGHUP flutter directly so the app window closes.
-      bash = "export PATH=\"$enrichedPath\"; "
-          "${prefix}cd \"$workingDir\" && $command; "
-          "echo \"__YOLOIT_EXIT_\$?\" >> \"$log\"";
+      bash = 'export PATH="$enrichedPath"; '
+          '${prefix}cd "$workingDir" && $command; '
+          'echo "__YOLOIT_EXIT_\$?" >> "$log"';
     } else {
-      bash = "export PATH=\"$enrichedPath\"; "
-          "${prefix}cd \"$workingDir\" && $command 2>&1 | tee \"$log\"; "
-          "echo \"__YOLOIT_EXIT_\$?\" >> \"$log\"";
+      bash = 'export PATH="$enrichedPath"; '
+          '${prefix}cd "$workingDir" && $command 2>&1 | tee "$log"; '
+          'echo "__YOLOIT_EXIT_\$?" >> "$log"';
     }
 
     // Use the user's default shell with -ic so ~/.zshrc / ~/.bashrc is loaded.
@@ -106,24 +106,24 @@ class RunService {
     final shellArgs = Platform.isWindows ? ['-c', bash] : ['-ic', bash];
     final result = await Process.run(
       tmux,
-      ["new-session", "-d", "-s", name, "-x", "220", "-y", "50",
+      ['new-session', '-d', '-s', name, '-x', '220', '-y', '50',
        shell, ...shellArgs],
       environment: {
         ...Platform.environment,
-        "PATH": enrichedPath,
-        "TERM": "xterm-256color",
+        'PATH': enrichedPath,
+        'TERM': 'xterm-256color',
       },
     );
 
     if (result.exitCode != 0) {
-      onOutput("Failed to start tmux session: ${result.stderr}", true);
+      onOutput('Failed to start tmux session: ${result.stderr}', true);
       onExit(1);
       return;
     }
 
     if (isFlutterRun) {
       // Mirror tmux pane output to log file so _tailLog can read it.
-      await Process.run(tmux, ["pipe-pane", "-t", name, "cat >> \"$log\""]);
+      await Process.run(tmux, ['pipe-pane', '-t', name, 'cat >> "$log"']);
     }
 
     await _tailLog(
@@ -140,7 +140,7 @@ class RunService {
   }) async {
     if (Platform.isWindows) return false;
     final name = tmuxName(configId);
-    final check = await Process.run(await _tmux(), ["has-session", "-t", name]);
+    final check = await Process.run(await _tmux(), ['has-session', '-t', name]);
     if (check.exitCode != 0) return false;
     _sessionTmux[sessionId] = name;
     final log = await logPath(configId);
@@ -215,20 +215,20 @@ class RunService {
     final name = _sessionTmux[sessionId];
     if (name != null) {
       final tmux = _tmuxPath ?? 'tmux';
-      Process.run(tmux, ["kill-session", "-t", name]);
+      Process.run(tmux, ['kill-session', '-t', name]);
     }
     _cleanup(sessionId);
   }
 
-  void sendHotReload(String sessionId) => _sendKeys(sessionId, "r");
-  void sendHotRestart(String sessionId) => _sendKeys(sessionId, "R");
+  void sendHotReload(String sessionId) => _sendKeys(sessionId, 'r');
+  void sendHotRestart(String sessionId) => _sendKeys(sessionId, 'R');
   void sendStdin(String sessionId, String text) => _sendKeys(sessionId, text);
 
   void _sendKeys(String sessionId, String keys) {
     final name = _sessionTmux[sessionId];
     if (name != null) {
       final tmux = _tmuxPath ?? 'tmux';
-      Process.run(tmux, ["send-keys", "-t", name, keys]);
+      Process.run(tmux, ['send-keys', '-t', name, keys]);
     }
   }
 

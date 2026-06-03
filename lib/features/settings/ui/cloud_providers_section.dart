@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/ai_models_section.dart';
+import 'package:yoloit/ui/components/typography/label.dart';
 
 /// Settings section for managing cloud LLM provider configs.
 ///
@@ -338,10 +338,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-        ),
+        Label(label, fontSize: 13),
         const SizedBox(height: 4),
         TextField(
           controller: ctrl,

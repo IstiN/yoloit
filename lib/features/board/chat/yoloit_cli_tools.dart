@@ -684,8 +684,9 @@ class YoloitCliToolArgumentNormalizer {
       final sizePair = _extractSizePair(userMessage);
       if (sizePair != null) {
         if (_isMissing(normalized['width'])) normalized['width'] = sizePair.$1;
-        if (_isMissing(normalized['height']))
+        if (_isMissing(normalized['height'])) {
           normalized['height'] = sizePair.$2;
+        }
       }
       if (_isMissing(normalized['width'])) {
         final value = _numberAfterLabel(
@@ -1199,7 +1200,7 @@ class YoloitCliToolExecutor implements YoloitToolExecutor {
     final id = _firstNotEmpty(ctx?.panelId, ctx?.panelTitle);
     if (id == null) return null;
     if (_cliAutoResolvesPanel(tool.group) &&
-        (_isChatPanel('$id') || _isChatLikePanelType(ctx?.panelType))) {
+        (_isChatPanel(id) || _isChatLikePanelType(ctx?.panelType))) {
       return null;
     }
     return id;
@@ -1443,13 +1444,13 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       ),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'reload',
     alias: 'rl',
     description: 'Hot reload the running Flutter app',
     group: 'app',
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'restart',
     alias: 'rs',
     description: 'Hot restart the running Flutter app',
@@ -1473,24 +1474,24 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('token', 'Bearer token', required: false),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'remote:disconnect',
     alias: 'rdisc',
     description: 'Disconnect remote yoloitd and use local desktop server',
     group: 'remote',
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'remote:status',
     alias: 'rst',
     description: 'Show active remote yoloitd connection',
     group: 'remote',
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'boards',
     alias: 'bls',
     description: 'List all boards',
     group: 'board',
-    humanVariants: const {
+    humanVariants: {
       'ru': ['покажи борды', 'список бордов', 'какие борды есть', 'мои доски'],
       'en': [
         'show boards',
@@ -1633,7 +1634,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('board', 'Board id or name', required: true, shortKey: 'b'),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'board:current',
     alias: 'bcur',
     description: 'Show current board',
@@ -2156,7 +2157,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('session', 'Session id, config id, or name', shortKey: 's'),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'models:list',
     alias: 'mls',
     description: 'List local AI model states',
@@ -2270,7 +2271,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       ),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'agent:list',
     alias: 'agl',
     description:
@@ -2360,7 +2361,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       ),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'yolochat:panels',
     alias: 'cls',
     description: 'List all board.chat panels',
@@ -2486,13 +2487,13 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       ),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'yolochat:sessions',
     alias: 'css',
     description: 'List active YoLo chat sessions',
     group: 'yolochat',
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'yolochat:history',
     alias: 'chy',
     description: 'List saved YoLo chat sessions from chat history',
@@ -2580,7 +2581,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       ),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'cloud:list',
     alias: 'clp',
     description: 'List cloud LLM providers and active config',
@@ -3285,7 +3286,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('start', 'Start timer immediately', shortKey: 's'),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'app:list',
     alias: 'myapps',
     description: 'List installed apps and which are currently running',
@@ -3411,14 +3412,14 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('output', 'Output PNG path (default: /tmp/<id>.png)', shortKey: 'o'),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'app:dev-skill',
     alias: 'apdocs',
     description:
         'Print the full YoLoIT app development guide (JS API, node types, examples). Useful for AI agents writing apps.',
     group: 'app',
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'app:demo',
     alias: 'apdemo',
     description:
@@ -3667,13 +3668,13 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     ],
   ),
   // ── Theme management ─────────────────────────────────────────────────────
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'theme',
     alias: 'thm',
     description: 'Show current theme info (preset, brightness, overrides)',
     group: 'app',
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'theme:presets',
     alias: 'thmp',
     description: 'List all available theme presets (built-in and custom)',
@@ -3745,7 +3746,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('slot', 'Color slot name', required: true, shortKey: 's'),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'theme:reset-all',
     alias: 'thmra',
     description: 'Clear all color overrides, reverting to base theme',
@@ -3761,7 +3762,7 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
       _p('name', 'Name for the new preset', required: true, shortKey: 'n'),
     ],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'theme:export',
     alias: 'thmex',
     description: 'Export current theme as JSON to stdout',
@@ -3784,13 +3785,13 @@ final List<YoloitCliTool> _tools = <YoloitCliTool>[
     destructive: true,
     params: <YoloitCliToolParam>[_p('id', 'Custom theme id', required: true)],
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'theme:colors',
     alias: 'thmcl',
     description: 'Show all effective color values for the current theme',
     group: 'app',
   ),
-  YoloitCliTool(
+  const YoloitCliTool(
     command: 'theme:slots',
     alias: 'thmsl',
     description: 'Show available color slot names grouped by category',

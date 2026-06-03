@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../model/sync_message.dart';
-import 'collaboration_cipher.dart';
+import 'package:yoloit/features/collaboration/model/sync_message.dart';
+import 'package:yoloit/features/collaboration/services/collaboration_cipher.dart';
 
 /// WebSocket client for the guest machine.
 /// Sends JSON text frames and receives [SyncMessage] callbacks.

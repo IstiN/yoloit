@@ -180,20 +180,19 @@ class TerminalCubit extends Cubit<TerminalState> {
     final allWsPaths = workspacePaths ?? [workspacePath];
     if (saved.isNotEmpty) {
       for (var i = 0; i < saved.length; i++) {
-        if (i > 0)
+        if (i > 0) {
           await Future<void>.delayed(const Duration(milliseconds: 200));
+        }
         final s = saved[i];
 
         // Recover worktreeContexts from symlinks if not persisted (old format).
         var worktreeContexts = s.worktreeContexts;
-        if (worktreeContexts == null) {
-          worktreeContexts = await AgentWorkspaceDirService.instance
+        worktreeContexts ??= await AgentWorkspaceDirService.instance
               .readWorktreeContexts(
                 s.workspaceId ?? workspaceId,
                 s.id,
                 allWsPaths,
               );
-        }
 
         await spawnSession(
           type: s.type,
@@ -611,8 +610,9 @@ class TerminalCubit extends Cubit<TerminalState> {
 
     // Play completion sound (interactive mode micro-completion).
     SessionPrefs.isCompletionSoundEnabled().then((enabled) {
-      if (enabled && Platform.isMacOS)
+      if (enabled && Platform.isMacOS) {
         Process.run('afplay', ['/System/Library/Sounds/Glass.aiff']);
+      }
     });
 
     Future.delayed(const Duration(seconds: 3), () {
@@ -678,8 +678,9 @@ class TerminalCubit extends Cubit<TerminalState> {
       }
       // Urgent sound — different from completion sound.
       SessionPrefs.isApprovalSoundEnabled().then((enabled) {
-        if (enabled && Platform.isMacOS)
+        if (enabled && Platform.isMacOS) {
           Process.run('afplay', ['/System/Library/Sounds/Sosumi.aiff']);
+        }
       });
     }
 
@@ -760,13 +761,14 @@ class TerminalCubit extends Cubit<TerminalState> {
       _allSessions[idx] = _allSessions[idx].copyWith(status: AgentStatus.idle);
     }
     final visible = _workspaceSessions;
-    if (!isClosed)
+    if (!isClosed) {
       emit(
         current.copyWith(
           sessions: visible,
           allSessions: List.unmodifiable(_allSessions),
         ),
       );
+    }
   }
 
   String _generateSessionId() {

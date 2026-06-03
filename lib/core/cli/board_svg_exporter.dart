@@ -51,7 +51,7 @@ class BoardSvgExporter {
     buf.writeln('</defs>');
 
     // Board title
-    buf.writeln('<text x="${padding}" y="${padding - 10}" class="board-title">'
+    buf.writeln('<text x="$padding" y="${padding - 10}" class="board-title">'
         '${_esc(board.name)}</text>');
 
     // Links

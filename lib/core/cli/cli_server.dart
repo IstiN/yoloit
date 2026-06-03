@@ -16,11 +16,12 @@ import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
+import 'package:yoloit/core/theme/app_theme.dart';
+import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
-import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
-import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
+import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/chat_session_naming.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -29,6 +30,7 @@ import 'package:yoloit/features/board/model/terminal_panel_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
+import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
@@ -37,8 +39,6 @@ import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
-import 'package:yoloit/core/theme/app_theme.dart';
-import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
@@ -3276,14 +3276,18 @@ class CliServer {
     }
 
     final updates = <String, dynamic>{};
-    if (raw.containsKey('title'))
+    if (raw.containsKey('title')) {
       updates['title'] = _string(raw['title']) ?? panel.title;
-    if (raw.containsKey('hidden'))
+    }
+    if (raw.containsKey('hidden')) {
       updates['hidden'] = _bool(raw['hidden']) ?? panel.hidden;
-    if (raw.containsKey('locked'))
+    }
+    if (raw.containsKey('locked')) {
       updates['locked'] = _bool(raw['locked']) ?? panel.locked;
-    if (raw.containsKey('pinned'))
+    }
+    if (raw.containsKey('pinned')) {
       updates['pinned'] = _bool(raw['pinned']) ?? panel.pinned;
+    }
     if (raw.containsKey('color')) {
       final colorStr = _string(raw['color']);
       updates['color'] = colorStr == 'clear' ? null : _parseColor(colorStr);
@@ -3294,8 +3298,9 @@ class CliServer {
     if (raw.containsKey('state')) {
       updates['state'] = {...panel.state, ...?_map(raw['state'])};
     }
-    if (raw.containsKey('zIndex'))
+    if (raw.containsKey('zIndex')) {
       updates['zIndex'] = _int(raw['zIndex']) ?? panel.zIndex;
+    }
     if (raw.containsKey('x') || raw.containsKey('y')) {
       final x = _double(raw['x']) ?? panel.bounds.x;
       final y = _double(raw['y']) ?? panel.bounds.y;
@@ -3878,7 +3883,7 @@ class CliServer {
         // Include panel ID as a searchable field so queries like
         // "demo_copilot" or "demo copilot" match a panel named demo_copilot.
         final texts = <String>[
-          if ((panel.title ?? '').trim().isNotEmpty) panel.title!.trim(),
+          if ((panel.title ?? '').trim().isNotEmpty) panel.title.trim(),
           panel.id,
           ..._collectSearchStrings(panel.state),
         ];
@@ -3930,7 +3935,6 @@ class CliServer {
     for (final entry in entries) {
       final messages = await ChatSessionHistory.instance.loadMessages(entry.id);
       for (final message in messages) {
-        if (message is! Map<String, dynamic>) continue;
         final content = message['content'] as String? ?? '';
         final snippet = _matchSnippet(content, query);
         if (snippet == null) continue;
@@ -4310,8 +4314,9 @@ class CliServer {
         return _error('Missing "path" field');
       }
       final manifest = await registry.install(srcPath.trim());
-      if (manifest == null)
+      if (manifest == null) {
         return _error('Failed to install widget from: $srcPath');
+      }
       return _json({'ok': true, 'widget': manifest.toJson()});
     }
 
@@ -4425,8 +4430,9 @@ class CliServer {
           await widgetFile.exists() ? await widgetFile.readAsString() : null;
       Map<String, dynamic> manifest = {};
       try {
-        if (manifestContent != null)
+        if (manifestContent != null) {
           manifest = jsonDecode(manifestContent) as Map<String, dynamic>;
+        }
       } catch (_) {}
       return _json({
         'id': id,
@@ -4623,7 +4629,7 @@ class CliServer {
         'hasOverrides': tm.hasOverrides,
         'overrides': tm.colorOverrides.map(
           (k, v) =>
-              MapEntry(k, '#${v.value.toRadixString(16).padLeft(8, '0')}'),
+              MapEntry(k, '#${v.toARGB32().toRadixString(16).padLeft(8, '0')}'),
         ),
       });
     }

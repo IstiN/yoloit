@@ -4,13 +4,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
-import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
-import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
+import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
+import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
+import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
-import 'package:yoloit/features/settings/data/agent_config_service.dart';
 
 typedef CursorProcessStarter =
     Future<Process> Function(
@@ -354,10 +354,10 @@ class CursorAgentProvider extends ChatProvider {
 
       case 'user':
         return [
-          ChatEvent(
+          const ChatEvent(
             type: ChatEventType.userMessage,
             rawType: 'cursor.user',
-            data: const {},
+            data: {},
           ),
         ];
 

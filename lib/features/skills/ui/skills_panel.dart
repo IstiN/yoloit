@@ -145,7 +145,7 @@ class _SyncStatusBar extends StatelessWidget {
               children: [
                 Icon(Icons.refresh, size: 12, color: colors.textMuted),
                 const SizedBox(width: 3),
-                Text('Sync', style: TextStyle(color: colors.textMuted, fontSize: 10)),
+                const Caption('Sync', fontSize: 10),
               ],
             ),
           ),
@@ -300,7 +300,7 @@ class _StoreTile extends StatelessWidget {
               GestureDetector(
                 onTap: onRemove,
                 child: Padding(
-                  padding: EdgeInsets.only(left: 4),
+                  padding: const EdgeInsets.only(left: 4),
                   child: Icon(Icons.close, size: 12, color: colors.textMuted),
                 ),
               ),
@@ -334,10 +334,7 @@ class _SkillsList extends StatelessWidget {
           children: [
             Icon(Icons.extension_outlined, size: 36, color: colors.textMuted),
             const SizedBox(height: 12),
-            Text(
-              'No skills found',
-              style: TextStyle(color: colors.textMuted, fontSize: 13),
-            ),
+            const Caption('No skills found', fontSize: 13),
           ],
         ),
       );
@@ -469,10 +466,7 @@ class _SkillCard extends StatelessWidget {
         backgroundColor: colors.surfaceElevated,
         title: Text('Uninstall Skill',
             style: TextStyle(color: colors.textPrimary, fontSize: 15)),
-        content: Text(
-          'Remove "${skill.name}" from the global skills store? Workspace symlinks will also be removed.',
-          style: TextStyle(color: colors.textMuted, fontSize: 13),
-        ),
+        content: Caption('Remove "${skill.name}" from the global skills store? Workspace symlinks will also be removed.', fontSize: 13),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -609,7 +603,7 @@ class _AddStoreButton extends StatelessWidget {
           children: [
             Icon(Icons.add, size: 13, color: colors.textMuted),
             const SizedBox(width: 4),
-            Caption('Add Store'),
+            const Caption('Add Store'),
           ],
         ),
       ),
@@ -672,7 +666,7 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
               hint: 'owner/repo  or  https://...  or  curl -fsSL ...',
             ),
             const SizedBox(height: 12),
-            Caption('Type'),
+            const Caption('Type'),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
@@ -798,18 +792,12 @@ class _InstallToRepoDialogState extends State<_InstallToRepoDialog> {
       content: SizedBox(
         width: 380,
         child: paths.isEmpty
-            ? Text(
-                'No repositories found. Add a workspace with a repo path first.',
-                style: TextStyle(color: colors.textMuted, fontSize: 12),
-              )
+            ? const Caption('No repositories found. Add a workspace with a repo path first.', fontSize: 12)
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Select a repository to install the skill into:',
-                    style: TextStyle(color: colors.textMuted, fontSize: 12),
-                  ),
+                  const Caption('Select a repository to install the skill into:', fontSize: 12),
                   const SizedBox(height: 10),
                   ...paths.map((path) {
                     final name = path.split('/').last;
@@ -903,9 +891,7 @@ class _ErrorView extends StatelessWidget {
         children: [
           Icon(Icons.error_outline, size: 32, color: colors.accentOrange),
           const SizedBox(height: 12),
-          Text(message,
-              style: TextStyle(color: colors.textMuted, fontSize: 12),
-              textAlign: TextAlign.center),
+          Caption(message, fontSize: 12, textAlign: TextAlign.center),
           const SizedBox(height: 12),
           TextButton.icon(
             onPressed: onRetry,

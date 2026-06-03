@@ -469,15 +469,17 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
       final expanded = _expandedIds.contains(node.id);
 
       // For workspace rows, toggling hides/shows workspace + all descendant IDs together.
-      List<String> _allDescendantIds(ShowHideSidebarNode n) {
+      List<String> allDescendantIds(ShowHideSidebarNode n) {
         final ids = <String>[n.id];
-        for (final c in n.children) ids.addAll(_allDescendantIds(c));
+        for (final c in n.children) {
+          ids.addAll(allDescendantIds(c));
+        }
         return ids;
       }
 
       final VoidCallback toggleHide =
           isWorkspace
-              ? () => widget.onToggleGroup(_allDescendantIds(node))
+              ? () => widget.onToggleGroup(allDescendantIds(node))
               : () => widget.onToggleHide(node.id);
 
       // Collect descendant IDs as a Set for hide/show-all-children callbacks.
@@ -639,72 +641,72 @@ void _collectReachableIds(
 
 ({String type, String label}) _desktopMeta(MindMapNodeData node) {
   return switch (node) {
-    WorkspaceNodeData data => (type: 'workspace', label: data.workspace.name),
-    AgentNodeData data => (type: 'agent', label: data.session.displayName),
-    RepoNodeData data => (type: 'repo', label: data.repoName),
-    BranchNodeData data => (type: 'branch', label: data.branch),
-    FilesNodeData data => (type: 'files', label: p.basename(data.repoPath)),
-    FileTreeNodeData data => (type: 'tree', label: data.repoName ?? 'Tree'),
-    DiffNodeData data => (type: 'diff', label: data.repoName ?? 'Diff'),
-    EditorNodeData data => (type: 'editor', label: p.basename(data.filePath)),
-    FilePanelNodeData data => (type: 'panel', label: p.basename(data.filePath)),
-    FileDiffPanelNodeData data => (
+    final WorkspaceNodeData data => (type: 'workspace', label: data.workspace.name),
+    final AgentNodeData data => (type: 'agent', label: data.session.displayName),
+    final RepoNodeData data => (type: 'repo', label: data.repoName),
+    final BranchNodeData data => (type: 'branch', label: data.branch),
+    final FilesNodeData data => (type: 'files', label: p.basename(data.repoPath)),
+    final FileTreeNodeData data => (type: 'tree', label: data.repoName ?? 'Tree'),
+    final DiffNodeData data => (type: 'diff', label: data.repoName ?? 'Diff'),
+    final EditorNodeData data => (type: 'editor', label: p.basename(data.filePath)),
+    final FilePanelNodeData data => (type: 'panel', label: p.basename(data.filePath)),
+    final FileDiffPanelNodeData data => (
       type: 'filediff',
       label: p.basename(data.filePath),
     ),
-    RunNodeData data => (type: 'run', label: data.session.config.name),
-    SessionNodeData data => (type: 'session', label: data.session.displayName),
+    final RunNodeData data => (type: 'run', label: data.session.config.name),
+    final SessionNodeData data => (type: 'session', label: data.session.displayName),
     MindMapPluginNodeData _ => (type: 'plugin', label: node.id),
   };
 }
 
 Map<String, dynamic> _snapshotContentFromNode(MindMapNodeData node) {
   return switch (node) {
-    WorkspaceNodeData data => {
+    final WorkspaceNodeData data => {
       'type': 'workspace',
       'name': data.workspace.name,
       'path': data.workspace.path,
     },
-    AgentNodeData data => {
+    final AgentNodeData data => {
       'type': 'agent',
       'name': data.session.displayName,
       'status': data.isRunning ? 'live' : 'idle',
     },
-    RepoNodeData data => {
+    final RepoNodeData data => {
       'type': 'repo',
       'name': data.repoName,
       'path': data.repoPath,
       'branch': data.branch,
     },
-    BranchNodeData data => {
+    final BranchNodeData data => {
       'type': 'branch',
       'name': data.branch,
       'branch': data.branch,
     },
-    FilesNodeData data => {'type': 'files', 'repoPath': data.repoPath},
-    FileTreeNodeData data => {
+    final FilesNodeData data => {'type': 'files', 'repoPath': data.repoPath},
+    final FileTreeNodeData data => {
       'type': 'tree',
       'repoName': data.repoName,
       'repoPath': data.repoPath,
     },
-    DiffNodeData data => {
+    final DiffNodeData data => {
       'type': 'diff',
       'repoName': data.repoName,
       'repoPath': data.repoPath,
     },
-    EditorNodeData data => {'type': 'editor', 'filePath': data.filePath},
-    FilePanelNodeData data => {'type': 'panel', 'filePath': data.filePath},
-    FileDiffPanelNodeData data => {
+    final EditorNodeData data => {'type': 'editor', 'filePath': data.filePath},
+    final FilePanelNodeData data => {'type': 'panel', 'filePath': data.filePath},
+    final FileDiffPanelNodeData data => {
       'type': 'filediff',
       'filePath': data.filePath,
       'repoPath': data.repoPath,
     },
-    RunNodeData data => {'type': 'run', 'name': data.session.config.name},
-    SessionNodeData data => {
+    final RunNodeData data => {'type': 'run', 'name': data.session.config.name},
+    final SessionNodeData data => {
       'type': 'session',
       'name': data.session.displayName,
     },
-    MindMapPluginNodeData data => {
+    final MindMapPluginNodeData data => {
       'type': 'plugin',
       'pluginId': data.pluginId,
       'name': data.id,

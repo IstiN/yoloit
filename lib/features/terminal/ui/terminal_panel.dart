@@ -11,6 +11,7 @@ import 'package:xterm/xterm.dart' hide TerminalState;
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
@@ -20,7 +21,6 @@ import 'package:yoloit/features/terminal/models/agent_phase.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
-import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
@@ -82,10 +82,7 @@ class _EmptyTerminal extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Open a workspace and start an AI agent to begin',
-                    style: TextStyle(color: colors.textMuted, fontSize: 13),
-                  ),
+                  const Caption('Open a workspace and start an AI agent to begin', fontSize: 13),
                   const SizedBox(height: 24),
                   BlocBuilder<WorkspaceCubit, WorkspaceState>(
                     builder: (context, wsState) {

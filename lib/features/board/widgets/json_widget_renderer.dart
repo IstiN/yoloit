@@ -564,11 +564,12 @@ class JsonWidgetRenderer {
 
   FontWeight? _fontWeight(dynamic v) {
     if (v == null) return null;
-    if (v is num)
+    if (v is num) {
       return FontWeight.values.firstWhere(
         (w) => w.value == ((v / 100).round() * 100).clamp(100, 900),
         orElse: () => FontWeight.normal,
       );
+    }
     return switch (v.toString()) {
       'bold' => FontWeight.bold,
       'w100' => FontWeight.w100,

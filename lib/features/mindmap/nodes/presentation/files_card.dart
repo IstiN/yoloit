@@ -13,7 +13,7 @@ class FilesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final visibleLimit = 8;
+    const visibleLimit = 8;
     final files = props.files.take(visibleLimit).toList();
     final remaining = props.files.length - visibleLimit;
     return Container(

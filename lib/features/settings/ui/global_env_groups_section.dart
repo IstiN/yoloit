@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class GlobalEnvGroupsSection extends StatefulWidget {
   const GlobalEnvGroupsSection({super.key});
@@ -215,12 +216,9 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
         ),
         const SizedBox(height: 10),
         if (_groups.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Text(
-              'No env groups yet. Create one or import a .env file.',
-              style: TextStyle(color: context.appColors.textMuted, fontSize: 12),
-            ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Caption('No env groups yet. Create one or import a .env file.', fontSize: 12),
           )
         else
           ..._groups.indexed.map((entry) {

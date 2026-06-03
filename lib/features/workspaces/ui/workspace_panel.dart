@@ -20,8 +20,8 @@ import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/data/workspace_secrets_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
-import 'package:yoloit/features/workspaces/ui/worktree_section.dart';
 import 'package:yoloit/features/workspaces/ui/workspace_inline_tree.dart';
+import 'package:yoloit/features/workspaces/ui/worktree_section.dart';
 
 class WorkspacePanel extends StatefulWidget {
   const WorkspacePanel({super.key});
@@ -109,7 +109,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
   Widget _buildBottomSection() {
     return Column(
       children: [
-        _ActiveSessionsPanel(),
+        const _ActiveSessionsPanel(),
         const Divider(height: 1),
         if (_showThemePicker) _buildThemePicker(),
         _SetupItem(
@@ -1189,7 +1189,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                 widget.suppressDecoration
                     ? EdgeInsets.zero
                     : const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            padding: EdgeInsets.all(10),
+            padding: const EdgeInsets.all(10),
             decoration:
                 widget.suppressDecoration
                     ? const BoxDecoration()
@@ -1296,7 +1296,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                 ),
                 // Color picker row
                 if (_showColorPicker) ...[
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Row(
                     children:
                         _palette(colors).map((c) {
@@ -1452,8 +1452,8 @@ class _SetupItemState extends State<_SetupItem> {
         child: GestureDetector(
           onTap: widget.onTap,
           child: AnimatedContainer(
-            duration: Duration(milliseconds: 100),
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            duration: const Duration(milliseconds: 100),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             color: _hovering ? colors.surfaceHighlight : Colors.transparent,
             child: Row(
               children: [
@@ -1553,11 +1553,12 @@ class _SecretsDialogState extends State<_SecretsDialog> {
     final loaded = await WorkspaceSecretsService.instance.load(
       widget.workspaceId,
     );
-    if (mounted)
+    if (mounted) {
       setState(() {
         _secrets = Map.from(loaded);
         _loading = false;
       });
+    }
   }
 
   void _addEntry() {
@@ -1708,11 +1709,11 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                       );
                     },
                   ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: _addEntry,
-                  icon: Icon(Icons.add, size: 14),
-                  label: Text('Add secret', style: TextStyle(fontSize: 12)),
+                  icon: const Icon(Icons.add, size: 14),
+                  label: const Text('Add secret', style: TextStyle(fontSize: 12)),
                   style: TextButton.styleFrom(foregroundColor: colors.primary),
                 ),
               ],
@@ -1731,7 +1732,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: _loading ? null : _save,
                     style: ElevatedButton.styleFrom(
@@ -1783,7 +1784,7 @@ class _SecretTextField extends StatelessWidget {
               context.appColors.textMuted,
           fontSize: 12,
         ),
-        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         isDense: true,
         filled: true,
         fillColor: colors.surfaceElevated,

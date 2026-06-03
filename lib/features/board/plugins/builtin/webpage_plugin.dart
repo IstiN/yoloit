@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
@@ -844,7 +843,7 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
 
       // C: body transform scale
       if (_bodyScaleEnabled && bodyScale.isNotEmpty) {
-        sb.writeln("  var b=document.body;");
+        sb.writeln('  var b=document.body;');
         sb.writeln("  b.style.transform='scale($bodyScale)';");
         sb.writeln("  b.style.transformOrigin='top left';");
         sb.writeln("  b.style.width=(100/parseFloat('$bodyScale'))+'%';");
@@ -962,18 +961,18 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
     });
   })();
 """);
-      sb.writeln("  return JSON.stringify({");
-      sb.writeln("    innerWidth: window.innerWidth,");
-      sb.writeln("    innerHeight: window.innerHeight,");
+      sb.writeln('  return JSON.stringify({');
+      sb.writeln('    innerWidth: window.innerWidth,');
+      sb.writeln('    innerHeight: window.innerHeight,');
       sb.writeln("    zoom: document.documentElement.style.zoom||'none',");
       sb.writeln(
-        "    bodyClientW: document.body?document.body.clientWidth:null,",
+        '    bodyClientW: document.body?document.body.clientWidth:null,',
       );
       sb.writeln(
-        "    bodyClientH: document.body?document.body.clientHeight:null,",
+        '    bodyClientH: document.body?document.body.clientHeight:null,',
       );
       sb.writeln(
-        "    bodyScrollW: document.body?document.body.scrollWidth:null,",
+        '    bodyScrollW: document.body?document.body.scrollWidth:null,',
       );
       // YouTube player info
       sb.writeln(
@@ -988,7 +987,7 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       sb.writeln(
         "    minHeight: document.body?document.body.style.minHeight:'none',",
       );
-      sb.writeln("  });");
+      sb.writeln('  });');
       sb.writeln('})()');
 
       await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -1084,7 +1083,7 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       // measure for responsive breakpoints.
       final sb = StringBuffer('(function(){\n');
       // Always override window.innerWidth to the fixed viewport target.
-      sb.writeln("  var iw = 1280;");
+      sb.writeln('  var iw = 1280;');
       sb.writeln(
         "  try{Object.defineProperty(window,'innerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
       );
@@ -1092,21 +1091,21 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
         "  try{Object.defineProperty(window,'outerWidth',{get:function(){return iw;},configurable:true});}catch(e){}",
       );
       if (useInner && innerWidth.isNotEmpty && innerWidth != '1280') {
-        sb.writeln("  iw = $innerWidth;");
+        sb.writeln('  iw = $innerWidth;');
       }
       // Apply CSS zoom on every DOMContentLoaded so reflow happens before JS.
       if (useZoom) {
         sb.writeln(
           "  var applyZoom = function(){ if(document.documentElement) document.documentElement.style.zoom='$cssZoom'; };",
         );
-        sb.writeln("  applyZoom();");
+        sb.writeln('  applyZoom();');
         sb.writeln(
           "  document.addEventListener('DOMContentLoaded', applyZoom);",
         );
       }
       if (useYtFix) {
-        sb.writeln("  var ytW = $ytPlayerWidth;");
-        sb.writeln("  var ytH = $ytPlayerHeight;");
+        sb.writeln('  var ytW = $ytPlayerWidth;');
+        sb.writeln('  var ytH = $ytPlayerHeight;');
         sb.writeln(r"""
   var installYtFix = function(){
     var css = ''
@@ -1185,11 +1184,10 @@ JSON.stringify({
       } catch (_) {}
 
       final pretty =
-          '✓ Installed on $installed WKWebView(s).\n\n' +
-          afterRaw
+          '✓ Installed on $installed WKWebView(s).\n\n${afterRaw
               .replaceAll('{', '{\n  ')
               .replaceAll(',', ',\n  ')
-              .replaceAll('}', '\n}');
+              .replaceAll('}', '\n}')}';
       setState(() {
         _result = pretty;
       });

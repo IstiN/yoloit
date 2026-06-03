@@ -59,12 +59,12 @@ class NoteCliHandler extends PanelCliHandler {
           stateUpdate: {'markdown': '$current\n$text'},
         );
       case 'wrap':
-        return CliActionResult(
+        return const CliActionResult(
           message: 'Auto-height enabled — panel will resize to fit content',
           stateUpdate: {'autoHeight': true},
         );
       case 'nowrap':
-        return CliActionResult(
+        return const CliActionResult(
           message: 'Auto-height disabled — panel has fixed height',
           stateUpdate: {'autoHeight': false},
         );

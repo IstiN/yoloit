@@ -134,10 +134,11 @@ class _TimerContentState extends State<_TimerContent>
       _pulseCtrl.stop();
       _pulseCtrl.reset();
     }
-    if (_isRunning)
+    if (_isRunning) {
       _startTicker();
-    else
+    } else {
       _stopTicker();
+    }
   }
 
   void _startTicker() {
