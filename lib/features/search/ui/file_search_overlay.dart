@@ -16,6 +16,7 @@ import 'package:yoloit/features/search/data/file_search_service.dart';
 import 'package:yoloit/features/search/utils/fuzzy_matcher.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// Shows the quick-open overlay.
 /// Searches open board panels, files inside file-tree panel directories,
@@ -609,20 +610,11 @@ class _FileSearchOverlayState extends State<FileSearchOverlay> {
       child: Row(
         children: [
           if (panelCount > 0)
-            Text(
-              '$panelCount panel${panelCount > 1 ? 's' : ''}',
-              style: TextStyle(color: colors.textMuted, fontSize: 11),
-            ),
+            Caption('$panelCount panel${panelCount > 1 ? 's' : ''}',),
           if (panelCount > 0 && fileCount > 0)
-            Text(
-              ' · ',
-              style: TextStyle(color: colors.textMuted, fontSize: 11),
-            ),
+            Caption(' · '),
           if (fileCount > 0)
-            Text(
-              '$fileCount file${fileCount > 1 ? 's' : ''}',
-              style: TextStyle(color: colors.textMuted, fontSize: 11),
-            ),
+            Caption('$fileCount file${fileCount > 1 ? 's' : ''}',),
           const Spacer(),
           Text(
             '${_results.length} result${_results.length > 1 ? 's' : ''}',
@@ -773,11 +765,7 @@ class _QuickResultTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 1),
-                  Text(
-                    result.subtitle,
-                    style: TextStyle(color: colors.textMuted, fontSize: 11),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Caption(result.subtitle, overflow: TextOverflow.ellipsis),
                   if (result.preview != null &&
                       result.preview != result.title) ...[
                     const SizedBox(height: 1),

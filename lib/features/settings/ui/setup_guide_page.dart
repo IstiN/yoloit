@@ -7,6 +7,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 // ── Embedded (Settings panel) ─────────────────────────────────────────────────
 
@@ -184,8 +185,7 @@ class _Header extends StatelessWidget {
               children: [
                 Text('Welcome to YoLoIT 👋',
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.w600)),
-                Text('Check dependencies and configure AI agents',
-                    style: TextStyle(color: context.appColors.textMuted, fontSize: 11)),
+                Caption('Check dependencies and configure AI agents'),
               ],
             ),
           ),

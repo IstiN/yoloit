@@ -27,6 +27,7 @@ import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/debug_ui_shell.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 import 'package:yoloit/features/settings/ui/sync_section.dart';
 import 'package:yoloit/features/settings/ui/widget_permissions_section.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
@@ -448,10 +449,7 @@ class _SupportSectionState extends State<_SupportSection> {
                 style: TextStyle(color: colors.textMuted, fontSize: 12),
               ),
               const SizedBox(height: 8),
-              Text(
-                'App log: ${_logPath ?? 'loading...'}',
-                style: TextStyle(color: colors.textMuted, fontSize: 11),
-              ),
+              Caption('App log: ${_logPath ?? 'loading...'}'),
             ],
           ),
         ),
@@ -572,9 +570,8 @@ class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
+                    Caption(
                       'Switches the embedded terminal emulator for board/app terminal panels.',
-                      style: TextStyle(color: colors.textMuted, fontSize: 11),
                     ),
                   ],
                 ),
@@ -615,9 +612,8 @@ class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
                       'Terminal backend',
                       style: TextStyle(color: colors.textPrimary, fontSize: 13),
                     ),
-                    Text(
+                    Caption(
                       'Runtime is the default persistent backend. Local PTY remains available as a fallback.',
-                      style: TextStyle(color: colors.textMuted, fontSize: 11),
                     ),
                   ],
                 ),

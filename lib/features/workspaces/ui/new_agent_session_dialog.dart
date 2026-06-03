@@ -7,6 +7,7 @@ import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// Opens [NewAgentSessionDialog] with the terminal cubit from [context].
 void showNewAgentSessionDialog(
@@ -594,11 +595,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
                     Padding(
                       padding:
                           const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      child: Text(
-                        'No branches found',
-                        style: TextStyle(
-                            color: context.appColors.textMuted, fontSize: 11),
-                      ),
+                      child: Caption('No branches found'),
                     ),
                   ...filtered.map((branch) {
                     final isActive =

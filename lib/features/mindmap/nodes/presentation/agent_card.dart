@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// Presentation agent/terminal card — shared shell used by both macOS and web.
 /// Web falls back to styled text lines; macOS can inject a live terminal body.
@@ -594,10 +595,7 @@ class _TerminalLines extends StatelessWidget {
     final colors = context.appColors;
     if (lines.isEmpty) {
       return Center(
-        child: Text(
-          'No output',
-          style: TextStyle(color: colors.textMuted, fontSize: 11),
-        ),
+        child: Caption('No output'),
       );
     }
     return Container(

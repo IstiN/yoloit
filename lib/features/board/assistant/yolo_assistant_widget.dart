@@ -28,6 +28,7 @@ import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class YoloAssistantController {
   Future<void> Function()? _startMic;
@@ -1796,10 +1797,7 @@ $messagesJson
       child: Row(
         children: [
           // Session info
-          Text(
-            '$msgCount msgs',
-            style: TextStyle(fontSize: 11, color: colors.textMuted),
-          ),
+          Caption('$msgCount msgs'),
           const Spacer(),
           // History
           _SessionBarButton(

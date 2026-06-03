@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class EnvGroupSelectionField extends StatefulWidget {
   const EnvGroupSelectionField({
@@ -47,10 +48,7 @@ class _EnvGroupSelectionFieldState extends State<EnvGroupSelectionField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          widget.label,
-          style: TextStyle(fontSize: 11, color: context.appColors.textMuted),
-        ),
+        Caption(widget.label),
         const SizedBox(height: 4),
         FutureBuilder<List<String>>(
           future: _namesFuture,
@@ -269,10 +267,7 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                'Later groups override earlier groups when the same key appears multiple times.',
-                style: TextStyle(color: context.appColors.textMuted, fontSize: 11),
-              ),
+              Caption('Later groups override earlier groups when the same key appears multiple times.'),
               const SizedBox(height: 14),
               if (_loading)
                 const Expanded(

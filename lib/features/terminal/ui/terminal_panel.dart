@@ -27,6 +27,7 @@ import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 import 'package:yoloit/features/workspaces/ui/new_agent_session_dialog.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class TerminalPanel extends StatelessWidget {
   const TerminalPanel({super.key});
@@ -1952,10 +1953,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
               ),
             ),
             if (_searchController.text.isNotEmpty) ...[
-              Text(
-                hitLabel,
-                style: TextStyle(fontSize: 11, color: colors.textMuted),
-              ),
+              Caption(hitLabel,),
               const SizedBox(width: 4),
               _searchIconBtn(Icons.keyboard_arrow_up, _prevHit),
               _searchIconBtn(Icons.keyboard_arrow_down, _nextHit),

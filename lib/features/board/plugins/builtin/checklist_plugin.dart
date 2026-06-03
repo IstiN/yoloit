@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 final _checklistDefaultColors = AppColorScheme.fromAccent(Colors.orange);
 
@@ -129,10 +130,7 @@ class _ChecklistContentState extends State<_ChecklistContent> {
                     ),
                   ),
                   if (total > 0)
-                    Text(
-                      '${(progress * 100).round()}%',
-                      style: TextStyle(fontSize: 11, color: colors.textMuted),
-                    ),
+                    Caption('${(progress * 100).round()}%'),
                 ],
               ),
               const SizedBox(height: 4),

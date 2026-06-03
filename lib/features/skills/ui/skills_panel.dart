@@ -8,6 +8,7 @@ import 'package:yoloit/features/skills/models/skill_store_config.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 import 'package:yoloit/features/workspaces/models/workspace.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// Skills panel embedded in the Settings dialog.
 class SkillsPanel extends StatefulWidget {
@@ -398,9 +399,8 @@ class _SkillCard extends StatelessWidget {
                 ),
                 if (skill.description.isNotEmpty) ...[
                   const SizedBox(height: 3),
-                  Text(
+                  Caption(
                     skill.description,
-                    style: TextStyle(color: colors.textMuted, fontSize: 11),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -581,10 +581,7 @@ class _WorkspaceCheckboxRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Text(
-                ws.name,
-                style: TextStyle(color: colors.textMuted, fontSize: 11),
-              ),
+              Caption(ws.name,),
             ],
           ),
         );
@@ -612,10 +609,7 @@ class _AddStoreButton extends StatelessWidget {
           children: [
             Icon(Icons.add, size: 13, color: colors.textMuted),
             const SizedBox(width: 4),
-            Text(
-              'Add Store',
-              style: TextStyle(color: colors.textMuted, fontSize: 11),
-            ),
+            Caption('Add Store'),
           ],
         ),
       ),
@@ -678,7 +672,7 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
               hint: 'owner/repo  or  https://...  or  curl -fsSL ...',
             ),
             const SizedBox(height: 12),
-            Text('Type', style: TextStyle(color: colors.textMuted, fontSize: 11)),
+            Caption('Type'),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
@@ -720,7 +714,7 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: colors.textMuted, fontSize: 11)),
+        Caption(label),
         const SizedBox(height: 4),
         TextField(
           controller: controller,

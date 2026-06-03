@@ -43,6 +43,7 @@ import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
@@ -3318,10 +3319,7 @@ class _ShareBoardDialogState extends State<_ShareBoardDialog> {
                       _copy(widget.info.token, (value) => _copiedToken = value),
             ),
             const SizedBox(height: 12),
-            Text(
-              'The app must stay open. If the other Mac cannot connect, allow incoming connections in macOS Firewall.',
-              style: TextStyle(color: colors.textMuted, fontSize: 11),
-            ),
+            Caption('The app must stay open. If the other Mac cannot connect, allow incoming connections in macOS Firewall.'),
           ],
         ),
       ),

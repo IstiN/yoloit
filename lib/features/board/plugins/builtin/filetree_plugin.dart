@@ -9,6 +9,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class FileTreePlugin extends BoardPanelPlugin {
   const FileTreePlugin();
@@ -1196,10 +1197,7 @@ class _GitDiffViewState extends State<_GitDiffView> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(
             children: [
-              Text(
-                '${entries.length} changed file${entries.length == 1 ? '' : 's'}',
-                style: TextStyle(color: colors.textMuted, fontSize: 11),
-              ),
+              Caption('${entries.length} changed file${entries.length == 1 ? '' : 's'}',),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 14),

@@ -21,6 +21,7 @@ import 'package:yoloit/features/editor/utils/editor_language_registry.dart';
 import 'package:yoloit/features/editor/utils/file_type_utils.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
 import 'package:yoloit/features/review/models/review_models.dart';
+import 'package:yoloit/ui/components/typography/caption.dart';
 
 class FileEditorPanel extends StatefulWidget {
   const FileEditorPanel({
@@ -2117,10 +2118,7 @@ class _SearchReplaceBar extends StatelessWidget {
                       count == 0 || current == null
                           ? '0 / 0'
                           : '${current + 1} / $count';
-                  return Text(
-                    label,
-                    style: TextStyle(color: colors.textMuted, fontSize: 11),
-                  );
+                  return Caption(label,);
                 },
               ),
               const SizedBox(width: 4),
@@ -2595,10 +2593,7 @@ class _SymbolOutline extends StatelessWidget {
             child:
                 symbols.isEmpty
                     ? Center(
-                      child: Text(
-                        'No symbols',
-                        style: TextStyle(color: colors.textMuted, fontSize: 11),
-                      ),
+                      child: Caption('No symbols'),
                     )
                     : ListView.builder(
                       itemCount: symbols.length,
@@ -2685,9 +2680,8 @@ class _DiffBody extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
+            Caption(
               tab.filePath.replaceFirst('diff:', ''),
-              style: TextStyle(color: colors.textMuted, fontSize: 11),
               textAlign: TextAlign.center,
             ),
           ],
