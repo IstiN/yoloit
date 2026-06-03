@@ -1,0 +1,21 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "output": {
+    "filePath": "snapshots/repomix-output.xml",
+    "style": "xml",
+    "compress": true,
+    "headerText": "YoloIT codebase snapshot for AI analysis. Generated via repomix."
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "third_party",
+      "packages",
+      "assets/command_catalog/**/*.jsonl",
+      "**/*.g.dart",
+      "**/*.freezed.dart",
+      "**/*.mocks.dart"
+    ]
+  }
+}

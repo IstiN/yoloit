@@ -63,6 +63,32 @@ This guide outlines non-obvious developer commands, compilation pipelines, stric
 
 ---
 
+## 📦 Repomix Code Snapshots
+
+A pre-configured `repomix.config.json` lives at the repo root. It excludes `third_party`, `packages` (submodules), generated Dart files (`.g.dart`, `.freezed.dart`, `.mocks.dart`), and training data (`assets/command_catalog/**/*.jsonl`).
+
+- **Install** (one-time): `npm install -g repomix`
+- **Full project snapshot**: `repomix .`
+  - Output: `snapshots/repomix-output.xml` (~500K tokens, ~2 MB, ~1.5s)
+- **Dart-only snapshot**:
+  ```bash
+  find lib test -name '*.dart' ! -name '*.g.dart' ! -name '*.freezed.dart' ! -name '*.mocks.dart' | repomix --stdin --compress --output snapshots/dart-only.xml
+  ```
+- **Single / multiple specific files** (e.g., after `rg`/`codegraph` search):
+  ```bash
+  # One file
+  echo 'lib/features/board/ui/board_view.dart' | repomix --stdin --compress --output snapshots/target.xml
+
+  # Several files
+  printf 'lib/app.dart\nlib/main.dart\n' | repomix --stdin --compress --output snapshots/target.xml
+  ```
+  > ⚠️ Multiple `--include` flags do **not** work reliably — always use `--stdin` for specific file lists.
+- **Tips**:
+  - `--compress` uses Tree-sitter to keep signatures and replace method bodies with `⋮----`. It captures **all** methods (public, private, protected).
+  - `snapshots/` is `.gitignore`d — never commit generated XML files.
+
+---
+
 ## 🛡️ Coding Conventions & Strict Analysis Constraints
 
 - **Strict Analysis Rules** (Violations are treated as build/CI errors):

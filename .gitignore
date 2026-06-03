@@ -134,3 +134,6 @@ app.*.symbols
 assets/command_catalog/models/
 assets/command_catalog/adapters/*/adapters.safetensors
 assets/command_catalog/adapters/*/0*_adapters.safetensors
+
+# Repomix generated snapshots
+snapshots/
