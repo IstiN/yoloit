@@ -352,6 +352,73 @@ void main() {
       expect(scrollController.offset, lessThan(before));
     });
 
+    testWidgets('terminal keeps user scroll position during live output', (
+      tester,
+    ) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'sess_live_output_scroll_lock',
+        type: AgentType.copilot,
+        workspacePath: '/project',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 140,
+              child: TerminalWidget(session: session, isActive: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (var i = 0; i < 80; i++) {
+        session.terminal.write('line $i\r\n');
+      }
+      await tester.pump();
+
+      final terminalView = tester.widget<TerminalView>(
+        find.byType(TerminalView),
+      );
+      final scrollController = terminalView.scrollController!;
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+
+      final bottom = scrollController.offset;
+      final position = tester.getCenter(find.byType(TerminalView));
+      await tester.sendEventToBinding(
+        PointerPanZoomStartEvent(pointer: 1, position: position),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomUpdateEvent(
+          pointer: 1,
+          position: position,
+          panDelta: const Offset(0, 48),
+        ),
+      );
+      await tester.sendEventToBinding(
+        PointerPanZoomEndEvent(pointer: 1, position: position),
+      );
+      await tester.pump();
+
+      final userOffset = scrollController.offset;
+      expect(userOffset, lessThan(bottom));
+
+      for (var i = 80; i < 110; i++) {
+        session.terminal.write('line $i\r\n');
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(scrollController.offset, closeTo(userOffset, 1.0));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 950));
+    });
+
     testWidgets('terminal ignores horizontal trackpad pan-zoom scrollback', (
       tester,
     ) async {
@@ -545,6 +612,15 @@ void main() {
       expect(scrollbar.trackVisibility, isTrue);
       expect(scrollbar.thickness, 14);
       expect(scrollbar.controller, same(terminalView.scrollController));
+
+      final terminalRect = tester.getRect(find.byType(TerminalView));
+      final dragStart = Offset(terminalRect.right - 6, terminalRect.top + 40);
+      final gesture = await tester.startGesture(dragStart);
+      await gesture.moveBy(const Offset(0, 50));
+      await gesture.up();
+      await tester.pump();
+
+      expect(terminalView.controller?.selection, isNull);
     });
 
     testWidgets('terminal resize keeps scrollback anchored to bottom', (

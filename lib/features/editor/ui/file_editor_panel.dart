@@ -1,10 +1,15 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
+// ignore: implementation_imports
+import 'package:flutter_code_editor/src/search/match.dart';
+// ignore: implementation_imports
+import 'package:flutter_code_editor/src/search/result.dart';
+// ignore: implementation_imports
+import 'package:flutter_code_editor/src/search/search_navigation_state.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:highlight/highlight_core.dart' show Mode;
 import 'package:yoloit/core/services/git_service.dart';
@@ -113,6 +118,7 @@ class _FileEditorPanelState extends State<FileEditorPanel>
         final currentTab = cubit.state.activeTab;
         if (currentTab?.filePath == tab.filePath &&
             text != currentTab?.content) {
+          _loadedContent[tab.filePath] = text;
           cubit.updateContent(text);
         }
       });
@@ -120,9 +126,21 @@ class _FileEditorPanelState extends State<FileEditorPanel>
       // Sync content if it was updated externally — but ONLY with real content.
       final incoming = tab.content;
       if (incoming != null && _loadedContent[tab.filePath] != incoming) {
+        final controller = _controllers[tab.filePath]!;
+        final oldSelection = controller.selection;
+        final preservedSelection = TextSelection(
+          baseOffset: oldSelection.baseOffset.clamp(0, incoming.length),
+          extentOffset: oldSelection.extentOffset.clamp(0, incoming.length),
+          affinity: oldSelection.affinity,
+          isDirectional: oldSelection.isDirectional,
+        );
         _suppressControllerUpdates = true;
         _loadedContent[tab.filePath] = incoming;
-        _controllers[tab.filePath]!.text = incoming;
+        controller.value = TextEditingValue(
+          text: incoming,
+          selection: preservedSelection,
+          composing: TextRange.empty,
+        );
         _suppressControllerUpdates = false;
       }
     }
@@ -928,21 +946,19 @@ class _EditorBody extends StatefulWidget {
   State<_EditorBody> createState() => _EditorBodyState();
 }
 
+enum _QuickFindCloseSelection { selected, collapsedStart, collapsedEnd }
+
 class _EditorBodyState extends State<_EditorBody> {
-  // ── Find / Replace ──────────────────────────────────────────────────────
-  bool _showFind = false;
-  bool _showReplace = false;
-  bool _showQuickFind = false;
-  bool _caseSensitive = false;
-  String _findQuery = '';
-  List<int> _matchOffsets = [];
-  int _currentMatch = 0;
-  final _findCtrl = TextEditingController();
-  final _quickFindCtrl = TextEditingController();
-  final _replaceCtrl = TextEditingController();
-  final _findFocus = FocusNode();
-  final _quickFindFocus = FocusNode();
+  final _editorFocus = FocusNode();
   final _codeFocus = FocusNode();
+  final _replaceCtrl = TextEditingController();
+  final _replaceFocus = FocusNode();
+  bool _showQuickFind = false;
+  bool _showReplace = false;
+  String _quickFindQuery = '';
+  List<int> _quickFindOffsets = [];
+  int _quickFindCurrent = 0;
+  int _quickFindOrigin = 0;
 
   // ── Editor options ───────────────────────────────────────────────────────
   bool _wordWrap = false;
@@ -960,6 +976,7 @@ class _EditorBodyState extends State<_EditorBody> {
   void initState() {
     super.initState();
     widget.codeController.addListener(_onTextChanged);
+    widget.codeController.searchController.addListener(_onSearchChanged);
     _loadGitGutter();
   }
 
@@ -971,21 +988,36 @@ class _EditorBodyState extends State<_EditorBody> {
       _loadGitGutter();
     }
     if (old.codeController != widget.codeController) {
+      _clearQuickFindSearchResult(
+        controller: old.codeController,
+        notify: false,
+      );
       old.codeController.removeListener(_onTextChanged);
+      old.codeController.searchController.removeListener(_onSearchChanged);
       widget.codeController.addListener(_onTextChanged);
+      widget.codeController.searchController.addListener(_onSearchChanged);
     }
   }
 
   @override
   void dispose() {
+    _clearQuickFindSearchResult(notify: false);
     widget.codeController.removeListener(_onTextChanged);
-    _findCtrl.dispose();
-    _quickFindCtrl.dispose();
+    widget.codeController.searchController.removeListener(_onSearchChanged);
     _replaceCtrl.dispose();
-    _findFocus.dispose();
-    _quickFindFocus.dispose();
+    _replaceFocus.dispose();
+    _editorFocus.dispose();
     _codeFocus.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) return;
+    if (!widget.codeController.searchController.shouldShow && _showReplace) {
+      setState(() => _showReplace = false);
+      return;
+    }
+    setState(() {});
   }
 
   // ── Auto-pairs ───────────────────────────────────────────────────────────
@@ -1088,136 +1120,289 @@ class _EditorBodyState extends State<_EditorBody> {
   }
 
   // ── Find & replace ──────────────────────────────────────────────────────
-  void _openFind() => setState(() {
-    _showFind = true;
-    _showReplace = false;
-    _showQuickFind = false;
-    _findCtrl.text = _findQuery;
-    _updateMatches(selectCurrent: true);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _findFocus.requestFocus();
-    });
-  });
-  void _openReplace() => setState(() {
-    _showFind = true;
-    _showReplace = true;
-    _showQuickFind = false;
-    _findCtrl.text = _findQuery;
-    _updateMatches(selectCurrent: true);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _findFocus.requestFocus();
-    });
-  });
-  void _closeFind() => setState(() {
-    _showFind = false;
-    _showReplace = false;
-  });
-
-  void _openQuickFind() => setState(() {
-    _showFind = false;
-    _showReplace = false;
-    _showQuickFind = true;
-    _quickFindCtrl.text = _findQuery;
-    _updateMatches(selectCurrent: true, returnFocus: _quickFindFocus);
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _quickFindFocus.requestFocus();
-      _quickFindCtrl.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _quickFindCtrl.text.length,
-      );
-    });
-  });
-
-  void _closeQuickFind() => setState(() => _showQuickFind = false);
-
-  void _updateMatches({bool selectCurrent = false, FocusNode? returnFocus}) {
-    if (_findQuery.isEmpty) {
-      _matchOffsets = [];
-      _currentMatch = 0;
-      return;
-    }
-    final text = widget.codeController.text;
-    final q = _caseSensitive ? _findQuery : _findQuery.toLowerCase();
-    final src = _caseSensitive ? text : text.toLowerCase();
-    final offsets = <int>[];
-    int start = 0;
-    while (true) {
-      final idx = src.indexOf(q, start);
-      if (idx == -1) break;
-      offsets.add(idx);
-      start = idx + 1;
-    }
-    _matchOffsets = offsets;
-    if (_currentMatch >= offsets.length) _currentMatch = 0;
-    if (selectCurrent) _selectCurrentMatch(returnFocus: returnFocus);
+  void _openFind() {
+    _closeQuickFind(returnFocusToCode: false);
+    _codeFocus.requestFocus();
+    widget.codeController.showSearch();
   }
 
-  void _selectCurrentMatch({FocusNode? returnFocus}) {
-    if (_matchOffsets.isEmpty) return;
-    final off = _matchOffsets[_currentMatch];
+  void _openReplace() {
+    _closeQuickFind(returnFocusToCode: false);
+    setState(() => _showReplace = true);
     _codeFocus.requestFocus();
-    widget.codeController.selection = TextSelection(
-      baseOffset: off,
-      extentOffset: off + _findQuery.length,
-    );
-    if (returnFocus != null) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted) returnFocus.requestFocus();
+    widget.codeController.showSearch();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _replaceFocus.requestFocus();
+    });
+  }
+
+  void _openQuickFind() {
+    final cursor = widget.codeController.selection.extentOffset;
+    _clearQuickFindSearchResult();
+    setState(() {
+      _showQuickFind = true;
+      _quickFindQuery = '';
+      _quickFindOffsets = [];
+      _quickFindCurrent = 0;
+      _quickFindOrigin = cursor.clamp(0, widget.codeController.text.length);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _editorFocus.requestFocus();
+    });
+  }
+
+  void _closeQuickFind({
+    bool returnFocusToCode = true,
+    _QuickFindCloseSelection selection = _QuickFindCloseSelection.selected,
+  }) {
+    if (!_showQuickFind) return;
+    final currentRange = _quickFindCurrentRange();
+    _clearQuickFindSearchResult(notify: false);
+    if (currentRange != null) {
+      final nextSelection = switch (selection) {
+        _QuickFindCloseSelection.selected => TextSelection(
+          baseOffset: currentRange.start,
+          extentOffset: currentRange.end,
+        ),
+        _QuickFindCloseSelection.collapsedStart => TextSelection.collapsed(
+          offset: currentRange.start,
+        ),
+        _QuickFindCloseSelection.collapsedEnd => TextSelection.collapsed(
+          offset: currentRange.end,
+        ),
+      };
+      widget.codeController.selection = nextSelection;
+    } else {
+      widget.codeController.notifyListeners();
+    }
+    setState(() {
+      _showQuickFind = false;
+      _quickFindQuery = '';
+      _quickFindOffsets = [];
+      _quickFindCurrent = 0;
+    });
+    if (returnFocusToCode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _codeFocus.requestFocus();
       });
     }
   }
 
-  void _findNext({FocusNode? returnFocus}) {
-    if (_matchOffsets.isEmpty) return;
-    setState(() => _currentMatch = (_currentMatch + 1) % _matchOffsets.length);
-    _selectCurrentMatch(returnFocus: returnFocus);
+  ({int start, int end})? _quickFindCurrentRange() {
+    if (_quickFindQuery.isEmpty || _quickFindOffsets.isEmpty) return null;
+    final start = _quickFindOffsets[_quickFindCurrent];
+    return (start: start, end: start + _quickFindQuery.length);
   }
 
-  void _findPrev({FocusNode? returnFocus}) {
-    if (_matchOffsets.isEmpty) return;
-    setState(
-      () =>
-          _currentMatch =
-              (_currentMatch - 1 + _matchOffsets.length) % _matchOffsets.length,
-    );
-    _selectCurrentMatch(returnFocus: returnFocus);
+  void _updateQuickFindQuery(String query) {
+    final nextQuery = query;
+    final currentSelection = widget.codeController.selection.start;
+    final searchOrigin =
+        _quickFindOffsets.isEmpty || currentSelection < 0
+            ? _quickFindOrigin
+            : currentSelection.clamp(0, widget.codeController.text.length);
+    final offsets = <int>[];
+    if (nextQuery.isNotEmpty) {
+      final text = widget.codeController.text.toLowerCase();
+      final needle = nextQuery.toLowerCase();
+      var start = 0;
+      while (true) {
+        final index = text.indexOf(needle, start);
+        if (index == -1) break;
+        offsets.add(index);
+        start = index + 1;
+      }
+    }
+
+    var current = 0;
+    if (offsets.isNotEmpty) {
+      final nearest = offsets.indexWhere((offset) => offset >= searchOrigin);
+      current = nearest == -1 ? 0 : nearest;
+    }
+
+    setState(() {
+      _quickFindQuery = nextQuery;
+      _quickFindOffsets = offsets;
+      _quickFindCurrent = current;
+    });
+    _selectQuickFindCurrent();
   }
 
-  void _replaceOne() {
-    if (_matchOffsets.isEmpty) return;
-    final ctrl = widget.codeController;
-    final off = _matchOffsets[_currentMatch];
-    final text = ctrl.text;
-    final newText =
-        text.substring(0, off) +
-        _replaceCtrl.text +
-        text.substring(off + _findQuery.length);
-    ctrl.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(
-        offset: off + _replaceCtrl.text.length,
-      ),
-    );
-    _updateMatches();
+  void _selectQuickFindCurrent() {
+    _syncQuickFindSearchResult();
+    if (_quickFindQuery.isEmpty || _quickFindOffsets.isEmpty) {
+      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _editorFocus.requestFocus();
+      });
+      return;
+    }
     setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _editorFocus.requestFocus();
+    });
   }
 
-  void _replaceAll() {
-    if (_findQuery.isEmpty) return;
-    final ctrl = widget.codeController;
-    final newText = ctrl.text.replaceAll(
-      _caseSensitive
-          ? _findQuery
-          : RegExp(RegExp.escape(_findQuery), caseSensitive: false),
-      _replaceCtrl.text,
+  void _syncQuickFindSearchResult() {
+    final matches = _quickFindOffsets
+        .map(
+          (offset) =>
+              SearchMatch(start: offset, end: offset + _quickFindQuery.length),
+        )
+        .toList(growable: false);
+    widget.codeController.fullSearchResult = SearchResult(matches: matches);
+    widget.codeController.searchController.navigationController.value =
+        matches.isEmpty
+            ? SearchNavigationState.noMatches
+            : SearchNavigationState(
+              totalMatchCount: matches.length,
+              currentMatchIndex: _quickFindCurrent,
+            );
+  }
+
+  void _clearQuickFindSearchResult({
+    CodeController? controller,
+    bool notify = true,
+  }) {
+    final target = controller ?? widget.codeController;
+    target.fullSearchResult = SearchResult.empty;
+    target.searchController.navigationController.value =
+        SearchNavigationState.noMatches;
+    if (notify) target.notifyListeners();
+  }
+
+  void _quickFindNext() {
+    if (_quickFindOffsets.isEmpty) return;
+    setState(() {
+      _quickFindCurrent = (_quickFindCurrent + 1) % _quickFindOffsets.length;
+    });
+    _selectQuickFindCurrent();
+  }
+
+  void _quickFindPrev() {
+    if (_quickFindOffsets.isEmpty) return;
+    setState(() {
+      _quickFindCurrent =
+          (_quickFindCurrent - 1 + _quickFindOffsets.length) %
+          _quickFindOffsets.length;
+    });
+    _selectQuickFindCurrent();
+  }
+
+  void _replaceCurrentMatch() {
+    final result = widget.codeController.fullSearchResult;
+    final nav =
+        widget.codeController.searchController.navigationController.value;
+    final index = nav.currentMatchIndex;
+    if (index == null || index < 0 || index >= result.matches.length) return;
+    final match = result.matches[index];
+    _replaceRange(match.start, match.end, _replaceCtrl.text);
+  }
+
+  void _replaceAllMatches() {
+    final matches = widget.codeController.fullSearchResult.matches;
+    if (matches.isEmpty) return;
+    var text = widget.codeController.text;
+    for (final match in matches.reversed) {
+      text =
+          text.substring(0, match.start) +
+          _replaceCtrl.text +
+          text.substring(match.end);
+    }
+    widget.codeController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
-    ctrl.value = TextEditingValue(
-      text: newText,
-      selection: const TextSelection.collapsed(offset: 0),
+  }
+
+  void _replaceRange(int start, int end, String replacement) {
+    final text = widget.codeController.text;
+    final nextText =
+        text.substring(0, start) + replacement + text.substring(end);
+    widget.codeController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: start + replacement.length),
     );
-    _updateMatches();
-    setState(() {});
+  }
+
+  bool _handleQuickFindKey(KeyEvent event) {
+    if (!_showQuickFind) return false;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _closeQuickFind();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _closeQuickFind(selection: _QuickFindCloseSelection.collapsedStart);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      _closeQuickFind(selection: _QuickFindCloseSelection.collapsedEnd);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+        event.logicalKey == LogicalKeyboardKey.enter) {
+      _quickFindNext();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _quickFindPrev();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.backspace) {
+      if (_quickFindQuery.isNotEmpty) {
+        _updateQuickFindQuery(
+          _quickFindQuery.substring(0, _quickFindQuery.length - 1),
+        );
+      }
+      return true;
+    }
+    if (HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed) {
+      return false;
+    }
+    final ch = event.character;
+    if (ch == null || ch.isEmpty || ch.codeUnits.any((u) => u < 0x20)) {
+      return false;
+    }
+    _updateQuickFindQuery(_quickFindQuery + ch);
+    return true;
+  }
+
+  bool _handleNativeSearchTypeahead(KeyEvent event) {
+    final searchController = widget.codeController.searchController;
+    if (!searchController.shouldShow ||
+        searchController.patternFocusNode.hasFocus) {
+      return false;
+    }
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    if (HardwareKeyboard.instance.isMetaPressed ||
+        HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed) {
+      return false;
+    }
+    final ch = event.character;
+    if (ch == null || ch.isEmpty || ch.codeUnits.any((u) => u < 0x20)) {
+      return false;
+    }
+
+    final controller = searchController.settingsController.patternController;
+    final value = controller.value;
+    final selection =
+        value.selection.isValid
+            ? value.selection
+            : TextSelection.collapsed(offset: value.text.length);
+    final start = selection.start.clamp(0, value.text.length);
+    final end = selection.end.clamp(0, value.text.length);
+    final nextText = value.text.replaceRange(start, end, ch);
+    controller.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: start + ch.length),
+    );
+    searchController.patternFocusNode.requestFocus();
+    return true;
   }
 
   // ── Text editing helpers ────────────────────────────────────────────────
@@ -1389,16 +1574,17 @@ class _EditorBodyState extends State<_EditorBody> {
   Future<void> _showGoToLine(BuildContext ctx) async {
     final ctrl = widget.codeController;
     final lineCount = '\n'.allMatches(ctrl.text).length + 1;
-    final inputCtrl = TextEditingController();
+    final colors = ctx.appColors;
+    final colorScheme = Theme.of(ctx).colorScheme;
     await showDialog<void>(
       context: ctx,
-      barrierColor: ctx.appColors.background.withAlpha(138),
+      barrierColor: colors.background.withAlpha(138),
       builder: (dctx) {
-        final onSurface = Theme.of(dctx).colorScheme.onSurface;
+        final onSurface = colorScheme.onSurface;
         final mutedColor = onSurface.withAlpha(120);
-        final borderColor = context.appColors.border;
+        final borderColor = colors.border;
         return Dialog(
-          backgroundColor: context.appColors.surfaceElevated,
+          backgroundColor: colors.surfaceElevated,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -1416,7 +1602,6 @@ class _EditorBodyState extends State<_EditorBody> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  controller: inputCtrl,
                   autofocus: true,
                   keyboardType: TextInputType.number,
                   style: TextStyle(color: onSurface, fontSize: 13),
@@ -1430,7 +1615,7 @@ class _EditorBodyState extends State<_EditorBody> {
                       borderSide: BorderSide(color: borderColor),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: context.appColors.primary),
+                      borderSide: BorderSide(color: colors.primary),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -1452,7 +1637,6 @@ class _EditorBodyState extends State<_EditorBody> {
         );
       },
     );
-    inputCtrl.dispose();
   }
 
   void _jumpToLine(CodeController ctrl, int lineNumber) {
@@ -1502,13 +1686,17 @@ class _EditorBodyState extends State<_EditorBody> {
             _formatDocument,
         const SingleActivator(LogicalKeyboardKey.keyO, meta: true, shift: true):
             _toggleOutline,
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          _closeFind();
-          _closeQuickFind();
-        },
       },
       child: Focus(
+        focusNode: _editorFocus,
         autofocus: true,
+        descendantsAreFocusable: !_showQuickFind,
+        onKeyEvent:
+            (_, event) =>
+                _handleQuickFindKey(event) ||
+                        _handleNativeSearchTypeahead(event)
+                    ? KeyEventResult.handled
+                    : KeyEventResult.ignored,
         child: Column(
           children: [
             _EditorToolbar(
@@ -1519,39 +1707,17 @@ class _EditorBodyState extends State<_EditorBody> {
               onFormat: _formatDocument,
               onToggleOutline: _toggleOutline,
               onGoToLine: () => _showGoToLine(context),
-              onOpenFind: _openFind,
             ),
-            if (_showFind)
-              _FindBar(
-                findCtrl: _findCtrl,
-                replaceCtrl: _replaceCtrl,
-                findFocus: _findFocus,
+            if (widget.codeController.searchController.shouldShow)
+              _SearchReplaceBar(
+                controller: widget.codeController,
+                replaceController: _replaceCtrl,
+                replaceFocus: _replaceFocus,
                 showReplace: _showReplace,
-                caseSensitive: _caseSensitive,
-                matchCount: _matchOffsets.length,
-                currentMatch: _currentMatch,
-                onClose: _closeFind,
-                onNext: _findNext,
-                onPrev: _findPrev,
-                onReplace: _replaceOne,
-                onReplaceAll: _replaceAll,
-                onToggleCase: () {
-                  setState(() => _caseSensitive = !_caseSensitive);
-                  _updateMatches(selectCurrent: true, returnFocus: _findFocus);
-                  setState(() {});
-                },
                 onToggleReplace:
                     () => setState(() => _showReplace = !_showReplace),
-                onQueryChanged: (q) {
-                  setState(() {
-                    _findQuery = q;
-                    _quickFindCtrl.text = q;
-                    _updateMatches(
-                      selectCurrent: true,
-                      returnFocus: _findFocus,
-                    );
-                  });
-                },
+                onReplace: _replaceCurrentMatch,
+                onReplaceAll: _replaceAllMatches,
               ),
             Expanded(
               child: Stack(
@@ -1649,26 +1815,12 @@ class _EditorBodyState extends State<_EditorBody> {
                   ),
                   if (_showQuickFind)
                     Positioned(
-                      top: 10,
-                      right: 14,
+                      top: 8,
+                      left: 24,
                       child: _QuickFindHint(
-                        controller: _quickFindCtrl,
-                        focusNode: _quickFindFocus,
-                        matchCount: _matchOffsets.length,
-                        currentMatch: _currentMatch,
-                        onClose: _closeQuickFind,
-                        onNext: () => _findNext(returnFocus: _quickFindFocus),
-                        onPrev: () => _findPrev(returnFocus: _quickFindFocus),
-                        onQueryChanged: (q) {
-                          setState(() {
-                            _findQuery = q;
-                            _findCtrl.text = q;
-                            _updateMatches(
-                              selectCurrent: true,
-                              returnFocus: _quickFindFocus,
-                            );
-                          });
-                        },
+                        query: _quickFindQuery,
+                        matchCount: _quickFindOffsets.length,
+                        currentMatch: _quickFindCurrent,
                       ),
                     ),
                 ],
@@ -1725,114 +1877,6 @@ class _EditorBodyState extends State<_EditorBody> {
     'addition': TextStyle(color: colors.diffAddText),
     'deletion': TextStyle(color: colors.diffRemoveText),
   };
-}
-
-class _QuickFindHint extends StatelessWidget {
-  const _QuickFindHint({
-    required this.controller,
-    required this.focusNode,
-    required this.matchCount,
-    required this.currentMatch,
-    required this.onClose,
-    required this.onNext,
-    required this.onPrev,
-    required this.onQueryChanged,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final int matchCount;
-  final int currentMatch;
-  final VoidCallback onClose;
-  final VoidCallback onNext;
-  final VoidCallback onPrev;
-  final ValueChanged<String> onQueryChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final hasQuery = controller.text.isNotEmpty;
-    final counter =
-        !hasQuery
-            ? 'Type to search'
-            : matchCount == 0
-            ? 'No results'
-            : '${currentMatch + 1} / $matchCount';
-    return Material(
-      color: Colors.transparent,
-      child: Focus(
-        onKeyEvent: (_, event) {
-          if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-            return KeyEventResult.ignored;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.escape) {
-            onClose();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
-              event.logicalKey == LogicalKeyboardKey.enter) {
-            onNext();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-            onPrev();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: Container(
-          width: 260,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: colors.surfaceElevated,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(70),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.search, size: 14, color: colors.primaryLight),
-              const SizedBox(width: 6),
-              Expanded(
-                child: TextField(
-                  key: const Key('editor-quick-find-input'),
-                  controller: controller,
-                  focusNode: focusNode,
-                  onChanged: onQueryChanged,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (_) => onNext(),
-                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    hintText: 'Quick find',
-                    hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                counter,
-                style: TextStyle(
-                  color:
-                      matchCount == 0 && hasQuery
-                          ? colors.statusError
-                          : colors.textMuted,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ── Git gutter types & painter ────────────────────────────────────────────────
@@ -1924,7 +1968,6 @@ class _EditorToolbar extends StatelessWidget {
     required this.onFormat,
     required this.onToggleOutline,
     required this.onGoToLine,
-    required this.onOpenFind,
   });
   final String language;
   final bool wordWrap;
@@ -1933,7 +1976,6 @@ class _EditorToolbar extends StatelessWidget {
   final VoidCallback onFormat;
   final VoidCallback onToggleOutline;
   final VoidCallback onGoToLine;
-  final VoidCallback onOpenFind;
 
   @override
   Widget build(BuildContext context) {
@@ -1946,11 +1988,6 @@ class _EditorToolbar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _ToolbarBtn(
-            icon: Icons.search,
-            tooltip: 'Find  ⌘F',
-            onTap: onOpenFind,
-          ),
           _ToolbarBtn(
             icon: Icons.wrap_text,
             tooltip: 'Word Wrap',
@@ -2021,52 +2058,40 @@ class _ToolbarBtn extends StatelessWidget {
   }
 }
 
-// ── Find / Replace bar ───────────────────────────────────────────────────────
+// ── Search / Replace bar ────────────────────────────────────────────────────
 
-class _FindBar extends StatelessWidget {
-  const _FindBar({
-    required this.findCtrl,
-    required this.replaceCtrl,
-    required this.findFocus,
+class _SearchReplaceBar extends StatelessWidget {
+  const _SearchReplaceBar({
+    required this.controller,
+    required this.replaceController,
+    required this.replaceFocus,
     required this.showReplace,
-    required this.caseSensitive,
-    required this.matchCount,
-    required this.currentMatch,
-    required this.onClose,
-    required this.onNext,
-    required this.onPrev,
+    required this.onToggleReplace,
     required this.onReplace,
     required this.onReplaceAll,
-    required this.onToggleCase,
-    required this.onToggleReplace,
-    required this.onQueryChanged,
   });
-  final TextEditingController findCtrl;
-  final TextEditingController replaceCtrl;
-  final FocusNode findFocus;
+
+  final CodeController controller;
+  final TextEditingController replaceController;
+  final FocusNode replaceFocus;
   final bool showReplace;
-  final bool caseSensitive;
-  final int matchCount;
-  final int currentMatch;
-  final VoidCallback onClose;
-  final VoidCallback onNext;
-  final VoidCallback onPrev;
+  final VoidCallback onToggleReplace;
   final VoidCallback onReplace;
   final VoidCallback onReplaceAll;
-  final VoidCallback onToggleCase;
-  final VoidCallback onToggleReplace;
-  final ValueChanged<String> onQueryChanged;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final hasQuery = findCtrl.text.isNotEmpty;
+    final searchController = controller.searchController;
+    final patternController =
+        searchController.settingsController.patternController;
     return Container(
+      key: const Key('editor-search-replace-bar'),
       decoration: BoxDecoration(
-        color: colors.surfaceElevated,
+        color: colors.surface,
         border: Border(bottom: BorderSide(color: colors.border)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2074,95 +2099,92 @@ class _FindBar extends StatelessWidget {
             children: [
               Icon(Icons.search, size: 14, color: colors.textMuted),
               const SizedBox(width: 6),
-              SizedBox(
-                width: 220,
-                height: 24,
-                child: TextField(
-                  controller: findCtrl,
-                  focusNode: findFocus,
-                  onChanged: onQueryChanged,
-                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
-                  decoration: InputDecoration(
-                    hintText: 'Find',
-                    hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 2,
-                    ),
-                    isDense: true,
-                  ),
+              Expanded(
+                child: _SearchField(
+                  key: const Key('editor-find-input'),
+                  controller: patternController,
+                  focusNode: searchController.patternFocusNode,
+                  hint: 'Find',
                 ),
               ),
               const SizedBox(width: 6),
-              if (hasQuery && matchCount > 0)
-                Text(
-                  '${currentMatch + 1} / $matchCount',
-                  style: TextStyle(color: colors.textMuted, fontSize: 10),
-                ),
-              if (hasQuery && matchCount == 0)
-                Text(
-                  'No results',
-                  style: TextStyle(color: colors.statusError, fontSize: 10),
-                ),
+              ValueListenableBuilder<SearchNavigationState>(
+                valueListenable: searchController.navigationController,
+                builder: (context, value, _) {
+                  final current = value.currentMatchIndex;
+                  final count = value.totalMatchCount;
+                  final label =
+                      count == 0 || current == null
+                          ? '0 / 0'
+                          : '${current + 1} / $count';
+                  return Text(
+                    label,
+                    style: TextStyle(color: colors.textMuted, fontSize: 11),
+                  );
+                },
+              ),
               const SizedBox(width: 4),
-              _FBBtn(
-                icon: Icons.text_fields,
-                tooltip: 'Case sensitive',
-                active: caseSensitive,
-                onTap: onToggleCase,
-              ),
-              _FBBtn(
+              _MiniIconButton(
                 icon: Icons.keyboard_arrow_up,
-                tooltip: 'Previous  ⇧Enter',
-                onTap: onPrev,
+                tooltip: 'Previous',
+                onTap:
+                    controller
+                        .searchController
+                        .navigationController
+                        .movePrevious,
               ),
-              _FBBtn(
+              _MiniIconButton(
                 icon: Icons.keyboard_arrow_down,
-                tooltip: 'Next  Enter',
-                onTap: onNext,
+                tooltip: 'Next',
+                onTap:
+                    controller.searchController.navigationController.moveNext,
               ),
-              _FBBtn(
+              _MiniIconButton(
                 icon: Icons.find_replace,
-                tooltip: 'Toggle Replace  ⌘H',
+                tooltip: 'Replace',
                 active: showReplace,
                 onTap: onToggleReplace,
               ),
-              const Spacer(),
-              _FBBtn(icon: Icons.close, tooltip: 'Close  Esc', onTap: onClose),
+              _MiniIconButton(
+                icon: Icons.close,
+                tooltip: 'Close',
+                onTap:
+                    () => searchController.hideSearch(
+                      returnFocusToCodeField: true,
+                    ),
+              ),
             ],
           ),
           if (showReplace) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             Row(
               children: [
-                Icon(Icons.edit, size: 14, color: colors.textMuted),
+                Icon(
+                  Icons.drive_file_rename_outline,
+                  size: 14,
+                  color: colors.textMuted,
+                ),
                 const SizedBox(width: 6),
-                SizedBox(
-                  width: 220,
-                  height: 24,
-                  child: TextField(
-                    controller: replaceCtrl,
-                    style: TextStyle(color: colors.textPrimary, fontSize: 12),
-                    decoration: InputDecoration(
-                      hintText: 'Replace',
-                      hintStyle: TextStyle(
-                        color: colors.textMuted,
-                        fontSize: 12,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      isDense: true,
-                    ),
+                Expanded(
+                  child: _SearchField(
+                    key: const Key('editor-replace-input'),
+                    controller: replaceController,
+                    focusNode: replaceFocus,
+                    hint: 'Replace',
                   ),
                 ),
-                const SizedBox(width: 8),
-                _TextBtn(label: 'Replace', onTap: onReplace),
+                const SizedBox(width: 6),
+                _MiniTextButton(
+                  key: const Key('editor-replace-one'),
+                  label: 'Replace',
+                  onTap: onReplace,
+                ),
                 const SizedBox(width: 4),
-                _TextBtn(label: 'All', onTap: onReplaceAll),
+                _MiniTextButton(
+                  key: const Key('editor-replace-all'),
+                  label: 'All',
+                  onTap: onReplaceAll,
+                ),
               ],
             ),
           ],
@@ -2172,13 +2194,59 @@ class _FindBar extends StatelessWidget {
   }
 }
 
-class _FBBtn extends StatelessWidget {
-  const _FBBtn({
+class _SearchField extends StatelessWidget {
+  const _SearchField({
+    super.key,
+    required this.controller,
+    required this.focusNode,
+    required this.hint,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return SizedBox(
+      height: 26,
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        style: TextStyle(color: colors.textPrimary, fontSize: 12),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
+          isDense: true,
+          filled: true,
+          fillColor: colors.surfaceElevated,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: colors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(6),
+            borderSide: BorderSide(color: colors.primary),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniIconButton extends StatelessWidget {
+  const _MiniIconButton({
     required this.icon,
     required this.tooltip,
     required this.onTap,
     this.active = false,
   });
+
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
@@ -2193,15 +2261,15 @@ class _FBBtn extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(4),
         child: Container(
-          width: 22,
-          height: 22,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
-            color: active ? colors.primary.withAlpha(60) : Colors.transparent,
+            color: active ? colors.primary.withAlpha(50) : Colors.transparent,
             borderRadius: BorderRadius.circular(4),
           ),
           child: Icon(
             icon,
-            size: 13,
+            size: 15,
             color: active ? colors.primaryLight : colors.textMuted,
           ),
         ),
@@ -2210,26 +2278,75 @@ class _FBBtn extends StatelessWidget {
   }
 }
 
-class _TextBtn extends StatelessWidget {
-  const _TextBtn({required this.label, required this.onTap});
+class _MiniTextButton extends StatelessWidget {
+  const _MiniTextButton({super.key, required this.label, required this.onTap});
+
   final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          border: Border.all(color: colors.border),
-          borderRadius: BorderRadius.circular(4),
-        ),
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        minimumSize: const Size(0, 26),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        foregroundColor: colors.primaryLight,
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
+    );
+  }
+}
+
+// ── Quick Find hint ──────────────────────────────────────────────────────────
+
+class _QuickFindHint extends StatelessWidget {
+  const _QuickFindHint({
+    required this.query,
+    required this.matchCount,
+    required this.currentMatch,
+  });
+
+  final String query;
+  final int matchCount;
+  final int currentMatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final hasQuery = query.isNotEmpty;
+    final status =
+        !hasQuery
+            ? ''
+            : matchCount == 0
+            ? '  no matches'
+            : '  ${currentMatch + 1}/$matchCount';
+    return DecoratedBox(
+      key: const Key('editor-quick-find-hint'),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        border: Border.all(color: colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(80),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Text(
-          label,
-          style: TextStyle(color: colors.textMuted, fontSize: 11),
+          'Search for: $query$status',
+          style: TextStyle(
+            color:
+                matchCount == 0 && hasQuery
+                    ? colors.statusError
+                    : colors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );

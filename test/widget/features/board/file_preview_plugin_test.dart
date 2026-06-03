@@ -39,6 +39,45 @@ void main() {
       greaterThanOrEqualTo(4),
     );
   });
+
+  test('highlights HTML/XML tags, attributes, and strings', () {
+    final colors = AppColorScheme.fromAccent(Colors.deepPurple);
+    final spans = filePreviewCodeSyntaxSpans(
+      '<meta name="viewport" content="width=device-width">',
+      extension: 'html',
+      colors: colors,
+    );
+
+    final styled = spans.where((span) => span.style?.color != null).toList();
+    expect(styled.map((span) => span.text), containsAll(['<meta', 'name']));
+    expect(
+      styled.map((span) => span.text),
+      containsAll(['"viewport"', '"width=device-width"']),
+    );
+    expect(
+      styled.map((span) => span.style!.color).toSet().length,
+      greaterThanOrEqualTo(3),
+    );
+  });
+
+  test('highlights dotenv keys, values, export, and comments', () {
+    final colors = AppColorScheme.fromAccent(Colors.deepPurple);
+    final spans = filePreviewCodeSyntaxSpans(
+      'export OPENAI_API_KEY=test # local',
+      extension: 'env',
+      colors: colors,
+    );
+
+    final styled = spans.where((span) => span.style?.color != null).toList();
+    expect(
+      styled.map((span) => span.text),
+      containsAll(['export ', 'OPENAI_API_KEY', 'test ', '# local']),
+    );
+    expect(
+      styled.map((span) => span.style!.color).toSet().length,
+      greaterThanOrEqualTo(4),
+    );
+  });
 }
 
 Widget _previewHarness(FilePreviewPlugin plugin, String path) {

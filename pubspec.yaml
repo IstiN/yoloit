@@ -50,8 +50,10 @@ dependencies:
   flutter_svg: ^2.2.4
   flutter_secure_storage: ^10.0.0
   flutter_colorpicker: ^1.1.0
-  flutter_code_editor: ^0.3.5
+  flutter_code_editor:
+    path: third_party/flutter_code_editor
   flutter_markdown_plus: ^1.0.7
+  markdown: ^7.3.1
   yaml: ^3.1.2
   flutter_js: ^0.8.7
   dmtools_mermaid_renderer:

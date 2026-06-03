@@ -157,10 +157,10 @@ void main() {
 
   // ── Toolbar ─────────────────────────────────────────────────────────────────
   group('FileEditorPanel — toolbar', () {
-    testWidgets('shows search icon', (tester) async {
+    testWidgets('does not show the removed app search icon', (tester) async {
       await tester.pumpWidget(_buildEditor(_dartTab()));
       await tester.pump();
-      expect(find.byIcon(Icons.search), findsAtLeastNWidgets(1));
+      expect(find.byIcon(Icons.search), findsNothing);
     });
 
     testWidgets('shows word-wrap icon', (tester) async {
@@ -195,6 +195,8 @@ void main() {
       );
       await tester.pump();
       expect(find.text('ENV'), findsAtLeastNWidgets(1));
+      final codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.language, isNotNull);
     });
   });
 
@@ -207,17 +209,7 @@ void main() {
       expect(find.widgetWithText(TextField, 'Find'), findsNothing);
     });
 
-    testWidgets('Find bar appears after tapping search icon', (tester) async {
-      await tester.pumpWidget(_buildEditor(_dartTab()));
-      await tester.pump();
-
-      await tester.tap(find.byIcon(Icons.search).first);
-      await tester.pump();
-
-      expect(find.text('Find'), findsAtLeastNWidgets(1));
-    });
-
-    testWidgets('Cmd+F opens the app find bar', (tester) async {
+    testWidgets('Cmd+F opens the built-in CodeField search', (tester) async {
       await tester.pumpWidget(_buildEditor(_dartTab()));
       await tester.pump();
 
@@ -226,50 +218,67 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
       await tester.pump();
 
-      expect(find.widgetWithText(TextField, 'Find'), findsOneWidget);
-    });
-
-    testWidgets('Find bar selects the first match while typing', (
-      tester,
-    ) async {
-      const content = 'alpha\nbeta target\nsecond target';
-      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
-      await tester.pump();
-
-      await tester.tap(find.byIcon(Icons.search).first);
-      await tester.pump();
-      await tester.enterText(find.widgetWithText(TextField, 'Find'), 'target');
-      await tester.pump();
-
       final codeField = tester.widget<CodeField>(find.byType(CodeField));
-      expect(codeField.controller.selection.start, content.indexOf('target'));
-      expect(codeField.controller.selection.end, content.indexOf('target') + 6);
-      expect(find.text('1 / 2'), findsOneWidget);
-    });
-
-    testWidgets('Find next moves the editor selection to the next match', (
-      tester,
-    ) async {
-      const content = 'target\nmiddle\ntarget';
-      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
-      await tester.pump();
-
-      await tester.tap(find.byIcon(Icons.search).first);
-      await tester.pump();
-      await tester.enterText(find.widgetWithText(TextField, 'Find'), 'target');
-      await tester.pump();
-      await tester.tap(find.byTooltip('Next  Enter'));
-      await tester.pump();
-
-      final codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.searchController.shouldShow, isTrue);
       expect(
-        codeField.controller.selection.start,
-        content.lastIndexOf('target'),
+        find.byKey(const Key('editor-search-replace-bar')),
+        findsOneWidget,
       );
-      expect(find.text('2 / 2'), findsOneWidget);
+      expect(find.byKey(const Key('editor-find-input')), findsOneWidget);
     });
 
-    testWidgets('Cmd+J opens quick find and arrow navigation works', (
+    testWidgets('Cmd+H opens replace controls', (tester) async {
+      await tester.pumpWidget(_buildEditor(_dartTab(content: 'hello world')));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('editor-search-replace-bar')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('editor-replace-input')), findsOneWidget);
+    });
+
+    testWidgets('Replace and replace all update matches from Cmd+F search', (
+      tester,
+    ) async {
+      const content = 'hello one\nhello two';
+      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      await tester.enterText(
+        find.byKey(const Key('editor-find-input')),
+        'hello',
+      );
+      await tester.enterText(
+        find.byKey(const Key('editor-replace-input')),
+        'hi',
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('editor-replace-one')));
+      await tester.pump();
+
+      var codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.text, 'hello one\nhi two');
+
+      await tester.tap(find.byKey(const Key('editor-replace-all')));
+      await tester.pump();
+
+      codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.text, 'hi one\nhi two');
+    });
+
+    testWidgets('Cmd+J opens quick find without built-in CodeField search', (
       tester,
     ) async {
       const content = 'one apple\ntwo apple';
@@ -281,38 +290,123 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
       await tester.pump();
 
-      expect(find.byKey(const Key('editor-quick-find-input')), findsOneWidget);
-      await tester.enterText(
-        find.byKey(const Key('editor-quick-find-input')),
-        'apple',
-      );
-      await tester.pump();
-      expect(find.text('1 / 2'), findsOneWidget);
+      final codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.searchController.shouldShow, isFalse);
+      expect(find.byKey(const Key('editor-quick-find-hint')), findsOneWidget);
+      expect(find.text('Search for: '), findsOneWidget);
+      expect(find.byKey(const Key('editor-find-input')), findsNothing);
+      expect(find.byKey(const Key('editor-quick-find-input')), findsNothing);
+    });
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    testWidgets('Cmd+J keeps editor content unchanged', (tester) async {
+      const content = 'one apple\ntwo apple';
+      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
       await tester.pump();
 
       final codeField = tester.widget<CodeField>(find.byType(CodeField));
-      expect(
-        codeField.controller.selection.start,
-        content.lastIndexOf('apple'),
-      );
-      expect(find.text('2 / 2'), findsOneWidget);
+      expect(codeField.controller.text, content);
+      expect(codeField.controller.searchController.shouldShow, isFalse);
+      expect(find.byKey(const Key('editor-find-input')), findsNothing);
     });
 
-    testWidgets('Find bar disappears after tapping close', (tester) async {
+    testWidgets('Cmd+J typeahead searches nearest match and Escape closes', (
+      tester,
+    ) async {
+      const content = 'alpha\nvortex\nbutton\nvoltage';
+      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV, character: 'v');
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyO, character: 'o');
+      await tester.pump();
+
+      var codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.text, content);
+      expect(codeField.controller.searchController.shouldShow, isFalse);
+      expect(find.text('Search for: vo  1/2'), findsOneWidget);
+      expect(codeField.controller.fullSearchResult.matches.length, 2);
+      expect(
+        codeField
+            .controller
+            .searchController
+            .navigationController
+            .value
+            .currentMatchIndex,
+        0,
+      );
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+
+      expect(find.byKey(const Key('editor-quick-find-hint')), findsNothing);
+      codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(codeField.controller.fullSearchResult.matches, isEmpty);
+      expect(codeField.controller.selection.start, content.indexOf('vo'));
+      expect(codeField.controller.selection.end, content.indexOf('vo') + 2);
+      expect(find.byKey(const Key('editor-find-input')), findsNothing);
+    });
+
+    testWidgets('Cmd+J closes to caret with left and right arrows', (
+      tester,
+    ) async {
+      const content = 'alpha\nvortex\nbutton\nvoltage';
+      final firstMatch = content.indexOf('vo');
+      await tester.pumpWidget(_buildEditor(_dartTab(content: content)));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV, character: 'v');
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyO, character: 'o');
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+
+      var codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(find.byKey(const Key('editor-quick-find-hint')), findsNothing);
+      expect(codeField.controller.selection.isCollapsed, isTrue);
+      expect(codeField.controller.selection.extentOffset, firstMatch + 2);
+
+      codeField.controller.selection = const TextSelection.collapsed(offset: 0);
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyV, character: 'v');
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyO, character: 'o');
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+
+      codeField = tester.widget<CodeField>(find.byType(CodeField));
+      expect(find.byKey(const Key('editor-quick-find-hint')), findsNothing);
+      expect(codeField.controller.selection.isCollapsed, isTrue);
+      expect(codeField.controller.selection.extentOffset, firstMatch);
+    });
+
+    testWidgets('Search icon remains absent after disabling app find bar', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildEditor(_dartTab()));
       await tester.pump();
 
-      // Open find
-      await tester.tap(find.byIcon(Icons.search).first);
-      await tester.pump();
-
-      // Close via X button
-      await tester.tap(find.byIcon(Icons.close).last);
-      await tester.pump();
-
-      expect(find.text('Find'), findsNothing);
+      expect(find.byIcon(Icons.search), findsNothing);
+      expect(find.byKey(const Key('editor-find-input')), findsNothing);
     });
   });
 
@@ -334,6 +428,26 @@ void main() {
       await tester.pumpWidget(_buildEditor(_dartTab()));
       await tester.pump();
       expect(find.textContaining('Ln'), findsAtLeastNWidgets(1));
+    });
+  });
+
+  // ── Go to line ─────────────────────────────────────────────────────────────
+  group('FileEditorPanel — go to line', () {
+    testWidgets('Cmd+G dialog can be dismissed with Escape', (tester) async {
+      await tester.pumpWidget(_buildEditor(_dartTab(content: 'one\ntwo')));
+      await tester.pump();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyG);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Go to Line'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Go to Line'), findsNothing);
     });
   });
 
@@ -540,5 +654,35 @@ void main() {
         );
       },
     );
+
+    testWidgets('local edits keep the editor selection after cubit rebuild', (
+      tester,
+    ) async {
+      final cubit = FileEditorCubit()..emit(_dartTab(content: 'alpha\nomega'));
+
+      await tester.pumpWidget(
+        BlocProvider<FileEditorCubit>.value(
+          value: cubit,
+          child: MaterialApp(
+            theme: AppThemePreset.neonPurple.theme,
+            home: const Scaffold(body: FileEditorPanel()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final codeField = tester.widget<CodeField>(find.byType(CodeField));
+      final controller = codeField.controller;
+      controller.value = const TextEditingValue(
+        text: 'alpha!\nomega',
+        selection: TextSelection.collapsed(offset: 6),
+      );
+      await tester.pump();
+
+      expect(cubit.state.activeTab!.content, 'alpha!\nomega');
+      expect(controller.selection.baseOffset, 6);
+      expect(controller.selection.extentOffset, 6);
+      await cubit.close();
+    });
   });
 }

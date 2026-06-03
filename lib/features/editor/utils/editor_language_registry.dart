@@ -23,10 +23,13 @@ class EditorLanguageRegistry {
     final name = _fileName(path).toLowerCase();
     final ext = _extension(name);
 
-    if (_dotenvNames.contains(name) || ext == 'env') {
-      return const EditorLanguageSpec(
+    if (_dotenvNames.contains(name) ||
+        name.startsWith('.env.') ||
+        ext == 'env') {
+      return EditorLanguageSpec(
         id: 'dotenv',
         label: 'ENV',
+        mode: bash,
         commentPrefix: '# ',
       );
     }

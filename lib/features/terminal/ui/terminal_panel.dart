@@ -672,10 +672,12 @@ class _CanvasGestureAbsorbPointer extends StatelessWidget {
 
 class _TerminalScrollAnchor {
   const _TerminalScrollAnchor({
+    required this.pixels,
     required this.fraction,
     required this.stickToBottom,
   });
 
+  final double pixels;
   final double fraction;
   final bool stickToBottom;
 }
@@ -694,6 +696,9 @@ class TerminalWidgetState extends State<TerminalWidget> {
   double _fontSize = 13.0;
   Size _terminalSize = Size.zero;
   _TerminalScrollAnchor? _resizeScrollAnchor;
+  _TerminalScrollAnchor? _userScrollAnchor;
+  Timer? _userScrollAnchorTimer;
+  Timer? _userScrollPreserveTimer;
   Offset? _clickDownPosition;
 
   // Manual drag-to-select: xterm 4.x's PanGestureRecognizer fails to win the
@@ -701,6 +706,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   // raw Listener pointer events — these always fire regardless of arena.
   bool _isDragSelecting = false;
   Offset? _dragStartGlobal;
+  final _scrollbarPointers = <int>{};
 
   // Pinch-to-zoom tracked via raw pointer events (avoids gesture arena
   // conflict with xterm's internal pan recogniser used for text selection).
@@ -716,6 +722,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
   final _searchFocusNode = FocusNode();
   List<CellOffset> _searchHits = [];
   int _currentHitIndex = -1;
+
+  bool _isTerminalScrollbarHit(Offset localPosition) {
+    if (_terminalSize == Size.zero) return false;
+    const scrollbarHitWidth = 24.0;
+    return localPosition.dx >= _terminalSize.width - scrollbarHitWidth;
+  }
+
   final _scrollController = ScrollController();
 
   // Identity-checked callbacks stored as fields so we can null them safely in
@@ -1183,6 +1196,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
   @override
   void dispose() {
     _focusRetryTimer?.cancel();
+    _userScrollAnchorTimer?.cancel();
+    _userScrollPreserveTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     AgentConfigService.instance.terminalRenderEngineNotifier.removeListener(
       _rebindTerminalForActiveEngine,
@@ -1360,6 +1375,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       return;
     }
     position.jumpTo(target);
+    _markUserScrollActive();
     _debugScrollLog(
       '$source jump delta=${delta.toStringAsFixed(1)} '
       'target=${target.toStringAsFixed(1)}',
@@ -1382,6 +1398,42 @@ class TerminalWidgetState extends State<TerminalWidget> {
     });
   }
 
+  void _markUserScrollActive() {
+    final anchor = _captureScrollAnchor();
+    if (anchor == null || anchor.stickToBottom) return;
+    _userScrollAnchor = anchor;
+    _userScrollAnchorTimer?.cancel();
+    _userScrollAnchorTimer = Timer(const Duration(milliseconds: 900), () {
+      _userScrollAnchor = null;
+      _userScrollPreserveTimer?.cancel();
+      _userScrollPreserveTimer = null;
+    });
+    _userScrollPreserveTimer ??= Timer.periodic(
+      const Duration(milliseconds: 50),
+      (_) => _preserveUserScrollDuringOutput(),
+    );
+    _preserveUserScrollDuringOutput();
+  }
+
+  void _preserveUserScrollDuringOutput() {
+    final anchor = _userScrollAnchor;
+    if (anchor == null || anchor.stickToBottom) return;
+    void restore() {
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      if (!position.hasContentDimensions) return;
+      final target =
+          anchor.pixels
+              .clamp(position.minScrollExtent, position.maxScrollExtent)
+              .toDouble();
+      if ((position.pixels - target).abs() < 0.5) return;
+      position.jumpTo(target);
+    }
+
+    scheduleMicrotask(restore);
+    WidgetsBinding.instance.addPostFrameCallback((_) => restore());
+  }
+
   _TerminalScrollAnchor? _captureScrollAnchor() {
     if (!_scrollController.hasClients) return null;
     final position = _scrollController.position;
@@ -1393,6 +1445,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     );
     final distanceToBottom = max - pixels;
     return _TerminalScrollAnchor(
+      pixels: pixels.toDouble(),
       fraction: max <= 0 ? 1 : (pixels / max).clamp(0.0, 1.0).toDouble(),
       stickToBottom: distanceToBottom <= 24,
     );
@@ -1616,6 +1669,14 @@ class TerminalWidgetState extends State<TerminalWidget> {
                   },
                   onPointerDown: (event) {
                     if (!_focusNode.hasFocus) _focusNode.requestFocus();
+                    if (_isTerminalScrollbarHit(event.localPosition)) {
+                      _scrollbarPointers.add(event.pointer);
+                      _clickDownPosition = null;
+                      _dragStartGlobal = null;
+                      _isDragSelecting = false;
+                      _activePointers.remove(event.pointer);
+                      return;
+                    }
                     // Right-click → context menu
                     if (event.buttons == kSecondaryMouseButton) {
                       _showTerminalContextMenu(context, event.position);
@@ -1635,6 +1696,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
                     }
                   },
                   onPointerMove: (event) {
+                    if (_scrollbarPointers.contains(event.pointer)) {
+                      _markUserScrollActive();
+                      return;
+                    }
                     _activePointers[event.pointer] = event.localPosition;
                     if (_activePointers.length == 2 &&
                         _pinchStartDistance > 0 &&
@@ -1668,6 +1733,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
                     rt.selectCharacters(localStart, localCurrent);
                   },
                   onPointerUp: (event) {
+                    if (_scrollbarPointers.remove(event.pointer)) {
+                      _clickDownPosition = null;
+                      _dragStartGlobal = null;
+                      _isDragSelecting = false;
+                      return;
+                    }
                     _activePointers.remove(event.pointer);
                     final wasDragging = _isDragSelecting;
                     _isDragSelecting = false;
@@ -1687,6 +1758,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
                     }
                   },
                   onPointerCancel: (event) {
+                    _scrollbarPointers.remove(event.pointer);
                     _activePointers.remove(event.pointer);
                     _isDragSelecting = false;
                     _dragStartGlobal = null;
