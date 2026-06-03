@@ -3683,8 +3683,7 @@ class _BoardSwitcherButton extends StatelessWidget {
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     return Tooltip(
       message: 'Open boards overview',
       child: InkWell(
@@ -4469,8 +4468,7 @@ class _BoardOverviewCard extends StatelessWidget {
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final remote = remoteInfoForBoard(board);
     return InkWell(
       onTap: onTap,
@@ -4606,8 +4604,7 @@ class _CreateBoardOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -4815,13 +4812,13 @@ class _ToolbarChip extends StatelessWidget {
           Icon(
             icon,
             size: 16,
-            color: Theme.of(context).textTheme.bodySmall?.color,
+            color: context.appColors.textMuted,
           ),
           const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
-              color: Theme.of(context).textTheme.bodySmall?.color,
+              color: context.appColors.textMuted,
               fontSize: 12,
             ),
           ),
@@ -4870,8 +4867,7 @@ class _OverlayIconButton extends StatelessWidget {
             color:
                 active
                     ? colors.primary
-                    : Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                    : context.appColors.textMuted,
           ),
         ),
       ),
@@ -5683,7 +5679,7 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
       child: Text(
         'Unknown: ${panel.type}',
         style: TextStyle(
-          color: Theme.of(context).textTheme.bodySmall?.color,
+          color: context.appColors.textMuted,
           fontSize: 12,
         ),
       ),
@@ -7584,8 +7580,7 @@ class _BoardToolsPanel extends StatelessWidget {
     final mutedColor =
         isLight
             ? const Color(0xFF252A31)
-            : (Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface);
+            : (context.appColors.textMuted);
     final panelBg =
         isLight ? Colors.white : colors.surfaceElevated.withAlpha(0xF2);
     return Column(
@@ -8530,8 +8525,7 @@ class _DrawSettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     return Container(
       width: 160,
       padding: const EdgeInsets.all(10),
@@ -8681,8 +8675,7 @@ class _ConnectSettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final activeColor = settings.color;
     return Container(
       width: 200,
@@ -9250,8 +9243,7 @@ class _LinkStyleDialogState extends State<_LinkStyleDialog> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     return AlertDialog(
       title: const Text('Link style'),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -9667,8 +9659,7 @@ class _ChatHeaderMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final secondaryColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
@@ -9775,8 +9766,7 @@ class _ChatHeaderMenu extends StatelessWidget {
         final colors = ctx.appColors;
         final onSurface = Theme.of(ctx).colorScheme.onSurface;
         final mutedColor =
-            Theme.of(ctx).textTheme.bodySmall?.color ??
-            Theme.of(ctx).colorScheme.onSurface;
+            ctx.appColors.textMuted;
         return AlertDialog(
           backgroundColor: colors.surfaceElevated,
           title: Text('Rename session', style: TextStyle(color: onSurface)),
@@ -9851,8 +9841,7 @@ class _ChatHeaderMenu extends StatelessWidget {
             Theme.of(ctx).textTheme.bodyMedium?.color ??
             Theme.of(ctx).colorScheme.onSurface;
         final mutedColor =
-            Theme.of(ctx).textTheme.bodySmall?.color ??
-            Theme.of(ctx).colorScheme.onSurface;
+            ctx.appColors.textMuted;
         var mode = config.mode;
         var reasoningEffort = config.reasoningEffort;
         var envGroupIds = List<String>.from(config.envGroupIds);
@@ -10036,8 +10025,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final secondaryColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;

@@ -66,7 +66,7 @@ class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
                 onPressed: _loading ? null : _runChecks,
                 icon: const Icon(Icons.refresh, size: 12),
                 label: const Text('Re-check', style: TextStyle(fontSize: 11)),
-                style: TextButton.styleFrom(foregroundColor: Theme.of(context).textTheme.bodySmall?.color),
+                style: TextButton.styleFrom(foregroundColor: context.appColors.textMuted),
               ),
             ],
           ),
@@ -185,7 +185,7 @@ class _Header extends StatelessWidget {
                 Text('Welcome to YoLoIT 👋',
                     style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.w600)),
                 Text('Check dependencies and configure AI agents',
-                    style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11)),
+                    style: TextStyle(color: context.appColors.textMuted, fontSize: 11)),
               ],
             ),
           ),
@@ -193,7 +193,7 @@ class _Header extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.close, size: 16),
               onPressed: onClose,
-              color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+              color: context.appColors.textMuted,
               splashRadius: 16,
             ),
         ],
@@ -215,7 +215,7 @@ class _LoadingView extends StatelessWidget {
       children: [
         SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: colors.accentBlue)),
         const SizedBox(height: 12),
-        Text('Checking your environment...', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+        Text('Checking your environment...', style: TextStyle(color: context.appColors.textMuted, fontSize: 12)),
       ],
     );
   }
@@ -379,7 +379,7 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
                   const SizedBox(height: 1),
                   Text(
                     'Allow YoLoIT in System Settings → Privacy & Security → Files and Folders',
-                    style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+                    style: TextStyle(color: context.appColors.textMuted, fontSize: 10),
                   ),
                 ],
               ),
@@ -404,14 +404,14 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface).withAlpha(60)),
+                      border: Border.all(color: context.appColors.textMuted.withAlpha(60)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.refresh, size: 9, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                        Icon(Icons.refresh, size: 9, color: context.appColors.textMuted),
                         const SizedBox(width: 3),
-                        Text('Re-check', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 9)),
+                        Text('Re-check', style: TextStyle(color: context.appColors.textMuted, fontSize: 9)),
                       ],
                     ),
                   ),
@@ -466,7 +466,7 @@ class _SectionTitle extends StatelessWidget {
         Expanded(
           child: Text(
             subtitle,
-            style: TextStyle(color: subtitleColor ?? Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10),
+            style: TextStyle(color: subtitleColor ?? context.appColors.textMuted, fontSize: 10),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -626,12 +626,12 @@ class _DependencyCardState extends State<_DependencyCard> {
                             ),
                           if ((ok || _phase == _Phase.done) && dep.version != null) ...[
                             const SizedBox(width: 8),
-                            Text(dep.version!, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10)),
+                            Text(dep.version!, style: TextStyle(color: context.appColors.textMuted, fontSize: 10)),
                           ],
                         ],
                       ),
                       const SizedBox(height: 1),
-                      Text(dep.description, style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10)),
+                      Text(dep.description, style: TextStyle(color: context.appColors.textMuted, fontSize: 10)),
                     ],
                   ),
                 ),
@@ -677,7 +677,7 @@ class _DependencyCardState extends State<_DependencyCard> {
                 children: [
                   TextButton(
                     onPressed: () => setState(() { _phase = _Phase.idle; _output.clear(); _showOutput = false; }),
-                    child: Text('Dismiss', style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface)),
+                    child: Text('Dismiss', style: TextStyle(fontSize: 10, color: context.appColors.textMuted)),
                   ),
                   const SizedBox(width: 4),
                   TextButton(
@@ -697,7 +697,7 @@ class _DependencyCardState extends State<_DependencyCard> {
       onTap: () => setState(() => _showOutput = !_showOutput),
       child: Text(
         expanded ? 'Hide log ▲' : 'Show log ▼',
-        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 9),
+        style: TextStyle(color: context.appColors.textMuted, fontSize: 9),
       ),
     );
   }
@@ -736,12 +736,12 @@ class _OutputLog extends StatelessWidget {
             children: [
               Text(
                 phase == _Phase.installing ? 'Installing...' : 'Output',
-                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 9, fontWeight: FontWeight.w600),
+                style: TextStyle(color: context.appColors.textMuted, fontSize: 9, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               GestureDetector(
                 onTap: onToggle,
-                child: Text('▲ hide', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 9)),
+                child: Text('▲ hide', style: TextStyle(color: context.appColors.textMuted, fontSize: 9)),
               ),
             ],
           ),
@@ -834,7 +834,7 @@ class _CopyButtonState extends State<_CopyButton> {
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface).withAlpha(60)),
+            border: Border.all(color: context.appColors.textMuted.withAlpha(60)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -842,12 +842,12 @@ class _CopyButtonState extends State<_CopyButton> {
               Icon(
                 _copied ? Icons.check : Icons.copy_outlined,
                 size: 10,
-                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                color: context.appColors.textMuted,
               ),
               const SizedBox(width: 3),
               Text(
                 _copied ? 'Copied' : 'Copy',
-                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 9),
+                style: TextStyle(color: context.appColors.textMuted, fontSize: 9),
               ),
             ],
           ),
@@ -900,7 +900,7 @@ class _Footer extends StatelessWidget {
             onPressed: loading ? null : onRecheck,
             icon: const Icon(Icons.refresh, size: 12),
             label: const Text('Re-check', style: TextStyle(fontSize: 11)),
-            style: TextButton.styleFrom(foregroundColor: Theme.of(context).textTheme.bodySmall?.color),
+            style: TextButton.styleFrom(foregroundColor: context.appColors.textMuted),
           ),
           if (isWizard) ...[
             const SizedBox(width: 8),

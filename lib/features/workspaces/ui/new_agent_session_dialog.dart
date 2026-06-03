@@ -243,7 +243,7 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: Text('Cancel',
-                        style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface)),
+                        style: TextStyle(color: context.appColors.textMuted)),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
@@ -360,7 +360,7 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
       style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+        hintStyle: TextStyle(color: context.appColors.textMuted, fontSize: 12),
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -511,7 +511,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
           decoration: InputDecoration(
             hintText: 'Search or create branch…',
             hintStyle:
-                TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                TextStyle(color: context.appColors.textMuted, fontSize: 12),
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -529,13 +529,13 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       child: Icon(Icons.close,
-                          size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                          size: 14, color: context.appColors.textMuted),
                     ),
                   )
                 : Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Icon(Icons.unfold_more,
-                        size: 14, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+                        size: 14, color: context.appColors.textMuted),
                   ),
             suffixIconConstraints: const BoxConstraints(minWidth: 0),
             border: OutlineInputBorder(
@@ -597,7 +597,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
                       child: Text(
                         'No branches found',
                         style: TextStyle(
-                            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+                            color: context.appColors.textMuted, fontSize: 11),
                       ),
                     ),
                   ...filtered.map((branch) {
@@ -664,7 +664,7 @@ class _BranchRow extends StatelessWidget {
             Icon(
               isActive ? Icons.account_tree_outlined : Icons.call_split,
               size: 12,
-              color: isActive ? colors.primary : (Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+              color: isActive ? colors.primary : (context.appColors.textMuted),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -714,7 +714,7 @@ class _CreateRow extends StatelessWidget {
             Text(
               'Create ',
               style: TextStyle(
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+                  color: context.appColors.textMuted, fontSize: 12),
             ),
             Expanded(
               child: Text(
@@ -746,7 +746,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: TextStyle(
-          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10, letterSpacing: 0.8),
+          color: context.appColors.textMuted, fontSize: 10, letterSpacing: 0.8),
     );
   }
 }
@@ -769,7 +769,7 @@ class _BusyRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text('Creating worktree…',
-              style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+              style: TextStyle(color: context.appColors.textMuted, fontSize: 12)),
         ],
       ),
     );

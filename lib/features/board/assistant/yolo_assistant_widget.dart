@@ -1201,7 +1201,7 @@ $messagesJson
                         'This is the prompt/context/tool list that will be sent with the next message.',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context).textTheme.bodySmall?.color,
+                          color: context.appColors.textMuted,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1339,7 +1339,7 @@ $messagesJson
                       '${sessions.length} sessions',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(ctx).textTheme.bodySmall?.color,
+                        color: ctx.appColors.textMuted,
                       ),
                     ),
                   ],
@@ -1601,8 +1601,7 @@ $messagesJson
   void _showToolsDialog() {
     final colors = context.appColors;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withAlpha(153);
+        context.appColors.textMuted.withAlpha(153);
     var disabled = _disabledLocalTools();
     final tools = [...YoloitCliToolCatalog.tools]..sort((a, b) {
       final byGroup = a.group.compareTo(b.group);
@@ -1980,8 +1979,7 @@ $messagesJson
               style: TextStyle(
                 fontSize: 13,
                 color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface.withAlpha(153),
+                    context.appColors.textMuted.withAlpha(153),
               ),
             ),
           ],
@@ -2159,8 +2157,7 @@ $messagesJson
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final hintColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withAlpha(153);
+        context.appColors.textMuted.withAlpha(153);
     return Container(
       margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
@@ -3233,7 +3230,7 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).textTheme.bodySmall?.color,
+                    color: context.appColors.textMuted,
                   ),
                 ),
               ),
@@ -3295,9 +3292,7 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
                                     style: TextStyle(
                                       fontSize: 10,
                                       color:
-                                          Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall?.color,
+                                          context.appColors.textMuted,
                                     ),
                                   ),
                                 ),
@@ -3381,9 +3376,7 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
                                         color:
                                             sel
                                                 ? colors.primary
-                                                : Theme.of(
-                                                  context,
-                                                ).textTheme.bodySmall?.color,
+                                                : context.appColors.textMuted,
                                       ),
                                     ),
                                   ),

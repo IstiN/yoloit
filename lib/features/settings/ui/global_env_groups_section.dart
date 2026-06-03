@@ -184,7 +184,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
         Text(
           'Manage global env variable groups. They are stored securely and can be attached to board chats and board terminals. If multiple selected groups contain the same key, the last selected group wins.',
           style: TextStyle(
-            color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+            color: context.appColors.textMuted,
             fontSize: 12,
             height: 1.5,
           ),
@@ -219,7 +219,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
             padding: const EdgeInsets.symmetric(vertical: 18),
             child: Text(
               'No env groups yet. Create one or import a .env file.',
-              style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+              style: TextStyle(color: context.appColors.textMuted, fontSize: 12),
             ),
           )
         else
@@ -277,7 +277,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                       Text(
                         'No variables yet.',
                         style: TextStyle(
-                          color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                          color: context.appColors.textMuted,
                           fontSize: 11,
                         ),
                       )
@@ -335,7 +335,7 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                                       : Icons.visibility_outlined,
                                   size: 16,
                                 ),
-                                color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                                color: context.appColors.textMuted,
                                 splashRadius: 14,
                               ),
                               IconButton(
@@ -429,7 +429,7 @@ class _EnvFieldState extends State<_EnvField> {
       decoration: InputDecoration(
         isDense: true,
         hintText: widget.hint,
-        hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 12),
+        hintStyle: TextStyle(color: context.appColors.textMuted, fontSize: 12),
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),

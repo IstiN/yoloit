@@ -151,7 +151,7 @@ class _FallbackCard extends StatelessWidget {
           Text(nodeId,
               style: TextStyle(
                   fontSize: 10,
-                  color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface,
+                  color: context.appColors.textMuted,
                   fontFamily: 'monospace')),
           const SizedBox(height: 4),
           for (final e in content.entries.where((e) => e.value is String))

@@ -64,8 +64,7 @@ class _SyncSectionState extends State<SyncSection> {
               : 'Last synced: $_lastSynced',
           style: TextStyle(
             color:
-                Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface,
+                context.appColors.textMuted,
             fontSize: 11,
           ),
         ),
@@ -259,8 +258,7 @@ class _SyncSectionState extends State<SyncSection> {
             ),
           ),
           iconColor:
-              Theme.of(context).textTheme.bodySmall?.color ??
-              Theme.of(context).colorScheme.onSurface,
+              context.appColors.textMuted,
           children: [
             _syncInfoRow(
               Icons.check_circle,
@@ -350,8 +348,7 @@ class _SyncTextField extends StatelessWidget {
           label,
           style: TextStyle(
             color:
-                Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface,
+                context.appColors.textMuted,
             fontSize: 11,
           ),
         ),
@@ -368,8 +365,7 @@ class _SyncTextField extends StatelessWidget {
             hintText: hint,
             hintStyle: TextStyle(
               color:
-                  Theme.of(context).textTheme.bodySmall?.color ??
-                  Theme.of(context).colorScheme.onSurface,
+                  context.appColors.textMuted,
               fontSize: 12,
             ),
             contentPadding: const EdgeInsets.symmetric(

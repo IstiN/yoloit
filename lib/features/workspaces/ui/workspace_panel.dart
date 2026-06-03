@@ -120,8 +120,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
             _showThemePicker ? Icons.expand_less : Icons.chevron_right,
             size: 14,
             color:
-                Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface,
+                context.appColors.textMuted,
           ),
         ),
         const SizedBox(height: 8),
@@ -271,8 +270,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                 hintText: 'Workspace name',
                 hintStyle: TextStyle(
                   color:
-                      Theme.of(ctx).textTheme.bodySmall?.color ??
-                      Theme.of(ctx).colorScheme.onSurface,
+                      ctx.appColors.textMuted,
                   fontSize: 13,
                 ),
                 filled: true,
@@ -306,8 +304,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                   'Cancel',
                   style: TextStyle(
                     color:
-                        Theme.of(ctx).textTheme.bodySmall?.color ??
-                        Theme.of(ctx).colorScheme.onSurface,
+                        ctx.appColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -420,8 +417,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                 hintText: 'Workspace name',
                 hintStyle: TextStyle(
                   color:
-                      Theme.of(ctx).textTheme.bodySmall?.color ??
-                      Theme.of(ctx).colorScheme.onSurface,
+                      ctx.appColors.textMuted,
                   fontSize: 13,
                 ),
                 filled: true,
@@ -455,8 +451,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                   'Cancel',
                   style: TextStyle(
                     color:
-                        Theme.of(ctx).textTheme.bodySmall?.color ??
-                        Theme.of(ctx).colorScheme.onSurface,
+                        ctx.appColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -556,8 +551,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
               message,
               style: TextStyle(
                 color:
-                    Theme.of(ctx).textTheme.bodySmall?.color ??
-                    Theme.of(ctx).colorScheme.onSurface,
+                    ctx.appColors.textMuted,
                 fontSize: 12,
               ),
             ),
@@ -568,8 +562,7 @@ class WorkspacePanelState extends State<WorkspacePanel> {
                   'Cancel',
                   style: TextStyle(
                     color:
-                        Theme.of(ctx).textTheme.bodySmall?.color ??
-                        Theme.of(ctx).colorScheme.onSurface,
+                        ctx.appColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -632,8 +625,7 @@ class _PathChipState extends State<_PathChip> {
                 Icons.folder_outlined,
                 size: 9,
                 color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
+                    context.appColors.textMuted,
               ),
               const SizedBox(width: 3),
               Flexible(
@@ -741,8 +733,7 @@ class _WorkspaceListState extends State<_WorkspaceList> {
                   'Workspaces / Repositories',
                   style: TextStyle(
                     color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        context.appColors.textMuted,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -776,8 +767,7 @@ class _WorkspaceListState extends State<_WorkspaceList> {
                       Icons.folder_open_outlined,
                       size: 14,
                       color:
-                          Theme.of(context).textTheme.bodySmall?.color ??
-                          Theme.of(context).colorScheme.onSurface,
+                          context.appColors.textMuted,
                     ),
                     const SizedBox(width: 8),
                     Flexible(
@@ -785,8 +775,7 @@ class _WorkspaceListState extends State<_WorkspaceList> {
                         'Open a folder...',
                         style: TextStyle(
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                           fontSize: 12,
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -1042,8 +1031,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                   'Start ${type.displayName}',
                   style: TextStyle(
                     color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        context.appColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -1060,16 +1048,14 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                 Icons.drive_file_rename_outline,
                 size: 14,
                 color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
+                    context.appColors.textMuted,
               ),
               const SizedBox(width: 8),
               Text(
                 'Rename',
                 style: TextStyle(
                   color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
+                      context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -1085,16 +1071,14 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                 Icons.create_new_folder_outlined,
                 size: 14,
                 color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
+                    context.appColors.textMuted,
               ),
               const SizedBox(width: 8),
               Text(
                 'Add Folder',
                 style: TextStyle(
                   color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
+                      context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -1110,16 +1094,14 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                 Icons.extension_outlined,
                 size: 14,
                 color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
+                    context.appColors.textMuted,
               ),
               const SizedBox(width: 8),
               Text(
                 'Add Skill',
                 style: TextStyle(
                   color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
+                      context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -1135,16 +1117,14 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                 Icons.key_outlined,
                 size: 14,
                 color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
+                    context.appColors.textMuted,
               ),
               const SizedBox(width: 8),
               Text(
                 'Workspace Secrets',
                 style: TextStyle(
                   color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
+                      context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -1371,8 +1351,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                         Icons.alt_route,
                         size: 10,
                         color:
-                            Theme.of(context).textTheme.bodySmall?.color ??
-                            Theme.of(context).colorScheme.onSurface,
+                            context.appColors.textMuted,
                       ),
                       const SizedBox(width: 3),
                       Flexible(
@@ -1380,8 +1359,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                           'Git Branch: ${ws.gitBranch}',
                           style: TextStyle(
                             color:
-                                Theme.of(context).textTheme.bodySmall?.color ??
-                                Theme.of(context).colorScheme.onSurface,
+                                context.appColors.textMuted,
                             fontSize: 10,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -1408,8 +1386,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                           ' / ',
                           style: TextStyle(
                             color:
-                                Theme.of(context).textTheme.bodySmall?.color ??
-                                Theme.of(context).colorScheme.onSurface,
+                                context.appColors.textMuted,
                             fontSize: 10,
                           ),
                         ),
@@ -1426,8 +1403,7 @@ class _WorkspaceTileState extends State<_WorkspaceTile> {
                         ' lines',
                         style: TextStyle(
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                           fontSize: 10,
                         ),
                       ),
@@ -1539,8 +1515,7 @@ class _SmallIconButton extends StatelessWidget {
               size: 12,
               color:
                   color ??
-                  Theme.of(context).textTheme.bodySmall?.color ??
-                  Theme.of(context).colorScheme.onSurface,
+                  context.appColors.textMuted,
             ),
           ),
         ),
@@ -1637,8 +1612,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                           'Injected as env vars when launching agents in ${widget.workspaceName}',
                           style: TextStyle(
                             color:
-                                Theme.of(context).textTheme.bodySmall?.color ??
-                                Theme.of(context).colorScheme.onSurface,
+                                context.appColors.textMuted,
                             fontSize: 11,
                           ),
                         ),
@@ -1658,8 +1632,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                       'No secrets yet. Add a KEY=VALUE pair.',
                       style: TextStyle(
                         color:
-                            Theme.of(context).textTheme.bodySmall?.color ??
-                            Theme.of(context).colorScheme.onSurface,
+                            context.appColors.textMuted,
                         fontSize: 12,
                       ),
                     ),
@@ -1706,10 +1679,7 @@ class _SecretsDialogState extends State<_SecretsDialog> {
                                     : Icons.visibility_outlined,
                                 size: 16,
                                 color:
-                                    Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color ??
-                                    Theme.of(context).colorScheme.onSurface,
+                                    context.appColors.textMuted,
                               ),
                               splashRadius: 14,
                               tooltip: revealed ? 'Hide' : 'Reveal',
@@ -1810,8 +1780,7 @@ class _SecretTextField extends StatelessWidget {
         hintText: hint,
         hintStyle: TextStyle(
           color:
-              Theme.of(context).textTheme.bodySmall?.color ??
-              Theme.of(context).colorScheme.onSurface,
+              context.appColors.textMuted,
           fontSize: 12,
         ),
         contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1875,8 +1844,7 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                           Icons.terminal,
                           size: 12,
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -1884,10 +1852,7 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                             'Active Sessions',
                             style: TextStyle(
                               color:
-                                  Theme.of(
-                                    context,
-                                  ).textTheme.bodySmall?.color ??
-                                  Theme.of(context).colorScheme.onSurface,
+                                  context.appColors.textMuted,
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.8,
@@ -1918,8 +1883,7 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                           _expanded ? Icons.expand_less : Icons.expand_more,
                           size: 14,
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                         ),
                       ],
                     ),
@@ -1935,8 +1899,7 @@ class _ActiveSessionsPanelState extends State<_ActiveSessionsPanel> {
                         'No active sessions',
                         style: TextStyle(
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                           fontSize: 10,
                         ),
                       ),
@@ -1972,8 +1935,7 @@ class _AgentSessionRowState extends State<_AgentSessionRow> {
     final dotColor =
         isLive
             ? colors.accentGreen
-            : (Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface);
+            : (context.appColors.textMuted);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
@@ -2053,8 +2015,7 @@ class _RunSessionRowState extends State<_RunSessionRow> {
       RunStatus.running => (colors.accentGreen, Icons.play_arrow),
       RunStatus.failed => (colors.accentRed, Icons.error_outline),
       _ => (
-        Theme.of(context).textTheme.bodySmall?.color ??
-            Theme.of(context).colorScheme.onSurface,
+        context.appColors.textMuted,
         Icons.stop_circle_outlined,
       ),
     };
@@ -2204,8 +2165,7 @@ class _AddSkillToWorkspaceDialogState
                         'No skills installed yet.\nInstall skills from the Skills panel first.',
                         style: TextStyle(
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                           fontSize: 12,
                         ),
                         textAlign: TextAlign.center,
@@ -2307,8 +2267,7 @@ class _AddSkillToWorkspaceDialogState
                 'Cancel',
                 style: TextStyle(
                   color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
+                      context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),

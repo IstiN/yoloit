@@ -198,9 +198,7 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
                             color:
                                 _copied
                                     ? colors.accentGreen
-                                    : Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color,
+                                    : context.appColors.textMuted,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -210,9 +208,7 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
                               color:
                                   _copied
                                       ? colors.accentGreen
-                                      : Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall?.color,
+                                      : context.appColors.textMuted,
                             ),
                           ),
                         ],

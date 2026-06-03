@@ -1684,8 +1684,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Widget _buildInfoBar() {
     final colors = context.appColors;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+        context.appColors.textMuted.withOpacity(0.6);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -1834,8 +1833,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Future<void> _showLocalToolsDialog() async {
     final colors = context.appColors;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+        context.appColors.textMuted.withOpacity(0.6);
     var disabled = _disabledLocalTools();
     final tools = [...YoloitCliToolCatalog.tools]..sort((a, b) {
       final byGroup = a.group.compareTo(b.group);
@@ -2010,8 +2008,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             style: TextStyle(
               fontSize: 13,
               color:
-                  Theme.of(context).textTheme.bodySmall?.color ??
-                  Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  context.appColors.textMuted.withOpacity(0.6),
             ),
           ),
         ],
@@ -2342,8 +2339,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final hintColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+        context.appColors.textMuted.withOpacity(0.6);
     final changedFiles = _collectChangedFilesForStrip();
     return Container(
       margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),
@@ -3443,10 +3439,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                             color:
                                 m.inputCostPerMillion! > 10
                                     ? colors.statusError
-                                    : Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall?.color ??
-                                        Theme.of(context).colorScheme.onSurface,
+                                    : context.appColors.textMuted,
                           ),
                         )
                       else if (m.costMultiplier != null)
@@ -3459,10 +3452,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                                     ? colors.statusActive
                                     : m.costMultiplier! > 3
                                     ? colors.statusError
-                                    : Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall?.color ??
-                                        Theme.of(context).colorScheme.onSurface,
+                                    : context.appColors.textMuted,
                           ),
                         ),
                     ],
@@ -3585,8 +3575,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        context.appColors.textMuted,
                     fontSize: 13,
                   ),
                 ),
@@ -3619,10 +3608,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                         color:
                             isCurrent
                                 ? colors.statusActive
-                                : Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color ??
-                                    Theme.of(context).colorScheme.onSurface,
+                                : context.appColors.textMuted,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -3650,10 +3636,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                               style: TextStyle(
                                 fontSize: 10,
                                 color:
-                                    Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color ??
-                                    Theme.of(context).colorScheme.onSurface,
+                                    context.appColors.textMuted,
                               ),
                             ),
                           ],
@@ -3664,8 +3647,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                         style: TextStyle(
                           fontSize: 9,
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -4081,8 +4063,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
     final labelStyle = TextStyle(
       fontSize: 11,
       color:
-          Theme.of(context).textTheme.bodySmall?.color ??
-          Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+          context.appColors.textMuted.withOpacity(0.6),
     );
     final inputTextStyle = TextStyle(
       fontSize: 12,
@@ -4419,8 +4400,7 @@ class _ChangedFilesStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final labelColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withOpacity(0.7);
+        context.appColors.textMuted.withOpacity(0.7);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -4636,7 +4616,7 @@ class _BubbleMenu extends StatelessWidget {
     final color =
         light
             ? context.appColors.textPrimary.withOpacity(0.6)
-            : (Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey);
+            : (context.appColors.textMuted);
     return SizedBox(
       width: 24,
       height: 28,
@@ -4907,8 +4887,7 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withOpacity(0.6);
+        context.appColors.textMuted.withOpacity(0.6);
     final codeBg = colors.surface;
     final processedContent = widget.content.replaceAll(
       RegExp(r'<br\s*/?>'),
@@ -5077,8 +5056,7 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                   style: TextStyle(
                     fontSize: 9,
                     color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        context.appColors.textMuted,
                   ),
                 ),
               ),
@@ -5274,8 +5252,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                         Icons.copy_all_outlined,
                         size: 14,
                         color:
-                            Theme.of(context).textTheme.bodySmall?.color ??
-                            Theme.of(context).colorScheme.onSurface,
+                            context.appColors.textMuted,
                       ),
                     ),
                   ),
@@ -5288,8 +5265,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                         Icons.open_in_full_rounded,
                         size: 14,
                         color:
-                            Theme.of(context).textTheme.bodySmall?.color ??
-                            Theme.of(context).colorScheme.onSurface,
+                            context.appColors.textMuted,
                       ),
                     ),
                   ),
@@ -5303,8 +5279,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                           Icons.note_add_outlined,
                           size: 14,
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                         ),
                       ),
                     ),
@@ -5328,8 +5303,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                     _expanded ? Icons.expand_less : Icons.expand_more,
                     size: 16,
                     color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        context.appColors.textMuted,
                   ),
                 ],
               ),
@@ -5344,8 +5318,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                       fontSize: 11,
                       height: 1.35,
                       color:
-                          Theme.of(context).textTheme.bodySmall?.color ??
-                          Theme.of(context).colorScheme.onSurface,
+                          context.appColors.textMuted,
                     ),
                   ),
                 ),

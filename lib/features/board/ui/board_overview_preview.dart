@@ -32,8 +32,7 @@ class BoardOverviewPreview extends StatelessWidget {
                 child: Icon(
                   Icons.dashboard_outlined,
                   color:
-                      Theme.of(context).textTheme.bodySmall?.color ??
-                      Theme.of(context).colorScheme.onSurface,
+                      context.appColors.textMuted,
                   size: 26,
                 ),
               ),
@@ -270,8 +269,7 @@ class BoardOverviewPanelPreview extends StatelessWidget {
         final tiny = constraints.maxWidth < 54 || constraints.maxHeight < 38;
         final textColor = Theme.of(context).colorScheme.onSurface;
         final muted =
-            Theme.of(context).textTheme.bodySmall?.color ??
-            textColor.withAlpha(140);
+            context.appColors.textMuted;
         return ClipRRect(
           borderRadius: BorderRadius.circular(tiny ? 3 : 6),
           child: DecoratedBox(

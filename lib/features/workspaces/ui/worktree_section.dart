@@ -118,8 +118,7 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                 Icons.account_tree_outlined,
                 size: 11,
                 color:
-                    Theme.of(context).textTheme.bodySmall?.color ??
-                    Theme.of(context).colorScheme.onSurface,
+                    context.appColors.textMuted,
               ),
               const SizedBox(width: 5),
               Flexible(
@@ -127,8 +126,7 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                   'Worktrees',
                   style: TextStyle(
                     color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        context.appColors.textMuted,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -166,8 +164,7 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                       Icons.folder_outlined,
                       size: 11,
                       color:
-                          Theme.of(context).textTheme.bodySmall?.color ??
-                          Theme.of(context).colorScheme.onSurface,
+                          context.appColors.textMuted,
                     ),
                     const SizedBox(width: 4),
                     Flexible(
@@ -232,18 +229,14 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                             Icons.add,
                             size: 11,
                             color:
-                                Theme.of(context).textTheme.bodySmall?.color ??
-                                Theme.of(context).colorScheme.onSurface,
+                                context.appColors.textMuted,
                           ),
                           const SizedBox(width: 5),
                           Text(
                             'Add worktree',
                             style: TextStyle(
                               color:
-                                  Theme.of(
-                                    context,
-                                  ).textTheme.bodySmall?.color ??
-                                  Theme.of(context).colorScheme.onSurface,
+                                  context.appColors.textMuted,
                               fontSize: 11,
                             ),
                           ),
@@ -263,16 +256,14 @@ class _WorktreeSectionState extends State<WorktreeSection> {
                           Icons.add,
                           size: 10,
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           'Add worktree',
                           style: TextStyle(
                             color:
-                                Theme.of(context).textTheme.bodySmall?.color ??
-                                Theme.of(context).colorScheme.onSurface,
+                                context.appColors.textMuted,
                             fontSize: 10,
                           ),
                         ),
@@ -401,8 +392,7 @@ class _WorktreeTileState extends State<_WorktreeTile> {
                     branchLabel,
                     style: TextStyle(
                       color:
-                          Theme.of(context).textTheme.bodySmall?.color ??
-                          Theme.of(context).colorScheme.onSurface,
+                          context.appColors.textMuted,
                       fontSize: 9,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -419,8 +409,7 @@ class _WorktreeTileState extends State<_WorktreeTile> {
                     Icons.close,
                     size: 11,
                     color:
-                        Theme.of(context).textTheme.bodySmall?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                        context.appColors.textMuted,
                   ),
                 ),
               ),
@@ -749,8 +738,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                     'No branches found',
                     style: TextStyle(
                       color:
-                          Theme.of(context).textTheme.bodySmall?.color ??
-                          Theme.of(context).colorScheme.onSurface,
+                          context.appColors.textMuted,
                       fontSize: 12,
                     ),
                   )
@@ -834,8 +822,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
       hintText: hint,
       hintStyle: TextStyle(
         color:
-            Theme.of(context).textTheme.bodySmall?.color ??
-            Theme.of(context).colorScheme.onSurface,
+            context.appColors.textMuted,
         fontSize: 12,
       ),
       contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -913,8 +900,7 @@ class _SmallIconButton extends StatelessWidget {
             icon,
             size: 12,
             color:
-                Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface,
+                context.appColors.textMuted,
           ),
         ),
       ),

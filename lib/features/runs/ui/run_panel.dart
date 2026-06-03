@@ -1037,8 +1037,7 @@ class _ConfigList extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 9,
                         color:
-                            Theme.of(context).textTheme.bodySmall?.color ??
-                            Theme.of(context).colorScheme.onSurface,
+                            context.appColors.textMuted,
                       ),
                     ),
                   ),
@@ -1058,8 +1057,7 @@ class _ConfigList extends StatelessWidget {
                       Icons.edit_outlined,
                       size: 12,
                       color:
-                          Theme.of(context).textTheme.bodySmall?.color ??
-                          Theme.of(context).colorScheme.onSurface,
+                          context.appColors.textMuted,
                     ),
                   ),
                 ],
@@ -1268,8 +1266,7 @@ class _SessionGroup extends StatelessWidget {
     final runningCount =
         sessions.where((s) => s.status == RunStatus.running).length;
     final titleColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface.withAlpha(150);
+        context.appColors.textMuted.withAlpha(150);
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
       child: Container(
@@ -1337,8 +1334,7 @@ class _SessionGroup extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 8,
                             color:
-                                Theme.of(context).textTheme.bodySmall?.color ??
-                                Theme.of(context).colorScheme.onSurface,
+                                context.appColors.textMuted,
                           ),
                         ),
                       const SizedBox(width: 4),

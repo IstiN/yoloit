@@ -692,8 +692,7 @@ class _BoardTerminalInfoBarState extends State<_BoardTerminalInfoBar> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -832,8 +831,7 @@ class _BoardTerminalSetupViewState extends State<_BoardTerminalSetupView> {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -994,8 +992,7 @@ class _TerminalDisconnectedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return Center(
       child: Padding(
@@ -1082,8 +1079,7 @@ class _BoardTerminalSessionHistoryDialogState
     final manager = BoardTerminalSessionManager.instance;
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final secondaryColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;

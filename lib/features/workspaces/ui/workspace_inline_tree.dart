@@ -228,7 +228,7 @@ class _BranchRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final branch = entry.branch ?? entry.commit ?? '(detached)';
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final mutedColor = context.appColors.textMuted;
     final dotColor = entry.isMain ? colors.accentGreen : hasSession ? colors.accentBlue : mutedColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 1, 8, 1),
@@ -269,7 +269,7 @@ class _AddBranchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final mutedColor = context.appColors.textMuted;
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -309,7 +309,7 @@ class _AddBranchField extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 2, 8, 2),
       child: Row(
         children: [
-          Text('└─ ', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 10)),
+          Text('└─ ', style: TextStyle(color: context.appColors.textMuted, fontSize: 10)),
           Expanded(
             child: TextField(
               controller: controller,
@@ -317,7 +317,7 @@ class _AddBranchField extends StatelessWidget {
               style: TextStyle(color: colors.primary, fontSize: 11),
               decoration: InputDecoration(
                 hintText: 'branch-name',
-                hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface, fontSize: 11),
+                hintStyle: TextStyle(color: context.appColors.textMuted, fontSize: 11),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
                 filled: false,
@@ -339,7 +339,7 @@ class _AddBranchField extends StatelessWidget {
           const SizedBox(width: 4),
           GestureDetector(
             onTap: onCancel,
-            child: Icon(Icons.close, size: 11, color: Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface),
+            child: Icon(Icons.close, size: 11, color: context.appColors.textMuted),
           ),
         ],
       ),
@@ -391,7 +391,7 @@ class _SessionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final mutedColor = context.appColors.textMuted;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -442,7 +442,7 @@ class _SessionRowState extends State<_SessionRow> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+    final mutedColor = context.appColors.textMuted;
     final statusColor = switch (widget.session.status) {
       AgentStatus.live => colors.accentGreen,
       AgentStatus.idle => mutedColor,
@@ -515,7 +515,7 @@ class _NewSessionButton extends StatelessWidget {
       onTap: () => _showDialog(context),
       child: Builder(
         builder: (context) {
-          final mutedColor = Theme.of(context).textTheme.bodySmall?.color ?? Theme.of(context).colorScheme.onSurface;
+          final mutedColor = context.appColors.textMuted;
           return Padding(
             padding: const EdgeInsets.fromLTRB(28, 2, 8, 4),
             child: Row(

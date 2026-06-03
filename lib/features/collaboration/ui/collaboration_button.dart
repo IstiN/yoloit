@@ -129,8 +129,7 @@ class _CollaborationDialogState extends State<_CollaborationDialog>
                       icon: Icon(
                         Icons.close,
                         size: 16,
-                        color: Theme.of(context).textTheme.bodySmall?.color ??
-                            Theme.of(context).colorScheme.onSurface,
+                        color: context.appColors.textMuted,
                       ),
                       padding: EdgeInsets.zero,
                       onPressed: () => Navigator.pop(context),
@@ -202,8 +201,7 @@ class _IdleView extends StatelessWidget {
             ),
             labelColor: Theme.of(context).colorScheme.onSurface,
             unselectedLabelColor:
-                Theme.of(context).textTheme.bodySmall?.color ??
-                Theme.of(context).colorScheme.onSurface,
+                context.appColors.textMuted,
             labelStyle: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -384,7 +382,7 @@ class _HostActiveView extends StatelessWidget {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+        context.appColors.textMuted;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -817,8 +815,7 @@ class _DarkTextField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(
-          color: Theme.of(context).textTheme.bodySmall?.color ??
-              Theme.of(context).colorScheme.onSurface,
+          color: context.appColors.textMuted,
           fontSize: 12,
         ),
         filled: true,

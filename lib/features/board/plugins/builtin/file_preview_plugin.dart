@@ -260,7 +260,7 @@ class _FilePreviewContentState extends State<_FilePreviewContent> {
             Text(
               'No file selected',
               style: TextStyle(
-                color: Theme.of(context).textTheme.bodySmall?.color,
+                color: context.appColors.textMuted,
                 fontSize: 13,
               ),
             ),
@@ -1280,14 +1280,14 @@ class _AudioPreviewState extends State<_AudioPreview> {
                   _fmt(_position),
                   style: TextStyle(
                     fontSize: 11,
-                    color: Theme.of(context).textTheme.bodySmall?.color,
+                    color: context.appColors.textMuted,
                   ),
                 ),
                 Text(
                   _fmt(_total),
                   style: TextStyle(
                     fontSize: 11,
-                    color: Theme.of(context).textTheme.bodySmall?.color,
+                    color: context.appColors.textMuted,
                   ),
                 ),
               ],
@@ -1394,7 +1394,7 @@ class _Toolbar extends StatelessWidget {
               fileName,
               style: TextStyle(
                 fontSize: 11,
-                color: Theme.of(context).textTheme.bodySmall?.color,
+                color: context.appColors.textMuted,
               ),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,

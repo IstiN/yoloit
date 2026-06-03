@@ -511,7 +511,7 @@ class _KanbanContentState extends State<_KanbanContent> {
             ? Color.lerp(baseColor, colors.textPrimary, 0.25)!
             : baseColor;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ?? colors.textSecondary;
+        context.appColors.textMuted;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Column(
@@ -777,7 +777,7 @@ class _CardTile extends StatelessWidget {
     final textColor =
         Theme.of(context).textTheme.bodyMedium?.color ?? colors.textSecondary;
     final muted =
-        Theme.of(context).textTheme.bodySmall?.color ?? colors.textSecondary;
+        context.appColors.textMuted;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onEdit,

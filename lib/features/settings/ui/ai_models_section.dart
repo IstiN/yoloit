@@ -470,7 +470,7 @@ class _PrerequisitesCard extends StatelessWidget {
             SelectableText(
               status.installHint!,
               style: TextStyle(
-                color: Theme.of(context).textTheme.bodySmall?.color,
+                color: context.appColors.textMuted,
                 fontSize: 11,
                 fontFamily: 'monospace',
               ),

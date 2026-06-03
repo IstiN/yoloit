@@ -408,8 +408,7 @@ class _FourPaneLayoutState extends State<_FourPaneLayout> {
     return BlocBuilder<FileEditorCubit, FileEditorState>(
       builder: (context, editorState) {
         final mutedColor =
-            Theme.of(context).textTheme.bodySmall?.color ??
-            Theme.of(context).colorScheme.onSurface;
+            context.appColors.textMuted;
         final showWorkspace = widget.workspaceVis == PanelVisibility.open;
         final workspaceCollapsed =
             widget.workspaceVis == PanelVisibility.collapsed;
@@ -1027,8 +1026,7 @@ class _PanelToggleButton extends StatelessWidget {
               color:
                   active
                       ? colors.primary
-                      : (Theme.of(context).textTheme.bodySmall?.color ??
-                          Theme.of(context).colorScheme.onSurface),
+                      : (context.appColors.textMuted),
               semanticLabel: tooltip,
             ),
           ),
@@ -1127,8 +1125,7 @@ class _WinBtnState extends State<_WinBtn> {
   @override
   Widget build(BuildContext context) {
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final secondaryColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
@@ -1223,8 +1220,7 @@ class _ResourceChipState extends State<_ResourceChip> {
     final cpu = _snap.totalCpuPercent;
     final colors = context.appColors;
     final textColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     return GestureDetector(
       onTap: () => _toggle(context),
       child: Container(
@@ -1292,7 +1288,7 @@ class _ResourcePanelState extends State<_ResourcePanel> {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+        context.appColors.textMuted;
     final host = _snap.host;
     final ramSharePercent =
         host.totalBytes > 0
@@ -1552,7 +1548,7 @@ class _StatCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+        context.appColors.textMuted;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1594,7 +1590,7 @@ class _BoardResourceSection extends StatelessWidget {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+        context.appColors.textMuted;
     final totalPanels = boards.fold<int>(
       0,
       (sum, board) => sum + board.panels.length,
@@ -1686,8 +1682,7 @@ class _PanelTypeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 2, 14, 2),
       child: Row(
@@ -1768,7 +1763,7 @@ class _SessionRow extends StatelessWidget {
     final colors = context.appColors;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ?? onSurface;
+        context.appColors.textMuted;
     final metadata = session.metadata;
     final label = metadata?.displayLabel ?? formatSessionLabel(session.label);
     final canStop = resourceSessionCanStop(session);
@@ -1991,9 +1986,7 @@ void _showResourceSessionDetails(BuildContext context, SessionStat session) {
                               line.key,
                               style: TextStyle(
                                 color:
-                                    Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall?.color,
+                                    context.appColors.textMuted,
                                 fontSize: 12,
                               ),
                             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/sidebar/show_hide_sidebar.dart';
 import 'package:yoloit/features/review/bloc/review_cubit.dart';
 
@@ -23,7 +24,10 @@ Future<void> _pump(
       create: (_) => ReviewCubit(),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: _darkBg),
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: _darkBg,
+          extensions: [AppColorScheme.fromAccent(const Color(0xFF7C6BFF))],
+        ),
         home: Scaffold(
           body: SizedBox(width: width, height: height, child: child),
         ),

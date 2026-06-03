@@ -379,8 +379,7 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                           Icons.chevron_left,
                           size: 14,
                           color:
-                              Theme.of(context).textTheme.bodySmall?.color ??
-                              Theme.of(context).colorScheme.onSurface,
+                              context.appColors.textMuted,
                         ),
                       ),
                     ),
@@ -816,8 +815,7 @@ class _SidebarTreeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final mutedColor =
-        Theme.of(context).textTheme.bodySmall?.color ??
-        Theme.of(context).colorScheme.onSurface;
+        context.appColors.textMuted;
     final icon = _typeIcons[node.type] ?? Icons.circle;
     final rawColor = _typeColor(colors);
     final color = rawColor.isMuted ? mutedColor : rawColor.color;

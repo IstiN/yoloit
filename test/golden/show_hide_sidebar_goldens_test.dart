@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/collaboration/model/sync_message.dart';
 import 'package:yoloit/features/mindmap/bloc/mindmap_state.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
@@ -193,7 +194,10 @@ Future<void> _pumpSidebar(WidgetTester tester, ShowHideSidebarData data) async {
       create: (_) => ReviewCubit(),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: _surfaceBg),
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: _surfaceBg,
+          extensions: [AppColorScheme.fromAccent(const Color(0xFF7C6BFF))],
+        ),
         home: Scaffold(
           body: Align(
             alignment: Alignment.topLeft,
