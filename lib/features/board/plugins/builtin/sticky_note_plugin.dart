@@ -4,6 +4,7 @@ import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/ui/components/color_swatch_row.dart';
+import 'package:yoloit/ui/components/input/panel_text_controller_mixin.dart';
 
 class StickyNotePlugin extends BoardPanelPlugin {
   const StickyNotePlugin();
@@ -102,35 +103,10 @@ class _StickyNoteContent extends StatefulWidget {
   State<_StickyNoteContent> createState() => _StickyNoteContentState();
 }
 
-class _StickyNoteContentState extends State<_StickyNoteContent> {
-  late final TextEditingController _controller;
-
+class _StickyNoteContentState extends State<_StickyNoteContent>
+    with PanelTextControllerMixin<_StickyNoteContent> {
   @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: _textFromWidget());
-  }
-
-  @override
-  void didUpdateWidget(covariant _StickyNoteContent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final nextText = _textFromWidget();
-    if (nextText != _controller.text) {
-      _controller.value = _controller.value.copyWith(
-        text: nextText,
-        selection: TextSelection.collapsed(offset: nextText.length),
-        composing: TextRange.empty,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  String _textFromWidget() => widget.panel.state['text'] as String? ?? '';
+  String get panelText => widget.panel.state['text'] as String? ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +125,7 @@ class _StickyNoteContentState extends State<_StickyNoteContent> {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: TextField(
-          controller: _controller,
+          controller: controller,
           expands: true,
           maxLines: null,
           minLines: null,
