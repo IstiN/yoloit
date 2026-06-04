@@ -160,15 +160,17 @@ class _TerminalViewState extends State<_TerminalView> {
             child:
                 sessions.isEmpty
                     ? const SizedBox()
-                    : IndexedStack(
-                      index: activeIndex,
+                    : Stack(
                       children:
                           sessions.asMap().entries.map((e) {
-                            return RepaintBoundary(
-                              child: TerminalWidget(
-                                key: ValueKey(e.value.id),
-                                session: e.value,
-                                isActive: e.key == activeIndex,
+                            return Offstage(
+                              offstage: e.key != activeIndex,
+                              child: RepaintBoundary(
+                                child: TerminalWidget(
+                                  key: ValueKey(e.value.id),
+                                  session: e.value,
+                                  isActive: e.key == activeIndex,
+                                ),
                               ),
                             );
                           }).toList(),

@@ -132,5 +132,13 @@ void main() {
       expect(updated.displayName, 'refactor');
       expect(updated.status, AgentStatus.live);
     });
+
+    test('terminal maxLines is limited to 2000 to prevent UI freeze', () {
+      final s = AgentSession(
+        id: 'id5', type: AgentType.terminal, workspacePath: '/p',
+      );
+      expect(s.terminal.maxLines, 2000);
+      expect(s.kTerminal.maxLines, 2000);
+    });
   });
 }

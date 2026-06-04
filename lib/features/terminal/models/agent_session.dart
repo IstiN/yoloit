@@ -18,8 +18,8 @@ class AgentSession extends Equatable {
     this.customName,
     this.worktreeContexts,
     this.hookPhase,
-  }) : terminal = Terminal(maxLines: 10000),
-       kTerminal = kterm.Terminal(maxLines: 10000);
+  }) : terminal = Terminal(maxLines: 2000),
+       kTerminal = kterm.Terminal(maxLines: 2000);
 
   // Private constructor that preserves an existing terminal instance.
   AgentSession._preserve({
