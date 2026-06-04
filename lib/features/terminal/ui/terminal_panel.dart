@@ -161,19 +161,19 @@ class _TerminalViewState extends State<_TerminalView> {
                 sessions.isEmpty
                     ? const SizedBox()
                     : Stack(
-                      children:
-                          sessions.asMap().entries.map((e) {
-                            return Offstage(
-                              offstage: e.key != activeIndex,
-                              child: RepaintBoundary(
-                                child: TerminalWidget(
-                                  key: ValueKey(e.value.id),
-                                  session: e.value,
-                                  isActive: e.key == activeIndex,
-                                ),
+                      children: [
+                        for (final e in sessions.asMap().entries)
+                          if (e.key == activeIndex)
+                            RepaintBoundary(
+                              child: TerminalWidget(
+                                key: ValueKey(e.value.id),
+                                session: e.value,
+                                isActive: true,
                               ),
-                            );
-                          }).toList(),
+                            )
+                          else
+                            const SizedBox(),
+                      ],
                     ),
           ),
           _WorkspaceStatusBar(session: activeSession),
@@ -729,7 +729,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     return localPosition.dx >= _terminalSize.width - scrollbarHitWidth;
   }
 
-  final _scrollController = ScrollController();
+  late final ScrollController _scrollController;
 
   // Identity-checked callbacks stored as fields so we can null them safely in
   // dispose without clobbering another TerminalWidget that rebound the same
@@ -737,9 +737,19 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void Function(String)? _boundOnOutput;
   void Function(int, int, int, int)? _boundOnResize;
 
+  void _persistScrollOffset() {
+    if (_scrollController.hasClients) {
+      widget.session.scrollOffset = _scrollController.offset;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController(
+      initialScrollOffset: widget.session.scrollOffset,
+    );
+    _scrollController.addListener(_persistScrollOffset);
     _focusNode.addListener(() {});
     _bindTerminal();
     AgentConfigService.instance.terminalRenderEngineNotifier.addListener(
@@ -750,6 +760,14 @@ class TerminalWidgetState extends State<TerminalWidget> {
     // Load persisted font size
     SessionPrefs.load().then((snap) {
       if (mounted) setState(() => _fontSize = snap.terminalFontSize);
+    });
+    // Restore scroll position after the first frame because xterm's
+    // RenderTerminal defaults _stickToBottom=true and snaps to maxExtent
+    // during initial layout, ignoring initialScrollOffset.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(widget.session.scrollOffset);
+      }
     });
   }
 
@@ -762,7 +780,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _bindTerminal();
       HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     }
-    // Request focus when this session becomes active (IndexedStack shows it).
+    // Request focus when this session becomes active (conditional render shows it).
     if (!oldWidget.isActive && widget.isActive && widget.autoRequestFocus) {
       _requestFocusAfterFrame();
     }
@@ -1203,6 +1221,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _rebindTerminalForActiveEngine,
     );
     _unbindTerminalIfOurs(widget.session);
+    _scrollController.removeListener(_persistScrollOffset);
     _controller.dispose();
     _kController.dispose();
     _scrollController.dispose();

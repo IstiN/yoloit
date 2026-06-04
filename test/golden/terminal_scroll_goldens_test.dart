@@ -58,6 +58,9 @@ void main() {
         'abcdefghijklmnopqrstuvwxyz\r\n',
       );
     }
+    // Two pumps are required because xterm render.dart now batches
+    // layout updates via addPostFrameCallback.
+    await tester.pump();
     await tester.pump();
 
     final terminalView = tester.widget<TerminalView>(find.byType(TerminalView));

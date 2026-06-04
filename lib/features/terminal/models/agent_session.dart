@@ -57,6 +57,10 @@ class AgentSession extends Equatable {
   /// NOT included in [props] — mutations don't trigger state rebuilds.
   final List<String> recentLines = [];
 
+  /// Last known scroll offset of the terminal view.
+  /// NOT included in [props] — persisted across widget rebuilds.
+  double scrollOffset = 0.0;
+
   /// Rolling buffer of RAW PTY bytes (with ANSI) — replayed to new remote
   /// guests so they see the full current terminal state, not just new data.
   /// Capped at [_maxRawBytes] to bound memory.

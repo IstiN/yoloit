@@ -321,6 +321,9 @@ void main() {
       for (var i = 0; i < 80; i++) {
         session.terminal.write('line $i\r\n');
       }
+      // Two pumps are required because xterm render.dart now batches
+      // layout updates via addPostFrameCallback.
+      await tester.pump();
       await tester.pump();
 
       final terminalView = tester.widget<TerminalView>(
@@ -1021,6 +1024,135 @@ void main() {
 
       expect(outputs, isNotEmpty);
       expect(outputs.join(), contains('\x1B[A'));
+    });
+
+    testWidgets('persists scroll offset across widget rebuilds', (tester) async {
+      useXtermRenderer();
+      final session = AgentSession(
+        id: 'sess_scroll_persist',
+        type: AgentType.terminal,
+        workspacePath: '/project',
+      );
+      // Fill terminal with enough lines to make it scrollable.
+      for (var i = 0; i < 100; i++) {
+        session.terminal.write('line $i\n');
+      }
+
+      // Pre-seed scroll offset so the widget restores it on creation.
+      session.scrollOffset = 150.0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 200,
+              child: TerminalWidget(
+                session: session,
+                isActive: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scrollable = find.byType(Scrollable);
+      final controller = tester.widget<Scrollable>(scrollable).controller;
+      expect(controller?.hasClients, isTrue);
+      // The offset should reflect the restored scroll position.
+      expect(controller?.offset, 150.0);
+
+      // Update scroll position and verify it is persisted via listener.
+      controller?.jumpTo(200.0);
+      await tester.pump();
+      expect(session.scrollOffset, 200.0);
+
+      // Dispose and recreate — new controller should start at 200.0.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 200,
+              child: Container(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 600,
+              height: 200,
+              child: TerminalWidget(
+                session: session,
+                isActive: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final newScrollable = find.byType(Scrollable);
+      final newController = tester.widget<Scrollable>(newScrollable).controller;
+      expect(newController?.hasClients, isTrue);
+      expect(newController?.offset, 200.0);
+    });
+
+    testWidgets('only active session is rendered in Stack', (tester) async {
+      useXtermRenderer();
+      final s1 = AgentSession(
+        id: 'sess_a',
+        type: AgentType.terminal,
+        workspacePath: '/p1',
+      );
+      final s2 = AgentSession(
+        id: 'sess_b',
+        type: AgentType.terminal,
+        workspacePath: '/p2',
+      );
+
+      final cubit = _FakeTerminalCubit()
+        ..emit(
+          TerminalLoaded(
+            sessions: [s1, s2],
+            activeIndex: 0,
+          ),
+        );
+
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<TerminalCubit>(create: (_) => cubit),
+            BlocProvider<WorkspaceCubit>(create: (_) => WorkspaceCubit()),
+          ],
+          child: MaterialApp(
+            theme: AppThemePreset.neonPurple.theme,
+            home: const Scaffold(body: TerminalPanel()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Only one TerminalWidget should exist in the tree.
+      expect(find.byType(TerminalWidget), findsOneWidget);
+
+      // Switch to second session.
+      cubit.emit(
+        TerminalLoaded(
+          sessions: [s1, s2],
+          activeIndex: 1,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Still only one TerminalWidget.
+      expect(find.byType(TerminalWidget), findsOneWidget);
     });
   });
 }

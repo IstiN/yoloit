@@ -2,6 +2,7 @@ import 'dart:math' show max;
 import 'dart:ui';
 
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:xterm/src/core/buffer/cell_offset.dart';
 import 'package:xterm/src/core/buffer/range.dart';
@@ -49,6 +50,8 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
           textStyle: textStyle,
           textScaler: textScaler,
         );
+
+  bool _layoutPending = false;
 
   Terminal _terminal;
   set terminal(Terminal terminal) {
@@ -163,13 +166,22 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     markNeedsPaint();
   }
 
+  void _scheduleLayout() {
+    if (_layoutPending) return;
+    _layoutPending = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _layoutPending = false;
+      if (attached) markNeedsLayout();
+    });
+  }
+
   void _onTerminalChange() {
-    markNeedsLayout();
+    _scheduleLayout();
     _notifyEditableRect();
   }
 
   void _onControllerUpdate() {
-    markNeedsLayout();
+    _scheduleLayout();
   }
 
   @override
