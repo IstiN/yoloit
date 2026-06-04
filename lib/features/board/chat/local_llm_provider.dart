@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
+import 'package:yoloit/core/utils/string_utils.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
@@ -1023,7 +1024,7 @@ class LocalLlmProvider extends ChatProvider {
         for (final call in toolHistory) {
           toolBuf.writeln(
             '- ${call.toolName} ${call.success ? 'succeeded' : 'failed'} '
-            'args=${_compactPromptJson(call.arguments, 600)} '
+            'args=${compactPromptJson(call.arguments, 600)} '
             'result=${_compactToolResultForPrompt(call.result)}',
           );
         }
@@ -1062,10 +1063,10 @@ class LocalLlmProvider extends ChatProvider {
         final stdout = decoded['stdout'];
         final panel = _panelSummaryFromStdout(stdout);
         if (panel != null) compact['panel'] = panel;
-        if (compact.isNotEmpty) return _compactPromptJson(compact, 800);
+        if (compact.isNotEmpty) return compactPromptJson(compact, 800);
       }
     } catch (_) {}
-    return _truncatePromptText(result, 800);
+    return truncatePromptText(result, 800);
   }
 
   Map<String, Object?>? _panelSummaryFromStdout(Object? stdout) {
@@ -1083,20 +1084,6 @@ class LocalLlmProvider extends ChatProvider {
     } catch (_) {
       return null;
     }
-  }
-
-  String _compactPromptJson(Object? value, int maxChars) {
-    try {
-      return _truncatePromptText(jsonEncode(value), maxChars);
-    } catch (_) {
-      return _truncatePromptText('$value', maxChars);
-    }
-  }
-
-  String _truncatePromptText(String value, int maxChars) {
-    final text = value.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (text.length <= maxChars) return text;
-    return '${text.substring(0, maxChars)}…';
   }
 
   String _extractDelta({required String previous, required String incoming}) {

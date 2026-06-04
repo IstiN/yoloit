@@ -13,6 +13,7 @@ import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/string_utils.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -1082,9 +1083,9 @@ $messagesJson
   String _formatToolMessageForPrompt(Map<String, dynamic> message) {
     final toolName = (message['toolName'] as String? ?? 'tool').trim();
     final success = message['success'] as bool? ?? true;
-    final arguments = _compactJsonForPrompt(
+    final arguments = compactPromptJson(
       message['arguments'],
-      maxChars: 600,
+      600,
     );
     final result = _compactToolResultForPrompt(message['rawResult']);
     return '\nTool $toolName ${success ? 'succeeded' : 'failed'}'
@@ -1106,11 +1107,11 @@ $messagesJson
         final panelSummary = _panelSummaryFromStdout(stdout);
         if (panelSummary != null) compact['panel'] = panelSummary;
         if (compact.isNotEmpty) {
-          return _compactJsonForPrompt(compact, maxChars: 800);
+          return compactPromptJson(compact, 800);
         }
       }
     } catch (_) {}
-    return _truncatePromptText(rawResult, 800);
+    return truncatePromptText(rawResult, 800);
   }
 
   Map<String, Object?>? _panelSummaryFromStdout(Object? stdout) {
@@ -1128,20 +1129,6 @@ $messagesJson
     } catch (_) {
       return null;
     }
-  }
-
-  String _compactJsonForPrompt(Object? value, {required int maxChars}) {
-    try {
-      return _truncatePromptText(jsonEncode(value), maxChars);
-    } catch (_) {
-      return _truncatePromptText('$value', maxChars);
-    }
-  }
-
-  String _truncatePromptText(Object? value, int maxChars) {
-    final text = '$value'.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (text.length <= maxChars) return text;
-    return '${text.substring(0, maxChars)}…';
   }
 
   int _estimateTokens(String text) {
@@ -2010,7 +1997,7 @@ $messagesJson
     if (isTool) {
       final success = msg['success'] as bool? ?? true;
       final toolName = msg['toolName'] as String? ?? 'tool';
-      final args = _compactJsonForPrompt(msg['arguments'], maxChars: 420);
+      final args = compactPromptJson(msg['arguments'], 420);
       final rawResult = msg['rawResult'] as String?;
       final result = _compactToolResultForPrompt(rawResult);
       return Align(
