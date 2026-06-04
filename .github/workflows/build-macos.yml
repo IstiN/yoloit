@@ -75,6 +75,14 @@ jobs:
           echo "Submodules initialized:"
           git -C "$GITHUB_WORKSPACE" submodule status
 
+          # Clone flutter_code_editor (not a submodule, but a path dependency)
+          rm -rf "$GITHUB_WORKSPACE/third_party/flutter_code_editor"
+          git clone --branch v0.3.5 --depth=1 \
+            https://github.com/akvelon/flutter-code-editor.git \
+            "$GITHUB_WORKSPACE/third_party/flutter_code_editor"
+          echo "flutter_code_editor cloned:"
+          git -C "$GITHUB_WORKSPACE/third_party/flutter_code_editor" log -1 --oneline
+
       # ── Environment ─────────────────────────────────────────────────────────
       - name: Setup Flutter environment
         run: |

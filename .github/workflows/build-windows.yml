@@ -30,6 +30,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Clone flutter_code_editor
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue third_party/flutter_code_editor
+          git clone --branch v0.3.5 --depth=1 `
+            https://github.com/akvelon/flutter-code-editor.git `
+            third_party/flutter_code_editor
+          git -C third_party/flutter_code_editor log -1 --oneline
+
       # ── Flutter ──────────────────────────────────────────────────────────────
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
