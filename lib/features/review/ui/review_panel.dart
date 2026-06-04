@@ -13,6 +13,7 @@ import 'package:yoloit/features/review/models/review_models.dart';
 import 'package:yoloit/features/runs/ui/run_panel.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
+import 'package:yoloit/ui/components/feedback/status_badge.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 enum _FileTreeTab { files, diff }
@@ -1049,17 +1050,12 @@ class _PrButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withAlpha(30),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: color.withAlpha(80)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
-        ),
+      child: StatusBadge(
+        label: label,
+        color: color,
+        borderRadius: 4,
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
       ),
     );
   }

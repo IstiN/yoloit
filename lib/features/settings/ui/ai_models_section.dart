@@ -5,6 +5,7 @@ import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
+import 'package:yoloit/ui/components/feedback/status_badge.dart';
 
 class AiModelsSection extends StatefulWidget {
   const AiModelsSection({super.key});
@@ -388,22 +389,7 @@ class _StatusChip extends StatelessWidget {
       ),
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withAlpha(30),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withAlpha(80)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
+    return StatusBadge(label: label, color: color);
   }
 }
 
