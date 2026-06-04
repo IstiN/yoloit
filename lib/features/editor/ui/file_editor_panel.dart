@@ -103,12 +103,29 @@ class _FileEditorPanelState extends State<FileEditorPanel>
     return spec.mode;
   }
 
+  static const int _kLargeFileLineThreshold = 3000;
+  static const int _kLargeFileByteThreshold = 100 * 1024;
+
+  static bool _isLargeFile(String? content) {
+    if (content == null) return false;
+    if (content.length > _kLargeFileByteThreshold) return true;
+    var lines = 0;
+    for (var i = 0; i < content.length; i++) {
+      if (content[i] == '\n') lines++;
+      if (lines > _kLargeFileLineThreshold) return true;
+    }
+    return false;
+  }
+
   /// Returns the controller for [tab], creating it if needed.
   CodeController _controllerFor(EditorTab tab, BuildContext context) {
     if (!_controllers.containsKey(tab.filePath)) {
+      final large = _isLargeFile(tab.content);
       final ctrl = CodeController(
         text: tab.content ?? '',
-        language: _modeFor(tab.filePath),
+        // Disable syntax highlighting for large files — the highlight package
+        // tokenizes the entire file eagerly and freezes the UI on open.
+        language: large ? null : _modeFor(tab.filePath),
       );
       _controllers[tab.filePath] = ctrl;
       _loadedContent[tab.filePath] = tab.content ?? '';
@@ -245,6 +262,7 @@ class _FileEditorPanelState extends State<FileEditorPanel>
                               tab: activeTab,
                               codeController: controller!,
                               fontSizeNotifier: _fontSizeNotifier,
+                              isLargeFile: _isLargeFile(activeTab.content),
                             ),
                   ),
                   if (!immersive)
@@ -936,10 +954,12 @@ class _EditorBody extends StatefulWidget {
     required this.tab,
     required this.codeController,
     required this.fontSizeNotifier,
+    this.isLargeFile = false,
   });
   final EditorTab tab;
   final CodeController codeController;
   final ValueNotifier<double> fontSizeNotifier;
+  final bool isLargeFile;
   @override
   State<_EditorBody> createState() => _EditorBodyState();
 }
@@ -1706,6 +1726,33 @@ class _EditorBodyState extends State<_EditorBody> {
               onToggleOutline: _toggleOutline,
               onGoToLine: () => _showGoToLine(context),
             ),
+            if (widget.isLargeFile)
+              Container(
+                color: colors.accentOrange.withValues(alpha: 0.12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 14,
+                      color: colors.accentOrange,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Large file — syntax highlighting disabled for performance.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colors.accentOrange,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (widget.codeController.searchController.shouldShow)
               _SearchReplaceBar(
                 controller: widget.codeController,
@@ -2439,7 +2486,19 @@ class _OutlineSymbol {
   final bool isClass;
 }
 
+// Cache key: content length + hash + path → symbols.
+// This avoids re-parsing the entire file on every build when _showOutline is true.
+final _symbolCache = <String, List<_OutlineSymbol>>{};
+
+String _symbolCacheKey(String content, String filePath) {
+  return '${content.length}:${content.hashCode}:$filePath';
+}
+
 List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
+  final key = _symbolCacheKey(content, filePath);
+  final cached = _symbolCache[key];
+  if (cached != null) return cached;
+
   final ext = filePath.split('.').last.toLowerCase();
   final lines = content.split('\n');
   final symbols = <_OutlineSymbol>[];
@@ -2537,6 +2596,12 @@ List<_OutlineSymbol> _parseSymbols(String content, String filePath) {
         }
     }
   }
+
+  // Trim cache if it grows too large (leak prevention).
+  if (_symbolCache.length > 50) {
+    _symbolCache.remove(_symbolCache.keys.first);
+  }
+  _symbolCache[key] = symbols;
   return symbols;
 }
 

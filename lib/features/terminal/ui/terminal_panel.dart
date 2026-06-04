@@ -699,6 +699,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   _TerminalScrollAnchor? _userScrollAnchor;
   Timer? _userScrollAnchorTimer;
   Timer? _userScrollPreserveTimer;
+  Timer? _resizeDebounce;
   Offset? _clickDownPosition;
 
   // Manual drag-to-select: xterm 4.x's PanGestureRecognizer fails to win the
@@ -815,7 +816,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
     };
     _boundOnResize = (cols, rows, pixelWidth, pixelHeight) {
       _captureResizeScrollAnchor();
-      TerminalBackendService.instance.resize(widget.session.id, cols, rows);
+      // Debounce backend resize — during a panel-drag the terminal dimension
+      // changes on every frame, and flooding the PTY with resize signals
+      // causes the shell/app to re-render output continuously which hangs UI.
+      _resizeDebounce?.cancel();
+      _resizeDebounce = Timer(const Duration(milliseconds: 150), () {
+        TerminalBackendService.instance.resize(widget.session.id, cols, rows);
+      });
       _restoreResizeScrollAnchor();
     };
     switch (AgentConfigService.instance.terminalRenderEngine) {
@@ -1216,6 +1223,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _focusRetryTimer?.cancel();
     _userScrollAnchorTimer?.cancel();
     _userScrollPreserveTimer?.cancel();
+    _resizeDebounce?.cancel();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     AgentConfigService.instance.terminalRenderEngineNotifier.removeListener(
       _rebindTerminalForActiveEngine,
