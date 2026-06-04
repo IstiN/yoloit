@@ -358,7 +358,7 @@ class LocalLlmProvider extends ChatProvider {
               'role': 'tool',
               'content':
                   '${tc.toolName} ${tc.success ? "→ ok" : "→ error"}: '
-                  '${_compactToolResultForPrompt(tc.result)}',
+                  '${compactToolResultForPrompt(tc.result)}',
             });
           }
 
@@ -1026,7 +1026,7 @@ class LocalLlmProvider extends ChatProvider {
           toolBuf.writeln(
             '- ${call.toolName} ${call.success ? 'succeeded' : 'failed'} '
             'args=${compactPromptJson(call.arguments, 600)} '
-            'result=${_compactToolResultForPrompt(call.result)}',
+            'result=${compactToolResultForPrompt(call.result)}',
           );
         }
         result.add({'role': 'tool', 'content': toolBuf.toString().trim()});
@@ -1050,24 +1050,6 @@ class LocalLlmProvider extends ChatProvider {
     }
 
     return result;
-  }
-
-  String _compactToolResultForPrompt(String result) {
-    try {
-      final decoded = jsonDecode(result);
-      if (decoded is Map) {
-        final compact = <String, Object?>{
-          if (decoded.containsKey('ok')) 'ok': decoded['ok'],
-          if (decoded['command'] != null) 'command': decoded['command'],
-          if (decoded['error'] != null) 'error': decoded['error'],
-        };
-        final stdout = decoded['stdout'];
-        final panel = panelSummaryFromStdout(stdout);
-        if (panel != null) compact['panel'] = panel;
-        if (compact.isNotEmpty) return compactPromptJson(compact, 800);
-      }
-    } catch (_) {}
-    return truncatePromptText(result, 800);
   }
 
   String _extractDelta({required String previous, required String incoming}) {

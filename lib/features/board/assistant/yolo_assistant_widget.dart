@@ -1088,31 +1088,10 @@ $messagesJson
       message['arguments'],
       600,
     );
-    final result = _compactToolResultForPrompt(message['rawResult']);
+    final result = compactToolResultForPrompt(message['rawResult']);
     return '\nTool $toolName ${success ? 'succeeded' : 'failed'}'
         '\nTool arguments: $arguments'
         '\nTool result: $result';
-  }
-
-  String _compactToolResultForPrompt(Object? rawResult) {
-    if (rawResult is! String || rawResult.trim().isEmpty) return 'none';
-    try {
-      final decoded = jsonDecode(rawResult);
-      if (decoded is Map) {
-        final compact = <String, Object?>{
-          if (decoded.containsKey('ok')) 'ok': decoded['ok'],
-          if (decoded['command'] != null) 'command': decoded['command'],
-          if (decoded['error'] != null) 'error': decoded['error'],
-        };
-        final stdout = decoded['stdout'];
-        final panelSummary = panelSummaryFromStdout(stdout);
-        if (panelSummary != null) compact['panel'] = panelSummary;
-        if (compact.isNotEmpty) {
-          return compactPromptJson(compact, 800);
-        }
-      }
-    } catch (_) {}
-    return truncatePromptText(rawResult, 800);
   }
 
   int _estimateTokens(String text) {
@@ -1983,7 +1962,7 @@ $messagesJson
       final toolName = msg['toolName'] as String? ?? 'tool';
       final args = compactPromptJson(msg['arguments'], 420);
       final rawResult = msg['rawResult'] as String?;
-      final result = _compactToolResultForPrompt(rawResult);
+      final result = compactToolResultForPrompt(rawResult);
       return Align(
         alignment: Alignment.centerLeft,
         child: Container(
