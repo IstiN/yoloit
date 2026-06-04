@@ -4,6 +4,7 @@ import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/svg_utils.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/preview/widgets/mermaid/mermaid_cache.dart';
 import 'package:yoloit/features/preview/widgets/mermaid/mermaid_expanded_dialog.dart';
@@ -106,21 +107,6 @@ class MermaidDiagramState extends State<MermaidDiagram> {
     } finally {
       HeadlessRenderRegistry.activeTasks.remove(taskKey);
     }
-  }
-
-  static double parseAspectRatio(String svg) {
-    final match = RegExp(r'viewBox="([^"]+)"').firstMatch(svg);
-    if (match != null) {
-      final parts = match.group(1)!.trim().split(RegExp(r'[\s,]+'));
-      if (parts.length == 4) {
-        final width = double.tryParse(parts[2]);
-        final height = double.tryParse(parts[3]);
-        if (width != null && height != null && width > 0 && height > 0) {
-          return width / height;
-        }
-      }
-    }
-    return 16 / 9;
   }
 
   bool _hydrateFromCacheIfAvailable() {

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/utils/svg_utils.dart';
 
 /// Rasterized diagram data holder.
 class MermaidRasterizedDiagram {
@@ -48,21 +49,6 @@ class MermaidRasterizedDiagramCache {
     return existing;
   }
 
-  static double parseAspectRatio(String svg) {
-    final match = RegExp(r'viewBox="([^"]+)"').firstMatch(svg);
-    if (match != null) {
-      final parts = match.group(1)!.trim().split(RegExp(r'[\s,]+'));
-      if (parts.length == 4) {
-        final width = double.tryParse(parts[2]);
-        final height = double.tryParse(parts[3]);
-        if (width != null && height != null && width > 0 && height > 0) {
-          return width / height;
-        }
-      }
-    }
-    return 16 / 9;
-  }
-
   static Future<MermaidRasterizedDiagram> load({
     required MermaidRenderer renderer,
     required String code,
@@ -87,7 +73,7 @@ class MermaidRasterizedDiagramCache {
         width: width,
         backgroundColor: options.backgroundColor,
       );
-      final aspectRatio = parseAspectRatio(svg);
+      final aspectRatio = parseSvgAspectRatio(svg);
       final imageProvider = MemoryImage(png);
       stopwatch.stop();
       debugPrint(
