@@ -7,7 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:kterm/kterm.dart' as kterm;
+import 'package:kterm/src/core/buffer/line.dart' as kterm_buffer;
+import 'package:kterm/src/core/cell.dart' as kterm_core;
 import 'package:xterm/xterm.dart' hide TerminalState;
+import 'package:xterm/src/core/buffer/line.dart' as xterm_buffer;
+import 'package:xterm/src/core/cell.dart' as xterm_core;
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -82,7 +86,10 @@ class _EmptyTerminal extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Caption('Open a workspace and start an AI agent to begin', fontSize: 13),
+                  const Caption(
+                    'Open a workspace and start an AI agent to begin',
+                    fontSize: 13,
+                  ),
                   const SizedBox(height: 24),
                   BlocBuilder<WorkspaceCubit, WorkspaceState>(
                     builder: (context, wsState) {
@@ -700,7 +707,9 @@ class TerminalWidgetState extends State<TerminalWidget> {
   Timer? _userScrollAnchorTimer;
   Timer? _userScrollPreserveTimer;
   Timer? _resizeDebounce;
+  Timer? _terminalDiagnosticsDebounce;
   Offset? _clickDownPosition;
+  String? _pendingTerminalDiagnosticsReason;
 
   // Manual drag-to-select: xterm 4.x's PanGestureRecognizer fails to win the
   // gesture arena in our widget tree, so we implement selection directly via
@@ -753,6 +762,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _scrollController.addListener(_persistScrollOffset);
     _focusNode.addListener(() {});
     _bindTerminal();
+    _attachTerminalDiagnostics(widget.session);
     AgentConfigService.instance.terminalRenderEngineNotifier.addListener(
       _rebindTerminalForActiveEngine,
     );
@@ -777,8 +787,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session.id != widget.session.id) {
       _unbindTerminalIfOurs(oldWidget.session);
+      _detachTerminalDiagnostics(oldWidget.session);
       HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
       _bindTerminal();
+      _attachTerminalDiagnostics(widget.session);
       HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     }
     // Request focus when this session becomes active (conditional render shows it).
@@ -823,6 +835,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _resizeDebounce = Timer(const Duration(milliseconds: 150), () {
         TerminalBackendService.instance.resize(widget.session.id, cols, rows);
       });
+      _scheduleTerminalDiagnostics('resize cols=$cols rows=$rows');
       _restoreResizeScrollAnchor();
     };
     switch (AgentConfigService.instance.terminalRenderEngine) {
@@ -851,6 +864,238 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (identical(session.kTerminal.onResize, _boundOnResize)) {
       session.kTerminal.onResize = null;
     }
+  }
+
+  void _attachTerminalDiagnostics(AgentSession session) {
+    if (!_terminalDiagnosticsEnabled) return;
+    session.terminal.addListener(_onTerminalDiagnosticsChange);
+    session.kTerminal.addListener(_onTerminalDiagnosticsChange);
+  }
+
+  void _detachTerminalDiagnostics(AgentSession session) {
+    if (!_terminalDiagnosticsEnabled) return;
+    session.terminal.removeListener(_onTerminalDiagnosticsChange);
+    session.kTerminal.removeListener(_onTerminalDiagnosticsChange);
+  }
+
+  void _onTerminalDiagnosticsChange() {
+    _scheduleTerminalDiagnostics('buffer-change');
+  }
+
+  bool get _terminalDiagnosticsEnabled => kDebugMode;
+
+  String get _terminalDiagnosticsLabel =>
+      widget.debugLabel ?? widget.session.id;
+
+  void _debugTerminalLog(String message) {
+    if (!_terminalDiagnosticsEnabled) return;
+    widget.debugLogSink?.call(message);
+    debugPrint('[TerminalDiag:${_terminalDiagnosticsLabel}] $message');
+  }
+
+  void _scheduleTerminalDiagnostics(String reason) {
+    if (!_terminalDiagnosticsEnabled || !mounted || !widget.isActive) return;
+    _pendingTerminalDiagnosticsReason = reason;
+    _terminalDiagnosticsDebounce?.cancel();
+    _terminalDiagnosticsDebounce = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || !widget.isActive) return;
+      _dumpTerminalDiagnostics(_pendingTerminalDiagnosticsReason ?? reason);
+    });
+  }
+
+  void _dumpTerminalDiagnostics(String reason) {
+    final engine = AgentConfigService.instance.terminalRenderEngine;
+    _debugTerminalLog('$reason ${debugStateSummary}');
+    _dumpXtermDiagnostics(active: engine == TerminalRenderEngine.xterm);
+    _dumpKtermDiagnostics(active: engine == TerminalRenderEngine.kterm);
+  }
+
+  void _dumpXtermDiagnostics({required bool active}) {
+    final terminal = widget.session.terminal;
+    final buffer = terminal.buffer;
+    final lines = buffer.lines;
+    if (lines.length == 0) {
+      _debugTerminalLog('xterm active=$active lines=0');
+      return;
+    }
+    final visibleStart = buffer.scrollBack.clamp(0, lines.length - 1);
+    final visibleEnd = (visibleStart + terminal.viewHeight - 1).clamp(
+      visibleStart,
+      lines.length - 1,
+    );
+    final renderState = _terminalViewKey.currentState;
+    final renderTerminal = renderState?.renderTerminal;
+    final renderSummary =
+        renderTerminal == null
+            ? 'render=none'
+            : 'cell=${renderTerminal.cellSize.width.toStringAsFixed(2)}x'
+                '${renderTerminal.cellSize.height.toStringAsFixed(2)} '
+                'lineHeight=${renderTerminal.lineHeight.toStringAsFixed(2)}';
+    _debugTerminalLog(
+      'xterm active=$active visible=$visibleStart-$visibleEnd '
+      'cursor=${buffer.cursorX},${buffer.cursorY} abs=${buffer.absoluteCursorY} '
+      'scrollBack=${buffer.scrollBack} $renderSummary',
+    );
+    for (final row in _collectDiagnosticRows(
+      visibleStart: visibleStart,
+      visibleEnd: visibleEnd,
+      cursorRow: buffer.absoluteCursorY,
+      lineCount: lines.length,
+      textAt: (row) => lines[row].getText(),
+    )) {
+      final line = lines[row];
+      _debugTerminalLog(
+        'xterm row=$row wrapped=${line.isWrapped} '
+        'text="${_sanitizeTerminalText(line.getText())}" '
+        'cells=${_dumpXtermCells(line, maxCols: terminal.viewWidth.clamp(0, 24).toInt())}',
+      );
+    }
+  }
+
+  void _dumpKtermDiagnostics({required bool active}) {
+    final terminal = widget.session.kTerminal;
+    final buffer = terminal.buffer;
+    final lines = buffer.lines;
+    if (lines.length == 0) {
+      _debugTerminalLog('kterm active=$active lines=0');
+      return;
+    }
+    final visibleStart = buffer.scrollBack.clamp(0, lines.length - 1);
+    final visibleEnd = (visibleStart + terminal.viewHeight - 1).clamp(
+      visibleStart,
+      lines.length - 1,
+    );
+    final renderState = _kTerminalViewKey.currentState;
+    final renderTerminal = renderState?.renderTerminal;
+    final renderSummary =
+        renderTerminal == null
+            ? 'render=none'
+            : 'cell=${renderTerminal.cellSize.width.toStringAsFixed(2)}x'
+                '${renderTerminal.cellSize.height.toStringAsFixed(2)} '
+                'lineHeight=${renderTerminal.lineHeight.toStringAsFixed(2)}';
+    _debugTerminalLog(
+      'kterm active=$active visible=$visibleStart-$visibleEnd '
+      'cursor=${buffer.cursorX},${buffer.cursorY} abs=${buffer.absoluteCursorY} '
+      'scrollBack=${buffer.scrollBack} $renderSummary',
+    );
+    for (final row in _collectDiagnosticRows(
+      visibleStart: visibleStart,
+      visibleEnd: visibleEnd,
+      cursorRow: buffer.absoluteCursorY,
+      lineCount: lines.length,
+      textAt: (row) => lines[row].getText(),
+    )) {
+      final line = lines[row];
+      _debugTerminalLog(
+        'kterm row=$row wrapped=${line.isWrapped} '
+        'text="${_sanitizeTerminalText(line.getText())}" '
+        'cells=${_dumpKtermCells(line, maxCols: terminal.viewWidth.clamp(0, 24).toInt())}',
+      );
+    }
+  }
+
+  List<int> _collectDiagnosticRows({
+    required int visibleStart,
+    required int visibleEnd,
+    required int cursorRow,
+    required int lineCount,
+    required String Function(int row) textAt,
+  }) {
+    final rows = <int>{};
+    void addAround(int row) {
+      for (var delta = -1; delta <= 1; delta++) {
+        final candidate = row + delta;
+        if (candidate >= 0 && candidate < lineCount) {
+          rows.add(candidate);
+        }
+      }
+    }
+
+    addAround(cursorRow);
+    addAround(visibleStart);
+    addAround(visibleEnd);
+
+    for (var row = visibleStart; row <= visibleEnd; row++) {
+      final text = textAt(row);
+      if (_isInterestingTerminalRow(text)) {
+        addAround(row);
+      }
+    }
+
+    final sorted = rows.toList()..sort();
+    if (sorted.length <= 8) return sorted;
+    return sorted.sublist(0, 8);
+  }
+
+  bool _isInterestingTerminalRow(String text) {
+    final normalized = text.replaceAll('\r', '').trimLeft();
+    return normalized.startsWith('>') ||
+        normalized.startsWith('}') ||
+        normalized.startsWith('1.') ||
+        normalized.startsWith('2.') ||
+        normalized.startsWith('3.') ||
+        normalized.contains('Confirm folder trust') ||
+        normalized.contains('Do you trust') ||
+        normalized.contains('Yes') ||
+        normalized.contains('No (Esc)');
+  }
+
+  String _sanitizeTerminalText(String text) {
+    final sanitized = text
+        .replaceAll('\x1b', r'\x1b')
+        .replaceAll('\r', r'\r')
+        .replaceAll('\n', r'\n');
+    return sanitized.length <= 160
+        ? sanitized
+        : '${sanitized.substring(0, 160)}...';
+  }
+
+  String _dumpXtermCells(xterm_buffer.BufferLine line, {required int maxCols}) {
+    final cell = xterm_core.CellData.empty();
+    final parts = <String>[];
+    for (var col = 0; col < maxCols && col < line.length; col++) {
+      line.getCellData(col, cell);
+      final code = cell.content & xterm_core.CellContent.codepointMask;
+      final width = cell.content >> xterm_core.CellContent.widthShift;
+      if (parts.length >= 12) break;
+      if (code == 0 && width <= 0) continue;
+      if (code == 0 && cell.flags == 0 && cell.background == 0 && col >= 6) {
+        continue;
+      }
+      parts.add(
+        '$col:${_debugCellChar(code)}'
+        '/w$width/f${cell.flags}/fg${cell.foreground}/bg${cell.background}',
+      );
+    }
+    return parts.isEmpty ? '-' : parts.join(' | ');
+  }
+
+  String _dumpKtermCells(kterm_buffer.BufferLine line, {required int maxCols}) {
+    final cell = kterm_core.CellData.empty();
+    final parts = <String>[];
+    for (var col = 0; col < maxCols && col < line.length; col++) {
+      line.getCellData(col, cell);
+      final code = cell.content & kterm_core.CellContent.codepointMask;
+      final width = cell.content >> kterm_core.CellContent.widthShift;
+      if (parts.length >= 12) break;
+      if (code == 0 && width <= 0) continue;
+      if (code == 0 && cell.flags == 0 && cell.background == 0 && col >= 6) {
+        continue;
+      }
+      parts.add(
+        '$col:${_debugCellChar(code)}'
+        '/w$width/f${cell.flags}/fg${cell.foreground}/bg${cell.background}',
+      );
+    }
+    return parts.isEmpty ? '-' : parts.join(' | ');
+  }
+
+  String _debugCellChar(int code) {
+    if (code == 0) return '0x0';
+    if (code == 0x20) return '<sp>';
+    final char = String.fromCharCode(code);
+    if (RegExp(r'^[ -~]$').hasMatch(char)) return char;
+    return '0x${code.toRadixString(16)}';
   }
 
   /// Intercepts macOS keyboard shortcuts and translates them to PTY control
@@ -1229,6 +1474,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _rebindTerminalForActiveEngine,
     );
     _unbindTerminalIfOurs(widget.session);
+    _detachTerminalDiagnostics(widget.session);
+    _terminalDiagnosticsDebounce?.cancel();
     _scrollController.removeListener(_persistScrollOffset);
     _controller.dispose();
     _kController.dispose();
@@ -1979,7 +2226,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
               ),
             ),
             if (_searchController.text.isNotEmpty) ...[
-              Caption(hitLabel,),
+              Caption(hitLabel),
               const SizedBox(width: 4),
               _searchIconBtn(Icons.keyboard_arrow_up, _prevHit),
               _searchIconBtn(Icons.keyboard_arrow_down, _nextHit),

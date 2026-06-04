@@ -5,6 +5,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/ui/components/color_swatch_row.dart';
 
 class ShapePlugin extends BoardPanelPlugin {
   const ShapePlugin();
@@ -576,21 +577,22 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
               ),
               const SizedBox(height: 18),
               const _EditorSectionLabel('Stroke color'),
-              _EditorColorRow(
+              ColorSwatchRow(
                 colors: _colors.where((hex) => hex != '#00000000').toList(),
                 selected: _strokeColor,
                 onSelected: (value) => setState(() => _strokeColor = value),
               ),
               const SizedBox(height: 18),
               const _EditorSectionLabel('Fill color'),
-              _EditorColorRow(
+              ColorSwatchRow(
                 colors: _colors,
                 selected: _fillColor,
                 onSelected: (value) => setState(() => _fillColor = value),
+                transparentIcon: const Icon(Icons.block, size: 16),
               ),
               const SizedBox(height: 18),
               const _EditorSectionLabel('Text color'),
-              _EditorColorRow(
+              ColorSwatchRow(
                 colors: _colors.where((hex) => hex != '#00000000').toList(),
                 selected: _textColor,
                 onSelected: (value) => setState(() => _textColor = value),
@@ -712,52 +714,6 @@ class _EditorSectionLabel extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(text, style: Theme.of(context).textTheme.labelLarge),
-    );
-  }
-}
-
-class _EditorColorRow extends StatelessWidget {
-  const _EditorColorRow({
-    required this.colors,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final List<String> colors;
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children:
-          colors.map((hex) {
-            final color = parseHexColor(hex) ?? Colors.transparent;
-            final isTransparent = hex == '#00000000';
-            final isSelected = selected.toUpperCase() == hex.toUpperCase();
-            return InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: () => onSelected(hex),
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color:
-                        isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).dividerColor,
-                    width: isSelected ? 3 : 1,
-                  ),
-                ),
-                child: isTransparent ? const Icon(Icons.block, size: 16) : null,
-              ),
-            );
-          }).toList(),
     );
   }
 }

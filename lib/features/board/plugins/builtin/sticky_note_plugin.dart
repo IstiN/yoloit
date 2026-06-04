@@ -3,6 +3,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/ui/components/color_swatch_row.dart';
 
 class StickyNotePlugin extends BoardPanelPlugin {
   const StickyNotePlugin();
@@ -233,14 +234,14 @@ class _StickyEditorDialogState extends State<_StickyEditorDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _SectionLabel('Note color'),
-            _ColorRow(
+            ColorSwatchRow(
               colors: _noteColors,
               selected: _color,
               onSelected: (value) => setState(() => _color = value),
             ),
             const SizedBox(height: 16),
             const _SectionLabel('Text color'),
-            _ColorRow(
+            ColorSwatchRow(
               colors: _textColors,
               selected: _textColor,
               onSelected: (value) => setState(() => _textColor = value),
@@ -290,48 +291,5 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _ColorRow extends StatelessWidget {
-  const _ColorRow({
-    required this.colors,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final List<String> colors;
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children:
-          colors.map((hex) {
-            final color = parseHexColor(hex) ?? Colors.transparent;
-            final isSelected = selected.toUpperCase() == hex.toUpperCase();
-            return InkWell(
-              borderRadius: BorderRadius.circular(999),
-              onTap: () => onSelected(hex),
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color:
-                        isSelected
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).dividerColor,
-                    width: isSelected ? 3 : 1,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-    );
-  }
-}
 
 
