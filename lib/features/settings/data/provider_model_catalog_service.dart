@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/utils/http_utils.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -293,23 +294,7 @@ class ProviderModelCatalogService {
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> _fetchCatalogJson() async {
-    final client = HttpClient();
-    client.connectionTimeout = _fetchTimeout;
-    try {
-      final req = await client.getUrl(Uri.parse(_remoteUrl));
-      req.headers.set(HttpHeaders.userAgentHeader, 'YoLoIT');
-      final resp = await req.close().timeout(_fetchTimeout);
-      if (resp.statusCode != 200) return null;
-      final body = await resp
-          .transform(utf8.decoder)
-          .join()
-          .timeout(_fetchTimeout);
-      return jsonDecode(body) as Map<String, dynamic>;
-    } catch (_) {
-      return null;
-    } finally {
-      client.close(force: true);
-    }
+    return fetchJson(url: _remoteUrl, timeout: _fetchTimeout);
   }
 
   // ── Cache ───────────────────────────────────────────────────────────────────

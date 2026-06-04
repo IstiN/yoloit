@@ -34,7 +34,6 @@ import 'package:yoloit/features/skills/ui/skills_panel.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
-import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
@@ -444,7 +443,10 @@ class _SupportSectionState extends State<_SupportSection> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Caption('Board navigation diagnostics capture trackpad scroll, pan/zoom, canvas locks, and viewport interaction events.', fontSize: 12),
+              const Caption(
+                'Board navigation diagnostics capture trackpad scroll, pan/zoom, canvas locks, and viewport interaction events.',
+                fontSize: 12,
+              ),
               const SizedBox(height: 8),
               Caption('App log: ${_logPath ?? 'loading...'}'),
             ],
@@ -506,29 +508,21 @@ class _TerminalRendererSettings extends StatefulWidget {
 class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
   final _service = AgentConfigService.instance;
   final _tmux = TmuxService.instance;
-  TerminalRenderEngine _engine = TerminalRenderEngine.xterm;
   TerminalBackendMode _backendMode = TerminalBackendMode.local;
   bool _tmuxOn = false;
 
   @override
   void initState() {
     super.initState();
-    _engine = _service.terminalRenderEngine;
     _backendMode = _service.terminalBackendMode;
     _tmuxOn = _tmux.enabled;
     _service.load().then((_) {
       if (mounted) {
         setState(() {
-          _engine = _service.terminalRenderEngine;
           _backendMode = _service.terminalBackendMode;
         });
       }
     });
-  }
-
-  Future<void> _setEngine(TerminalRenderEngine engine) async {
-    setState(() => _engine = engine);
-    await _service.setTerminalRenderEngine(engine);
   }
 
   Future<void> _setBackendMode(TerminalBackendMode mode) async {
@@ -552,50 +546,16 @@ class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Terminal renderer',
-                      style: TextStyle(
-                        color: colors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Caption(
-                      'Switches the embedded terminal emulator for board/app terminal panels.',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              SegmentedButton<TerminalRenderEngine>(
-                segments:
-                    TerminalRenderEngine.values
-                        .map(
-                          (engine) => ButtonSegment(
-                            value: engine,
-                            label: Text(engine.label),
-                            tooltip: engine.description,
-                          ),
-                        )
-                        .toList(),
-                selected: {_engine},
-                onSelectionChanged: (selected) => _setEngine(selected.first),
-                style: ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: WidgetStateProperty.all(
-                    const TextStyle(fontSize: 12),
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            'Terminal renderer',
+            style: TextStyle(
+              color: colors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+          const SizedBox(height: 4),
+          const Caption('The embedded terminal uses kterm.'),
           Divider(height: 24, color: colors.border),
           Row(
             children: [
@@ -925,11 +885,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
             'Use only board-chat agents below, pick their models, and mark one as favorite (★).',
-            style: TextStyle(
-              color:
-                  context.appColors.textMuted,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: context.appColors.textMuted, fontSize: 11),
           ),
         ),
         // Global default ASR row
@@ -940,8 +896,7 @@ class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
               Text(
                 'Default ASR:',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -1130,11 +1085,7 @@ class _IgnoredToolCallsSectionState extends State<_IgnoredToolCallsSection> {
         children: [
           Text(
             'Tool calls in this list are hidden from chat results and running-status cards.',
-            style: TextStyle(
-              color:
-                  context.appColors.textMuted,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: context.appColors.textMuted, fontSize: 11),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -1427,8 +1378,7 @@ class _AgentRowState extends State<_AgentRow> {
                     isDense: true,
                     hintText: 'Name',
                     hintStyle: TextStyle(
-                      color:
-                          context.appColors.textMuted,
+                      color: context.appColors.textMuted,
                       fontSize: 13,
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -1511,8 +1461,7 @@ class _AgentRowState extends State<_AgentRow> {
                   child: Icon(
                     Icons.settings_backup_restore,
                     size: 18,
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                   ),
                 ),
               ),
@@ -1528,8 +1477,7 @@ class _AgentRowState extends State<_AgentRow> {
                 Text(
                   'Default model:',
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -1604,8 +1552,7 @@ class _AgentRowState extends State<_AgentRow> {
               Text(
                 'Launch command:',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -1644,8 +1591,7 @@ class _AgentRowState extends State<_AgentRow> {
               Text(
                 'Pass default flags:',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -1668,8 +1614,7 @@ class _AgentRowState extends State<_AgentRow> {
               Text(
                 'Disable model selection:',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -1693,8 +1638,7 @@ class _AgentRowState extends State<_AgentRow> {
                 Text(
                   'Stream Adapter:',
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -1757,8 +1701,7 @@ class _AgentRowState extends State<_AgentRow> {
               Text(
                 'ASR:',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -2442,10 +2385,7 @@ class _PresetChip extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color:
-                    isActive
-                        ? colors.primary
-                        : context.appColors.textMuted,
+                color: isActive ? colors.primary : context.appColors.textMuted,
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -2984,8 +2924,7 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
                 child: Text(
                   entry.key.toUpperCase(),
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
@@ -3024,8 +2963,7 @@ class _ShortcutsTableState extends State<_ShortcutsTable> {
             icon: const Icon(Icons.restart_alt, size: 14),
             label: const Text('Reset all to defaults'),
             style: TextButton.styleFrom(
-              foregroundColor:
-                  context.appColors.textMuted,
+              foregroundColor: context.appColors.textMuted,
               textStyle: const TextStyle(fontSize: 12),
             ),
           ),
@@ -3099,8 +3037,7 @@ class _HotkeyRow extends StatelessWidget {
                 child: Icon(
                   Icons.restart_alt,
                   size: 14,
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                 ),
               ),
             ),
@@ -3297,8 +3234,7 @@ class _KeyCaptureDialogState extends State<_KeyCaptureDialog> {
                           ? Text(
                             'Press a key combination…',
                             style: TextStyle(
-                              color:
-                                  context.appColors.textMuted,
+                              color: context.appColors.textMuted,
                               fontSize: 14,
                             ),
                           )
@@ -3481,8 +3417,7 @@ class _AboutSectionState extends State<_AboutSection> {
                             Text(
                               'v${UpdateService.currentVersion}',
                               style: TextStyle(
-                                color:
-                                    context.appColors.textMuted,
+                                color: context.appColors.textMuted,
                                 fontSize: 11,
                               ),
                             ),
@@ -3522,8 +3457,7 @@ class _AboutSectionState extends State<_AboutSection> {
               Text(
                 'A Flutter desktop app for orchestrating AI CLI tools (GitHub Copilot, Claude Code) with embedded PTY terminals and git workspace management.',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 12,
                   height: 1.6,
                 ),
@@ -3532,8 +3466,7 @@ class _AboutSectionState extends State<_AboutSection> {
               Text(
                 'Platform: macOS (primary) • Windows (coming soon)',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 11,
                 ),
               ),
@@ -3591,8 +3524,7 @@ class _AboutSectionState extends State<_AboutSection> {
               Text(
                 'Checks GitHub releases once per day in release builds.',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 10,
                 ),
               ),
@@ -3674,8 +3606,7 @@ class _AboutSectionState extends State<_AboutSection> {
                       Text(
                         'App will restart automatically after install.',
                         style: TextStyle(
-                          color:
-                              context.appColors.textMuted,
+                          color: context.appColors.textMuted,
                           fontSize: 10,
                         ),
                       ),
@@ -3747,8 +3678,7 @@ class _UpdateAvailableCard extends StatelessWidget {
                   ? '${info.releaseNotes.substring(0, 200)}...'
                   : info.releaseNotes,
               style: TextStyle(
-                color:
-                    context.appColors.textMuted,
+                color: context.appColors.textMuted,
                 fontSize: 10,
                 height: 1.5,
               ),
@@ -3775,8 +3705,7 @@ class _UpdateAvailableCard extends StatelessWidget {
                   'Skip this version',
                   style: TextStyle(
                     fontSize: 10,
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                   ),
                 ),
               ),
@@ -3901,8 +3830,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                     Icon(
                       _showLogs ? Icons.expand_less : Icons.expand_more,
                       size: 16,
-                      color:
-                          context.appColors.textMuted,
+                      color: context.appColors.textMuted,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -3950,8 +3878,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                     Icon(
                       _showAppLog ? Icons.expand_less : Icons.expand_more,
                       size: 16,
-                      color:
-                          context.appColors.textMuted,
+                      color: context.appColors.textMuted,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -4009,8 +3936,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 child: Text(
                   '~/.config/yoloit/app.log',
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -4044,8 +3970,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                   style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                   ),
                 ),
               ),
@@ -4070,8 +3995,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
               Text(
                 '${_logs.length} file(s)',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -4090,8 +4014,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
                 tooltip: 'Refresh',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color:
-                    context.appColors.textMuted,
+                color: context.appColors.textMuted,
               ),
             ],
           ),
@@ -4109,8 +4032,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
               child: Text(
                 'No logs yet.',
                 style: TextStyle(
-                  color:
-                      context.appColors.textMuted,
+                  color: context.appColors.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -4171,12 +4093,7 @@ class _ToggleRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color:
-                context.appColors.textMuted,
-          ),
+          Icon(icon, size: 18, color: context.appColors.textMuted),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -4195,8 +4112,7 @@ class _ToggleRow extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -4235,8 +4151,7 @@ class _LogRow extends StatelessWidget {
           Icon(
             Icons.insert_drive_file_outlined,
             size: 14,
-            color:
-                context.appColors.textMuted,
+            color: context.appColors.textMuted,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -4255,11 +4170,7 @@ class _LogRow extends StatelessWidget {
           ),
           Text(
             log.sizeLabel,
-            style: TextStyle(
-              color:
-                  context.appColors.textMuted,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: context.appColors.textMuted, fontSize: 11),
           ),
           const SizedBox(width: 8),
           GestureDetector(
@@ -4267,8 +4178,7 @@ class _LogRow extends StatelessWidget {
             child: Icon(
               Icons.close,
               size: 14,
-              color:
-                  context.appColors.textMuted,
+              color: context.appColors.textMuted,
             ),
           ),
         ],
@@ -4320,8 +4230,7 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                 Text(
                   widget.log.sizeLabel,
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -4330,12 +4239,14 @@ class _LogViewerDialogState extends State<_LogViewerDialog> {
                   icon: Icon(
                     Icons.close,
                     size: 18,
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                   ),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
                 ),
               ],
             ),
@@ -4416,12 +4327,7 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          Icon(
-            Icons.folder_open,
-            size: 16,
-            color:
-                context.appColors.textMuted,
-          ),
+          Icon(Icons.folder_open, size: 16, color: context.appColors.textMuted),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -4438,8 +4344,7 @@ class _WorkspaceStorageRowState extends State<_WorkspaceStorageRow> {
                 Text(
                   _currentPath,
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 11,
                     fontFamily: 'monospace',
                   ),
@@ -4522,11 +4427,7 @@ class _NotificationsSectionState extends State<_NotificationsSection> {
       children: [
         Text(
           'Sound alerts when AI agents change state.',
-          style: TextStyle(
-            color:
-                context.appColors.textMuted,
-            fontSize: 11,
-          ),
+          style: TextStyle(color: context.appColors.textMuted, fontSize: 11),
         ),
         const SizedBox(height: 16),
         _SettingsToggle(
@@ -4617,8 +4518,7 @@ class _SettingsToggle extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color:
-                        context.appColors.textMuted,
+                    color: context.appColors.textMuted,
                     fontSize: 11,
                   ),
                 ),

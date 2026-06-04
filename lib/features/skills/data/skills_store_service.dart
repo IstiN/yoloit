@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/utils/http_utils.dart';
 import 'package:yoloit/features/skills/models/skill_entry.dart';
 import 'package:yoloit/features/skills/models/skill_store_config.dart';
 
@@ -72,21 +73,12 @@ class SkillsStoreService {
   }
 
   Future<SkillsStoreConfig?> _fetchRemoteConfig() async {
-    final client = HttpClient();
-    client.connectionTimeout = _fetchTimeout;
-    try {
-      final req = await client.getUrl(Uri.parse(_remoteConfigUrl));
-      req.headers.set(HttpHeaders.userAgentHeader, 'YoLoIT');
-      final resp = await req.close().timeout(_fetchTimeout);
-      if (resp.statusCode != 200) return null;
-      final body = await resp.transform(utf8.decoder).join();
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      return SkillsStoreConfig.fromJson(data);
-    } catch (_) {
-      return null;
-    } finally {
-      client.close();
-    }
+    final data = await fetchJson(
+      url: _remoteConfigUrl,
+      timeout: _fetchTimeout,
+    );
+    if (data == null) return null;
+    return SkillsStoreConfig.fromJson(data);
   }
 
   Future<SkillsStoreConfig?> _loadLocalCache() async {

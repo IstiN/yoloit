@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/utils/http_utils.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -206,22 +207,7 @@ class ModelsDevCatalogService {
   }
 
   Future<Map<String, dynamic>?> _fetchRemote() async {
-    final client = HttpClient();
-    client.connectionTimeout = _fetchTimeout;
-    try {
-      final req = await client.getUrl(Uri.parse(_apiUrl));
-      req.headers.set(HttpHeaders.userAgentHeader, 'YoLoIT');
-      final resp = await req.close().timeout(_fetchTimeout);
-      if (resp.statusCode != 200) return null;
-      final body =
-          await resp.transform(utf8.decoder).join().timeout(_fetchTimeout);
-      return jsonDecode(body) as Map<String, dynamic>;
-    } catch (e) {
-      debugPrint('[ModelsDevCatalog] fetch failed: $e');
-      return null;
-    } finally {
-      client.close(force: true);
-    }
+    return fetchJson(url: _apiUrl, timeout: _fetchTimeout);
   }
 
   Future<Map<String, dynamic>?> _loadCache() async {

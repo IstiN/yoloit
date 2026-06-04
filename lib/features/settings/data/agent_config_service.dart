@@ -132,13 +132,13 @@ class AgentConfigService {
   String? _defaultAsrCloudConfigId;
   String? _defaultAsrCloudModel;
   TerminalBackendMode _terminalBackendMode = TerminalBackendMode.runtime;
-  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.xterm;
+  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.kterm;
 
   final ValueNotifier<TerminalBackendMode> terminalBackendModeNotifier =
       ValueNotifier<TerminalBackendMode>(TerminalBackendMode.runtime);
 
   final ValueNotifier<TerminalRenderEngine> terminalRenderEngineNotifier =
-      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.xterm);
+      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.kterm);
 
   static List<AgentConfig> get _defaults => [
     ...AgentType.values.map(
@@ -248,9 +248,7 @@ class AgentConfigService {
         _defaultAsrMode = prefs['defaultAsrMode'] as String? ?? 'local';
         _defaultAsrCloudConfigId = prefs['defaultAsrCloudConfigId'] as String?;
         _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
-        _terminalRenderEngine = TerminalRenderEngineX.fromId(
-          prefs['terminalRenderEngine'] as String?,
-        );
+        _terminalRenderEngine = TerminalRenderEngine.kterm;
         _terminalBackendMode = TerminalBackendModeX.fromId(
           prefs['terminalBackendMode'] as String?,
         );
@@ -288,8 +286,8 @@ class AgentConfigService {
   }
 
   Future<void> setTerminalRenderEngine(TerminalRenderEngine engine) async {
-    _terminalRenderEngine = engine;
-    terminalRenderEngineNotifier.value = engine;
+    _terminalRenderEngine = TerminalRenderEngine.kterm;
+    terminalRenderEngineNotifier.value = TerminalRenderEngine.kterm;
     await _savePrefs();
   }
 
@@ -322,8 +320,6 @@ class AgentConfigService {
           'defaultAsrCloudConfigId': _defaultAsrCloudConfigId,
         if (_defaultAsrCloudModel != null)
           'defaultAsrCloudModel': _defaultAsrCloudModel,
-        if (_terminalRenderEngine != TerminalRenderEngine.xterm)
-          'terminalRenderEngine': _terminalRenderEngine.id,
         if (_terminalBackendMode != TerminalBackendMode.runtime)
           'terminalBackendMode': _terminalBackendMode.id,
       }),
