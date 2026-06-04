@@ -14,6 +14,7 @@ import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/json_utils.dart';
+import 'package:yoloit/core/utils/date_utils.dart';
 import 'package:yoloit/core/utils/string_utils.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -4074,7 +4075,7 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
                         ),
                       ),
                       Text(
-                        _formatDate(e.lastMessageAt ?? e.createdAt),
+                        formatTimeAgo(e.lastMessageAt ?? e.createdAt),
                         style: TextStyle(
                           fontSize: 9,
                           color: colors.textSecondary,
@@ -4140,12 +4141,4 @@ class _AssistantHistoryDialogState extends State<_AssistantHistoryDialog> {
     );
   }
 
-  String _formatDate(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
-  }
 }

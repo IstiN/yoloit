@@ -19,6 +19,7 @@ import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
+import 'package:yoloit/core/utils/date_utils.dart';
 import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
 import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -9749,7 +9750,7 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
                           ),
                         ),
                         Text(
-                          _formatDate(e.lastMessageAt ?? e.createdAt),
+                          formatTimeAgo(e.lastMessageAt ?? e.createdAt),
                           style: TextStyle(fontSize: 9, color: mutedColor),
                         ),
                         const SizedBox(width: 6),
@@ -9825,15 +9826,6 @@ class _ChatSessionHistoryDialogState extends State<_ChatSessionHistoryDialog> {
     );
   }
 
-  String _formatDate(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${dt.day}/${dt.month}/${dt.year}';
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

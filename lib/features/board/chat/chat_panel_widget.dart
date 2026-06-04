@@ -13,6 +13,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/date_utils.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -3587,7 +3588,7 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
                         ),
                       ),
                       Text(
-                        _formatDate(e.lastMessageAt ?? e.createdAt),
+                        formatTimeAgo(e.lastMessageAt ?? e.createdAt),
                         style: TextStyle(
                           fontSize: 9,
                           color:
@@ -3655,15 +3656,6 @@ class _SessionHistoryDialogState extends State<_SessionHistoryDialog> {
     );
   }
 
-  String _formatDate(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${dt.day}/${dt.month}/${dt.year}';
-  }
 }
 
 class _ChatSetupView extends StatefulWidget {
