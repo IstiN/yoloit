@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -829,18 +830,28 @@ class _CodePreview extends StatefulWidget {
 }
 
 class _CodePreviewState extends State<_CodePreview> {
+  static const int _kMaxPreviewLines = 5000;
+  static const int _kMaxLineLength = 2000;
+  static const int _kMaxPreviewBytes = 2 * 1024 * 1024;
+
   late List<String> _lines;
   late String _extension;
   late String _languageId;
   final _scrollCtrl = ScrollController();
   StreamSubscription<BoardFileModifiedEvent>? _fileSub;
+  Timer? _fileChangeDebounce;
+  bool _wasTruncated = false;
+  String _truncateInfo = '';
 
   @override
   void initState() {
     super.initState();
     _extension = p.extension(widget.path).replaceFirst('.', '').toLowerCase();
     _languageId = EditorLanguageRegistry.forPath(widget.path).id;
-    _lines = _readLines();
+    final result = _readLines();
+    _lines = result.lines;
+    _wasTruncated = result.wasTruncated;
+    _truncateInfo = result.info;
     _fileSub = BoardEventBus.instance.on<BoardFileModifiedEvent>().listen(
       _onFileModified,
     );
@@ -852,36 +863,90 @@ class _CodePreviewState extends State<_CodePreview> {
     if (old.path != widget.path) {
       _extension = p.extension(widget.path).replaceFirst('.', '').toLowerCase();
       _languageId = EditorLanguageRegistry.forPath(widget.path).id;
-      _lines = _readLines();
+      final result = _readLines();
+      _lines = result.lines;
+      _wasTruncated = result.wasTruncated;
+      _truncateInfo = result.info;
     }
   }
 
   @override
   void dispose() {
+    _fileChangeDebounce?.cancel();
     _fileSub?.cancel();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
-  List<String> _readLines() {
+  _ReadResult _readLines() {
     try {
       final file = File(widget.path);
-      if (!file.existsSync()) return [];
-      return file.readAsStringSync().split('\n');
+      if (!file.existsSync()) return _ReadResult([]);
+
+      final size = file.lengthSync();
+      if (size == 0) return _ReadResult([]);
+
+      String raw;
+      bool truncated = false;
+      String info = '';
+
+      if (size > _kMaxPreviewBytes) {
+        final bytes = file.readAsBytesSync().sublist(0, _kMaxPreviewBytes);
+        raw = utf8.decode(bytes, allowMalformed: true);
+        truncated = true;
+        info =
+            'Showing first ${(_kMaxPreviewBytes / 1024 / 1024).toStringAsFixed(1)} MB of ${(size / 1024 / 1024).toStringAsFixed(1)} MB. Open in editor for full file.';
+      } else {
+        raw = file.readAsStringSync();
+      }
+
+      var lines = raw.split('\n');
+      final totalLines = lines.length;
+
+      // Limit line count.
+      if (lines.length > _kMaxPreviewLines) {
+        lines = lines.sublist(0, _kMaxPreviewLines);
+        truncated = true;
+        info =
+            'Showing first $_kMaxPreviewLines of $totalLines lines. Open in editor for full file.';
+      }
+
+      // Limit line length.
+      var longLinesTruncated = false;
+      for (var i = 0; i < lines.length; i++) {
+        if (lines[i].length > _kMaxLineLength) {
+          lines[i] = '${lines[i].substring(0, _kMaxLineLength)}…';
+          longLinesTruncated = true;
+        }
+      }
+      if (longLinesTruncated && info.isEmpty) {
+        info =
+            'Long lines truncated to $_kMaxLineLength chars. Open in editor for full file.';
+      }
+
+      return _ReadResult(lines, wasTruncated: truncated, info: info);
     } catch (_) {
-      return [];
+      return _ReadResult([]);
     }
   }
 
   void _onFileModified(BoardFileModifiedEvent event) {
     if (!mounted || event.path != widget.path) return;
-    // Capture scroll offset before rebuild so we can restore it after.
-    final offset = _scrollCtrl.hasClients ? _scrollCtrl.offset : 0.0;
-    setState(() => _lines = _readLines());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollCtrl.hasClients) return;
-      final max = _scrollCtrl.position.maxScrollExtent;
-      _scrollCtrl.jumpTo(offset.clamp(0.0, max));
+    _fileChangeDebounce?.cancel();
+    _fileChangeDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final offset = _scrollCtrl.hasClients ? _scrollCtrl.offset : 0.0;
+      final result = _readLines();
+      setState(() {
+        _lines = result.lines;
+        _wasTruncated = result.wasTruncated;
+        _truncateInfo = result.info;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollCtrl.hasClients) return;
+        final max = _scrollCtrl.position.maxScrollExtent;
+        _scrollCtrl.jumpTo(offset.clamp(0.0, max));
+      });
     });
   }
 
@@ -894,57 +959,98 @@ class _CodePreviewState extends State<_CodePreview> {
     final textColor = Theme.of(context).colorScheme.onSurface;
     final lineNumColor = textColor.withValues(alpha: 0.35);
 
-    return Container(
-      color: colors.terminalBackground,
-      child: ListView.builder(
-        controller: _scrollCtrl,
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        itemCount: _lines.length,
-        itemBuilder: (_, i) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 44,
-                  child: Text(
-                    '${i + 1}',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      color: lineNumColor,
-                      height: 1.5,
-                    ),
+    // Use plain Text.rich for large files — SelectableText is very expensive
+    // when there are thousands of lines because it sets up selection handles
+    // and gesture detectors for every widget.
+    final useSelectable = _lines.length <= 1000;
+
+    Widget lineWidget(int i) {
+      final span = TextSpan(
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 12,
+          color: colors.terminalPrompt,
+          height: 1.5,
+        ),
+        children: filePreviewCodeSyntaxSpans(
+          _lines[i],
+          extension: _extension,
+          languageId: _languageId,
+          colors: colors,
+        ),
+      );
+      if (useSelectable) {
+        return SelectableText.rich(span);
+      }
+      return Text.rich(span);
+    }
+
+    final listBody = ListView.builder(
+      controller: _scrollCtrl,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      itemCount: _lines.length,
+      itemBuilder: (_, i) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 44,
+                child: Text(
+                  '${i + 1}',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    color: lineNumColor,
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(width: 12),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: lineWidget(i)),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!_wasTruncated) return Container(color: colors.terminalBackground, child: listBody);
+
+    return Container(
+      color: colors.terminalBackground,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            color: colors.accentOrange.withValues(alpha: 0.12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 14, color: colors.accentOrange),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: SelectableText.rich(
-                    TextSpan(
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        color: colors.terminalPrompt,
-                        height: 1.5,
-                      ),
-                      children: filePreviewCodeSyntaxSpans(
-                        _lines[i],
-                        extension: _extension,
-                        languageId: _languageId,
-                        colors: colors,
-                      ),
-                    ),
+                  child: Text(
+                    _truncateInfo,
+                    style: TextStyle(fontSize: 11, color: colors.accentOrange),
                   ),
                 ),
               ],
             ),
-          );
-        },
+          ),
+          Expanded(child: listBody),
+        ],
       ),
     );
   }
+}
+
+class _ReadResult {
+  _ReadResult(this.lines, {this.wasTruncated = false, this.info = ''});
+  final List<String> lines;
+  final bool wasTruncated;
+  final String info;
 }
 
 @visibleForTesting
