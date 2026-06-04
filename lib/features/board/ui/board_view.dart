@@ -35,13 +35,14 @@ import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
-import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/board/ui/board_overview_preview.dart';
+import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
+import 'package:yoloit/features/board/ui/dialogs/connect_remote_yoloit_dialog.dart';
+import 'package:yoloit/features/board/ui/dialogs/share_board_dialog.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
-import 'package:yoloit/ui/components/typography/caption.dart';
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
@@ -2601,9 +2602,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 
   Future<void> _connectRemoteYoloit(BuildContext context) async {
-    final result = await showAdaptiveYoloDialog<_RemoteYoloitConnection>(
+    final result = await showAdaptiveYoloDialog<RemoteYoloitConnection>(
       context: context,
-      builder: (_) => const _ConnectRemoteYoloitDialog(),
+      builder: (_) => const ConnectRemoteYoloitDialog(),
     );
     if (!context.mounted || result == null) return;
     try {
@@ -2639,7 +2640,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       if (!context.mounted) return;
       await showAdaptiveYoloDialog<void>(
         context: context,
-        builder: (_) => _ShareBoardDialog(info: info),
+        builder: (_) => ShareBoardDialog(info: info),
       );
     } catch (error) {
       if (!context.mounted) return;
@@ -2658,7 +2659,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
         await showAdaptiveYoloDialog<({String name, String defaultFolder})>(
           context: context,
           builder:
-              (_) => _BoardSettingsDialog(
+              (_) => BoardSettingsDialog(
                 initialName: board.name,
                 initialDefaultFolder: board.defaultFolder,
                 remoteInfo: remote,
@@ -3171,231 +3172,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 }
 
-class _RemoteYoloitConnection {
-  const _RemoteYoloitConnection({required this.url, this.token});
 
-  final String url;
-  final String? token;
-}
-
-class _ConnectRemoteYoloitDialog extends StatefulWidget {
-  const _ConnectRemoteYoloitDialog();
-
-  @override
-  State<_ConnectRemoteYoloitDialog> createState() =>
-      _ConnectRemoteYoloitDialogState();
-}
-
-class _ConnectRemoteYoloitDialogState
-    extends State<_ConnectRemoteYoloitDialog> {
-  final _url = TextEditingController(text: 'http://127.0.0.1:43110');
-  final _token = TextEditingController();
-
-  @override
-  void dispose() {
-    _url.dispose();
-    _token.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final url = _url.text.trim();
-    if (url.isEmpty) return;
-    Navigator.of(context).pop(
-      _RemoteYoloitConnection(
-        url: url,
-        token: _token.text.trim().isEmpty ? null : _token.text.trim(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AdaptiveDialogScaffold(
-      title: 'Connect remote YoLoIT',
-      icon: const Icon(Icons.cloud_outlined),
-      maxWidth: 420,
-      body: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _url,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Remote URL',
-                hintText: 'http://host:43110',
-              ),
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _token,
-              decoration: const InputDecoration(
-                labelText: 'Token',
-                hintText: 'Optional bearer token',
-              ),
-              obscureText: true,
-              onSubmitted: (_) => _submit(),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton.icon(
-          onPressed: _submit,
-          icon: const Icon(Icons.cloud_outlined),
-          label: const Text('Connect'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ShareBoardDialog extends StatefulWidget {
-  const _ShareBoardDialog({required this.info});
-
-  final BoardShareServerInfo info;
-
-  @override
-  State<_ShareBoardDialog> createState() => _ShareBoardDialogState();
-}
-
-class _ShareBoardDialogState extends State<_ShareBoardDialog> {
-  bool _copiedUrl = false;
-  bool _copiedToken = false;
-  bool _stopping = false;
-
-  Future<void> _copy(String text, ValueChanged<bool> setCopied) async {
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!mounted) return;
-    setState(() => setCopied(true));
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (mounted) setState(() => setCopied(false));
-  }
-
-  Future<void> _stopSharing() async {
-    setState(() => _stopping = true);
-    await BoardShareServer.instance.stop();
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AdaptiveDialogScaffold(
-      title: 'Share board',
-      icon: const Icon(Icons.ios_share_outlined),
-      maxWidth: 520,
-      body: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Caption('Use Connect remote YoLoIT on another device and paste this URL and token.', fontSize: 12),
-            const SizedBox(height: 16),
-            _ShareValueRow(
-              label: 'URL',
-              value: widget.info.url,
-              copied: _copiedUrl,
-              onCopy:
-                  () => _copy(widget.info.url, (value) => _copiedUrl = value),
-            ),
-            const SizedBox(height: 10),
-            _ShareValueRow(
-              label: 'Token',
-              value: widget.info.token,
-              copied: _copiedToken,
-              onCopy:
-                  () =>
-                      _copy(widget.info.token, (value) => _copiedToken = value),
-            ),
-            const SizedBox(height: 12),
-            const Caption('The app must stay open. If the other Mac cannot connect, allow incoming connections in macOS Firewall.'),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _stopping ? null : _stopSharing,
-          child: Text(_stopping ? 'Stopping...' : 'Stop sharing'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
-        ),
-      ],
-    );
-  }
-}
-
-class _ShareValueRow extends StatelessWidget {
-  const _ShareValueRow({
-    required this.label,
-    required this.value,
-    required this.copied,
-    required this.onCopy,
-  });
-
-  final String label;
-  final String value;
-  final bool copied;
-  final VoidCallback onCopy;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: colors.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  border: Border.all(color: colors.border),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: SelectableText(
-                  value,
-                  style: TextStyle(
-                    color: colors.textPrimary,
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: copied ? 'Copied' : 'Copy $label',
-              onPressed: onCopy,
-              icon: Icon(copied ? Icons.check : Icons.copy, size: 18),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
 
 class _BoardToolbar extends StatelessWidget {
   const _BoardToolbar({
@@ -4670,119 +4447,6 @@ class _BoardOverviewPngPreview extends StatelessWidget {
   }
 }
 
-class _BoardSettingsDialog extends StatefulWidget {
-  const _BoardSettingsDialog({
-    required this.initialName,
-    required this.initialDefaultFolder,
-    required this.remoteInfo,
-  });
-
-  final String initialName;
-  final String initialDefaultFolder;
-  final ({String url, String? token, String boardId, int? revision})?
-  remoteInfo;
-
-  @override
-  State<_BoardSettingsDialog> createState() => _BoardSettingsDialogState();
-}
-
-class _BoardSettingsDialogState extends State<_BoardSettingsDialog> {
-  late final TextEditingController _nameController;
-  late final TextEditingController _folderController;
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController(text: widget.initialName);
-    _folderController = TextEditingController(
-      text: widget.initialDefaultFolder,
-    );
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _folderController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AdaptiveDialogScaffold(
-      title: 'Board settings',
-      icon: const Icon(Icons.settings_outlined),
-      maxWidth: 520,
-      body: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Board name'),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _folderController,
-              decoration: const InputDecoration(
-                labelText: 'Default folder',
-                helperText: 'Used for new chats, terminals, and file trees.',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final selected = await BoardFilePicker.pickDirectory(
-                      context,
-                      remoteInfo: widget.remoteInfo,
-                      initialPath: _folderController.text,
-                      title:
-                          widget.remoteInfo == null
-                              ? 'Choose folder'
-                              : 'Choose remote folder',
-                    );
-                    if (!mounted || selected == null) return;
-                    _folderController.text = selected;
-                  },
-                  icon: Icon(
-                    widget.remoteInfo == null
-                        ? Icons.folder_open_outlined
-                        : Icons.cloud_queue,
-                  ),
-                  label: Text(
-                    widget.remoteInfo == null
-                        ? 'Choose folder'
-                        : 'Choose remote folder',
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () => _folderController.clear(),
-                  child: const Text('Clear'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed:
-              () => Navigator.of(context).pop((
-                name: _nameController.text.trim(),
-                defaultFolder: _folderController.text.trim(),
-              )),
-          child: const Text('Save'),
-        ),
-      ],
-    );
-  }
-}
 
 class _ToolbarChip extends StatelessWidget {
   const _ToolbarChip({required this.icon, required this.label});
@@ -7048,42 +6712,6 @@ class _WebViewOverlays extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-class _BoardGridPainter extends CustomPainter {
-  const _BoardGridPainter({required this.minorColor, required this.majorColor});
-
-  final Color minorColor;
-  final Color majorColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const minorStep = 24.0;
-    const majorStep = 120.0;
-    final minorPaint =
-        Paint()
-          ..color = minorColor
-          ..strokeWidth = 1;
-    final majorPaint =
-        Paint()
-          ..color = majorColor
-          ..strokeWidth = 1;
-
-    for (double x = 0; x <= size.width; x += minorStep) {
-      final paint = x % majorStep == 0 ? majorPaint : minorPaint;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y <= size.height; y += minorStep) {
-      final paint = y % majorStep == 0 ? majorPaint : minorPaint;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BoardGridPainter oldDelegate) {
-    return oldDelegate.minorColor != minorColor ||
-        oldDelegate.majorColor != majorColor;
   }
 }
 
