@@ -52,6 +52,11 @@ abstract class CliProviderBase extends ChatProvider {
   final Map<String, Process> _processes = {};
   final Map<String, String> _sessionIds = {};
 
+  /// Tracks the last model used per session.  Subclasses that need to reset
+  /// a session when the model changes can read / write this map.
+  @protected
+  final Map<String, String> sessionModels = {};
+
   /// Prefix used in [debugPrint] output, e.g. `'[KimiCli]'`.
   String get debugPrefix;
 
@@ -133,6 +138,17 @@ abstract class CliProviderBase extends ChatProvider {
     StreamController<ChatEvent> controller,
   ) {}
 
+  /// Subclass hook for environment-variable overrides.
+  ///
+  /// The returned map is merged on top of the base environment (which already
+  /// includes platform env + global env groups + PATH enrichment).  Use this
+  /// to add provider-specific variables such as `YOLOIT_BIN` or
+  /// `AGENT_CLI_CREDENTIAL_STORE`.
+  Future<Map<String, String>> buildEnvironment({
+    required Map<String, String> baseEnv,
+    required ChatSessionConfig config,
+  }) async => const {};
+
   // ---------------------------------------------------------------------------
   // Protected helpers for subclasses
   // ---------------------------------------------------------------------------
@@ -208,10 +224,10 @@ abstract class CliProviderBase extends ChatProvider {
         configObj?.streamAdapter ?? defaultLaunchCommand,
       );
     }
-    final cmdParts = _splitCommand(rawCommand);
+    final cmdParts = splitCommand(rawCommand);
     final executable = cmdParts.isNotEmpty ? cmdParts[0] : defaultLaunchCommand;
     final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
-    final workingDir = _resolveWorkingDir(config.workingDir);
+    final workingDir = resolveWorkingDir(config.workingDir);
 
     // 2. Let subclass tweak args (now with extraCmdArgs visible).
     final args = await buildArgs(
@@ -235,6 +251,7 @@ abstract class CliProviderBase extends ChatProvider {
       final extraEnv = await GlobalEnvGroupsService.instance
           .resolveSelectedGroups(config.envGroupIds);
       final baseEnv = {...Platform.environment, ...extraEnv};
+      final hookEnv = await buildEnvironment(baseEnv: baseEnv, config: config);
       final process = await _processStarter(
         executable,
         args,
@@ -242,6 +259,7 @@ abstract class CliProviderBase extends ChatProvider {
         environment: {
           ...baseEnv,
           'PATH': PlatformShell.instance.enrichedPath(baseEnv['PATH'] ?? ''),
+          ...hookEnv,
         },
       );
 
@@ -384,6 +402,7 @@ abstract class CliProviderBase extends ChatProvider {
     }
     _processes.clear();
     _sessionIds.clear();
+    sessionModels.clear();
   }
 
   @override
@@ -395,13 +414,17 @@ abstract class CliProviderBase extends ChatProvider {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  static String _resolveWorkingDir(String configuredDir) {
+  /// Resolve a configured working directory, falling back to [Directory.current]
+  /// when empty or non-existent.
+  static String resolveWorkingDir(String configuredDir) {
     final trimmed = configuredDir.trim();
     if (trimmed.isNotEmpty && Directory(trimmed).existsSync()) return trimmed;
     return Directory.current.path;
   }
 
-  static List<String> _splitCommand(String command) {
+  /// Split a shell-style command string into tokens, respecting single and
+  /// double quotes.  Used to parse user-configured launch commands.
+  static List<String> splitCommand(String command) {
     final parts = <String>[];
     final buffer = StringBuffer();
     var inSingle = false;

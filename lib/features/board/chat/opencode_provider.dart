@@ -3,13 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
-import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
+import 'package:yoloit/features/board/chat/cli_provider_base.dart';
+import 'package:yoloit/features/board/chat/cli_yoloit_resolver.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/settings/data/agent_config_service.dart';
-import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/models_dev_catalog_service.dart';
 import 'package:yoloit/features/settings/data/opencode_auth_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
@@ -19,25 +17,17 @@ import 'package:yoloit/features/settings/data/provider_model_catalog_service.dar
 /// Runs `opencode run --format json --dangerously-skip-permissions`
 /// and parses the NDJSON output into [ChatEvent] objects, same pattern
 /// as CopilotCliProvider and CursorAgentProvider.
-class OpencodeProvider extends ChatProvider {
-  OpencodeProvider({this.agentId = 'opencode'});
-
-  final String agentId;
-
-  final Map<String, String> _sessionIds = {};
-  final Map<String, Process> _processes = {};
-  // Tracks last model used per session — if model changes, session is reset.
-  final Map<String, String> _sessionModels = {};
-  String? _cachedYoloitBin;
-
-  // Cached models loaded from models.dev
-  List<ChatModelInfo>? _cachedModelsDevModels;
+class OpencodeProvider extends CliProviderBase {
+  OpencodeProvider({super.agentId = 'opencode', super.processStarter});
 
   @override
-  String get providerId => agentId;
+  String get debugPrefix => '[OpenCode]';
 
   @override
   String get displayName => 'OpenCode';
+
+  @override
+  String get defaultLaunchCommand => 'opencode';
 
   @override
   List<ChatModelInfo> get availableModels {
@@ -82,6 +72,9 @@ class OpencodeProvider extends ChatProvider {
     }
   }
 
+  // Cached models loaded from models.dev
+  List<ChatModelInfo>? _cachedModelsDevModels;
+
   @override
   bool get supportsImages => true;
 
@@ -89,100 +82,89 @@ class OpencodeProvider extends ChatProvider {
   ChatImageMode get imageMode => ChatImageMode.filePath;
 
   @override
-  bool isRunning(String sessionName) => _processes.containsKey(sessionName);
+  bool get passSessionArgs => false;
 
   @override
-  Stream<ChatEvent> sendMessage({
-    required String message,
+  Future<Map<String, String>> buildEnvironment({
+    required Map<String, String> baseEnv,
     required ChatSessionConfig config,
-    required bool isFirstMessage,
-    List<String> attachments = const [],
-    ChatRuntimeContext? runtimeContext,
-    List<Map<String, Object?>>? audioContentOverride, // ignored
-  }) {
-    final controller = StreamController<ChatEvent>();
-
-    _runProcess(
-      message: message,
-      config: config,
-      isFirstMessage: isFirstMessage,
-      attachments: attachments,
-      runtimeContext: runtimeContext,
-      controller: controller,
+  }) async {
+    final yoloitBin = CliYoloitResolver.resolve();
+    final sessionPath = CliYoloitResolver.buildSessionPath(
+      baseEnv['PATH'] ?? '',
+      yoloitBin: yoloitBin,
     );
-
-    return controller.stream;
+    return {
+      'PATH': sessionPath,
+      if (yoloitBin != null) 'YOLOIT_BIN': yoloitBin,
+    };
   }
 
-  Future<void> _runProcess({
+  @override
+  Future<List<String>> buildArgs({
     required String message,
     required ChatSessionConfig config,
     required bool isFirstMessage,
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
-    required StreamController<ChatEvent> controller,
+    required List<String> baseArgs,
+    List<String> extraCmdArgs = const [],
   }) async {
-    await stop(config.sessionName);
+    final args = <String>[...extraCmdArgs, ...baseArgs];
 
-    final configObj = AgentConfigService.instance.configForAgent(agentId);
-    final passDefault = configObj?.passDefaultArgs ?? true;
+    // Model
+    if (config.model.isNotEmpty) {
+      args.addAll(['--model', config.model]);
+    }
 
-    final args = <String>[];
-    if (passDefault) {
-      // Model
-      if (!(configObj?.disableModel ?? false) && config.model.isNotEmpty) {
-        args.addAll(['--model', config.model]);
+    // Reasoning effort / variant
+    if (config.reasoningEffort != null && config.reasoningEffort!.isNotEmpty) {
+      args.addAll(['--variant', config.reasoningEffort!]);
+    }
+
+    // Agent mode
+    if (config.mode != null && config.mode!.isNotEmpty) {
+      args.addAll(['--agent', config.mode!]);
+    }
+
+    // Session resume — reset session if model changed since last message.
+    if (!isFirstMessage) {
+      final lastModel = sessionModels[config.sessionName];
+      if (lastModel != null && lastModel != config.model) {
+        debugPrint(
+          '[OpenCode] Model changed ($lastModel → ${config.model}), '
+          'starting new session',
+        );
+        clearSessionId(config.sessionName);
       }
-
-      // Reasoning effort / variant
-      if (config.reasoningEffort != null &&
-          config.reasoningEffort!.isNotEmpty) {
-        args.addAll(['--variant', config.reasoningEffort!]);
+      final sessionID = getSessionId(config.sessionName);
+      if (sessionID != null) {
+        args.addAll(['--session', sessionID]);
+        debugPrint('[OpenCode] Resuming session: $sessionID');
+      } else {
+        debugPrint(
+          '[OpenCode] No sessionID for ${config.sessionName}, creating new',
+        );
       }
+    }
+    sessionModels[config.sessionName] = config.model;
 
-      // Agent mode
-      if (config.mode != null && config.mode!.isNotEmpty) {
-        args.addAll(['--agent', config.mode!]);
-      }
+    // Working directory
+    if (config.workingDir.isNotEmpty) {
+      args.addAll(['--dir', config.workingDir]);
+    }
 
-      // Session resume — reset session if model changed since last message.
-      if (!isFirstMessage) {
-        final lastModel = _sessionModels[config.sessionName];
-        if (lastModel != null && lastModel != config.model) {
-          debugPrint(
-            '[OpenCode] Model changed ($lastModel → ${config.model}), starting new session',
-          );
-          _sessionIds.remove(config.sessionName);
-        }
-        final sessionID = _sessionIds[config.sessionName];
-        if (sessionID != null) {
-          args.addAll(['--session', sessionID]);
-          debugPrint('[OpenCode] Resuming session: $sessionID');
-        } else {
-          debugPrint(
-            '[OpenCode] No sessionID for ${config.sessionName}, creating new',
-          );
-        }
-      }
-      _sessionModels[config.sessionName] = config.model;
+    // Attachments via --file
+    for (final path in attachments) {
+      args.addAll(['--file', path]);
+    }
 
-      // Working directory
-      if (config.workingDir.isNotEmpty) {
-        args.addAll(['--dir', config.workingDir]);
-      }
+    // Custom args
+    args.addAll(config.customArgs);
 
-      // Attachments via --file
-      for (final path in attachments) {
-        args.addAll(['--file', path]);
-      }
-
-      // Custom args
-      args.addAll(config.customArgs);
-
-      // Title for session naming
-      if (isFirstMessage && config.sessionName.isNotEmpty) {
-        args.addAll(['--title', config.sessionName]);
-      }
+    // Title for session naming
+    if (isFirstMessage && config.sessionName.isNotEmpty) {
+      args.addAll(['--title', config.sessionName]);
     }
 
     // Prepend YoLoIT CLI guidance tree to first message
@@ -197,185 +179,96 @@ class OpencodeProvider extends ChatProvider {
     // Prompt as final positional argument
     args.add(effectiveMessage);
 
-    final workingDir = _resolveWorkingDir(config.workingDir);
+    return args;
+  }
 
-    var rawCommand = configObj?.launchCommand.trim() ?? '';
-    if (rawCommand.isEmpty || rawCommand == 'opencode') {
-      rawCommand = AgentConfigService.defaultBoardChatCommand(
-        configObj?.streamAdapter ?? 'opencode',
-      );
+  @override
+  void onProcessStarted(
+    Process process,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) {
+    // Emit user message event immediately
+    controller.add(
+      const ChatEvent(
+        type: ChatEventType.userMessage,
+        rawType: 'opencode.user.message',
+        data: {},
+      ),
+    );
+
+    // Watch the opencode log file in real-time and surface retries immediately.
+    // Log is at ~/.local/share/opencode/log/*.log — a new file per run.
+    _logWatcher = _OpenCodeLogWatcher(
+      onRetry: (msg, {bool isFatal = false}) {
+        _emitErrorMessage(controller, msg);
+        if (isFatal) {
+          // Kill immediately so the spinner stops — no need to wait for timeout.
+          _startupTimer?.cancel();
+          process.kill(ProcessSignal.sigkill);
+        }
+      },
+    );
+    unawaited(_logWatcher!.start());
+
+    // Timeout: if no JSON event arrives within 120s, kill the process.
+    _receivedFirstEvent = false;
+    _startupTimer = Timer(const Duration(seconds: 120), () {
+      if (!_receivedFirstEvent && !controller.isClosed) {
+        debugPrint('[OpenCode] Startup timeout — no events in 120s');
+        _emitErrorMessage(
+          controller,
+          'OpenCode не отвечает 120 секунд. Попробуйте позже.',
+        );
+        controller.add(
+          const ChatEvent(
+            type: ChatEventType.result,
+            rawType: 'opencode.timeout',
+            data: {},
+          ),
+        );
+        process.kill(ProcessSignal.sigterm);
+      }
+    });
+  }
+
+  bool _receivedFirstEvent = false;
+  Timer? _startupTimer;
+  _OpenCodeLogWatcher? _logWatcher;
+
+  @override
+  List<ChatEvent> parseLine(String line, String sessionName) {
+    final json = jsonDecode(line) as Map<String, dynamic>;
+
+    // Cancel startup timeout on first received event
+    if (!_receivedFirstEvent) {
+      _receivedFirstEvent = true;
+      _startupTimer?.cancel();
     }
 
-    final cmdParts = _splitCommand(rawCommand);
-    final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'opencode';
-    final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
+    // Capture sessionID from first event (for first message)
+    final sid = json['sessionID'] as String?;
+    if (sid != null && !getSessionId(sessionName).isSet) {
+      storeSessionId(sessionName, sid);
+      debugPrint('[OpenCode] Captured sessionID: $sid');
+    }
 
-    debugPrint(
-      '[OpenCode] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}',
-    );
-    debugPrint('[OpenCode] cwd: $workingDir');
+    return _parseOpenCodeEvent(json);
+  }
 
-    try {
-      final extraEnv = await GlobalEnvGroupsService.instance
-          .resolveSelectedGroups(config.envGroupIds);
-      final baseEnv = {...Platform.environment, ...extraEnv};
-      final yoloitBin = _resolveYoloitBin();
-      final sessionPath = _buildSessionPath(
-        baseEnv['PATH'] ?? '',
-        yoloitBin: yoloitBin,
-      );
+  @override
+  void onProcessExited(
+    int exitCode,
+    String stderr,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) {
+    _startupTimer?.cancel();
+    _logWatcher?.stop();
+    _logWatcher = null;
 
-      final process = await Process.start(
-        executable,
-        [...extraCmdArgs, ...args],
-        workingDirectory: workingDir,
-        environment: {
-          ...baseEnv,
-          'PATH': sessionPath,
-          if (yoloitBin != null) 'YOLOIT_BIN': yoloitBin,
-        },
-      );
-      // Close stdin so opencode doesn't wait for interactive input
-      process.stdin.close();
-      _processes[config.sessionName] = process;
-      registerChatProcessResource(
-        process: process,
-        providerId: agentId,
-        config: config,
-        runtimeContext: runtimeContext,
-      );
-
-      // Emit user message event
-      controller.add(
-        const ChatEvent(
-          type: ChatEventType.userMessage,
-          rawType: 'opencode.user.message',
-          data: {},
-        ),
-      );
-
-      // Timeout: if no JSON event arrives within 120s (with live log monitoring),
-      // kill the process.
-      var receivedFirstEvent = false;
-      final startupTimer = Timer(const Duration(seconds: 120), () {
-        if (!receivedFirstEvent && !controller.isClosed) {
-          debugPrint('[OpenCode] Startup timeout — no events in 120s');
-          _emitErrorMessage(
-            controller,
-            'OpenCode не отвечает 120 секунд. Попробуйте позже.',
-          );
-          controller.add(
-            const ChatEvent(
-              type: ChatEventType.result,
-              rawType: 'opencode.timeout',
-              data: {},
-            ),
-          );
-          process.kill(ProcessSignal.sigterm);
-        }
-      });
-
-      // Watch the opencode log file in real-time and surface retries immediately.
-      // Log is at ~/.local/share/opencode/log/*.log — a new file per run.
-      final logWatcher = _OpenCodeLogWatcher(
-        onRetry: (msg, {bool isFatal = false}) {
-          _emitErrorMessage(controller, msg);
-          if (isFatal) {
-            // Kill immediately so the spinner stops — no need to wait for timeout.
-            startupTimer.cancel();
-            process.kill(ProcessSignal.sigkill);
-          }
-        },
-      );
-      unawaited(logWatcher.start());
-
-      final buffer = StringBuffer();
-
-      process.stdout
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              buffer.write(chunk);
-              final lines = buffer.toString().split('\n');
-              buffer.clear();
-              buffer.write(lines.removeLast());
-
-              for (final line in lines) {
-                final trimmed = line.trim();
-                if (trimmed.isEmpty) continue;
-                try {
-                  final json = jsonDecode(trimmed) as Map<String, dynamic>;
-
-                  // Cancel startup timeout on first received event
-                  if (!receivedFirstEvent) {
-                    receivedFirstEvent = true;
-                    startupTimer.cancel();
-                  }
-
-                  // Capture sessionID from first event (for first message)
-                  if (isFirstMessage) {
-                    final sid = json['sessionID'] as String?;
-                    if (sid != null &&
-                        !_sessionIds.containsKey(config.sessionName)) {
-                      _sessionIds[config.sessionName] = sid;
-                      debugPrint('[OpenCode] Captured sessionID: $sid');
-                    }
-                  }
-
-                  final events = _parseOpenCodeEvent(json);
-                  for (final event in events) {
-                    controller.add(event);
-                  }
-                } catch (e) {
-                  // Non-JSON stdout line — show it if it looks like an error/status
-                  if (_looksLikeError(trimmed)) {
-                    _emitErrorMessage(controller, trimmed);
-                  } else {
-                    debugPrint('[OpenCode] Failed to parse: $trimmed');
-                  }
-                }
-              }
-            },
-            onError: (Object error) {
-              debugPrint('[OpenCode] stdout error: $error');
-              controller.addError(error);
-            },
-          );
-
-      // Monitor stderr in real-time. Rate-limit and other errors appear here
-      // while the process is still running (retrying). Show them immediately.
-      final stderrBuf = StringBuffer();
-      process.stderr.transform(utf8.decoder).listen((chunk) {
-        debugPrint('[OpenCode] stderr: $chunk');
-        stderrBuf.write(chunk);
-
-        // Emit each line that looks like an error so the spinner stops
-        for (final line in chunk.split('\n')) {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty) continue;
-          if (_looksLikeError(trimmed)) {
-            _emitErrorMessage(controller, trimmed);
-          }
-        }
-      });
-
-      final exitCode = await process.exitCode;
-      startupTimer.cancel();
-      logWatcher.stop();
-      debugPrint('[OpenCode] Process exited: $exitCode');
-
-      // Flush remaining buffer
-      final remaining = buffer.toString().trim();
-      if (remaining.isNotEmpty) {
-        try {
-          final json = jsonDecode(remaining) as Map<String, dynamic>;
-          for (final event in _parseOpenCodeEvent(json)) {
-            controller.add(event);
-          }
-        } catch (_) {}
-      }
-
-      // Emit result
+    // Emit result event
+    if (!controller.isClosed) {
       controller.add(
         const ChatEvent(
           type: ChatEventType.result,
@@ -383,23 +276,6 @@ class OpencodeProvider extends ChatProvider {
           data: {},
         ),
       );
-
-      if (exitCode != 0) {
-        final err = stderrBuf.toString().trim();
-        if (err.isNotEmpty) {
-          controller.addError(err);
-        }
-      }
-
-      if (_processes[config.sessionName] == process) {
-        _processes.remove(config.sessionName);
-      }
-      unregisterChatProcessResource(process);
-      await controller.close();
-    } catch (e, st) {
-      debugPrint('[OpenCode] Failed to start: $e\n$st');
-      controller.addError(e);
-      await controller.close();
     }
   }
 
@@ -511,7 +387,7 @@ class OpencodeProvider extends ChatProvider {
             errorData?['message'] as String? ??
             errorObj?['name'] as String? ??
             'Unknown error';
-        // Emit as assistant message so it's visible in chat (sessionStatus is ignored by UI)
+        // Emit as assistant message so it's visible in chat
         return [
           ChatEvent(
             type: ChatEventType.assistantMessage,
@@ -534,7 +410,7 @@ class OpencodeProvider extends ChatProvider {
 
   /// Returns true if [line] looks like an error/status message from opencode
   /// that should be surfaced in chat (not silently swallowed).
-  static bool _looksLikeError(String line) {
+  static bool looksLikeError(String line) {
     if (line.length < 4) return false;
     // Strip ANSI escape sequences before checking
     final clean =
@@ -573,136 +449,20 @@ class OpencodeProvider extends ChatProvider {
     );
   }
 
-  String _resolveWorkingDir(String configuredDir) {
-    final trimmed = configuredDir.trim();
-    if (trimmed.isNotEmpty && Directory(trimmed).existsSync()) return trimmed;
-    return Directory.current.path;
-  }
-
-  String _buildSessionPath(String existingPath, {required String? yoloitBin}) {
-    final shell = PlatformShell.instance;
-    final entries = <String>[
-      if (yoloitBin != null) File(yoloitBin).parent.path,
-      ...shell.splitPath(shell.enrichedPath(existingPath)),
-    ];
-    final deduped = <String>[];
-    for (final entry in entries) {
-      if (entry.isEmpty || deduped.contains(entry)) continue;
-      deduped.add(entry);
-    }
-    return shell.joinPath(deduped);
-  }
-
-  String? _resolveYoloitBin() {
-    final cached = _cachedYoloitBin;
-    if (cached != null && File(cached).existsSync()) return cached;
-
-    // Check the installed location first — written by CliServer on startup.
-    final home = Platform.environment['HOME'] ?? '';
-    if (home.isNotEmpty) {
-      final installed = File('$home/.config/yoloit/yoloit');
-      if (installed.existsSync()) {
-        _cachedYoloitBin = installed.path;
-        return installed.path;
+  @override
+  void onStderrChunk(
+    String chunk,
+    String sessionName,
+    StreamController<ChatEvent> controller,
+  ) {
+    // Emit each line that looks like an error so the spinner stops
+    for (final line in chunk.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      if (looksLikeError(trimmed)) {
+        _emitErrorMessage(controller, trimmed);
       }
     }
-
-    final roots = <Directory>[];
-    void addRoot(String path) {
-      if (path.isEmpty) return;
-      final dir = Directory(path).absolute;
-      if (roots.any((existing) => existing.path == dir.path)) return;
-      roots.add(dir);
-    }
-
-    addRoot(Directory.current.path);
-    addRoot(File(Platform.resolvedExecutable).parent.path);
-
-    for (final root in roots) {
-      var current = root;
-      for (var depth = 0; depth < 6; depth++) {
-        final candidate = File(
-          '${current.path}${Platform.pathSeparator}tools${Platform.pathSeparator}yoloit',
-        );
-        if (candidate.existsSync()) {
-          _cachedYoloitBin = candidate.path;
-          return candidate.path;
-        }
-        final parent = current.parent;
-        if (parent.path == current.path) break;
-        current = parent;
-      }
-    }
-    return null;
-  }
-
-  @override
-  void setSessionId(String sessionName, String sessionId) {
-    _sessionIds[sessionName] = sessionId;
-  }
-
-  @override
-  String? getSessionId(String sessionName) {
-    return _sessionIds[sessionName];
-  }
-
-  @override
-  Future<void> stop(String sessionName) async {
-    final process = _processes.remove(sessionName);
-    if (process != null) {
-      debugPrint('[OpenCode] Killing process for: $sessionName');
-      unregisterChatProcessResource(process);
-      process.kill(ProcessSignal.sigterm);
-      await process.exitCode.timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => -1,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final process in _processes.values) {
-      unregisterChatProcessResource(process);
-      process.kill(ProcessSignal.sigterm);
-    }
-    _processes.clear();
-  }
-
-  /// Drop process references without killing them.
-  ///
-  /// Called when the board is switched away. In-flight opencode processes
-  /// continue running and persist their session state; the user can resume
-  /// from the next message when they switch back.
-  @override
-  void detach() {
-    _processes.clear();
-  }
-
-  List<String> _splitCommand(String command) {
-    final parts = <String>[];
-    final sb = StringBuffer();
-    bool inDoubleQuotes = false;
-    bool inSingleQuotes = false;
-    for (int i = 0; i < command.length; i++) {
-      final char = command[i];
-      if (char == '"' && !inSingleQuotes) {
-        inDoubleQuotes = !inDoubleQuotes;
-      } else if (char == "'" && !inDoubleQuotes) {
-        inSingleQuotes = !inSingleQuotes;
-      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
-        if (sb.isNotEmpty) {
-          parts.add(sb.toString());
-          sb.clear();
-        }
-      } else {
-        sb.write(char);
-      }
-    }
-    if (sb.isNotEmpty) {
-      parts.add(sb.toString());
-    }
-    return parts;
   }
 }
 
@@ -817,4 +577,8 @@ class _OpenCodeLogWatcher {
   void stop() {
     _stopped = true;
   }
+}
+
+extension on String? {
+  bool get isSet => this != null && this!.isNotEmpty;
 }

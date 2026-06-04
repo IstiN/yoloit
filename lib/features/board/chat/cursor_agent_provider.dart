@@ -5,57 +5,30 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
-import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
+import 'package:yoloit/features/board/chat/cli_provider_base.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/settings/data/agent_config_service.dart';
-import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
-
-typedef CursorProcessStarter =
-    Future<Process> Function(
-      String executable,
-      List<String> arguments, {
-      String? workingDirectory,
-      Map<String, String>? environment,
-    });
 
 /// [ChatProvider] implementation that wraps the Cursor Agent CLI.
 ///
 /// Runs `cursor-agent --print --output-format stream-json` and translates
 /// the cursor-specific NDJSON events into [ChatEvent] objects understood
 /// by the common chat panel.
-class CursorAgentProvider extends ChatProvider {
+class CursorAgentProvider extends CliProviderBase {
   CursorAgentProvider({
-    this.agentId = 'cursor',
-    CursorProcessStarter? processStarter,
-  }) : _processStarter = processStarter ?? _defaultProcessStarter;
-
-  final String agentId;
-
-  /// sessionName → cursor session_id (UUID captured from the init event).
-  final Map<String, String> _sessionIds = {};
-  final Map<String, Process> _processes = {};
-
-  /// sessionName → model used when the session was started.
-  final Map<String, String> _sessionModels = {};
-  final CursorProcessStarter _processStarter;
-
-  /// The generated id of the currently streaming assistant message.
-  /// Non-null means we are mid-stream; null means the stream is idle.
-  String? _currentStreamId;
-
-  /// Accumulated text from the current streaming turn.
-  /// cursor-agent can emit both incremental token chunks and periodic
-  /// cumulative snapshots (full text so far); we use this accumulator to
-  /// normalize both into true UI deltas.
-  String _cumulativeContent = '';
+    super.agentId = 'cursor',
+    super.processStarter,
+  });
 
   @override
-  String get providerId => agentId;
+  String get debugPrefix => '[CursorAgent]';
 
   @override
   String get displayName => 'Cursor Agent';
+
+  @override
+  String get defaultLaunchCommand => 'cursor-agent';
 
   @override
   List<ChatModelInfo> get availableModels {
@@ -75,80 +48,80 @@ class CursorAgentProvider extends ChatProvider {
   ChatImageMode get imageMode => ChatImageMode.filePath;
 
   @override
-  bool isRunning(String sessionName) => _processes.containsKey(sessionName);
+  bool get passSessionArgs => false;
+
+  /// The generated id of the currently streaming assistant message.
+  /// Non-null means we are mid-stream; null means the stream is idle.
+  String? _currentStreamId;
+
+  /// Accumulated text from the current streaming turn.
+  /// cursor-agent can emit both incremental token chunks and periodic
+  /// cumulative snapshots (full text so far); we use this accumulator to
+  /// normalize both into true UI deltas.
+  String _cumulativeContent = '';
 
   @override
-  Stream<ChatEvent> sendMessage({
-    required String message,
+  Future<Map<String, String>> buildEnvironment({
+    required Map<String, String> baseEnv,
     required ChatSessionConfig config,
-    required bool isFirstMessage,
-    List<String> attachments = const [],
-    ChatRuntimeContext? runtimeContext,
-    List<Map<String, Object?>>? audioContentOverride, // ignored
-  }) {
-    final controller = StreamController<ChatEvent>();
-    _runProcess(
-      message: message,
-      config: config,
-      isFirstMessage: isFirstMessage,
-      attachments: attachments,
-      runtimeContext: runtimeContext,
-      controller: controller,
-    );
-    return controller.stream;
+  }) async {
+    // On macOS, cursor-agent hardcodes `/usr/bin/security` to access the
+    // login keychain. When spawned from a GUI app the security context
+    // lacks a default keychain → exit 154 (errSecNoDefaultKeychain), which
+    // cursor-agent throws as a hard error before checking the
+    // CURSOR_API_KEY env-var fallback.
+    //
+    // Setting AGENT_CLI_CREDENTIAL_STORE=memory makes cursor-agent use an
+    // in-memory credential store (no keychain access at all). The auth
+    // flow then naturally falls back to CURSOR_API_KEY from the process
+    // environment, which the user can export from their shell profile or
+    // store in macOS Keychain via `security add-generic-password`.
+    return {
+      if (Platform.isMacOS) 'AGENT_CLI_CREDENTIAL_STORE': 'memory',
+    };
   }
 
-  Future<void> _runProcess({
+  @override
+  Future<List<String>> buildArgs({
     required String message,
     required ChatSessionConfig config,
     required bool isFirstMessage,
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
-    required StreamController<ChatEvent> controller,
+    required List<String> baseArgs,
+    List<String> extraCmdArgs = const [],
   }) async {
-    await stop(config.sessionName);
-    _currentStreamId = null;
-    _cumulativeContent = '';
+    final args = <String>[...baseArgs];
 
-    final configObj = AgentConfigService.instance.configForAgent(agentId);
-    final passDefault = configObj?.passDefaultArgs ?? true;
+    if (config.workingDir.isNotEmpty) {
+      args.addAll(['--workspace', config.workingDir]);
+    }
 
-    final args = <String>[];
-    if (passDefault) {
-      if (!(configObj?.disableModel ?? false) && config.model.isNotEmpty) {
-        args.addAll(['--model', config.model]);
+    // Resume existing cursor session only if the model hasn't changed.
+    // Cursor ignores --model when --resume is passed (session stores its own
+    // model), so a model switch must start a fresh session.
+    if (!isFirstMessage) {
+      final cursorSessionId = getSessionId(config.sessionName);
+      final sessionModel = sessionModels[config.sessionName];
+      final modelChanged =
+          sessionModel != null && sessionModel != config.model;
+      if (cursorSessionId != null && !modelChanged) {
+        args.addAll(['--resume', cursorSessionId]);
+      } else if (modelChanged) {
+        // Clear the old session so the next init event registers the new one.
+        clearSessionId(config.sessionName);
+        sessionModels.remove(config.sessionName);
       }
+    }
 
-      if (config.workingDir.isNotEmpty) {
-        args.addAll(['--workspace', config.workingDir]);
-      }
+    // Agent mode (plan / ask)
+    if (config.mode != null && config.mode!.isNotEmpty) {
+      args.addAll(['--mode', config.mode!]);
+    }
 
-      // Resume existing cursor session only if the model hasn't changed.
-      // Cursor ignores --model when --resume is passed (session stores its own
-      // model), so a model switch must start a fresh session.
-      if (!isFirstMessage) {
-        final cursorSessionId = _sessionIds[config.sessionName];
-        final sessionModel = _sessionModels[config.sessionName];
-        final modelChanged =
-            sessionModel != null && sessionModel != config.model;
-        if (cursorSessionId != null && !modelChanged) {
-          args.addAll(['--resume', cursorSessionId]);
-        } else if (modelChanged) {
-          // Clear the old session so the next init event registers the new one.
-          _sessionIds.remove(config.sessionName);
-          _sessionModels.remove(config.sessionName);
-        }
-      }
-
-      // Agent mode (plan / ask)
-      if (config.mode != null && config.mode!.isNotEmpty) {
-        args.addAll(['--mode', config.mode!]);
-      }
-
-      // Autopilot mode
-      if (config.autopilot) {
-        args.add('--autopilot');
-      }
+    // Autopilot mode
+    if (config.autopilot) {
+      args.add('--autopilot');
     }
 
     // Prompt as positional argument.
@@ -164,176 +137,26 @@ class CursorAgentProvider extends ChatProvider {
     final promptParts = [effectiveMessage, ...attachments];
     args.add(promptParts.join(' '));
 
-    debugPrint('[CursorAgent] cwd: ${config.workingDir}');
+    return [...extraCmdArgs, ...args];
+  }
 
-    try {
-      final extraEnv = await GlobalEnvGroupsService.instance
-          .resolveSelectedGroups(config.envGroupIds);
+  @override
+  List<ChatEvent> parseLine(String line, String sessionName) {
+    final json = jsonDecode(line) as Map<String, dynamic>;
+
+    // Capture cursor session_id from init event and record the model.
+    if (json['type'] == 'system' &&
+        json['subtype'] == 'init' &&
+        json['session_id'] is String) {
+      storeSessionId(sessionName, json['session_id'] as String);
+      // We don't have access to config.model here; the model is recorded
+      // when args are built in the next message via sessionModels.
       debugPrint(
-        '[CursorAgent] envGroupIds: ${config.envGroupIds}, '
-        'resolved keys: ${extraEnv.keys.toList()}',
+        '[CursorAgent] session_id: ${getSessionId(sessionName)}',
       );
-      final baseEnv = {...Platform.environment, ...extraEnv};
-      final enrichedPath = PlatformShell.instance.enrichedPath(
-        baseEnv['PATH'] ?? '',
-      );
-
-      var rawCommand = configObj?.launchCommand.trim() ?? '';
-      if (rawCommand.isEmpty || rawCommand == 'cursor-agent') {
-        rawCommand = AgentConfigService.defaultBoardChatCommand(
-          configObj?.streamAdapter ?? 'cursor',
-        );
-      }
-
-      final cmdParts = _splitCommand(rawCommand);
-      final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'cursor-agent';
-      final extraCmdArgs =
-          cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
-
-      debugPrint(
-        '[CursorAgent] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}',
-      );
-
-      // On macOS, cursor-agent hardcodes `/usr/bin/security` to access the
-      // login keychain. When spawned from a GUI app the security context
-      // lacks a default keychain → exit 154 (errSecNoDefaultKeychain), which
-      // cursor-agent throws as a hard error before checking the
-      // CURSOR_API_KEY env-var fallback.
-      //
-      // Setting AGENT_CLI_CREDENTIAL_STORE=memory makes cursor-agent use an
-      // in-memory credential store (no keychain access at all). The auth
-      // flow then naturally falls back to CURSOR_API_KEY from the process
-      // environment, which the user can export from their shell profile or
-      // store in macOS Keychain via `security add-generic-password`.
-      final processEnv = {
-        ...baseEnv,
-        'PATH': enrichedPath,
-        if (Platform.isMacOS) 'AGENT_CLI_CREDENTIAL_STORE': 'memory',
-      };
-
-      final process = await _processStarter(
-        executable,
-        [...extraCmdArgs, ...args],
-        workingDirectory:
-            config.workingDir.isNotEmpty ? config.workingDir : null,
-        environment: processEnv,
-      );
-      _processes[config.sessionName] = process;
-      registerChatProcessResource(
-        process: process,
-        providerId: agentId,
-        config: config,
-        runtimeContext: runtimeContext,
-      );
-
-      final buffer = StringBuffer();
-
-      final stdoutDone = Completer<void>();
-      process.stdout
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              buffer.write(chunk);
-              final lines = buffer.toString().split('\n');
-              buffer.clear();
-              buffer.write(lines.removeLast());
-
-              for (final line in lines) {
-                final trimmed = line.trim();
-                if (trimmed.isEmpty) continue;
-                try {
-                  final json = jsonDecode(trimmed) as Map<String, dynamic>;
-
-                  // Capture cursor session_id from init event and record the model.
-                  if (json['type'] == 'system' &&
-                      json['subtype'] == 'init' &&
-                      json['session_id'] is String) {
-                    _sessionIds[config.sessionName] =
-                        json['session_id'] as String;
-                    _sessionModels[config.sessionName] = config.model;
-                    debugPrint(
-                      '[CursorAgent] session_id: ${_sessionIds[config.sessionName]} model: ${config.model}',
-                    );
-                  }
-
-                  final events = _parseCursorEvent(json);
-                  for (final event in events) {
-                    controller.add(event);
-                  }
-                } catch (e) {
-                  debugPrint('[CursorAgent] Failed to parse: $trimmed');
-                  debugPrint('[CursorAgent] Error: $e');
-                }
-              }
-            },
-            onError: (Object error) {
-              debugPrint('[CursorAgent] stdout error: $error');
-              controller.addError(error);
-              if (!stdoutDone.isCompleted) {
-                stdoutDone.complete();
-              }
-            },
-            onDone: () {
-              if (!stdoutDone.isCompleted) {
-                stdoutDone.complete();
-              }
-            },
-          );
-
-      final stderrBuf = StringBuffer();
-      final stderrDone = Completer<void>();
-      process.stderr
-          .transform(utf8.decoder)
-          .listen(
-            (chunk) {
-              debugPrint('[CursorAgent] stderr: $chunk');
-              stderrBuf.write(chunk);
-            },
-            onError: (_) {
-              if (!stderrDone.isCompleted) {
-                stderrDone.complete();
-              }
-            },
-            onDone: () {
-              if (!stderrDone.isCompleted) {
-                stderrDone.complete();
-              }
-            },
-          );
-
-      final exitCode = await process.exitCode;
-      await stdoutDone.future;
-      await stderrDone.future;
-      debugPrint('[CursorAgent] Process exited: $exitCode');
-
-      // Flush remaining buffer
-      final remaining = buffer.toString().trim();
-      if (remaining.isNotEmpty) {
-        try {
-          final json = jsonDecode(remaining) as Map<String, dynamic>;
-          for (final event in _parseCursorEvent(json)) {
-            controller.add(event);
-          }
-        } catch (_) {}
-      }
-
-      if (exitCode != 0) {
-        final err = stderrBuf.toString().trim();
-        controller.addError(
-          err.isNotEmpty ? err : 'cursor-agent exited with code $exitCode',
-        );
-      }
-
-      if (_processes[config.sessionName] == process) {
-        _processes.remove(config.sessionName);
-      }
-      unregisterChatProcessResource(process);
-      await controller.close();
-    } catch (e, st) {
-      debugPrint('[CursorAgent] Failed to start: $e\n$st');
-      controller.addError(e);
-      await controller.close();
     }
+
+    return _parseCursorEvent(json);
   }
 
   /// Translate a cursor-agent stream-json event into [ChatEvent]s.
@@ -578,62 +401,6 @@ class CursorAgentProvider extends ChatProvider {
   /// Cursor call_ids can contain newline characters — sanitize for use as keys.
   String _sanitizeCallId(String id) => id.replaceAll('\n', '_');
 
-  @override
-  Future<void> stop(String sessionName) async {
-    final process = _processes.remove(sessionName);
-    if (process != null) {
-      debugPrint('[CursorAgent] Killing process for: $sessionName');
-      unregisterChatProcessResource(process);
-      process.kill(ProcessSignal.sigterm);
-      await process.exitCode.timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => -1,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    for (final process in _processes.values) {
-      unregisterChatProcessResource(process);
-      process.kill(ProcessSignal.sigterm);
-    }
-    _processes.clear();
-    _sessionModels.clear();
-  }
-
-  /// Drop process references without killing them.
-  ///
-  /// Called when the board is switched away. In-flight cursor processes
-  /// continue running and persist their session state; the user can resume
-  /// from the next message when they switch back.
-  @override
-  void detach() {
-    _processes.clear();
-  }
-
-  @override
-  void setSessionId(String sessionName, String sessionId) {
-    _sessionIds[sessionName] = sessionId;
-  }
-
-  @override
-  String? getSessionId(String sessionName) => _sessionIds[sessionName];
-
-  static Future<Process> _defaultProcessStarter(
-    String executable,
-    List<String> arguments, {
-    String? workingDirectory,
-    Map<String, String>? environment,
-  }) {
-    return Process.start(
-      executable,
-      arguments,
-      workingDirectory: workingDirectory,
-      environment: environment,
-    );
-  }
-
   /// Runs `cursor-agent --list-models` and parses the output into
   /// [ChatModelInfo] entries.
   ///
@@ -691,31 +458,5 @@ class CursorAgentProvider extends ChatProvider {
     }
     debugPrint('[CursorAgent] parsed ${models.length} models from CLI');
     return models;
-  }
-
-  List<String> _splitCommand(String command) {
-    final parts = <String>[];
-    final sb = StringBuffer();
-    bool inDoubleQuotes = false;
-    bool inSingleQuotes = false;
-    for (int i = 0; i < command.length; i++) {
-      final char = command[i];
-      if (char == '"' && !inSingleQuotes) {
-        inDoubleQuotes = !inDoubleQuotes;
-      } else if (char == "'" && !inDoubleQuotes) {
-        inSingleQuotes = !inSingleQuotes;
-      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
-        if (sb.isNotEmpty) {
-          parts.add(sb.toString());
-          sb.clear();
-        }
-      } else {
-        sb.write(char);
-      }
-    }
-    if (sb.isNotEmpty) {
-      parts.add(sb.toString());
-    }
-    return parts;
   }
 }

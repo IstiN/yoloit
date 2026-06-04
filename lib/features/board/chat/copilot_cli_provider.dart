@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_resource_registration.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
+import 'package:yoloit/features/board/chat/cli_provider_base.dart';
+import 'package:yoloit/features/board/chat/cli_yoloit_resolver.dart';
 import 'package:yoloit/features/board/chat/sub_agent_event_watcher.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
@@ -103,7 +104,6 @@ class CopilotCliProvider extends ChatProvider {
   final String _homeDirectory;
   final String? _sessionStateRoot;
   final bool _enableSubAgentWatcher;
-  String? _cachedYoloitBin;
 
   @override
   String get providerId => agentId;
@@ -198,7 +198,7 @@ class CopilotCliProvider extends ChatProvider {
       // Session name/resume — copilot binary rejects double quotes in --name.
       // Also normalize typographic quotes to avoid provider-side validation errors.
       final safeSessionName = config.sessionName.replaceAll(
-        RegExp(r'["“”]'),
+        RegExp(r'["""]'),
         "'",
       );
       final resumeKey =
@@ -228,7 +228,7 @@ class CopilotCliProvider extends ChatProvider {
               runtimeContext: runtimeContext,
             )
             : message;
-    final workingDir = _resolveWorkingDir(config.workingDir);
+    final workingDir = CliProviderBase.resolveWorkingDir(config.workingDir);
 
     // Prompt
     args.addAll(['-p', effectiveMessage]);
@@ -242,7 +242,7 @@ class CopilotCliProvider extends ChatProvider {
       );
     }
 
-    final cmdParts = _splitCommand(rawCommand);
+    final cmdParts = CliProviderBase.splitCommand(rawCommand);
     final executable = cmdParts.isNotEmpty ? cmdParts[0] : 'copilot';
     final extraCmdArgs =
         cmdParts.length > 1
@@ -258,8 +258,8 @@ class CopilotCliProvider extends ChatProvider {
       final extraEnv = await GlobalEnvGroupsService.instance
           .resolveSelectedGroups(config.envGroupIds);
       final baseEnv = {...Platform.environment, ...extraEnv};
-      final yoloitBin = _resolveYoloitBin();
-      final enrichedPath = _buildSessionPath(
+      final yoloitBin = CliYoloitResolver.resolve();
+      final enrichedPath = CliYoloitResolver.buildSessionPath(
         baseEnv['PATH'] ?? '',
         yoloitBin: yoloitBin,
       );
@@ -284,9 +284,6 @@ class CopilotCliProvider extends ChatProvider {
       // Merge sub-agent events (from events.jsonl) into the main stream.
       // SubAgentEventWatcher discovers the session folder via the process PID
       // and tails events.jsonl in real-time.
-      // Other providers (OpenCode, Cursor) should implement their own watcher
-      // and merge into their controller the same way — the ChatPanelWidget
-      // only depends on the subagent* ChatEventType values.
       final subAgentWatcher =
           _enableSubAgentWatcher
               ? SubAgentEventWatcher(pid: process.pid)
@@ -505,69 +502,6 @@ class CopilotCliProvider extends ChatProvider {
     _processes.clear();
   }
 
-  String _resolveWorkingDir(String configuredDir) {
-    final trimmed = configuredDir.trim();
-    if (trimmed.isNotEmpty && Directory(trimmed).existsSync()) return trimmed;
-    return Directory.current.path;
-  }
-
-  String _buildSessionPath(String existingPath, {required String? yoloitBin}) {
-    final shell = PlatformShell.instance;
-    final entries = <String>[
-      if (yoloitBin != null) File(yoloitBin).parent.path,
-      ...shell.splitPath(shell.enrichedPath(existingPath)),
-    ];
-    final deduped = <String>[];
-    for (final entry in entries) {
-      if (entry.isEmpty || deduped.contains(entry)) continue;
-      deduped.add(entry);
-    }
-    return shell.joinPath(deduped);
-  }
-
-  String? _resolveYoloitBin() {
-    final cached = _cachedYoloitBin;
-    if (cached != null && File(cached).existsSync()) return cached;
-
-    // Check the installed location first — written by CliServer on startup.
-    final home = _homeDirectory;
-    if (home.isNotEmpty) {
-      final installed = File('$home/.config/yoloit/yoloit');
-      if (installed.existsSync()) {
-        _cachedYoloitBin = installed.path;
-        return installed.path;
-      }
-    }
-
-    final roots = <Directory>[];
-    void addRoot(String path) {
-      if (path.isEmpty) return;
-      final dir = Directory(path).absolute;
-      if (roots.any((existing) => existing.path == dir.path)) return;
-      roots.add(dir);
-    }
-
-    addRoot(Directory.current.path);
-    addRoot(File(Platform.resolvedExecutable).parent.path);
-
-    for (final root in roots) {
-      var current = root;
-      for (var depth = 0; depth < 6; depth++) {
-        final candidate = File(
-          '${current.path}${Platform.pathSeparator}tools${Platform.pathSeparator}yoloit',
-        );
-        if (candidate.existsSync()) {
-          _cachedYoloitBin = candidate.path;
-          return candidate.path;
-        }
-        final parent = current.parent;
-        if (parent.path == current.path) break;
-        current = parent;
-      }
-    }
-    return null;
-  }
-
   @override
   void setSessionId(String sessionName, String sessionId) {
     _sessionIds[sessionName] = sessionId;
@@ -612,31 +546,5 @@ class CopilotCliProvider extends ChatProvider {
       workingDirectory: workingDirectory,
       environment: environment,
     );
-  }
-
-  List<String> _splitCommand(String command) {
-    final parts = <String>[];
-    final sb = StringBuffer();
-    bool inDoubleQuotes = false;
-    bool inSingleQuotes = false;
-    for (int i = 0; i < command.length; i++) {
-      final char = command[i];
-      if (char == '"' && !inSingleQuotes) {
-        inDoubleQuotes = !inDoubleQuotes;
-      } else if (char == "'" && !inDoubleQuotes) {
-        inSingleQuotes = !inSingleQuotes;
-      } else if (char == ' ' && !inDoubleQuotes && !inSingleQuotes) {
-        if (sb.isNotEmpty) {
-          parts.add(sb.toString());
-          sb.clear();
-        }
-      } else {
-        sb.write(char);
-      }
-    }
-    if (sb.isNotEmpty) {
-      parts.add(sb.toString());
-    }
-    return parts;
   }
 }
