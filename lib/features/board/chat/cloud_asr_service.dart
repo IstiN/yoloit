@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:yoloit/features/board/chat/cloud_asr_http_client.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
 class CloudAsrService {
@@ -68,66 +69,17 @@ class CloudAsrService {
     required Uint8List audioBytes,
     required String format,
   }) async {
-    final normalizedBase = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
-    final uri = Uri.parse('$normalizedBase/chat/completions');
-    final payload = jsonEncode({
-      'model': model,
-      'messages': [
-        {
-          'role': 'user',
-          'content': [
-            {
-              'type': 'input_audio',
-              'input_audio': {
-                'data': base64Encode(audioBytes),
-                'format': format,
-              },
-            },
-            {
-              'type': 'text',
-              'text':
-                  'Transcribe this audio exactly as spoken. '
-                  'Output only the transcription text, nothing else.',
-            },
-          ],
-        },
-      ],
-    });
-
-    final client = HttpClient();
-    try {
-      final request = await client.postUrl(uri);
-      request.headers.set(
-        HttpHeaders.authorizationHeader,
-        'Bearer ${config.apiKey}',
-      );
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      for (final entry in config.extraHeaders.entries) {
-        request.headers.set(entry.key, entry.value);
-      }
-      request.add(utf8.encode(payload));
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError(
-          'Cloud ASR (LLM) failed (${response.statusCode}): '
-          '${body.length > 600 ? '${body.substring(0, 600)}…' : body}',
-        );
-      }
-      final decoded = jsonDecode(body);
-      if (decoded is Map) {
-        final choices = decoded['choices'];
-        if (choices is List && choices.isNotEmpty) {
-          final content = choices.first['message']?['content'];
-          if (content is String) return content.trim();
-        }
-      }
-      throw StateError(
-        'Cloud ASR (LLM) returned unexpected response: $body',
-      );
-    } finally {
-      client.close(force: true);
-    }
+    final payload = buildChatAudioPayload(
+      model: model,
+      audioBytes: audioBytes,
+      format: format,
+    );
+    return postChatCompletion(
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      extraHeaders: config.extraHeaders,
+      payload: payload,
+    );
   }
 
   Future<String> _transcribeViaCloudEndpointFromBytes({
@@ -244,68 +196,19 @@ class CloudAsrService {
     required String filePath,
     required String mimeType,
   }) async {
-    final normalizedBase = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
-    final uri = Uri.parse('$normalizedBase/chat/completions');
     final fileBytes = await File(filePath).readAsBytes();
     final format = mimeType == 'audio/mpeg' ? 'mp3' : 'wav';
-
-    final payload = jsonEncode({
-      'model': model,
-      'messages': [
-        {
-          'role': 'user',
-          'content': [
-            {
-              'type': 'input_audio',
-              'input_audio': {'data': base64Encode(fileBytes), 'format': format},
-            },
-            {
-              'type': 'text',
-              'text':
-                  'Transcribe this audio exactly as spoken. '
-                  'Output only the transcription text, nothing else.',
-            },
-          ],
-        },
-      ],
-    });
-
-    final client = HttpClient();
-    try {
-      final request = await client.postUrl(uri);
-      request.headers.set(
-        HttpHeaders.authorizationHeader,
-        'Bearer ${config.apiKey}',
-      );
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      for (final entry in config.extraHeaders.entries) {
-        request.headers.set(entry.key, entry.value);
-      }
-      request.add(utf8.encode(payload));
-
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError(
-          'Cloud ASR (LLM) failed (${response.statusCode}): '
-          '${body.length > 600 ? '${body.substring(0, 600)}…' : body}',
-        );
-      }
-
-      final decoded = jsonDecode(body);
-      if (decoded is Map) {
-        final choices = decoded['choices'];
-        if (choices is List && choices.isNotEmpty) {
-          final content = choices.first['message']?['content'];
-          if (content is String) return content.trim();
-        }
-      }
-      throw StateError(
-        'Cloud ASR (LLM) returned unexpected response: $body',
-      );
-    } finally {
-      client.close(force: true);
-    }
+    final payload = buildChatAudioPayload(
+      model: model,
+      audioBytes: fileBytes,
+      format: format,
+    );
+    return postChatCompletion(
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      extraHeaders: config.extraHeaders,
+      payload: payload,
+    );
   }
 
   Future<(String, String)> _prepareTranscriptionUpload({
