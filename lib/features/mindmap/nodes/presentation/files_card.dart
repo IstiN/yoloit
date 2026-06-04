@@ -3,6 +3,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
+import 'package:yoloit/features/mindmap/nodes/presentation/mindmap_card_shell.dart';
 
 /// Presentation files card — identical visuals to macOS FilesNode.
 class FilesCard extends StatelessWidget {
@@ -16,69 +17,36 @@ class FilesCard extends StatelessWidget {
     const visibleLimit = 8;
     final files = props.files.take(visibleLimit).toList();
     final remaining = props.files.length - visibleLimit;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        border: Border.all(
-          color: colors.textSecondary.withAlpha(89),
-          width: 1.5,
-        ),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: colors.background.withAlpha(112),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return MindmapCardShell(
+      borderColor: colors.textSecondary.withAlpha(89),
       child: Column(
         mainAxisSize: MainAxisSize.max,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(9),
+          MindmapCardHeader(
+            icon: Icons.insert_drive_file_outlined,
+            iconColor: colors.textSecondary,
+            title: 'FILES CHANGED',
+            backgroundColor: colors.surface,
+            bottomBorder: BorderSide(color: colors.divider),
+            titleStyle: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.08,
+              color: colors.textSecondary,
+            ),
+            actions: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                  color: colors.surfaceHighlight,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  '${props.files.length}',
+                  style: TextStyle(fontSize: 9, color: colors.textSecondary),
+                ),
               ),
-              border: Border(bottom: BorderSide(color: colors.divider)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.insert_drive_file_outlined,
-                  size: 12,
-                  color: colors.textSecondary,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'FILES CHANGED',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.08,
-                      color: colors.textSecondary,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceHighlight,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    '${props.files.length}',
-                    style: TextStyle(fontSize: 9, color: colors.textSecondary),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
           Expanded(
             child: ListView(
