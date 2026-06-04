@@ -484,7 +484,6 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     return SettingsCard(
       borderColor: Theme.of(context).colorScheme.error,
       child: Text(

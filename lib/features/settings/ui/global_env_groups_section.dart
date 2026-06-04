@@ -354,7 +354,6 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
                     ),
                   ],
                 ),
-              ),
             );
           }),
       ],

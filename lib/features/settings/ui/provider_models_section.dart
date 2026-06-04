@@ -166,8 +166,6 @@ class _ProviderCatalogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-
     return SettingsCard(
       padding: EdgeInsets.zero,
       child: ClipRRect(

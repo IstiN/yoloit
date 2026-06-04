@@ -309,7 +309,6 @@ class _SyncCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
     return SettingsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
