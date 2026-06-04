@@ -5,6 +5,7 @@ import 'package:local_models_sdk/local_models_sdk.dart' as sdk;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/ui/components/feedback/status_badge.dart';
 
 class AiModelsSection extends StatefulWidget {
@@ -153,13 +154,7 @@ class _ModelCard extends StatelessWidget {
     final state = stateForModel(selected.id);
     final action = _actionFor(state.status, state.canResume);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.border),
-      ),
-      padding: const EdgeInsets.all(14),
+    return SettingsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -418,14 +413,8 @@ class _PrerequisitesCard extends StatelessWidget {
         status.message ??
         'Local AI model runtime prerequisites are available on this machine.';
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withAlpha(170)),
-      ),
-      padding: const EdgeInsets.all(14),
+    return SettingsCard(
+      borderColor: color.withAlpha(170),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -496,14 +485,8 @@ class _ErrorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).colorScheme.error),
-      ),
-      padding: const EdgeInsets.all(14),
+    return SettingsCard(
+      borderColor: Theme.of(context).colorScheme.error,
       child: Text(
         message,
         style: TextStyle(

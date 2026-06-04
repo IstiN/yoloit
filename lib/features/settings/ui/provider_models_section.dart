@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 
@@ -123,14 +124,8 @@ class _CatalogStatusCard extends StatelessWidget {
             colors.accentOrange,
           );
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withAlpha(170)),
-      ),
+    return SettingsCard(
+      borderColor: color.withAlpha(170),
       child: Row(
         children: [
           Icon(icon, size: 18, color: color),
@@ -173,12 +168,8 @@ class _ProviderCatalogCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.border),
-      ),
+    return SettingsCard(
+      padding: EdgeInsets.zero,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Theme(

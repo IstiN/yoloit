@@ -555,7 +555,7 @@ class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
             ),
           ),
           const SizedBox(height: 4),
-          const Caption('The embedded terminal uses kterm.'),
+          const Caption('The embedded terminal uses xterm.dart.'),
           Divider(height: 24, color: colors.border),
           Row(
             children: [

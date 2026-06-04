@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/ui/components/feedback/status_badge.dart';
 
 enum SyncMethod { none, git, googleDrive, customPath }
@@ -235,12 +236,8 @@ class _SyncSectionState extends State<SyncSection> {
   // ─── Info expander ────────────────────────────────────────────────────────
 
   Widget _buildSyncInfoExpander(AppColorScheme colors) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.border),
-      ),
+    return SettingsCard(
+      padding: EdgeInsets.zero,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -313,13 +310,7 @@ class _SyncCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.border),
-      ),
-      padding: const EdgeInsets.all(14),
+    return SettingsCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,

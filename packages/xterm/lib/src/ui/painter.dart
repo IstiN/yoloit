@@ -105,18 +105,21 @@ class TerminalPainter {
     switch (cursorType) {
       case TerminalCursorType.block:
         paint.style = PaintingStyle.fill;
-        canvas.drawRect(offset & _cellSize, paint);
+        canvas.drawRect(_snapRect(offset & _cellSize), paint);
         return;
       case TerminalCursorType.underline:
         return canvas.drawLine(
-          Offset(offset.dx, _cellSize.height - 1),
-          Offset(offset.dx + _cellSize.width, _cellSize.height - 1),
+          _snapOffset(Offset(offset.dx, offset.dy + _cellSize.height - 1)),
+          _snapOffset(
+            Offset(
+                offset.dx + _cellSize.width, offset.dy + _cellSize.height - 1),
+          ),
           paint,
         );
       case TerminalCursorType.verticalBar:
         return canvas.drawLine(
-          Offset(offset.dx, 0),
-          Offset(offset.dx, _cellSize.height),
+          _snapOffset(offset),
+          _snapOffset(Offset(offset.dx, offset.dy + _cellSize.height)),
           paint,
         );
     }
@@ -132,7 +135,7 @@ class TerminalPainter {
       ..strokeWidth = 1;
 
     canvas.drawRect(
-      Rect.fromPoints(offset, endOffset),
+      _snapRect(Rect.fromPoints(offset, endOffset)),
       paint,
     );
   }
@@ -146,12 +149,14 @@ class TerminalPainter {
   ) {
     final cellData = CellData.empty();
     final cellWidth = _cellSize.width;
+    final lineOffset = _snapOffset(offset);
 
     for (var i = 0; i < line.length; i++) {
       line.getCellData(i, cellData);
 
       final charWidth = cellData.content >> CellContent.widthShift;
-      final cellOffset = offset.translate(i * cellWidth, 0);
+      final cellOffset =
+          Offset(_snap(lineOffset.dx + i * cellWidth), lineOffset.dy);
 
       paintCell(canvas, cellOffset, cellData);
 
@@ -214,7 +219,7 @@ class TerminalPainter {
       );
     }
 
-    canvas.drawParagraph(paragraph, offset);
+    canvas.drawParagraph(paragraph, _snapOffset(offset));
   }
 
   /// Paints the background of a cell represented by [cellData] to [canvas] at
@@ -236,8 +241,25 @@ class TerminalPainter {
     final doubleWidth = cellData.content >> CellContent.widthShift == 2;
     final widthScale = doubleWidth ? 2 : 1;
     final size = Size(_cellSize.width * widthScale + 1, _cellSize.height);
-    canvas.drawRect(offset & size, paint);
+    canvas.drawRect(_snapRect(offset & size), paint);
   }
+
+  double _snap(double value) {
+    final dpr =
+        PlatformDispatcher.instance.implicitView?.devicePixelRatio ?? 1.0;
+    if (dpr <= 0) return value;
+    return (value * dpr).roundToDouble() / dpr;
+  }
+
+  Offset _snapOffset(Offset offset) =>
+      Offset(_snap(offset.dx), _snap(offset.dy));
+
+  Rect _snapRect(Rect rect) => Rect.fromLTRB(
+        _snap(rect.left),
+        _snap(rect.top),
+        _snap(rect.right),
+        _snap(rect.bottom),
+      );
 
   /// Get the effective foreground color for a cell from information encoded in
   /// [cellColor].

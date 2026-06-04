@@ -132,13 +132,13 @@ class AgentConfigService {
   String? _defaultAsrCloudConfigId;
   String? _defaultAsrCloudModel;
   TerminalBackendMode _terminalBackendMode = TerminalBackendMode.runtime;
-  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.kterm;
+  TerminalRenderEngine _terminalRenderEngine = TerminalRenderEngine.xterm;
 
   final ValueNotifier<TerminalBackendMode> terminalBackendModeNotifier =
       ValueNotifier<TerminalBackendMode>(TerminalBackendMode.runtime);
 
   final ValueNotifier<TerminalRenderEngine> terminalRenderEngineNotifier =
-      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.kterm);
+      ValueNotifier<TerminalRenderEngine>(TerminalRenderEngine.xterm);
 
   static List<AgentConfig> get _defaults => [
     ...AgentType.values.map(
@@ -248,7 +248,7 @@ class AgentConfigService {
         _defaultAsrMode = prefs['defaultAsrMode'] as String? ?? 'local';
         _defaultAsrCloudConfigId = prefs['defaultAsrCloudConfigId'] as String?;
         _defaultAsrCloudModel = prefs['defaultAsrCloudModel'] as String?;
-        _terminalRenderEngine = TerminalRenderEngine.kterm;
+        _terminalRenderEngine = TerminalRenderEngine.xterm;
         _terminalBackendMode = TerminalBackendModeX.fromId(
           prefs['terminalBackendMode'] as String?,
         );
@@ -286,8 +286,8 @@ class AgentConfigService {
   }
 
   Future<void> setTerminalRenderEngine(TerminalRenderEngine engine) async {
-    _terminalRenderEngine = TerminalRenderEngine.kterm;
-    terminalRenderEngineNotifier.value = TerminalRenderEngine.kterm;
+    _terminalRenderEngine = TerminalRenderEngine.xterm;
+    terminalRenderEngineNotifier.value = TerminalRenderEngine.xterm;
     await _savePrefs();
   }
 

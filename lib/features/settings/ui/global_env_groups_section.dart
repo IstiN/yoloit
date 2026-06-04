@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 class GlobalEnvGroupsSection extends StatefulWidget {
@@ -225,16 +226,9 @@ class _GlobalEnvGroupsSectionState extends State<GlobalEnvGroupsSection> {
             final groupIndex = entry.$1;
             final group = entry.$2;
             final vars = group.values.entries.toList();
-            return Container(
+            return SettingsCard(
               margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: colors.surfaceElevated,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: colors.border),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
+              child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(

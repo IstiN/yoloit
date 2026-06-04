@@ -61,6 +61,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (attached) _terminal.addListener(_onTerminalChange);
     _resizeTerminalIfNeeded();
     markNeedsLayout();
+    markNeedsPaint();
   }
 
   TerminalController _controller;
@@ -70,6 +71,7 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     _controller = controller;
     if (attached) _controller.addListener(_onControllerUpdate);
     markNeedsLayout();
+    markNeedsPaint();
   }
 
   ViewportOffset _offset;
@@ -177,11 +179,13 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
   void _onTerminalChange() {
     _scheduleLayout();
+    markNeedsPaint();
     _notifyEditableRect();
   }
 
   void _onControllerUpdate() {
     _scheduleLayout();
+    markNeedsPaint();
   }
 
   @override
@@ -412,6 +416,10 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
   void _paint(PaintingContext context, Offset offset) {
     final canvas = context.canvas;
+    final paintBounds = offset & size;
+    canvas.save();
+    canvas.clipRect(paintBounds);
+    canvas.drawRect(paintBounds, Paint()..color = _painter.theme.background);
 
     final lines = _terminal.buffer.lines;
     final charHeight = _painter.cellSize.height;
@@ -464,6 +472,8 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         effectLastLine,
       );
     }
+
+    canvas.restore();
   }
 
   /// Paints the text that is currently being composed in IME to [canvas] at
