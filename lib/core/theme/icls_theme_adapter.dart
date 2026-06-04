@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/color_utils.dart';
 
 /// Converts a JetBrains `.icls` (IntelliJ Color Scheme) XML file into an
 /// [AppColorScheme].
@@ -55,7 +56,7 @@ class IclsThemeAdapter {
 
     // ── Resolve colours ──────────────────────────────────────────────────
 
-    Color? c(String hex) => _parseHex(hex);
+    Color? c(String hex) => parseHexColor(hex);
     Color? fromColors(String key) {
       final v = colorMap[key];
       return v != null ? c(v) : null;
@@ -151,17 +152,6 @@ class IclsThemeAdapter {
         statusWarning: orangeFg,
       ),
     );
-  }
-
-  static Color? _parseHex(String hex) {
-    final h = hex.replaceFirst('#', '').trim();
-    if (h.isEmpty) return null;
-    try {
-      if (h.length <= 6) return Color(int.parse('FF$h'.padLeft(8, '0'), radix: 16));
-      return Color(int.parse(h, radix: 16));
-    } catch (_) {
-      return null;
-    }
   }
 
   /// Shifts a colour lighter (positive) or darker (negative) by [amount].

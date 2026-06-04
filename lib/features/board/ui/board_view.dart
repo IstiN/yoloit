@@ -18,6 +18,7 @@ import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
 import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -5629,10 +5630,10 @@ class _MiroPanelToolbar extends StatelessWidget {
     if (panel.type == 'board.sticky') {
       final fontSize = (panel.state['fontSize'] as num?)?.round() ?? 18;
       final noteColor =
-          _miroToolbarParseHex(panel.state['color'] as String?) ??
+          parseHexColor(panel.state['color'] as String?) ??
           const Color(0xFFFEF08A);
       final stickyTextColor =
-          _miroToolbarParseHex(panel.state['textColor'] as String?) ??
+          parseHexColor(panel.state['textColor'] as String?) ??
           const Color(0xFF1F2937);
       return [
         _MiroToolbarDivider(colors: colors),
@@ -5697,10 +5698,10 @@ class _MiroPanelToolbar extends StatelessWidget {
       final textOrientation =
           panel.state['textOrientation'] as String? ?? 'horizontal';
       final strokeColor =
-          _miroToolbarParseHex(panel.state['strokeColor'] as String?) ??
+          parseHexColor(panel.state['strokeColor'] as String?) ??
           const Color(0xFF93C5FD);
       final fillColor =
-          _miroToolbarParseHex(panel.state['fillColor'] as String?) ??
+          parseHexColor(panel.state['fillColor'] as String?) ??
           Colors.transparent;
       return [
         _MiroToolbarDivider(colors: colors),
@@ -6232,21 +6233,6 @@ Future<Color?> _showMiroToolbarCustomColor(
             ),
           ],
         ),
-  );
-}
-
-Color? _miroToolbarParseHex(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return null;
-  final cleaned = raw.trim().replaceFirst('#', '');
-  if (cleaned.length != 6 && cleaned.length != 8) return null;
-  final value = int.tryParse(cleaned, radix: 16);
-  if (value == null) return null;
-  if (cleaned.length == 8) return Color(value);
-  return Color.fromARGB(
-    255,
-    (value >> 16) & 255,
-    (value >> 8) & 255,
-    value & 255,
   );
 }
 

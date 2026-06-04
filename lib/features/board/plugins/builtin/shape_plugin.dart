@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -58,11 +59,11 @@ class ShapePlugin extends BoardPanelPlugin {
         (panel.state['shape'] as String? ?? 'rectangle').toLowerCase();
     final colors = context.appColors;
     final fillColor =
-        _parseHex(panel.state['fillColor'] as String?) ?? Colors.transparent;
+        parseHexColor(panel.state['fillColor'] as String?) ?? Colors.transparent;
     final strokeColor =
-        _parseHex(panel.state['strokeColor'] as String?) ?? colors.primaryLight;
+        parseHexColor(panel.state['strokeColor'] as String?) ?? colors.primaryLight;
     final textColor =
-        _parseHex(panel.state['textColor'] as String?) ?? colors.textPrimary;
+        parseHexColor(panel.state['textColor'] as String?) ?? colors.textPrimary;
     final strokeWidth = (panel.state['strokeWidth'] as num?)?.toDouble() ?? 3.0;
     final fontSize = (panel.state['fontSize'] as num?)?.toDouble() ?? 18.0;
     final textHAlign =
@@ -324,7 +325,7 @@ class _ShapePalette extends StatelessWidget {
             }),
             _ToolbarDivider(colors: colors),
             ..._colorOptions.map((hex) {
-              final color = _parseHex(hex)!;
+              final color = parseHexColor(hex)!;
               final selected = _sameColor(selectedColor, color);
               return Tooltip(
                 message: 'Color $hex',
@@ -733,7 +734,7 @@ class _EditorColorRow extends StatelessWidget {
       runSpacing: 8,
       children:
           colors.map((hex) {
-            final color = _parseHex(hex) ?? Colors.transparent;
+            final color = parseHexColor(hex) ?? Colors.transparent;
             final isTransparent = hex == '#00000000';
             final isSelected = selected.toUpperCase() == hex.toUpperCase();
             return InkWell(
@@ -883,17 +884,4 @@ Path _polygon(Rect rect, int sides) {
   return path..close();
 }
 
-Color? _parseHex(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return null;
-  final cleaned = raw.trim().replaceFirst('#', '');
-  if (cleaned.length != 6 && cleaned.length != 8) return null;
-  final value = int.tryParse(cleaned, radix: 16);
-  if (value == null) return null;
-  if (cleaned.length == 8) return Color(value);
-  return Color.fromARGB(
-    255,
-    (value >> 16) & 255,
-    (value >> 8) & 255,
-    value & 255,
-  );
-}
+

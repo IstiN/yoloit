@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
@@ -48,10 +49,10 @@ class StickyNotePlugin extends BoardPanelPlugin {
   ) {
     final colors = context.appColors;
     final color =
-        _parseHex(panel.state['color'] as String?) ??
+        parseHexColor(panel.state['color'] as String?) ??
         colors.accentOrange.withValues(alpha: 0.85);
     final textColor =
-        _parseHex(panel.state['textColor'] as String?) ??
+        parseHexColor(panel.state['textColor'] as String?) ??
         Theme.of(context).colorScheme.onSurface;
     final fontSize = (panel.state['fontSize'] as num?)?.toDouble() ?? 18.0;
     return _StickyNoteContent(
@@ -307,7 +308,7 @@ class _ColorRow extends StatelessWidget {
       runSpacing: 8,
       children:
           colors.map((hex) {
-            final color = _parseHex(hex) ?? Colors.transparent;
+            final color = parseHexColor(hex) ?? Colors.transparent;
             final isSelected = selected.toUpperCase() == hex.toUpperCase();
             return InkWell(
               borderRadius: BorderRadius.circular(999),
@@ -333,17 +334,4 @@ class _ColorRow extends StatelessWidget {
   }
 }
 
-Color? _parseHex(String? raw) {
-  if (raw == null || raw.trim().isEmpty) return null;
-  final cleaned = raw.trim().replaceFirst('#', '');
-  if (cleaned.length != 6 && cleaned.length != 8) return null;
-  final value = int.tryParse(cleaned, radix: 16);
-  if (value == null) return null;
-  if (cleaned.length == 8) return Color(value);
-  return Color.fromARGB(
-    255,
-    (value >> 16) & 255,
-    (value >> 8) & 255,
-    value & 255,
-  );
-}
+
