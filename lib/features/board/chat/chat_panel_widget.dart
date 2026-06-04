@@ -25,7 +25,16 @@ import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
 import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
+import 'package:yoloit/features/board/chat/chat_panel_models.dart';
 import 'package:yoloit/features/board/chat/provider_icon.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_ask_user_card.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_attachment_preview.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_bubble_menu.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_changed_files_strip.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_provider_badge.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_system_bubble.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_tool_status_badge.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_typing_indicator.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -44,63 +53,10 @@ import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/terminal/data/smart_clipboard_paste_service.dart';
-import 'package:yoloit/ui/widgets/ui_components.dart';
 
 /// Slash command definition for the chat input bar.
-class _SlashCommand {
-  const _SlashCommand({
-    required this.id,
-    required this.displayName,
-    required this.description,
-    required this.triggers,
-  });
-
-  final String id;
-  final String displayName;
-  final String description;
-  final List<String> triggers;
-
-  bool matches(String text) => triggers.any(text.startsWith);
-}
 
 /// Small grey provider badge used in model picker lists.
-Widget _buildProviderBadge(BuildContext context, String providerName) {
-  final colors = context.appColors;
-  final label = switch (providerName.toLowerCase()) {
-    'openrouter' => 'OR',
-    'opencode' => 'OC',
-    'siliconflow' => 'SF',
-    'anthropic' => 'ANT',
-    'openai' => 'OAI',
-    'google' => 'GGL',
-    'mistral' => 'MST',
-    'groq' => 'GRQ',
-    _ =>
-      providerName.length > 6
-          ? providerName.substring(0, 2).toUpperCase()
-          : providerName,
-  };
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(3),
-      color: colors.accentGreen.withOpacity(0.08),
-      border: Border.all(
-        color: colors.accentGreen.withOpacity(0.2),
-        width: 0.5,
-      ),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(
-        fontSize: 8,
-        fontWeight: FontWeight.w600,
-        color: colors.textMuted,
-        letterSpacing: 0.3,
-      ),
-    ),
-  );
-}
 
 @visibleForTesting
 List<(String, String)> buildChatProviderOptions(Iterable<AgentConfig> configs) {
@@ -184,7 +140,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   // Sub-agent panel tracking: agentId → board panelId
   final Map<String, String> _subAgentPanels = {};
   // Sub-agent event log state: agentId → state
-  final Map<String, _SubAgentRunState> _subAgents = {};
+  final Map<String, SubAgentRunState> _subAgents = {};
 
   /// Persisted opencode session ID (survives widget rebuilds).
   String? _opencodeSessionId;
@@ -1409,7 +1365,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         if (_subAgents.containsKey(agentId)) break;
         final agentName = event.agentName ?? 'Agent';
         final agentDesc = event.agentDescription ?? '';
-        final state = _SubAgentRunState(
+        final state = SubAgentRunState(
           agentId: agentId,
           agentName: agentName,
           agentDescription: agentDesc,
@@ -1424,7 +1380,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         if (state == null) break;
         setState(() {
           state.events.add(
-            _SubAgentEvent(
+            SubAgentEvent(
               type: 'tool_start',
               toolName: event.toolName ?? '',
               timestamp: event.timestamp ?? DateTime.now(),
@@ -1443,7 +1399,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         final resultContent = event.toolResultContent ?? '';
         setState(() {
           state.events.add(
-            _SubAgentEvent(
+            SubAgentEvent(
               type: success ? 'tool_complete' : 'tool_error',
               toolName: toolName,
               content:
@@ -1464,7 +1420,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         if (content.isEmpty) break;
         setState(() {
           state.events.add(
-            _SubAgentEvent(
+            SubAgentEvent(
               type: 'message',
               content:
                   content.length > 300
@@ -2057,7 +2013,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                   bottomRight: Radius.circular(16),
                 ),
               ),
-              child: const _TypingIndicator(),
+              child: const ChatTypingIndicator(),
             ),
           );
         }
@@ -2129,7 +2085,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       case ChatRole.system:
         final meta = message.metadata;
         if (meta != null && meta['type'] == 'ask_user') {
-          return _AskUserCard(
+          return ChatAskUserCard(
             question: message.content,
             choices: (meta['choices'] as List?)?.cast<String>() ?? [],
             onChoice: (choice) {
@@ -2138,7 +2094,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             },
           );
         }
-        return _SystemBubble(content: message.content);
+        return ChatSystemBubble(content: message.content);
     }
   }
 
@@ -2292,7 +2248,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         ),
         child:
             processedContent.isEmpty
-                ? const _TypingIndicator()
+                ? const ChatTypingIndicator()
                 : MarkdownBody(
                   data: processedContent,
                   onTapLink: (text, href, title) {
@@ -2344,7 +2300,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         mainAxisSize: MainAxisSize.min,
         children: [
           if (changedFiles.isNotEmpty) ...[
-            _ChangedFilesStrip(
+            ChatChangedFilesStrip(
               files: changedFiles,
               onOpenFile: _openInPreviewPanel,
             ),
@@ -2992,17 +2948,17 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   /// Small grey provider badge shown next to model name in pickers.
   static Widget _providerBadge(BuildContext context, String providerName) {
-    return _buildProviderBadge(context, providerName);
+    return buildProviderBadge(context, providerName);
   }
 
   static const _slashCommands = [
-    _SlashCommand(
+    ChatSlashCommand(
       id: 'model',
       displayName: 'model',
       description: 'Switch AI model',
       triggers: ['/model', '.model'],
     ),
-    _SlashCommand(
+    ChatSlashCommand(
       id: 'context',
       displayName: 'context',
       description: 'Toggle context injections',
@@ -3010,7 +2966,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     ),
   ];
 
-  _SlashCommand? _findMatchingCommand(String text) {
+  ChatSlashCommand? _findMatchingCommand(String text) {
     for (final c in _slashCommands) {
       if (c.matches(text)) return c;
     }
@@ -3098,7 +3054,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
   }
 
-  List<_SlashCommand> get _filteredSlashCommands {
+  List<ChatSlashCommand> get _filteredSlashCommands {
     final text = _inputController.text;
     if (text.length <= 1) return _slashCommands;
     final query = text.substring(1).toLowerCase();
@@ -4316,7 +4272,7 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
                       if (m != null && m.providerGroup != null) {
                         return Padding(
                           padding: const EdgeInsets.only(right: 4),
-                          child: _buildProviderBadge(context, m.providerGroup!),
+                          child: buildProviderBadge(context, m.providerGroup!),
                         );
                       }
                       return const SizedBox.shrink();
@@ -4378,91 +4334,6 @@ class _ChatSetupViewState extends State<_ChatSetupView> {
 // Message bubbles
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ChangedFilesStrip extends StatelessWidget {
-  const _ChangedFilesStrip({required this.files, required this.onOpenFile});
-
-  final List<String> files;
-  final void Function(String path) onOpenFile;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final labelColor =
-        context.appColors.textMuted.withOpacity(0.7);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.file_present_rounded, size: 13, color: colors.primary),
-            const SizedBox(width: 5),
-            Text(
-              'Files changed',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: labelColor,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children:
-                files.map((path) {
-                  final fileName = path.split('/').last;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Tooltip(
-                      message: path,
-                      waitDuration: const Duration(milliseconds: 350),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => onOpenFile(path),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colors.surfaceElevated,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: colors.border.withOpacity(0.6),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.description_outlined,
-                                size: 12,
-                                color: colors.primary,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                fileName,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color:
-                                      Theme.of(context).colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _UserBubble extends StatefulWidget {
   const _UserBubble({
@@ -4526,7 +4397,7 @@ class _UserBubbleState extends State<_UserBubble> {
                     opacity: _isHovered ? 1.0 : 0.0,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 6, bottom: 4),
-                      child: _BubbleMenu(
+                      child: ChatBubbleMenu(
                         textToCopy: resolved.text,
                         light: false,
                       ),
@@ -4562,7 +4433,7 @@ class _UserBubbleState extends State<_UserBubble> {
                           if (hasAttachments)
                             Padding(
                               padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                              child: _AttachmentPreviewSection(
+                              child: ChatAttachmentPreview(
                                 paths: resolved.paths,
                                 onLight: false,
                                 onOpenFile: widget.onOpenFile,
@@ -4594,243 +4465,11 @@ class _UserBubbleState extends State<_UserBubble> {
 }
 
 /// Small menu button for chat bubbles — copy on click.
-class _BubbleMenu extends StatelessWidget {
-  const _BubbleMenu({required this.textToCopy, this.light = false});
-  final String textToCopy;
-  final bool light;
-
-  @override
-  Widget build(BuildContext context) {
-    final color =
-        light
-            ? context.appColors.textPrimary.withOpacity(0.6)
-            : (context.appColors.textMuted);
-    return SizedBox(
-      width: 24,
-      height: 28,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-        child: InkWell(
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: textToCopy));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Copied to clipboard'),
-                duration: Duration(seconds: 1),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-          borderRadius: BorderRadius.circular(6),
-          child: Icon(Icons.more_vert, size: 16, color: color),
-        ),
-      ),
-    );
-  }
-}
 
 /// Shows image thumbnails + file chips for a list of file paths.
 /// Used in both user bubbles (attachments) and assistant bubbles (detected paths).
-class _AttachmentPreviewSection extends StatelessWidget {
-  const _AttachmentPreviewSection({
-    required this.paths,
-    this.onLight = true,
-    this.onOpenFile,
-  });
-
-  final List<String> paths;
-
-  /// True when rendered on a light background (assistant bubble), false on dark (user bubble).
-  final bool onLight;
-
-  /// Called when the user taps a file — uses board preview or system open.
-  final void Function(String path)? onOpenFile;
-
-  static final _imageRe = RegExp(
-    r'\.(png|jpg|jpeg|gif|webp|bmp|svg)$',
-    caseSensitive: false,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final images = paths.where((p) => _imageRe.hasMatch(p)).toList();
-    final files = paths.where((p) => !_imageRe.hasMatch(p)).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (images.isNotEmpty) _buildImageGrid(context, images),
-        if (images.isNotEmpty && files.isNotEmpty) const SizedBox(height: 6),
-        if (files.isNotEmpty) _buildFileChips(context, files),
-      ],
-    );
-  }
-
-  Widget _buildImageGrid(BuildContext context, List<String> imagePaths) {
-    if (imagePaths.length == 1) {
-      return _ImageThumbnail(
-        path: imagePaths.first,
-        maxWidth: 280,
-        maxHeight: 200,
-        onOpenFile: onOpenFile,
-      );
-    }
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      alignment: WrapAlignment.end,
-      children:
-          imagePaths
-              .map(
-                (p) => _ImageThumbnail(
-                  path: p,
-                  maxWidth: 140,
-                  maxHeight: 120,
-                  onOpenFile: onOpenFile,
-                ),
-              )
-              .toList(),
-    );
-  }
-
-  Widget _buildFileChips(BuildContext context, List<String> filePaths) {
-    final colors = context.appColors;
-    final chipBg =
-        onLight
-            ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : colors.textPrimary.withOpacity(0.15);
-    final textColor =
-        onLight ? Theme.of(context).colorScheme.onSurface : colors.textPrimary;
-    final iconColor =
-        onLight ? Theme.of(context).colorScheme.primary : colors.accentBlue;
-
-    return Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      alignment: WrapAlignment.end,
-      children:
-          filePaths.map((p) {
-            final name = p.split('/').last;
-            return GestureDetector(
-              onTap: () {
-                if (onOpenFile != null) {
-                  onOpenFile!(p);
-                } else {
-                  // Fallback: reveal in Finder
-                  Process.run('open', ['-R', p]);
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: chipBg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color:
-                        onLight
-                            ? Theme.of(
-                              context,
-                            ).colorScheme.outline.withOpacity(0.3)
-                            : colors.textPrimary.withOpacity(0.24),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.insert_drive_file_outlined,
-                      size: 13,
-                      color: iconColor,
-                    ),
-                    const SizedBox(width: 4),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 200),
-                      child: Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11, color: textColor),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-    );
-  }
-}
 
 /// Tappable image thumbnail that opens via [onOpenFile] on tap.
-class _ImageThumbnail extends StatelessWidget {
-  const _ImageThumbnail({
-    required this.path,
-    this.maxWidth = 280,
-    this.maxHeight = 200,
-    this.onOpenFile,
-  });
-
-  final String path;
-  final double maxWidth;
-  final double maxHeight;
-  final void Function(String path)? onOpenFile;
-
-  @override
-  Widget build(BuildContext context) {
-    final file = File(path);
-    final name = path.split('/').last;
-
-    return GestureDetector(
-      onTap: () {
-        if (onOpenFile != null) {
-          onOpenFile!(path);
-        } else {
-          Process.run('open', [path]);
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: maxWidth,
-                maxHeight: maxHeight,
-              ),
-              child: Image.file(
-                file,
-                fit: BoxFit.contain,
-                errorBuilder:
-                    (_, __, ___) => Container(
-                      width: 80,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: context.appColors.background.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        size: 24,
-                        color: context.appColors.textPrimary.withOpacity(0.38),
-                      ),
-                    ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            name,
-            style: TextStyle(fontSize: 9, color: context.appColors.accentBlue),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _AssistantBubble extends StatefulWidget {
   const _AssistantBubble({
@@ -5025,7 +4664,7 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                         opacity: _isHovered ? 1.0 : 0.0,
                         child: Padding(
                           padding: const EdgeInsets.only(left: 6, bottom: 4),
-                          child: _BubbleMenu(
+                          child: ChatBubbleMenu(
                             textToCopy: processedContent,
                             light: false,
                           ),
@@ -5055,7 +4694,7 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                 if (detectedPaths.isEmpty) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: _AttachmentPreviewSection(
+                  child: ChatAttachmentPreview(
                     paths: detectedPaths,
                     onLight: true,
                     onOpenFile: widget.onOpenFile,
@@ -5166,12 +4805,12 @@ class _ToolResultCardState extends State<_ToolResultCard> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final status = _ToolExecutionStatus.from(
+    final status = ToolExecutionStatus.from(
       colors,
       success: widget.success,
       content: widget.content,
     );
-    final previewText = _toolResultPreview(widget.content);
+    final previewText = toolResultPreview(widget.content);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -5230,7 +4869,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _ToolStatusBadge(status: status),
+                  ChatToolStatusBadge(status: status),
                   const SizedBox(width: 6),
                   Tooltip(
                     message: 'Copy',
@@ -5341,316 +4980,16 @@ class _ToolResultCardState extends State<_ToolResultCard> {
   }
 }
 
-class _ToolStatusBadge extends StatelessWidget {
-  const _ToolStatusBadge({required this.status});
 
-  final _ToolExecutionStatus status;
 
-  @override
-  Widget build(BuildContext context) {
-    return NeonBadge(
-      label: status.label,
-      color: status.tint,
-      showPulse: status.isRunning,
-    );
-  }
-}
 
-class _ToolExecutionStatus {
-  const _ToolExecutionStatus({
-    required this.icon,
-    required this.label,
-    required this.tint,
-    this.isRunning = false,
-  });
 
-  final IconData icon;
-  final String label;
-  final Color tint;
-  final bool isRunning;
 
-  static _ToolExecutionStatus from(
-    AppColorScheme colors, {
-    required bool? success,
-    required String content,
-  }) {
-    final exitCode = _extractExitCode(content);
-    if (success == null) {
-      if (exitCode != null) {
-        return _ToolExecutionStatus(
-          icon:
-              exitCode == 0 ? Icons.check_circle_rounded : Icons.error_rounded,
-          label: exitCode == 0 ? 'Done $exitCode' : 'Failed $exitCode',
-          tint: exitCode == 0 ? colors.statusActive : colors.statusError,
-        );
-      }
-      if (content.trim().isNotEmpty) {
-        return _ToolExecutionStatus(
-          icon: Icons.check_circle_rounded,
-          label: 'Done',
-          tint: colors.statusActive,
-        );
-      }
-      return _ToolExecutionStatus(
-        icon: Icons.pending_outlined,
-        label: 'Running',
-        tint: colors.statusWarning,
-        isRunning: true,
-      );
-    }
-    if (success) {
-      return _ToolExecutionStatus(
-        icon: Icons.check_circle_rounded,
-        label: exitCode == null ? 'Done' : 'Done $exitCode',
-        tint: colors.statusActive,
-      );
-    }
-    return _ToolExecutionStatus(
-      icon: Icons.error_rounded,
-      label: exitCode == null ? 'Failed' : 'Failed $exitCode',
-      tint: colors.statusError,
-    );
-  }
-}
 
-int? _extractExitCode(String content) {
-  final match = RegExp(
-    r'(?:exited with exit code|exit code)\s+(\d+)',
-    caseSensitive: false,
-  ).firstMatch(content);
-  return match == null ? null : int.tryParse(match.group(1)!);
-}
-
-String? _toolResultPreview(String content) {
-  final cleaned =
-      content
-          .replaceAll(RegExp(r'<[^>]+>'), ' ')
-          .split('\n')
-          .map((line) => line.trim())
-          .where((line) => line.isNotEmpty)
-          .where(
-            (line) => !line.toLowerCase().contains('exited with exit code'),
-          )
-          .toList();
-  if (cleaned.isEmpty) {
-    final exitCode = _extractExitCode(content);
-    return exitCode == null ? null : 'Exited with code $exitCode';
-  }
-  return cleaned.first;
-}
-
-class _SystemBubble extends StatelessWidget {
-  const _SystemBubble({required this.content});
-  final String content;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: colors.statusError.withAlpha(21),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '✕ ',
-                style: TextStyle(fontSize: 12, color: colors.statusError),
-              ),
-              Flexible(
-                child: SelectableText(
-                  content,
-                  style: TextStyle(fontSize: 12, color: colors.statusError),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AskUserCard extends StatelessWidget {
-  const _AskUserCard({
-    required this.question,
-    required this.choices,
-    required this.onChoice,
-  });
-  final String question;
-  final List<String> choices;
-  final ValueChanged<String> onChoice;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colors.primaryLight.withAlpha(21),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colors.primaryLight.withAlpha(64)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.help_outline, size: 16, color: colors.primaryLight),
-                const SizedBox(width: 6),
-                Text(
-                  'Agent asks:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: colors.primaryLight,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              question,
-              style: TextStyle(
-                fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            if (choices.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children:
-                    choices
-                        .map(
-                          (choice) => OutlinedButton(
-                            onPressed: () => onChoice(choice),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: colors.primaryLight,
-                              side: BorderSide(color: colors.primaryLight),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              textStyle: const TextStyle(fontSize: 12),
-                            ),
-                            child: Text(choice),
-                          ),
-                        )
-                        .toList(),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TypingIndicator extends StatefulWidget {
-  const _TypingIndicator();
-
-  @override
-  State<_TypingIndicator> createState() => _TypingIndicatorState();
-}
-
-class _TypingIndicatorState extends State<_TypingIndicator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (i) {
-            final delay = i * 0.2;
-            final t = ((_ctrl.value - delay) % 1.0).clamp(0.0, 1.0);
-            final opacity = (0.3 + 0.7 * (1.0 - (t * 2 - 1).abs())).clamp(
-              0.3,
-              1.0,
-            );
-            return Padding(
-              padding: const EdgeInsets.only(right: 3),
-              child: Opacity(
-                opacity: opacity,
-                child: Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color:
-                        Theme.of(context).textTheme.bodyMedium?.color ??
-                        Theme.of(context).colorScheme.onSurface,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-}
 
 // ── Sub-agent state data classes ─────────────────────────────────────────────
 
-class _SubAgentEvent {
-  _SubAgentEvent({
-    required this.type,
-    required this.timestamp,
-    this.toolName,
-    this.content,
-  });
 
-  /// One of: 'tool_start', 'tool_complete', 'tool_error', 'message'
-  final String type;
-  final DateTime timestamp;
-  final String? toolName;
-  final String? content;
-}
-
-class _SubAgentRunState {
-  _SubAgentRunState({
-    required this.agentId,
-    required this.agentName,
-    required this.agentDescription,
-  });
-
-  final String agentId;
-  final String agentName;
-  final String agentDescription;
-  final List<_SubAgentEvent> events = [];
-  bool isRunning = true;
-}
 
 // ── Searchable model picker dialog ──────────────────────────────────────────
 
@@ -5792,7 +5131,7 @@ class _ModelSearchDialogState extends State<_ModelSearchDialog> {
                                     const SizedBox(width: 14),
                                   const SizedBox(width: 6),
                                   if (m.providerGroup != null) ...[
-                                    _buildProviderBadge(
+                                    buildProviderBadge(
                                       context,
                                       m.providerGroup!,
                                     ),
