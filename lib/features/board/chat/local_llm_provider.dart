@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
+import 'package:yoloit/core/utils/json_utils.dart';
 import 'package:yoloit/core/utils/string_utils.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/yolo_chat_prompt.dart';
@@ -1061,29 +1062,12 @@ class LocalLlmProvider extends ChatProvider {
           if (decoded['error'] != null) 'error': decoded['error'],
         };
         final stdout = decoded['stdout'];
-        final panel = _panelSummaryFromStdout(stdout);
+        final panel = panelSummaryFromStdout(stdout);
         if (panel != null) compact['panel'] = panel;
         if (compact.isNotEmpty) return compactPromptJson(compact, 800);
       }
     } catch (_) {}
     return truncatePromptText(result, 800);
-  }
-
-  Map<String, Object?>? _panelSummaryFromStdout(Object? stdout) {
-    if (stdout is! String || stdout.trim().isEmpty) return null;
-    try {
-      final decoded = jsonDecode(stdout);
-      if (decoded is! Map) return null;
-      final panel = decoded['panel'];
-      if (panel is! Map) return null;
-      return <String, Object?>{
-        if (panel['id'] != null) 'id': panel['id'],
-        if (panel['title'] != null) 'title': panel['title'],
-        if (panel['type'] != null) 'type': panel['type'],
-      };
-    } catch (_) {
-      return null;
-    }
   }
 
   String _extractDelta({required String previous, required String incoming}) {

@@ -13,6 +13,7 @@ import 'package:yoloit/core/platform/microphone_permission_service.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/json_utils.dart';
 import 'package:yoloit/core/utils/string_utils.dart';
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
@@ -1104,7 +1105,7 @@ $messagesJson
           if (decoded['error'] != null) 'error': decoded['error'],
         };
         final stdout = decoded['stdout'];
-        final panelSummary = _panelSummaryFromStdout(stdout);
+        final panelSummary = panelSummaryFromStdout(stdout);
         if (panelSummary != null) compact['panel'] = panelSummary;
         if (compact.isNotEmpty) {
           return compactPromptJson(compact, 800);
@@ -1112,23 +1113,6 @@ $messagesJson
       }
     } catch (_) {}
     return truncatePromptText(rawResult, 800);
-  }
-
-  Map<String, Object?>? _panelSummaryFromStdout(Object? stdout) {
-    if (stdout is! String || stdout.trim().isEmpty) return null;
-    try {
-      final decoded = jsonDecode(stdout);
-      if (decoded is! Map) return null;
-      final panel = decoded['panel'];
-      if (panel is! Map) return null;
-      return <String, Object?>{
-        if (panel['id'] != null) 'id': panel['id'],
-        if (panel['title'] != null) 'title': panel['title'],
-        if (panel['type'] != null) 'type': panel['type'],
-      };
-    } catch (_) {
-      return null;
-    }
   }
 
   int _estimateTokens(String text) {
