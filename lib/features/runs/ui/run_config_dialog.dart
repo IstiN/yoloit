@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/input_decoration_utils.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
@@ -911,29 +912,7 @@ class _Field extends StatelessWidget {
             fontSize: 13,
             fontFamily: fontFamily,
           ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-            filled: true,
-            fillColor: colors.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: colors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: colors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: colors.primary),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 8,
-            ),
-            isDense: true,
-          ),
+          decoration: appInputDecoration(colors: colors, hintText: hint),
         ),
       ],
     );

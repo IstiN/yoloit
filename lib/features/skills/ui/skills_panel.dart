@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/input_decoration_utils.dart';
 import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/bloc/skills_state.dart';
 import 'package:yoloit/features/skills/models/skill_entry.dart';
@@ -713,16 +714,13 @@ class _AddStoreDialogState extends State<_AddStoreDialog> {
         TextField(
           controller: controller,
           style: TextStyle(color: colors.textPrimary, fontSize: 12),
-          decoration: InputDecoration(
+          decoration: appInputDecoration(
+            colors: colors,
             hintText: hint,
-            hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-            filled: true,
+            borderRadius: 6,
             fillColor: colors.surfaceHighlight,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: colors.divider),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            borderColor: colors.divider,
+            isDense: false,
           ),
         ),
       ],
