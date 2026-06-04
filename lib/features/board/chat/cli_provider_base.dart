@@ -19,6 +19,17 @@ typedef ProcessStarter = Future<Process> Function(
   Map<String, String>? environment,
 });
 
+/// Exception thrown by [CliProviderBase.parseLine] when a line represents a
+/// business-logic error (e.g. a 'turn.failed' event from the CLI).
+/// Unlike other throws, [CliParseError] is propagated to the stream as an
+/// error rather than being logged and skipped.
+class CliParseError implements Exception {
+  CliParseError(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
 /// Base class for chat providers that communicate with an external CLI.
 ///
 /// Subclasses only need to implement:
@@ -50,6 +61,11 @@ abstract class CliProviderBase extends ChatProvider {
   /// Whether the provider passes default arguments (model, session, etc.).
   bool get passDefaultArgs => true;
 
+  /// Whether the provider adds `--session <id>` to [baseArgs] for resumed
+  /// conversations. Override to `false` when the subclass handles session
+  /// resumption itself inside [buildArgs].
+  bool get passSessionArgs => true;
+
   @override
   String get providerId => agentId;
 
@@ -71,7 +87,9 @@ abstract class CliProviderBase extends ChatProvider {
   /// Build the CLI argument list.
   ///
   /// [baseArgs] already contains model / session / custom args when
-  /// [passDefaultArgs] is true.  Subclasses may mutate or replace it.
+  /// [passDefaultArgs] is true. [extraCmdArgs] contains any words after the
+  /// executable in the user's configured launch command. Subclasses may
+  /// mutate, replace, or re-order both lists.
   Future<List<String>> buildArgs({
     required String message,
     required ChatSessionConfig config,
@@ -79,7 +97,8 @@ abstract class CliProviderBase extends ChatProvider {
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
     required List<String> baseArgs,
-  }) async => baseArgs;
+    List<String> extraCmdArgs = const [],
+  }) async => [...extraCmdArgs, ...baseArgs];
 
   /// Parse a single non-empty stdout line into chat events.
   ///
@@ -173,7 +192,7 @@ abstract class CliProviderBase extends ChatProvider {
       if (!(configObj?.disableModel ?? false) && config.model.isNotEmpty) {
         baseArgs.addAll(['--model', config.model]);
       }
-      if (!isFirstMessage) {
+      if (passSessionArgs && !isFirstMessage) {
         final sessionId = _sessionIds[config.sessionName];
         if (sessionId != null && sessionId.isNotEmpty) {
           baseArgs.addAll(['--session', sessionId]);
@@ -181,16 +200,6 @@ abstract class CliProviderBase extends ChatProvider {
       }
       baseArgs.addAll(config.customArgs);
     }
-
-    // 2. Let subclass tweak args.
-    final args = await buildArgs(
-      message: message,
-      config: config,
-      isFirstMessage: isFirstMessage,
-      attachments: attachments,
-      runtimeContext: runtimeContext,
-      baseArgs: baseArgs,
-    );
 
     // 3. Resolve executable & working dir.
     var rawCommand = configObj?.launchCommand.trim() ?? '';
@@ -204,9 +213,20 @@ abstract class CliProviderBase extends ChatProvider {
     final extraCmdArgs = cmdParts.length > 1 ? cmdParts.sublist(1) : <String>[];
     final workingDir = _resolveWorkingDir(config.workingDir);
 
+    // 2. Let subclass tweak args (now with extraCmdArgs visible).
+    final args = await buildArgs(
+      message: message,
+      config: config,
+      isFirstMessage: isFirstMessage,
+      attachments: attachments,
+      runtimeContext: runtimeContext,
+      baseArgs: baseArgs,
+      extraCmdArgs: extraCmdArgs,
+    );
+
     debugPrint(
       '$debugPrefix Running: '
-      '$executable ${[...extraCmdArgs, ...args].join(' ')}',
+      '$executable ${args.join(' ')}',
     );
     debugPrint('$debugPrefix cwd: $workingDir');
 
@@ -217,7 +237,7 @@ abstract class CliProviderBase extends ChatProvider {
       final baseEnv = {...Platform.environment, ...extraEnv};
       final process = await _processStarter(
         executable,
-        [...extraCmdArgs, ...args],
+        args,
         workingDirectory: workingDir,
         environment: {
           ...baseEnv,
@@ -333,6 +353,8 @@ abstract class CliProviderBase extends ChatProvider {
       for (final event in parseLine(trimmed, sessionName)) {
         controller.add(event);
       }
+    } on CliParseError catch (error) {
+      if (!controller.isClosed) controller.addError(error);
     } catch (error) {
       debugPrint('$debugPrefix Failed to parse line: $trimmed');
       debugPrint('$debugPrefix Error: $error');

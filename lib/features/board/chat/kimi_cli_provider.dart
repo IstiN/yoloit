@@ -45,11 +45,12 @@ class KimiCliProvider extends CliProviderBase {
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
     required List<String> baseArgs,
+    List<String> extraCmdArgs = const [],
   }) async {
     final configObj = AgentConfigService.instance.configForAgent(agentId);
     final passDefault = configObj?.passDefaultArgs ?? true;
 
-    final args = <String>[...baseArgs];
+    final args = <String>[...extraCmdArgs, ...baseArgs];
 
     if (passDefault) {
       if (config.mode == 'plan') {

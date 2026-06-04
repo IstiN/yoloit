@@ -37,8 +37,9 @@ class _TestProvider extends CliProviderBase {
     required List<String> attachments,
     required ChatRuntimeContext? runtimeContext,
     required List<String> baseArgs,
+    List<String> extraCmdArgs = const [],
   }) async {
-    return [...baseArgs, '-p', message];
+    return [...extraCmdArgs, ...baseArgs, '-p', message];
   }
 
   @override
