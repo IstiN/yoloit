@@ -883,7 +883,18 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _scheduleTerminalDiagnostics('buffer-change');
   }
 
-  bool get _terminalDiagnosticsEnabled => kDebugMode;
+  /// Whether to enable verbose per-cell terminal diagnostics.
+  ///
+  /// Defaults to `false` because dumping every visible cell on every buffer
+  /// change (even with a short debounce) generates thousands of log lines per
+  /// second and freezes the Flutter UI thread in debug builds.
+  static bool enableTerminalDiagnostics = false;
+
+  bool get _terminalDiagnosticsEnabled =>
+      kDebugMode &&
+      (enableTerminalDiagnostics ||
+          widget.debugLabel != null ||
+          widget.debugLogSink != null);
 
   String get _terminalDiagnosticsLabel =>
       widget.debugLabel ?? widget.session.id;
@@ -898,7 +909,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     if (!_terminalDiagnosticsEnabled || !mounted || !widget.isActive) return;
     _pendingTerminalDiagnosticsReason = reason;
     _terminalDiagnosticsDebounce?.cancel();
-    _terminalDiagnosticsDebounce = Timer(const Duration(milliseconds: 120), () {
+    _terminalDiagnosticsDebounce = Timer(const Duration(milliseconds: 2000), () {
       if (!mounted || !widget.isActive) return;
       _dumpTerminalDiagnostics(_pendingTerminalDiagnosticsReason ?? reason);
     });
@@ -937,19 +948,24 @@ class TerminalWidgetState extends State<TerminalWidget> {
       'cursor=${buffer.cursorX},${buffer.cursorY} abs=${buffer.absoluteCursorY} '
       'scrollBack=${buffer.scrollBack} $renderSummary',
     );
-    for (final row in _collectDiagnosticRows(
-      visibleStart: visibleStart,
-      visibleEnd: visibleEnd,
-      cursorRow: buffer.absoluteCursorY,
-      lineCount: lines.length,
-      textAt: (row) => lines[row].getText(),
-    )) {
-      final line = lines[row];
-      _debugTerminalLog(
-        'xterm row=$row wrapped=${line.isWrapped} '
-        'text="${_sanitizeTerminalText(line.getText())}" '
-        'cells=${_dumpXtermCells(line, maxCols: terminal.viewWidth.clamp(0, 80).toInt())}',
-      );
+    // Per-cell row dumps are extremely verbose and can freeze the UI thread
+    // in debug builds when output is continuous. Only emit them when the
+    // explicit verbose flag is set.
+    if (TerminalWidgetState.enableTerminalDiagnostics) {
+      for (final row in _collectDiagnosticRows(
+        visibleStart: visibleStart,
+        visibleEnd: visibleEnd,
+        cursorRow: buffer.absoluteCursorY,
+        lineCount: lines.length,
+        textAt: (row) => lines[row].getText(),
+      )) {
+        final line = lines[row];
+        _debugTerminalLog(
+          'xterm row=$row wrapped=${line.isWrapped} '
+          'text="${_sanitizeTerminalText(line.getText())}" '
+          'cells=${_dumpXtermCells(line, maxCols: terminal.viewWidth.clamp(0, 80).toInt())}',
+        );
+      }
     }
   }
 
@@ -979,19 +995,21 @@ class TerminalWidgetState extends State<TerminalWidget> {
       'cursor=${buffer.cursorX},${buffer.cursorY} abs=${buffer.absoluteCursorY} '
       'scrollBack=${buffer.scrollBack} $renderSummary',
     );
-    for (final row in _collectDiagnosticRows(
-      visibleStart: visibleStart,
-      visibleEnd: visibleEnd,
-      cursorRow: buffer.absoluteCursorY,
-      lineCount: lines.length,
-      textAt: (row) => lines[row].getText(),
-    )) {
-      final line = lines[row];
-      _debugTerminalLog(
-        'kterm row=$row wrapped=${line.isWrapped} '
-        'text="${_sanitizeTerminalText(line.getText())}" '
-        'cells=${_dumpKtermCells(line, maxCols: terminal.viewWidth.clamp(0, 24).toInt())}',
-      );
+    if (TerminalWidgetState.enableTerminalDiagnostics) {
+      for (final row in _collectDiagnosticRows(
+        visibleStart: visibleStart,
+        visibleEnd: visibleEnd,
+        cursorRow: buffer.absoluteCursorY,
+        lineCount: lines.length,
+        textAt: (row) => lines[row].getText(),
+      )) {
+        final line = lines[row];
+        _debugTerminalLog(
+          'kterm row=$row wrapped=${line.isWrapped} '
+          'text="${_sanitizeTerminalText(line.getText())}" '
+          'cells=${_dumpKtermCells(line, maxCols: terminal.viewWidth.clamp(0, 24).toInt())}',
+        );
+      }
     }
   }
 
