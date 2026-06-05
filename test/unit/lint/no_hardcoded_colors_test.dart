@@ -16,7 +16,8 @@ void main() {
   // theme colors, lower its count here.  Remove the entry once it hits 0.
   const baseline = <String, int>{
     'lib/features/board/assistant/yolo_voice_overlay.dart': 87,
-    'lib/features/settings/ui/settings_page.dart': 3,
+    'lib/features/settings/ui/settings_page.dart': 0,
+    'lib/features/settings/ui/sections/prompts_section.dart': 3,
     'lib/features/settings/ui/dialogs/color_picker_dialog.dart': 40,
     'lib/features/settings/ui/debug_ui/sections/plectrum_debug.dart': 12,
     'lib/features/settings/ui/debug_ui/sections/voice_overlay_debug.dart': 19,
@@ -162,6 +163,7 @@ void main() {
       'lib/features/board/ui/miro_panel_toolbar.dart': 1,
       'lib/ui/components/menus/miro_toolbar_primitives.dart': 2,
       'lib/features/settings/ui/settings_page.dart': 6,
+      'lib/features/settings/ui/sections/prompts_section.dart': 2,
       'lib/features/settings/ui/dialogs/color_picker_dialog.dart': 3,
       'lib/features/settings/ui/dialogs/key_capture_dialog.dart': 2,
       'lib/features/settings/ui/debug_ui/sections/component_showcase.dart': 2,

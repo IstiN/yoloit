@@ -3,30 +3,33 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/config/app_config.dart';
 import 'package:yoloit/core/hotkeys/hotkey_definition.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
 import 'package:yoloit/core/services/app_logger.dart';
-import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
-import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
-import 'package:yoloit/features/settings/data/agent_config_service.dart';
-import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
-import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
-import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
 import 'package:yoloit/features/settings/ui/cloud_providers_section.dart';
 import 'package:yoloit/features/settings/ui/debug_ui/debug_ui_shell.dart';
+import 'package:yoloit/features/settings/ui/dialogs/color_picker_dialog.dart';
+import 'package:yoloit/features/settings/ui/dialogs/key_capture_dialog.dart';
+import 'package:yoloit/features/settings/ui/dialogs/log_viewer_dialog.dart';
 import 'package:yoloit/features/settings/ui/global_env_groups_section.dart';
+import 'package:yoloit/features/settings/ui/sections/agent_settings_section.dart';
+import 'package:yoloit/features/settings/ui/sections/chat_context_section.dart';
+import 'package:yoloit/features/settings/ui/sections/ignored_tool_calls_section.dart';
+import 'package:yoloit/features/settings/ui/sections/prompts_section.dart';
+import 'package:yoloit/features/settings/ui/sections/section_header.dart';
+import 'package:yoloit/features/settings/ui/sections/support_section.dart';
+import 'package:yoloit/features/settings/ui/sections/terminal_renderer_settings.dart';
+import 'package:yoloit/features/settings/ui/sections/toggle_row.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/settings/ui/sync_section.dart';
 import 'package:yoloit/features/settings/ui/widget_permissions_section.dart';
@@ -34,14 +37,9 @@ import 'package:yoloit/features/skills/bloc/skills_cubit.dart';
 import 'package:yoloit/features/skills/ui/skills_panel.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
-import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 import 'package:yoloit/features/workspaces/bloc/workspace_cubit.dart';
-import 'package:yoloit/ui/components/typography/caption.dart';
-import 'package:yoloit/features/settings/ui/dialogs/asr_picker_dialog.dart';
-import 'package:yoloit/features/settings/ui/dialogs/color_picker_dialog.dart';
-import 'package:yoloit/features/settings/ui/dialogs/key_capture_dialog.dart';
-import 'package:yoloit/features/settings/ui/dialogs/log_viewer_dialog.dart';
+
 
 const _kCategories = [
   'Appearance',
@@ -242,36 +240,36 @@ class _SettingsPageState extends State<SettingsPage> {
         0 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Appearance'),
+            const SectionHeader(title: 'Appearance'),
             const SizedBox(height: 12),
             _ThemeSelector(),
           ],
         ),
-        1 => Column(
+        1 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Cloud Providers'),
-            const SizedBox(height: 12),
-            const CloudProvidersSection(),
-            const SizedBox(height: 24),
-            const _SectionHeader(title: 'AI Agents'),
-            const SizedBox(height: 12),
-            _AgentSettingsSection(),
-            const SizedBox(height: 20),
-            const _SectionHeader(title: 'Ignored Tool Calls'),
-            const SizedBox(height: 12),
-            const _IgnoredToolCallsSection(),
-            const SizedBox(height: 20),
-            const _SectionHeader(title: 'Chat Context'),
-            const SizedBox(height: 12),
-            const _ChatContextSection(),
+            SectionHeader(title: 'Cloud Providers'),
+            SizedBox(height: 12),
+            CloudProvidersSection(),
+            SizedBox(height: 24),
+            SectionHeader(title: 'AI Agents'),
+            SizedBox(height: 12),
+            AgentSettingsSection(),
+            SizedBox(height: 20),
+            SectionHeader(title: 'Ignored Tool Calls'),
+            SizedBox(height: 12),
+            IgnoredToolCallsSection(),
+            SizedBox(height: 20),
+            SectionHeader(title: 'Chat Context'),
+            SizedBox(height: 12),
+            ChatContextSection(),
           ],
         ),
-        2 => const _PromptsSection(),
+        2 => const PromptsSection(),
         3 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionHeader(title: 'Environment'),
+            SectionHeader(title: 'Environment'),
             SizedBox(height: 12),
             GlobalEnvGroupsSection(),
           ],
@@ -279,7 +277,7 @@ class _SettingsPageState extends State<SettingsPage> {
         4 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionHeader(title: 'Notifications'),
+            SectionHeader(title: 'Notifications'),
             SizedBox(height: 12),
             _NotificationsSection(),
           ],
@@ -287,7 +285,7 @@ class _SettingsPageState extends State<SettingsPage> {
         5 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Sessions'),
+            const SectionHeader(title: 'Sessions'),
             const SizedBox(height: 12),
             _SessionSettings(),
           ],
@@ -295,7 +293,7 @@ class _SettingsPageState extends State<SettingsPage> {
         6 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'Keyboard Shortcuts'),
+            const SectionHeader(title: 'Keyboard Shortcuts'),
             const SizedBox(height: 12),
             _ShortcutsTable(),
           ],
@@ -303,7 +301,7 @@ class _SettingsPageState extends State<SettingsPage> {
         8 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionHeader(title: 'Sync'),
+            SectionHeader(title: 'Sync'),
             SizedBox(height: 12),
             SyncSection(),
           ],
@@ -312,11 +310,11 @@ class _SettingsPageState extends State<SettingsPage> {
         10 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionHeader(title: 'Terminal'),
+            SectionHeader(title: 'Terminal'),
             SizedBox(height: 12),
-            _TerminalRendererSettings(),
+            TerminalRendererSettings(),
             SizedBox(height: 24),
-            _SectionHeader(title: 'Widget API Permissions'),
+            SectionHeader(title: 'Widget API Permissions'),
             SizedBox(height: 12),
             WidgetPermissionsSection(),
           ],
@@ -324,15 +322,15 @@ class _SettingsPageState extends State<SettingsPage> {
         11 => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionHeader(title: 'Support'),
+            SectionHeader(title: 'Support'),
             SizedBox(height: 12),
-            _SupportSection(),
+            SupportSection(),
           ],
         ),
         12 => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeader(title: 'About'),
+            const SectionHeader(title: 'About'),
             const SizedBox(height: 12),
             _AboutSection(),
           ],
@@ -343,1394 +341,13 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
-  final String title;
 
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Text(
-      title,
-      style: TextStyle(
-        color: colors.primary,
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 1,
-      ),
-    );
-  }
-}
 
-class _SupportSection extends StatefulWidget {
-  const _SupportSection();
 
-  @override
-  State<_SupportSection> createState() => _SupportSectionState();
-}
 
-class _SupportSectionState extends State<_SupportSection> {
-  bool _copying = false;
-  String? _logPath;
 
-  @override
-  void initState() {
-    super.initState();
-    AppLogger.instance.logPath.then((path) {
-      if (mounted) setState(() => _logPath = path);
-    });
-  }
 
-  Future<void> _copyLogs() async {
-    setState(() => _copying = true);
-    try {
-      final payload = await SupportLogService.instance.buildCopyPayload();
-      await copyToClipboard(payload);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Support logs copied')));
-    } finally {
-      if (mounted) setState(() => _copying = false);
-    }
-  }
 
-  void _clearRecentEvents() {
-    SupportLogService.instance.clearMemoryLog();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Recent support events cleared')),
-    );
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final recent = SupportLogService.instance.memoryLog;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.support_outlined, size: 18, color: colors.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Diagnostics',
-                      style: TextStyle(
-                        color: colors.textPrimary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  FilledButton.icon(
-                    onPressed: _copying ? null : _copyLogs,
-                    icon:
-                        _copying
-                            ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Icon(Icons.copy, size: 16),
-                    label: Text(_copying ? 'Copying...' : 'Copy logs'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Caption(
-                'Board navigation diagnostics capture trackpad scroll, pan/zoom, canvas locks, and viewport interaction events.',
-                fontSize: 12,
-              ),
-              const SizedBox(height: 8),
-              Caption('App log: ${_logPath ?? 'loading...'}'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Text(
-              'Recent support events',
-              style: TextStyle(
-                color: colors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: _clearRecentEvents,
-              icon: const Icon(Icons.delete_outline, size: 16),
-              label: const Text('Clear recent'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          constraints: const BoxConstraints(minHeight: 180, maxHeight: 320),
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colors.background,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
-          ),
-          child: SingleChildScrollView(
-            child: SelectableText(
-              recent,
-              style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 11,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TerminalRendererSettings extends StatefulWidget {
-  const _TerminalRendererSettings();
-
-  @override
-  State<_TerminalRendererSettings> createState() =>
-      _TerminalRendererSettingsState();
-}
-
-class _TerminalRendererSettingsState extends State<_TerminalRendererSettings> {
-  final _service = AgentConfigService.instance;
-  final _tmux = TmuxService.instance;
-  TerminalBackendMode _backendMode = TerminalBackendMode.local;
-  bool _tmuxOn = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _backendMode = _service.terminalBackendMode;
-    _tmuxOn = _tmux.enabled;
-    _service.load().then((_) {
-      if (mounted) {
-        setState(() {
-          _backendMode = _service.terminalBackendMode;
-        });
-      }
-    });
-  }
-
-  Future<void> _setBackendMode(TerminalBackendMode mode) async {
-    setState(() {
-      _backendMode = mode;
-      _tmuxOn = mode == TerminalBackendMode.tmux;
-    });
-    await _service.setTerminalBackendMode(mode);
-    await _tmux.setEnabled(mode == TerminalBackendMode.tmux);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Terminal renderer',
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Caption('The embedded terminal uses xterm.dart.'),
-          Divider(height: 24, color: colors.border),
-          Row(
-            children: [
-              Icon(Icons.history_toggle_off, size: 18, color: colors.textMuted),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Terminal backend',
-                      style: TextStyle(color: colors.textPrimary, fontSize: 13),
-                    ),
-                    const Caption(
-                      'Runtime is the default persistent backend. Local PTY remains available as a fallback.',
-                    ),
-                  ],
-                ),
-              ),
-              SegmentedButton<TerminalBackendMode>(
-                segments:
-                    TerminalBackendMode.values
-                        .map(
-                          (mode) => ButtonSegment(
-                            value: mode,
-                            label: Text(mode.label),
-                            tooltip: mode.description,
-                            enabled:
-                                mode != TerminalBackendMode.tmux ||
-                                _tmux.available,
-                          ),
-                        )
-                        .toList(),
-                selected: {_backendMode},
-                onSelectionChanged:
-                    (selected) => _setBackendMode(selected.first),
-                style: ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  textStyle: WidgetStateProperty.all(
-                    const TextStyle(fontSize: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (_backendMode == TerminalBackendMode.runtime) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Runtime is dev MVP on macOS/Linux. Existing sessions stay in the backend process.',
-              style: TextStyle(color: colors.statusWarning, fontSize: 11),
-            ),
-          ] else if (_tmuxOn && _tmux.available) ...[
-            const SizedBox(height: 8),
-            Text(
-              'For scroll debugging, turn this off and start a new terminal session.',
-              style: TextStyle(color: colors.statusWarning, fontSize: 11),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Prompts ─────────────────────────────────────────────────────────────────
-
-class _PromptsSection extends StatefulWidget {
-  const _PromptsSection();
-
-  @override
-  State<_PromptsSection> createState() => _PromptsSectionState();
-}
-
-class _PromptsSectionState extends State<_PromptsSection> {
-  late Future<Map<String, String>> _promptsFuture;
-
-  static const _yoloChatAsset = 'assets/prompts/yolo_chat_system_prompt.md';
-  static const _cliGuidanceAsset = 'assets/prompts/cli_agent_guidance.md';
-
-  @override
-  void initState() {
-    super.initState();
-    _promptsFuture = _loadPrompts();
-  }
-
-  Future<Map<String, String>> _loadPrompts() async {
-    final chat = await rootBundle.loadString(_yoloChatAsset);
-    final guidance = await rootBundle.loadString(_cliGuidanceAsset);
-    final help = await CliGuidanceService.instance.fetchHelp();
-    return {
-      'yolochat': chat.trim(),
-      'agents': guidance.trim(),
-      'help': help ?? '(yoloit binary not found or help unavailable)',
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, String>>(
-      future: _promptsFuture,
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final prompts = snap.data!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: 'YoloChat System Prompt'),
-            const SizedBox(height: 4),
-            const Text(
-              'Injected as the system prompt for every YoloChat LLM session.',
-              style: TextStyle(color: Color(0xFF8C8D9E), fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            _PromptCard(
-              label: 'assets/prompts/yolo_chat_system_prompt.md',
-              content: prompts['yolochat']!,
-            ),
-            const SizedBox(height: 28),
-            const _SectionHeader(title: 'CLI Agent Guidance'),
-            const SizedBox(height: 4),
-            const Text(
-              'Prepended to every user message sent to Copilot, Cursor, and OpenCode agents.',
-              style: TextStyle(color: Color(0xFF8C8D9E), fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            _PromptCard(
-              label: 'assets/prompts/cli_agent_guidance.md',
-              content: prompts['agents']!,
-            ),
-            const SizedBox(height: 28),
-            const _SectionHeader(title: 'YoLoIT CLI Help (injected)'),
-            const SizedBox(height: 4),
-            const Text(
-              'Output of `yoloit help --format short` — appended to the first message in every agent session.',
-              style: TextStyle(color: Color(0xFF8C8D9E), fontSize: 12),
-            ),
-            const SizedBox(height: 12),
-            _PromptCard(
-              label: 'yoloit help --format short',
-              content: prompts['help']!,
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _PromptCard extends StatelessWidget {
-  const _PromptCard({required this.label, required this.content});
-
-  final String label;
-  final String content;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.border.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header bar with filename + copy button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Row(
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.40),
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.copy_outlined, size: 15),
-                  tooltip: 'Copy to clipboard',
-                  style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(4),
-                    minimumSize: const Size(28, 28),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () {
-                    copyToClipboard(content);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Copied to clipboard'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: colors.border.withValues(alpha: 0.25),
-          ),
-          // Scrollable content
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 320),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(14),
-              child: SelectableText(
-                content,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.88),
-                  fontSize: 12.5,
-                  fontFamily: 'monospace',
-                  height: 1.55,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AgentSettingsSection extends StatefulWidget {
-  @override
-  State<_AgentSettingsSection> createState() => _AgentSettingsSectionState();
-}
-
-class _AgentSettingsSectionState extends State<_AgentSettingsSection> {
-  final _service = AgentConfigService.instance;
-  final _catalogService = ProviderModelCatalogService.instance;
-  List<AgentConfig>? _configs;
-  bool _loading = true;
-  String? _defaultAgentId;
-  static const _boardChatAgentIds = {'copilot', 'cursor', 'opencode'};
-
-  // Global default ASR state.
-  String _defaultAsrMode = 'local';
-  String? _defaultAsrCloudConfigId;
-  String? _defaultAsrCloudModel;
-  List<CloudLlmConfig> _cloudConfigs = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadConfigs();
-  }
-
-  Future<void> _loadConfigs() async {
-    await _catalogService.load();
-    final configs = await _service.load();
-    final cloudCfgs = await CloudLlmSettingsService.instance.loadConfigs();
-    if (mounted) {
-      setState(() {
-        _configs = configs;
-        _defaultAgentId = _service.defaultAgentId;
-        _defaultAsrMode = _service.defaultAsrMode;
-        _defaultAsrCloudConfigId = _service.defaultAsrCloudConfigId;
-        _defaultAsrCloudModel = _service.defaultAsrCloudModel;
-        _cloudConfigs = cloudCfgs;
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _saveConfigs() async {
-    if (_configs != null) await _service.save(_configs!);
-  }
-
-  void _updateConfig(int index, AgentConfig updated) {
-    setState(() => _configs![index] = updated);
-    _saveConfigs();
-  }
-
-  Future<void> _setDefault(String? id) async {
-    setState(() => _defaultAgentId = id);
-    await _service.setDefaultAgentId(id);
-  }
-
-  Future<void> _saveDefaultAsr({
-    required String mode,
-    String? configId,
-    String? model,
-  }) async {
-    setState(() {
-      _defaultAsrMode = mode;
-      _defaultAsrCloudConfigId = configId;
-      _defaultAsrCloudModel = model;
-    });
-    await _service.saveDefaultAsr(mode: mode, configId: configId, model: model);
-  }
-
-  String _defaultAsrLabel() {
-    if (_defaultAsrMode != 'cloud') return 'Local';
-    final cfg =
-        _cloudConfigs
-            .where((c) => c.id == _defaultAsrCloudConfigId)
-            .firstOrNull;
-    final modelName = _defaultAsrCloudModel ?? '—';
-    final provName = cfg?.name ?? '—';
-    return 'Cloud · $provName · $modelName';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final colors = context.appColors;
-    final configs = _configs!;
-    final visibleEntries = <({int index, AgentConfig config})>[
-      for (var i = 0; i < configs.length; i++)
-        if (configs[i].streamAdapter != null) (index: i, config: configs[i]),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            'Use only board-chat agents below, pick their models, and mark one as favorite (★).',
-            style: TextStyle(color: context.appColors.textMuted, fontSize: 11),
-          ),
-        ),
-        // Global default ASR row
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Row(
-            children: [
-              Text(
-                'Default ASR:',
-                style: TextStyle(
-                  color: context.appColors.textMuted,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  // Reload cloud configs so newly-added providers appear.
-                  final freshConfigs =
-                      await CloudLlmSettingsService.instance.loadConfigs();
-                  if (mounted) setState(() => _cloudConfigs = freshConfigs);
-                  if (!context.mounted) return;
-                  final result = await showDialog<
-                    ({String mode, String? configId, String? model})
-                  >(
-                    context: context,
-                    builder:
-                        (_) => AsrPickerDialog(
-                          showDefaultOption: false,
-                          initialMode: _defaultAsrMode,
-                          initialConfigId: _defaultAsrCloudConfigId,
-                          initialModel: _defaultAsrCloudModel,
-                          cloudConfigs: freshConfigs,
-                        ),
-                  );
-                  if (result != null) {
-                    await _saveDefaultAsr(
-                      mode: result.mode,
-                      configId: result.configId,
-                      model: result.model,
-                    );
-                  }
-                },
-                icon: const Icon(Icons.mic, size: 14),
-                label: Text(
-                  _defaultAsrLabel(),
-                  style: const TextStyle(fontSize: 12),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
-          ),
-          child: Column(
-            children: [
-              for (
-                var visibleIndex = 0;
-                visibleIndex < visibleEntries.length;
-                visibleIndex++
-              ) ...[
-                Builder(
-                  builder: (context) {
-                    final visibleEntry = visibleEntries[visibleIndex];
-                    final index = visibleEntry.index;
-                    final config = visibleEntry.config;
-                    final isDefault = config.id == _defaultAgentId;
-                    return _AgentRow(
-                      config: config,
-                      isDefault: isDefault,
-                      cloudConfigs: _cloudConfigs,
-                      onChanged: (updated) => _updateConfig(index, updated),
-                      onSetDefault:
-                          () => _setDefault(isDefault ? null : config.id),
-                      onDelete:
-                          config.isBuiltIn
-                              ? null
-                              : () {
-                                setState(() {
-                                  _configs!.removeAt(index);
-                                });
-                                _saveConfigs();
-                              },
-                    );
-                  },
-                ),
-                if (visibleIndex != visibleEntries.length - 1)
-                  Divider(height: 1, color: colors.border),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: () {
-            final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
-            final newAgent = AgentConfig(
-              id: id,
-              displayName: 'Custom Agent',
-              iconLabel: 'CA',
-              launchCommand: '',
-              visible: true,
-              isBuiltIn: false,
-              streamAdapter: 'opencode',
-            );
-            setState(() {
-              _configs!.add(newAgent);
-            });
-            _saveConfigs();
-          },
-          icon: const Icon(Icons.add, size: 14),
-          label: const Text('Add Custom Agent', style: TextStyle(fontSize: 12)),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _IgnoredToolCallsSection extends StatefulWidget {
-  const _IgnoredToolCallsSection();
-
-  @override
-  State<_IgnoredToolCallsSection> createState() =>
-      _IgnoredToolCallsSectionState();
-}
-
-class _IgnoredToolCallsSectionState extends State<_IgnoredToolCallsSection> {
-  final _service = ToolCallSettingsService.instance;
-  final _controller = TextEditingController();
-  Set<String> _ignored = const {'report_intent'};
-
-  @override
-  void initState() {
-    super.initState();
-    _service.load().then((_) {
-      if (!mounted) return;
-      setState(() => _ignored = _service.ignoredTools);
-    });
-    _service.ignoredToolsListenable.addListener(_onIgnoredChanged);
-  }
-
-  @override
-  void dispose() {
-    _service.ignoredToolsListenable.removeListener(_onIgnoredChanged);
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onIgnoredChanged() {
-    if (!mounted) return;
-    setState(() => _ignored = _service.ignoredTools);
-  }
-
-  Future<void> _addTool() async {
-    final value = _controller.text.trim().toLowerCase();
-    if (value.isEmpty) return;
-    final next = {..._ignored, value};
-    _controller.clear();
-    await _service.setIgnoredTools(next);
-  }
-
-  Future<void> _removeTool(String toolName) async {
-    final next = {..._ignored}..remove(toolName);
-    await _service.setIgnoredTools(next);
-  }
-
-  Future<void> _resetDefault() async {
-    await _service.setIgnoredTools({'report_intent'});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-        color: colors.surfaceElevated.withAlpha(60),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Tool calls in this list are hidden from chat results and running-status cards.',
-            style: TextStyle(color: context.appColors.textMuted, fontSize: 11),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children:
-                _ignored
-                    .map(
-                      (tool) => Chip(
-                        label: Text(tool, style: const TextStyle(fontSize: 11)),
-                        onDeleted: () => _removeTool(tool),
-                        deleteIcon: const Icon(Icons.close, size: 14),
-                      ),
-                    )
-                    .toList(),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    hintText: 'tool name (e.g. report_intent)',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (_) => _addTool(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(onPressed: _addTool, child: const Text('Add')),
-              TextButton(onPressed: _resetDefault, child: const Text('Reset')),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Chat Context Settings ────────────────────────────────────────────────────
-
-class _ChatContextSection extends StatefulWidget {
-  const _ChatContextSection();
-
-  @override
-  State<_ChatContextSection> createState() => _ChatContextSectionState();
-}
-
-class _ChatContextSectionState extends State<_ChatContextSection> {
-  bool _injectCliHelp = true;
-  bool _boardSnapshot = false;
-
-  @override
-  void initState() {
-    super.initState();
-    SessionPrefs.isInjectCliHelpEnabled().then((v) {
-      if (mounted) setState(() => _injectCliHelp = v);
-    });
-    SessionPrefs.isBoardSnapshotEnabled().then((v) {
-      if (mounted) setState(() => _boardSnapshot = v);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        children: [
-          _ToggleRow(
-            icon: Icons.integration_instructions_outlined,
-            title: 'Inject CLI help on first message',
-            subtitle:
-                'Prepends yoloit command reference to the first Copilot message',
-            value: _injectCliHelp,
-            onChanged: (v) async {
-              await SessionPrefs.saveInjectCliHelpEnabled(v);
-              CliGuidanceService.instance.clearCache();
-              if (mounted) setState(() => _injectCliHelp = v);
-            },
-          ),
-          Divider(height: 1, color: colors.border),
-          _ToggleRow(
-            icon: Icons.screenshot_monitor_outlined,
-            title: 'Attach board snapshot',
-            subtitle:
-                'Sends a compressed screenshot of the current board view with each message',
-            value: _boardSnapshot,
-            onChanged: (v) async {
-              await SessionPrefs.saveBoardSnapshotEnabled(v);
-              if (mounted) setState(() => _boardSnapshot = v);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AgentRow extends StatefulWidget {
-  const _AgentRow({
-    required this.config,
-    required this.isDefault,
-    required this.cloudConfigs,
-    required this.onChanged,
-    required this.onSetDefault,
-    this.onDelete,
-  });
-
-  final AgentConfig config;
-  final bool isDefault;
-  final List<CloudLlmConfig> cloudConfigs;
-  final ValueChanged<AgentConfig> onChanged;
-  final VoidCallback onSetDefault;
-  final VoidCallback? onDelete;
-
-  @override
-  State<_AgentRow> createState() => _AgentRowState();
-}
-
-class _AgentRowState extends State<_AgentRow> {
-  late TextEditingController _nameCtrl;
-  late TextEditingController _iconCtrl;
-  late TextEditingController _cmdCtrl;
-
-  String _effectiveLaunchCommand(AgentConfig cfg) {
-    final cmd = cfg.launchCommand.trim();
-    if (cfg.streamAdapter != null &&
-        (cmd.isEmpty ||
-            cmd == 'opencode' ||
-            cmd == 'cursor-agent' ||
-            cmd == 'copilot' ||
-            cmd == 'copilot --allow-all')) {
-      return AgentConfigService.defaultBoardChatCommand(cfg.streamAdapter!);
-    }
-    return cmd;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _nameCtrl = TextEditingController(text: widget.config.displayName);
-    _iconCtrl = TextEditingController(text: widget.config.iconLabel);
-    _cmdCtrl = TextEditingController(
-      text: _effectiveLaunchCommand(widget.config),
-    );
-  }
-
-  @override
-  void didUpdateWidget(_AgentRow old) {
-    super.didUpdateWidget(old);
-    if (old.config.id != widget.config.id) {
-      _nameCtrl.text = widget.config.displayName;
-      _iconCtrl.text = widget.config.iconLabel;
-      _cmdCtrl.text = _effectiveLaunchCommand(widget.config);
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _iconCtrl.dispose();
-    _cmdCtrl.dispose();
-    super.dispose();
-  }
-
-  void _emit() {
-    widget.onChanged(
-      widget.config.copyWith(
-        displayName: _nameCtrl.text,
-        iconLabel: _iconCtrl.text,
-        launchCommand: _cmdCtrl.text,
-      ),
-    );
-  }
-
-  String _asrLabel() {
-    final mode = widget.config.asrMode;
-    if (mode == 'default') return 'Default';
-    if (mode == 'local') return 'Local';
-    final cfg =
-        widget.cloudConfigs
-            .where((c) => c.id == widget.config.asrCloudConfigId)
-            .firstOrNull;
-    final modelName = widget.config.asrCloudModel ?? '—';
-    final provName = cfg?.name ?? '—';
-    return 'Cloud · $provName · $modelName';
-  }
-
-  Future<void> _pickAsr(BuildContext context) async {
-    // Reload cloud configs so any providers added since page load are visible.
-    final freshConfigs = await CloudLlmSettingsService.instance.loadConfigs();
-    if (!context.mounted) return;
-    final result =
-        await showDialog<({String mode, String? configId, String? model})>(
-          context: context,
-          builder:
-              (_) => AsrPickerDialog(
-                showDefaultOption: true,
-                initialMode: widget.config.asrMode,
-                initialConfigId: widget.config.asrCloudConfigId,
-                initialModel: widget.config.asrCloudModel,
-                cloudConfigs: freshConfigs,
-              ),
-        );
-    if (result != null) {
-      widget.onChanged(
-        widget.config.copyWith(
-          asrMode: result.mode,
-          asrCloudConfigId: result.configId,
-          asrCloudModel: result.model,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    // Providers that have a remote model catalog.
-    final catalogModels = ProviderModelCatalogService.instance
-        .modelsForProvider(widget.config.id);
-    final hasCatalog = catalogModels != null && catalogModels.isNotEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Visibility toggle
-              Switch(
-                value: widget.config.visible,
-                onChanged:
-                    (v) => widget.onChanged(widget.config.copyWith(visible: v)),
-                activeThumbColor: colors.primary,
-              ),
-              const SizedBox(width: 8),
-              // Icon label
-              SizedBox(
-                width: 48,
-                child: TextField(
-                  controller: _iconCtrl,
-                  readOnly: widget.config.isBuiltIn,
-                  onChanged: (_) => _emit(),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 16,
-                    fontFamily: 'monospace',
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 6,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Name
-              SizedBox(
-                width: 100,
-                child: TextField(
-                  controller: _nameCtrl,
-                  readOnly: widget.config.isBuiltIn,
-                  onChanged: (_) => _emit(),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 13,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Name',
-                    hintStyle: TextStyle(
-                      color: context.appColors.textMuted,
-                      fontSize: 13,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Spacer(),
-              // Default star button
-              const SizedBox(width: 4),
-              Tooltip(
-                message:
-                    widget.isDefault
-                        ? 'Favorite agent (click to unset)'
-                        : 'Set as favorite agent',
-                child: GestureDetector(
-                  onTap: widget.onSetDefault,
-                  child: Icon(
-                    widget.isDefault ? Icons.star : Icons.star_border,
-                    size: 18,
-                    color:
-                        widget.isDefault
-                            ? Colors.amber
-                            : context.appColors.textMuted,
-                  ),
-                ),
-              ),
-              if (!widget.config.isBuiltIn && widget.onDelete != null) ...[
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: 'Delete custom agent',
-                  child: GestureDetector(
-                    onTap: widget.onDelete,
-                    child: Icon(
-                      Icons.delete_outline,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 8),
-              Tooltip(
-                message: 'Reset to defaults',
-                child: GestureDetector(
-                  onTap: () {
-                    if (widget.config.isBuiltIn) {
-                      final def = AgentConfigService.instance
-                          .defaultConfigForId(widget.config.id);
-                      if (def != null) {
-                        widget.onChanged(def);
-                        _nameCtrl.text = def.displayName;
-                        _iconCtrl.text = def.iconLabel;
-                        _cmdCtrl.text = _effectiveLaunchCommand(def);
-                      }
-                    } else {
-                      final adapter = widget.config.streamAdapter ?? 'opencode';
-                      final defaultCmd =
-                          AgentConfigService.defaultBoardChatCommand(adapter);
-                      final updated = widget.config.copyWith(
-                        launchCommand: defaultCmd,
-                        passDefaultArgs: true,
-                        disableModel: false,
-                      );
-                      widget.onChanged(updated);
-                      _cmdCtrl.text = defaultCmd;
-                    }
-                  },
-                  child: Icon(
-                    Icons.settings_backup_restore,
-                    size: 18,
-                    color: context.appColors.textMuted,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          // Model picker for catalog-backed providers (copilot, cursor, opencode).
-          if (hasCatalog) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const SizedBox(width: 8),
-                Text(
-                  'Default model:',
-                  style: TextStyle(
-                    color: context.appColors.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value:
-                        catalogModels.any(
-                              (m) => m.id == widget.config.defaultModel,
-                            )
-                            ? widget.config.defaultModel
-                            : null,
-                    hint: Text(
-                      catalogModels
-                          .firstWhere(
-                            (m) => m.isDefault,
-                            orElse: () => catalogModels.first,
-                          )
-                          .displayName,
-                      style: TextStyle(
-                        color: context.appColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    items:
-                        catalogModels
-                            .map(
-                              (m) => DropdownMenuItem<String>(
-                                value: m.id,
-                                child: Text(
-                                  m.displayName,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                    onChanged:
-                        (v) => widget.onChanged(
-                          widget.config.copyWith(defaultModel: v),
-                        ),
-                    dropdownColor: colors.surfaceElevated,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 12,
-                    ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-              ],
-            ),
-          ],
-          // ── Launch Command override ───────────────────────────────────────
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const SizedBox(width: 8),
-              Text(
-                'Launch command:',
-                style: TextStyle(
-                  color: context.appColors.textMuted,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _cmdCtrl,
-                  onChanged: (_) => _emit(),
-                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    hintText: 'e.g. opencode or codemie-opencode',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-            ],
-          ),
-          // ── Pass default flags override ───────────────────────────────────
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const SizedBox(width: 8),
-              Text(
-                'Pass default flags:',
-                style: TextStyle(
-                  color: context.appColors.textMuted,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Switch(
-                value: widget.config.passDefaultArgs,
-                onChanged: (v) {
-                  widget.onChanged(widget.config.copyWith(passDefaultArgs: v));
-                },
-                activeThumbColor: colors.primary,
-              ),
-              const Spacer(),
-            ],
-          ),
-          // ── Disable model selection ──────────────────────────────────────
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const SizedBox(width: 8),
-              Text(
-                'Disable model selection:',
-                style: TextStyle(
-                  color: context.appColors.textMuted,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Switch(
-                value: widget.config.disableModel,
-                onChanged: (v) {
-                  widget.onChanged(widget.config.copyWith(disableModel: v));
-                },
-                activeThumbColor: colors.primary,
-              ),
-              const Spacer(),
-            ],
-          ),
-          // ── Stream Adapter ───────────────────────────────────────────────
-          if (!widget.config.isBuiltIn) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const SizedBox(width: 8),
-                Text(
-                  'Stream Adapter:',
-                  style: TextStyle(
-                    color: context.appColors.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: widget.config.streamAdapter,
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'opencode',
-                        child: Text('OpenCode', style: TextStyle(fontSize: 12)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'cursor',
-                        child: Text('Cursor', style: TextStyle(fontSize: 12)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'copilot',
-                        child: Text('Copilot', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        widget.onChanged(
-                          widget.config.copyWith(streamAdapter: v),
-                        );
-                      }
-                    },
-                    dropdownColor: colors.surfaceElevated,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 12,
-                    ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-              ],
-            ),
-          ],
-          // ── ASR (transcription) picker ────────────────────────────────────
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const SizedBox(width: 8),
-              Text(
-                'ASR:',
-                style: TextStyle(
-                  color: context.appColors.textMuted,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () => _pickAsr(context),
-                icon: const Icon(Icons.mic, size: 13),
-                label: Text(_asrLabel(), style: const TextStyle(fontSize: 11)),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Theme Selector ───────────────────────────────────────────────────────
 
@@ -3042,7 +1659,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Tmux toggle
-          _ToggleRow(
+          ToggleRow(
             icon: Icons.terminal,
             title: 'Keep sessions alive after closing app',
             subtitle:
@@ -3058,7 +1675,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
           ),
           Divider(height: 1, color: colors.border),
           // Terminal logging toggle
-          _ToggleRow(
+          ToggleRow(
             icon: Icons.description_outlined,
             title: 'Log terminal output to files',
             subtitle: 'Saved to ~/.yoloit/logs/',
@@ -3107,7 +1724,7 @@ class _SessionSettingsState extends State<_SessionSettings> {
           ],
           // App diagnostics logging
           Divider(height: 1, color: colors.border),
-          _ToggleRow(
+          ToggleRow(
             icon: Icons.bug_report_outlined,
             title: 'Log app diagnostics to file',
             subtitle:
@@ -3327,67 +1944,6 @@ class _SessionSettingsState extends State<_SessionSettings> {
             ),
             child: LogViewerDialog(log: log),
           ),
-    );
-  }
-}
-
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-    this.enabled = true,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool value;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: context.appColors.textMuted),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color:
-                        enabled
-                            ? Theme.of(context).colorScheme.onSurface
-                            : context.appColors.textMuted,
-                    fontSize: 13,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: context.appColors.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value && enabled,
-            onChanged: enabled ? onChanged : null,
-            activeThumbColor: colors.primary,
-          ),
-        ],
-      ),
     );
   }
 }
