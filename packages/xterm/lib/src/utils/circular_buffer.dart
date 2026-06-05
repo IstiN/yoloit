@@ -237,25 +237,28 @@ class IndexAwareCircularBuffer<T extends IndexedItem> {
 
   /// Replaces all elements in the list with [replacement].
   void replaceWith(List<T> replacement) {
+    // Detach all existing elements.
     for (var i = 0; i < _length; i++) {
       _dropChild(i);
     }
 
-    var copyStart = 0;
-    if (replacement.length > maxLength) {
-      copyStart = replacement.length - maxLength;
-    }
-
-    for (var i = 0; i < copyStart; i++) {
-      _dropChild(i);
-    }
-
+    // Determine which portion of replacement to keep (last maxLength items).
+    final copyStart =
+        replacement.length > maxLength ? replacement.length - maxLength : 0;
     final copyLength = replacement.length - copyStart;
+
+    // IMPORTANT: reset _startIndex to 0 BEFORE calling _adoptChild so that
+    // adopted elements land at positions 0..copyLength-1 in the backing array.
+    // If we left _startIndex at its old value (non-zero after scrollback grows),
+    // elements would be placed at the wrong cyclic positions and subsequent
+    // reads (especially lines[absoluteCursorY]) would return null → crash.
+    _startIndex = 0;
+    _length = 0;
+
     for (var i = 0; i < copyLength; i++) {
       _adoptChild(i, replacement[copyStart + i]);
     }
 
-    _startIndex = 0;
     _length = copyLength;
   }
 
