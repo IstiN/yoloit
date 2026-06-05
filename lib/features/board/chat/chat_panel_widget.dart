@@ -105,7 +105,7 @@ class ChatPanelWidget extends StatefulWidget {
   onCreateLinkedPanel;
 
   /// Global registry of processing notifiers keyed by panel ID.
-  /// Used by [_BoardPanelCard] to animate the border glow.
+  /// Used by [BoardPanelCard] to animate the border glow.
   static final Map<String, ValueNotifier<bool>> processingNotifiers = {};
 
   /// Fires whenever any panel's processing state changes. Used by minimap.

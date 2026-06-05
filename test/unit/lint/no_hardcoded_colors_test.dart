@@ -156,7 +156,8 @@ void main() {
     const colorsBaseline = <String, int>{
       'lib/features/board/ui/board_history_panel.dart': 2,
       'lib/features/board/ui/board_tools_panel.dart': 4,
-      'lib/features/board/ui/board_view.dart': 1,
+      'lib/features/board/ui/board_panel_card.dart': 1,
+      'lib/features/board/ui/board_view.dart': 0,
       'lib/features/board/ui/miro_panel_toolbar.dart': 1,
       'lib/ui/components/menus/miro_toolbar_primitives.dart': 2,
       'lib/features/settings/ui/settings_page.dart': 11,

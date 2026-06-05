@@ -59,6 +59,13 @@ import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
 import 'package:yoloit/features/settings/ui/env_group_picker.dart';
+import 'package:yoloit/features/board/ui/board_constants.dart';
+import 'package:yoloit/features/board/ui/board_math.dart';
+import 'package:yoloit/features/board/ui/board_minimap.dart';
+import 'package:yoloit/features/board/ui/board_panel_card.dart';
+import 'package:yoloit/features/board/ui/board_toolbar.dart';
+import 'package:yoloit/features/board/ui/infinite_grid_painter.dart';
+import 'package:yoloit/features/board/ui/webview_overlays.dart';
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
@@ -82,19 +89,6 @@ bool boardShouldRevertInteractionForCanvasLock({
 }
 
 class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
-  static const Size _initialCanvasSize = Size(40000, 30000);
-  static const double _canvasExpansionMargin = 6000;
-  static const double _canvasExpansionChunk = 20000;
-  static const double _edgePanZone = 120;
-  static const double _edgePanMaxStep = 18;
-
-  /// Extract the 2D uniform scale from a Matrix4.
-  /// `getMaxScaleOnAxis()` returns max(scaleX, scaleY, 1.0) — wrong when
-  /// zoomed out (scale < 1) because the Z column is always 1.
-  static double _scaleOf(Matrix4 m) {
-    final s = m.storage;
-    return math.sqrt(s[0] * s[0] + s[1] * s[1]);
-  }
 
   static bool _isPointerOverScrollableCard(Offset position, int viewId) {
     final result = HitTestResult();
@@ -111,7 +105,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   final GlobalKey _viewportKey = GlobalKey();
   final GlobalKey _screenshotBoundaryKey = GlobalKey();
   Size? _viewportSize;
-  Size _canvasSize = _initialCanvasSize;
+  Size _canvasSize = initialCanvasSize;
   Offset _canvasOrigin = const Offset(20000, 15000);
   bool _canvasExpansionScheduled = false;
   bool _isPanelDragging = false;
@@ -249,7 +243,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _BoardToolbar(
+                BoardToolbar(
                   board: activeBoard,
                   onCreateBoard: () => _createBoard(context),
                   onConnectRemote: () => _connectRemoteYoloit(context),
@@ -287,7 +281,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   Positioned.fill(
                                     child: IgnorePointer(
                                       child: CustomPaint(
-                                        painter: _InfiniteBoardGridPainter(
+                                        painter: InfiniteBoardGridPainter(
                                           transformCtrl: _transformController,
                                           origin: _canvasOrigin,
                                           minorColor: colors.divider.withAlpha(
@@ -331,7 +325,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                   event.viewId,
                                                 );
                                             final scale =
-                                                _BoardViewState._scaleOf(
+                                                matrixScaleOf(
                                                   _transformController.value,
                                                 );
                                             _boardSupportLog(
@@ -340,9 +334,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               'overScrollable=$overScrollable '
                                               'tool=${_activeTool.name} '
                                               'kind=${event.kind.name} '
-                                              'delta=${_fmtOffset(event.scrollDelta)} '
-                                              'pos=${_fmtOffset(event.position)} '
-                                              'scale=${_fmt(scale)}',
+                                              'delta=${fmtOffset(event.scrollDelta)} '
+                                              'pos=${fmtOffset(event.position)} '
+                                              'scale=${fmtDouble(scale)}',
                                             );
                                             if (!isLocked && !overScrollable) {
                                               CanvasInteractionLock.instance
@@ -354,7 +348,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
                                               'tool=${_activeTool.name} '
                                               'type=${event.runtimeType} '
-                                              'pos=${_fmtOffset(event.position)}',
+                                              'pos=${fmtOffset(event.position)}',
                                             );
                                           }
                                           if (isLocked) {
@@ -378,19 +372,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
                                             'overScrollable=$overScrollable '
                                             'tool=${_activeTool.name} '
-                                            'pos=${_fmtOffset(event.position)} '
-                                            'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                            'pos=${fmtOffset(event.position)} '
+                                            'scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                           );
                                         },
                                         onPointerPanZoomUpdate: (event) {
                                           _boardSupportLog(
                                             'panZoom.update locked=$isLocked '
                                             'tool=${_activeTool.name} '
-                                            'pan=${_fmtOffset(event.pan)} '
-                                            'panDelta=${_fmtOffset(event.panDelta)} '
-                                            'scale=${_fmt(event.scale)} '
+                                            'pan=${fmtOffset(event.pan)} '
+                                            'panDelta=${fmtOffset(event.panDelta)} '
+                                            'scale=${fmtDouble(event.scale)} '
                                             'rotation=${event.rotation.toStringAsFixed(3)} '
-                                            'viewScale=${_fmt(_scaleOf(_transformController.value))}',
+                                            'viewScale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                           );
                                         },
                                         onPointerPanZoomEnd: (event) {
@@ -404,7 +398,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             'panZoom.end locked=$isLocked '
                                             'canvasGesture=${CanvasInteractionLock.instance.isCanvasGestureActive} '
                                             'tool=${_activeTool.name} '
-                                            'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                            'scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                           );
                                         },
                                         child: InteractiveViewer(
@@ -416,7 +410,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           maxScale: 2.5,
                                           scaleEnabled: true,
                                           boundaryMargin: const EdgeInsets.all(
-                                            _canvasExpansionChunk,
+                                            canvasExpansionChunk,
                                           ),
                                           // Disable pan only while actively drawing (drawPointer held) or canvas is locked
                                           panEnabled:
@@ -427,19 +421,19 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               _transformController,
                                           onInteractionStart: (details) {
                                             final startScale =
-                                                _BoardViewState._scaleOf(
+                                                matrixScaleOf(
                                                   _transformController.value,
                                                 );
                                             _boardSupportLog(
                                               'interaction.start locked=$isLocked '
                                               'tool=${_activeTool.name} '
                                               'pointerCount=${details.pointerCount} '
-                                              'focal=${_fmtOffset(details.focalPoint)} '
-                                              'local=${_fmtOffset(details.localFocalPoint)} '
-                                              'scale=${_fmt(startScale)}',
+                                              'focal=${fmtOffset(details.focalPoint)} '
+                                              'local=${fmtOffset(details.localFocalPoint)} '
+                                              'scale=${fmtDouble(startScale)}',
                                             );
                                             _interactionStartScale =
-                                                _BoardViewState._scaleOf(
+                                                matrixScaleOf(
                                                   _transformController.value,
                                                 );
                                             _interactionStartMatrix =
@@ -458,7 +452,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           },
                                           onInteractionUpdate: (details) {
                                             final currentScale =
-                                                _BoardViewState._scaleOf(
+                                                matrixScaleOf(
                                                   _transformController.value,
                                                 );
                                             if (boardShouldRevertInteractionForCanvasLock(
@@ -480,7 +474,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 'interaction.update.reverted '
                                                 'reason=canvasLock '
                                                 'pointerCount=${details.pointerCount} '
-                                                'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                                'scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                               );
                                               _transformController.value =
                                                   _interactionStartMatrix!;
@@ -490,9 +484,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               'interaction.update locked=$isLocked '
                                               'tool=${_activeTool.name} '
                                               'pointerCount=${details.pointerCount} '
-                                              'scaleDelta=${_fmt(details.scale)} '
-                                              'currentScale=${_fmt(currentScale)} '
-                                              'focalDelta=${_fmtOffset(details.focalPointDelta)}',
+                                              'scaleDelta=${fmtDouble(details.scale)} '
+                                              'currentScale=${fmtDouble(currentScale)} '
+                                              'focalDelta=${fmtOffset(details.focalPointDelta)}',
                                             );
                                             // Detect zoom by comparing current scale to
                                             // the scale at interaction start.
@@ -512,8 +506,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             _boardSupportLog(
                                               'interaction.end locked=$isLocked '
                                               'tool=${_activeTool.name} '
-                                              'velocity=${_fmtOffset(details.velocity.pixelsPerSecond)} '
-                                              'scale=${_fmt(_scaleOf(_transformController.value))}',
+                                              'velocity=${fmtOffset(details.velocity.pixelsPerSecond)} '
+                                              'scale=${fmtDouble(matrixScaleOf(_transformController.value))}',
                                             );
                                             _interactionStartMatrix = null;
                                             _interactionStartedLocked = false;
@@ -616,7 +610,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     final boardCubit =
                                                         context
                                                             .read<BoardCubit>();
-                                                    return _BoardPanelCard(
+                                                    return BoardPanelCard(
                                                       key: ValueKey(panel.id),
                                                       panel: panel,
                                                       positionOffset:
@@ -1010,7 +1004,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   // outside the transform, positioned at each
                                   // panel's computed screen rect.
                                   Positioned.fill(
-                                    child: _WebViewOverlays(
+                                    child: WebViewOverlays(
                                       panels: activeBoard.panels,
                                       focusedPanelId: focusedPanelId,
                                       transformController: _transformController,
@@ -1210,7 +1204,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     context,
                                                     _,
                                                     __,
-                                                  ) => _BoardMiniMap(
+                                                  ) => BoardMiniMap(
                                                     panels: activeBoard.panels,
                                                     processingPanelIds:
                                                         ChatPanelWidget
@@ -1535,8 +1529,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       _suppressFocusVisibility = true;
     }
     _boardOverviewLog(
-      'syncViewport board=${board.id} scale=${_fmt(vp.scale)} '
-      'translation=${_fmtOffset(vp.translation)} '
+      'syncViewport board=${board.id} scale=${fmtDouble(vp.scale)} '
+      'translation=${fmtOffset(vp.translation)} '
       'isDefault=${_isDefaultViewport(vp)} '
       '${externalChange ? "(external)" : "(board switch)"}',
     );
@@ -1559,14 +1553,14 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   Future<void> _persistViewport(BuildContext context, BoardDocument board) {
     final matrix = _transformController.value.storage;
-    final scale = _scaleOf(_transformController.value);
+    final scale = matrixScaleOf(_transformController.value);
     final translation = Offset(
       matrix[12] + (_canvasOrigin.dx * scale),
       matrix[13] + (_canvasOrigin.dy * scale),
     );
     _boardOverviewLog(
-      'persistViewport board=${board.id} scale=${_fmt(scale)} '
-      'translation=${_fmtOffset(translation)}',
+      'persistViewport board=${board.id} scale=${fmtDouble(scale)} '
+      'translation=${fmtOffset(translation)}',
     );
     final newVp = board.viewport.copyWith(
       scale: scale,
@@ -1803,8 +1797,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     if (result) {
       _boardOverviewLog(
         'shouldAutoFit=true board=${board.id} '
-        'vpScale=${_fmt(board.viewport.scale)} '
-        'vpTx=${_fmtOffset(board.viewport.translation)}',
+        'vpScale=${fmtDouble(board.viewport.scale)} '
+        'vpTx=${fmtOffset(board.viewport.translation)}',
       );
     }
     return result;
@@ -1925,8 +1919,8 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     final tx = centerX - screen.width / (2 * scale);
     final ty = centerY - screen.height / (2 * scale);
     _boardDebugLog(
-      'fitBoardPanels scale=${_fmt(scale)} topLeft=${_fmtOffset(Offset(tx, ty))} '
-      'screen=${_fmtSize(screen)} panels=${visiblePanels.length} persist=$persist',
+      'fitBoardPanels scale=${fmtDouble(scale)} topLeft=${fmtOffset(Offset(tx, ty))} '
+      'screen=${fmtSize(screen)} panels=${visiblePanels.length} persist=$persist',
     );
     _animateToMatrix(
       _matrixForBoardTopLeft(scale: scale, topLeft: Offset(tx, ty)),
@@ -1942,12 +1936,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }) {
     final screen = _viewportSize ?? MediaQuery.sizeOf(context);
     if (screen.isEmpty) return;
-    final scale = _scaleOf(_transformController.value);
+    final scale = matrixScaleOf(_transformController.value);
     final tx = canvasCenter.dx - screen.width / (2 * scale);
     final ty = canvasCenter.dy - screen.height / (2 * scale);
     _boardDebugLog(
-      'centerViewportOn center=${_fmtOffset(canvasCenter)} scale=${_fmt(scale)} '
-      'topLeft=${_fmtOffset(Offset(tx, ty))} persist=$persist',
+      'centerViewportOn center=${fmtOffset(canvasCenter)} scale=${fmtDouble(scale)} '
+      'topLeft=${fmtOffset(Offset(tx, ty))} persist=$persist',
     );
     _animateToMatrix(
       _matrixForBoardTopLeft(scale: scale, topLeft: Offset(tx, ty)),
@@ -1978,7 +1972,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
     _boardDebugLog(
       'zoomToPanel panelRect=${panelRect.shortestSide.toStringAsFixed(0)} '
-      'scale=${_fmt(targetScale)} center=${_fmtOffset(panelRect.center)} persist=true',
+      'scale=${fmtDouble(targetScale)} center=${fmtOffset(panelRect.center)} persist=true',
     );
     _animateToMatrix(
       _matrixForBoardTopLeft(scale: targetScale, topLeft: Offset(tx, ty)),
@@ -2014,7 +2008,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   void _resizePanelWithEdgePan(
     BuildContext context,
     BoardPanelInstance panel,
-    _BoardPanelResizeUpdate update,
+    BoardPanelResizeUpdate update,
   ) {
     _panViewportNearEdge(update.globalPosition);
     final delta = _consumePanelDragDelta(update.globalPosition, update.delta);
@@ -2027,7 +2021,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   BoardPanelBounds _resizeBoundsForHandle(
     BoardPanelInstance panel,
-    _BoardPanelResizeHandle handle,
+    BoardPanelResizeHandle handle,
     Offset delta,
   ) {
     const minWidth = 220.0;
@@ -2154,7 +2148,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _lastPanelDragBoardPointer = current;
     final delta = current - previous;
     _boardDebugLog(
-      'panelDrag.delta pointer=${_fmtOffset(current)} delta=${_fmtOffset(delta)} fallback=${_fmtOffset(fallbackDelta)}',
+      'panelDrag.delta pointer=${fmtOffset(current)} delta=${fmtOffset(delta)} fallback=${fmtOffset(fallbackDelta)}',
     );
     return delta;
   }
@@ -2183,7 +2177,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     );
     if (screenDelta == Offset.zero) return;
 
-    final scale = _scaleOf(_transformController.value);
+    final scale = matrixScaleOf(_transformController.value);
     if (scale == 0) return;
 
     final matrix = _transformController.value.clone();
@@ -2193,23 +2187,23 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     _transformController.value = matrix;
 
     _boardDebugLog(
-      'edgePan local=${_fmtOffset(local)} screenDelta=${_fmtOffset(screenDelta)} '
-      'boardDelta=${_fmtOffset(screenDelta / scale)} scale=${_fmt(scale)}',
+      'edgePan local=${fmtOffset(local)} screenDelta=${fmtOffset(screenDelta)} '
+      'boardDelta=${fmtOffset(screenDelta / scale)} scale=${fmtDouble(scale)}',
     );
   }
 
   double _edgePanStep(double position, double extent) {
     if (extent <= 0) return 0;
-    if (position < _edgePanZone) {
-      final t = ((_edgePanZone - position) / _edgePanZone).clamp(0.0, 1.0);
-      return -_edgePanMaxStep * Curves.easeOut.transform(t);
+    if (position < edgePanZone) {
+      final t = ((edgePanZone - position) / edgePanZone).clamp(0.0, 1.0);
+      return -edgePanMaxStep * Curves.easeOut.transform(t);
     }
-    if (extent - position < _edgePanZone) {
-      final t = ((_edgePanZone - (extent - position)) / _edgePanZone).clamp(
+    if (extent - position < edgePanZone) {
+      final t = ((edgePanZone - (extent - position)) / edgePanZone).clamp(
         0.0,
         1.0,
       );
-      return _edgePanMaxStep * Curves.easeOut.transform(t);
+      return edgePanMaxStep * Curves.easeOut.transform(t);
     }
     return 0;
   }
@@ -2242,32 +2236,32 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     var addRight = 0.0;
     var addBottom = 0.0;
 
-    if (visible.left < _canvasExpansionMargin) {
-      addLeft = _canvasExpansionChunk;
+    if (visible.left < canvasExpansionMargin) {
+      addLeft = canvasExpansionChunk;
     }
-    if (visible.top < _canvasExpansionMargin) {
-      addTop = _canvasExpansionChunk;
+    if (visible.top < canvasExpansionMargin) {
+      addTop = canvasExpansionChunk;
     }
-    if (_canvasSize.width - visible.right < _canvasExpansionMargin) {
-      addRight = _canvasExpansionChunk;
+    if (_canvasSize.width - visible.right < canvasExpansionMargin) {
+      addRight = canvasExpansionChunk;
     }
-    if (_canvasSize.height - visible.bottom < _canvasExpansionMargin) {
-      addBottom = _canvasExpansionChunk;
+    if (_canvasSize.height - visible.bottom < canvasExpansionMargin) {
+      addBottom = canvasExpansionChunk;
     }
 
     if (addLeft == 0 && addTop == 0 && addRight == 0 && addBottom == 0) {
       return;
     }
 
-    final scale = _scaleOf(_transformController.value);
+    final scale = matrixScaleOf(_transformController.value);
     final matrix = _transformController.value.clone();
     final storage = matrix.storage;
     storage[12] -= addLeft * scale;
     storage[13] -= addTop * scale;
 
     _boardDebugLog(
-      'canvas.expand visible=${_fmtRect(visible)} add=(${_fmt(addLeft)}, ${_fmt(addTop)}, ${_fmt(addRight)}, ${_fmt(addBottom)}) '
-      'oldSize=${_fmtSize(_canvasSize)} oldOrigin=${_fmtOffset(_canvasOrigin)} scale=${_fmt(scale)}',
+      'canvas.expand visible=${fmtRect(visible)} add=(${fmtDouble(addLeft)}, ${fmtDouble(addTop)}, ${fmtDouble(addRight)}, ${fmtDouble(addBottom)}) '
+      'oldSize=${fmtSize(_canvasSize)} oldOrigin=${fmtOffset(_canvasOrigin)} scale=${fmtDouble(scale)}',
     );
     setState(() {
       _canvasSize = Size(
@@ -2278,7 +2272,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       _transformController.value = matrix;
     });
     _boardDebugLog(
-      'canvas.expanded newSize=${_fmtSize(_canvasSize)} newOrigin=${_fmtOffset(_canvasOrigin)}',
+      'canvas.expanded newSize=${fmtSize(_canvasSize)} newOrigin=${fmtOffset(_canvasOrigin)}',
     );
   }
 
@@ -2289,7 +2283,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }) {
     _boardDebugLog(
       'animateToMatrix board=${board.id} persist=$persist '
-      'from=${_fmtMatrix(_transformController.value)} to=${_fmtMatrix(target)}',
+      'from=${fmtMatrix(_transformController.value)} to=${fmtMatrix(target)}',
     );
     _stopPanAnimation();
     final animation = Matrix4Tween(
@@ -2401,21 +2395,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     debugPrint('[BoardWebFocus] $message');
   }
 
-  String _fmt(double value) => value.toStringAsFixed(2);
-
-  String _fmtOffset(Offset offset) =>
-      '(${_fmt(offset.dx)}, ${_fmt(offset.dy)})';
-
-  String _fmtSize(Size size) => '${_fmt(size.width)}x${_fmt(size.height)}';
-
-  String _fmtRect(Rect rect) =>
-      'l=${_fmt(rect.left)} t=${_fmt(rect.top)} r=${_fmt(rect.right)} b=${_fmt(rect.bottom)}';
-
-  String _fmtMatrix(Matrix4 matrix) {
-    final storage = matrix.storage;
-    return 'scale=${_fmt(_scaleOf(matrix))} t=${_fmtOffset(Offset(storage[12], storage[13]))}';
-  }
-
   // ── Tool actions ──────────────────────────────────────────────────────────
 
   /// Builds small ×-badge widgets at the midpoint of each link so the user
@@ -2443,7 +2422,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       );
       final start = BoardLinksPainter.edgePointToward(fromRect, toRect.center);
       final end = BoardLinksPainter.edgePointToward(toRect, fromRect.center);
-      final mid = _linkMidpoint(start, end, link.geometry);
+      final mid = linkMidpoint(start, end, link.geometry);
 
       // Large transparent hit area so mouse-over the line is easy to trigger
       const hitR = 24.0;
@@ -2501,39 +2480,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       );
     }
     return badges;
-  }
-
-  /// Returns the midpoint of the link curve between [start] and [end].
-  static Offset _linkMidpoint(
-    Offset start,
-    Offset end,
-    BoardLinkGeometry geometry,
-  ) {
-    switch (geometry) {
-      case BoardLinkGeometry.straight:
-        return Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2);
-      case BoardLinkGeometry.elbow:
-        // Mid of the elbow corner
-        return Offset(end.dx, start.dy);
-      case BoardLinkGeometry.bezier:
-        // Sample cubic bezier at t=0.5
-        final cx1 = start.dx + (end.dx - start.dx) * 0.35;
-        final cy1 = start.dy;
-        final cx2 = end.dx - (end.dx - start.dx) * 0.35;
-        final cy2 = end.dy;
-        const t = 0.5;
-        const mt = 1 - t;
-        return Offset(
-          mt * mt * mt * start.dx +
-              3 * mt * mt * t * cx1 +
-              3 * mt * t * t * cx2 +
-              t * t * t * end.dx,
-          mt * mt * mt * start.dy +
-              3 * mt * mt * t * cy1 +
-              3 * mt * t * t * cy2 +
-              t * t * t * end.dy,
-        );
-    }
   }
 
   void _finishDrawStroke(BuildContext context) {
@@ -3188,1723 +3134,3 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   }
 }
 
-
-
-class _BoardToolbar extends StatelessWidget {
-  const _BoardToolbar({
-    required this.board,
-    required this.onCreateBoard,
-    required this.onConnectRemote,
-    required this.onShareBoard,
-    required this.onBoardSettings,
-    required this.onDeleteBoard,
-    required this.onOpenBoardOverview,
-    required this.onSearch,
-  });
-
-  final BoardDocument board;
-  final VoidCallback onCreateBoard;
-  final VoidCallback onConnectRemote;
-  final VoidCallback onShareBoard;
-  final VoidCallback onBoardSettings;
-  final VoidCallback onDeleteBoard;
-  final VoidCallback onOpenBoardOverview;
-  final VoidCallback onSearch;
-
-  @override
-  Widget build(BuildContext context) {
-    final remoteBoard = isRemoteBoard(board);
-    final deleteTooltip =
-        remoteBoard ? 'Disconnect remote board' : 'Delete board';
-    final deleteLabel = remoteBoard ? 'Disconnect' : 'Delete';
-    final deleteIcon =
-        remoteBoard ? Icons.link_off_rounded : Icons.delete_outline;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 900;
-        final phone = constraints.maxWidth < 560;
-        final horizontalPadding = phone ? 8.0 : 16.0;
-        final gap = phone ? 6.0 : 12.0;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            horizontalPadding,
-            phone ? 8 : 12,
-            horizontalPadding,
-            phone ? 8 : 12,
-          ),
-          child: Row(
-            children: [
-              if (compact)
-                Flexible(
-                  child: _BoardSwitcherButton(
-                    board: board,
-                    onOpenBoardOverview: onOpenBoardOverview,
-                    compact: phone,
-                  ),
-                )
-              else
-                _BoardSwitcherButton(
-                  board: board,
-                  onOpenBoardOverview: onOpenBoardOverview,
-                ),
-              if (!compact && board.defaultFolder.isNotEmpty) ...[
-                const SizedBox(width: 12),
-                ToolbarChip(
-                  icon: Icons.folder_outlined,
-                  label: _shortToolbarPath(board.defaultFolder),
-                ),
-              ],
-              SizedBox(width: gap),
-              if (!compact)
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: onSearch,
-                        child: Container(
-                          height: 36,
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: context.appColors.border),
-                            color: context.appColors.surface,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.search,
-                                size: 18,
-                                color: context.appColors.textMuted,
-                              ),
-                              const SizedBox(width: 10),
-                              Flexible(
-                                child: Text(
-                                  'Search boards and panels…',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: context.appColors.textMuted,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                Platform.isMacOS ? '⌘O' : 'Ctrl+O',
-                                style: TextStyle(
-                                  color: context.appColors.textMuted.withAlpha(
-                                    120,
-                                  ),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-              else if (!phone)
-                Tooltip(
-                  message: 'Search boards and panels',
-                  child: IconButton(
-                    onPressed: onSearch,
-                    icon: const Icon(Icons.search),
-                  ),
-                ),
-              if (compact) const Spacer() else const SizedBox(width: 16),
-              if (phone)
-                PopupMenuButton<String>(
-                  tooltip: 'Board actions',
-                  icon: const Icon(Icons.more_horiz),
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'search':
-                        onSearch();
-                      case 'new':
-                        onCreateBoard();
-                      case 'remote':
-                        onConnectRemote();
-                      case 'share':
-                        onShareBoard();
-                      case 'settings':
-                        onBoardSettings();
-                      case 'delete':
-                        onDeleteBoard();
-                    }
-                  },
-                  itemBuilder:
-                      (context) => [
-                        const PopupMenuItem(
-                          value: 'search',
-                          child: Text('Search boards and panels'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'new',
-                          child: Text('New board'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'remote',
-                          child: Text('Connect remote YoLoIT'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'share',
-                          child: Text('Share board'),
-                        ),
-                        const PopupMenuItem(
-                          value: 'settings',
-                          child: Text('Settings'),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Text(deleteLabel),
-                        ),
-                      ],
-                )
-              else if (compact) ...[
-                IconButton(
-                  tooltip: 'New board',
-                  onPressed: onCreateBoard,
-                  icon: const Icon(Icons.add),
-                ),
-                IconButton(
-                  tooltip: 'Connect remote YoLoIT',
-                  onPressed: onConnectRemote,
-                  icon: const Icon(Icons.cloud_outlined),
-                ),
-                IconButton(
-                  tooltip: 'Share board',
-                  onPressed: onShareBoard,
-                  icon: const Icon(Icons.ios_share_outlined),
-                ),
-                IconButton(
-                  tooltip: 'Board settings',
-                  onPressed: onBoardSettings,
-                  icon: const Icon(Icons.settings_outlined),
-                ),
-                IconButton(
-                  tooltip: deleteTooltip,
-                  onPressed: onDeleteBoard,
-                  icon: Icon(deleteIcon),
-                ),
-              ] else ...[
-                OutlinedButton.icon(
-                  style: _toolbarButtonStyle(),
-                  onPressed: onCreateBoard,
-                  icon: const Icon(Icons.add),
-                  label: const Text('New board'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  style: _toolbarButtonStyle(),
-                  onPressed: onConnectRemote,
-                  icon: const Icon(Icons.cloud_outlined),
-                  label: const Text('Remote'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  style: _toolbarButtonStyle(),
-                  onPressed: onShareBoard,
-                  icon: const Icon(Icons.ios_share_outlined),
-                  label: const Text('Share'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  style: _toolbarButtonStyle(),
-                  onPressed: onBoardSettings,
-                  icon: const Icon(Icons.settings_outlined),
-                  label: const Text('Settings'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  style: _toolbarButtonStyle(),
-                  onPressed: onDeleteBoard,
-                  icon: Icon(deleteIcon),
-                  label: Text(deleteLabel),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  static ButtonStyle _toolbarButtonStyle() {
-    return OutlinedButton.styleFrom(
-      minimumSize: const Size(0, 36),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-    );
-  }
-
-  static String _shortToolbarPath(String path) {
-    final normalized = path.trim();
-    if (normalized.length <= 28) return normalized;
-    final parts = normalized.split(Platform.pathSeparator);
-    if (parts.length >= 2) return '…${Platform.pathSeparator}${parts.last}';
-    return '…${normalized.substring(normalized.length - 27)}';
-  }
-}
-
-class _BoardSwitcherButton extends StatelessWidget {
-  const _BoardSwitcherButton({
-    required this.board,
-    required this.onOpenBoardOverview,
-    this.compact = false,
-  });
-
-  final BoardDocument board;
-  final VoidCallback onOpenBoardOverview;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        context.appColors.textMuted;
-    return Tooltip(
-      message: 'Open boards overview',
-      child: InkWell(
-        onTap: onOpenBoardOverview,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          height: 36,
-          constraints: BoxConstraints(
-            minWidth: compact ? 0 : 160,
-            maxWidth: compact ? 220 : 260,
-          ),
-          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 12),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: colors.divider),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.dashboard_customize_outlined,
-                size: 16,
-                color: mutedColor,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  board.name,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(Icons.expand_more, size: 18, color: mutedColor),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
-enum _BoardPanelResizeHandle {
-  topLeft,
-  top,
-  topRight,
-  right,
-  bottomRight,
-  bottom,
-  bottomLeft,
-  left;
-
-  bool get affectsLeft => this == left || this == topLeft || this == bottomLeft;
-  bool get affectsRight =>
-      this == right || this == topRight || this == bottomRight;
-  bool get affectsTop => this == top || this == topLeft || this == topRight;
-  bool get affectsBottom =>
-      this == bottom || this == bottomLeft || this == bottomRight;
-
-  SystemMouseCursor get cursor => switch (this) {
-    topLeft || bottomRight => SystemMouseCursors.resizeUpLeftDownRight,
-    topRight || bottomLeft => SystemMouseCursors.resizeUpRightDownLeft,
-    left || right => SystemMouseCursors.resizeLeftRight,
-    top || bottom => SystemMouseCursors.resizeUpDown,
-  };
-
-  String get tooltip => switch (this) {
-    topLeft => 'Resize from top left',
-    top => 'Resize height',
-    topRight => 'Resize from top right',
-    right => 'Resize width',
-    bottomRight => 'Resize from bottom right',
-    bottom => 'Resize height',
-    bottomLeft => 'Resize from bottom left',
-    left => 'Resize width',
-  };
-}
-
-class _BoardPanelResizeUpdate {
-  const _BoardPanelResizeUpdate({
-    required this.handle,
-    required this.delta,
-    required this.globalPosition,
-  });
-
-  final _BoardPanelResizeHandle handle;
-  final Offset delta;
-  final Offset globalPosition;
-}
-
-class _BoardPanelCard extends StatefulWidget {
-  const _BoardPanelCard({
-    super.key,
-    required this.panel,
-    required this.positionOffset,
-    required this.onTap,
-    required this.onMove,
-    required this.onResize,
-    required this.onDragStart,
-    required this.onDragEnd,
-    required this.onDelete,
-    required this.onEditColor,
-    required this.onBringToFront,
-    required this.onSendToBack,
-    this.onEditNote,
-    this.onUpdateState,
-    this.onCreateLinkedPanel,
-    this.connectMode = false,
-    this.connectSourceId,
-    this.onConnectTap,
-    this.capturingScreenshot = false,
-  });
-
-  final BoardPanelInstance panel;
-  final Offset positionOffset;
-  final VoidCallback onTap;
-  final ValueChanged<DragUpdateDetails> onMove;
-  final ValueChanged<_BoardPanelResizeUpdate> onResize;
-  final ValueChanged<DragStartDetails> onDragStart;
-  final VoidCallback onDragEnd;
-  final VoidCallback onDelete;
-  final VoidCallback onEditColor;
-  final VoidCallback onBringToFront;
-  final VoidCallback onSendToBack;
-  final VoidCallback? onEditNote;
-  final ValueChanged<Map<String, dynamic>>? onUpdateState;
-  final Future<String?> Function(
-    String typeId,
-    Map<String, dynamic> state,
-    String title,
-  )?
-  onCreateLinkedPanel;
-  final bool connectMode;
-  final String? connectSourceId;
-  final VoidCallback? onConnectTap;
-  final bool capturingScreenshot;
-
-  @override
-  State<_BoardPanelCard> createState() => _BoardPanelCardState();
-}
-
-class _BoardPanelCardState extends State<_BoardPanelCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _entryController;
-  late final Animation<double> _opacity;
-  late final Animation<double> _scale;
-  bool _isTransformingPanel = false;
-
-  // Convenience getters so build code can still use widget.panel etc.
-  BoardPanelInstance get panel => widget.panel;
-  Offset get positionOffset => widget.positionOffset;
-  VoidCallback get onTap => widget.onTap;
-  ValueChanged<DragUpdateDetails> get onMove => widget.onMove;
-  ValueChanged<_BoardPanelResizeUpdate> get onResize => widget.onResize;
-  ValueChanged<DragStartDetails> get onDragStart => widget.onDragStart;
-  VoidCallback get onDragEnd => widget.onDragEnd;
-  VoidCallback get onDelete => widget.onDelete;
-  VoidCallback get onEditColor => widget.onEditColor;
-  VoidCallback get onBringToFront => widget.onBringToFront;
-  VoidCallback get onSendToBack => widget.onSendToBack;
-  VoidCallback? get onEditNote => widget.onEditNote;
-  ValueChanged<Map<String, dynamic>>? get onUpdateState => widget.onUpdateState;
-  Future<String?> Function(String, Map<String, dynamic>, String)?
-  get onCreateLinkedPanel => widget.onCreateLinkedPanel;
-  bool get connectMode => widget.connectMode;
-  String? get connectSourceId => widget.connectSourceId;
-  VoidCallback? get onConnectTap => widget.onConnectTap;
-
-  @override
-  void initState() {
-    super.initState();
-    _entryController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
-    );
-    _opacity = CurvedAnimation(parent: _entryController, curve: Curves.easeOut);
-    _scale = Tween<double>(begin: 0.88, end: 1.0).animate(
-      CurvedAnimation(parent: _entryController, curve: Curves.easeOutBack),
-    );
-    _entryController.forward();
-  }
-
-  @override
-  void dispose() {
-    _entryController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _showPanelSettingsDialog(
-    BuildContext context, {
-    required BoardPanelInstance panel,
-    required BoardPanelPlugin? plugin,
-    required VoidCallback? onEditPanel,
-    required VoidCallback onEditColor,
-    required VoidCallback onBringToFront,
-    required VoidCallback onSendToBack,
-  }) async {
-    await showAdaptiveYoloDialog<void>(
-      context: context,
-      builder:
-          (dialogContext) => PanelSettingsDialog(
-            panel: panel,
-            plugin: plugin,
-            onEditPanel:
-                onEditPanel == null
-                    ? null
-                    : () {
-                      Navigator.of(dialogContext).pop();
-                      onEditPanel();
-                    },
-            onEditColor: () {
-              Navigator.of(dialogContext).pop();
-              onEditColor();
-            },
-            onBringToFront: () {
-              Navigator.of(dialogContext).pop();
-              onBringToFront();
-            },
-            onSendToBack: () {
-              Navigator.of(dialogContext).pop();
-              onSendToBack();
-            },
-          ),
-    );
-  }
-
-  void _startPanelTransform(DragStartDetails details) {
-    onTap();
-    setState(() => _isTransformingPanel = true);
-    onDragStart(details);
-  }
-
-  void _endPanelTransform() {
-    if (_isTransformingPanel) {
-      setState(() => _isTransformingPanel = false);
-    }
-    onDragEnd();
-  }
-
-  void _resizeFromHandle(
-    _BoardPanelResizeHandle handle,
-    DragUpdateDetails details,
-  ) {
-    onResize(
-      _BoardPanelResizeUpdate(
-        handle: handle,
-        delta: details.delta,
-        globalPosition: details.globalPosition,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final focusedPanelId = context.select<BoardCubit, String?>(
-      (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
-    );
-    final isFocused = panel.id == focusedPanelId;
-    final isWebpage = panel.type == 'board.webpage';
-    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
-    final usePanelChrome = plugin?.usePanelChrome ?? true;
-    final showHeader = plugin?.showHeader ?? true;
-    final accent = panel.color;
-    final isCapturing = widget.capturingScreenshot;
-    final panelFill =
-        !usePanelChrome
-            ? Colors.transparent
-            : isCapturing
-            ? colors.background
-            : accent == null
-            ? colors.surface
-            : Color.lerp(colors.surface, accent, 0.12) ?? colors.surface;
-    final panelHeaderFill =
-        isCapturing
-            ? colors.background
-            : accent == null
-            ? colors.surfaceElevated
-            : Color.lerp(colors.surfaceElevated, accent, 0.18) ??
-                colors.surfaceElevated;
-    final borderColor =
-        !usePanelChrome
-            ? Colors.transparent
-            : isCapturing
-            ? colors.background
-            : accent == null
-            ? colors.divider
-            : Color.lerp(colors.divider, accent, 0.65) ?? colors.divider;
-    final showSelectionChrome = isFocused && !isCapturing;
-    const selectionSideGutter = 18.0;
-    const selectionTopGutter = 62.0;
-    const selectionBottomGutter = 18.0;
-    const selectionHandleInset = 12.0;
-    final selectionToolbarMinWidth =
-        panel.type == 'board.sticky' || panel.type == 'board.shape'
-            ? 680.0
-            : 360.0;
-    final selectionToolbarWidth = math.max(
-      selectionToolbarMinWidth,
-      panel.bounds.width,
-    );
-    final selectionWrapperWidth = math.max(
-      panel.bounds.width + selectionSideGutter * 2,
-      selectionToolbarWidth + selectionSideGutter * 2,
-    );
-    return AnimatedPositioned(
-      duration:
-          _isTransformingPanel
-              ? Duration.zero
-              : const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-      left: panel.bounds.x + positionOffset.dx - selectionSideGutter,
-      top: panel.bounds.y + positionOffset.dy - selectionTopGutter,
-      width: selectionWrapperWidth,
-      height: panel.bounds.height + selectionTopGutter + selectionBottomGutter,
-      child: FadeTransition(
-        opacity: _opacity,
-        child: ScaleTransition(
-          scale: _scale,
-          alignment: Alignment.topLeft,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: selectionSideGutter,
-                top: selectionTopGutter,
-                width: panel.bounds.width,
-                height: panel.bounds.height,
-                child: ChatGlowWrapper(
-                  panelId: panel.id,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Listener(
-                    behavior: HitTestBehavior.deferToChild,
-                    onPointerDown: (_) {
-                      if (isWebpage) {
-                        if (!isFocused) {
-                          if (kDebugMode) {
-                            debugPrint(
-                              '[BoardWebFocus] panelPointerDown -> focus webpage panel=${panel.id}',
-                            );
-                          }
-                          onTap();
-                        } else {
-                          if (kDebugMode) {
-                            debugPrint(
-                              '[BoardWebFocus] panelPointerDown -> already focused, releasing Flutter focus panel=${panel.id}',
-                            );
-                          }
-                        }
-                        // Release ALL Flutter keyboard focus so the native WKWebView
-                        // can become firstResponder and receive keyboard input.
-                        FocusManager.instance.primaryFocus?.unfocus();
-                        return;
-                      }
-                      if (!isFocused) {
-                        onTap();
-                      }
-                    },
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: panelFill,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color:
-                              isCapturing
-                                  ? colors.background
-                                  : isFocused
-                                  ? colors.primary
-                                  : borderColor,
-                          width: isFocused && !isCapturing ? 1.5 : 1,
-                        ),
-                        boxShadow:
-                            isCapturing || !usePanelChrome
-                                ? null
-                                : [
-                                  BoxShadow(
-                                    color: colors.background.withAlpha(35),
-                                    blurRadius: 22,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                      ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          if (isFocused && !isCapturing)
-                            Positioned.fill(
-                              child: IgnorePointer(
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: colors.primary,
-                                      width: usePanelChrome ? 1.6 : 2.0,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (showHeader)
-                                GestureDetector(
-                                  behavior: HitTestBehavior.opaque,
-                                  onPanStart: _startPanelTransform,
-                                  onPanUpdate:
-                                      panel.locked
-                                          ? null
-                                          : (details) => onMove(details),
-                                  onPanEnd: (_) => _endPanelTransform(),
-                                  onPanCancel: _endPanelTransform,
-                                  child: Container(
-                                    height: 44,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: panelHeaderFill,
-                                      borderRadius: const BorderRadius.vertical(
-                                        top: Radius.circular(16),
-                                      ),
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: colors.divider,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        if (panel.type ==
-                                            ChatPanelPlugin.kTypeId)
-                                          ChatProviderIcon(
-                                            provider:
-                                                (panel.state['config']
-                                                        as Map?)?['provider']
-                                                    as String? ??
-                                                'copilot',
-                                            size: 18,
-                                          )
-                                        else
-                                          Builder(
-                                            builder: (ctx) {
-                                              final plugin = BoardPluginRegistry
-                                                  .instance
-                                                  .pluginFor(panel.type);
-                                              final svgIcon = plugin
-                                                  ?.buildIconWidget(
-                                                    ctx,
-                                                    size: 16,
-                                                  );
-                                              if (svgIcon != null) {
-                                                return svgIcon;
-                                              }
-                                              return Icon(
-                                                plugin?.icon ??
-                                                    Icons
-                                                        .dashboard_customize_outlined,
-                                                size: 16,
-                                                color:
-                                                    Theme.of(context)
-                                                        .textTheme
-                                                        .bodySmall
-                                                        ?.color ??
-                                                    Theme.of(
-                                                      context,
-                                                    ).colorScheme.onSurface,
-                                              );
-                                            },
-                                          ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            panel.title,
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                            style: TextStyle(
-                                              color:
-                                                  Theme.of(
-                                                    context,
-                                                  ).colorScheme.onSurface,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                        ),
-                                        if (panel.type !=
-                                            ChatPanelPlugin.kTypeId) ...[
-                                          GestureDetector(
-                                            onTap: onEditColor,
-                                            child: Container(
-                                              width: 16,
-                                              height: 16,
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    accent ??
-                                                    (Theme.of(context)
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.color ??
-                                                        Theme.of(context)
-                                                            .colorScheme
-                                                            .onSurface),
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: colors.textPrimary
-                                                      .withAlpha(100),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          if (onEditNote != null)
-                                            SizedBox(
-                                              width: 28,
-                                              height: 28,
-                                              child: IconButton(
-                                                tooltip: 'Edit note',
-                                                onPressed: onEditNote,
-                                                icon: const Icon(
-                                                  Icons.edit_outlined,
-                                                  size: 16,
-                                                ),
-                                                splashRadius: 14,
-                                                padding: EdgeInsets.zero,
-                                              ),
-                                            ),
-                                        ],
-                                        if (panel.type ==
-                                            ChatPanelPlugin.kTypeId)
-                                          ChatHeaderMenu(
-                                            panel: panel,
-                                            onEditColor: onEditColor,
-                                            onUpdateState: onUpdateState,
-                                          ),
-                                        // Plugin-specific header actions (e.g. env gear for widget panels)
-                                        ...() {
-                                          final plugin = BoardPluginRegistry
-                                              .instance
-                                              .pluginFor(panel.type);
-                                          if (plugin == null ||
-                                              onUpdateState == null) {
-                                            return <Widget>[];
-                                          }
-                                          return plugin.buildHeaderActions(
-                                            context,
-                                            panel,
-                                            onUpdateState!,
-                                            onResize:
-                                                (w, h) => context
-                                                    .read<BoardCubit>()
-                                                    .resizePanel(
-                                                      panel.id,
-                                                      width: w,
-                                                      height: h,
-                                                    ),
-                                          );
-                                        }(),
-                                        PanelHeaderIconButton(
-                                          tooltip: 'Panel settings',
-                                          icon: Icons.tune_rounded,
-                                          onPressed:
-                                              () => _showPanelSettingsDialog(
-                                                context,
-                                                panel: panel,
-                                                plugin: plugin,
-                                                onEditPanel: onEditNote,
-                                                onEditColor: onEditColor,
-                                                onBringToFront: onBringToFront,
-                                                onSendToBack: onSendToBack,
-                                              ),
-                                        ),
-                                        PanelHeaderIconButton(
-                                          tooltip: 'Bring to front',
-                                          icon: Icons.flip_to_front_outlined,
-                                          onPressed: onBringToFront,
-                                        ),
-                                        PanelHeaderIconButton(
-                                          tooltip: 'Send to back',
-                                          icon: Icons.flip_to_back_outlined,
-                                          onPressed: onSendToBack,
-                                        ),
-                                        SizedBox(
-                                          width: 28,
-                                          height: 28,
-                                          child: IconButton(
-                                            tooltip: 'Remove panel',
-                                            onPressed: onDelete,
-                                            icon: const Icon(
-                                              Icons.close,
-                                              size: 16,
-                                            ),
-                                            splashRadius: 14,
-                                            padding: EdgeInsets.zero,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              Expanded(
-                                child: Padding(
-                                  padding:
-                                      !showHeader ||
-                                              panel.type ==
-                                                  ChatPanelPlugin.kTypeId ||
-                                              panel.type ==
-                                                  BoardTerminalPanelPlugin
-                                                      .kTypeId ||
-                                              panel.type == 'board.webpage'
-                                          ? EdgeInsets.zero
-                                          : const EdgeInsets.all(12),
-                                  child: _buildPanelContent(context, panel),
-                                ),
-                              ),
-                            ],
-                          ),
-                          // ── Connect mode overlay ──────────────────────────────────────
-                          if (connectMode)
-                            Positioned.fill(
-                              child: GestureDetector(
-                                onTap: onConnectTap,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color:
-                                          connectSourceId == panel.id
-                                              ? colors.statusActive
-                                              : colors.statusActive.withAlpha(
-                                                100,
-                                              ),
-                                      width:
-                                          connectSourceId == panel.id
-                                              ? 2.5
-                                              : 1.5,
-                                    ),
-                                    color:
-                                        connectSourceId == panel.id
-                                            ? colors.statusActive.withAlpha(21)
-                                            : Colors.transparent,
-                                  ),
-                                  child:
-                                      connectSourceId == null
-                                          ? Center(
-                                            child: Container(
-                                              width: 36,
-                                              height: 36,
-                                              decoration: BoxDecoration(
-                                                color: colors.statusActive
-                                                    .withAlpha(102),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                Icons.add_link,
-                                                size: 18,
-                                                color: colors.statusActive,
-                                              ),
-                                            ),
-                                          )
-                                          : connectSourceId == panel.id
-                                          ? Center(
-                                            child: Text(
-                                              'Source\n(tap to cancel)',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: colors.statusActive,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          )
-                                          : Center(
-                                            child: Container(
-                                              width: 36,
-                                              height: 36,
-                                              decoration: BoxDecoration(
-                                                color: colors.statusActive
-                                                    .withAlpha(102),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                Icons.call_made,
-                                                size: 18,
-                                                color: colors.statusActive,
-                                              ),
-                                            ),
-                                          ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              if (showSelectionChrome)
-                Positioned(
-                  top: 8,
-                  left: selectionSideGutter,
-                  child: MiroPanelToolbar(
-                    maxWidth: selectionToolbarWidth,
-                    panel: panel,
-                    plugin: plugin,
-                    canEdit: onEditNote != null,
-                    onEdit: onEditNote,
-                    onEditColor: onEditColor,
-                    onBringToFront: onBringToFront,
-                    onSendToBack: onSendToBack,
-                    onDelete: onDelete,
-                    onToggleLocked: () {
-                      context.read<BoardCubit>().updatePanel(
-                        panel.id,
-                        (p) => p.copyWith(locked: !p.locked),
-                      );
-                    },
-                    onMoveStart: _startPanelTransform,
-                    onMoveUpdate:
-                        panel.locked ? null : (details) => onMove(details),
-                    onMoveEnd: _endPanelTransform,
-                    onSettings:
-                        () => _showPanelSettingsDialog(
-                          context,
-                          panel: panel,
-                          plugin: plugin,
-                          onEditPanel: onEditNote,
-                          onEditColor: onEditColor,
-                          onBringToFront: onBringToFront,
-                          onSendToBack: onSendToBack,
-                        ),
-                    onUpdateState: onUpdateState,
-                  ),
-                ),
-              if (showSelectionChrome)
-                Positioned(
-                  left: selectionSideGutter - selectionHandleInset,
-                  top: selectionTopGutter - selectionHandleInset,
-                  width: panel.bounds.width + selectionHandleInset * 2,
-                  height: panel.bounds.height + selectionHandleInset * 2,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: _BoardPanelResizeOverlay.handles(
-                      locked: panel.locked,
-                      onStart: _startPanelTransform,
-                      onUpdate: _resizeFromHandle,
-                      onEnd: _endPanelTransform,
-                      colors: colors,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ), // ScaleTransition
-      ), // FadeTransition
-    );
-  }
-
-  Widget _buildPanelContent(BuildContext context, BoardPanelInstance panel) {
-    final plugin = BoardPluginRegistry.instance.pluginFor(panel.type);
-    if (plugin != null) {
-      final activeBoard = context.read<BoardCubit>().state.activeBoard;
-      return plugin.buildContent(
-        context,
-        panel,
-        BoardPanelRenderContext(
-          isSelected:
-              panel.id ==
-              context.select<BoardCubit, String?>(
-                (cubit) => cubit.state.activeBoard?.viewport.focusedPanelId,
-              ),
-          onFocus: onTap,
-          onDelete: onDelete,
-          onUpdateState: onUpdateState ?? (_) {},
-          onShowEditor: onEditNote ?? () {},
-          remoteInfo:
-              activeBoard == null ? null : remoteInfoForBoard(activeBoard),
-          onCreateLinkedPanel: onCreateLinkedPanel,
-          onFindPanelByGroup: (typeId, group) {
-            final board = context.read<BoardCubit>().state.activeBoard;
-            if (board == null) return null;
-            for (final p in board.panels) {
-              if (p.type != typeId) continue;
-              final panelGroup = p.state['group'];
-              if (panelGroup is String && panelGroup.trim() == group.trim()) {
-                return p.id;
-              }
-            }
-            return null;
-          },
-          onRevealSessionInPanel: (panelId, sessionId) async {
-            final cubit = context.read<BoardCubit>();
-            await cubit.updatePanel(panelId, (p) {
-              final hiddenRaw = p.state['hiddenSessionIds'];
-              final hidden =
-                  hiddenRaw is List
-                      ? hiddenRaw.whereType<String>().toSet()
-                      : <String>{};
-              hidden.remove(sessionId);
-              return p.copyWith(
-                state: {
-                  ...p.state,
-                  'activeSessionId': sessionId,
-                  'hiddenSessionIds': hidden.toList(),
-                },
-              );
-            });
-          },
-          onFocusPanelById:
-              (panelId) => context.read<BoardCubit>().focusPanel(panelId),
-          onResize:
-              (w, h) => context.read<BoardCubit>().resizePanel(
-                panel.id,
-                width: w,
-                height: h,
-              ),
-        ),
-      );
-    }
-    // Fallback for unknown types
-    return Center(
-      child: Text(
-        'Unknown: ${panel.type}',
-        style: TextStyle(
-          color: context.appColors.textMuted,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-}
-
-class _BoardPanelResizeOverlay {
-  const _BoardPanelResizeOverlay._();
-
-  static List<Widget> handles({
-    required bool locked,
-    required ValueChanged<DragStartDetails> onStart,
-    required void Function(_BoardPanelResizeHandle, DragUpdateDetails) onUpdate,
-    required VoidCallback onEnd,
-    required AppColorScheme colors,
-  }) {
-    if (locked) return const [];
-    return _BoardPanelResizeHandle.values
-        .map(
-          (handle) => _PanelResizeHandleWidget(
-            handle: handle,
-            onStart: onStart,
-            onUpdate: (details) => onUpdate(handle, details),
-            onEnd: onEnd,
-            colors: colors,
-          ),
-        )
-        .toList(growable: false);
-  }
-}
-
-class _PanelResizeHandleWidget extends StatelessWidget {
-  const _PanelResizeHandleWidget({
-    required this.handle,
-    required this.onStart,
-    required this.onUpdate,
-    required this.onEnd,
-    required this.colors,
-  });
-
-  final _BoardPanelResizeHandle handle;
-  final ValueChanged<DragStartDetails> onStart;
-  final ValueChanged<DragUpdateDetails> onUpdate;
-  final VoidCallback onEnd;
-  final AppColorScheme colors;
-
-  static const double _hitSize = 24;
-  static const double _dotSize = 10;
-
-  @override
-  Widget build(BuildContext context) {
-    final child = MouseRegion(
-      cursor: handle.cursor,
-      child: Tooltip(
-        message: handle.tooltip,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: onStart,
-          onPanUpdate: onUpdate,
-          onPanEnd: (_) => onEnd(),
-          onPanCancel: onEnd,
-          child: SizedBox(
-            width: _hitSize,
-            height: _hitSize,
-            child: Center(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: colors.primary, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.16),
-                      blurRadius: 5,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: const SizedBox(width: _dotSize, height: _dotSize),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    return switch (handle) {
-      _BoardPanelResizeHandle.topLeft => Positioned(
-        left: 0,
-        top: 0,
-        child: child,
-      ),
-      _BoardPanelResizeHandle.top => Positioned(
-        left: 0,
-        right: 0,
-        top: 0,
-        height: _hitSize,
-        child: Center(child: child),
-      ),
-      _BoardPanelResizeHandle.topRight => Positioned(
-        right: 0,
-        top: 0,
-        child: child,
-      ),
-      _BoardPanelResizeHandle.right => Positioned(
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: _hitSize,
-        child: Center(child: child),
-      ),
-      _BoardPanelResizeHandle.bottomRight => Positioned(
-        right: 0,
-        bottom: 0,
-        child: child,
-      ),
-      _BoardPanelResizeHandle.bottom => Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: _hitSize,
-        child: Center(child: child),
-      ),
-      _BoardPanelResizeHandle.bottomLeft => Positioned(
-        left: 0,
-        bottom: 0,
-        child: child,
-      ),
-      _BoardPanelResizeHandle.left => Positioned(
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: _hitSize,
-        child: Center(child: child),
-      ),
-    };
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WebView overlays — renders live WebViews for ALL webpage panels OUTSIDE the
-// InteractiveViewer's Transform widget, avoiding the fundamental coordinate
-// mismatch between Flutter's transform and native macOS platform views.
-//
-// Unfocused panels: visible but input blocked (click → focus that panel).
-// Focused panel:    full interaction, on top z-order.
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _WebViewOverlays extends StatelessWidget {
-  const _WebViewOverlays({
-    required this.panels,
-    required this.focusedPanelId,
-    required this.transformController,
-    required this.canvasOrigin,
-    required this.isInteracting,
-  });
-
-  final List<BoardPanelInstance> panels;
-  final String? focusedPanelId;
-  final TransformationController transformController;
-  final Offset canvasOrigin;
-  final bool isInteracting;
-
-  /// Header (44) + URL bar (36) + divider (1) = content starts at 81px.
-  static const double _contentOffsetY = 81.0;
-
-  Rect? _screenRect(BoardPanelInstance panel, Matrix4 matrix, double scale) {
-    final canvasPos = Offset(
-      panel.bounds.x + canvasOrigin.dx,
-      panel.bounds.y + canvasOrigin.dy + _contentOffsetY,
-    );
-    final screenPos = MatrixUtils.transformPoint(matrix, canvasPos);
-    final w = panel.bounds.width * scale;
-    final h = (panel.bounds.height - _contentOffsetY) * scale;
-    if (w < 1 || h < 1) return null;
-    return Rect.fromLTWH(screenPos.dx, screenPos.dy, w, h);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final webPanels =
-        panels
-            .where(
-              (p) =>
-                  p.type == WebpagePlugin.kTypeId &&
-                  !p.hidden &&
-                  WebpagePlugin.controllers.containsKey(p.id),
-            )
-            .toList();
-
-    if (webPanels.isEmpty) return const SizedBox.shrink();
-
-    // During active pinch-to-zoom / pan, hide overlays to avoid
-    // visual desync — native NSView frame updates lag behind
-    // the GPU-rendered InteractiveViewer transform.
-    if (isInteracting) return const SizedBox.shrink();
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final viewportRect = Rect.fromLTWH(
-          0,
-          0,
-          constraints.maxWidth,
-          constraints.maxHeight,
-        );
-
-        return ValueListenableBuilder<Matrix4>(
-          valueListenable: transformController,
-          builder: (context, matrix, _) {
-            final scale = _BoardViewState._scaleOf(matrix);
-            final children = <Widget>[];
-
-            // Apply CSS zoom = boardScale so pages use desktop layout widths.
-            // pageZoom is NOT used — it shrinks content visually without
-            // changing window.innerWidth.
-
-            // ── 1. Unfocused WebView overlays (bottom z-order) ──
-            for (final panel in webPanels) {
-              if (panel.id == focusedPanelId) continue;
-              final rect = _screenRect(panel, matrix, scale);
-              if (rect == null) continue;
-              // Viewport culling — skip off-screen panels.
-              if (!rect.overlaps(viewportRect)) continue;
-
-              final ctrl = WebpagePlugin.controllers[panel.id]!;
-
-              // pageZoom in Swift handles viewport width. No CSS zoom needed.
-              if (!WebpagePlugin.pendingCssZoom.containsKey(panel.id)) {
-                WebpagePlugin.pendingCssZoom[panel.id] = 1.0;
-              }
-
-              children.add(
-                Positioned(
-                  key: ValueKey('wv-${panel.id}'),
-                  left: rect.left,
-                  top: rect.top,
-                  width: rect.width,
-                  height: rect.height,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(16 * scale),
-                      bottomRight: Radius.circular(16 * scale),
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ColoredBox(color: context.appColors.background),
-                        WebViewWidget(controller: ctrl),
-                        // Loading overlay
-                        ValueListenableBuilder<bool>(
-                          valueListenable:
-                              WebpagePlugin.pageLoading[panel.id] ??
-                              ValueNotifier<bool>(false),
-                          builder: (_, isLoading, __) {
-                            if (!isLoading) return const SizedBox.shrink();
-                            return ColoredBox(
-                              color: context.appColors.surfaceHighlight,
-                            );
-                          },
-                        ),
-                        // Absorb clicks → focus this panel
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            if (kDebugMode) {
-                              debugPrint(
-                                '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
-                              );
-                            }
-                            context.read<BoardCubit>().focusPanel(panel.id);
-                            FocusManager.instance.primaryFocus?.unfocus();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            // ── 2. Focused WebView overlay (top z-order, full interaction) ──
-            // No full-screen background — the canvas Listener inside
-            // InteractiveViewer handles unfocusing when clicking empty space.
-            final focusedPanel =
-                webPanels.where((p) => p.id == focusedPanelId).firstOrNull;
-            if (focusedPanel != null) {
-              final rect = _screenRect(focusedPanel, matrix, scale);
-              if (rect != null) {
-                final ctrl = WebpagePlugin.controllers[focusedPanel.id]!;
-
-                // pageZoom in Swift handles viewport width via frame observer.
-                if (!WebpagePlugin.pendingCssZoom.containsKey(
-                  focusedPanel.id,
-                )) {
-                  WebpagePlugin.pendingCssZoom[focusedPanel.id] = 1.0;
-                }
-
-                children.add(
-                  Positioned(
-                    key: ValueKey('wv-focused-${focusedPanel.id}'),
-                    left: rect.left,
-                    top: rect.top,
-                    width: rect.width,
-                    height: rect.height,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(16 * scale),
-                        bottomRight: Radius.circular(16 * scale),
-                      ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ColoredBox(color: context.appColors.surface),
-                          WebViewWidget(controller: ctrl),
-                          // Loading overlay (navigation flash hide)
-                          ValueListenableBuilder<bool>(
-                            valueListenable:
-                                WebpagePlugin.pageLoading[focusedPanel.id] ??
-                                ValueNotifier<bool>(false),
-                            builder: (_, isLoading, __) {
-                              if (!isLoading) return const SizedBox.shrink();
-                              return ColoredBox(
-                                color: context.appColors.surfaceHighlight,
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-            }
-
-            if (children.isEmpty) return const SizedBox.shrink();
-            return Stack(children: children);
-          },
-        );
-      },
-    );
-  }
-}
-
-class _InfiniteBoardGridPainter extends CustomPainter {
-  _InfiniteBoardGridPainter({
-    required this.transformCtrl,
-    required this.origin,
-    required this.minorColor,
-    required this.majorColor,
-  }) : super(repaint: transformCtrl);
-
-  final TransformationController transformCtrl;
-  final Offset origin;
-  final Color minorColor;
-  final Color majorColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = _BoardViewState._scaleOf(
-      transformCtrl.value,
-    ).clamp(0.0001, 1000.0);
-    final translation = transformCtrl.value.storage;
-    final tx = translation[12] + (origin.dx * scale);
-    final ty = translation[13] + (origin.dy * scale);
-
-    const minorStep = 24.0;
-    const majorStep = 120.0;
-
-    final minorSpacing = minorStep * scale;
-    final majorSpacing = majorStep * scale;
-
-    final minorPaint =
-        Paint()
-          ..color = minorColor
-          ..strokeWidth = 1;
-    final majorPaint =
-        Paint()
-          ..color = majorColor
-          ..strokeWidth = 1;
-
-    double startXMinor = tx % minorSpacing;
-    if (startXMinor > 0) startXMinor -= minorSpacing;
-    for (double x = startXMinor; x <= size.width; x += minorSpacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), minorPaint);
-    }
-
-    double startYMinor = ty % minorSpacing;
-    if (startYMinor > 0) startYMinor -= minorSpacing;
-    for (double y = startYMinor; y <= size.height; y += minorSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), minorPaint);
-    }
-
-    double startXMajor = tx % majorSpacing;
-    if (startXMajor > 0) startXMajor -= majorSpacing;
-    for (double x = startXMajor; x <= size.width; x += majorSpacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), majorPaint);
-    }
-
-    double startYMajor = ty % majorSpacing;
-    if (startYMajor > 0) startYMajor -= majorSpacing;
-    for (double y = startYMajor; y <= size.height; y += majorSpacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), majorPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _InfiniteBoardGridPainter oldDelegate) {
-    return oldDelegate.transformCtrl != transformCtrl ||
-        oldDelegate.origin != origin ||
-        oldDelegate.minorColor != minorColor ||
-        oldDelegate.majorColor != majorColor;
-  }
-}
-
-class _BoardMiniMap extends StatelessWidget {
-  const _BoardMiniMap({
-    required this.panels,
-    required this.processingPanelIds,
-    required this.transformCtrl,
-    required this.viewportSize,
-    required this.origin,
-    required this.onPanTo,
-  });
-
-  final List<BoardPanelInstance> panels;
-  final Set<String> processingPanelIds;
-  final TransformationController transformCtrl;
-  final Size viewportSize;
-  final Offset origin;
-  final ValueChanged<Offset> onPanTo;
-
-  static const double _mapW = 210.0;
-  static const double _mapH = 130.0;
-  static const double _padding = 180.0;
-
-  Rect _canvasBounds(Rect viewportRect) {
-    final visiblePanels = panels.where((panel) => !panel.hidden).toList();
-    if (visiblePanels.isEmpty) {
-      return viewportRect.inflate(_padding);
-    }
-    double minX = double.infinity;
-    double minY = double.infinity;
-    double maxX = -double.infinity;
-    double maxY = -double.infinity;
-    for (final panel in visiblePanels) {
-      final rect = panel.bounds.rect;
-      if (rect.left < minX) minX = rect.left;
-      if (rect.top < minY) minY = rect.top;
-      if (rect.right > maxX) maxX = rect.right;
-      if (rect.bottom > maxY) maxY = rect.bottom;
-    }
-    final contentBounds = Rect.fromLTRB(
-      minX - _padding,
-      minY - _padding,
-      maxX + _padding,
-      maxY + _padding,
-    );
-    return contentBounds.expandToInclude(viewportRect).inflate(_padding);
-  }
-
-  void _handleGesture(Offset local, Rect bounds) {
-    final cx = bounds.left + (local.dx / _mapW) * bounds.width;
-    final cy = bounds.top + (local.dy / _mapH) * bounds.height;
-    onPanTo(Offset(cx, cy));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return AnimatedBuilder(
-      animation: transformCtrl,
-      builder: (context, _) {
-        final vpTL = transformCtrl.toScene(Offset.zero) - origin;
-        final vpBR =
-            transformCtrl.toScene(
-              Offset(viewportSize.width, viewportSize.height),
-            ) -
-            origin;
-        final viewportRect = Rect.fromLTRB(vpTL.dx, vpTL.dy, vpBR.dx, vpBR.dy);
-        final bounds = _canvasBounds(viewportRect);
-        return GestureDetector(
-          onTapDown: (details) => _handleGesture(details.localPosition, bounds),
-          onPanUpdate:
-              (details) => _handleGesture(details.localPosition, bounds),
-          child: Container(
-            width: _mapW,
-            height: _mapH,
-            decoration: BoxDecoration(
-              color: colors.surface.withAlpha(0xE5),
-              border: Border.all(color: colors.primary.withAlpha(0x50)),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.background.withAlpha(102),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: CustomPaint(
-                painter: _BoardMiniMapPainter(
-                  panels: panels.where((panel) => !panel.hidden).toList(),
-                  processingPanelIds: processingPanelIds,
-                  bounds: bounds,
-                  viewportRect: viewportRect,
-                  colors: colors,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _BoardMiniMapPainter extends CustomPainter {
-  const _BoardMiniMapPainter({
-    required this.panels,
-    required this.processingPanelIds,
-    required this.bounds,
-    required this.viewportRect,
-    required this.colors,
-  });
-
-  final List<BoardPanelInstance> panels;
-  final Set<String> processingPanelIds;
-  final Rect bounds;
-  final Rect viewportRect;
-  final AppColorScheme colors;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (bounds.isEmpty) return;
-    final scaleX = size.width / bounds.width;
-    final scaleY = size.height / bounds.height;
-
-    for (final panel in panels) {
-      final rect = panel.bounds.rect;
-      final x = (rect.left - bounds.left) * scaleX;
-      final y = (rect.top - bounds.top) * scaleY;
-      final w = math.max(4.0, rect.width * scaleX);
-      final h = math.max(3.0, rect.height * scaleY);
-      final rrect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(x, y, w, h),
-        const Radius.circular(1.5),
-      );
-
-      final isProcessing = processingPanelIds.contains(panel.id);
-
-      if (isProcessing) {
-        // Draw glow behind processing panels
-        canvas.drawRRect(
-          rrect.inflate(2),
-          Paint()
-            ..color = colors.accentGreen
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-        );
-      }
-
-      canvas.drawRRect(
-        rrect,
-        Paint()
-          ..color =
-              isProcessing
-                  ? colors.accentGreen
-                  : panelTypeColor(
-                    panel.type,
-                    colors,
-                    override: panel.color,
-                  ).withAlpha(0xCC),
-      );
-    }
-
-    final vx = (viewportRect.left - bounds.left) * scaleX;
-    final vy = (viewportRect.top - bounds.top) * scaleY;
-    final vw = math.max(8.0, viewportRect.width * scaleX);
-    final vh = math.max(8.0, viewportRect.height * scaleY);
-    final viewport = RRect.fromRectAndRadius(
-      Rect.fromLTWH(vx, vy, vw, vh),
-      const Radius.circular(3),
-    );
-    canvas.drawRRect(
-      viewport,
-      Paint()..color = colors.accentBlue.withAlpha(32),
-    );
-    canvas.drawRRect(
-      viewport,
-      Paint()
-        ..color = colors.accentBlue.withAlpha(204)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _BoardMiniMapPainter oldDelegate) {
-    return oldDelegate.panels != panels ||
-        oldDelegate.bounds != bounds ||
-        oldDelegate.viewportRect != viewportRect ||
-        oldDelegate.processingPanelIds != processingPanelIds ||
-        oldDelegate.colors != colors;
-  }
-}
