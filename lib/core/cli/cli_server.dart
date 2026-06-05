@@ -15,14 +15,17 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yaml/yaml.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
+import 'package:yoloit/core/cli/handlers/agents_handler.dart';
+import 'package:yoloit/core/cli/handlers/apps_handler.dart';
+import 'package:yoloit/core/cli/handlers/panel_handler.dart';
+import 'package:yoloit/core/cli/handlers/server_helpers.dart';
+import 'package:yoloit/core/cli/handlers/theme_handler.dart';
+import 'package:yoloit/core/cli/handlers/yolo_chat_handler.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
-import 'package:yoloit/core/theme/app_theme.dart';
-import 'package:yoloit/core/theme/theme_manager.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
-import 'package:yoloit/features/board/chat/chat_session_naming.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -32,17 +35,11 @@ import 'package:yoloit/features/board/plugins/builtin/playlist_player_registry.d
 import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_session_manager.dart';
-import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
-import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
-import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
-import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
-import 'package:yoloit/features/terminal/models/agent_type.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
 /// API on `localhost`. A companion CLI script (`tools/yoloit`) communicates
@@ -86,17 +83,6 @@ class CliServer {
   PanelCliHandler? handlerFor(String typeId) => _panelHandlers[typeId];
 
   // ── UI-thread helper ────────────────────────────────────────────────────
-
-  /// Schedule a UI frame so Flutter repaints after a cubit mutation.
-  /// Shelf runs on the same isolate, so cubit mutations work directly —
-  /// we just need to tell the engine a new frame is needed.
-  void _scheduleRebuild() {
-    try {
-      SchedulerBinding.instance.scheduleFrame();
-    } catch (_) {}
-  }
-
-  /// Wait for a single frame to be drawn using a post-frame callback.
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
@@ -313,7 +299,7 @@ class CliServer {
 
     // /api/boards/:boardIdOrName/...
     if (path.length >= 2 && path[0] == 'boards') {
-      final board = _findBoard(cubit, path[1]);
+      final board = findBoard(cubit, path[1]);
       if (board == null) return _notFound('Board not found: ${path[1]}');
 
       final sub = path.sublist(2);
@@ -610,263 +596,19 @@ class CliServer {
     List<String> sub,
     shelf.Request request,
   ) async {
-    final terminalCubit = _terminalCubit;
-    if (terminalCubit == null) return _error('Terminal cubit not available');
-
-    if ((sub.isEmpty || (sub.length == 1 && sub[0] == 'list')) &&
-        method == 'GET') {
-      final configs = await AgentConfigService.instance.load();
-      final defaultId =
-          AgentConfigService.instance.defaultAgentId ?? AgentType.copilot.name;
-      final state = terminalCubit.state;
-      final sessions =
-          state is TerminalLoaded
-              ? state.allSessions
-                  .map(
-                    (session) => {
-                      'id': session.id,
-                      'agent': session.type.name,
-                      'displayName':
-                          session.customName ?? session.type.displayName,
-                      'workspacePath': session.workspacePath,
-                      'workspaceId': session.workspaceId,
-                      'status': session.status.name,
-                    },
-                  )
-                  .toList()
-              : const <Map<String, Object?>>[];
-      return _json({
-        'ok': true,
-        'defaultAgentId': defaultId,
-        'agents':
-            configs
-                .map(
-                  (config) => {
-                    'id': config.id,
-                    'displayName': config.displayName,
-                    'iconLabel': config.iconLabel,
-                    'launchCommand': config.launchCommand,
-                    'visible': config.visible,
-                    'isBuiltIn': config.isBuiltIn,
-                    'defaultModel': config.defaultModel,
-                    'asrMode': config.asrMode,
-                    if (config.asrCloudConfigId != null)
-                      'asrCloudConfigId': config.asrCloudConfigId,
-                    if (config.asrCloudModel != null)
-                      'asrCloudModel': config.asrCloudModel,
-                    'isDefault': config.id == defaultId,
-                  },
-                )
-                .toList(),
-        'sessions': sessions,
-      });
-    }
-
-    if (sub.length == 1 && sub[0] == 'default' && method == 'POST') {
-      final body = await _body(request);
-      final id = body['id'] as String?;
-      if (id != null &&
-          AgentType.values.every((type) => type.name != id) &&
-          id.isNotEmpty) {
-        return _error('Unknown agent id: $id');
-      }
-      await AgentConfigService.instance.setDefaultAgentId(id);
-      return _json({
-        'ok': true,
-        'defaultAgentId': id ?? AgentType.copilot.name,
-      });
-    }
-
-    if (sub.length == 1 && sub[0] == 'run' && method == 'POST') {
-      final body = await _body(request);
-      final agentId =
-          (body['agent'] as String?) ??
-          (body['id'] as String?) ??
-          AgentConfigService.instance.defaultAgentType.name;
-      final workspacePath =
-          (body['path'] as String?) ??
-          (body['workspacePath'] as String?) ??
-          Directory.current.path;
-      final task = body['task'] as String?;
-      final rawName = (body['name'] as String?)?.trim();
-      final requestedSessionName =
-          (rawName != null && rawName.isNotEmpty ? rawName : null) ??
-          (task != null && task.trim().isNotEmpty
-              ? task.trim().length > 40
-                  ? '${task.trim().substring(0, 37)}…'
-                  : task.trim()
-              : 'agent-${DateTime.now().millisecondsSinceEpoch}');
-
-      // Map agent id to board.chat provider string.
-      // copilot → 'copilot', opencode → 'opencode', claude → 'claude', etc.
-      final provider = agentId; // agent id matches chat provider naming
-
-      // Look up default model from agent config
-      final configs = await AgentConfigService.instance.load();
-      final agentConfig = configs.firstWhere(
-        (c) => c.id == agentId,
-        orElse:
-            () => AgentConfig(
-              id: agentId,
-              displayName: agentId,
-              iconLabel: agentId[0].toUpperCase(),
-              launchCommand: agentId,
-              visible: true,
-              isBuiltIn: false,
-            ),
-      );
-      final model = agentConfig.defaultModel ?? 'gpt-5-mini';
-
-      // Create board.chat panel on active board
-      final cubit = _cubit;
-      if (cubit == null) return _error('Board cubit not available');
-      final board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
-      if (board == null) return _error('No active board');
-      final sessionName = makeUniqueChatSessionName(
-        requestedSessionName,
-        board.panels
-            .where((p) => p.type == ChatPanelPlugin.kTypeId)
-            .map(
-              (p) =>
-                  (p.state['config'] is Map
-                      ? (Map<String, dynamic>.from(
-                            p.state['config'] as Map,
-                          ))['sessionName']
-                          as String?
-                      : null) ??
-                  p.title,
-            ),
-      );
-
-      // Build ChatSessionConfig state for the board.chat panel
-      final config = ChatSessionConfig(
-        sessionName: sessionName,
-        workingDir: workspacePath,
-        provider: provider,
-        model: model,
-        autopilot: false,
-      );
-
-      const plugin = ChatPanelPlugin();
-      final panelId = 'chat-${DateTime.now().millisecondsSinceEpoch}';
-      final bounds = _nextAvailableBoundsFor(
-        board,
-        preferredWidth: plugin.defaultSize.width,
-        preferredHeight: plugin.defaultSize.height,
-      );
-      final trimmedTask = task?.trim();
-      final panel = BoardPanelInstance(
-        id: panelId,
-        type: ChatPanelPlugin.kTypeId,
-        title: sessionName,
-        bounds: bounds,
-        state: {'config': config.toJson(), 'configured': true},
-        zIndex:
-            board.panels.fold<int>(
-              0,
-              (value, p) => p.zIndex > value ? p.zIndex : value,
-            ) +
-            1,
-      );
-      await cubit.addPanel(panel, boardId: board.id);
-      if (cubit.state.activeBoardId != board.id) {
-        await cubit.setActiveBoard(board.id);
-      }
-      await cubit.focusPanel(panel.id, boardId: board.id);
-      _scheduleRebuild();
-
-      // Send initial task directly via ChatSessionManager — no UI dependency.
-      // When the panel widget mounts it picks up this existing session.
-      var taskSent = false;
-      if (trimmedTask != null && trimmedTask.isNotEmpty) {
-        final session = ChatSessionManager.instance.getOrCreate(
-          panelId,
-          config,
-        );
-        taskSent = session.sendMessage(text: trimmedTask);
-      }
-
-      return _json({
-        'ok': true,
-        'taskSent': taskSent,
-        'STOP':
-            taskSent
-                ? 'Task already sent to agent. DO NOT call yolochat:send or any other tool. Your job is done.'
-                : 'Panel created. Use yolochat:send to send a message.',
-        'panel': {
-          'id': panelId,
-          'title': sessionName,
-          'boardId': board.id,
-          'boardName': board.name,
-          'type': ChatPanelPlugin.kTypeId,
-          'provider': provider,
-          'model': model,
-          'workingDir': workspacePath,
-        },
-      });
-    }
-
-    // POST /agents/config — update agent config fields (defaultModel, asrMode, asrCloudConfigId, asrCloudModel)
-    if (sub.length == 1 && sub[0] == 'config' && method == 'POST') {
-      final body = await _body(request);
-      final agentId = body['id'] as String?;
-      if (agentId == null || agentId.isEmpty) {
-        return _error('Missing required field: id');
-      }
-      final configs = await AgentConfigService.instance.load();
-      final idx = configs.indexWhere((c) => c.id == agentId);
-      if (idx < 0) return _error('Unknown agent id: $agentId');
-
-      var config = configs[idx];
-      if (body.containsKey('defaultModel')) {
-        config = config.copyWith(
-          defaultModel:
-              (body['defaultModel'] as String?)?.trim().isEmpty == true
-                  ? null
-                  : body['defaultModel'] as String?,
-        );
-      }
-      if (body.containsKey('asrMode')) {
-        final mode = body['asrMode'] as String?;
-        if (mode != null &&
-            mode != 'default' &&
-            mode != 'local' &&
-            mode != 'cloud') {
-          return _error('asrMode must be "default", "local", or "cloud"');
-        }
-        config = config.copyWith(asrMode: mode ?? 'default');
-      }
-      if (body.containsKey('asrCloudConfigId')) {
-        config = config.copyWith(
-          asrCloudConfigId:
-              (body['asrCloudConfigId'] as String?)?.trim().isEmpty == true
-                  ? null
-                  : body['asrCloudConfigId'] as String?,
-        );
-      }
-      if (body.containsKey('asrCloudModel')) {
-        config = config.copyWith(
-          asrCloudModel:
-              (body['asrCloudModel'] as String?)?.trim().isEmpty == true
-                  ? null
-                  : body['asrCloudModel'] as String?,
-        );
-      }
-      configs[idx] = config;
-      await AgentConfigService.instance.save(configs);
-      return _json({
-        'ok': true,
-        'agent': {
-          'id': config.id,
-          'defaultModel': config.defaultModel,
-          'asrMode': config.asrMode,
-          'asrCloudConfigId': config.asrCloudConfigId,
-          'asrCloudModel': config.asrCloudModel,
-        },
-      });
-    }
-
-    return _notFound('Unknown agents route');
+    return handleAgents(
+      method,
+      sub,
+      request,
+      cubit: _cubit,
+      terminalCubit: _terminalCubit,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+      scheduleRebuild: _scheduleRebuild,
+      nextAvailableBoundsFor: _nextAvailableBoundsFor,
+    );
   }
 
   // ── /api/drawings ─────────────────────────────────────────────────────────
@@ -889,7 +631,7 @@ class CliServer {
           (isSvgExport ? sub.elementAtOrNull(1) : sub.firstOrNull);
       final board =
           (boardId != null && boardId.isNotEmpty)
-              ? _findBoard(cubit, boardId)
+              ? findBoard(cubit, boardId)
               : cubit.state.activeBoard;
       if (board == null) return _error('Board not found');
 
@@ -922,7 +664,7 @@ class CliServer {
       // DELETE /api/drawings/<board>/<id>  or  /api/drawings/<board>
       final boardId = sub.firstOrNull;
       if (boardId == null) return _error('Missing board ID in path');
-      final board = _findBoard(cubit, boardId);
+      final board = findBoard(cubit, boardId);
       if (board == null) return _error('Board not found: $boardId');
 
       final drawingId = sub.length >= 2 ? sub[1] : null;
@@ -955,7 +697,7 @@ class CliServer {
         (body['board'] as String?) ?? request.url.queryParameters['board'];
     final board =
         (boardId != null && boardId.isNotEmpty)
-            ? _findBoard(cubit, boardId)
+            ? findBoard(cubit, boardId)
             : cubit.state.activeBoard;
     if (board == null) return _error('Board not found');
 
@@ -1560,392 +1302,17 @@ class CliServer {
     shelf.Request request,
     BoardCubit cubit,
   ) async {
-    if (sub.length == 1 && sub[0] == 'panels' && method == 'GET') {
-      final out = <Map<String, dynamic>>[];
-      for (final board in cubit.state.boards) {
-        for (final panel in board.panels.where((p) => p.type == 'board.chat')) {
-          out.add({
-            'boardId': board.id,
-            'boardName': board.name,
-            'panelId': panel.id,
-            'panelTitle': panel.title,
-          });
-        }
-      }
-      return _json({'ok': true, 'items': out});
-    }
-
-    if (sub.length == 1 && sub[0] == 'send' && method == 'POST') {
-      final body = await _body(request);
-      final text = body['text'] as String? ?? body['message'] as String?;
-      if (text == null || text.trim().isEmpty) {
-        return _error('Missing "text" field');
-      }
-      final target = _resolveYoloChatTarget(
-        cubit,
-        boardHint: body['board'] as String? ?? body['boardId'] as String?,
-        panelHint: body['panel'] as String? ?? body['panelId'] as String?,
-      );
-      if (target == null) {
-        return _error('No board.chat panel found (or target not found)');
-      }
-      // Inject global cloud provider if no explicit provider specified
-      if (!body.containsKey('provider')) {
-        final service = CloudLlmSettingsService.instance;
-        final providerType = await service.loadAssistantProviderType();
-        if (providerType == 'cloud') {
-          final activeId = await service.loadActiveConfigId();
-          if (activeId != null) {
-            body['provider'] = 'cloud:$activeId';
-          }
-        }
-      }
-      final actionBody = <String, dynamic>{
-        ...body,
-        'action': 'send',
-        'text': text,
-      };
-      return _panelAction(cubit, target.board, target.panel, actionBody);
-    }
-
-    if (sub.length == 1 &&
-        (sub[0] == 'terminal' || sub[0] == 'terminal-input') &&
-        method == 'POST') {
-      final body = await _body(request);
-      final text = body['text'] as String? ?? body['input'] as String?;
-      if (text == null || text.isEmpty) {
-        return _error('Missing "text" field');
-      }
-      final appendNewline =
-          body['appendNewline'] as bool? ?? body['enter'] as bool? ?? true;
-      final explicitSession =
-          body['sessionId'] as String? ?? body['session'] as String?;
-      var sessionId = explicitSession?.trim() ?? '';
-      ({BoardDocument board, BoardPanelInstance panel})? target;
-
-      if (sessionId.isEmpty) {
-        target = _resolveTerminalTarget(
-          cubit,
-          boardHint: body['board'] as String? ?? body['boardId'] as String?,
-          panelHint: body['panel'] as String? ?? body['panelId'] as String?,
-        );
-        if (target == null) {
-          return _error('No board.terminal panel found (or target not found)');
-        }
-        final config = _terminalConfigForPanel(target.panel);
-        if (!config.isConfigured || config.sessionId.trim().isEmpty) {
-          return _error('Target terminal panel is not configured');
-        }
-        await BoardTerminalSessionManager.instance.ensureSession(config);
-        sessionId = config.sessionId;
-      }
-
-      final payload = appendNewline ? '$text\n' : text;
-      TerminalBackendService.instance.write(sessionId, payload);
-      return _json({
-        'ok': true,
-        'sessionId': sessionId,
-        'bytes': payload.length,
-        'appendNewline': appendNewline,
-        if (target != null)
-          'target': {
-            'boardId': target.board.id,
-            'boardName': target.board.name,
-            'panelId': target.panel.id,
-            'panelTitle': target.panel.title,
-          },
-      });
-    }
-
-    if (sub.length == 1 && sub[0] == 'messages' && method == 'GET') {
-      final boardHint = request.url.queryParameters['board'];
-      final panelHint = request.url.queryParameters['panel'];
-      final limitRaw = request.url.queryParameters['limit'];
-      final target = _resolveYoloChatTarget(
-        cubit,
-        boardHint: boardHint,
-        panelHint: panelHint,
-      );
-      if (target == null) {
-        return _error('No board.chat panel found (or target not found)');
-      }
-      final body = <String, dynamic>{'action': 'messages'};
-      final limit = int.tryParse(limitRaw ?? '');
-      if (limit != null && limit > 0) {
-        body['limit'] = limit;
-      }
-      return _panelAction(cubit, target.board, target.panel, body);
-    }
-
-    // POST /yolochat/clear
-    if (sub.length == 1 && sub[0] == 'clear' && method == 'POST') {
-      final body = await _body(request);
-      final target = _resolveYoloChatTarget(
-        cubit,
-        boardHint: body['board'] as String?,
-        panelHint: body['panel'] as String?,
-      );
-      if (target == null) {
-        return _error('No board.chat panel found (or target not found)');
-      }
-      return _panelAction(cubit, target.board, target.panel, {
-        'action': 'clear',
-      });
-    }
-
-    // GET /yolochat/sessions
-    // GET /yolochat/sessions — list all active sessions (no target needed)
-    if (sub.length == 1 && sub[0] == 'sessions' && method == 'GET') {
-      final ids = ChatSessionManager.instance.activeSessionIds;
-      final sessions = <Map<String, dynamic>>[];
-      for (final id in ids) {
-        final session = ChatSessionManager.instance.get(id);
-        if (session != null) {
-          sessions.add({
-            'panelId': id,
-            'provider': session.config.provider,
-            'model': session.config.model,
-            'messageCount': session.messages.length,
-            'isProcessing': session.isProcessing,
-          });
-        }
-      }
-      return _json({'ok': true, 'sessions': sessions});
-    }
-
-    if (sub.length == 1 && sub[0] == 'history' && method == 'GET') {
-      final entries = await ChatSessionHistory.instance.loadAll();
-      return _json({
-        'ok': true,
-        'sessions':
-            entries
-                .map(
-                  (entry) => {
-                    'id': entry.id,
-                    'sessionName': entry.sessionName,
-                    'provider': entry.provider,
-                    'model': entry.model,
-                    'workingDir': entry.workingDir,
-                    'messageCount': entry.messageCount,
-                    'createdAt': entry.createdAt.toIso8601String(),
-                    'lastMessageAt': entry.lastMessageAt?.toIso8601String(),
-                  },
-                )
-                .toList(),
-      });
-    }
-
-    if (sub.length == 1 && sub[0] == 'restore' && method == 'POST') {
-      final body = await _body(request);
-      final sessionId = body['sessionId'] as String? ?? body['id'] as String?;
-      if (sessionId == null || sessionId.isEmpty) {
-        return _error('Missing "sessionId" field');
-      }
-      final entries = await ChatSessionHistory.instance.loadAll();
-      final entry = entries.where((item) => item.id == sessionId).firstOrNull;
-      if (entry == null) {
-        return _error('Saved session not found: $sessionId');
-      }
-      final messages = await ChatSessionHistory.instance.loadMessages(
-        sessionId,
-      );
-      final target = _resolveYoloChatTarget(
-        cubit,
-        boardHint: body['board'] as String?,
-        panelHint: body['panel'] as String?,
-      );
-      if (target == null) {
-        return _error('No board.chat panel found (or target not found)');
-      }
-      final restoredState = Map<String, dynamic>.from(target.panel.state)
-        ..addAll({
-          'messages': messages,
-          'provider': entry.provider,
-          'model': entry.model,
-          'sessionName': entry.sessionName,
-          'workingDir': entry.workingDir,
-        });
-      await cubit.updatePanel(
-        target.panel.id,
-        (panel) => panel.copyWith(state: restoredState),
-        boardId: target.board.id,
-      );
-      _scheduleRebuild();
-      return _json({
-        'ok': true,
-        'restored': {
-          'id': entry.id,
-          'sessionName': entry.sessionName,
-          'messageCount': messages.length,
-        },
-      });
-    }
-
-    // GET /yolochat/status
-    if (sub.length == 1 && sub[0] == 'status' && method == 'GET') {
-      final boardHint = request.url.queryParameters['board'];
-      final panelHint = request.url.queryParameters['panel'];
-      final target = _resolveYoloChatTarget(
-        cubit,
-        boardHint: boardHint,
-        panelHint: panelHint,
-      );
-      if (target == null) {
-        return _error('No board.chat panel found (or target not found)');
-      }
-      return _panelAction(cubit, target.board, target.panel, {
-        'action': 'status',
-      });
-    }
-
-    // POST /yolochat/stop
-    if (sub.length == 1 && sub[0] == 'stop' && method == 'POST') {
-      final body = await _body(request);
-      final boardHint = body['board'] as String?;
-      final panelHint = body['panel'] as String?;
-      final hasExplicitTarget =
-          (boardHint?.trim().isNotEmpty ?? false) ||
-          (panelHint?.trim().isNotEmpty ?? false);
-
-      if (!hasExplicitTarget) {
-        final stopped = await _stopAllActiveYoloChats();
-        if (stopped > 0) {
-          return _json({
-            'ok': true,
-            'message': 'Stopped $stopped active chat stream(s)',
-            'stopped': stopped,
-          });
-        }
-      }
-
-      final target = _resolveYoloChatTarget(
-        cubit,
-        boardHint: boardHint,
-        panelHint: panelHint,
-      );
-      if (target == null) {
-        return _error(
-          hasExplicitTarget
-              ? 'No board.chat panel found (or target not found)'
-              : 'No active chat stream to stop',
-        );
-      }
-      return _panelAction(cubit, target.board, target.panel, {
-        'action': 'stop',
-      });
-    }
-
-    // GET /yolochat/logs — full session log for debugging (copy-paste friendly)
-    if (sub.length == 1 && sub[0] == 'logs' && method == 'GET') {
-      final boardHint = request.url.queryParameters['board'];
-      final panelHint = request.url.queryParameters['panel'];
-      final target = _resolveYoloChatTarget(
-        cubit,
-        boardHint: boardHint,
-        panelHint: panelHint,
-      );
-      if (target == null) {
-        return _error('No board.chat panel found (or target not found)');
-      }
-      final session = ChatSessionManager.instance.get(target.panel.id);
-      final messages = session?.messages ?? [];
-      final buf = StringBuffer();
-      buf.writeln('=== YoLoIT Chat Logs ===');
-      buf.writeln('Board: ${target.board.name}');
-      buf.writeln('Panel: ${target.panel.title ?? target.panel.id}');
-      buf.writeln('Provider: ${session?.config.provider ?? "unknown"}');
-      buf.writeln('Model: ${session?.config.model ?? "unknown"}');
-      buf.writeln('Messages: ${messages.length}');
-      buf.writeln('');
-      for (final msg in messages) {
-        buf.writeln('--- [${msg.role.name}] ---');
-        buf.writeln(msg.content);
-        if (msg.toolCalls.isNotEmpty) {
-          for (final tc in msg.toolCalls) {
-            buf.writeln('  [tool] ${tc.toolName}(${tc.arguments})');
-            if (tc.result != null) buf.writeln('  [result] ${tc.result}');
-          }
-        }
-        buf.writeln('');
-      }
-      return shelf.Response.ok(
-        buf.toString(),
-        headers: {'content-type': 'text/plain; charset=utf-8'},
-      );
-    }
-
-    return _notFound('Unknown yolochat route');
-  }
-
-  Future<int> _stopAllActiveYoloChats() async {
-    var stopped = 0;
-    final ids = ChatSessionManager.instance.activeSessionIds;
-    for (final id in ids) {
-      final session = ChatSessionManager.instance.get(id);
-      if (session == null || !session.isProcessing) continue;
-      await session.stopStreaming();
-      stopped++;
-    }
-    return stopped;
-  }
-
-  ({BoardDocument board, BoardPanelInstance panel})? _resolveYoloChatTarget(
-    BoardCubit cubit, {
-    String? boardHint,
-    String? panelHint,
-  }) {
-    BoardDocument? board;
-    if (boardHint != null && boardHint.trim().isNotEmpty) {
-      board = _findBoard(cubit, boardHint);
-    } else {
-      board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
-    }
-    if (board == null) return null;
-
-    BoardPanelInstance? panel;
-    if (panelHint != null && panelHint.trim().isNotEmpty) {
-      panel = _findPanel(board, panelHint);
-      if (panel?.type != 'board.chat') return null;
-    } else {
-      panel = board.panels.where((p) => p.type == 'board.chat').firstOrNull;
-    }
-    if (panel == null) return null;
-    return (board: board, panel: panel);
-  }
-
-  ({BoardDocument board, BoardPanelInstance panel})? _resolveTerminalTarget(
-    BoardCubit cubit, {
-    String? boardHint,
-    String? panelHint,
-  }) {
-    BoardDocument? board;
-    if (boardHint != null && boardHint.trim().isNotEmpty) {
-      board = _findBoard(cubit, boardHint);
-    } else {
-      board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
-    }
-    if (board == null) return null;
-
-    BoardPanelInstance? panel;
-    if (panelHint != null && panelHint.trim().isNotEmpty) {
-      panel = _findPanel(board, panelHint);
-      if (panel?.type != 'board.terminal') return null;
-    } else {
-      panel = board.panels.where((p) => p.type == 'board.terminal').firstOrNull;
-    }
-    if (panel == null) return null;
-    return (board: board, panel: panel);
-  }
-
-  BoardTerminalConfig _terminalConfigForPanel(BoardPanelInstance panel) {
-    final raw = panel.state['config'];
-    if (raw is Map) {
-      return BoardTerminalConfig.fromJson(Map<String, dynamic>.from(raw));
-    }
-    return const BoardTerminalConfig(
-      sessionId: '',
-      sessionName: '',
-      workingDir: '',
+    return handleYoloChat(
+      method,
+      sub,
+      request,
+      cubit,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+      scheduleRebuild: _scheduleRebuild,
+      panelAction: _panelAction,
     );
   }
 
@@ -2008,7 +1375,7 @@ class CliServer {
     }
     // /api/boards/:id/panels/:panelIdOrTitle/...
     if (sub.length >= 2 && sub[0] == 'panels') {
-      final panel = _findPanel(board, sub[1]);
+      final panel = findPanel(board, sub[1]);
       if (panel == null) return _notFound('Panel not found: ${sub[1]}');
       final panelSub = sub.sublist(2);
       return _handlePanel(method, panelSub, board, panel, cubit, request);
@@ -2066,35 +1433,22 @@ class CliServer {
     BoardCubit cubit,
     shelf.Request request,
   ) async {
-    // GET .../panels/:id → panel details + content
-    if (sub.isEmpty && method == 'GET') {
-      return _panelDetails(panel);
-    }
-    // PUT .../panels/:id → update panel props
-    if (sub.isEmpty && method == 'PUT') {
-      final body = await _body(request);
-      return _updatePanel(cubit, board, panel, body);
-    }
-    // DELETE .../panels/:id
-    if (sub.isEmpty && method == 'DELETE') {
-      if (panel.type == 'board.widget.custom') {
-        WidgetEngineManager.instance.remove(panel.id);
-      }
-      await cubit.removePanel(panel.id, boardId: board.id);
-      _scheduleRebuild();
-      return _json({'ok': true, 'message': 'Panel deleted'});
-    }
-    // POST .../panels/:id/action  { action: "send", ... }
-    if (sub.length == 1 && sub[0] == 'action' && method == 'POST') {
-      final body = await _body(request);
-      return _panelAction(cubit, board, panel, body);
-    }
-    // GET .../panels/:id/screenshot
-    if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
-      return _panelScreenshot(board, panel);
-    }
-
-    return _notFound('Unknown panel route');
+    return handlePanel(
+      method,
+      sub,
+      board,
+      panel,
+      cubit,
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+      scheduleRebuild: _scheduleRebuild,
+      panelDetails: _panelDetails,
+      updatePanel: _updatePanel,
+      panelAction: _panelAction,
+      notFound: _notFound,
+    );
   }
 
   // ── Board implementations ──────────────────────────────────────────────
@@ -2264,17 +1618,6 @@ class CliServer {
       File('${cacheDir.path}/${board.id}.png').writeAsBytesSync(png);
     } catch (_) {}
 
-    return shelf.Response.ok(png, headers: {'content-type': 'image/png'});
-  }
-
-  Future<shelf.Response> _panelScreenshot(
-    BoardDocument board,
-    BoardPanelInstance panel,
-  ) async {
-    final png = await BoardOffscreenRenderer.instance.renderPanel(board, panel);
-    if (png == null) {
-      return _error('Failed to capture panel screenshot');
-    }
     return shelf.Response.ok(png, headers: {'content-type': 'image/png'});
   }
 
@@ -2839,7 +2182,7 @@ class CliServer {
     // Determine root: hint → no-incoming node → first panel
     BoardPanelInstance? root;
     if (rootHint != null) {
-      root = _findPanel(board, rootHint);
+      root = findPanel(board, rootHint);
     }
     root ??= panels.firstWhere(
       (p) => linkedIds.contains(p.id) && !hasIncoming.contains(p.id),
@@ -3832,14 +3175,14 @@ class CliServer {
       if (pendingById != null) {
         return pendingById;
       }
-      return _findPanel(liveBoard, byRef);
+      return findPanel(liveBoard, byRef);
     }
     for (final panel in liveBoard.panels) {
       if (panel.params['yamlRef'] == ref) {
         return panel;
       }
     }
-    return _findPanel(liveBoard, ref);
+    return findPanel(liveBoard, ref);
   }
 
   dynamic _yamlToDart(dynamic value) {
@@ -4150,8 +3493,8 @@ class CliServer {
     }
 
     // Resolve panel names/titles to actual IDs.
-    final fromPanel = _findPanel(board, fromRaw);
-    final toPanel = _findPanel(board, toRaw);
+    final fromPanel = findPanel(board, fromRaw);
+    final toPanel = findPanel(board, toRaw);
     if (fromPanel == null) return _error('Panel not found: $fromRaw');
     if (toPanel == null) return _error('Panel not found: $toRaw');
 
@@ -4184,33 +3527,6 @@ class CliServer {
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
-  BoardDocument? _findBoard(BoardCubit cubit, String idOrName) {
-    final boards = cubit.state.boards;
-    // Exact id match
-    final byId = boards.where((b) => b.id == idOrName).firstOrNull;
-    if (byId != null) return byId;
-    // Exact name match (case-insensitive)
-    final byName =
-        boards
-            .where((b) => b.name.toLowerCase() == idOrName.toLowerCase())
-            .firstOrNull;
-    if (byName != null) return byName;
-    // Partial id match
-    return boards.where((b) => b.id.startsWith(idOrName)).firstOrNull;
-  }
-
-  BoardPanelInstance? _findPanel(BoardDocument board, String idOrTitle) {
-    final panels = board.panels;
-    final byId = panels.where((p) => p.id == idOrTitle).firstOrNull;
-    if (byId != null) return byId;
-    final byTitle =
-        panels
-            .where((p) => p.title.toLowerCase() == idOrTitle.toLowerCase())
-            .firstOrNull;
-    if (byTitle != null) return byTitle;
-    return panels.where((p) => p.id.startsWith(idOrTitle)).firstOrNull;
-  }
-
   Map<String, dynamic> _panelSummary(BoardPanelInstance p) {
     final plugin = BoardPluginRegistry.instance.pluginFor(p.type);
     return {
@@ -4232,32 +3548,6 @@ class CliServer {
   }
 
   String _short(String id) => id.length > 12 ? '${id.substring(0, 12)}…' : id;
-
-  Future<Map<String, dynamic>> _body(shelf.Request request) async {
-    try {
-      final raw = await request.readAsString();
-      if (raw.isEmpty) return {};
-      return jsonDecode(raw) as Map<String, dynamic>;
-    } catch (_) {
-      return {};
-    }
-  }
-
-  shelf.Response _json(Object data) => shelf.Response.ok(
-    jsonEncode(data),
-    headers: {'content-type': 'application/json; charset=utf-8'},
-  );
-
-  shelf.Response _error(String msg) => shelf.Response(
-    400,
-    body: jsonEncode({'ok': false, 'error': msg}),
-    headers: {'content-type': 'application/json; charset=utf-8'},
-  );
-
-  shelf.Response _notFound(String msg) => shelf.Response.notFound(
-    jsonEncode({'ok': false, 'error': msg}),
-    headers: {'content-type': 'application/json; charset=utf-8'},
-  );
 
   /// Parse a color string to a [Color].
   /// - `null` → returns null (clear/no color)
@@ -4344,262 +3634,15 @@ class CliServer {
     List<String> sub,
     shelf.Request request,
   ) async {
-    final registry = WidgetRegistryService.instance;
-    final appRegistry = WidgetAppRegistry.instance;
-
-    // GET /api/apps — list all installed widgets + which are currently active
-    if (sub.isEmpty && method == 'GET') {
-      final widgets = await registry.loadAll();
-      final activeIds = appRegistry.activeIds();
-      return _json({
-        'apps':
-            widgets
-                .map((m) => {...m.toJson(), 'active': activeIds.contains(m.id)})
-                .toList(),
-        'activeIds': activeIds,
-      });
-    }
-
-    // GET /api/apps/dev-skill — return the app development skill doc
-    if (sub.length == 1 && sub[0] == 'dev-skill' && method == 'GET') {
-      try {
-        final content = await rootBundle.loadString(
-          'docs/app-development-skill.md',
-        );
-        return shelf.Response.ok(
-          content,
-          headers: {'content-type': 'text/plain; charset=utf-8'},
-        );
-      } catch (e) {
-        return _error('Skill doc not found: $e');
-      }
-    }
-
-    // GET /api/apps/demo — list installed demo apps with their file paths
-    if (sub.length == 1 && sub[0] == 'demo' && method == 'GET') {
-      final appsDir = Directory(
-        '${Platform.environment['HOME']}/.config/yoloit/apps',
-      );
-      if (!await appsDir.exists()) {
-        return _json({'demos': []});
-      }
-      final demos = <Map<String, Object?>>[];
-      await for (final entry in appsDir.list()) {
-        if (entry is! Directory) continue;
-        final manifestFile = File('${entry.path}/manifest.json');
-        if (!await manifestFile.exists()) continue;
-        try {
-          final raw = await manifestFile.readAsString();
-          final manifest = jsonDecode(raw) as Map<String, dynamic>;
-          demos.add({
-            'id':
-                manifest['id'] ?? entry.path.split(Platform.pathSeparator).last,
-            'name': manifest['name'] ?? '',
-            'description': manifest['description'] ?? '',
-            'icon': manifest['icon'] ?? '',
-            'network': manifest['network'] ?? false,
-            'path': entry.path,
-            'files': {
-              'manifest': '${entry.path}/manifest.json',
-              'widget': '${entry.path}/widget.js',
-            },
-          });
-        } catch (_) {}
-      }
-      demos.sort((a, b) => (a['id'] as String).compareTo(b['id'] as String));
-      return _json({'demos': demos});
-    }
-
-    // GET /api/apps/demo/:id — show manifest + widget.js content of a demo app
-    if (sub.length == 2 && sub[0] == 'demo' && method == 'GET') {
-      final id = sub[1];
-      final appsDir = '${Platform.environment['HOME']}/.config/yoloit/apps';
-      final appDir = Directory('$appsDir/$id');
-      if (!await appDir.exists()) {
-        return _error(
-          'Demo app "$id" not found. Run app:demo to list available apps.',
-        );
-      }
-      final manifestFile = File('${appDir.path}/manifest.json');
-      final widgetFile = File('${appDir.path}/widget.js');
-      final manifestContent =
-          await manifestFile.exists()
-              ? await manifestFile.readAsString()
-              : null;
-      final widgetContent =
-          await widgetFile.exists() ? await widgetFile.readAsString() : null;
-      Map<String, dynamic> manifest = {};
-      try {
-        if (manifestContent != null) {
-          manifest = jsonDecode(manifestContent) as Map<String, dynamic>;
-        }
-      } catch (_) {}
-      return _json({
-        'id': id,
-        'path': appDir.path,
-        'manifest': manifest,
-        'manifestRaw': manifestContent,
-        'widgetJs': widgetContent,
-      });
-    }
-
-    // POST /api/apps/install-zip { zipPath: "..." }
-    if (sub.length == 1 && sub[0] == 'install-zip' && method == 'POST') {
-      final body = await _body(request);
-      final zipPath = body['zipPath'] as String?;
-      if (zipPath == null || zipPath.trim().isEmpty) {
-        return _error('Missing "zipPath" field');
-      }
-      final zipFile = File(zipPath.trim());
-      if (!await zipFile.exists()) {
-        return _error('ZIP file not found: $zipPath');
-      }
-      try {
-        final zipName = zipFile.path.split(Platform.pathSeparator).last;
-        final appNameFromZip =
-            zipName.endsWith('.zip')
-                ? zipName.substring(0, zipName.length - 4)
-                : zipName;
-        final appsDir = Directory(
-          '${Platform.environment['HOME']}/.config/yoloit/apps',
-        );
-        await appsDir.create(recursive: true);
-        final extractDir = Directory(
-          '${appsDir.path}${Platform.pathSeparator}__zip_extract_${DateTime.now().millisecondsSinceEpoch}',
-        );
-        await extractDir.create();
-        final unzipResult = await Process.run('unzip', [
-          '-q',
-          zipFile.path,
-          '-d',
-          extractDir.path,
-        ]);
-        if (unzipResult.exitCode != 0) {
-          await extractDir.delete(recursive: true);
-          return _error('Failed to extract ZIP: ${unzipResult.stderr}');
-        }
-        // Find the directory containing widget.js or manifest.json
-        Directory? appSource;
-        await for (final entity in extractDir.list(recursive: true)) {
-          if (entity is File) {
-            final name = entity.path.split(Platform.pathSeparator).last;
-            if (name == 'widget.js' || name == 'manifest.json') {
-              appSource = entity.parent;
-              break;
-            }
-          }
-        }
-        appSource ??= extractDir;
-        // Determine app name from manifest or zip filename
-        String appName = appNameFromZip;
-        final manifestFile = File(
-          '${appSource.path}${Platform.pathSeparator}manifest.json',
-        );
-        if (await manifestFile.exists()) {
-          try {
-            final raw =
-                jsonDecode(await manifestFile.readAsString())
-                    as Map<String, dynamic>;
-            appName = (raw['id'] as String?)?.trim() ?? appNameFromZip;
-          } catch (_) {}
-        }
-        final destDir = Directory(
-          '${appsDir.path}${Platform.pathSeparator}$appName',
-        );
-        if (await destDir.exists()) await destDir.delete(recursive: true);
-        await Process.run('cp', ['-r', appSource.path, destDir.path]);
-        await extractDir.delete(recursive: true);
-        final manifest = await registry.find(appName);
-        await registry.loadAll(); // refresh registry cache
-        return _json({
-          'ok': true,
-          'appName': appName,
-          'widget': manifest?.toJson(),
-        });
-      } catch (e) {
-        return _error('ZIP install failed: $e');
-      }
-    }
-
-    // /api/apps/:id/...
-    if (sub.length >= 2) {
-      final id = sub[0];
-      final action = sub[1];
-
-      // GET /api/apps/:id/snapshot — return current UI tree JSON
-      if (action == 'snapshot' && method == 'GET') {
-        final tree = appRegistry.tree(id);
-        if (tree == null) {
-          return _json({
-            'ok': false,
-            'message':
-                'No render tree available for widget "$id". Is it running?',
-          });
-        }
-        return _json({'ok': true, 'widgetId': id, 'tree': tree});
-      }
-
-      // POST /api/apps/:id/execute — call JS event
-      if (action == 'execute' && method == 'POST') {
-        final body = await _body(request);
-        final actionId = body['action'] as String?;
-        if (actionId == null || actionId.isEmpty) {
-          return _error('Missing "action" field');
-        }
-        final engine = appRegistry.engine(id);
-        if (engine == null) {
-          return _json({
-            'ok': false,
-            'message': 'Widget "$id" is not currently running',
-          });
-        }
-        final payload = body['payload'] as Map<String, dynamic>?;
-        engine.callEvent(actionId, payload);
-        return _json({'ok': true, 'widgetId': id, 'action': actionId});
-      }
-
-      // GET /api/apps/:id/logs — return console.log buffer
-      if (action == 'logs' && method == 'GET') {
-        final engine = appRegistry.engine(id);
-        if (engine == null) {
-          return _json({
-            'ok': false,
-            'message': 'App "$id" is not currently running',
-            'logs': <Map<String, dynamic>>[],
-          });
-        }
-        final logs = engine.peekLogs();
-        return _json({'ok': true, 'widgetId': id, 'logs': logs});
-      }
-
-      // POST /api/apps/:id/reload — hot-reload widget JS without restarting the app
-      if (action == 'reload' && method == 'POST') {
-        final ok = await appRegistry.triggerReload(id);
-        if (!ok) {
-          return _json({
-            'ok': false,
-            'message': 'Widget "$id" is not currently running',
-          });
-        }
-        return _json({
-          'ok': true,
-          'widgetId': id,
-          'message': 'Widget reloaded',
-        });
-      }
-
-      // POST /api/apps/:id/screenshot
-      if (action == 'screenshot' && method == 'POST') {
-        // TODO: implement full screenshot once BoardScreenshotService.capturePanel(panelId) is wired to widgetId lookup
-        return _json({
-          'ok': false,
-          'message':
-              'Widget screenshot requires the panel to be visible on screen. Use app:snapshot for the render tree.',
-        });
-      }
-    }
-
-    return _notFound('Unknown app route');
+    return handleApps(
+      method,
+      sub,
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+    );
   }
 
   // ── Theme routes ────────────────────────────────────────────────────────
@@ -4608,220 +3651,49 @@ class CliServer {
     List<String> path,
     shelf.Request request,
   ) async {
-    final tm = ThemeManager.instance;
-
-    // GET /api/theme → current theme info
-    if (path.isEmpty && method == 'GET') {
-      final activeCustomId = tm.activeCustomThemeId;
-      String name;
-      if (activeCustomId != null) {
-        final custom =
-            tm.customThemes.where((t) => t.id == activeCustomId).firstOrNull;
-        name = custom?.name ?? 'Custom';
-      } else {
-        name = tm.current.label;
-      }
-      return _json({
-        'preset': tm.current.name,
-        'name': name,
-        'brightness': tm.isDark ? 'dark' : 'light',
-        'customThemeId': activeCustomId,
-        'hasOverrides': tm.hasOverrides,
-        'overrides': tm.colorOverrides.map(
-          (k, v) =>
-              MapEntry(k, '#${v.toARGB32().toRadixString(16).padLeft(8, '0')}'),
-        ),
-      });
-    }
-
-    // GET /api/theme/presets → list all presets (built-in + custom)
-    if (path.length == 1 && path[0] == 'presets' && method == 'GET') {
-      final builtIn =
-          AppThemePreset.values
-              .map(
-                (p) => {
-                  'id': p.name,
-                  'name': p.label,
-                  'type': 'builtin',
-                  'brightness':
-                      (p.defaultBrightness ?? Brightness.dark) ==
-                              Brightness.light
-                          ? 'light'
-                          : 'dark',
-                },
-              )
-              .toList();
-      final custom =
-          tm.customThemes
-              .map(
-                (c) => {
-                  'id': c.id,
-                  'name': c.name,
-                  'type': 'custom',
-                  'brightness':
-                      c.brightness == Brightness.light ? 'light' : 'dark',
-                },
-              )
-              .toList();
-      return _json({
-        'presets': [...builtIn, ...custom],
-      });
-    }
-
-    // POST /api/theme/set { preset: "neonPurple" } or { customId: "custom_xxx" }
-    if (path.length == 1 && path[0] == 'set' && method == 'POST') {
-      final body =
-          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-      final presetName = body['preset'] as String?;
-      final customId = body['customId'] as String?;
-      if (presetName != null) {
-        final preset =
-            AppThemePreset.values
-                .where((p) => p.name == presetName)
-                .firstOrNull;
-        if (preset == null) {
-          return _json({'ok': false, 'message': 'Unknown preset: $presetName'});
-        }
-        await tm.setTheme(preset);
-        await tm.clearColorOverrides();
-        return _json({'ok': true, 'message': 'Theme set to ${preset.label}'});
-      } else if (customId != null) {
-        await tm.setCustomTheme(customId);
-        await tm.clearColorOverrides();
-        return _json({
-          'ok': true,
-          'message': 'Custom theme activated: $customId',
-        });
-      }
-      return _json({'ok': false, 'message': 'Provide "preset" or "customId"'});
-    }
-
-    // POST /api/theme/brightness { brightness: "dark"|"light" }
-    if (path.length == 1 && path[0] == 'brightness' && method == 'POST') {
-      final body =
-          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-      final b = body['brightness'] as String?;
-      if (b == 'dark') {
-        await tm.setBrightness(Brightness.dark);
-      } else if (b == 'light') {
-        await tm.setBrightness(Brightness.light);
-      } else {
-        return _json({
-          'ok': false,
-          'message': 'Provide brightness: "dark" or "light"',
-        });
-      }
-      return _json({'ok': true, 'brightness': b});
-    }
-
-    // POST /api/theme/color { slot: "primary", color: "#FF548AF7" }
-    if (path.length == 1 && path[0] == 'color' && method == 'POST') {
-      final body =
-          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-      final slot = body['slot'] as String?;
-      final hex = body['color'] as String?;
-      if (slot == null || hex == null) {
-        return _json({'ok': false, 'message': 'Provide "slot" and "color"'});
-      }
-      final h = hex.replaceFirst('#', '');
-      late Color color;
-      if (h.length == 6) {
-        color = Color(int.parse('FF$h', radix: 16));
-      } else if (h.length == 8) {
-        color = Color(int.parse(h, radix: 16));
-      } else {
-        return _json({'ok': false, 'message': 'Invalid hex color: $hex'});
-      }
-      await tm.setColorOverride(slot, color);
-      return _json({'ok': true, 'message': 'Color override set for $slot'});
-    }
-
-    // DELETE /api/theme/color?slot=primary — remove a color override
-    if (path.length == 1 && path[0] == 'color' && method == 'DELETE') {
-      final slot = request.url.queryParameters['slot'];
-      if (slot == null) {
-        return _json({'ok': false, 'message': 'Provide ?slot= query param'});
-      }
-      await tm.removeColorOverride(slot);
-      return _json({'ok': true, 'message': 'Color override removed for $slot'});
-    }
-
-    // POST /api/theme/reset-colors — clear all overrides
-    if (path.length == 1 && path[0] == 'reset-colors' && method == 'POST') {
-      await tm.clearColorOverrides();
-      return _json({'ok': true, 'message': 'All color overrides cleared'});
-    }
-
-    // POST /api/theme/save { name: "My Theme" } — save current as custom preset
-    if (path.length == 1 && path[0] == 'save' && method == 'POST') {
-      final body =
-          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-      final name = body['name'] as String?;
-      if (name == null || name.trim().isEmpty) {
-        return _json({'ok': false, 'message': 'Provide "name"'});
-      }
-      final id = await tm.saveCurrentAsPreset(name.trim());
-      return _json({
-        'ok': true,
-        'id': id,
-        'message': 'Preset saved: ${name.trim()}',
-      });
-    }
-
-    // GET /api/theme/export → current theme as JSON
-    if (path.length == 1 && path[0] == 'export' && method == 'GET') {
-      return shelf.Response.ok(
-        tm.exportCurrentAsJson(),
-        headers: {'content-type': 'application/json'},
-      );
-    }
-
-    // POST /api/theme/import { path: "/path/to/file.json" }
-    if (path.length == 1 && path[0] == 'import' && method == 'POST') {
-      final body =
-          jsonDecode(await request.readAsString()) as Map<String, dynamic>;
-      final filePath = body['path'] as String?;
-      if (filePath == null) {
-        return _json({'ok': false, 'message': 'Provide "path" to theme file'});
-      }
-      try {
-        final id = await tm.importThemeFile(filePath);
-        await tm.setCustomTheme(id);
-        return _json({
-          'ok': true,
-          'id': id,
-          'message': 'Theme imported and activated',
-        });
-      } catch (e) {
-        return _json({'ok': false, 'message': 'Import failed: $e'});
-      }
-    }
-
-    // DELETE /api/theme/custom?id=xxx — delete a custom theme
-    if (path.length == 1 && path[0] == 'custom' && method == 'DELETE') {
-      final id = request.url.queryParameters['id'];
-      if (id == null) {
-        return _json({'ok': false, 'message': 'Provide ?id= query param'});
-      }
-      await tm.deleteCustomTheme(id);
-      return _json({'ok': true, 'message': 'Custom theme deleted'});
-    }
-
-    // GET /api/theme/colors → all effective color slots
-    if (path.length == 1 && path[0] == 'colors' && method == 'GET') {
-      final scheme = tm.effectiveScheme;
-      return _json({'colors': scheme.toJson()});
-    }
-
-    // GET /api/theme/slots → available color slot names grouped by category
-    if (path.length == 1 && path[0] == 'slots' && method == 'GET') {
-      return _json({
-        'categories': ThemeManager.colorCategories.map(
-          (cat, slots) => MapEntry(cat, slots.map((s) => s.key).toList()),
-        ),
-      });
-    }
-
-    return _notFound('Unknown theme route');
+    return handleTheme(
+      method,
+      path,
+      request,
+      json: _json,
+      notFound: _notFound,
+    );
   }
 }
+
+// ── Top-level helpers used by handlers ────────────────────────────────────
+
+/// Schedule a UI frame so Flutter repaints after a cubit mutation.
+/// Shelf runs on the same isolate, so cubit mutations work directly —
+/// we just need to tell the engine a new frame is needed.
+void _scheduleRebuild() {
+  try {
+    SchedulerBinding.instance.scheduleFrame();
+  } catch (_) {}
+}
+
+Future<Map<String, dynamic>> _body(shelf.Request request) async {
+  try {
+    final raw = await request.readAsString();
+    if (raw.isEmpty) return {};
+    return jsonDecode(raw) as Map<String, dynamic>;
+  } catch (_) {
+    return {};
+  }
+}
+
+shelf.Response _json(Object data) => shelf.Response.ok(
+  jsonEncode(data),
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
+
+shelf.Response _error(String msg) => shelf.Response(
+  400,
+  body: jsonEncode({'ok': false, 'error': msg}),
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
+
+shelf.Response _notFound(String msg) => shelf.Response.notFound(
+  jsonEncode({'ok': false, 'error': msg}),
+  headers: {'content-type': 'application/json; charset=utf-8'},
+);
