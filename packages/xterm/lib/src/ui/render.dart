@@ -54,9 +54,12 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
   bool _layoutPending = false;
 
-  /// Pending size when a resize is debounced in alt-buffer mode.
+  /// Pending size when a resize is debounced (alt-buffer or large scrollback).
   Timer? _altResizeDebounce;
   TerminalSize? _pendingViewportSize;
+
+  /// Number of scrollback lines above which main-buffer resizes are debounced.
+  static const _largeScrollbackThreshold = 100;
 
   Terminal _terminal;
   set terminal(Terminal terminal) {
@@ -369,13 +372,24 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (!_autoResize || _viewportSize == null) return;
     final size = _viewportSize!;
 
-    // When the alt-buffer is active (full-screen TUI app), rapid resize events
-    // from panel dragging corrupt the TUI. Debounce to let the user finish
-    // dragging before sending the resize to the terminal.
-    if (_terminal.isUsingAltBuffer) {
+    // Alt-buffer (full-screen TUI): debounce 200ms to avoid corrupting the TUI
+    // layout during a panel drag.
+    //
+    // Main buffer with large scrollback: debounce 150ms to avoid triggering
+    // an expensive O(maxLines) reflow on every layout frame during drag.
+    // Sessions with <= _largeScrollbackThreshold lines of scrollback are
+    // resized immediately (cheap: no reflow work).
+    final scrollBack = _terminal.lines.length - _terminal.viewHeight;
+    final needsDebounce =
+        _terminal.isUsingAltBuffer || scrollBack > _largeScrollbackThreshold;
+
+    if (needsDebounce) {
       _pendingViewportSize = size;
       _altResizeDebounce?.cancel();
-      _altResizeDebounce = Timer(const Duration(milliseconds: 200), () {
+      final delay = _terminal.isUsingAltBuffer
+          ? const Duration(milliseconds: 200)
+          : const Duration(milliseconds: 150);
+      _altResizeDebounce = Timer(delay, () {
         final pending = _pendingViewportSize;
         _pendingViewportSize = null;
         if (pending != null) {
