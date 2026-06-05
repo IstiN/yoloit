@@ -7,7 +7,7 @@ import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/markdown_note_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/shape_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/sticky_note_plugin.dart';
-import 'package:yoloit/features/board/ui/board_view.dart';
+import 'package:yoloit/features/board/ui/miro_panel_toolbar.dart';
 
 BoardPanelRenderContext _noopContext({bool selected = false}) {
   return BoardPanelRenderContext(
