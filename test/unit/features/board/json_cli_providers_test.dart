@@ -379,4 +379,113 @@ void main() {
     expect(stdinSink.closed, isTrue);
     expect(secondStdinSink.closed, isTrue);
   });
+
+  test('Codex provider parses command execution items', () async {
+    final starter = _FakeStarter();
+    final process = _FakeProcess(pid: 205, stdin: stdinSink);
+    starter.processes.add(process);
+    final provider = CodexCliProvider(processStarter: starter.start);
+
+    final eventsFuture =
+        provider
+            .sendMessage(
+              message: 'run ls',
+              config: config('codex'),
+              isFirstMessage: true,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+
+    process.addStdout(
+      '{"type":"item.started","item":{"id":"cmd_1","type":"command_execution","command":"ls -la","aggregated_output":"","status":"in_progress"}}\n',
+    );
+    process.addStdout(
+      '{"type":"item.completed","item":{"id":"cmd_1","type":"command_execution","command":"ls -la","aggregated_output":"total 0","exit_code":0,"status":"completed"}}\n',
+    );
+    await process.closeStdout();
+    await process.closeStderr();
+    process.completeExit(0);
+
+    final events = await eventsFuture;
+    expect(events, hasLength(2));
+    expect(events[0].type, ChatEventType.toolStart);
+    expect(events[0].data['toolCallId'], 'cmd_1');
+    expect(events[0].data['toolName'], 'ls -la');
+    expect(events[1].type, ChatEventType.toolComplete);
+    expect(events[1].data['toolCallId'], 'cmd_1');
+    expect(events[1].toolResultContent, 'total 0');
+    expect(events[1].toolSuccess, isTrue);
+  });
+
+  test('Codex provider parses MCP tool call items', () async {
+    final starter = _FakeStarter();
+    final process = _FakeProcess(pid: 206, stdin: stdinSink);
+    starter.processes.add(process);
+    final provider = CodexCliProvider(processStarter: starter.start);
+
+    final eventsFuture =
+        provider
+            .sendMessage(
+              message: 'search',
+              config: config('codex'),
+              isFirstMessage: true,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+
+    process.addStdout(
+      '{"type":"item.started","item":{"id":"mcp_1","type":"mcp_tool_call","server":"filesystem","tool":"read_file","arguments":{"path":"/tmp/test.txt"},"status":"in_progress"}}\n',
+    );
+    process.addStdout(
+      '{"type":"item.completed","item":{"id":"mcp_1","type":"mcp_tool_call","server":"filesystem","tool":"read_file","arguments":{"path":"/tmp/test.txt"},"result":{"content":[{"type":"text","text":"hello"}]},"status":"completed"}}\n',
+    );
+    await process.closeStdout();
+    await process.closeStderr();
+    process.completeExit(0);
+
+    final events = await eventsFuture;
+    expect(events, hasLength(2));
+    expect(events[0].type, ChatEventType.toolStart);
+    expect(events[0].data['toolCallId'], 'mcp_1');
+    expect(events[0].data['toolName'], 'filesystem/read_file');
+    expect(events[1].type, ChatEventType.toolComplete);
+    expect(events[1].data['toolCallId'], 'mcp_1');
+    expect(events[1].toolResultContent, 'hello');
+    expect(events[1].toolSuccess, isTrue);
+  });
+
+  test('Codex provider parses file change and reasoning items', () async {
+    final starter = _FakeStarter();
+    final process = _FakeProcess(pid: 207, stdin: stdinSink);
+    starter.processes.add(process);
+    final provider = CodexCliProvider(processStarter: starter.start);
+
+    final eventsFuture =
+        provider
+            .sendMessage(
+              message: 'refactor',
+              config: config('codex'),
+              isFirstMessage: true,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+
+    process.addStdout(
+      '{"type":"item.completed","item":{"id":"reason_1","type":"reasoning","text":"Thinking..."}}\n',
+    );
+    process.addStdout(
+      '{"type":"item.completed","item":{"id":"fc_1","type":"file_change","changes":[{"path":"lib/main.dart","kind":"update"}],"status":"completed"}}\n',
+    );
+    await process.closeStdout();
+    await process.closeStderr();
+    process.completeExit(0);
+
+    final events = await eventsFuture;
+    expect(events, hasLength(2));
+    expect(events[0].type, ChatEventType.assistantMessage);
+    expect(events[0].messageContent, 'Thinking...');
+    expect(events[1].type, ChatEventType.assistantMessage);
+    expect(events[1].messageContent, contains('File changes'));
+    expect(events[1].messageContent, contains('lib/main.dart'));
+  });
 }

@@ -161,6 +161,7 @@ void main() {
       'lib/features/board/ui/miro_panel_toolbar.dart': 1,
       'lib/ui/components/menus/miro_toolbar_primitives.dart': 2,
       'lib/features/settings/ui/settings_page.dart': 11,
+      'lib/features/settings/ui/debug_ui/sections/component_showcase.dart': 2,
       'lib/features/settings/ui/debug_ui/sections/plectrum_debug.dart': 1,
       'lib/features/settings/ui/debug_ui/sections/voice_overlay_debug.dart': 5,
       'lib/features/board/plugins/builtin/file_preview_plugin.dart': 14,

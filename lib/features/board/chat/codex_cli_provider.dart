@@ -111,23 +111,154 @@ class CodexCliProvider extends CliProviderBase {
       return const [];
     }
 
-    if (type == 'item.completed') {
+    if (type == 'item.started' || type == 'item.completed') {
       final item = json['item'] as Map<String, dynamic>?;
-      if (item?['type'] == 'agent_message') {
-        final text = item?['text'] as String? ?? '';
-        if (text.isEmpty) return const [];
-        final id =
-            item?['id'] as String? ??
-            'codex-${DateTime.now().microsecondsSinceEpoch}';
+      final itemType = item?['type'] as String? ?? '';
+      final itemId = item?['id'] as String? ?? '';
+
+      // Agent message – only emit on completed.
+      if (itemType == 'agent_message') {
+        if (type == 'item.completed') {
+          final text = item?['text'] as String? ?? '';
+          if (text.isEmpty) return const [];
+          return [
+            ChatEvent(
+              type: ChatEventType.assistantMessage,
+              rawType: 'codex.agent_message',
+              id: itemId,
+              data: {'messageId': itemId, 'content': text},
+            ),
+          ];
+        }
+        return const [];
+      }
+
+      // Reasoning – emit as assistant message on completed.
+      if (itemType == 'reasoning') {
+        if (type == 'item.completed') {
+          final text = item?['text'] as String? ?? '';
+          if (text.isEmpty) return const [];
+          return [
+            ChatEvent(
+              type: ChatEventType.assistantMessage,
+              rawType: 'codex.reasoning',
+              id: itemId,
+              data: {'messageId': itemId, 'content': text},
+            ),
+          ];
+        }
+        return const [];
+      }
+
+      // Command execution – map to toolStart / toolComplete.
+      if (itemType == 'command_execution') {
+        final command = item?['command'] as String? ?? '';
+        if (type == 'item.started') {
+          return [
+            ChatEvent(
+              type: ChatEventType.toolStart,
+              rawType: 'codex.command_execution.start',
+              id: itemId,
+              data: {
+                'toolCallId': itemId,
+                'toolName': command.isNotEmpty ? command : 'command',
+                'arguments': <String, dynamic>{'command': command},
+              },
+            ),
+          ];
+        }
+        // item.completed
+        final output = item?['aggregated_output'] as String? ?? '';
+        final exitCode = (item?['exit_code'] as num?)?.toInt();
+        final status = item?['status'] as String? ?? '';
+        final isSuccess =
+            status == 'completed' && (exitCode == null || exitCode == 0);
         return [
           ChatEvent(
-            type: ChatEventType.assistantMessage,
-            rawType: 'codex.agent_message',
-            id: id,
-            data: {'messageId': id, 'content': text},
+            type: ChatEventType.toolComplete,
+            rawType: 'codex.command_execution.complete',
+            id: itemId,
+            data: {
+              'toolCallId': itemId,
+              'toolName': command.isNotEmpty ? command : 'command',
+              'success': isSuccess,
+              'result': {'content': output},
+            },
           ),
         ];
       }
+
+      // MCP tool call – map to toolStart / toolComplete.
+      if (itemType == 'mcp_tool_call') {
+        final server = item?['server'] as String? ?? '';
+        final tool = item?['tool'] as String? ?? '';
+        final toolName = server.isNotEmpty && tool.isNotEmpty
+            ? '$server/$tool'
+            : tool.isNotEmpty
+            ? tool
+            : 'mcp_tool';
+        if (type == 'item.started') {
+          return [
+            ChatEvent(
+              type: ChatEventType.toolStart,
+              rawType: 'codex.mcp_tool_call.start',
+              id: itemId,
+              data: {
+                'toolCallId': itemId,
+                'toolName': toolName,
+                'arguments':
+                    item?['arguments'] as Map<String, dynamic>? ??
+                    <String, dynamic>{},
+              },
+            ),
+          ];
+        }
+        // item.completed
+        final result = item?['result'] as Map<String, dynamic>?;
+        final error = item?['error'] as Map<String, dynamic>?;
+        final status = item?['status'] as String? ?? '';
+        final isSuccess = status == 'completed' && error == null;
+        final resultContent = _extractMcpResult(result);
+        return [
+          ChatEvent(
+            type: ChatEventType.toolComplete,
+            rawType: 'codex.mcp_tool_call.complete',
+            id: itemId,
+            data: {
+              'toolCallId': itemId,
+              'toolName': toolName,
+              'success': isSuccess,
+              'result': {'content': resultContent},
+            },
+          ),
+        ];
+      }
+
+      // File change – emit as assistant message on completed.
+      if (itemType == 'file_change') {
+        if (type == 'item.completed') {
+          final changes = item?['changes'] as List? ?? [];
+          final status = item?['status'] as String? ?? '';
+          final buffer = StringBuffer('**File changes** ($status):\n');
+          for (final change in changes) {
+            if (change is Map) {
+              final path = change['path'] as String? ?? '';
+              final kind = change['kind'] as String? ?? '';
+              buffer.writeln('- `$path` ($kind)');
+            }
+          }
+          return [
+            ChatEvent(
+              type: ChatEventType.assistantMessage,
+              rawType: 'codex.file_change',
+              id: itemId,
+              data: {'messageId': itemId, 'content': buffer.toString()},
+            ),
+          ];
+        }
+        return const [];
+      }
+
       return const [];
     }
 
@@ -157,6 +288,26 @@ class CodexCliProvider extends CliProviderBase {
     }
 
     return const [];
+  }
+
+  /// Extracts readable text from an MCP tool result payload.
+  static String _extractMcpResult(Map<String, dynamic>? result) {
+    if (result == null) return '';
+    final content = result['content'] as List?;
+    if (content != null && content.isNotEmpty) {
+      return content
+          .map((part) {
+            if (part is Map) {
+              final text = part['text'];
+              if (text is String) return text;
+            }
+            return jsonEncode(part);
+          })
+          .join('\n');
+    }
+    final structured = result['structured_content'];
+    if (structured != null) return jsonEncode(structured);
+    return '';
   }
 
   static List<String> _withoutResumeUnsupportedArgs(List<String> args) {
