@@ -4,6 +4,7 @@ import 'package:yoloit/core/theme/app_colors.dart';
 import 'package:yoloit/ui/components/buttons/icon_text_button.dart';
 import 'package:yoloit/ui/components/feedback/neon_badge.dart';
 import 'package:yoloit/ui/components/layout/panel_header.dart';
+import 'package:yoloit/ui/components/layout/showcase_scaffold.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 import 'package:yoloit/ui/components/typography/label.dart';
 import 'package:yoloit/ui/components/typography/section_title.dart';
@@ -14,11 +15,8 @@ class ComponentShowcase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return ShowcaseScaffold(
+      children: [
           const SectionTitle('NeonBadge'),
           const SizedBox(height: 8),
           const Wrap(
@@ -77,8 +75,7 @@ class ComponentShowcase extends StatelessWidget {
           const Caption('Caption — small muted text'),
           const Label('Label — emphasised text'),
           const SectionTitle('SectionTitle — bold header'),
-        ],
-      ),
+      ],
     );
   }
 }

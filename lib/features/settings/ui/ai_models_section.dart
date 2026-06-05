@@ -7,6 +7,7 @@ import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/ui/components/feedback/status_badge.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 
 class AiModelsSection extends StatefulWidget {
   const AiModelsSection({super.key});
@@ -195,21 +196,7 @@ class _ModelCard extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 12,
                   ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                  ),
+                  decoration: outlineInputDecoration(colors: colors),
                 ),
               ),
               const SizedBox(width: 10),

@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -1205,7 +1206,7 @@ class _SidebarTreeRow extends StatelessWidget {
       ],
     );
     if (selected == 'copy_path') {
-      await Clipboard.setData(ClipboardData(text: node.path!));
+      await copyToClipboard(node.path!);
     } else if (selected == 'delete') {
       // node.id = 'ws:{workspaceId}'
       final workspaceId =

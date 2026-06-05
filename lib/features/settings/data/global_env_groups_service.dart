@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/platform/secure_storage_factory.dart';
 
 /// Manages global env variable groups.
 ///
@@ -40,31 +41,7 @@ class GlobalEnvGroupsService {
     return '$_secureKeyPrefix$groupId';
   }
 
-  // flutter_secure_storage_darwin 0.2.0 has a key-name mismatch:
-  //   Dart sends  'usesDataProtectionKeychain'  (lowercase c, with s)
-  //   Swift reads 'useDataProtectionKeyChain'    (uppercase C, no s)
-  // So usesDataProtectionKeychain: false is silently ignored and the data
-  // protection keychain is always used (default true). This causes writes
-  // to fail on non-sandboxed macOS apps. Work around by sending the correct
-  // Swift key directly via a custom MacOsOptions subclass.
-  static FlutterSecureStorage _buildStorage() {
-    if (Platform.isMacOS) {
-      return const FlutterSecureStorage(
-        mOptions: _FixedMacOsOptions(
-          accountName: 'yoloit',
-          usesDataProtectionKeychain: false,
-        ),
-      );
-    } else if (Platform.isWindows) {
-      return const FlutterSecureStorage(
-        wOptions: WindowsOptions(useBackwardCompatibility: false),
-      );
-    } else {
-      return const FlutterSecureStorage(lOptions: LinuxOptions());
-    }
-  }
-
-  final _storage = _buildStorage();
+  final _storage = SecureStorageFactory.create();
   List<GlobalEnvGroup>? _loadAllCache;
   Future<List<GlobalEnvGroup>>? _loadAllInFlight;
   String? _loadAllCacheSignature;
@@ -516,26 +493,3 @@ class GlobalEnvGroup {
   }
 }
 
-/// Workaround for flutter_secure_storage_darwin 0.2.0 key-name mismatch.
-///
-/// The native Swift code reads `useDataProtectionKeyChain` (no 's', capital C)
-/// but [MacOsOptions.toMap] sends `usesDataProtectionKeychain` (with 's',
-/// lowercase c). This class overrides [toMap] to emit the correct key so the
-/// option actually reaches the native layer.
-class _FixedMacOsOptions extends MacOsOptions {
-  const _FixedMacOsOptions({
-    super.accountName,
-    super.usesDataProtectionKeychain,
-  });
-
-  @override
-  Map<String, String> toMap() {
-    final base = super.toMap();
-    // Remove the broken Dart key and add the correct Swift key.
-    final value = base.remove('usesDataProtectionKeychain');
-    if (value != null) {
-      base['useDataProtectionKeyChain'] = value;
-    }
-    return base;
-  }
-}

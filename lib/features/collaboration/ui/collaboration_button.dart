@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -537,7 +538,7 @@ class _HostActiveView extends StatelessWidget {
                       icon: Icons.copy,
                       tooltip: 'Copy URL',
                       onTap: () =>
-                          Clipboard.setData(ClipboardData(text: remoteUrl)),
+                          copyToClipboard(remoteUrl),
                     ),
                   ],
                 ),

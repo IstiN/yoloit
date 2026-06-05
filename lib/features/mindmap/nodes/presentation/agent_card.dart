@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
+import 'package:yoloit/ui/components/feedback/status_dot.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// Presentation agent/terminal card — shared shell used by both macOS and web.
@@ -311,22 +312,9 @@ class _AgentCardHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color,
-                  boxShadow:
-                      isRunning
-                          ? [
-                            BoxShadow(
-                              color: color.withAlpha(180),
-                              blurRadius: 8,
-                            ),
-                          ]
-                          : [],
-                ),
+              StatusDot(
+                color: color,
+                isActive: isRunning,
               ),
               const SizedBox(width: 8),
               Expanded(

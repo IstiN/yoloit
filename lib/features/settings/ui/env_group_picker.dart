@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 class EnvGroupSelectionField extends StatefulWidget {
@@ -504,26 +505,9 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
             ],
           ),
           const SizedBox(height: 8),
-          TextField(
+          LabeledTextField(
             controller: _newGroupNameCtrl,
-            style: TextStyle(fontSize: 12, color: colors.textPrimary),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'Group name',
-              hintStyle: TextStyle(fontSize: 12, color: colors.textMuted),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 8,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colors.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colors.border),
-              ),
-            ),
+            hint: 'Group name',
           ),
           const SizedBox(height: 8),
           ..._newKvEntries.indexed.map((entry) {

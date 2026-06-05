@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
+import 'package:yoloit/ui/components/feedback/status_dot.dart';
 
 /// Presentation session card — identical visuals to macOS SessionNode.
 class SessionCard extends StatelessWidget {
@@ -61,22 +62,11 @@ class SessionCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: dotColor,
-                              boxShadow:
-                                  isLive
-                                      ? [
-                                        BoxShadow(
-                                          color: dotColor.withAlpha(160),
-                                          blurRadius: 6,
-                                        ),
-                                      ]
-                                      : [],
-                            ),
+                          StatusDot(
+                            color: dotColor,
+                            isActive: isLive,
+                            glowAlpha: 160,
+                            blurRadius: 6,
                           ),
                           const SizedBox(width: 6),
                           Expanded(

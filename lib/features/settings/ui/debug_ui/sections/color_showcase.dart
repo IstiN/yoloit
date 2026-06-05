@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/ui/components/layout/showcase_scaffold.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 import 'package:yoloit/ui/components/typography/section_title.dart';
 
@@ -9,11 +10,8 @@ class ColorShowcase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return ShowcaseScaffold(
+      children: [
           const SectionTitle('Accent'),
           const SizedBox(height: 8),
           _colorGrid([
@@ -72,8 +70,7 @@ class ColorShowcase extends StatelessWidget {
             ('orbPurple', colors.orbPurple),
             ('orbPink', colors.orbPink),
           ]),
-        ],
-      ),
+      ],
     );
   }
 

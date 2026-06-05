@@ -144,6 +144,26 @@ abstract class BoardPanelPlugin {
     return false;
   }
 
+  /// Convenience helper for plugins that only need a simple `showDialog`
+  /// followed by merging the result into panel state.
+  ///
+  /// Replaces the duplicated `showEditor` boilerplate in [ShapePlugin],
+  /// [StickyNotePlugin], and similar editors.
+  Future<bool> showPanelEditorDialog(
+    BuildContext context,
+    BoardPanelInstance panel,
+    ValueChanged<Map<String, dynamic>> onSave,
+    WidgetBuilder builder,
+  ) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: builder,
+    );
+    if (result == null) return false;
+    onSave({...panel.state, ...result});
+    return true;
+  }
+
   /// Whether this plugin provides a custom editor accessible from the panel header.
   bool get hasEditor => false;
 

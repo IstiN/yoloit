@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -345,9 +346,9 @@ class _FileTreeContentState extends State<_FileTreeContent> {
       case 'rename':
         await _promptRename(entity.path, name);
       case 'copy_path':
-        await Clipboard.setData(ClipboardData(text: entity.path));
+        await copyToClipboard(entity.path);
       case 'copy_name':
-        await Clipboard.setData(ClipboardData(text: name));
+        await copyToClipboard(name);
       case 'show_finder':
         await PlatformLauncher.instance.revealInFinder(entity.path);
       case 'delete':

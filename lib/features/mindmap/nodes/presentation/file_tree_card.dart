@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
+import 'package:yoloit/ui/components/cards/mindmap_card_shell.dart';
 
 /// Presentation file-tree card — renders a flat expandable tree from snapshot data.
 class FileTreeCard extends StatelessWidget {
@@ -34,120 +34,69 @@ class FileTreeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border.all(
-          color: colors.accentGreen.withAlpha(112),
-          width: 1.5,
-        ),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: colors.background.withAlpha(144),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(9),
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: colors.surfaceElevated,
-                border: Border(bottom: BorderSide(color: colors.divider)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.account_tree_outlined,
-                    size: 12,
-                    color: colors.accentGreen,
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      props.repoName != null
-                          ? 'Tree · ${props.repoName}'
-                          : 'File Tree',
-                      overflow: TextOverflow.ellipsis,
+    return MindmapCardShell(
+      borderColor: colors.accentGreen.withAlpha(112),
+      headerIcon: Icons.account_tree_outlined,
+      headerTitle:
+          props.repoName != null ? 'Tree · ${props.repoName}' : 'File Tree',
+      child:
+          props.entries.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'No files loaded',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
+                        fontSize: 10,
+                        color: colors.textMuted,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child:
-                  props.entries.isEmpty
-                      ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'No files loaded',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: colors.textMuted,
-                              ),
-                            ),
-                            if (props.repoPath != null &&
-                                props.repoPath!.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 4,
-                                  left: 8,
-                                  right: 8,
-                                ),
-                                child: Text(
-                                  props.repoPath!,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: colors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                          ],
+                    if (props.repoPath != null &&
+                        props.repoPath!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: 4,
+                          left: 8,
+                          right: 8,
                         ),
-                      )
-                      : ListView.builder(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        itemCount: props.entries.length,
-                        itemBuilder: (_, i) {
-                          final entry = props.entries[i];
-                          return _TreeRow(
-                            entry: entry,
-                            onToggle:
-                                onToggle != null
-                                    ? () => onToggle!(entry.path)
-                                    : null,
-                            onSelect:
-                                onSelect != null
-                                    ? () => onSelect!(entry.path)
-                                    : null,
-                            onNewFolder: onNewFolder,
-                            onCopyPath: onCopyPath,
-                            onShowInFinder: onShowInFinder,
-                            onOpenInPanel: onOpenInPanel,
-                            onRename: onRename,
-                            onCreateFile: onCreateFile,
-                            onDelete: onDelete,
-                          );
-                        },
+                        child: Text(
+                          props.repoPath!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: colors.textSecondary,
+                          ),
+                        ),
                       ),
-            ),
-          ],
-        ),
-      ),
+                  ],
+                ),
+              )
+              : ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: props.entries.length,
+                itemBuilder: (_, i) {
+                  final entry = props.entries[i];
+                  return _TreeRow(
+                    entry: entry,
+                    onToggle:
+                        onToggle != null
+                            ? () => onToggle!(entry.path)
+                            : null,
+                    onSelect:
+                        onSelect != null
+                            ? () => onSelect!(entry.path)
+                            : null,
+                    onNewFolder: onNewFolder,
+                    onCopyPath: onCopyPath,
+                    onShowInFinder: onShowInFinder,
+                    onOpenInPanel: onOpenInPanel,
+                    onRename: onRename,
+                    onCreateFile: onCreateFile,
+                    onDelete: onDelete,
+                  );
+                },
+              ),
     );
   }
 }
@@ -271,9 +220,9 @@ class _TreeRowState extends State<_TreeRow> {
       case 'rename':
         widget.onRename?.call(e.path, e.name);
       case 'copy_path':
-        await Clipboard.setData(ClipboardData(text: e.path));
+        await copyToClipboard(e.path);
       case 'copy_name':
-        await Clipboard.setData(ClipboardData(text: e.name));
+        await copyToClipboard(e.name);
       case 'show_finder':
         await PlatformLauncher.instance.revealInFinder(e.path);
       case 'open_panel':

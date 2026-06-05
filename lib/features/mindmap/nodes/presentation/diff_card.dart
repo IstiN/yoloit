@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
+import 'package:yoloit/ui/components/cards/mindmap_card_shell.dart';
 
 /// Presentation diff card — renders changed files list + optional diff hunks.
 class DiffCard extends StatelessWidget {
@@ -13,108 +14,61 @@ class DiffCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.appColors;
     final hasChanges = props.changedFiles.isNotEmpty || props.hunks.isNotEmpty;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border.all(color: colors.primary.withAlpha(112), width: 1.5),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: colors.background.withAlpha(144),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(9),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: colors.surfaceElevated,
-                border: Border(bottom: BorderSide(color: colors.divider)),
+    return MindmapCardShell(
+      borderColor: colors.primary.withAlpha(112),
+      headerIcon: Icons.compare_arrows_rounded,
+      headerIconColor: colors.primary,
+      headerTitle: props.repoName != null
+          ? 'Diff · ${props.repoName}'
+          : 'Git Changes · Diff',
+      headerTrailing: [
+        if (props.changedFiles.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: colors.primary.withAlpha(51),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '${props.changedFiles.length}',
+              style: TextStyle(
+                fontSize: 9,
+                color: colors.primaryLight,
+                fontWeight: FontWeight.w600,
               ),
-              child: Row(
+            ),
+          ),
+      ],
+      child:
+          !hasChanges
+              ? Center(
+                child: Text(
+                  'No changes',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: colors.textMuted,
+                  ),
+                ),
+              )
+              : ListView(
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 children: [
-                  Icon(
-                    Icons.compare_arrows_rounded,
-                    size: 12,
-                    color: colors.primary,
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      props.repoName != null
-                          ? 'Diff · ${props.repoName}'
-                          : 'Git Changes · Diff',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
+                  if (props.changedFiles.isNotEmpty) ...[
+                    for (final f in props.changedFiles)
+                      _ChangedFileRow(
+                        file: f,
+                        isSelected: props.selectedFilePath == f.path,
+                        onTap:
+                            onFileTap != null
+                                ? () => onFileTap!(f.path)
+                                : null,
                       ),
-                    ),
-                  ),
-                  if (props.changedFiles.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withAlpha(51),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${props.changedFiles.length}',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: colors.primaryLight,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+                    if (props.hunks.isNotEmpty)
+                      Divider(color: colors.divider, height: 8),
+                  ],
+                  for (final h in props.hunks) _HunkWidget(hunk: h),
                 ],
               ),
-            ),
-            Expanded(
-              child:
-                  !hasChanges
-                      ? Center(
-                        child: Text(
-                          'No changes',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: colors.textMuted,
-                          ),
-                        ),
-                      )
-                      : ListView(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        children: [
-                          if (props.changedFiles.isNotEmpty) ...[
-                            for (final f in props.changedFiles)
-                              _ChangedFileRow(
-                                file: f,
-                                isSelected: props.selectedFilePath == f.path,
-                                onTap:
-                                    onFileTap != null
-                                        ? () => onFileTap!(f.path)
-                                        : null,
-                              ),
-                            if (props.hunks.isNotEmpty)
-                              Divider(color: colors.divider, height: 8),
-                          ],
-                          for (final h in props.hunks) _HunkWidget(hunk: h),
-                        ],
-                      ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

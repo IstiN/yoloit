@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/svg_utils.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
@@ -152,7 +153,7 @@ class MermaidDiagramState extends State<MermaidDiagram> {
   }
 
   Future<void> _copySource() async {
-    await Clipboard.setData(ClipboardData(text: widget.code));
+    await copyToClipboard(widget.code);
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)
       ?..hideCurrentSnackBar()

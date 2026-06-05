@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/runs/bloc/run_cubit.dart';
@@ -1560,7 +1561,7 @@ class _ConsoleState extends State<_Console> {
     final session = widget.state.activeSession;
     if (session == null) return;
     final text = session.output.map((l) => l.text).join('\n');
-    Clipboard.setData(ClipboardData(text: text));
+    copyToClipboard(text);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Output copied to clipboard'),

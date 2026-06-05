@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:local_models_flutter/runtime/embedded_gemma_tool_calls.dart';
@@ -1114,7 +1115,7 @@ $messagesJson
           (dialogContext) => StatefulBuilder(
             builder: (context, setDialogState) {
               Future<void> copyPreview() async {
-                await Clipboard.setData(ClipboardData(text: prompt));
+                await copyToClipboard(prompt);
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -2858,7 +2859,7 @@ $messagesJson
 
   Future<void> _copyMessageToClipboard(String text) async {
     if (text.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: text));
+    await copyToClipboard(text);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -2904,7 +2905,7 @@ $messagesJson
         buf.writeln('');
       }
     }
-    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    await copyToClipboard(buf.toString());
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -2931,7 +2932,7 @@ $messagesJson
             actions: [
               TextButton.icon(
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: message));
+                  await copyToClipboard(message);
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -3000,7 +3001,7 @@ $messagesJson
               ),
               TextButton.icon(
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: resetCommand));
+                  await copyToClipboard(resetCommand);
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -3364,7 +3365,7 @@ class _DebugSessionListViewState extends State<_DebugSessionListView> {
                                   session,
                                   _selectedTab,
                                 );
-                                Clipboard.setData(ClipboardData(text: text));
+                                copyToClipboard(text);
                               },
                               icon: const Icon(Icons.copy_outlined, size: 14),
                               label: const Text('Copy'),

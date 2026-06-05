@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' show max;
 import 'dart:ui';
 
@@ -52,6 +53,10 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         );
 
   bool _layoutPending = false;
+
+  /// Pending size when a resize is debounced in alt-buffer mode.
+  Timer? _altResizeDebounce;
+  TerminalSize? _pendingViewportSize;
 
   Terminal _terminal;
   set terminal(Terminal terminal) {
@@ -203,6 +208,8 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   @override
   void detach() {
     super.detach();
+    _altResizeDebounce?.cancel();
+    _altResizeDebounce = null;
     _offset.removeListener(_onScroll);
     _terminal.removeListener(_onTerminalChange);
     _controller.removeListener(_onControllerUpdate);
@@ -359,14 +366,38 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
   /// Notify the underlying terminal that the viewport size has changed.
   void _resizeTerminalIfNeeded() {
-    if (_autoResize && _viewportSize != null) {
-      _terminal.resize(
-        _viewportSize!.width,
-        _viewportSize!.height,
-        _painter.cellSize.width.round(),
-        _painter.cellSize.height.round(),
-      );
+    if (!_autoResize || _viewportSize == null) return;
+    final size = _viewportSize!;
+
+    // When the alt-buffer is active (full-screen TUI app), rapid resize events
+    // from panel dragging corrupt the TUI. Debounce to let the user finish
+    // dragging before sending the resize to the terminal.
+    if (_terminal.isUsingAltBuffer) {
+      _pendingViewportSize = size;
+      _altResizeDebounce?.cancel();
+      _altResizeDebounce = Timer(const Duration(milliseconds: 200), () {
+        final pending = _pendingViewportSize;
+        _pendingViewportSize = null;
+        if (pending != null) {
+          _terminal.resize(
+            pending.width,
+            pending.height,
+            _painter.cellSize.width.round(),
+            _painter.cellSize.height.round(),
+          );
+        }
+      });
+      return;
     }
+
+    _altResizeDebounce?.cancel();
+    _altResizeDebounce = null;
+    _terminal.resize(
+      size.width,
+      size.height,
+      _painter.cellSize.width.round(),
+      _painter.cellSize.height.round(),
+    );
   }
 
   /// Update the scroll offset based on the current terminal state. This should
@@ -398,8 +429,11 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
   /// The offset of the cursor from the top left corner of this render object.
   Offset get cursorOffset {
+    final dpr = PlatformDispatcher.instance.implicitView?.devicePixelRatio ?? 1.0;
+    final rawX = _terminal.buffer.cursorX * _painter.cellSize.width;
+    final snappedX = dpr > 0 ? (rawX * dpr).roundToDouble() / dpr : rawX;
     return Offset(
-      _terminal.buffer.cursorX * _painter.cellSize.width,
+      snappedX,
       _terminal.buffer.absoluteCursorY * _painter.cellSize.height + _lineOffset,
     );
   }
@@ -419,7 +453,14 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     final paintBounds = offset & size;
     canvas.save();
     canvas.clipRect(paintBounds);
-    canvas.drawRect(paintBounds, Paint()..color = _painter.theme.background);
+    // Use isAntiAlias=false for solid background fills so they have sharp
+    // pixel-perfect edges even when the board canvas has a fractional scale.
+    canvas.drawRect(
+      paintBounds,
+      Paint()
+        ..color = _painter.theme.background
+        ..isAntiAlias = false,
+    );
 
     final lines = _terminal.buffer.lines;
     final charHeight = _painter.cellSize.height;

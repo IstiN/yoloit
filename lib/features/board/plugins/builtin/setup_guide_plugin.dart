@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/setup/setup_catalog.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -389,7 +390,7 @@ class _SetupGuidePanelState extends State<SetupGuidePanel> {
   }
 
   Future<void> _copyText(String text) async {
-    await Clipboard.setData(ClipboardData(text: text));
+    await copyToClipboard(text);
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       const SnackBar(

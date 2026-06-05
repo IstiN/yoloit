@@ -6,7 +6,9 @@ import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/ui/components/color_swatch_row.dart';
+import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 import 'package:yoloit/ui/components/input/panel_text_controller_mixin.dart';
+import 'package:yoloit/ui/components/typography/editor_section_label.dart';
 
 class ShapePlugin extends BoardPanelPlugin {
   const ShapePlugin();
@@ -98,15 +100,12 @@ class ShapePlugin extends BoardPanelPlugin {
     BuildContext context,
     BoardPanelInstance panel,
     ValueChanged<Map<String, dynamic>> onSave,
-  ) async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => _ShapeEditorDialog(panel: panel),
-    );
-    if (result == null) return false;
-    onSave({...panel.state, ...result});
-    return true;
-  }
+  ) => showPanelEditorDialog(
+    context,
+    panel,
+    onSave,
+    (ctx) => _ShapeEditorDialog(panel: panel),
+  );
 }
 
 class _ShapeContent extends StatefulWidget {
@@ -536,7 +535,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _EditorSectionLabel('Shape'),
+              const EditorSectionLabel('Shape'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -552,14 +551,14 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                     }).toList(),
               ),
               const SizedBox(height: 18),
-              const _EditorSectionLabel('Stroke color'),
+              const EditorSectionLabel('Stroke color'),
               ColorSwatchRow(
                 colors: _colors.where((hex) => hex != '#00000000').toList(),
                 selected: _strokeColor,
                 onSelected: (value) => setState(() => _strokeColor = value),
               ),
               const SizedBox(height: 18),
-              const _EditorSectionLabel('Fill color'),
+              const EditorSectionLabel('Fill color'),
               ColorSwatchRow(
                 colors: _colors,
                 selected: _fillColor,
@@ -567,14 +566,14 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 transparentIcon: const Icon(Icons.block, size: 16),
               ),
               const SizedBox(height: 18),
-              const _EditorSectionLabel('Text color'),
+              const EditorSectionLabel('Text color'),
               ColorSwatchRow(
                 colors: _colors.where((hex) => hex != '#00000000').toList(),
                 selected: _textColor,
                 onSelected: (value) => setState(() => _textColor = value),
               ),
               const SizedBox(height: 18),
-              _EditorSectionLabel('Stroke width ${_strokeWidth.round()}'),
+              EditorSectionLabel('Stroke width ${_strokeWidth.round()}'),
               Slider(
                 min: 1,
                 max: 12,
@@ -583,7 +582,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 onChanged: (value) => setState(() => _strokeWidth = value),
               ),
               const SizedBox(height: 18),
-              const _EditorSectionLabel('Text alignment'),
+              const EditorSectionLabel('Text alignment'),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -609,7 +608,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 ],
               ),
               const SizedBox(height: 18),
-              const _EditorSectionLabel('Text orientation'),
+              const EditorSectionLabel('Text orientation'),
               Wrap(
                 spacing: 8,
                 children: [
@@ -622,7 +621,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 ],
               ),
               const SizedBox(height: 18),
-              const _EditorSectionLabel('Text'),
+              const EditorSectionLabel('Text'),
               TextField(
                 minLines: 1,
                 maxLines: 4,
@@ -634,7 +633,7 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
                 ),
               ),
               const SizedBox(height: 18),
-              _EditorSectionLabel('Text size ${_fontSize.round()}'),
+              EditorSectionLabel('Text size ${_fontSize.round()}'),
               Slider(
                 min: 12,
                 max: 36,
@@ -647,25 +646,19 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed:
-              () => Navigator.of(context).pop({
-                'shape': _shape,
-                'fillColor': _fillColor,
-                'strokeColor': _strokeColor,
-                'textColor': _textColor,
-                'text': _text,
-                'strokeWidth': _strokeWidth,
-                'fontSize': _fontSize,
-                'textHAlign': _textHAlign,
-                'textVAlign': _textVAlign,
-                'textOrientation': _textOrientation,
-              }),
-          child: const Text('Apply'),
+        EditorDialogActions(
+          applyResultBuilder: () => {
+            'shape': _shape,
+            'fillColor': _fillColor,
+            'strokeColor': _strokeColor,
+            'textColor': _textColor,
+            'text': _text,
+            'strokeWidth': _strokeWidth,
+            'fontSize': _fontSize,
+            'textHAlign': _textHAlign,
+            'textVAlign': _textVAlign,
+            'textOrientation': _textOrientation,
+          },
         ),
       ],
     );
@@ -676,20 +669,6 @@ class _ShapeEditorDialogState extends State<_ShapeEditorDialog> {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
-    );
-  }
-}
-
-class _EditorSectionLabel extends StatelessWidget {
-  const _EditorSectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text, style: Theme.of(context).textTheme.labelLarge),
     );
   }
 }

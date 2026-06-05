@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
 import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:highlight/highlight_core.dart';
@@ -153,7 +154,7 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
   }
 
   Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: _controller.text));
+    await copyToClipboard(_controller.text);
     if (!mounted) return;
     setState(() => _copied = true);
     await Future<void>.delayed(const Duration(seconds: 2));

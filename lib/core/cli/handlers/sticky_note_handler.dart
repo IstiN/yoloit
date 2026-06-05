@@ -1,7 +1,8 @@
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
+import 'package:yoloit/core/cli/panel_getset_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
-class StickyNoteCliHandler extends PanelCliHandler {
+class StickyNoteCliHandler extends PanelCliHandler with PanelGetSetCliHandler {
   const StickyNoteCliHandler();
 
   @override
@@ -9,6 +10,12 @@ class StickyNoteCliHandler extends PanelCliHandler {
 
   @override
   List<String> get supportedActions => ['get', 'set', 'append', 'color'];
+
+  @override
+  List<String> get settableKeys => ['text', 'color', 'textColor', 'fontSize'];
+
+  @override
+  String get settableName => 'Sticky note';
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) => {
@@ -25,23 +32,6 @@ class StickyNoteCliHandler extends PanelCliHandler {
     BoardPanelInstance panel,
   ) async {
     switch (action) {
-      case 'get':
-        return CliActionResult(data: getContent(panel));
-      case 'set':
-        final update = <String, dynamic>{};
-        for (final key in ['text', 'color', 'textColor', 'fontSize']) {
-          if (args.containsKey(key)) update[key] = args[key];
-        }
-        if (update.isEmpty) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Missing sticky note fields to update',
-          );
-        }
-        return CliActionResult(
-          message: 'Sticky note updated',
-          stateUpdate: update,
-        );
       case 'append':
         final text = args['text'] as String?;
         if (text == null) {
@@ -71,7 +61,7 @@ class StickyNoteCliHandler extends PanelCliHandler {
           },
         );
       default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
+        return super.handleAction(action, args, panel);
     }
   }
 

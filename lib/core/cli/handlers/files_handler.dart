@@ -1,8 +1,8 @@
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
+import 'package:yoloit/core/cli/panel_getopen_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
-/// CLI handler for Files panels (`board.files`).
-class FilesCliHandler extends PanelCliHandler {
+class FilesCliHandler extends PanelCliHandler with PanelGetOpenCliHandler {
   const FilesCliHandler();
 
   @override
@@ -12,31 +12,14 @@ class FilesCliHandler extends PanelCliHandler {
   List<String> get supportedActions => ['get', 'open'];
 
   @override
-  Map<String, dynamic> getContent(BoardPanelInstance panel) {
-    return {'selectedPath': panel.state['selectedPath'] ?? ''};
-  }
+  String get openPathKey => 'selectedPath';
 
   @override
-  Future<CliActionResult> handleAction(
-    String action,
-    Map<String, dynamic> args,
-    BoardPanelInstance panel,
-  ) async {
-    switch (action) {
-      case 'get':
-        return CliActionResult(data: getContent(panel));
-      case 'open':
-        final path = args['path'] as String?;
-        if (path == null) {
-          return const CliActionResult(ok: false, message: 'Missing "path"');
-        }
-        return CliActionResult(
-          message: 'Opening $path',
-          stateUpdate: {'selectedPath': path},
-        );
-      default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
-    }
+  String get openMessage => 'Opening';
+
+  @override
+  Map<String, dynamic> getContent(BoardPanelInstance panel) {
+    return {'selectedPath': panel.state['selectedPath'] ?? ''};
   }
 
   @override
@@ -49,8 +32,7 @@ class FilesCliHandler extends PanelCliHandler {
   };
 }
 
-/// CLI handler for File Preview panels (`board.file.preview`).
-class FilePreviewCliHandler extends PanelCliHandler {
+class FilePreviewCliHandler extends PanelCliHandler with PanelGetOpenCliHandler {
   const FilePreviewCliHandler();
 
   @override
@@ -60,32 +42,20 @@ class FilePreviewCliHandler extends PanelCliHandler {
   List<String> get supportedActions => ['get', 'open'];
 
   @override
+  String get openPathKey => 'path';
+
+  @override
+  String get openMessage => 'Previewing';
+
+  @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) {
     final path = panel.state['path'] ?? panel.state['filePath'] ?? '';
     return {'path': path, 'filePath': path};
   }
 
   @override
-  Future<CliActionResult> handleAction(
-    String action,
-    Map<String, dynamic> args,
-    BoardPanelInstance panel,
-  ) async {
-    switch (action) {
-      case 'get':
-        return CliActionResult(data: getContent(panel));
-      case 'open':
-        final path = args['path'] as String?;
-        if (path == null) {
-          return const CliActionResult(ok: false, message: 'Missing "path"');
-        }
-        return CliActionResult(
-          message: 'Previewing $path',
-          stateUpdate: {'path': path, 'filePath': path},
-        );
-      default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
-    }
+  Map<String, dynamic> buildOpenStateUpdate(String path) {
+    return {'path': path, 'filePath': path};
   }
 
   @override

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/ui/components/cards/settings_card.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 class GlobalEnvGroupsSection extends StatefulWidget {
@@ -417,19 +418,9 @@ class _EnvFieldState extends State<_EnvField> {
             fontSize: 12,
             fontFamily: 'monospace',
           ),
-      decoration: InputDecoration(
-        isDense: true,
+      decoration: outlineInputDecoration(
+        colors: colors,
         hintText: widget.hint,
-        hintStyle: TextStyle(color: context.appColors.textMuted, fontSize: 12),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colors.border),
-        ),
       ),
     );
   }

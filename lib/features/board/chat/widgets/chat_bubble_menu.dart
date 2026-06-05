@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 
@@ -28,7 +29,7 @@ class ChatBubbleMenu extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         child: InkWell(
           onTap: () {
-            Clipboard.setData(ClipboardData(text: textToCopy));
+            copyToClipboard(textToCopy);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Copied to clipboard'),

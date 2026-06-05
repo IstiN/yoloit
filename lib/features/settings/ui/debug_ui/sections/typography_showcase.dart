@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/ui/components/layout/showcase_scaffold.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 import 'package:yoloit/ui/components/typography/label.dart';
 import 'package:yoloit/ui/components/typography/section_title.dart';
@@ -10,11 +11,8 @@ class TypographyShowcase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return ShowcaseScaffold(
+      children: [
           const SectionTitle('Typography Components'),
           const SizedBox(height: 24),
           _showcaseRow('SectionTitle', const SectionTitle('Section Title Example')),
@@ -40,8 +38,7 @@ class TypographyShowcase extends StatelessWidget {
           _colorRow('textSecondary', colors.textSecondary),
           _colorRow('textMuted', colors.textMuted),
           _colorRow('textHighlight', colors.textHighlight),
-        ],
-      ),
+      ],
     );
   }
 

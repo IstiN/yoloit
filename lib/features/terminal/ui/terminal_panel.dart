@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:kterm/kterm.dart' as kterm;
@@ -947,7 +948,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _debugTerminalLog(
         'xterm row=$row wrapped=${line.isWrapped} '
         'text="${_sanitizeTerminalText(line.getText())}" '
-        'cells=${_dumpXtermCells(line, maxCols: terminal.viewWidth.clamp(0, 24).toInt())}',
+        'cells=${_dumpXtermCells(line, maxCols: terminal.viewWidth.clamp(0, 80).toInt())}',
       );
     }
   }
@@ -1015,16 +1016,26 @@ class TerminalWidgetState extends State<TerminalWidget> {
     addAround(visibleStart);
     addAround(visibleEnd);
 
+    bool hasInteresting = false;
     for (var row = visibleStart; row <= visibleEnd; row++) {
       final text = textAt(row);
       if (_isInterestingTerminalRow(text)) {
         addAround(row);
+        hasInteresting = true;
+      }
+    }
+
+    // When TUI is active dump ALL visible rows for full diagnostics.
+    if (hasInteresting) {
+      for (var row = visibleStart; row <= visibleEnd; row++) {
+        rows.add(row);
       }
     }
 
     final sorted = rows.toList()..sort();
-    if (sorted.length <= 8) return sorted;
-    return sorted.sublist(0, 8);
+    // Cap at 30 rows to avoid excessive log spam.
+    if (sorted.length <= 30) return sorted;
+    return sorted.sublist(0, 30);
   }
 
   bool _isInterestingTerminalRow(String text) {
@@ -1037,7 +1048,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
         normalized.contains('Confirm folder trust') ||
         normalized.contains('Do you trust') ||
         normalized.contains('Yes') ||
-        normalized.contains('No (Esc)');
+        normalized.contains('No (Esc)') ||
+        normalized.contains('◆') ||
+        normalized.contains('❯') ||
+        normalized.contains('→') ||
+        normalized.contains('┌') ||
+        normalized.contains('├') ||
+        normalized.contains('└') ||
+        normalized.contains('│') ||
+        normalized.startsWith('◆') ||
+        normalized.startsWith('❯');
   }
 
   String _sanitizeTerminalText(String text) {
@@ -1057,7 +1077,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       line.getCellData(col, cell);
       final code = cell.content & xterm_core.CellContent.codepointMask;
       final width = cell.content >> xterm_core.CellContent.widthShift;
-      if (parts.length >= 12) break;
+      if (parts.length >= 40) break;
       if (code == 0 && width <= 0) continue;
       if (code == 0 && cell.flags == 0 && cell.background == 0 && col >= 6) {
         continue;
@@ -1247,7 +1267,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
       final selection = _controller.selection;
       if (selection != null) {
         final text = widget.session.terminal.buffer.getText(selection);
-        Clipboard.setData(ClipboardData(text: text));
+        copyToClipboard(text);
         return true;
       }
       // No selection — fall through so xterm sends ^C (SIGINT)
@@ -1450,7 +1470,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         if (selection != null) {
           final text = widget.session.terminal.buffer.getText(selection);
           _controller.clearSelection();
-          await Clipboard.setData(ClipboardData(text: text));
+          await copyToClipboard(text);
         }
       case _TermCtxAction.paste:
         await _pasteAsFileRef();

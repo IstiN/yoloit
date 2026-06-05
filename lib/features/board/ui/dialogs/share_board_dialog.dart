@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -22,7 +23,7 @@ class _ShareBoardDialogState extends State<ShareBoardDialog> {
   bool _stopping = false;
 
   Future<void> _copy(String text, ValueChanged<bool> setCopied) async {
-    await Clipboard.setData(ClipboardData(text: text));
+    await copyToClipboard(text);
     if (!mounted) return;
     setState(() => setCopied(true));
     await Future<void>.delayed(const Duration(seconds: 2));

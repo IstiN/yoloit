@@ -1,7 +1,8 @@
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
+import 'package:yoloit/core/cli/panel_getset_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
-class ShapeCliHandler extends PanelCliHandler {
+class ShapeCliHandler extends PanelCliHandler with PanelGetSetCliHandler {
   const ShapeCliHandler();
 
   @override
@@ -9,6 +10,22 @@ class ShapeCliHandler extends PanelCliHandler {
 
   @override
   List<String> get supportedActions => ['get', 'set'];
+
+  @override
+  List<String> get settableKeys => [
+    'shape',
+    'text',
+    'fillColor',
+    'strokeColor',
+    'textColor',
+    'strokeWidth',
+    'textHAlign',
+    'textVAlign',
+    'textOrientation',
+  ];
+
+  @override
+  String get settableName => 'Shape';
 
   @override
   Map<String, dynamic> getContent(BoardPanelInstance panel) => {
@@ -22,42 +39,6 @@ class ShapeCliHandler extends PanelCliHandler {
     'textVAlign': panel.state['textVAlign'] ?? 'center',
     'textOrientation': panel.state['textOrientation'] ?? 'horizontal',
   };
-
-  @override
-  Future<CliActionResult> handleAction(
-    String action,
-    Map<String, dynamic> args,
-    BoardPanelInstance panel,
-  ) async {
-    switch (action) {
-      case 'get':
-        return CliActionResult(data: getContent(panel));
-      case 'set':
-        final update = <String, dynamic>{};
-        for (final key in [
-          'shape',
-          'text',
-          'fillColor',
-          'strokeColor',
-          'textColor',
-          'strokeWidth',
-          'textHAlign',
-          'textVAlign',
-          'textOrientation',
-        ]) {
-          if (args.containsKey(key)) update[key] = args[key];
-        }
-        if (update.isEmpty) {
-          return const CliActionResult(
-            ok: false,
-            message: 'Missing shape fields to update',
-          );
-        }
-        return CliActionResult(message: 'Shape updated', stateUpdate: update);
-      default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
-    }
-  }
 
   @override
   Map<String, CliActionHelp> get actionHelp => {

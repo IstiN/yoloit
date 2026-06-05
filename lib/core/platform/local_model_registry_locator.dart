@@ -17,25 +17,10 @@ class LocalModelRegistryLocator {
     String? executablePath,
     Map<String, String>? environment,
   }) {
-    final checked = <String>[];
-    for (final root in _candidateRoots(
+    return _resolveSyncOrAsync(
       currentDirectory: currentDirectory,
       executablePath: executablePath,
       environment: environment,
-    )) {
-      final directory = Directory(
-        p.joinAll(<String>[root, ..._registrySegments]),
-      );
-      checked.add(directory.path);
-      if (directory.existsSync()) {
-        return directory;
-      }
-    }
-
-    throw StateError(
-      'Cannot find flutter_local_models registry at '
-      'third_party/flutter_local_models/registry/models. Checked: '
-      '${checked.join(', ')}',
     );
   }
 
@@ -45,6 +30,20 @@ class LocalModelRegistryLocator {
     Map<String, String>? environment,
     Uri? packageConfig,
   }) async {
+    return _resolveSyncOrAsync(
+      currentDirectory: currentDirectory,
+      executablePath: executablePath,
+      environment: environment,
+      packageConfig: packageConfig,
+    );
+  }
+
+  static Directory _resolveSyncOrAsync({
+    String? currentDirectory,
+    String? executablePath,
+    Map<String, String>? environment,
+    Uri? packageConfig,
+  }) {
     final checked = <String>[];
     for (final root in _candidateRoots(
       currentDirectory: currentDirectory,

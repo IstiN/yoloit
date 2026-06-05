@@ -1,4 +1,13 @@
 export 'buttons/icon_text_button.dart';
+export 'buttons/small_action_button.dart';
+export 'cards/mindmap_card_shell.dart';
+export 'cards/settings_card.dart';
+export 'dialog/editor_dialog_actions.dart';
 export 'feedback/neon_badge.dart';
+export 'feedback/status_badge.dart';
+export 'feedback/status_dot.dart';
+export 'input/labeled_text_field.dart';
+export 'input/panel_text_controller_mixin.dart';
 export 'layout/panel_header.dart';
+export 'layout/showcase_scaffold.dart';
 export 'typography/typography.dart';

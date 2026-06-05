@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -823,7 +824,7 @@ class _CopyButtonState extends State<_CopyButton> {
       message: widget.hint,
       child: GestureDetector(
         onTap: () async {
-          await Clipboard.setData(ClipboardData(text: widget.hint));
+          await copyToClipboard(widget.hint);
           setState(() => _copied = true);
           await Future<void>.delayed(const Duration(seconds: 2));
           if (mounted) setState(() => _copied = false);

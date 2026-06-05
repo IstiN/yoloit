@@ -17,11 +17,69 @@ class CloudAsrService {
   ];
 
   /// Transcribes audio directly from in-memory bytes, skipping all disk I/O.
-  /// Useful when audio was captured into a memory buffer (e.g. mic stream).
   Future<String> transcribeFromBytes({
     required Uint8List audioBytes,
     required VoiceSettings voiceSettings,
   }) async {
+    final (config, model) = await _resolveConfigAndModel(voiceSettings);
+
+    if (voiceSettings.useChatModelForCloudAsr) {
+      return _transcribeViaChatEndpoint(
+        config: config,
+        model: model,
+        audioBytes: audioBytes,
+        format: 'wav',
+      );
+    }
+    return _transcribeViaCloudEndpointFromBytes(
+      config: config,
+      model: model,
+      audioBytes: audioBytes,
+      mimeType: 'audio/wav',
+    );
+  }
+
+  Future<String> transcribeFromFile({
+    required String audioPath,
+    required VoiceSettings voiceSettings,
+  }) async {
+    final (config, model) = await _resolveConfigAndModel(voiceSettings);
+
+    final (uploadPath, mimeType) = await _prepareTranscriptionUpload(
+      audioPath: audioPath,
+      convertToMp3: voiceSettings.convertWavToMp3,
+    );
+    try {
+      if (voiceSettings.useChatModelForCloudAsr) {
+        return await _transcribeViaChatEndpointFromFile(
+          config: config,
+          model: model,
+          filePath: uploadPath,
+          mimeType: mimeType,
+        );
+      }
+      return await _transcribeViaCloudEndpointFromFile(
+        config: config,
+        model: model,
+        filePath: uploadPath,
+        mimeType: mimeType,
+      );
+    } finally {
+      if (uploadPath != audioPath && File(uploadPath).existsSync()) {
+        try {
+          await File(uploadPath).delete();
+        } on FileSystemException {
+          // ignore temp cleanup failure
+        }
+      }
+    }
+  }
+
+  // ── Config resolution ────────────────────────────────────────────────────
+
+  Future<(CloudLlmConfig, String)> _resolveConfigAndModel(
+    VoiceSettings voiceSettings,
+  ) async {
     final explicitConfigId =
         voiceSettings.useChatModelForCloudAsr
             ? null
@@ -46,24 +104,12 @@ class CloudAsrService {
     if (model.isEmpty) {
       throw StateError('Cloud ASR model is empty.');
     }
-
-    if (voiceSettings.useChatModelForCloudAsr) {
-      return _transcribeViaChatEndpointFromBytes(
-        config: config,
-        model: model,
-        audioBytes: audioBytes,
-        format: 'wav',
-      );
-    }
-    return _transcribeViaCloudEndpointFromBytes(
-      config: config,
-      model: model,
-      audioBytes: audioBytes,
-      mimeType: 'audio/wav',
-    );
+    return (config, model);
   }
 
-  Future<String> _transcribeViaChatEndpointFromBytes({
+  // ── Chat endpoint (inline audio) ─────────────────────────────────────────
+
+  Future<String> _transcribeViaChatEndpoint({
     required CloudLlmConfig config,
     required String model,
     required Uint8List audioBytes,
@@ -82,13 +128,85 @@ class CloudAsrService {
     );
   }
 
+  Future<String> _transcribeViaChatEndpointFromFile({
+    required CloudLlmConfig config,
+    required String model,
+    required String filePath,
+    required String mimeType,
+  }) async {
+    final fileBytes = await File(filePath).readAsBytes();
+    final format = mimeType == 'audio/mpeg' ? 'mp3' : 'wav';
+    return _transcribeViaChatEndpoint(
+      config: config,
+      model: model,
+      audioBytes: fileBytes,
+      format: format,
+    );
+  }
+
+  // ── Cloud endpoint (dedicated /audio/transcriptions) ─────────────────────
+
   Future<String> _transcribeViaCloudEndpointFromBytes({
     required CloudLlmConfig config,
     required String model,
     required Uint8List audioBytes,
     required String mimeType,
   }) async {
-    final normalizedBase = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    return _performCloudTranscription(
+      config: config,
+      model: model,
+      mimeType: mimeType,
+      writeBody: (request) async {
+        request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+        final payload = jsonEncode({
+          'model': model,
+          'input_audio': {
+            'data': base64Encode(audioBytes),
+            'format': mimeType == 'audio/mpeg' ? 'mp3' : 'wav',
+          },
+        });
+        request.add(utf8.encode(payload));
+      },
+    );
+  }
+
+  Future<String> _transcribeViaCloudEndpointFromFile({
+    required CloudLlmConfig config,
+    required String model,
+    required String filePath,
+    required String mimeType,
+  }) async {
+    final fileBytes = await File(filePath).readAsBytes();
+    final fileName = filePath.split(Platform.pathSeparator).last;
+    return _performCloudTranscription(
+      config: config,
+      model: model,
+      mimeType: mimeType,
+      writeBody: (request) async {
+        final adapter = _payloadAdapters.firstWhere(
+          (candidate) => candidate.supports(
+            config: config,
+            baseUrl: _normalizedBaseUrl(config.baseUrl),
+          ),
+        );
+        await adapter.writeRequest(
+          request: request,
+          model: model,
+          fileBytes: fileBytes,
+          fileName: fileName,
+          mimeType: mimeType,
+        );
+      },
+    );
+  }
+
+  Future<String> _performCloudTranscription({
+    required CloudLlmConfig config,
+    required String model,
+    required String mimeType,
+    required Future<void> Function(HttpClientRequest request) writeBody,
+  }) async {
+    final normalizedBase = _normalizedBaseUrl(config.baseUrl);
     final uri = Uri.parse('$normalizedBase/audio/transcriptions');
     final client = HttpClient();
     try {
@@ -100,16 +218,7 @@ class CloudAsrService {
       for (final entry in config.extraHeaders.entries) {
         request.headers.set(entry.key, entry.value);
       }
-      // Use the JSON body format (OpenRouter-compatible).
-      final payload = jsonEncode({
-        'model': model,
-        'input_audio': {
-          'data': base64Encode(audioBytes),
-          'format': mimeType == 'audio/mpeg' ? 'mp3' : 'wav',
-        },
-      });
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-      request.add(utf8.encode(payload));
+      await writeBody(request);
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -118,97 +227,24 @@ class CloudAsrService {
           '${body.length > 600 ? '${body.substring(0, 600)}…' : body}',
         );
       }
-      final decoded = jsonDecode(body) as Map;
-      final text = decoded['text'];
-      if (text is String) return text.trim();
+      final decoded = jsonDecode(body);
+      if (decoded is Map) {
+        final text =
+            (decoded['text'] as String?) ??
+            (decoded['transcript'] as String?) ??
+            (decoded['output_text'] as String?);
+        if (text != null) return text.trim();
+      }
       throw StateError('Cloud ASR returned unexpected response: $body');
     } finally {
       client.close(force: true);
     }
   }
 
-  Future<String> transcribeFromFile({
-    required String audioPath,
-    required VoiceSettings voiceSettings,
-  }) async {
-    final explicitConfigId =
-        voiceSettings.useChatModelForCloudAsr
-            ? null
-            : voiceSettings.cloudAsrConfigId?.trim();
-    CloudLlmConfig? config;
-    if (explicitConfigId != null && explicitConfigId.isNotEmpty) {
-      config = await _settingsService.loadConfigById(explicitConfigId);
-    }
-    config ??= await _settingsService.loadActiveConfig();
-    if (config == null || !config.isValid) {
-      throw StateError(
-        'Cloud ASR is enabled but cloud provider is not configured. '
-        'Open Settings → Cloud Providers.',
-      );
-    }
+  // ── Helpers ──────────────────────────────────────────────────────────────
 
-    final model =
-        !voiceSettings.useChatModelForCloudAsr &&
-                voiceSettings.cloudAsrModel?.trim().isNotEmpty == true
-            ? voiceSettings.cloudAsrModel!.trim()
-            : config.model.trim();
-    if (model.isEmpty) {
-      throw StateError('Cloud ASR model is empty.');
-    }
-
-    final (uploadPath, mimeType) = await _prepareTranscriptionUpload(
-      audioPath: audioPath,
-      convertToMp3: voiceSettings.convertWavToMp3,
-    );
-    try {
-      // When using the chat model for ASR, send audio inline to the LLM
-      // chat endpoint instead of the dedicated /audio/transcriptions endpoint.
-      if (voiceSettings.useChatModelForCloudAsr) {
-        return await _transcribeViaLlmChatEndpoint(
-          config: config,
-          model: model,
-          filePath: uploadPath,
-          mimeType: mimeType,
-        );
-      }
-      return await _transcribeViaCloudEndpoint(
-        config: config,
-        model: model,
-        filePath: uploadPath,
-        mimeType: mimeType,
-      );
-    } finally {
-      if (uploadPath != audioPath && File(uploadPath).existsSync()) {
-        try {
-          await File(uploadPath).delete();
-        } on FileSystemException {
-          // ignore temp cleanup failure
-        }
-      }
-    }
-  }
-
-  /// Sends audio inline to the LLM chat completion endpoint and extracts
-  /// the transcription from the response. Used when [VoiceSettings.useChatModelForCloudAsr] is true.
-  Future<String> _transcribeViaLlmChatEndpoint({
-    required CloudLlmConfig config,
-    required String model,
-    required String filePath,
-    required String mimeType,
-  }) async {
-    final fileBytes = await File(filePath).readAsBytes();
-    final format = mimeType == 'audio/mpeg' ? 'mp3' : 'wav';
-    final payload = buildChatAudioPayload(
-      model: model,
-      audioBytes: fileBytes,
-      format: format,
-    );
-    return postChatCompletion(
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      extraHeaders: config.extraHeaders,
-      payload: payload,
-    );
+  static String _normalizedBaseUrl(String baseUrl) {
+    return baseUrl.replaceFirst(RegExp(r'/+$'), '');
   }
 
   Future<(String, String)> _prepareTranscriptionUpload({
@@ -245,64 +281,9 @@ class CloudAsrService {
     }
     return (filePath, mimeType);
   }
-
-  Future<String> _transcribeViaCloudEndpoint({
-    required CloudLlmConfig config,
-    required String model,
-    required String filePath,
-    required String mimeType,
-  }) async {
-    final normalizedBase = config.baseUrl.replaceFirst(RegExp(r'/+$'), '');
-    final uri = Uri.parse('$normalizedBase/audio/transcriptions');
-    final fileBytes = await File(filePath).readAsBytes();
-    final fileName = filePath.split(Platform.pathSeparator).last;
-    final client = HttpClient();
-    try {
-      final request = await client.postUrl(uri);
-      request.headers.set(
-        HttpHeaders.authorizationHeader,
-        'Bearer ${config.apiKey}',
-      );
-      for (final entry in config.extraHeaders.entries) {
-        request.headers.set(entry.key, entry.value);
-      }
-
-      final adapter = _payloadAdapters.firstWhere(
-        (candidate) =>
-            candidate.supports(config: config, baseUrl: normalizedBase),
-      );
-      await adapter.writeRequest(
-        request: request,
-        model: model,
-        fileBytes: fileBytes,
-        fileName: fileName,
-        mimeType: mimeType,
-      );
-
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError(
-          'Cloud ASR failed (${response.statusCode}): '
-          '${body.length > 600 ? '${body.substring(0, 600)}…' : body}',
-        );
-      }
-
-      final decoded = jsonDecode(body);
-      if (decoded is Map) {
-        final text =
-            (decoded['text'] as String?) ??
-            (decoded['transcript'] as String?) ??
-            (decoded['output_text'] as String?);
-        // text="" is a valid "no speech detected" response — return empty string.
-        if (text != null) return text.trim();
-      }
-      throw StateError('Cloud ASR returned unexpected response: $body');
-    } finally {
-      client.close(force: true);
-    }
-  }
 }
+
+// ── Payload adapters ───────────────────────────────────────────────────────
 
 abstract class _CloudAsrPayloadAdapter {
   const _CloudAsrPayloadAdapter();

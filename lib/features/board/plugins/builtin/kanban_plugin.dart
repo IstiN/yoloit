@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 
 final _kanbanDefaultColors = AppColorScheme.fromAccent(Colors.indigo);
 
@@ -1033,16 +1034,9 @@ class _KanbanCardEditorDialogState extends State<_KanbanCardEditorDialog> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(onPressed: _save, child: const Text('Save')),
-                ],
+              EditorDialogActions(
+                onApply: _save,
+                applyLabel: 'Save',
               ),
             ],
           ),

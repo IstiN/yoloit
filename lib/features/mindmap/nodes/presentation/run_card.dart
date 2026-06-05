@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/mindmap/nodes/presentation/card_props.dart';
+import 'package:yoloit/ui/components/buttons/small_action_button.dart';
 
 /// Presentation run card — identical visuals to macOS RunNode.
 class RunCard extends StatelessWidget {
@@ -81,7 +81,7 @@ class RunCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                _RunActionBtn(
+                SmallActionButton(
                   icon: Icons.copy_all_rounded,
                   tooltip: 'Copy all logs',
                   color: colors.primaryLight,
@@ -89,7 +89,7 @@ class RunCard extends StatelessWidget {
                       onCopy ??
                       () {
                         final text = props.lines.map((l) => l.text).join('\n');
-                        Clipboard.setData(ClipboardData(text: text));
+                        copyToClipboard(text);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Logs copied to clipboard'),
@@ -102,21 +102,21 @@ class RunCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 if (isRunning)
-                  _RunActionBtn(
+                  SmallActionButton(
                     icon: Icons.stop_rounded,
                     tooltip: 'Stop',
                     color: colors.accentRed,
                     onTap: onStop,
                   )
                 else
-                  _RunActionBtn(
+                  SmallActionButton(
                     icon: Icons.play_arrow_rounded,
                     tooltip: 'Start',
                     color: colors.accentGreen,
                     onTap: onStart,
                   ),
                 const SizedBox(width: 4),
-                _RunActionBtn(
+                SmallActionButton(
                   icon: Icons.refresh,
                   tooltip: 'Restart',
                   color: colors.accentBlue,
@@ -176,59 +176,4 @@ class RunCard extends StatelessWidget {
   }
 }
 
-class _RunActionBtn extends StatefulWidget {
-  const _RunActionBtn({
-    required this.icon,
-    required this.tooltip,
-    required this.color,
-    this.onTap,
-  });
-  final IconData icon;
-  final String tooltip;
-  final Color color;
-  final VoidCallback? onTap;
 
-  @override
-  State<_RunActionBtn> createState() => _RunActionBtnState();
-}
-
-class _RunActionBtnState extends State<_RunActionBtn> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Tooltip(
-      message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color:
-                  _hovered
-                      ? widget.color.withAlpha(40)
-                      : colors.surfaceElevated,
-              border: Border.all(
-                color: _hovered ? widget.color : colors.border,
-                width: 1,
-              ),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Icon(
-              widget.icon,
-              size: 13,
-              color: _hovered ? widget.color : colors.textSecondary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

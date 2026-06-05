@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
+import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 
 class ProviderModelsSection extends StatefulWidget {
   const ProviderModelsSection({super.key});
@@ -361,38 +363,16 @@ class _AddCustomModelDialogState extends State<_AddCustomModelDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            LabeledTextField(
               controller: _idController,
+              label: 'Model ID',
               autofocus: true,
-              style: TextStyle(color: onSurface),
-              decoration: InputDecoration(
-                labelText: 'Model ID',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-              ),
               onSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: 12),
-            TextField(
+            LabeledTextField(
               controller: _displayNameController,
-              style: TextStyle(color: onSurface),
-              decoration: InputDecoration(
-                labelText: 'Display Name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colors.border),
-                ),
-              ),
+              label: 'Display Name',
               onSubmitted: (_) => _submit(),
             ),
             if (_error != null) ...[
@@ -409,11 +389,10 @@ class _AddCustomModelDialogState extends State<_AddCustomModelDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+        EditorDialogActions(
+          onApply: _submit,
+          applyLabel: 'OK',
         ),
-        FilledButton(onPressed: _submit, child: const Text('OK')),
       ],
     );
   }

@@ -21,21 +21,9 @@ class PtyService {
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) {
-    final existing = _ptys[sessionId];
-    if (existing != null) {
-      existing.kill();
-      _ptys.remove(sessionId);
-    }
+    _killExisting(sessionId);
 
-    final env = <String, String>{
-      ...Platform.environment,
-      'TERM': 'xterm-256color',
-      'COLORTERM': 'truecolor',
-      'PATH': _enrichedPath(),
-      if (extraEnv != null) ...extraEnv,
-    };
-
-    // Use the user's default shell
+    final env = _buildEnv(extraEnv: extraEnv);
     final shell = PlatformShell.instance.defaultShell;
 
     final pty = Pty.start(
@@ -46,16 +34,9 @@ class PtyService {
       rows: 50,
     );
 
-    _ptys[sessionId] = pty;
-    ResourceMonitorService.instance.registerSession(
-      pty.pid,
-      label ?? sessionId,
-      metadata: metadata,
-    );
-    return pty;
+    return _registerPty(sessionId, pty, label: label, metadata: metadata);
   }
 
-  /// Launches a PTY connected to an existing (or new) tmux session.
   Pty launchTmux({
     required String sessionId,
     required String workspacePath,
@@ -71,30 +52,45 @@ class PtyService {
     ResourceSessionMetadata? metadata,
     Map<String, String>? extraEnv,
   }) {
+    _killExisting(sessionId);
+
+    final pty = tmuxLauncher(
+      sessionId: sessionId,
+      workspacePath: workspacePath,
+      env: _buildEnv(extraEnv: extraEnv),
+      columns: 220,
+      rows: 50,
+    );
+
+    _tmuxSessions.add(sessionId);
+    return _registerPty(sessionId, pty, label: label, metadata: metadata);
+  }
+
+  void _killExisting(String sessionId) {
     final existing = _ptys[sessionId];
     if (existing != null) {
       existing.kill();
       _ptys.remove(sessionId);
     }
+  }
 
-    final env = <String, String>{
+  Map<String, String> _buildEnv({Map<String, String>? extraEnv}) {
+    return <String, String>{
       ...Platform.environment,
       'TERM': 'xterm-256color',
       'COLORTERM': 'truecolor',
       'PATH': _enrichedPath(),
       if (extraEnv != null) ...extraEnv,
     };
+  }
 
-    final pty = tmuxLauncher(
-      sessionId: sessionId,
-      workspacePath: workspacePath,
-      env: env,
-      columns: 220,
-      rows: 50,
-    );
-
+  Pty _registerPty(
+    String sessionId,
+    Pty pty, {
+    String? label,
+    ResourceSessionMetadata? metadata,
+  }) {
     _ptys[sessionId] = pty;
-    _tmuxSessions.add(sessionId);
     ResourceMonitorService.instance.registerSession(
       pty.pid,
       label ?? sessionId,

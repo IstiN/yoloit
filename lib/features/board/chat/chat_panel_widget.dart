@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:record/record.dart';
@@ -2740,7 +2741,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
   Future<void> _copySessionToClipboard() async {
     final transcript = _buildSessionTranscript();
-    await Clipboard.setData(ClipboardData(text: transcript));
+    await copyToClipboard(transcript);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -2804,7 +2805,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             actions: [
               TextButton.icon(
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: message));
+                  await copyToClipboard(message);
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -2873,7 +2874,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               ),
               TextButton.icon(
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: resetCommand));
+                  await copyToClipboard(resetCommand);
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -4727,7 +4728,7 @@ class _ToolResultCardState extends State<_ToolResultCard> {
   bool _expanded = false;
 
   void _copyResult() {
-    Clipboard.setData(ClipboardData(text: widget.content));
+    copyToClipboard(widget.content);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Tool result copied'),

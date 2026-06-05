@@ -94,7 +94,8 @@ class TerminalPainter {
   }) {
     final paint = Paint()
       ..color = _theme.cursor
-      ..strokeWidth = 1;
+      ..strokeWidth = 1
+      ..isAntiAlias = false;
 
     if (!hasFocus) {
       paint.style = PaintingStyle.stroke;
@@ -132,7 +133,8 @@ class TerminalPainter {
 
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 1;
+      ..strokeWidth = 1
+      ..isAntiAlias = false;
 
     canvas.drawRect(
       _snapRect(Rect.fromPoints(offset, endOffset)),
@@ -155,10 +157,14 @@ class TerminalPainter {
       line.getCellData(i, cellData);
 
       final charWidth = cellData.content >> CellContent.widthShift;
-      final cellOffset =
-          Offset(_snap(lineOffset.dx + i * cellWidth), lineOffset.dy);
+      final effectiveCols = charWidth == 2 ? 2 : 1;
+      // Snap both edges from the same base to eliminate gaps and overlaps
+      // between adjacent cell backgrounds.
+      final cellLeft = _snap(lineOffset.dx + i * cellWidth);
+      final cellRight = _snap(lineOffset.dx + (i + effectiveCols) * cellWidth);
+      final cellOffset = Offset(cellLeft, lineOffset.dy);
 
-      paintCell(canvas, cellOffset, cellData);
+      paintCell(canvas, cellOffset, cellData, cellRight);
 
       if (charWidth == 2) {
         i++;
@@ -167,8 +173,8 @@ class TerminalPainter {
   }
 
   @pragma('vm:prefer-inline')
-  void paintCell(Canvas canvas, Offset offset, CellData cellData) {
-    paintCellBackground(canvas, offset, cellData);
+  void paintCell(Canvas canvas, Offset offset, CellData cellData, double rightEdge) {
+    paintCellBackground(canvas, offset, cellData, rightEdge);
     paintCellForeground(canvas, offset, cellData);
   }
 
@@ -223,9 +229,11 @@ class TerminalPainter {
   }
 
   /// Paints the background of a cell represented by [cellData] to [canvas] at
-  /// [offset].
+  /// [offset]. [rightEdge] is the pre-snapped x coordinate of the cell's right
+  /// boundary, ensuring adjacent cells share the same edge without overlap or
+  /// gaps.
   @pragma('vm:prefer-inline')
-  void paintCellBackground(Canvas canvas, Offset offset, CellData cellData) {
+  void paintCellBackground(Canvas canvas, Offset offset, CellData cellData, double rightEdge) {
     late Color color;
     final colorType = cellData.background & CellColor.typeMask;
 
@@ -237,11 +245,11 @@ class TerminalPainter {
       color = resolveBackgroundColor(cellData.background);
     }
 
-    final paint = Paint()..color = color;
-    final doubleWidth = cellData.content >> CellContent.widthShift == 2;
-    final widthScale = doubleWidth ? 2 : 1;
-    final size = Size(_cellSize.width * widthScale + 1, _cellSize.height);
-    canvas.drawRect(_snapRect(offset & size), paint);
+    final paint = Paint()
+      ..color = color
+      ..isAntiAlias = false;
+    final y1 = _snap(offset.dy + _cellSize.height);
+    canvas.drawRect(Rect.fromLTRB(offset.dx, offset.dy, rightEdge, y1), paint);
   }
 
   double _snap(double value) {

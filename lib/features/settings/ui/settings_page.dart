@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/config/app_config.dart';
@@ -380,7 +381,7 @@ class _SupportSectionState extends State<_SupportSection> {
     setState(() => _copying = true);
     try {
       final payload = await SupportLogService.instance.buildCopyPayload();
-      await Clipboard.setData(ClipboardData(text: payload));
+      await copyToClipboard(payload);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -747,7 +748,7 @@ class _PromptCard extends StatelessWidget {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: content));
+                    copyToClipboard(content);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Copied to clipboard'),

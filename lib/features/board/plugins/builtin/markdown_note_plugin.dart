@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/preview/widgets/markdown_document_preview.dart';
+import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 
 final _markdownNoteDefaultColors = AppColorScheme.fromAccent(Colors.deepPurple);
 
@@ -133,7 +134,7 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
   }
 
   Future<void> _copyContent() async {
-    await Clipboard.setData(ClipboardData(text: widget.markdown));
+    await copyToClipboard(widget.markdown);
     if (!mounted) return;
     setState(() => _copied = true);
     await Future<void>.delayed(const Duration(seconds: 1));
@@ -409,16 +410,11 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
               enableAlpha: false,
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
+              EditorDialogActions(
+                onApply: () {
                   setState(() => _selectedColor = picked);
                   Navigator.of(ctx).pop();
                 },
-                child: const Text('Apply'),
               ),
             ],
           ),
@@ -560,18 +556,13 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed:
-              () => Navigator.of(context).pop({
-                '_title': _titleCtrl.text.trim(),
-                '_color': _selectedColor?.toARGB32(),
-                'markdown': _mdCtrl.text,
-              }),
-          child: Text(widget.panel.id.isEmpty ? 'Add' : 'Save'),
+        EditorDialogActions(
+          applyResultBuilder: () => {
+            '_title': _titleCtrl.text.trim(),
+            '_color': _selectedColor?.toARGB32(),
+            'markdown': _mdCtrl.text,
+          },
+          applyLabel: widget.panel.id.isEmpty ? 'Add' : 'Save',
         ),
       ],
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/ui/components/feedback/status_badge.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 
 enum SyncMethod { none, git, googleDrive, customPath }
 
@@ -117,13 +118,13 @@ class _SyncSectionState extends State<SyncSection> {
   Widget _buildGitSection(AppColorScheme colors) {
     return _SyncCard(
       children: [
-        _SyncTextField(
+        LabeledTextField(
           controller: _gitRemoteCtrl,
           label: 'Remote URL',
           hint: 'https://github.com/user/repo.git',
         ),
         const SizedBox(height: 10),
-        _SyncTextField(
+        LabeledTextField(
           controller: _gitBranchCtrl,
           label: 'Branch',
           hint: 'yoloit-sync',
@@ -192,7 +193,7 @@ class _SyncSectionState extends State<SyncSection> {
           ],
         ),
         const SizedBox(height: 10),
-        _SyncTextField(
+        LabeledTextField(
           controller: _gdriveFolderCtrl,
           label: 'Sync Folder',
           hint: '/YoLoIT/sync',
@@ -209,7 +210,7 @@ class _SyncSectionState extends State<SyncSection> {
         Row(
           children: [
             Expanded(
-              child: _SyncTextField(
+              child: LabeledTextField(
                 controller: _customPathCtrl,
                 label: 'Directory Path',
                 hint: '/home/user/yoloit-sync',
@@ -314,66 +315,6 @@ class _SyncCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
       ),
-    );
-  }
-}
-
-class _SyncTextField extends StatelessWidget {
-  const _SyncTextField({
-    required this.controller,
-    required this.label,
-    required this.hint,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final String hint;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color:
-                context.appColors.textMuted,
-            fontSize: 11,
-          ),
-        ),
-        const SizedBox(height: 4),
-        TextField(
-          controller: controller,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 12,
-            fontFamily: 'monospace',
-          ),
-          decoration: InputDecoration(
-            isDense: true,
-            hintText: hint,
-            hintStyle: TextStyle(
-              color:
-                  context.appColors.textMuted,
-              fontSize: 12,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 8,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: colors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: colors.border),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

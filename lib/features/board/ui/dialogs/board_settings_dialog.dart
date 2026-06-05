@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
+import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 
 /// Dialog for editing board name and default folder.
 class BoardSettingsDialog extends StatefulWidget {
@@ -102,17 +103,12 @@ class _BoardSettingsDialogState extends State<BoardSettingsDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed:
-              () => Navigator.of(context).pop((
-                name: _nameController.text.trim(),
-                defaultFolder: _folderController.text.trim(),
-              )),
-          child: const Text('Save'),
+        EditorDialogActions(
+          applyResultBuilder: () => (
+            name: _nameController.text.trim(),
+            defaultFolder: _folderController.text.trim(),
+          ),
+          applyLabel: 'Save',
         ),
       ],
     );

@@ -1,8 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/core/platform/secure_storage_factory.dart';
 
 /// A configured cloud LLM endpoint (OpenRouter, Google Gemini, OpenAI, etc.).
 ///
@@ -234,21 +233,7 @@ class CloudLlmSettingsService {
   static const _assistantProviderPrefKey = 'assistant_provider_type_v1';
   static const _voiceSettingsPrefKey = 'voice_settings_v1';
 
-  static FlutterSecureStorage _buildStorage() {
-    if (Platform.isMacOS) {
-      return const FlutterSecureStorage(
-        mOptions: MacOsOptions(usesDataProtectionKeychain: false),
-      );
-    } else if (Platform.isWindows) {
-      return const FlutterSecureStorage(
-        wOptions: WindowsOptions(useBackwardCompatibility: false),
-      );
-    } else {
-      return const FlutterSecureStorage(lOptions: LinuxOptions());
-    }
-  }
-
-  final _storage = _buildStorage();
+  final _storage = SecureStorageFactory.create();
 
   /// Load all saved cloud provider configs.
   Future<List<CloudLlmConfig>> loadConfigs() async {

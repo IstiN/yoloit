@@ -4,7 +4,9 @@ import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/ui/components/color_swatch_row.dart';
+import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 import 'package:yoloit/ui/components/input/panel_text_controller_mixin.dart';
+import 'package:yoloit/ui/components/typography/editor_section_label.dart';
 
 class StickyNotePlugin extends BoardPanelPlugin {
   const StickyNotePlugin();
@@ -73,15 +75,12 @@ class StickyNotePlugin extends BoardPanelPlugin {
     BuildContext context,
     BoardPanelInstance panel,
     ValueChanged<Map<String, dynamic>> onSave,
-  ) async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => _StickyEditorDialog(panel: panel),
-    );
-    if (result == null) return false;
-    onSave({...panel.state, ...result});
-    return true;
-  }
+  ) => showPanelEditorDialog(
+    context,
+    panel,
+    onSave,
+    (ctx) => _StickyEditorDialog(panel: panel),
+  );
 }
 
 class _StickyNoteContent extends StatefulWidget {
@@ -209,21 +208,21 @@ class _StickyEditorDialogState extends State<_StickyEditorDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionLabel('Note color'),
+            const EditorSectionLabel('Note color'),
             ColorSwatchRow(
               colors: _noteColors,
               selected: _color,
               onSelected: (value) => setState(() => _color = value),
             ),
             const SizedBox(height: 16),
-            const _SectionLabel('Text color'),
+            const EditorSectionLabel('Text color'),
             ColorSwatchRow(
               colors: _textColors,
               selected: _textColor,
               onSelected: (value) => setState(() => _textColor = value),
             ),
             const SizedBox(height: 16),
-            _SectionLabel('Text size ${_fontSize.round()}'),
+            EditorSectionLabel('Text size ${_fontSize.round()}'),
             Slider(
               min: 12,
               max: 36,
@@ -235,37 +234,15 @@ class _StickyEditorDialogState extends State<_StickyEditorDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed:
-              () => Navigator.of(context).pop({
-                'color': _color,
-                'textColor': _textColor,
-                'fontSize': _fontSize,
-              }),
-          child: const Text('Apply'),
+        EditorDialogActions(
+          applyResultBuilder: () => {
+            'color': _color,
+            'textColor': _textColor,
+            'fontSize': _fontSize,
+          },
         ),
       ],
     );
   }
 }
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text, style: Theme.of(context).textTheme.labelLarge),
-    );
-  }
-}
-
-
 

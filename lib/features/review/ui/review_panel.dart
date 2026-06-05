@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
@@ -716,14 +717,14 @@ class _FileTreeNodeWidgetState extends State<_FileTreeNodeWidget> {
       case 'new_folder':
         _showNewFolderDialog(context, node.path);
       case 'copy_path':
-        await Clipboard.setData(ClipboardData(text: node.path));
+        await copyToClipboard(node.path);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Path copied'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
           );
         }
       case 'copy_name':
-        await Clipboard.setData(ClipboardData(text: node.name));
+        await copyToClipboard(node.name);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Filename copied'), duration: Duration(seconds: 1), behavior: SnackBarBehavior.floating),
