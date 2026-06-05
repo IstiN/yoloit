@@ -615,8 +615,17 @@ flowchart TD
     required List<Map<String, Object?>> tools,
     required void Function(String delta) onDelta,
   }) async {
-    final url =
-        '${config.baseUrl.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+    var base = config.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    // Ollama's OpenAI-compatible endpoint lives under /v1.  If the user
+    // configured a local Ollama URL without the /v1 suffix, auto-correct it
+    // so the request doesn't 404 on /chat/completions.
+    final lowerBase = base.toLowerCase();
+    final looksLikeOllama =
+        lowerBase.contains('ollama') || lowerBase.contains(':11434');
+    if (looksLikeOllama && !lowerBase.endsWith('/v1')) {
+      base = '$base/v1';
+    }
+    final url = '$base/chat/completions';
 
     // Convert internal message format to OpenAI API format.
     final apiMessages =

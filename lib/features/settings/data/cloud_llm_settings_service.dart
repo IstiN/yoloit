@@ -79,10 +79,20 @@ class CloudLlmConfig {
   }
 
   /// Whether this config has enough data to make API calls.
-  bool get isValid =>
-      apiKey.trim().isNotEmpty &&
-      baseUrl.trim().isNotEmpty &&
-      model.trim().isNotEmpty;
+  ///
+  /// Local endpoints (e.g. Ollama on localhost) do not require an API key.
+  bool get isValid {
+    final url = baseUrl.trim().toLowerCase();
+    final isLocalEndpoint =
+        url.contains('localhost') ||
+        url.contains('127.0.0.1') ||
+        url.contains('::1') ||
+        url.contains('ollama');
+    return
+        baseUrl.trim().isNotEmpty &&
+        model.trim().isNotEmpty &&
+        (isLocalEndpoint || apiKey.trim().isNotEmpty);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,6 +187,21 @@ const kCloudLlmPresets = <CloudLlmPreset>[
       ),
       (id: 'openai/whisper-large-v3-turbo', name: 'Whisper Large v3 Turbo'),
       (id: 'openai/whisper-large-v3', name: 'Whisper Large v3'),
+    ],
+  ),
+  CloudLlmPreset(
+    id: 'ollama-local',
+    name: 'Ollama (Local)',
+    baseUrl: 'http://localhost:11434/v1',
+    defaultModel: 'qwen3:8b',
+    models: [
+      (id: 'qwen3:8b', name: 'Qwen 3 8B'),
+      (id: 'qwen3:32b', name: 'Qwen 3 32B'),
+      (id: 'llama3.1:8b', name: 'Llama 3.1 8B'),
+      (id: 'mistral:7b', name: 'Mistral 7B'),
+      (id: 'gemma3:27b', name: 'Gemma 3 27B'),
+      (id: 'deepseek-r1:14b', name: 'DeepSeek R1 14B'),
+      (id: 'ministral-3:14b', name: 'Ministral 3 14B'),
     ],
   ),
   CloudLlmPreset(

@@ -569,24 +569,73 @@ class TerminalCubit extends Cubit<TerminalState> {
     return normalized;
   }
 
+  /// Batched output buffer per session to avoid flooding the xterm
+  /// [notifyListeners] bridge on every PTY chunk.  When a runner dumps
+  /// thousands of lines per second, each [Terminal.write] triggers a full
+  /// UI rebuild; batching reduces that to ~20 rebuilds/sec.
+  final Map<String, StringBuffer> _batchedOutput = {};
+  final Map<String, Timer> _batchFlushTimers = {};
+  static const _batchFlushIntervalMs = 50;
+  static const _batchMaxBytes = 16384;
+
   void _attachProcessToSession(TerminalProcess process, AgentSession session) {
+    final sessionId = session.id;
+
+    void flushBatch() {
+      final buf = _batchedOutput.remove(sessionId);
+      if (buf == null || buf.isEmpty) return;
+      final data = buf.toString();
+      session.terminal.write(data);
+      _logging.write(sessionId, data);
+      session.appendOutput(data);
+    }
+
+    void scheduleFlush() {
+      _batchFlushTimers[sessionId]?.cancel();
+      _batchFlushTimers[sessionId] = Timer(
+        const Duration(milliseconds: _batchFlushIntervalMs),
+        () {
+          _batchFlushTimers.remove(sessionId);
+          flushBatch();
+        },
+      );
+    }
+
     process.output.listen(
       (data) {
-        session.terminal.write(data);
-        _logging.write(session.id, data);
-        session.appendOutput(data); // capture for browser streaming
+        // Accumulate into batch buffer.
+        final buf = _batchedOutput.putIfAbsent(sessionId, StringBuffer.new);
+        buf.write(data);
 
-        // ── PTY activity detection (backup when hooks don't fire) ──────
+        // Flush immediately if the batch is large, otherwise schedule.
+        if (buf.length >= _batchMaxBytes) {
+          _batchFlushTimers[sessionId]?.cancel();
+          _batchFlushTimers.remove(sessionId);
+          flushBatch();
+        } else {
+          scheduleFlush();
+        }
+
+        // PTY activity detection (backup when hooks don't fire).
+        // Use the *original* chunk so patterns aren't split across batches.
         final ptyConfig = session.type.ptyConfig;
         if (ptyConfig.hasDetection) {
           _onPtyActivity(session, data, ptyConfig);
         }
-
-        // Done-prompt detection is now handled inside _onPtyActivity via config.
       },
-      onDone: () => _onSessionDone(session.id),
+      onDone: () {
+        _batchFlushTimers[sessionId]?.cancel();
+        _batchFlushTimers.remove(sessionId);
+        flushBatch();
+        _onSessionDone(sessionId);
+      },
       // ignore: avoid_types_on_closure_parameters
-      onError: (Object e) => _onSessionDone(session.id),
+      onError: (Object e) {
+        _batchFlushTimers[sessionId]?.cancel();
+        _batchFlushTimers.remove(sessionId);
+        flushBatch();
+        _onSessionDone(sessionId);
+      },
     );
   }
 
@@ -800,6 +849,11 @@ class TerminalCubit extends Cubit<TerminalState> {
       t.cancel();
     }
     _approvalClearTimers.clear();
+    for (final t in _batchFlushTimers.values) {
+      t.cancel();
+    }
+    _batchFlushTimers.clear();
+    _batchedOutput.clear();
     AgentHookService.instance.stop();
     // Local PTY sessions are owned by their backend. Runtime sessions are
     // intentionally left alive across app shutdowns.
