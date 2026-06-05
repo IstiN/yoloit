@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
+import 'package:yoloit/features/board/chat/chat_panel_models.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 
 void main() {

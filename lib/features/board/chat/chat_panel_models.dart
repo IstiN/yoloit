@@ -20,7 +20,6 @@ class ChatSlashCommand {
   bool matches(String text) => triggers.any(text.startsWith);
 }
 
-@visibleForTesting
 List<(String, String)> buildChatProviderOptions(Iterable<AgentConfig> configs) {
   final byId = <String, String>{};
   for (final cfg in configs) {
@@ -31,7 +30,6 @@ List<(String, String)> buildChatProviderOptions(Iterable<AgentConfig> configs) {
   return byId.entries.map((e) => (e.key, e.value)).toList();
 }
 
-@visibleForTesting
 String? resolveChatProviderSelection(
   String selectedProvider,
   List<(String, String)> providers,
