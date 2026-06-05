@@ -18,6 +18,10 @@ import 'package:yoloit/core/remote/yoloitd_panel_catalog.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/ui/components/buttons/markdown_tool_button.dart';
+import 'package:yoloit/ui/components/buttons/overlay_icon_button.dart';
+import 'package:yoloit/ui/components/buttons/panel_header_icon_button.dart';
+import 'package:yoloit/ui/components/chip/toolbar_chip.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/core/utils/date_utils.dart';
 import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
@@ -1156,7 +1160,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              _OverlayIconButton(
+                                              OverlayIconButton(
                                                 icon: Icons.fit_screen_outlined,
                                                 tooltip: 'Fit board to content',
                                                 onTap:
@@ -1166,7 +1170,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     ),
                                               ),
                                               const SizedBox(width: 6),
-                                              _OverlayIconButton(
+                                              OverlayIconButton(
                                                 icon:
                                                     _showMinimap
                                                         ? Icons.map
@@ -2828,7 +2832,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          _MarkdownToolButton(
+                          MarkdownToolButton(
                             icon: Icons.title,
                             tooltip: 'Heading',
                             onTap: () {
@@ -2836,7 +2840,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               setDialogState(() {});
                             },
                           ),
-                          _MarkdownToolButton(
+                          MarkdownToolButton(
                             icon: Icons.format_bold,
                             tooltip: 'Bold',
                             onTap: () {
@@ -2849,7 +2853,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               setDialogState(() {});
                             },
                           ),
-                          _MarkdownToolButton(
+                          MarkdownToolButton(
                             icon: Icons.format_italic,
                             tooltip: 'Italic',
                             onTap: () {
@@ -2862,7 +2866,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               setDialogState(() {});
                             },
                           ),
-                          _MarkdownToolButton(
+                          MarkdownToolButton(
                             icon: Icons.format_list_bulleted,
                             tooltip: 'Bullet list',
                             onTap: () {
@@ -2870,7 +2874,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               setDialogState(() {});
                             },
                           ),
-                          _MarkdownToolButton(
+                          MarkdownToolButton(
                             icon: Icons.check_box_outlined,
                             tooltip: 'Checklist',
                             onTap: () {
@@ -2881,7 +2885,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               setDialogState(() {});
                             },
                           ),
-                          _MarkdownToolButton(
+                          MarkdownToolButton(
                             icon: Icons.link,
                             tooltip: 'Link',
                             onTap: () {
@@ -2894,7 +2898,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                               setDialogState(() {});
                             },
                           ),
-                          _MarkdownToolButton(
+                          MarkdownToolButton(
                             icon: Icons.code,
                             tooltip: 'Code block',
                             onTap: () {
@@ -3235,7 +3239,7 @@ class _BoardToolbar extends StatelessWidget {
                 ),
               if (!compact && board.defaultFolder.isNotEmpty) ...[
                 const SizedBox(width: 12),
-                _ToolbarChip(
+                ToolbarChip(
                   icon: Icons.folder_outlined,
                   label: _shortToolbarPath(board.defaultFolder),
                 ),
@@ -3860,7 +3864,7 @@ class _BoardOverviewLayerState extends State<_BoardOverviewLayer>
                 right: 14,
                 child: Opacity(
                   opacity: fade,
-                  child: _OverlayIconButton(
+                  child: OverlayIconButton(
                     icon: Icons.close,
                     tooltip: 'Close boards overview',
                     onTap: _close,
@@ -4450,114 +4454,6 @@ class _BoardOverviewPngPreview extends StatelessWidget {
 }
 
 
-class _ToolbarChip extends StatelessWidget {
-  const _ToolbarChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.divider),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: context.appColors.textMuted,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: context.appColors.textMuted,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OverlayIconButton extends StatelessWidget {
-  const _OverlayIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.active = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color:
-                Theme.of(context).brightness == Brightness.light
-                    ? colors.surface
-                    : colors.surface.withAlpha(0xE5),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: active ? colors.primary.withAlpha(128) : colors.border,
-            ),
-          ),
-          child: Icon(
-            icon,
-            size: 15,
-            color:
-                active
-                    ? colors.primary
-                    : context.appColors.textMuted,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MarkdownToolButton extends StatelessWidget {
-  const _MarkdownToolButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onTap,
-      icon: Icon(icon, size: 18),
-      splashRadius: 16,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}
-
 enum _BoardPanelResizeHandle {
   topLeft,
   top,
@@ -5074,7 +4970,7 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                                     ),
                                           );
                                         }(),
-                                        _PanelHeaderIconButton(
+                                        PanelHeaderIconButton(
                                           tooltip: 'Panel settings',
                                           icon: Icons.tune_rounded,
                                           onPressed:
@@ -5088,12 +4984,12 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
                                                 onSendToBack: onSendToBack,
                                               ),
                                         ),
-                                        _PanelHeaderIconButton(
+                                        PanelHeaderIconButton(
                                           tooltip: 'Bring to front',
                                           icon: Icons.flip_to_front_outlined,
                                           onPressed: onBringToFront,
                                         ),
-                                        _PanelHeaderIconButton(
+                                        PanelHeaderIconButton(
                                           tooltip: 'Send to back',
                                           icon: Icons.flip_to_back_outlined,
                                           onPressed: onSendToBack,
@@ -6310,33 +6206,6 @@ String _miroToolbarTextOrientationLabel(String value) => switch (value) {
   _ => 'Horizontal',
 };
 
-class _PanelHeaderIconButton extends StatelessWidget {
-  const _PanelHeaderIconButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 28,
-      height: 28,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        icon: Icon(icon, size: 16),
-        splashRadius: 14,
-        padding: EdgeInsets.zero,
-      ),
-    );
-  }
-}
-
 class PanelSettingsDialog extends StatelessWidget {
   const PanelSettingsDialog({
     super.key,
@@ -7196,7 +7065,7 @@ class _BoardToolsPanel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         // ── Toggle button ─────────────────────────────────────────────────
-        _OverlayIconButton(
+        OverlayIconButton(
           icon: visible ? Icons.tune : Icons.tune_outlined,
           tooltip: visible ? 'Hide tools' : 'Show tools',
           active: visible,
