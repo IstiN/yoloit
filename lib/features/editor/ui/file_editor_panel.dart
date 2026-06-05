@@ -127,6 +127,7 @@ class _FileEditorPanelState extends State<FileEditorPanel>
         // tokenizes the entire file eagerly and freezes the UI on open.
         language: large ? null : _modeFor(tab.filePath),
       );
+      ctrl.selection = TextSelection.collapsed(offset: ctrl.text.length);
       _controllers[tab.filePath] = ctrl;
       _loadedContent[tab.filePath] = tab.content ?? '';
       ctrl.addListener(() {
@@ -1707,7 +1708,6 @@ class _EditorBodyState extends State<_EditorBody> {
       },
       child: Focus(
         focusNode: _editorFocus,
-        autofocus: true,
         descendantsAreFocusable: !_showQuickFind,
         onKeyEvent:
             (_, event) =>

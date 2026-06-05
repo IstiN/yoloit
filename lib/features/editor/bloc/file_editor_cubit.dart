@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/session/session_prefs.dart';
+import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/editor/bloc/file_editor_state.dart';
 import 'package:yoloit/features/review/data/diff_service.dart';
 
@@ -295,6 +296,7 @@ class FileEditorCubit extends Cubit<FileEditorState> {
       }
       await File(filePath).writeAsString(content);
       _updateTab(filePath, (t) => t.copyWith(originalContent: content));
+      BoardEventBus.instance.emit(BoardFileModifiedEvent(filePath));
     } catch (_) {
       // Silently ignore write errors for auto-save.
     }
