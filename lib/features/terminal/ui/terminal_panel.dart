@@ -1969,6 +1969,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
                       _dragStartGlobal = null;
                       _isDragSelecting = false;
                       _activePointers.remove(event.pointer);
+                      // Stop the periodic preserve timer so it doesn't fight
+                      // RawScrollbar's jumpTo() calls during the drag.
+                      _userScrollAnchorTimer?.cancel();
+                      _userScrollAnchorTimer = null;
+                      _userScrollPreserveTimer?.cancel();
+                      _userScrollPreserveTimer = null;
+                      _userScrollAnchor = null;
                       return;
                     }
                     // Right-click → context menu
@@ -1991,7 +1998,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
                   },
                   onPointerMove: (event) {
                     if (_scrollbarPointers.contains(event.pointer)) {
-                      _markUserScrollActive();
+                      // RawScrollbar handles position changes via jumpTo()
+                      // internally. Do NOT call _markUserScrollActive() here —
+                      // that would start _preserveUserScrollDuringOutput() which
+                      // fights the scrollbar by immediately restoring the old pos.
                       return;
                     }
                     _activePointers[event.pointer] = event.localPosition;
@@ -2031,6 +2041,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
                       _clickDownPosition = null;
                       _dragStartGlobal = null;
                       _isDragSelecting = false;
+                      // Anchor scroll to the position where user released the
+                      // scrollbar, so terminal output doesn't jump to bottom.
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) _markUserScrollActive();
+                      });
                       return;
                     }
                     _activePointers.remove(event.pointer);

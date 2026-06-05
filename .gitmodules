@@ -4,3 +4,6 @@
 [submodule "third_party/flutter_local_models"]
 	path = third_party/flutter_local_models
 	url = https://github.com/IstiN/flutter_local_models.git
+[submodule "packages/xterm"]
+	path = packages/xterm
+	url = https://github.com/IstiN/xterm.git
