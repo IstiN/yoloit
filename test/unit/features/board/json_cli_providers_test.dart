@@ -174,6 +174,105 @@ void main() {
     expect(starter.calls.single, contains('stream-json'));
   });
 
+  test('Kimi provider parses assistant with tool_calls', () async {
+    final starter = _FakeStarter();
+    final process = _FakeProcess(pid: 103, stdin: stdinSink);
+    starter.processes.add(process);
+    final provider = KimiCliProvider(processStarter: starter.start);
+
+    final eventsFuture =
+        provider
+            .sendMessage(
+              message: 'run ls',
+              config: config('kimi'),
+              isFirstMessage: true,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+
+    process.addStdout(
+      '{"role":"assistant","content":"Sure.","tool_calls":[{"type":"function","id":"call_abc","function":{"name":"bash","arguments":"{\\"command\\": \\"ls\\"}"}}]}\n',
+    );
+    await process.closeStdout();
+    await process.closeStderr();
+    process.completeExit(0);
+
+    final events = await eventsFuture;
+    expect(events, hasLength(2));
+    expect(events[0].type, ChatEventType.toolStart);
+    expect(events[0].data['toolCallId'], 'call_abc');
+    expect(events[0].data['toolName'], 'bash');
+    expect(events[1].type, ChatEventType.assistantMessage);
+    expect(events[1].messageContent, 'Sure.');
+    expect(events[1].toolRequests, hasLength(1));
+    expect(events[1].toolRequests.first['toolCallId'], 'call_abc');
+    expect(events[1].toolRequests.first['name'], 'bash');
+  });
+
+  test('Kimi provider parses tool result message', () async {
+    final starter = _FakeStarter();
+    final process = _FakeProcess(pid: 104, stdin: stdinSink);
+    starter.processes.add(process);
+    final provider = KimiCliProvider(processStarter: starter.start);
+
+    final eventsFuture =
+        provider
+            .sendMessage(
+              message: 'run ls',
+              config: config('kimi'),
+              isFirstMessage: true,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+
+    process.addStdout(
+      '{"role":"tool","content":[{"type":"text","text":"file.txt"}],"tool_call_id":"call_abc"}\n',
+    );
+    await process.closeStdout();
+    await process.closeStderr();
+    process.completeExit(0);
+
+    final events = await eventsFuture;
+    expect(events.single.type, ChatEventType.toolComplete);
+    expect(events.single.toolCallId, 'call_abc');
+    expect(events.single.toolResultContent, 'file.txt');
+    expect(events.single.toolSuccess, isTrue);
+  });
+
+  test('Kimi provider parses notification and plan display', () async {
+    final starter = _FakeStarter();
+    final process = _FakeProcess(pid: 105, stdin: stdinSink);
+    starter.processes.add(process);
+    final provider = KimiCliProvider(processStarter: starter.start);
+
+    final eventsFuture =
+        provider
+            .sendMessage(
+              message: 'plan',
+              config: config('kimi'),
+              isFirstMessage: true,
+            )
+            .toList();
+    await Future<void>.delayed(Duration.zero);
+
+    process.addStdout(
+      '{"id":"n1","category":"system","type":"mcp_ready","source_kind":"system","source_id":"sys","title":"MCP ready","body":"Servers loaded","severity":"info","created_at":123.0,"payload":{}}\n',
+    );
+    process.addStdout(
+      '{"content":"# Plan\\n1. A\\n2. B","file_path":"/tmp/plan.md"}\n',
+    );
+    await process.closeStdout();
+    await process.closeStderr();
+    process.completeExit(0);
+
+    final events = await eventsFuture;
+    expect(events, hasLength(2));
+    expect(events[0].type, ChatEventType.sessionStatus);
+    expect(events[0].data['title'], 'MCP ready');
+    expect(events[1].type, ChatEventType.assistantMessage);
+    expect(events[1].messageContent, '# Plan\n1. A\n2. B');
+  });
+
   test('Codex provider parses thread, assistant, and usage JSONL', () async {
     final starter = _FakeStarter();
     final process = _FakeProcess(pid: 202, stdin: stdinSink);

@@ -80,20 +80,97 @@ class KimiCliProvider extends CliProviderBase {
     final json = jsonDecode(line) as Map<String, dynamic>;
     final role = json['role'] as String?;
 
+    // Assistant message (may contain tool_calls).
     if (role == 'assistant') {
       final content = _extractText(json['content']);
-      if (content.isEmpty) return const [];
+      final toolCalls = _extractToolCalls(json['tool_calls']);
       final id = 'kimi-${DateTime.now().microsecondsSinceEpoch}';
-      return [
+      final events = <ChatEvent>[];
+
+      // Emit toolStart for each requested tool call so the UI shows a
+      // running card before the tool result arrives.
+      for (final tc in toolCalls) {
+        final tcId = tc['toolCallId'] as String? ?? '';
+        events.add(
+          ChatEvent(
+            type: ChatEventType.toolStart,
+            rawType: 'kimi.tool_call.start',
+            id: tcId,
+            data: {
+              'toolCallId': tcId,
+              'toolName': tc['name'] as String? ?? '',
+              'arguments': tc['arguments'],
+            },
+          ),
+        );
+      }
+
+      events.add(
         ChatEvent(
           type: ChatEventType.assistantMessage,
           rawType: 'kimi.assistant',
           id: id,
-          data: {'messageId': id, 'content': content},
+          data: {
+            'messageId': id,
+            'content': content,
+            if (toolCalls.isNotEmpty) 'toolRequests': toolCalls,
+          },
+        ),
+      );
+      return events;
+    }
+
+    // Tool result message.
+    if (role == 'tool') {
+      final content = _extractText(json['content']);
+      final toolCallId = json['tool_call_id'] as String? ?? '';
+      final isError = content.contains('<system>ERROR:');
+      return [
+        ChatEvent(
+          type: ChatEventType.toolComplete,
+          rawType: 'kimi.tool',
+          id: toolCallId,
+          data: {
+            'toolCallId': toolCallId,
+            'toolName': '',
+            'success': !isError,
+            'result': {'content': content},
+          },
         ),
       ];
     }
 
+    // System notification (no role field).
+    if (json['category'] is String || json['severity'] is String) {
+      final title = json['title'] as String? ?? '';
+      final body = json['body'] as String? ?? '';
+      if (title.isNotEmpty || body.isNotEmpty) {
+        return [
+          ChatEvent(
+            type: ChatEventType.sessionStatus,
+            rawType: 'kimi.notification',
+            data: {'title': title, 'body': body},
+          ),
+        ];
+      }
+      return const [];
+    }
+
+    // Plan display (no role field).
+    if (json['file_path'] is String && json['content'] != null) {
+      final planContent = json['content'] as String? ?? '';
+      final planId = 'kimi-plan-${DateTime.now().microsecondsSinceEpoch}';
+      return [
+        ChatEvent(
+          type: ChatEventType.assistantMessage,
+          rawType: 'kimi.plan',
+          id: planId,
+          data: {'messageId': planId, 'content': planContent},
+        ),
+      ];
+    }
+
+    // Legacy meta event for session resumption (kept for backwards compat).
     if (role == 'meta' && json['type'] == 'session.resume_hint') {
       final sessionId = json['session_id'] as String?;
       if (sessionId != null && sessionId.isNotEmpty) {
@@ -105,6 +182,8 @@ class KimiCliProvider extends CliProviderBase {
     return const [];
   }
 
+  /// Extracts plain text from Kimi message content.
+  /// Content may be a single string or a list of content parts.
   String _extractText(Object? content) {
     if (content is String) return content;
     if (content is List) {
@@ -121,5 +200,35 @@ class KimiCliProvider extends CliProviderBase {
           .join();
     }
     return '';
+  }
+
+  /// Converts kosong-style tool_calls into the yoloit toolRequests format.
+  List<Map<String, dynamic>> _extractToolCalls(Object? toolCallsJson) {
+    if (toolCallsJson is! List) return const [];
+    return toolCallsJson
+        .whereType<Map<String, dynamic>>()
+        .map((tc) {
+          final id = tc['id'] as String? ?? '';
+          final function = tc['function'] as Map<String, dynamic>?;
+          final name = function?['name'] as String? ?? '';
+          final argumentsStr = function?['arguments'] as String? ?? '{}';
+          Map<String, dynamic> args;
+          try {
+            args = jsonDecode(argumentsStr) as Map<String, dynamic>;
+          } catch (_) {
+            args = <String, dynamic>{};
+          }
+          return <String, dynamic>{
+            'toolCallId': id,
+            'name': name,
+            'arguments': args,
+          };
+        })
+        .where(
+          (tc) =>
+              tc['toolCallId'] != null &&
+              (tc['toolCallId'] as String).isNotEmpty,
+        )
+        .toList();
   }
 }

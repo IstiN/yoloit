@@ -19,7 +19,8 @@ void main() {
     'lib/features/settings/ui/settings_page.dart': 43,
     'lib/features/settings/ui/debug_ui/sections/plectrum_debug.dart': 12,
     'lib/features/settings/ui/debug_ui/sections/voice_overlay_debug.dart': 19,
-    'lib/features/board/ui/board_view.dart': 4,
+    'lib/features/board/ui/board_history_panel.dart': 2,
+    'lib/features/board/ui/board_view.dart': 2,
     'lib/features/board/ui/miro_panel_toolbar.dart': 33,
     'lib/features/board/ui/board_overview_preview.dart': 57,
     'lib/features/board/chat/chat_panel_widget.dart': 55,
@@ -152,7 +153,8 @@ void main() {
     // Also catches hardcoded Colors.white / Colors.black which should
     // come from the theme instead.
     const colorsBaseline = <String, int>{
-      'lib/features/board/ui/board_view.dart': 7,
+      'lib/features/board/ui/board_history_panel.dart': 2,
+      'lib/features/board/ui/board_view.dart': 5,
       'lib/features/board/ui/miro_panel_toolbar.dart': 1,
       'lib/ui/components/menus/miro_toolbar_primitives.dart': 2,
       'lib/features/settings/ui/settings_page.dart': 11,
