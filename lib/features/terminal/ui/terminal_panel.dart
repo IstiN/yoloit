@@ -625,7 +625,11 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _focusRetryTimer?.cancel();
     _focusRetryTimer = Timer(const Duration(milliseconds: 300), () {
       if (mounted && widget.isActive && !_focusNode.hasFocus) {
-        _focusNode.requestFocus();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && widget.isActive && !_focusNode.hasFocus) {
+            _focusNode.requestFocus();
+          }
+        });
       }
     });
   }
@@ -1197,7 +1201,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
                   key: _terminalViewKey,
                   controller: _controller,
                   focusNode: _focusNode,
-                  autofocus: widget.isActive,
+                  autofocus: false,
                   onKeyEvent: _onTerminalKeyEvent,
                   textStyle: TerminalStyle(
                     fontSize: _fontSize,

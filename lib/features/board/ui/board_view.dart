@@ -2182,6 +2182,8 @@ class _BoardPanelCard extends StatefulWidget {
 
 class _BoardPanelCardState extends State<_BoardPanelCard>
     with SingleTickerProviderStateMixin {
+  static final Set<String> _animatedPanelIds = {};
+
   late final AnimationController _entryController;
   late final Animation<double> _opacity;
   late final Animation<double> _scale;
@@ -2214,7 +2216,12 @@ class _BoardPanelCardState extends State<_BoardPanelCard>
     _scale = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(parent: _entryController, curve: Curves.easeOutBack),
     );
-    _entryController.forward();
+    if (_animatedPanelIds.contains(widget.panel.id)) {
+      _entryController.value = 1.0;
+    } else {
+      _animatedPanelIds.add(widget.panel.id);
+      _entryController.forward();
+    }
   }
 
   @override

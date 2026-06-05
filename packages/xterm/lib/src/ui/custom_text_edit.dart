@@ -166,6 +166,7 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
         autocorrect: false,
         enableSuggestions: false,
         enableIMEPersonalizedLearning: false,
+        viewId: View.of(context).viewId,
       );
 
       _connection = TextInput.attach(this, config);
