@@ -9,6 +9,11 @@ class SessionHistoryListView extends StatelessWidget {
     required this.currentPanelId,
     this.trailingActions,
     this.onItemTap,
+    this.fallbackName = 'Unnamed session',
+    this.showModel = true,
+    this.borderNonCurrent = false,
+    this.activeColor,
+    this.mutedColor,
     super.key,
   });
 
@@ -16,6 +21,11 @@ class SessionHistoryListView extends StatelessWidget {
   final String currentPanelId;
   final Widget Function(ChatSessionEntry entry, bool isCurrent)? trailingActions;
   final void Function(ChatSessionEntry entry)? onItemTap;
+  final String fallbackName;
+  final bool showModel;
+  final bool borderNonCurrent;
+  final Color? activeColor;
+  final Color? mutedColor;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +42,7 @@ class SessionHistoryListView extends StatelessWidget {
               'No sessions yet.\nStart chatting to see history here.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: context.appColors.textMuted,
+                color: mutedColor ?? context.appColors.textMuted,
                 fontSize: 13,
               ),
             ),
@@ -49,6 +59,11 @@ class SessionHistoryListView extends StatelessWidget {
               isCurrent: isCurrent,
               onTap: onItemTap != null ? () => onItemTap!(entry) : null,
               trailing: trailingActions?.call(entry, isCurrent),
+              fallbackName: fallbackName,
+              showModel: showModel,
+              borderNonCurrent: borderNonCurrent,
+              activeColor: activeColor,
+              mutedColor: mutedColor,
             );
           },
         );
