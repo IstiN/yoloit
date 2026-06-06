@@ -110,7 +110,33 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
 
 ---
 
+## ⚡ Performance Optimization Rules
+
+- **Prefer `withAlpha` over `withOpacity`**:
+  - `withOpacity` triggers a save-layer compositing pass. Use `withAlpha` (or `withValues(alpha: ...)`) for static/partial transparency instead.
+- **Use `MediaQuery.sizeOf(context)` instead of `MediaQuery.of(context).size`**:
+  - `MediaQuery.of` rebuilds on any MediaQuery change. `sizeOf` only rebuilds when the size actually changes.
+- **Use `Visibility` instead of binary `Opacity` (`opacity: 0.0 / 1.0`)**:
+  - `Visibility` removes the subtree from the render tree when hidden, avoiding compositing cost entirely.
+- **Add `isComplex: true` to heavy `CustomPaint` widgets**:
+  - Grid painters, link painters, minimap painters, and shape painters should set `isComplex: true` so Flutter raster-caches the output.
+- **Add `gaplessPlayback: true` to `Image.memory` / `Image.network` / `Image.file`**:
+  - Prevents flickering when the image bytes change.
+- **Wrap expensive content in `RepaintBoundary`**:
+  - `CodeField`, `MarkdownBody`, `MarkdownDocumentPreview`, `TerminalView`, `SelectionArea`, `ShaderMask`, and WebView overlays should each be wrapped in `RepaintBoundary` to isolate their repaint cost from parent animations/pans.
+  - **Never wrap `BoardPanelCard` (or any widget inside `InteractiveViewer`'s transform) in `RepaintBoundary`**: it causes the widget to disappear from the transformed canvas.
+- **Debounce search `setState` in text fields**:
+  - Do not call `setState` on every keystroke. Use a `Timer` with ~150ms debounce for search inputs.
+- **Avoid `setState` inside animation listeners**:
+  - Use `AnimatedBuilder` with a `child` parameter instead of calling `setState(() {})` every frame.
+
+---
+
 ## 🚨 Critical Agent Gotchas
 
 - **No Heredocs (`cat << 'EOF'`)**:
-  - **NEVER** use heredocs in bash commands. They consistently freeze the persistent agent bash session. Instead, write files using `printf` or `python3` (e.g., `python3 -c "open('file.txt', 'w').write(...)"`).
+  - **NEVER** use heredocs in bash commands. They consistently freeze the persistent agent bash session. Instead, write files using `printf` or `python3` (e.g., `python3 -c "open('file.txt', 'w').write(...)")`).
+- **Never skip pre-commit checks with `--no-verify` unless explicitly told to**:
+  - If `git commit` fails due to pre-commit hooks (tests, lint, line-count), **fix the underlying issue** rather than bypassing it with `--no-verify`.
+  - Only use `--no-verify` when the user explicitly approves it, or when the failure is a known infrastructure issue outside the current changes.
+  - After using `--no-verify`, provide the user with a clear analysis of what failed and why it was skipped.

@@ -409,7 +409,7 @@ class AgentConfigService {
       'opencode' => 'opencode run --format json --dangerously-skip-permissions',
       'cursor' =>
         'cursor-agent --print --output-format stream-json --stream-partial-output --yolo',
-      'kimi' => 'kimi --output-format stream-json --max-steps-per-turn 2000',
+      'kimi' => 'kimi --output-format stream-json',
       'codex' =>
         'codex exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox',
       'copilot' => 'copilot --output-format json',
