@@ -61,8 +61,11 @@ class UserBubbleState extends State<UserBubble> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Opacity(
-                    opacity: _isHovered ? 1.0 : 0.0,
+                  Visibility(
+                    visible: _isHovered,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 6, bottom: 4),
                       child: ChatBubbleMenu(

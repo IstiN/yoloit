@@ -1428,10 +1428,13 @@ class _ConfigItemState extends State<_ConfigItem> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            // Always reserve space for buttons; show/hide via Opacity to
+            // Always reserve space for buttons; show/hide via Visibility to
             // prevent layout jump on hover.
-            Opacity(
-              opacity: widget.isRunning ? 1.0 : 0.0,
+            Visibility(
+              visible: widget.isRunning,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
               child: _SmallIconButton(
                 icon: Icons.fiber_manual_record,
                 color: colors.accentGreen,
@@ -1439,8 +1442,11 @@ class _ConfigItemState extends State<_ConfigItem> {
                 onTap: null,
               ),
             ),
-            Opacity(
-              opacity: (_hovering || widget.isRunning) ? 1.0 : 0.0,
+            Visibility(
+              visible: _hovering || widget.isRunning,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
               child: _SmallIconButton(
                 icon: Icons.play_arrow_rounded,
                 color: colors.accentGreen,
@@ -1448,8 +1454,11 @@ class _ConfigItemState extends State<_ConfigItem> {
                 onTap: (_hovering || widget.isRunning) ? widget.onRun : null,
               ),
             ),
-            Opacity(
-              opacity: (_hovering || widget.isRunning) ? 1.0 : 0.0,
+            Visibility(
+              visible: _hovering || widget.isRunning,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
               child: _SmallIconButton(
                 icon: Icons.more_vert,
                 color: Theme.of(context).colorScheme.onSurface.withAlpha(120),

@@ -479,8 +479,11 @@ class _AgentTabState extends State<_AgentTab> {
                 SizedBox(
                   width: 16,
                   height: 16,
-                  child: Opacity(
-                    opacity: _hovering || widget.isActive ? 1.0 : 0.0,
+                  child: Visibility(
+                    visible: _hovering || widget.isActive,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
                     child: GestureDetector(
                       onTap: widget.onClose,
                       child: Icon(

@@ -195,8 +195,11 @@ class AssistantBubbleState extends State<AssistantBubble> {
                           ),
                         ),
                       ),
-                      Opacity(
-                        opacity: _isHovered ? 1.0 : 0.0,
+                      Visibility(
+                        visible: _isHovered,
+                        maintainSize: true,
+                        maintainAnimation: true,
+                        maintainState: true,
                         child: Padding(
                           padding: const EdgeInsets.only(left: 6, bottom: 4),
                           child: ChatBubbleMenu(
