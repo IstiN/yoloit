@@ -16,14 +16,16 @@ Future<shelf.Response> handleApps(
   required shelf.Response Function(Object) json,
   required shelf.Response Function(String) error,
   required shelf.Response Function(String) notFound,
+  WidgetRegistryService? registryService,
+  WidgetAppRegistry? appRegistry,
 }) async {
-  final registry = WidgetRegistryService.instance;
-  final appRegistry = WidgetAppRegistry.instance;
+  final registry = registryService ?? WidgetRegistryService.instance;
+  final appReg = appRegistry ?? WidgetAppRegistry.instance;
 
   // GET /api/apps — list all installed widgets + which are currently active
   if (sub.isEmpty && method == 'GET') {
     final widgets = await registry.loadAll();
-    final activeIds = appRegistry.activeIds();
+    final activeIds = appReg.activeIds();
     return json({
       'apps':
           widgets
@@ -197,7 +199,7 @@ Future<shelf.Response> handleApps(
 
     // GET /api/apps/:id/snapshot — return current UI tree JSON
     if (action == 'snapshot' && method == 'GET') {
-      final tree = appRegistry.tree(id);
+      final tree = appReg.tree(id);
       if (tree == null) {
         return json(
           errorJson(
@@ -215,7 +217,7 @@ Future<shelf.Response> handleApps(
       if (actionId == null || actionId.isEmpty) {
         return error(missingField('action'));
       }
-      final engine = appRegistry.engine(id);
+      final engine = appReg.engine(id);
       if (engine == null) {
         return json(
           errorJson('Widget "$id" is not currently running'),
@@ -228,7 +230,7 @@ Future<shelf.Response> handleApps(
 
     // GET /api/apps/:id/logs — return console.log buffer
     if (action == 'logs' && method == 'GET') {
-      final engine = appRegistry.engine(id);
+      final engine = appReg.engine(id);
       if (engine == null) {
         return json(
           errorJson(
@@ -243,7 +245,7 @@ Future<shelf.Response> handleApps(
 
     // POST /api/apps/:id/reload — hot-reload widget JS without restarting the app
     if (action == 'reload' && method == 'POST') {
-      final ok = await appRegistry.triggerReload(id);
+      final ok = await appReg.triggerReload(id);
       if (!ok) {
         return json(
           errorJson('Widget "$id" is not currently running'),

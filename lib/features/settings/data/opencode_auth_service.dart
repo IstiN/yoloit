@@ -29,24 +29,30 @@ class OpenCodeAuthService {
     try {
       final content = await file.readAsString();
       final data = jsonDecode(content);
-      if (data is! Map) return const {};
-
-      final result = <String, String>{};
-      for (final entry in data.entries) {
-        final providerId = entry.key as String? ?? '';
-        if (providerId.isEmpty) continue;
-        final value = entry.value;
-        if (value is Map) {
-          final key = value['key'] as String? ?? '';
-          if (key.isNotEmpty) result[providerId] = key;
-        }
-      }
+      final result = parseAuthData(data);
       debugPrint('[OpenCodeAuth] configured providers: ${result.keys.toList()}');
       return result;
     } catch (e) {
       debugPrint('[OpenCodeAuth] failed to read auth.json: $e');
       return const {};
     }
+  }
+
+  @visibleForTesting
+  static Map<String, String> parseAuthData(dynamic data) {
+    if (data is! Map) return const {};
+
+    final result = <String, String>{};
+    for (final entry in data.entries) {
+      final providerId = entry.key as String? ?? '';
+      if (providerId.isEmpty) continue;
+      final value = entry.value;
+      if (value is Map) {
+        final key = value['key'] as String? ?? '';
+        if (key.isNotEmpty) result[providerId] = key;
+      }
+    }
+    return result;
   }
 
   /// Returns just the list of configured provider IDs.

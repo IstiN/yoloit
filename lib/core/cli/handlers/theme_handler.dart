@@ -13,8 +13,9 @@ Future<shelf.Response> handleTheme(
   shelf.Request request, {
   required shelf.Response Function(Object) json,
   required shelf.Response Function(String) notFound,
+  ThemeManager? themeManager,
 }) async {
-  final tm = ThemeManager.instance;
+  final tm = themeManager ?? ThemeManager.instance;
 
   // GET /api/theme → current theme info
   if (path.isEmpty && method == 'GET') {

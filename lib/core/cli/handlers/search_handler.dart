@@ -13,6 +13,8 @@ Future<shelf.Response> handleSearch(
   required shelf.Response Function(Object) json,
   required shelf.Response Function(String) error,
   required shelf.Response Function(String) notFound,
+  ChatSessionManager? chatSessionManager,
+  ChatSessionHistory? chatSessionHistory,
 }) async {
   if (method != 'GET' || (sub.isNotEmpty && sub[0] != 'all')) {
     return notFound('Unknown search route');
@@ -30,10 +32,10 @@ Future<shelf.Response> handleSearch(
     items.addAll(searchBoards(cubit, query));
   }
   if (scope == 'all' || scope == 'active-chats' || scope == 'chats') {
-    items.addAll(searchActiveChats(query));
+    items.addAll(searchActiveChats(query, chatSessionManager: chatSessionManager));
   }
   if (scope == 'all' || scope == 'sessions' || scope == 'history') {
-    items.addAll(await searchSavedChatSessions(query));
+    items.addAll(await searchSavedChatSessions(query, chatSessionHistory: chatSessionHistory));
   }
 
   return json({'ok': true, 'query': query, 'scope': scope, 'items': items});
@@ -82,10 +84,14 @@ List<Map<String, Object?>> searchBoards(BoardCubit cubit, String query) {
   return items;
 }
 
-List<Map<String, Object?>> searchActiveChats(String query) {
+List<Map<String, Object?>> searchActiveChats(
+  String query, {
+  ChatSessionManager? chatSessionManager,
+}) {
+  final manager = chatSessionManager ?? ChatSessionManager.instance;
   final items = <Map<String, Object?>>[];
-  for (final panelId in ChatSessionManager.instance.activeSessionIds) {
-    final session = ChatSessionManager.instance.get(panelId);
+  for (final panelId in manager.activeSessionIds) {
+    final session = manager.get(panelId);
     if (session == null) continue;
     for (final message in session.messages) {
       final snippet = matchSnippet(message.content, query);
@@ -104,12 +110,14 @@ List<Map<String, Object?>> searchActiveChats(String query) {
 }
 
 Future<List<Map<String, Object?>>> searchSavedChatSessions(
-  String query,
-) async {
-  final entries = await ChatSessionHistory.instance.loadAll();
+  String query, {
+  ChatSessionHistory? chatSessionHistory,
+}) async {
+  final history = chatSessionHistory ?? ChatSessionHistory.instance;
+  final entries = await history.loadAll();
   final items = <Map<String, Object?>>[];
   for (final entry in entries) {
-    final messages = await ChatSessionHistory.instance.loadMessages(entry.id);
+    final messages = await history.loadMessages(entry.id);
     for (final message in messages) {
       final content = message['content'] as String? ?? '';
       final snippet = matchSnippet(content, query);

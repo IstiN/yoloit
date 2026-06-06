@@ -30,15 +30,19 @@ Future<shelf.Response> handleAgents(
     required double preferredHeight,
   })
   nextAvailableBoundsFor,
+  AgentConfigService? agentConfigService,
+  ChatSessionManager? chatSessionManager,
 }) async {
+  final service = agentConfigService ?? AgentConfigService.instance;
+  final sessionManager = chatSessionManager ?? ChatSessionManager.instance;
   final tc = terminalCubit;
   if (tc == null) return error('Terminal cubit not available');
 
   if ((sub.isEmpty || (sub.length == 1 && sub[0] == 'list')) &&
       method == 'GET') {
-    final configs = await AgentConfigService.instance.load();
+    final configs = await service.load();
     final defaultId =
-        AgentConfigService.instance.defaultAgentId ?? AgentType.copilot.name;
+        service.defaultAgentId ?? AgentType.copilot.name;
     final state = tc.state;
     final sessions =
         state is TerminalLoaded
@@ -91,7 +95,7 @@ Future<shelf.Response> handleAgents(
         id.isNotEmpty) {
       return error('Unknown agent id: $id');
     }
-    await AgentConfigService.instance.setDefaultAgentId(id);
+    await service.setDefaultAgentId(id);
     return json({
       'ok': true,
       'defaultAgentId': id ?? AgentType.copilot.name,
@@ -103,7 +107,7 @@ Future<shelf.Response> handleAgents(
     final agentId =
         (requestBody['agent'] as String?) ??
         (requestBody['id'] as String?) ??
-        AgentConfigService.instance.defaultAgentType.name;
+        service.defaultAgentType.name;
     final workspacePath =
         (requestBody['path'] as String?) ??
         (requestBody['workspacePath'] as String?) ??
@@ -123,7 +127,7 @@ Future<shelf.Response> handleAgents(
     final provider = agentId; // agent id matches chat provider naming
 
     // Look up default model from agent config
-    final configs = await AgentConfigService.instance.load();
+    final configs = await service.load();
     final agentConfig = configs.firstWhere(
       (c) => c.id == agentId,
       orElse:
@@ -200,7 +204,7 @@ Future<shelf.Response> handleAgents(
     // When the panel widget mounts it picks up this existing session.
     var taskSent = false;
     if (trimmedTask != null && trimmedTask.isNotEmpty) {
-      final session = ChatSessionManager.instance.getOrCreate(
+      final session = sessionManager.getOrCreate(
         panelId,
         config,
       );
@@ -234,7 +238,7 @@ Future<shelf.Response> handleAgents(
     if (agentId == null || agentId.isEmpty) {
       return error('Missing required field: id');
     }
-    final configs = await AgentConfigService.instance.load();
+    final configs = await service.load();
     final idx = configs.indexWhere((c) => c.id == agentId);
     if (idx < 0) return error('Unknown agent id: $agentId');
 
@@ -274,7 +278,7 @@ Future<shelf.Response> handleAgents(
       );
     }
     configs[idx] = config;
-    await AgentConfigService.instance.save(configs);
+    await service.save(configs);
     return json({
       'ok': true,
       'agent': {

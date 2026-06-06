@@ -77,6 +77,12 @@ class ModelsDevCatalogService {
 
   bool get isLoaded => _models != null;
 
+  @visibleForTesting
+  void resetForTesting() {
+    _models = null;
+    _lastMemoryRefresh = null;
+  }
+
   String get _cachePath =>
       p.join(PlatformDirs.instance.configDir, 'models_dev.json');
 

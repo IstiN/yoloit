@@ -12,12 +12,13 @@ Future<shelf.Response> handleLocalModels(
   required shelf.Response Function(Object) json,
   required shelf.Response Function(String) error,
   required shelf.Response Function(String) notFound,
+  LocalAiModelsService? service,
 }) async {
-  final service = LocalAiModelsService.instance;
-  await service.initialize();
+  final localService = service ?? LocalAiModelsService.instance;
+  await localService.initialize();
 
   if (sub.isEmpty && method == 'GET') {
-    return json(service.snapshot());
+    return json(localService.snapshot());
   }
 
   Future<shelf.Response> runModelAction(
@@ -39,38 +40,38 @@ Future<shelf.Response> handleLocalModels(
   if (sub.length == 1 && sub[0] == 'download' && method == 'POST') {
     return runModelAction(
       'download',
-      service.downloadOrUpdateModel,
+      localService.downloadOrUpdateModel,
     );
   }
   if (sub.length == 1 && sub[0] == 'resume' && method == 'POST') {
     return runModelAction(
       'resume',
-      service.resumeModelDownload,
+      localService.resumeModelDownload,
     );
   }
   if (sub.length == 1 && sub[0] == 'stop' && method == 'POST') {
     return runModelAction(
       'pause',
-      service.pauseModelDownload,
+      localService.pauseModelDownload,
       alias: 'stop',
     );
   }
   if (sub.length == 1 && sub[0] == 'pause' && method == 'POST') {
     return runModelAction(
       'pause',
-      service.pauseModelDownload,
+      localService.pauseModelDownload,
     );
   }
   if (sub.length == 1 && sub[0] == 'cancel' && method == 'POST') {
     return runModelAction(
       'cancel',
-      service.cancelModelDownload,
+      localService.cancelModelDownload,
     );
   }
   if (sub.length == 1 && sub[0] == 'delete' && method == 'POST') {
     return runModelAction(
       'delete',
-      service.deleteInstalledModel,
+      localService.deleteInstalledModel,
     );
   }
   if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
@@ -81,9 +82,9 @@ Future<shelf.Response> handleLocalModels(
       return error(missingFields(const ['kind', 'id']));
     }
     if (kind == 'chat') {
-      await service.setSelectedChatModel(modelId);
+      await localService.setSelectedChatModel(modelId);
     } else if (kind == 'asr') {
-      await service.setSelectedAsrModel(modelId);
+      await localService.setSelectedAsrModel(modelId);
     } else {
       return error('Unsupported kind "$kind". Expected "chat" or "asr".');
     }
