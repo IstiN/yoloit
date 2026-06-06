@@ -21,15 +21,17 @@ import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
-import 'package:yoloit/features/board/chat/copilot_cli_provider.dart';
-import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
-import 'package:yoloit/features/board/chat/local_llm_provider.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
-import 'package:yoloit/features/board/chat/provider_icon.dart';
 import 'package:yoloit/features/board/chat/widgets/assistant_bubble.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_action_button.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_ask_user_card.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_context_toggles.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_info_bar.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_model_suggestions.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_running_tools_card.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_slash_chips.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_changed_files_strip.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_provider_badge.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_empty_state.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_setup_view.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_system_bubble.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_typing_indicator.dart';
@@ -84,6 +86,8 @@ class ChatPanelWidget extends StatefulWidget {
 
 class _ChatPanelWidgetState extends State<ChatPanelWidget>
     with SingleTickerProviderStateMixin {
+  static final RegExp _brTagRe = RegExp(r'<br\s*/?>');
+
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _inputFocusNode = FocusNode();
@@ -102,7 +106,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   final Set<String> _ignoredToolCallIds = <String>{};
   Set<String> _ignoredToolCalls = const {'report_intent'};
   bool _isProcessing = false;
-  bool _isFirstMessage = true;
   ChatTokenUsage? _lastUsage;
   int _totalOutputTokens = 0;
 
@@ -166,7 +169,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     if (_session!.messages.isNotEmpty) {
       _messages.clear();
       _messages.addAll(_session!.messages);
-      _isFirstMessage = _session!.isFirstMessage;
       _isProcessing = _session!.isProcessing;
       _streamingContent = _session!.streamingContent;
       _streamingMessageId = _session!.streamingMessageId;
@@ -305,21 +307,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _consumeCliPendingMessage();
   }
 
-  static ChatProvider _providerForId(String id) {
-    return switch (id) {
-      'cursor' => CursorAgentProvider(),
-      'local' => LocalLlmProvider(),
-      'opencode' => _createOpencodeProvider(),
-      _ => CopilotCliProvider(),
-    };
-  }
-
-  static OpencodeProvider _createOpencodeProvider() {
-    final provider = OpencodeProvider();
-    provider.refreshModelsFromModelsDev();
-    return provider;
-  }
-
   @override
   void didUpdateWidget(covariant ChatPanelWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -410,7 +397,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         }
       }
       if (_messages.isNotEmpty) {
-        _isFirstMessage = false;
         _scrollToBottom();
       }
     }
@@ -1060,7 +1046,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       _streamingMessageId = null;
       _activeToolCalls.clear();
       _ignoredToolCallIds.clear();
-      _isFirstMessage = false;
     });
 
     _scrollToBottom();
@@ -1510,22 +1495,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _ignoredToolCallIds.clear();
   }
 
-  void _finalizeStreamingMessage() {
-    if (_streamingContent.isEmpty) return;
-    _messages.add(
-      ChatMessage(
-        id:
-            _streamingMessageId ??
-            'assistant-${DateTime.now().millisecondsSinceEpoch}',
-        role: ChatRole.assistant,
-        content: _streamingContent,
-        timestamp: DateTime.now(),
-      ),
-    );
-    _streamingMessageId = null;
-    _streamingContent = '';
-  }
-
   @override
   Widget build(BuildContext context) {
     final configured = widget.panel.state['configured'] == true;
@@ -1549,7 +1518,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           _session?.updateConfig(config);
           _provider = _session!.provider;
           _config = config;
-          _isFirstMessage = true;
         });
         // Update panel title to session name
         if (config.sessionName.isNotEmpty) {
@@ -1579,12 +1547,32 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       child: Column(
         children: [
           // Session info bar
-          _buildInfoBar(),
+          ChatInfoBar(
+            workingDir: _config.workingDir,
+            provider: _config.provider,
+            model: _config.model,
+            autopilot: _config.autopilot,
+            reasoningEffort: _config.reasoningEffort,
+            totalOutputTokens: _totalOutputTokens,
+            isProcessing: _isProcessing,
+            enabledLocalToolCount: _enabledLocalToolCount(),
+            totalLocalToolCount: YoloitCliToolCatalog.tools.length,
+            onAutopilotToggle: () {
+              setState(() {
+                _config = _config.copyWith(autopilot: !_config.autopilot);
+              });
+              _persistMessages();
+            },
+            onCycleReasoningEffort: _cycleReasoningEffort,
+            onCopySession: _copySessionToClipboard,
+            onShowHistory: () => _showSessionHistoryDialog(context),
+            shortPath: _shortPath,
+          ),
           // Messages
           Expanded(
             child:
                 _messages.isEmpty && !_isProcessing
-                    ? _buildEmptyState()
+                    ? const ChatEmptyState()
                     : _buildMessageList(),
           ),
           // Input
@@ -1592,139 +1580,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         ],
       ),
     );
-  }
-
-  Widget _buildInfoBar() {
-    final colors = context.appColors;
-    final muted =
-        context.appColors.textMuted.withOpacity(0.6);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(bottom: BorderSide(color: colors.border, width: 0.5)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.folder_outlined, size: 11, color: muted),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              _shortPath(_config.workingDir),
-              style: TextStyle(fontSize: 10, color: muted),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          ChatProviderIcon(provider: _config.provider, size: 14, color: muted),
-          if (_config.provider == 'local') ...[
-            const SizedBox(width: 6),
-            Tooltip(
-              message:
-                  'Local tools: ${_enabledLocalToolCount()}/${YoloitCliToolCatalog.tools.length} enabled',
-              child: Icon(Icons.construction, size: 12, color: muted),
-            ),
-          ],
-          const SizedBox(width: 8),
-          // Autopilot toggle
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _config = _config.copyWith(autopilot: !_config.autopilot);
-              });
-              _persistMessages();
-            },
-            child: Tooltip(
-              message: _config.autopilot ? 'Autopilot ON' : 'Autopilot OFF',
-              child: Icon(
-                Icons.rocket_launch,
-                size: 12,
-                color: _config.autopilot ? colors.statusActive : muted,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Reasoning effort
-          GestureDetector(
-            onTap: _cycleReasoningEffort,
-            child: Tooltip(
-              message: 'Effort: ${_config.reasoningEffort ?? 'default'}',
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color:
-                      _config.reasoningEffort != null
-                          ? colors.statusWarning.withAlpha(32)
-                          : colors.surfaceHighlight.withAlpha(21),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color:
-                        _config.reasoningEffort != null
-                            ? colors.statusWarning.withAlpha(128)
-                            : colors.border,
-                    width: 0.6,
-                  ),
-                ),
-                child: Text(
-                  _reasoningLabel(),
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color:
-                        _config.reasoningEffort != null
-                            ? colors.statusWarning
-                            : muted,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(_config.model, style: TextStyle(fontSize: 9, color: muted)),
-          if (_totalOutputTokens > 0) ...[
-            const SizedBox(width: 6),
-            Text(
-              '∑$_totalOutputTokens',
-              style: TextStyle(fontSize: 9, color: colors.primary),
-            ),
-          ],
-          if (_isProcessing)
-            Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: SizedBox(
-                width: 10,
-                height: 10,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.2,
-                  color: colors.statusActive,
-                ),
-              ),
-            ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: _copySessionToClipboard,
-            child: Tooltip(
-              message: 'Copy session',
-              child: Icon(Icons.copy_all_outlined, size: 13, color: muted),
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () => _showSessionHistoryDialog(context),
-            child: Icon(Icons.history, size: 13, color: muted),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _reasoningLabel() {
-    return switch (_config.reasoningEffort) {
-      'low' => 'Effort: low',
-      'medium' => 'Effort: med',
-      'high' => 'Effort: high',
-      'xhigh' => 'Effort: xhigh',
-      _ => 'Effort',
-    };
   }
 
   void _cycleReasoningEffort() {
@@ -1905,34 +1760,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 40,
-            color: Theme.of(context).colorScheme.onSurface.withAlpha(30),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Send a message to start',
-            style: TextStyle(
-              fontSize: 13,
-              color:
-                  context.appColors.textMuted.withOpacity(0.6),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMessageList() {
-    final hasRunningTools = _activeToolCalls.values.any(
-      (t) => t.isRunning && !_isIgnoredToolCall(t.toolName),
-    );
+    final runningTools =
+        _activeToolCalls.values
+            .where((t) => t.isRunning && !_isIgnoredToolCall(t.toolName))
+            .toList();
+    final hasRunningTools = runningTools.isNotEmpty;
     final showStreaming = _streamingContent.isNotEmpty;
     // Show thinking indicator when processing but no streaming content and no running tools
     final showThinking = _isProcessing && !showStreaming && !hasRunningTools;
@@ -1946,11 +1779,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
           (hasRunningTools ? 1 : 0) +
           (showThinking ? 1 : 0),
       itemBuilder: (context, index) {
-        final runningTools =
-            _activeToolCalls.values
-                .where((t) => t.isRunning && !_isIgnoredToolCall(t.toolName))
-                .toList();
-
         if (index < _messages.length) {
           return _buildMessageBubble(_messages[index]);
         }
@@ -1959,7 +1787,15 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
         // Running tools indicator
         if (hasRunningTools && extra == 0) {
-          return _buildRunningToolsCard(runningTools);
+          return ChatRunningToolsCard(
+            tools: runningTools,
+            subAgents: _subAgents,
+            subAgentPanels: _subAgentPanels,
+            isSubAgentToolCall: _isSubAgentToolCall,
+            onFocusPanel: (panelId) {
+              context.read<BoardCubit>().focusPanel(panelId);
+            },
+          );
         }
 
         // Streaming content
@@ -2067,141 +1903,13 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
   }
 
-  Widget _buildRunningToolsCard(List<ChatToolCall> tools) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children:
-            tools.map((tool) {
-              final isAgent = _isSubAgentToolCall(tool.toolName);
-              final agentDesc =
-                  (tool.arguments['description'] as String?)?.trim() ??
-                  (tool.arguments['name'] as String?)?.trim();
-              final color =
-                  isAgent
-                      ? context.appColors.primaryLight
-                      : context.appColors.accentOrange;
-              final subAgent = isAgent ? _subAgents[tool.toolCallId] : null;
-              final panelId = isAgent ? _subAgentPanels[tool.toolCallId] : null;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 4),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: color.withAlpha(22),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: color.withAlpha(60)),
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: color,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      isAgent ? Icons.smart_toy_outlined : Icons.build_outlined,
-                      size: 14,
-                      color: color,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            isAgent
-                                ? (subAgent != null
-                                    ? subAgent.agentName
-                                    : 'Running sub-agent\u2026')
-                                : tool.toolName,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (isAgent && agentDesc != null)
-                            Text(
-                              agentDesc,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: color.withAlpha(180),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          if (subAgent != null && subAgent.events.isNotEmpty)
-                            Text(
-                              '${subAgent.events.length} events',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: color.withAlpha(140),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    // Focus the agent panel on the board
-                    if (panelId != null)
-                      GestureDetector(
-                        onTap:
-                            () =>
-                                context.read<BoardCubit>().focusPanel(panelId),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: color.withAlpha(40),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: color.withAlpha(80)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Open',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: color,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(width: 3),
-                              Icon(Icons.open_in_new, size: 10, color: color),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-      ),
-    );
-  }
-
   Widget _buildStreamingBubble() {
     final colors = context.appColors;
     final textColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final codeBg = colors.surface;
-    final processedContent = _streamingContent.replaceAll(
-      RegExp(r'<br\s*/?>'),
-      '\n',
-    );
+    final processedContent = _streamingContent.replaceAll(_brTagRe, '\n');
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
       child: Container(
@@ -2276,15 +1984,58 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             const SizedBox(height: 8),
           ],
           if (_isPlainSlash) ...[
-            _buildSlashChips(colors),
+            ChatSlashChips(
+              commands: _filteredSlashCommands,
+              onSelect: (cmd) {
+                _inputController.text = '${cmd.triggers.first} ';
+                _inputController.selection = TextSelection.collapsed(
+                  offset: _inputController.text.length,
+                );
+                if (cmd.id == 'model') {
+                  setState(() {
+                    _isModelSlash = true;
+                    _modelQuery = '';
+                    _modelSelectedIndex = 0;
+                  });
+                }
+              },
+            ),
             const SizedBox(height: 8),
           ],
           if (_isModelSlash) ...[
-            _buildModelSuggestions(colors),
+            ChatModelSuggestions(
+              models: _filteredModels,
+              selectedIndex: _modelSelectedIndex,
+              currentModelId: _config.model,
+              scrollController: _modelScrollCtrl,
+              onSelect: _selectModelFromSlash,
+            ),
             const SizedBox(height: 8),
           ],
           if (_isContextSlash) ...[
-            _buildContextToggles(colors),
+            ChatContextToggles(
+              cliHelp: _ctxCliHelp,
+              boardSnapshot: _ctxBoardSnapshot,
+              boardPanelsJson: _ctxBoardPanelsJson,
+              systemPrompt: _ctxSystemPrompt,
+              onCliHelpChanged: (v) async {
+                await SessionPrefs.saveInjectCliHelpEnabled(v);
+                CliGuidanceService.instance.clearCache();
+                if (!mounted) return;
+                setState(() => _ctxCliHelp = v);
+              },
+              onBoardSnapshotChanged: (v) async {
+                await SessionPrefs.saveBoardSnapshotEnabled(v);
+                if (!mounted) return;
+                setState(() => _ctxBoardSnapshot = v);
+              },
+              onBoardPanelsJsonChanged: (v) {
+                setState(() => _ctxBoardPanelsJson = v);
+              },
+              onSystemPromptChanged: (v) {
+                setState(() => _ctxSystemPrompt = v);
+              },
+            ),
             const SizedBox(height: 8),
           ],
           Row(
@@ -2293,49 +2044,25 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
               // Model selector (bottom-left)
               Builder(
                 builder:
-                    (btnContext) => GestureDetector(
+                    (btnContext) => ChatActionButton(
+                      icon: Icons.auto_awesome,
                       onTap: () => _showModelPicker(btnContext),
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        margin: const EdgeInsets.only(bottom: 2),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceElevated,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(
-                          Icons.auto_awesome,
-                          size: 14,
-                          color: colors.terminalPrompt,
-                        ),
-                      ),
+                      backgroundColor: colors.surfaceElevated,
+                      iconColor: colors.terminalPrompt,
                     ),
               ),
               const SizedBox(width: 8),
               if (_config.provider == 'local') ...[
-                GestureDetector(
+                ChatActionButton(
+                  icon: Icons.settings_input_component_outlined,
                   onTap: _showLocalToolsDialog,
-                  child: Tooltip(
-                    message:
-                        'Choose local YoLoIT tools (${_enabledLocalToolCount()} enabled)',
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      margin: const EdgeInsets.only(bottom: 2),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceElevated,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        Icons.settings_input_component_outlined,
-                        size: 14,
-                        color:
-                            _config.disabledLocalToolNames.isEmpty
-                                ? colors.terminalPrompt
-                                : Theme.of(context).colorScheme.secondary,
-                      ),
-                    ),
-                  ),
+                  tooltip:
+                      'Choose local YoLoIT tools (${_enabledLocalToolCount()} enabled)',
+                  backgroundColor: colors.surfaceElevated,
+                  iconColor:
+                      _config.disabledLocalToolNames.isEmpty
+                          ? colors.terminalPrompt
+                          : Theme.of(context).colorScheme.secondary,
                 ),
                 const SizedBox(width: 8),
               ],
@@ -2470,50 +2197,31 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                 ),
               ),
               const SizedBox(width: 6),
-              GestureDetector(
-                onTap: _isTranscribingMic ? null : _handleMicInput,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  margin: const EdgeInsets.only(bottom: 2),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
+              ChatActionButton(
+                icon:
                     _isRecordingMic
                         ? Icons.mic_rounded
                         : (_isTranscribingMic
                             ? Icons.hourglass_top_rounded
                             : Icons.mic_none),
-                    size: 15,
-                    color:
-                        _isRecordingMic
-                            ? Theme.of(context).colorScheme.error
-                            : colors.terminalPrompt,
-                  ),
-                ),
+                onTap: _isTranscribingMic ? null : _handleMicInput,
+                backgroundColor: colors.surfaceElevated,
+                iconColor:
+                    _isRecordingMic
+                        ? Theme.of(context).colorScheme.error
+                        : colors.terminalPrompt,
+                iconSize: 15,
               ),
               const SizedBox(width: 6),
-              GestureDetector(
+              ChatActionButton(
+                icon: _isSending ? Icons.stop_rounded : Icons.arrow_upward,
                 onTap: _isSending ? _stopStreaming : _sendMessage,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  margin: const EdgeInsets.only(bottom: 2),
-                  decoration: BoxDecoration(
-                    color:
-                        _isSending
-                            ? Theme.of(context).colorScheme.error
-                            : colors.terminalPrompt,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    _isSending ? Icons.stop_rounded : Icons.arrow_upward,
-                    color: Theme.of(context).colorScheme.onPrimary,
-                    size: 16,
-                  ),
-                ),
+                backgroundColor:
+                    _isSending
+                        ? Theme.of(context).colorScheme.error
+                        : colors.terminalPrompt,
+                iconColor: Theme.of(context).colorScheme.onPrimary,
+                iconSize: 16,
               ),
             ],
           ),
@@ -2915,11 +2623,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         .toList();
   }
 
-  /// Small grey provider badge shown next to model name in pickers.
-  static Widget _providerBadge(BuildContext context, String providerName) {
-    return buildProviderBadge(context, providerName);
-  }
-
   static const _slashCommands = [
     ChatSlashCommand(
       id: 'model',
@@ -2972,29 +2675,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   bool _ctxBoardSnapshot = false;
   bool _ctxBoardPanelsJson = true;
   bool _ctxSystemPrompt = true;
-  bool _ctxLoaded = false;
-
-  void _loadContextToggles() {
-    if (_ctxLoaded) return;
-    _ctxLoaded = true;
-    SessionPrefs.isInjectCliHelpEnabled().then((v) {
-      if (mounted) setState(() => _ctxCliHelp = v);
-    });
-    SessionPrefs.isBoardSnapshotEnabled().then((v) {
-      if (mounted) setState(() => _ctxBoardSnapshot = v);
-    });
-  }
 
   bool get _isPlainSlash {
     final t = _inputController.text;
     return (t.startsWith('/') || t.startsWith('.')) &&
         !_isModelSlash &&
         !_isContextSlash;
-  }
-
-  double _suggestionHeight(int count) {
-    if (count == 0) return 40;
-    return (count * 32.0 + 8).clamp(0, 280);
   }
 
   void _ensureSuggestionsVisible() {
@@ -3059,193 +2745,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     });
   }
 
-  void _clearModelSlash() {
-    _inputController.clear();
-  }
-
-  Widget _buildSlashChips(AppColorScheme colors) {
-    final commands = _filteredSlashCommands;
-    if (commands.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return SizedBox(
-      height: 32,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: commands.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
-        itemBuilder: (context, i) {
-          final cmd = commands[i];
-          final isActive = i == 0;
-          return GestureDetector(
-            onTap: () {
-              _inputController.text = '${cmd.triggers.first} ';
-              _inputController.selection = TextSelection.collapsed(
-                offset: _inputController.text.length,
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color:
-                    isActive
-                        ? colors.terminalPrompt.withValues(alpha: 0.2)
-                        : colors.surfaceElevated,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color:
-                      isActive
-                          ? colors.terminalPrompt.withValues(alpha: 0.5)
-                          : colors.border,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    cmd.displayName,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          isActive ? FontWeight.w600 : FontWeight.normal,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    cmd.description,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildContextToggles(AppColorScheme colors) {
-    _loadContextToggles();
-    final items = <
-      ({
-        String id,
-        String label,
-        IconData icon,
-        bool value,
-        void Function(bool) onChanged,
-      })
-    >[
-      (
-        id: 'cli_help',
-        label: 'CLI Help',
-        icon: Icons.terminal,
-        value: _ctxCliHelp,
-        onChanged: (v) async {
-          await SessionPrefs.saveInjectCliHelpEnabled(v);
-          CliGuidanceService.instance.clearCache();
-          if (!mounted) return;
-          setState(() => _ctxCliHelp = v);
-        },
-      ),
-      (
-        id: 'board_snapshot',
-        label: 'Board Screenshot',
-        icon: Icons.screenshot_monitor_outlined,
-        value: _ctxBoardSnapshot,
-        onChanged: (v) async {
-          await SessionPrefs.saveBoardSnapshotEnabled(v);
-          if (!mounted) return;
-          setState(() => _ctxBoardSnapshot = v);
-        },
-      ),
-      (
-        id: 'board_json',
-        label: 'Board Panels JSON',
-        icon: Icons.data_object,
-        value: _ctxBoardPanelsJson,
-        onChanged: (v) {
-          setState(() => _ctxBoardPanelsJson = v);
-        },
-      ),
-      (
-        id: 'system_prompt',
-        label: 'System Prompt',
-        icon: Icons.psychology_outlined,
-        value: _ctxSystemPrompt,
-        onChanged: (v) {
-          setState(() => _ctxSystemPrompt = v);
-        },
-      ),
-    ];
-
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        itemCount: items.length,
-        separatorBuilder:
-            (_, __) =>
-                Divider(height: 1, color: colors.border.withValues(alpha: 0.3)),
-        itemBuilder: (context, i) {
-          final item = items[i];
-          return InkWell(
-            onTap: () => item.onChanged(!item.value),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Row(
-                children: [
-                  Icon(
-                    item.icon,
-                    size: 14,
-                    color:
-                        item.value
-                            ? colors.terminalPrompt
-                            : colors.textPrimary.withValues(alpha: 0.4),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color:
-                            item.value
-                                ? colors.textPrimary
-                                : colors.textPrimary.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    item.value
-                        ? Icons.check_box
-                        : Icons.check_box_outline_blank,
-                    size: 16,
-                    color:
-                        item.value
-                            ? colors.terminalPrompt
-                            : colors.textPrimary.withValues(alpha: 0.3),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   void _selectModelFromSlash(String modelId) {
     if (modelId != _config.model) {
       setState(() {
@@ -3256,126 +2755,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     _hideModelSlash();
     _inputController.clear();
     _inputFocusNode.requestFocus();
-  }
-
-  Widget _buildModelSuggestions(AppColorScheme colors) {
-    final models = _filteredModels;
-    if (models.isNotEmpty && _modelSelectedIndex >= models.length) {
-      _modelSelectedIndex = models.length - 1;
-    }
-
-    return Container(
-      height: _suggestionHeight(models.length),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
-      child: ListView(
-        controller: _modelScrollCtrl,
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        children: [
-          if (models.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                'No models found',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-            )
-          else
-            ...models.asMap().entries.map((entry) {
-              final i = entry.key;
-              final m = entry.value;
-              final isActive = m.id == _config.model;
-              final isHighlighted = i == _modelSelectedIndex;
-              return InkWell(
-                onTap: () => _selectModelFromSlash(m.id),
-                child: Container(
-                  height: 32,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  color:
-                      isHighlighted
-                          ? colors.surfaceHighlight
-                          : Colors.transparent,
-                  child: Row(
-                    children: [
-                      if (isActive)
-                        Icon(Icons.check, size: 14, color: colors.statusActive)
-                      else
-                        const SizedBox(width: 14),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            if (m.providerGroup != null) ...[
-                              _providerBadge(context, m.providerGroup!),
-                              const SizedBox(width: 4),
-                            ],
-                            Flexible(
-                              child: Text(
-                                m.displayName,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color:
-                                      isActive
-                                          ? colors.statusActive
-                                          : Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (m.isFree)
-                        Text(
-                          'FREE',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: colors.statusActive,
-                          ),
-                        )
-                      else if (m.inputCostPerMillion != null)
-                        Text(
-                          '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color:
-                                m.inputCostPerMillion! > 10
-                                    ? colors.statusError
-                                    : context.appColors.textMuted,
-                          ),
-                        )
-                      else if (m.costMultiplier != null)
-                        Text(
-                          '${m.costMultiplier}x',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                m.costMultiplier == 0
-                                    ? colors.statusActive
-                                    : m.costMultiplier! > 3
-                                    ? colors.statusError
-                                    : context.appColors.textMuted,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-        ],
-      ),
-    );
   }
 
   void _showSessionHistoryDialog(BuildContext context) {
@@ -3399,7 +2778,6 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                     _messages.add(ChatMessage.fromJson(m));
                   } catch (_) {}
                 }
-                _isFirstMessage = false;
               });
               // Update panel title
               context.read<BoardCubit>().updatePanelTitle(
