@@ -92,48 +92,51 @@ class _EmptyTerminal extends StatelessWidget {
                     fontSize: 13,
                   ),
                   const SizedBox(height: 24),
-                  BlocBuilder<WorkspaceCubit, WorkspaceState>(
-                    builder: (context, wsState) {
-                      final hasActive =
-                          wsState is WorkspaceLoaded &&
-                          wsState.activeWorkspace != null;
-                      if (!hasActive) {
-                        return Text(
-                          'Select a workspace from the left panel first',
-                          style: TextStyle(
-                            color: colors.textMuted,
-                            fontSize: 12,
-                          ),
-                        );
-                      }
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children:
-                              AgentType.values.map((type) {
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  child: _AgentLaunchButton(
-                                    type: type,
-                                    workspacePath:
-                                        wsState.activeWorkspace!.workspaceDir,
-                                    workspaceId: wsState.activeWorkspace!.id,
-                                  ),
-                                );
-                              }).toList(),
-                        ),
-                      );
-                    },
-                  ),
+                  const _AgentLaunchButtons(),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AgentLaunchButtons extends StatelessWidget {
+  const _AgentLaunchButtons();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return BlocBuilder<WorkspaceCubit, WorkspaceState>(
+      builder: (context, wsState) {
+        final hasActive =
+            wsState is WorkspaceLoaded && wsState.activeWorkspace != null;
+        if (!hasActive) {
+          return Text(
+            'Select a workspace from the left panel first',
+            style: TextStyle(color: colors.textMuted, fontSize: 12),
+          );
+        }
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children:
+                AgentType.values.map((type) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: _AgentLaunchButton(
+                      type: type,
+                      workspacePath: wsState.activeWorkspace!.workspaceDir,
+                      workspaceId: wsState.activeWorkspace!.id,
+                    ),
+                  );
+                }).toList(),
+          ),
+        );
+      },
     );
   }
 }
@@ -761,7 +764,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
       initialScrollOffset: widget.session.scrollOffset,
     );
     _scrollController.addListener(_persistScrollOffset);
-    _focusNode.addListener(() {});
     _bindTerminal();
     _attachTerminalDiagnostics(widget.session);
     AgentConfigService.instance.terminalRenderEngineNotifier.addListener(
@@ -855,7 +857,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     // its binding.
     if (identical(session.terminal.onOutput, _boundOnOutput)) {
       session.terminal.onOutput = null;
-    } else {}
+    }
     if (identical(session.terminal.onResize, _boundOnResize)) {
       session.terminal.onResize = null;
     }
@@ -890,14 +892,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
   /// second and freezes the Flutter UI thread in debug builds.
   static bool enableTerminalDiagnostics = false;
 
-  bool get _terminalDiagnosticsEnabled =>
-      kDebugMode &&
-      (enableTerminalDiagnostics ||
-          widget.debugLabel != null ||
-          widget.debugLogSink != null);
+  bool get _terminalDiagnosticsEnabled => kDebugMode &&
+      (enableTerminalDiagnostics || widget.debugLabel != null || widget.debugLogSink != null);
 
-  String get _terminalDiagnosticsLabel =>
-      widget.debugLabel ?? widget.session.id;
+  String get _terminalDiagnosticsLabel => widget.debugLabel ?? widget.session.id;
 
   void _debugTerminalLog(String message) {
     if (!_terminalDiagnosticsEnabled) return;
@@ -1914,235 +1912,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
             }
             return Stack(
               children: [
-                Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerSignal: (event) {
-                    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
-                      _preserveScrollForCanvasGesture();
-                      return;
-                    }
-                    if (event is PointerScrollEvent) {
-                      if (_isHorizontalTrackpadGesture(event.scrollDelta)) {
-                        CanvasInteractionLock.instance
-                            .markCanvasSignalGesture();
-                        _preserveScrollForCanvasGesture();
-                        return;
-                      }
-                      GestureBinding.instance.pointerSignalResolver.register(
-                        event,
-                        (resolved) {
-                          final scrollEvent = resolved as PointerScrollEvent;
-                          if (widget.session.terminal.isUsingAltBuffer) {
-                            _scrollAltBufferBy(
-                              scrollEvent.scrollDelta.dy,
-                              scrollEvent.position,
-                              'pointer-signal',
-                            );
-                          } else {
-                            _scrollTerminalBy(
-                              scrollEvent.scrollDelta.dy,
-                              'pointer-signal',
-                            );
-                          }
-                        },
-                      );
-                    }
-                  },
-                  onPointerPanZoomStart: (_) {
-                    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
-                      _preserveScrollForCanvasGesture();
-                      return;
-                    }
-                  },
-                  onPointerPanZoomUpdate: (event) {
-                    if ((event.scale - 1.0).abs() > 0.01) {
-                      CanvasInteractionLock.instance.markCanvasSignalGesture();
-                      _preserveScrollForCanvasGesture();
-                      return;
-                    }
-                    if (_isHorizontalTrackpadGesture(event.panDelta)) {
-                      CanvasInteractionLock.instance.markCanvasSignalGesture();
-                      _preserveScrollForCanvasGesture();
-                      return;
-                    }
-                    if (CanvasInteractionLock.instance.isCanvasGestureActive) {
-                      _preserveScrollForCanvasGesture();
-                      return;
-                    }
-                    if (widget.session.terminal.isUsingAltBuffer) {
-                      _scrollAltBufferBy(
-                        -event.panDelta.dy,
-                        event.position,
-                        'pan-zoom',
-                      );
-                    } else {
-                      _scrollTerminalBy(-event.panDelta.dy, 'pan-zoom');
-                    }
-                  },
-                  onPointerDown: (event) {
-                    if (!_focusNode.hasFocus) _focusNode.requestFocus();
-                    if (_isTerminalScrollbarHit(event.localPosition)) {
-                      _scrollbarPointers.add(event.pointer);
-                      _clickDownPosition = null;
-                      _dragStartGlobal = null;
-                      _isDragSelecting = false;
-                      _activePointers.remove(event.pointer);
-                      // Stop the periodic preserve timer so it doesn't fight
-                      // RawScrollbar's jumpTo() calls during the drag.
-                      _userScrollAnchorTimer?.cancel();
-                      _userScrollAnchorTimer = null;
-                      _userScrollPreserveTimer?.cancel();
-                      _userScrollPreserveTimer = null;
-                      _userScrollAnchor = null;
-                      return;
-                    }
-                    // Right-click → context menu
-                    if (event.buttons == kSecondaryMouseButton) {
-                      _showTerminalContextMenu(context, event.position);
-                      return;
-                    }
-                    if (event.buttons != kPrimaryButton) return;
-                    _clickDownPosition = event.localPosition;
-                    _dragStartGlobal = event.position;
-                    _isDragSelecting = false;
-                    _activePointers[event.pointer] = event.localPosition;
-                    if (_activePointers.length == 2 &&
-                        event.kind == PointerDeviceKind.touch) {
-                      final positions = _activePointers.values.toList();
-                      _pinchStartDistance =
-                          (positions[0] - positions[1]).distance;
-                      _pinchStartFontSize = _fontSize;
-                    }
-                  },
-                  onPointerMove: (event) {
-                    if (_scrollbarPointers.contains(event.pointer)) {
-                      // RawScrollbar handles position changes via jumpTo()
-                      // internally. Do NOT call _markUserScrollActive() here —
-                      // that would start _preserveUserScrollDuringOutput() which
-                      // fights the scrollbar by immediately restoring the old pos.
-                      return;
-                    }
-                    _activePointers[event.pointer] = event.localPosition;
-                    if (_activePointers.length == 2 &&
-                        _pinchStartDistance > 0 &&
-                        event.kind == PointerDeviceKind.touch) {
-                      final positions = _activePointers.values.toList();
-                      final dist = (positions[0] - positions[1]).distance;
-                      final newSize = (_pinchStartFontSize *
-                              dist /
-                              _pinchStartDistance)
-                          .clamp(8.0, 48.0);
-                      setState(() => _fontSize = newSize);
-                      SessionPrefs.saveTerminalFontSize(newSize);
-                      return;
-                    }
-                    // Drag-to-select: bypass xterm's gesture arena entirely.
-                    final startGlobal = _dragStartGlobal;
-                    if (startGlobal == null || _activePointers.length != 1) {
-                      return;
-                    }
-                    final dist = (event.position - startGlobal).distance;
-                    if (dist < 4.0) return;
-                    final state = _terminalViewKey.currentState;
-                    if (state == null) return;
-                    final rt = state.renderTerminal;
-                    if (!_isDragSelecting) {
-                      _isDragSelecting = true;
-                      _controller.clearSelection();
-                    }
-                    final localStart = rt.globalToLocal(startGlobal);
-                    final localCurrent = rt.globalToLocal(event.position);
-                    rt.selectCharacters(localStart, localCurrent);
-                  },
-                  onPointerUp: (event) {
-                    if (_scrollbarPointers.remove(event.pointer)) {
-                      _clickDownPosition = null;
-                      _dragStartGlobal = null;
-                      _isDragSelecting = false;
-                      // Anchor scroll to the position where user released the
-                      // scrollbar, so terminal output doesn't jump to bottom.
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) _markUserScrollActive();
-                      });
-                      return;
-                    }
-                    _activePointers.remove(event.pointer);
-                    final wasDragging = _isDragSelecting;
-                    _isDragSelecting = false;
-                    _dragStartGlobal = null;
-                    final down = _clickDownPosition;
-                    _clickDownPosition = null;
-                    if (wasDragging) {
-                      return; // keep selection
-                    }
-                    if (down == null) return;
-                    if ((event.localPosition - down).distance > 6.0) return;
-                    if (_openXtermUrlAt(event.position)) return;
-                    // Single tap clears any existing selection
-                    if (_controller.selection != null) {
-                      _controller.clearSelection();
-                      return;
-                    }
-                  },
-                  onPointerCancel: (event) {
-                    _scrollbarPointers.remove(event.pointer);
-                    _activePointers.remove(event.pointer);
-                    _isDragSelecting = false;
-                    _dragStartGlobal = null;
-                  },
-                  child: _CanvasGestureAbsorbPointer(
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.text,
-                      child: _TerminalScrollChrome(
-                        controller: _scrollController,
-                        colors: colors,
-                        child: TerminalView(
-                          widget.session.terminal,
-                          key: _terminalViewKey,
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          autofocus: widget.isActive,
-                          scrollController: _scrollController,
-                          // Keep trackpad scroll for terminal scrollback instead of
-                          // turning it into up/down key presses in the shell.
-                          simulateScroll: false,
-                          onKeyEvent: _onTerminalKeyEvent,
-                          textStyle: TerminalStyle(
-                            fontSize: _fontSize,
-                            fontFamily: 'JetBrainsMono',
-                            height: 1.2,
-                          ),
-                          theme: TerminalTheme(
-                            cursor: colors.primary,
-                            selection: colors.primary.withAlpha(120),
-                            foreground: colors.terminalText,
-                            background: colors.terminalBackground,
-                            black: colors.surface,
-                            red: colors.accentRed,
-                            green: colors.accentGreen,
-                            yellow: colors.accentOrange,
-                            blue: colors.accentBlue,
-                            magenta: colors.primary,
-                            cyan: colors.terminalPrompt,
-                            white: colors.terminalText,
-                            brightBlack: colors.textMuted,
-                            brightRed: colors.accentRedDim,
-                            brightGreen: colors.accentGreenDim,
-                            brightYellow: colors.statusWarning,
-                            brightBlue: colors.accentBlue,
-                            brightMagenta: colors.primaryLight,
-                            brightCyan: colors.accentBlue,
-                            brightWhite: colors.textPrimary,
-                            searchHitBackground: colors.accentOrange,
-                            searchHitBackgroundCurrent: colors.statusWarning,
-                            searchHitForeground: colors.background,
-                          ),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                _buildXtermTerminal(colors),
                 // Search overlay
                 if (_isSearching)
                   Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
@@ -2172,55 +1942,272 @@ class TerminalWidgetState extends State<TerminalWidget> {
       onPointerCancel: (_) {
         _clickDownPosition = null;
       },
-      child: _CanvasGestureAbsorbPointer(
-        child: MouseRegion(
-          cursor: SystemMouseCursors.text,
-          child: _TerminalScrollChrome(
-            controller: _scrollController,
-            colors: colors,
-            child: kterm.TerminalView(
-              widget.session.kTerminal,
-              key: _kTerminalViewKey,
-              controller: _kController,
-              focusNode: _focusNode,
-              autofocus: widget.isActive,
-              scrollController: _scrollController,
-              simulateScroll: true,
-              showSearchBar: true,
-              onKeyEvent: _onTerminalKeyEvent,
-              textStyle: kterm.TerminalStyle(
-                fontSize: _fontSize,
-                fontFamily: 'JetBrainsMono',
-                height: 1.2,
-              ),
-              theme: kterm.TerminalTheme(
-                cursor: colors.primary,
-                selection: colors.primary.withAlpha(120),
-                foreground: colors.terminalText,
-                background: colors.terminalBackground,
-                black: colors.surface,
-                red: colors.accentRed,
-                green: colors.accentGreen,
-                yellow: colors.accentOrange,
-                blue: colors.accentBlue,
-                magenta: colors.primary,
-                cyan: colors.terminalPrompt,
-                white: colors.terminalText,
-                brightBlack: colors.textMuted,
-                brightRed: colors.accentRedDim,
-                brightGreen: colors.accentGreenDim,
-                brightYellow: colors.statusWarning,
-                brightBlue: colors.accentBlue,
-                brightMagenta: colors.primaryLight,
-                brightCyan: colors.accentBlue,
-                brightWhite: colors.textPrimary,
-                searchHitBackground: colors.accentOrange,
-                searchHitBackgroundCurrent: colors.statusWarning,
-                searchHitForeground: colors.background,
-              ),
-              padding: const EdgeInsets.all(8),
-            ),
+      child: _wrapTerminal(
+        colors,
+        kterm.TerminalView(
+          widget.session.kTerminal,
+          key: _kTerminalViewKey,
+          controller: _kController,
+          focusNode: _focusNode,
+          autofocus: widget.isActive,
+          scrollController: _scrollController,
+          simulateScroll: true,
+          showSearchBar: true,
+          onKeyEvent: _onTerminalKeyEvent,
+          textStyle: kterm.TerminalStyle(
+            fontSize: _fontSize,
+            fontFamily: 'JetBrainsMono',
+            height: 1.2,
           ),
+          theme: kterm.TerminalTheme(
+            cursor: colors.primary,
+            selection: colors.primary.withAlpha(120),
+            foreground: colors.terminalText,
+            background: colors.terminalBackground,
+            black: colors.surface,
+            red: colors.accentRed,
+            green: colors.accentGreen,
+            yellow: colors.accentOrange,
+            blue: colors.accentBlue,
+            magenta: colors.primary,
+            cyan: colors.terminalPrompt,
+            white: colors.terminalText,
+            brightBlack: colors.textMuted,
+            brightRed: colors.accentRedDim,
+            brightGreen: colors.accentGreenDim,
+            brightYellow: colors.statusWarning,
+            brightBlue: colors.accentBlue,
+            brightMagenta: colors.primaryLight,
+            brightCyan: colors.accentBlue,
+            brightWhite: colors.textPrimary,
+            searchHitBackground: colors.accentOrange,
+            searchHitBackgroundCurrent: colors.statusWarning,
+            searchHitForeground: colors.background,
+          ),
+          padding: const EdgeInsets.all(8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildXtermTerminal(AppColorScheme colors) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerSignal: (event) {
+        if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+          _preserveScrollForCanvasGesture();
+          return;
+        }
+        if (event is PointerScrollEvent) {
+          if (_isHorizontalTrackpadGesture(event.scrollDelta)) {
+            CanvasInteractionLock.instance.markCanvasSignalGesture();
+            _preserveScrollForCanvasGesture();
+            return;
+          }
+          GestureBinding.instance.pointerSignalResolver.register(
+            event,
+            (resolved) {
+              final scrollEvent = resolved as PointerScrollEvent;
+              if (widget.session.terminal.isUsingAltBuffer) {
+                _scrollAltBufferBy(
+                  scrollEvent.scrollDelta.dy,
+                  scrollEvent.position,
+                  'pointer-signal',
+                );
+              } else {
+                _scrollTerminalBy(
+                  scrollEvent.scrollDelta.dy,
+                  'pointer-signal',
+                );
+              }
+            },
+          );
+        }
+      },
+      onPointerPanZoomStart: (_) {
+        if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+          _preserveScrollForCanvasGesture();
+          return;
+        }
+      },
+      onPointerPanZoomUpdate: (event) {
+        if ((event.scale - 1.0).abs() > 0.01) {
+          CanvasInteractionLock.instance.markCanvasSignalGesture();
+          _preserveScrollForCanvasGesture();
+          return;
+        }
+        if (_isHorizontalTrackpadGesture(event.panDelta)) {
+          CanvasInteractionLock.instance.markCanvasSignalGesture();
+          _preserveScrollForCanvasGesture();
+          return;
+        }
+        if (CanvasInteractionLock.instance.isCanvasGestureActive) {
+          _preserveScrollForCanvasGesture();
+          return;
+        }
+        if (widget.session.terminal.isUsingAltBuffer) {
+          _scrollAltBufferBy(
+            -event.panDelta.dy,
+            event.position,
+            'pan-zoom',
+          );
+        } else {
+          _scrollTerminalBy(-event.panDelta.dy, 'pan-zoom');
+        }
+      },
+      onPointerDown: (event) {
+        if (!_focusNode.hasFocus) _focusNode.requestFocus();
+        if (_isTerminalScrollbarHit(event.localPosition)) {
+          _scrollbarPointers.add(event.pointer);
+          _clickDownPosition = null;
+          _dragStartGlobal = null;
+          _isDragSelecting = false;
+          _activePointers.remove(event.pointer);
+          _userScrollAnchorTimer?.cancel();
+          _userScrollAnchorTimer = null;
+          _userScrollPreserveTimer?.cancel();
+          _userScrollPreserveTimer = null;
+          _userScrollAnchor = null;
+          return;
+        }
+        if (event.buttons == kSecondaryMouseButton) {
+          _showTerminalContextMenu(context, event.position);
+          return;
+        }
+        if (event.buttons != kPrimaryButton) return;
+        _clickDownPosition = event.localPosition;
+        _dragStartGlobal = event.position;
+        _isDragSelecting = false;
+        _activePointers[event.pointer] = event.localPosition;
+        if (_activePointers.length == 2 &&
+            event.kind == PointerDeviceKind.touch) {
+          final positions = _activePointers.values.toList();
+          _pinchStartDistance = (positions[0] - positions[1]).distance;
+          _pinchStartFontSize = _fontSize;
+        }
+      },
+      onPointerMove: (event) {
+        if (_scrollbarPointers.contains(event.pointer)) {
+          return;
+        }
+        _activePointers[event.pointer] = event.localPosition;
+        if (_activePointers.length == 2 &&
+            _pinchStartDistance > 0 &&
+            event.kind == PointerDeviceKind.touch) {
+          final positions = _activePointers.values.toList();
+          final dist = (positions[0] - positions[1]).distance;
+          final newSize =
+              (_pinchStartFontSize * dist / _pinchStartDistance)
+                  .clamp(8.0, 48.0);
+          setState(() => _fontSize = newSize);
+          SessionPrefs.saveTerminalFontSize(newSize);
+          return;
+        }
+        final startGlobal = _dragStartGlobal;
+        if (startGlobal == null || _activePointers.length != 1) {
+          return;
+        }
+        final dist = (event.position - startGlobal).distance;
+        if (dist < 4.0) return;
+        final state = _terminalViewKey.currentState;
+        if (state == null) return;
+        final rt = state.renderTerminal;
+        if (!_isDragSelecting) {
+          _isDragSelecting = true;
+          _controller.clearSelection();
+        }
+        final localStart = rt.globalToLocal(startGlobal);
+        final localCurrent = rt.globalToLocal(event.position);
+        rt.selectCharacters(localStart, localCurrent);
+      },
+      onPointerUp: (event) {
+        if (_scrollbarPointers.remove(event.pointer)) {
+          _clickDownPosition = null;
+          _dragStartGlobal = null;
+          _isDragSelecting = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _markUserScrollActive();
+          });
+          return;
+        }
+        _activePointers.remove(event.pointer);
+        final wasDragging = _isDragSelecting;
+        _isDragSelecting = false;
+        _dragStartGlobal = null;
+        final down = _clickDownPosition;
+        _clickDownPosition = null;
+        if (wasDragging) {
+          return;
+        }
+        if (down == null) return;
+        if ((event.localPosition - down).distance > 6.0) return;
+        if (_openXtermUrlAt(event.position)) return;
+        if (_controller.selection != null) {
+          _controller.clearSelection();
+          return;
+        }
+      },
+      onPointerCancel: (event) {
+        _scrollbarPointers.remove(event.pointer);
+        _activePointers.remove(event.pointer);
+        _isDragSelecting = false;
+        _dragStartGlobal = null;
+      },
+      child: _wrapTerminal(
+        colors,
+        TerminalView(
+          widget.session.terminal,
+          key: _terminalViewKey,
+          controller: _controller,
+          focusNode: _focusNode,
+          autofocus: widget.isActive,
+          scrollController: _scrollController,
+          simulateScroll: false,
+          onKeyEvent: _onTerminalKeyEvent,
+          textStyle: TerminalStyle(
+            fontSize: _fontSize,
+            fontFamily: 'JetBrainsMono',
+            height: 1.2,
+          ),
+          theme: TerminalTheme(
+            cursor: colors.primary,
+            selection: colors.primary.withAlpha(120),
+            foreground: colors.terminalText,
+            background: colors.terminalBackground,
+            black: colors.surface,
+            red: colors.accentRed,
+            green: colors.accentGreen,
+            yellow: colors.accentOrange,
+            blue: colors.accentBlue,
+            magenta: colors.primary,
+            cyan: colors.terminalPrompt,
+            white: colors.terminalText,
+            brightBlack: colors.textMuted,
+            brightRed: colors.accentRedDim,
+            brightGreen: colors.accentGreenDim,
+            brightYellow: colors.statusWarning,
+            brightBlue: colors.accentBlue,
+            brightMagenta: colors.primaryLight,
+            brightCyan: colors.accentBlue,
+            brightWhite: colors.textPrimary,
+            searchHitBackground: colors.accentOrange,
+            searchHitBackgroundCurrent: colors.statusWarning,
+            searchHitForeground: colors.background,
+          ),
+          padding: const EdgeInsets.all(8),
+        ),
+      ),
+    );
+  }
+
+  Widget _wrapTerminal(AppColorScheme colors, Widget child) {
+    return _CanvasGestureAbsorbPointer(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.text,
+        child: _TerminalScrollChrome(
+          controller: _scrollController,
+          colors: colors,
+          child: RepaintBoundary(child: child),
         ),
       ),
     );
@@ -2228,8 +2215,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
 
   Widget _buildSearchBar(AppColorScheme colors) {
     final hitCount = _searchHits.length;
-    final hitLabel =
-        hitCount == 0 ? 'No results' : '${_currentHitIndex + 1} of $hitCount';
+    final hitLabel = hitCount == 0 ? 'No results' : '${_currentHitIndex + 1} of $hitCount';
 
     return Material(
       color: Colors.transparent,
@@ -2586,7 +2572,7 @@ class _WorkspaceColorPickerDialogState
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final presets = [
+    final presets = {
       colors.primary,
       colors.accentBlue,
       colors.accentGreen,
@@ -2599,15 +2585,9 @@ class _WorkspaceColorPickerDialogState
       colors.statusWarning,
       colors.sidebarGlow,
       colors.primaryGlow,
-      colors.accentOrange,
       colors.accentGreenDim,
       colors.accentRedDim,
-      colors.primary,
-      colors.accentOrange,
-      colors.terminalPrompt,
-      colors.primaryLight,
-      colors.statusActive,
-    ];
+    }.toList();
     return Dialog(
       backgroundColor: colors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -2687,10 +2667,6 @@ class _WorkspaceColorPickerDialogState
                         filled: true,
                         fillColor: colors.surfaceElevated,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: _current.withAlpha(80)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(6),
                           borderSide: BorderSide(color: _current.withAlpha(80)),
                         ),
