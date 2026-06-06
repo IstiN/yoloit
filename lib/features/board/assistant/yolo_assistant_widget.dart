@@ -15,6 +15,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/utils/json_utils.dart';
+import 'package:yoloit/core/utils/string_utils.dart';
 
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_history_dialog.dart';
