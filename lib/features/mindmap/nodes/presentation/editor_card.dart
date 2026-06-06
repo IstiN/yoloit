@@ -190,9 +190,10 @@ class _EditorCardState extends State<EditorCard> {
                     ),
                   ],
                 ),
+              ),
+            ),
           ),
-        ),
-      );
+        );
     }
 
     return Container(

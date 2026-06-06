@@ -120,6 +120,7 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
           ),
         ),
       ),
+    ),
     );
 
     if (!_isMobile) return terminalWidget;

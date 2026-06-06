@@ -168,6 +168,7 @@ class RunCard extends StatelessWidget {
                             );
                           },
                         ),
+                ),
               ),
             ),
           ),
