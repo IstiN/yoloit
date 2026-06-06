@@ -590,8 +590,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     final boardCubit =
                                                         context
                                                             .read<BoardCubit>();
-                                                    return RepaintBoundary(
-                                                      child: BoardPanelCard(
+                                                    return BoardPanelCard(
                                                         key: ValueKey(panel.id),
                                                         panel: panel,
                                                       positionOffset:
@@ -865,8 +864,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                     panel.id,
                                                                   )
                                                               : null,
-                                                      ),
-                                                    );
+                                                      );
                                                   }).toList();
                                                 })(),
                                                 // ── Drawing layer (above panels visually;
