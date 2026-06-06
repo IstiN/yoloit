@@ -18,6 +18,7 @@ import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/models/agent_session.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
+import 'package:yoloit/ui/components/buttons/action_icon_button.dart';
 
 class BoardTerminalPanelWidget extends StatefulWidget {
   const BoardTerminalPanelWidget({
@@ -1198,43 +1199,49 @@ class _BoardTerminalSessionHistoryDialogState
                               ),
                             ),
                             if (!isCurrent)
-                              _historyActionButton(
-                                icon: Icons.restore,
-                                color: colors.accentBlue,
-                                tooltip: 'Restore as new terminal panel',
+                              Padding(
+                                padding: const EdgeInsets.only(left: 6),
+                                child: ActionIconButton(
+                                  icon: Icons.restore,
+                                  color: colors.accentBlue,
+                                  tooltip: 'Restore as new terminal panel',
+                                  onTap: () async {
+                                    Navigator.pop(context);
+                                    await context
+                                        .read<BoardCubit>()
+                                        .createTerminalPanel(
+                                          title: entry.sessionName,
+                                          sessionId: entry.id,
+                                          sessionName: entry.sessionName,
+                                          workingDir: entry.workingDir,
+                                          envGroupIds: entry.envGroupIds,
+                                        );
+                                  },
+                                ),
+                              ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: ActionIconButton(
+                                icon:
+                                    isLive
+                                        ? Icons.stop_circle_outlined
+                                        : Icons.delete_outline,
+                                color:
+                                    isLive
+                                        ? colors.accentOrange
+                                        : colors.accentRed,
+                                tooltip:
+                                    isLive ? 'Kill session' : 'Delete history',
                                 onTap: () async {
-                                  Navigator.pop(context);
-                                  await context
-                                      .read<BoardCubit>()
-                                      .createTerminalPanel(
-                                        title: entry.sessionName,
-                                        sessionId: entry.id,
-                                        sessionName: entry.sessionName,
-                                        workingDir: entry.workingDir,
-                                        envGroupIds: entry.envGroupIds,
-                                      );
+                                  if (isLive) {
+                                    await manager.killSession(entry.id);
+                                  } else {
+                                    await BoardTerminalSessionHistory.instance
+                                        .delete(entry.id);
+                                  }
+                                  _refresh();
                                 },
                               ),
-                            _historyActionButton(
-                              icon:
-                                  isLive
-                                      ? Icons.stop_circle_outlined
-                                      : Icons.delete_outline,
-                              color:
-                                  isLive
-                                      ? colors.accentOrange
-                                      : colors.accentRed,
-                              tooltip:
-                                  isLive ? 'Kill session' : 'Delete history',
-                              onTap: () async {
-                                if (isLive) {
-                                  await manager.killSession(entry.id);
-                                } else {
-                                  await BoardTerminalSessionHistory.instance
-                                      .delete(entry.id);
-                                }
-                                _refresh();
-                              },
                             ),
                           ],
                         ),
@@ -1255,26 +1262,4 @@ class _BoardTerminalSessionHistoryDialogState
       ],
     );
   }
-}
-
-Widget _historyActionButton({
-  required IconData icon,
-  required Color color,
-  required String tooltip,
-  required VoidCallback onTap,
-}) {
-  return Padding(
-    padding: const EdgeInsets.only(left: 6),
-    child: Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(icon, size: 14, color: color),
-        ),
-      ),
-    ),
-  );
 }

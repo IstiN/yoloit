@@ -1,6 +1,6 @@
 {
   "statistics": {
-    "detectionDate": "2026-06-05T22:37:52.075Z",
+    "detectionDate": "2026-06-05T23:26:56.260Z",
     "formats": {
       "dart": {
         "sources": {
@@ -784,15 +784,63 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
-          "lib/features/board/chat/widgets/chat_typing_indicator.dart": {
-            "lines": 64,
-            "tokens": 496,
+          "lib/features/board/chat/widgets/user_bubble.dart": {
+            "lines": 132,
+            "tokens": 1137,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
             "duplicatedTokens": 0,
             "percentage": 0,
             "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/tool_result_card.dart": {
+            "lines": 275,
+            "tokens": 2082,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/session_history_dialog.dart": {
+            "lines": 210,
+            "tokens": 1533,
+            "sources": 1,
+            "clones": 9,
+            "duplicatedLines": 154,
+            "duplicatedTokens": 1156,
+            "percentage": 73.33,
+            "percentageTokens": 75.41,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/model_search_dialog.dart": {
+            "lines": 210,
+            "tokens": 1557,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/chat_typing_indicator.dart": {
+            "lines": 64,
+            "tokens": 496,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 39,
+            "duplicatedTokens": 343,
+            "percentage": 60.94,
+            "percentageTokens": 69.15,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -817,6 +865,18 @@
             "duplicatedTokens": 0,
             "percentage": 0,
             "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/chat_setup_view.dart": {
+            "lines": 687,
+            "tokens": 5814,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 42,
+            "duplicatedTokens": 450,
+            "percentage": 6.11,
+            "percentageTokens": 7.74,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -889,6 +949,78 @@
             "duplicatedTokens": 0,
             "percentage": 0,
             "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/assistant_bubble.dart": {
+            "lines": 244,
+            "tokens": 1918,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 6,
+            "duplicatedTokens": 76,
+            "percentage": 2.46,
+            "percentageTokens": 3.96,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/assistant/widgets/session_bar_button.dart": {
+            "lines": 30,
+            "tokens": 215,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/assistant/widgets/debug_session_list_view.dart": {
+            "lines": 503,
+            "tokens": 4610,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/assistant/widgets/assistant_tool_executor.dart": {
+            "lines": 301,
+            "tokens": 2868,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/assistant/widgets/assistant_thinking_indicator.dart": {
+            "lines": 65,
+            "tokens": 488,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 39,
+            "duplicatedTokens": 343,
+            "percentage": 60,
+            "percentageTokens": 70.29,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/assistant/widgets/assistant_history_dialog.dart": {
+            "lines": 208,
+            "tokens": 1534,
+            "sources": 1,
+            "clones": 5,
+            "duplicatedLines": 74,
+            "duplicatedTokens": 565,
+            "percentage": 35.58,
+            "percentageTokens": 36.83,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2468,11 +2600,11 @@
             "lines": 228,
             "tokens": 1722,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 45,
-            "duplicatedTokens": 411,
-            "percentage": 19.74,
-            "percentageTokens": 23.87,
+            "clones": 7,
+            "duplicatedLines": 125,
+            "duplicatedTokens": 1002,
+            "percentage": 54.82,
+            "percentageTokens": 58.19,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2516,11 +2648,11 @@
             "lines": 335,
             "tokens": 2585,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 9,
-            "duplicatedTokens": 83,
-            "percentage": 2.69,
-            "percentageTokens": 3.21,
+            "clones": 2,
+            "duplicatedLines": 15,
+            "duplicatedTokens": 159,
+            "percentage": 4.48,
+            "percentageTokens": 6.15,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3077,8 +3209,8 @@
             "newClones": 0
           },
           "lib/features/board/chat/chat_panel_models.dart": {
-            "lines": 159,
-            "tokens": 1248,
+            "lines": 157,
+            "tokens": 1244,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3112,6 +3244,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "lib/core/cli/handlers/yolo_chat_handler.dart": {
+            "lines": 418,
+            "tokens": 4313,
+            "sources": 1,
+            "clones": 9,
+            "duplicatedLines": 88,
+            "duplicatedTokens": 989,
+            "percentage": 21.05,
+            "percentageTokens": 22.93,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "lib/core/cli/handlers/webpage_handler.dart": {
             "lines": 231,
             "tokens": 1874,
@@ -3133,6 +3277,18 @@
             "duplicatedTokens": 72,
             "percentage": 2.72,
             "percentageTokens": 5.1,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/core/cli/handlers/theme_handler.dart": {
+            "lines": 228,
+            "tokens": 2453,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3172,6 +3328,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "lib/core/cli/handlers/server_helpers.dart": {
+            "lines": 25,
+            "tokens": 338,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "lib/core/cli/handlers/run_configs_handler.dart": {
             "lines": 411,
             "tokens": 3579,
@@ -3193,6 +3361,18 @@
             "duplicatedTokens": 0,
             "percentage": 0,
             "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/core/cli/handlers/panel_handler.dart": {
+            "lines": 80,
+            "tokens": 749,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 167,
+            "percentage": 15,
+            "percentageTokens": 22.3,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3272,11 +3452,11 @@
             "lines": 392,
             "tokens": 3576,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 24,
-            "duplicatedTokens": 235,
-            "percentage": 6.12,
-            "percentageTokens": 6.57,
+            "clones": 3,
+            "duplicatedLines": 35,
+            "duplicatedTokens": 325,
+            "percentage": 8.93,
+            "percentageTokens": 9.09,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3289,6 +3469,30 @@
             "duplicatedTokens": 501,
             "percentage": 21.2,
             "percentageTokens": 25.3,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/core/cli/handlers/apps_handler.dart": {
+            "lines": 272,
+            "tokens": 2651,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 6,
+            "duplicatedTokens": 80,
+            "percentage": 2.21,
+            "percentageTokens": 3.02,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/core/cli/handlers/agents_handler.dart": {
+            "lines": 290,
+            "tokens": 2705,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 5,
+            "duplicatedTokens": 82,
+            "percentage": 1.72,
+            "percentageTokens": 3.03,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -4062,14 +4266,14 @@
           }
         },
         "total": {
-          "lines": 78373,
-          "tokens": 658921,
-          "sources": 338,
-          "clones": 133,
-          "duplicatedLines": 1441,
-          "duplicatedTokens": 14224,
-          "percentage": 1.84,
-          "percentageTokens": 2.16,
+          "lines": 82549,
+          "tokens": 695882,
+          "sources": 355,
+          "clones": 153,
+          "duplicatedLines": 1722,
+          "duplicatedTokens": 16728,
+          "percentage": 2.09,
+          "percentageTokens": 2.4,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -4104,14 +4308,14 @@
       }
     },
     "total": {
-      "lines": 78448,
-      "tokens": 659365,
-      "sources": 339,
-      "clones": 133,
-      "duplicatedLines": 1441,
-      "duplicatedTokens": 14224,
-      "percentage": 1.84,
-      "percentageTokens": 2.16,
+      "lines": 82624,
+      "tokens": 696326,
+      "sources": 356,
+      "clones": 153,
+      "duplicatedLines": 1722,
+      "duplicatedTokens": 16728,
+      "percentage": 2.08,
+      "percentageTokens": 2.4,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
@@ -4834,6 +5038,294 @@
           "line": 295,
           "column": 16,
           "position": 2339
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 10,
+      "fragment": "if (!models.any((m) => m.id == _selectedModel)) {\n            _selectedModel =\n                models\n                    .firstWhere((m) => m.isDefault, orElse: () => models.first)\n                    .id;\n          }\n        });\n      }\n    } catch (e) {\n      debugPrint('[ChatSetup] cursor models load failed: $e'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/chat/widgets/chat_setup_view.dart",
+        "start": 190,
+        "end": 199,
+        "startLoc": {
+          "line": 190,
+          "column": 11,
+          "position": 1714
+        },
+        "endLoc": {
+          "line": 199,
+          "column": 61,
+          "position": 1809
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/chat_setup_view.dart",
+        "start": 158,
+        "end": 167,
+        "startLoc": {
+          "line": 158,
+          "column": 11,
+          "position": 1391
+        },
+        "endLoc": {
+          "line": 167,
+          "column": 63,
+          "position": 1486
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 13,
+      "fragment": ");\n      if (models != null && models.isNotEmpty && mounted) {\n        setState(() {\n          if (!models.any((m) => m.id == _selectedModel)) {\n            _selectedModel =\n                models\n                    .firstWhere((m) => m.isDefault, orElse: () => models.first)\n                    .id;\n          }\n        });\n      }\n    } catch (e) {\n      debugPrint('[ChatSetup] codex models load failed: $e'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/chat/widgets/chat_setup_view.dart",
+        "start": 209,
+        "end": 221,
+        "startLoc": {
+          "line": 209,
+          "column": 74,
+          "position": 1905
+        },
+        "endLoc": {
+          "line": 221,
+          "column": 60,
+          "position": 2035
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/chat_setup_view.dart",
+        "start": 187,
+        "end": 167,
+        "startLoc": {
+          "line": 187,
+          "column": 66,
+          "position": 1679
+        },
+        "endLoc": {
+          "line": 167,
+          "column": 63,
+          "position": 1486
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 40,
+      "fragment": "AnimationController _ctrl;\n\n  @override\n  void initState() {\n    super.initState();\n    _ctrl = AnimationController(\n      vsync: this,\n      duration: const Duration(milliseconds: 800),\n    )..repeat();\n  }\n\n  @override\n  void dispose() {\n    _ctrl.dispose();\n    super.dispose();\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    return AnimatedBuilder(\n      animation: _ctrl,\n      builder: (context, _) {\n        return Row(\n          mainAxisSize: MainAxisSize.min,\n          children: List.generate(3, (i) {\n            final delay = i * 0.2;\n            final t = ((_ctrl.value - delay) % 1.0).clamp(0.0, 1.0);\n            final opacity = (0.3 + 0.7 * (1.0 - (t * 2 - 1).abs())).clamp(\n              0.3,\n              1.0,\n            );\n            return Padding(\n              padding: const EdgeInsets.only(right: 3),\n              child: Opacity(\n                opacity: opacity,\n                child: Container(\n                  width: 5,\n                  height: 5,\n                  decoration: BoxDecoration(\n                    color: widget",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/assistant/widgets/assistant_thinking_indicator.dart",
+        "start": 16,
+        "end": 55,
+        "startLoc": {
+          "line": 16,
+          "column": 14,
+          "position": 95
+        },
+        "endLoc": {
+          "line": 55,
+          "column": 34,
+          "position": 438
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/chat_typing_indicator.dart",
+        "start": 13,
+        "end": 53,
+        "startLoc": {
+          "line": 13,
+          "column": 8,
+          "position": 77
+        },
+        "endLoc": {
+          "line": 53,
+          "column": 30,
+          "position": 421
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 11,
+      "fragment": "@override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return AlertDialog(\n      backgroundColor: colors.surface,\n      title: Row(\n        children: [\n          Icon(\n            Icons.history,\n            size: 18,\n            color: Theme.of(context).colorScheme",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
+        "start": 36,
+        "end": 46,
+        "startLoc": {
+          "line": 36,
+          "column": 3,
+          "position": 252
+        },
+        "endLoc": {
+          "line": 46,
+          "column": 49,
+          "position": 334
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 35,
+        "end": 46,
+        "startLoc": {
+          "line": 35,
+          "column": 3,
+          "position": 237
+        },
+        "endLoc": {
+          "line": 46,
+          "column": 44,
+          "position": 320
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 14,
+      "fragment": ",\n        child: FutureBuilder<List<ChatSessionEntry>>(\n          future: _entriesFuture,\n          builder: (context, snapshot) {\n            if (!snapshot.hasData) {\n              return const Center(child: CircularProgressIndicator());\n            }\n            final entries = snapshot.data!;\n            if (entries.isEmpty) {\n              return Center(\n                child: Text(\n                  'No sessions yet.\\nStart chatting to see history here.',\n                  textAlign: TextAlign.center,\n                  style: TextStyle(color: colors",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
+        "start": 60,
+        "end": 73,
+        "startLoc": {
+          "line": 60,
+          "column": 20,
+          "position": 428
+        },
+        "endLoc": {
+          "line": 73,
+          "column": 49,
+          "position": 552
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 61,
+        "end": 76,
+        "startLoc": {
+          "line": 61,
+          "column": 20,
+          "position": 432
+        },
+        "endLoc": {
+          "line": 76,
+          "column": 32,
+          "position": 559
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 9,
+      "fragment": "(\n                          icon: Icons.restore,\n                          color: colors.accentBlue,\n                          tooltip: 'Restore',\n                          onTap: () async {\n                            final msgs = await ChatSessionHistory.instance\n                                .loadMessages(e.id);\n                            if (!context.mounted) return;\n                            Navigator.pop(context,",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
+        "start": 152,
+        "end": 160,
+        "startLoc": {
+          "line": 152,
+          "column": 36,
+          "position": 1137
+        },
+        "endLoc": {
+          "line": 160,
+          "column": 51,
+          "position": 1217
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 154,
+        "end": 162,
+        "startLoc": {
+          "line": 154,
+          "column": 38,
+          "position": 1125
+        },
+        "endLoc": {
+          "line": 162,
+          "column": 51,
+          "position": 1205
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 25,
+      "fragment": ",\n                        tooltip: 'Delete',\n                        onTap: () async {\n                          await ChatSessionHistory.instance.delete(e.id);\n                          _refresh();\n                        },\n                      ),\n                    ],\n                  ),\n                );\n              },\n            );\n          },\n        ),\n      ),\n      actions: [\n        TextButton(\n          onPressed: () => Navigator.pop(context),\n          child: const Text('Close'),\n        ),\n      ],\n    );\n  }\n\n  Widget _historyBtn",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
+        "start": 166,
+        "end": 190,
+        "startLoc": {
+          "line": 166,
+          "column": 48,
+          "position": 1254
+        },
+        "endLoc": {
+          "line": 190,
+          "column": 21,
+          "position": 1394
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 169,
+        "end": 193,
+        "startLoc": {
+          "line": 169,
+          "column": 50,
+          "position": 1254
+        },
+        "endLoc": {
+          "line": 193,
+          "column": 23,
+          "position": 1394
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 20,
+      "fragment": "({\n    required IconData icon,\n    required Color color,\n    required String tooltip,\n    required VoidCallback onTap,\n  }) {\n    return Tooltip(\n      message: tooltip,\n      child: InkWell(\n        borderRadius: BorderRadius.circular(6),\n        onTap: onTap,\n        child: Padding(\n          padding: const EdgeInsets.all(4),\n          child: Icon(icon, size: 14, color: color),\n        ),\n      ),\n    );\n  }\n\n}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
+        "start": 190,
+        "end": 209,
+        "startLoc": {
+          "line": 190,
+          "column": 21,
+          "position": 1395
+        },
+        "endLoc": {
+          "line": 209,
+          "column": 2,
+          "position": 1534
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 193,
+        "end": 211,
+        "startLoc": {
+          "line": 193,
+          "column": 23,
+          "position": 1395
+        },
+        "endLoc": {
+          "line": 211,
+          "column": 2,
+          "position": 1533
         }
       }
     },
@@ -6747,6 +7239,114 @@
     },
     {
       "format": "dart",
+      "lines": 20,
+      "fragment": "),\n          ),\n        ],\n      ),\n      content: SizedBox(\n        width: 380,\n        height: 420,\n        child: FutureBuilder<List<ChatSessionEntry>>(\n          future: _entriesFuture,\n          builder: (context, snapshot) {\n            if (!snapshot.hasData) {\n              return const Center(child: CircularProgressIndicator());\n            }\n            final entries = snapshot.data!;\n            if (entries.isEmpty) {\n              return Center(\n                child: Text(\n                  'No sessions yet.\\nStart chatting to see history here.',\n                  textAlign: TextAlign.center,\n                  style: TextStyle(color: mutedColor",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/ui/chat_session_history_dialog.dart",
+        "start": 49,
+        "end": 68,
+        "startLoc": {
+          "line": 49,
+          "column": 60,
+          "position": 379
+        },
+        "endLoc": {
+          "line": 68,
+          "column": 53,
+          "position": 537
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 55,
+        "end": 76,
+        "startLoc": {
+          "line": 55,
+          "column": 13,
+          "position": 398
+        },
+        "endLoc": {
+          "line": 76,
+          "column": 32,
+          "position": 559
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 10,
+      "fragment": "),\n                ),\n              );\n            }\n            return ListView.separated(\n              itemCount: entries.length,\n              separatorBuilder: (_, __) => const SizedBox(height: 4),\n              itemBuilder: (context, index) {\n                final e = entries[index];\n                final isCurrent = e.id == widget.panelId",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/ui/chat_session_history_dialog.dart",
+        "start": 68,
+        "end": 77,
+        "startLoc": {
+          "line": 68,
+          "column": 67,
+          "position": 544
+        },
+        "endLoc": {
+          "line": 77,
+          "column": 57,
+          "position": 641
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 78,
+        "end": 87,
+        "startLoc": {
+          "line": 78,
+          "column": 19,
+          "position": 574
+        },
+        "endLoc": {
+          "line": 87,
+          "column": 64,
+          "position": 671
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 18,
+      "fragment": ",\n                        ),\n                        const SizedBox(width: 10),\n                        Expanded(\n                          child: Column(\n                            crossAxisAlignment: CrossAxisAlignment.start,\n                            children: [\n                              Text(\n                                e.sessionName.isNotEmpty\n                                    ? e.sessionName\n                                    : 'Unnamed session',\n                                style: TextStyle(\n                                  fontSize: 13,\n                                  fontWeight: FontWeight.w500,\n                                  color:\n                                      isCurrent\n                                          ? colors.statusActive\n                                          : onSurface",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/ui/chat_session_history_dialog.dart",
+        "start": 122,
+        "end": 139,
+        "startLoc": {
+          "line": 122,
+          "column": 78,
+          "position": 981
+        },
+        "endLoc": {
+          "line": 139,
+          "column": 54,
+          "position": 1089
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 109,
+        "end": 126,
+        "startLoc": {
+          "line": 109,
+          "column": 62,
+          "position": 837
+        },
+        "endLoc": {
+          "line": 126,
+          "column": 48,
+          "position": 945
+        }
+      }
+    },
+    {
+      "format": "dart",
       "lines": 19,
       "fragment": ": () async {\n                              final msgs = await ChatSessionHistory.instance\n                                  .loadMessages(e.id);\n                              if (!context.mounted) return;\n                              Navigator.pop(context);\n                              final cubit = context.read<BoardCubit>();\n                              await cubit.createChatPanel(\n                                title:\n                                    e.sessionName.isNotEmpty\n                                        ? e.sessionName\n                                        : 'Restored chat',\n                                sessionName: e.sessionName,\n                                workingDir: e.workingDir,\n                                model: e.model,\n                                envGroupIds: e.envGroupIds,\n                                messages: msgs,\n                              );\n                            },\n                          )",
       "tokens": 0,
@@ -6778,6 +7378,42 @@
           "line": 100,
           "column": 24,
           "position": 818
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 36,
+      "fragment": ",\n                  ),\n                );\n              },\n            );\n          },\n        ),\n      ),\n      actions: [\n        TextButton(\n          onPressed: () => Navigator.pop(context),\n          child: const Text('Close'),\n        ),\n      ],\n    );\n  }\n\n  Widget _actionButton({\n    required IconData icon,\n    required Color color,\n    required String tooltip,\n    required VoidCallback onTap,\n  }) {\n    return Tooltip(\n      message: tooltip,\n      child: InkWell(\n        borderRadius: BorderRadius.circular(6),\n        onTap: onTap,\n        child: Padding(\n          padding: const EdgeInsets.all(4),\n          child: Icon(icon, size: 14, color: color),\n        ),\n      ),\n    );\n  }\n}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/ui/chat_session_history_dialog.dart",
+        "start": 194,
+        "end": 229,
+        "startLoc": {
+          "line": 194,
+          "column": 22,
+          "position": 1494
+        },
+        "endLoc": {
+          "line": 229,
+          "column": 2,
+          "position": 1722
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
+        "start": 176,
+        "end": 211,
+        "startLoc": {
+          "line": 176,
+          "column": 22,
+          "position": 1305
+        },
+        "endLoc": {
+          "line": 211,
+          "column": 2,
+          "position": 1533
         }
       }
     },
@@ -6886,6 +7522,42 @@
           "line": 94,
           "column": 20,
           "position": 751
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 7,
+      "fragment": "@override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    final textColor =\n        Theme.of(context).textTheme.bodyMedium?.color ??\n        Theme.of(context).colorScheme.onSurface;\n    final mutedColor = context.appColors.textMuted;",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/features/board/ui/board_toolbar.dart",
+        "start": 284,
+        "end": 290,
+        "startLoc": {
+          "line": 284,
+          "column": 3,
+          "position": 2155
+        },
+        "endLoc": {
+          "line": 290,
+          "column": 52,
+          "position": 2231
+        }
+      },
+      "secondFile": {
+        "name": "lib/features/board/chat/widgets/assistant_bubble.dart",
+        "start": 45,
+        "end": 52,
+        "startLoc": {
+          "line": 45,
+          "column": 3,
+          "position": 357
+        },
+        "endLoc": {
+          "line": 52,
+          "column": 37,
+          "position": 434
         }
       }
     },
@@ -7612,6 +8284,114 @@
     {
       "format": "dart",
       "lines": 7,
+      "fragment": "(\n        cubit,\n        boardHint: requestBody['board'] as String? ?? requestBody['boardId'] as String?,\n        panelHint: requestBody['panel'] as String? ?? requestBody['panelId'] as String?,\n      );\n      if (target == null) {\n        return error('No board.terminal panel found (or target not found)'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 96,
+        "end": 102,
+        "startLoc": {
+          "line": 96,
+          "column": 38,
+          "position": 1063
+        },
+        "endLoc": {
+          "line": 102,
+          "column": 75,
+          "position": 1147
+        }
+      },
+      "secondFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 53,
+        "end": 59,
+        "startLoc": {
+          "line": 53,
+          "column": 42,
+          "position": 547
+        },
+        "endLoc": {
+          "line": 59,
+          "column": 69,
+          "position": 631
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 12,
+      "fragment": "&& method == 'GET') {\n    final boardHint = request.url.queryParameters['board'];\n    final panelHint = request.url.queryParameters['panel'];\n    final target = _resolveYoloChatTarget(\n      cubit,\n      boardHint: boardHint,\n      panelHint: panelHint,\n    );\n    if (target == null) {\n      return error('No board.chat panel found (or target not found)');\n    }\n    final",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 308,
+        "end": 319,
+        "startLoc": {
+          "line": 308,
+          "column": 43,
+          "position": 3165
+        },
+        "endLoc": {
+          "line": 319,
+          "column": 10,
+          "position": 3268
+        }
+      },
+      "secondFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 254,
+        "end": 265,
+        "startLoc": {
+          "line": 254,
+          "column": 45,
+          "position": 2683
+        },
+        "endLoc": {
+          "line": 265,
+          "column": 11,
+          "position": 2786
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 17,
+      "fragment": "(\n  BoardCubit cubit, {\n  String? boardHint,\n  String? panelHint,\n}) {\n  BoardDocument? board;\n  if (boardHint != null && boardHint.trim().isNotEmpty) {\n    board = findBoard(cubit, boardHint);\n  } else {\n    board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;\n  }\n  if (board == null) return null;\n\n  BoardPanelInstance? panel;\n  if (panelHint != null && panelHint.trim().isNotEmpty) {\n    panel = findPanel(board, panelHint);\n    if (panel?.type != 'board.terminal'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 385,
+        "end": 401,
+        "startLoc": {
+          "line": 385,
+          "column": 74,
+          "position": 3954
+        },
+        "endLoc": {
+          "line": 401,
+          "column": 40,
+          "position": 4132
+        }
+      },
+      "secondFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 361,
+        "end": 377,
+        "startLoc": {
+          "line": 361,
+          "column": 74,
+          "position": 3677
+        },
+        "endLoc": {
+          "line": 377,
+          "column": 36,
+          "position": 3855
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 7,
       "fragment": ",\n            quickActions:\n                (args['quickActions'] as List?)\n                    ?.whereType<Map<String, dynamic>>()\n                    .map(RunQuickAction.fromJson)\n                    .where((action) => action.command.trim().isNotEmpty)\n                    .toList(),",
       "tokens": 0,
       "firstFile": {
@@ -7642,6 +8422,42 @@
           "line": 109,
           "column": 30,
           "position": 1033
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 7,
+      "fragment": ", {\n  required Future<Map<String, dynamic>> Function(shelf.Request) body,\n  required shelf.Response Function(Object) json,\n  required shelf.Response Function(String) error,\n  required shelf.Response Function(String) notFound,\n  required void Function() scheduleRebuild,\n  required shelf",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/core/cli/handlers/panel_handler.dart",
+        "start": 15,
+        "end": 21,
+        "startLoc": {
+          "line": 15,
+          "column": 24,
+          "position": 85
+        },
+        "endLoc": {
+          "line": 21,
+          "column": 17,
+          "position": 172
+        }
+      },
+      "secondFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 18,
+        "end": 24,
+        "startLoc": {
+          "line": 18,
+          "column": 19,
+          "position": 98
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 18,
+          "position": 185
         }
       }
     },
@@ -7714,6 +8530,42 @@
           "line": 57,
           "column": 11,
           "position": 449
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 12,
+      "fragment": ".get(id);\n      if (session != null) {\n        sessions.add({\n          'panelId': id,\n          'provider': session.config.provider,\n          'model': session.config.model,\n          'messageCount': session.messages.length,\n          'isProcessing': session.isProcessing,\n        });\n      }\n    }\n    return CliActionResult",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/core/cli/handlers/chat_handler.dart",
+        "start": 276,
+        "end": 287,
+        "startLoc": {
+          "line": 276,
+          "column": 38,
+          "position": 2575
+        },
+        "endLoc": {
+          "line": 287,
+          "column": 27,
+          "position": 2665
+        }
+      },
+      "secondFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 171,
+        "end": 182,
+        "startLoc": {
+          "line": 171,
+          "column": 50,
+          "position": 1878
+        },
+        "endLoc": {
+          "line": 182,
+          "column": 16,
+          "position": 1968
         }
       }
     },
@@ -7822,6 +8674,78 @@
           "line": 155,
           "column": 15,
           "position": 1417
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 7,
+      "fragment": ",\n  shelf.Request request, {\n  required Future<Map<String, dynamic>> Function(shelf.Request) body,\n  required shelf.Response Function(Object) json,\n  required shelf.Response Function(String) error,\n  required shelf.Response Function(String) notFound,\n}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/core/cli/handlers/apps_handler.dart",
+        "start": 12,
+        "end": 18,
+        "startLoc": {
+          "line": 12,
+          "column": 19,
+          "position": 64
+        },
+        "endLoc": {
+          "line": 18,
+          "column": 2,
+          "position": 144
+        }
+      },
+      "secondFile": {
+        "name": "lib/core/cli/handlers/panel_handler.dart",
+        "start": 14,
+        "end": 20,
+        "startLoc": {
+          "line": 14,
+          "column": 19,
+          "position": 77
+        },
+        "endLoc": {
+          "line": 20,
+          "column": 11,
+          "position": 158
+        }
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 6,
+      "fragment": "required Future<Map<String, dynamic>> Function(shelf.Request) body,\n  required shelf.Response Function(Object) json,\n  required shelf.Response Function(String) error,\n  required shelf.Response Function(String) notFound,\n  required void Function() scheduleRebuild,\n  required BoardPanelBounds",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/core/cli/handlers/agents_handler.dart",
+        "start": 22,
+        "end": 27,
+        "startLoc": {
+          "line": 22,
+          "column": 3,
+          "position": 125
+        },
+        "endLoc": {
+          "line": 27,
+          "column": 28,
+          "position": 207
+        }
+      },
+      "secondFile": {
+        "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
+        "start": 19,
+        "end": 24,
+        "startLoc": {
+          "line": 19,
+          "column": 3,
+          "position": 103
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 18,
+          "position": 185
         }
       }
     },
