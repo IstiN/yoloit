@@ -132,6 +132,16 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
 
 ---
 
+## 📦 Release Management
+
+- **Versions are managed automatically via GitHub Actions**:
+  - **Never bump `version` in `pubspec.yaml` manually.** The release workflow (`.github/workflows/release.yml`) auto-increments the patch version based on the latest GitHub Release tag.
+  - To create a new release, trigger the workflow with `version=auto`:
+    `gh workflow run release.yml --field version=auto`
+  - The workflow builds all three platforms (macOS DMG, Windows ZIP, Linux tar.gz) in parallel and uploads them to a unified GitHub Release.
+
+---
+
 ## 🚨 Critical Agent Gotchas
 
 - **No Heredocs (`cat << 'EOF'`)**:
@@ -140,3 +150,7 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
   - If `git commit` fails due to pre-commit hooks (tests, lint, line-count), **fix the underlying issue** rather than bypassing it with `--no-verify`.
   - Only use `--no-verify` when the user explicitly approves it, or when the failure is a known infrastructure issue outside the current changes.
   - After using `--no-verify`, provide the user with a clear analysis of what failed and why it was skipped.
+- **Pre-existing `jscpd` duplication failure**:
+  - The pre-commit hook enforces `< 1%` code duplication, but the project baseline is **~1.91%** (1,687 duplicated lines across 88K+ lines). This is a known, pre-existing issue.
+  - If `git commit` fails with `Code duplication too high: 1.9%`, this is **not caused by your changes** unless `jscpd` output shows new clones in files you modified.
+  - Remediation options: (1) ask the user to lower the jscpd threshold to `2%` in `.git/hooks/pre-commit`, (2) refactor the existing duplicates (especially `lib/app.dart`, `lib/core/remote/yoloitd_models.dart` ↔ `lib/features/board/model/board_models.dart`), or (3) use `--no-verify` with explicit user approval.
