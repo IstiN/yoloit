@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
@@ -415,6 +417,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
   final _fieldKey = GlobalKey();
   late final TextEditingController _ctrl;
   final FocusNode _focusNode = FocusNode();
+  Timer? _searchDebounce;
   String _query = '';
 
   bool get _open => _overlayController.isShowing;
@@ -478,6 +481,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _ctrl.dispose();
     _focusNode
       ..removeListener(_onFocusChange)
@@ -500,7 +504,13 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
           focusNode: _focusNode,
           autofocus: true,
           style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
-          onChanged: (v) => setState(() => _query = v.trim()),
+          onChanged: (v) {
+            _searchDebounce?.cancel();
+            _searchDebounce = Timer(
+              const Duration(milliseconds: 150),
+              () => setState(() => _query = v.trim()),
+            );
+          },
           onSubmitted: (v) {
             final q = v.trim();
             if (q.isEmpty) {

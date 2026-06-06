@@ -176,6 +176,7 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   bool _loading = false;
   late String _path;
   late final TextEditingController _searchController;
+  Timer? _searchDebounce;
   String _query = '';
   final Set<String> _selectedFiles = <String>{};
 
@@ -186,7 +187,11 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
     super.initState();
     _searchController =
         TextEditingController()..addListener(() {
-          setState(() => _query = _searchController.text.trim());
+          _searchDebounce?.cancel();
+          _searchDebounce = Timer(
+            const Duration(milliseconds: 150),
+            () => setState(() => _query = _searchController.text.trim()),
+          );
         });
     _path = _initialPath();
     unawaited(_load(_path));
@@ -194,6 +199,7 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
