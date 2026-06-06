@@ -217,13 +217,15 @@ class _CodeSnippetPanelContentState extends State<_CodeSnippetPanelContent> {
           child: CodeTheme(
             data: CodeThemeData(styles: atomOneDarkTheme),
             child: SingleChildScrollView(
-              child: CodeField(
-                controller: _controller,
-                textStyle: const TextStyle(
-                  fontSize: 13,
-                  fontFamily: 'monospace',
+              child: RepaintBoundary(
+                child: CodeField(
+                  controller: _controller,
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                  ),
+                  onChanged: _saveCode,
                 ),
-                onChanged: _saveCode,
               ),
             ),
           ),

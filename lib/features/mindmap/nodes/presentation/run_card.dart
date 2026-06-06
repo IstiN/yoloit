@@ -135,13 +135,14 @@ class RunCard extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: SelectionArea(
-              child: Container(
-                color: colors.terminalBackground,
-                child:
-                    props.lines.isEmpty
-                        ? Center(
-                          child: Text(
+            child: RepaintBoundary(
+              child: SelectionArea(
+                child: Container(
+                  color: colors.terminalBackground,
+                  child:
+                      props.lines.isEmpty
+                          ? Center(
+                            child: Text(
                             'No output',
                             style: TextStyle(
                               fontSize: 10,

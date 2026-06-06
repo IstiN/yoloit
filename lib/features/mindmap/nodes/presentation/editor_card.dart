@@ -154,14 +154,15 @@ class _EditorCardState extends State<EditorCard> {
       editorBody = Container(
         color: colors.terminalBackground,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        child: SelectionArea(
-          child: ListView.builder(
-            itemCount: lines.length,
-            itemBuilder:
-                (_, i) => Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
+        child: RepaintBoundary(
+          child: SelectionArea(
+            child: ListView.builder(
+              itemCount: lines.length,
+              itemBuilder:
+                  (_, i) => Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
                       width: 32,
                       child: Text(
                         '${i + 1}',

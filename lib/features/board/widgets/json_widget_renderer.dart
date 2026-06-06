@@ -207,6 +207,7 @@ class JsonWidgetRenderer {
       width: w,
       height: h,
       fit: fit,
+      gaplessPlayback: true,
       errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: w ?? 48),
     );
   }
@@ -662,6 +663,7 @@ class JsonWidgetRenderer {
     Widget chart = SizedBox(
       height: height,
       child: CustomPaint(
+        isComplex: true,
         painter: _SparklinePainter(points: points, color: color, fill: fill),
         size: Size.infinite,
       ),

@@ -156,10 +156,12 @@ class _ScrollableNoteContentState extends State<_ScrollableNoteContent> {
               controller: _scrollCtrl,
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child:
-                    renderAsMermaid
-                        ? MarkdownDocumentPreview(content: markdown)
-                        : MarkdownBody(data: markdown),
+                child: RepaintBoundary(
+                  child:
+                      renderAsMermaid
+                          ? MarkdownDocumentPreview(content: markdown)
+                          : MarkdownBody(data: markdown),
+                ),
               ),
             ),
           ),
@@ -302,10 +304,12 @@ class _AutoHeightNoteContentState extends State<_AutoHeightNoteContent> {
         child: Padding(
           key: _contentKey,
           padding: const EdgeInsets.all(_innerPadding),
-          child:
-              renderAsMermaid
-                  ? MarkdownDocumentPreview(content: markdown)
-                  : MarkdownBody(data: markdown),
+          child: RepaintBoundary(
+            child:
+                renderAsMermaid
+                    ? MarkdownDocumentPreview(content: markdown)
+                    : MarkdownBody(data: markdown),
+          ),
         ),
       ),
     );

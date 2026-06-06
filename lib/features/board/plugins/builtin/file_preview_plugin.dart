@@ -816,7 +816,7 @@ class _MarkdownPreviewState extends State<_MarkdownPreview> {
         ),
       );
     }
-    return MarkdownDocumentPreview(content: _content);
+    return RepaintBoundary(child: MarkdownDocumentPreview(content: _content));
   }
 }
 

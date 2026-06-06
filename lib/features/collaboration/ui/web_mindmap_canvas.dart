@@ -76,7 +76,7 @@ class _WebMindMapCanvasState extends State<WebMindMapCanvas> {
 
   void _panToOffset(Offset canvasCenter) {
     if (!mounted) return;
-    final viewSize = MediaQuery.of(context).size;
+    final viewSize = MediaQuery.sizeOf(context);
     final scale = _transform.value.getMaxScaleOnAxis();
     final tx = viewSize.width / 2 - scale * canvasCenter.dx;
     final ty = viewSize.height / 2 - scale * canvasCenter.dy;
@@ -86,7 +86,7 @@ class _WebMindMapCanvasState extends State<WebMindMapCanvas> {
   }
 
   void _zoom(double factor) {
-    final viewSize = MediaQuery.of(context).size;
+    final viewSize = MediaQuery.sizeOf(context);
     final focalCanvas = _toCanvas(
       Offset(viewSize.width / 2, viewSize.height / 2),
     );
@@ -428,10 +428,12 @@ class _WebNodeState extends State<_WebNode> {
                   ),
                   // Card content
                   Expanded(
-                    child: buildCardFromContent(
-                      widget.nodeId,
-                      widget.content,
-                      widget.callbacks,
+                    child: RepaintBoundary(
+                      child: buildCardFromContent(
+                        widget.nodeId,
+                        widget.content,
+                        widget.callbacks,
+                      ),
                     ),
                   ),
                 ],

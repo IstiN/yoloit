@@ -759,14 +759,15 @@ class _InstallLog extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Expanded(
-            child: SelectionArea(
-              child: ListView.builder(
-                controller: controller,
-                itemCount: lines.length,
-                itemBuilder: (_, index) {
-                  final line = lines[index];
-                  return Text(
-                    line,
+            child: RepaintBoundary(
+              child: SelectionArea(
+                child: ListView.builder(
+                  controller: controller,
+                  itemCount: lines.length,
+                  itemBuilder: (_, index) {
+                    final line = lines[index];
+                    return Text(
+                      line,
                     style: TextStyle(
                       color:
                           line.startsWith('[exit 0]')
@@ -782,6 +783,7 @@ class _InstallLog extends StatelessWidget {
                 },
               ),
             ),
+          ),
           ),
         ],
       ),

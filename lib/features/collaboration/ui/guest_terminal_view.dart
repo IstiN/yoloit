@@ -98,16 +98,17 @@ class _GuestTerminalViewState extends State<GuestTerminalView> {
         },
         child: ColoredBox(
           color: colors.terminalBackground,
-          child: TerminalView(
-            _terminal,
-            controller: _controller,
-            focusNode: _focus,
-            autofocus: false,
-            autoResize: true,
-            // Preserve scrollback for the guest view; do not translate wheel
-            // gestures into shell arrow keys.
-            simulateScroll: false,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: RepaintBoundary(
+            child: TerminalView(
+              _terminal,
+              controller: _controller,
+              focusNode: _focus,
+              autofocus: false,
+              autoResize: true,
+              // Preserve scrollback for the guest view; do not translate wheel
+              // gestures into shell arrow keys.
+              simulateScroll: false,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             // Bundled monospace font — guarantees identical metrics and full
             // Unicode coverage (cyrillic, CJK, box-drawing) on web and native.
             textStyle: const TerminalStyle(

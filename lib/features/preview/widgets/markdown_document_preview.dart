@@ -90,6 +90,6 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
       return mdBody;
     }
 
-    return SelectionArea(child: mdBody);
+    return RepaintBoundary(child: SelectionArea(child: mdBody));
   }
 }

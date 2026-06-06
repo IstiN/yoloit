@@ -178,6 +178,7 @@ class _ShapeContentState extends State<_ShapeContent>
     return Stack(
       children: [
         CustomPaint(
+          isComplex: true,
           painter: _ShapePainter(
             shape: widget.shape,
             fillColor: widget.fillColor,

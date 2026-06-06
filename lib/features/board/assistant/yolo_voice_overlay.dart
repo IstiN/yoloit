@@ -592,27 +592,29 @@ class _YoloVoiceOverlayState extends State<YoloVoiceOverlay>
 
   Widget _orbLabel(double sz) {
     final colors = context.appColors;
-    return ShaderMask(
-      shaderCallback:
-          (b) => LinearGradient(
-            colors:
-                widget.titleColor != null
-                    ? [widget.titleColor!, widget.titleColor!]
-                    : [colors.orbCyan, colors.orbPurple],
-          ).createShader(b),
-      child: Text(
-        'YoLo',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: widget.titleFontSize ?? sz * 0.15,
-          fontWeight: FontWeight.w300,
-          letterSpacing: -0.8,
-          shadows: [
-            Shadow(
-              color: colors.orbCyan.withValues(alpha: 0.67),
-              blurRadius: 16,
-            ),
-          ],
+    return RepaintBoundary(
+      child: ShaderMask(
+        shaderCallback:
+            (b) => LinearGradient(
+              colors:
+                  widget.titleColor != null
+                      ? [widget.titleColor!, widget.titleColor!]
+                      : [colors.orbCyan, colors.orbPurple],
+            ).createShader(b),
+        child: Text(
+          'YoLo',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: widget.titleFontSize ?? sz * 0.15,
+            fontWeight: FontWeight.w300,
+            letterSpacing: -0.8,
+            shadows: [
+              Shadow(
+                color: colors.orbCyan.withValues(alpha: 0.67),
+                blurRadius: 16,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1034,7 +1036,9 @@ class _ResponseCardState extends State<_ResponseCard>
     if (hasMermaid) {
       return ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxH),
-        child: MarkdownDocumentPreview(content: text),
+        child: RepaintBoundary(
+          child: MarkdownDocumentPreview(content: text),
+        ),
       );
     }
 
@@ -1121,11 +1125,13 @@ class _ResponseCardState extends State<_ResponseCard>
             SliverPadding(
               padding: EdgeInsets.only(top: toolLines.isNotEmpty ? 10 : 0),
               sliver: SliverToBoxAdapter(
-                child: MarkdownBody(
-                  data: restText,
-                  softLineBreak: true,
-                  selectable: false,
-                  styleSheet: mdStyle,
+                child: RepaintBoundary(
+                  child: MarkdownBody(
+                    data: restText,
+                    softLineBreak: true,
+                    selectable: false,
+                    styleSheet: mdStyle,
+                  ),
                 ),
               ),
             ),

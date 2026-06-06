@@ -1812,29 +1812,33 @@ $messagesJson
                       ),
                     )
                     : containsMermaid
-                    ? MarkdownDocumentPreview(content: content)
-                    : MarkdownBody(
-                      data: content,
-                      styleSheet: MarkdownStyleSheet(
-                        p: TextStyle(
-                          fontSize: 13,
-                          color: textColor,
-                          height: 1.5,
-                        ),
-                        a: TextStyle(
-                          fontSize: 13,
-                          color: colors.primary,
-                          decoration: TextDecoration.underline,
-                        ),
-                        code: TextStyle(
-                          fontSize: 11.5,
-                          color: colors.terminalPrompt,
-                          backgroundColor: codeBg,
-                        ),
-                        codeblockDecoration: BoxDecoration(
-                          color: codeBg,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: colors.border),
+                    ? RepaintBoundary(
+                      child: MarkdownDocumentPreview(content: content),
+                    )
+                    : RepaintBoundary(
+                      child: MarkdownBody(
+                        data: content,
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            fontSize: 13,
+                            color: textColor,
+                            height: 1.5,
+                          ),
+                          a: TextStyle(
+                            fontSize: 13,
+                            color: colors.primary,
+                            decoration: TextDecoration.underline,
+                          ),
+                          code: TextStyle(
+                            fontSize: 11.5,
+                            color: colors.terminalPrompt,
+                            backgroundColor: codeBg,
+                          ),
+                          codeblockDecoration: BoxDecoration(
+                            color: codeBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: colors.border),
+                          ),
                         ),
                       ),
                     ),
