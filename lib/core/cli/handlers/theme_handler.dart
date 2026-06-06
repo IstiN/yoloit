@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart' show Brightness, Color;
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/core/theme/app_theme.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
 
@@ -68,9 +69,7 @@ Future<shelf.Response> handleTheme(
               },
             )
             .toList();
-    return json({
-      'presets': [...builtIn, ...custom],
-    });
+    return json({'presets': [...builtIn, ...custom]});
   }
 
   // POST /api/theme/set { preset: "neonPurple" } or { customId: "custom_xxx" }
@@ -83,20 +82,17 @@ Future<shelf.Response> handleTheme(
       final preset =
           AppThemePreset.values.where((p) => p.name == presetName).firstOrNull;
       if (preset == null) {
-        return json({'ok': false, 'message': 'Unknown preset: $presetName'});
+        return json(errorJson('Unknown preset: $presetName'));
       }
       await tm.setTheme(preset);
       await tm.clearColorOverrides();
-      return json({'ok': true, 'message': 'Theme set to ${preset.label}'});
+      return json(okJson({'message': 'Theme set to ${preset.label}'}));
     } else if (customId != null) {
       await tm.setCustomTheme(customId);
       await tm.clearColorOverrides();
-      return json({
-        'ok': true,
-        'message': 'Custom theme activated: $customId',
-      });
+      return json(okJson({'message': 'Custom theme activated: $customId'}));
     }
-    return json({'ok': false, 'message': 'Provide "preset" or "customId"'});
+    return json(errorJson('Provide "preset" or "customId"'));
   }
 
   // POST /api/theme/brightness { brightness: "dark"|"light" }
@@ -109,12 +105,9 @@ Future<shelf.Response> handleTheme(
     } else if (b == 'light') {
       await tm.setBrightness(Brightness.light);
     } else {
-      return json({
-        'ok': false,
-        'message': 'Provide brightness: "dark" or "light"',
-      });
+      return json(errorJson('Provide brightness: "dark" or "light"'));
     }
-    return json({'ok': true, 'brightness': b});
+    return json(okJson({'brightness': b}));
   }
 
   // POST /api/theme/color { slot: "primary", color: "#FF548AF7" }
@@ -124,7 +117,7 @@ Future<shelf.Response> handleTheme(
     final slot = body['slot'] as String?;
     final hex = body['color'] as String?;
     if (slot == null || hex == null) {
-      return json({'ok': false, 'message': 'Provide "slot" and "color"'});
+      return json(errorJson('Provide "slot" and "color"'));
     }
     final h = hex.replaceFirst('#', '');
     late Color color;
@@ -133,26 +126,26 @@ Future<shelf.Response> handleTheme(
     } else if (h.length == 8) {
       color = Color(int.parse(h, radix: 16));
     } else {
-      return json({'ok': false, 'message': 'Invalid hex color: $hex'});
+      return json(errorJson('Invalid hex color: $hex'));
     }
     await tm.setColorOverride(slot, color);
-    return json({'ok': true, 'message': 'Color override set for $slot'});
+    return json(okJson({'message': 'Color override set for $slot'}));
   }
 
   // DELETE /api/theme/color?slot=primary — remove a color override
   if (path.length == 1 && path[0] == 'color' && method == 'DELETE') {
     final slot = request.url.queryParameters['slot'];
     if (slot == null) {
-      return json({'ok': false, 'message': 'Provide ?slot= query param'});
+      return json(errorJson('Provide ?slot= query param'));
     }
     await tm.removeColorOverride(slot);
-    return json({'ok': true, 'message': 'Color override removed for $slot'});
+    return json(okJson({'message': 'Color override removed for $slot'}));
   }
 
   // POST /api/theme/reset-colors — clear all overrides
   if (path.length == 1 && path[0] == 'reset-colors' && method == 'POST') {
     await tm.clearColorOverrides();
-    return json({'ok': true, 'message': 'All color overrides cleared'});
+    return json(okJson({'message': 'All color overrides cleared'}));
   }
 
   // POST /api/theme/save { name: "My Theme" } — save current as custom preset
@@ -161,14 +154,10 @@ Future<shelf.Response> handleTheme(
         jsonDecode(await request.readAsString()) as Map<String, dynamic>;
     final name = body['name'] as String?;
     if (name == null || name.trim().isEmpty) {
-      return json({'ok': false, 'message': 'Provide "name"'});
+      return json(errorJson('Provide "name"'));
     }
     final id = await tm.saveCurrentAsPreset(name.trim());
-    return json({
-      'ok': true,
-      'id': id,
-      'message': 'Preset saved: ${name.trim()}',
-    });
+    return json(okJson({'id': id, 'message': 'Preset saved: ${name.trim()}'}));
   }
 
   // GET /api/theme/export → current theme as JSON
@@ -185,18 +174,14 @@ Future<shelf.Response> handleTheme(
         jsonDecode(await request.readAsString()) as Map<String, dynamic>;
     final filePath = body['path'] as String?;
     if (filePath == null) {
-      return json({'ok': false, 'message': 'Provide "path" to theme file'});
+      return json(errorJson('Provide "path" to theme file'));
     }
     try {
       final id = await tm.importThemeFile(filePath);
       await tm.setCustomTheme(id);
-      return json({
-        'ok': true,
-        'id': id,
-        'message': 'Theme imported and activated',
-      });
+      return json(okJson({'id': id, 'message': 'Theme imported and activated'}));
     } catch (e) {
-      return json({'ok': false, 'message': 'Import failed: $e'});
+      return json(errorJson('Import failed: $e'));
     }
   }
 
@@ -204,10 +189,10 @@ Future<shelf.Response> handleTheme(
   if (path.length == 1 && path[0] == 'custom' && method == 'DELETE') {
     final id = request.url.queryParameters['id'];
     if (id == null) {
-      return json({'ok': false, 'message': 'Provide ?id= query param'});
+      return json(errorJson('Provide ?id= query param'));
     }
     await tm.deleteCustomTheme(id);
-    return json({'ok': true, 'message': 'Custom theme deleted'});
+    return json(okJson({'message': 'Custom theme deleted'}));
   }
 
   // GET /api/theme/colors → all effective color slots
@@ -225,5 +210,5 @@ Future<shelf.Response> handleTheme(
     });
   }
 
-  return notFound('Unknown theme route');
+  return notFound(unknownRoute('theme'));
 }

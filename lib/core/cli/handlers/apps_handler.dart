@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/board/widgets/widget_app_registry.dart';
 import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
 
@@ -53,7 +54,7 @@ Future<shelf.Response> handleApps(
       '${Platform.environment['HOME']}/.config/yoloit/apps',
     );
     if (!await appsDir.exists()) {
-      return json({'demos': []});
+      return json({'demos': <Map<String, Object?>>[]});
     }
     final demos = <Map<String, Object?>>[];
     await for (final entry in appsDir.list()) {
@@ -118,7 +119,7 @@ Future<shelf.Response> handleApps(
     final requestBody = await body(request);
     final zipPath = requestBody['zipPath'] as String?;
     if (zipPath == null || zipPath.trim().isEmpty) {
-      return error('Missing "zipPath" field');
+      return error(missingField('zipPath'));
     }
     final zipFile = File(zipPath.trim());
     if (!await zipFile.exists()) {
@@ -181,11 +182,9 @@ Future<shelf.Response> handleApps(
       await extractDir.delete(recursive: true);
       final manifest = await registry.find(appName);
       await registry.loadAll(); // refresh registry cache
-      return json({
-        'ok': true,
-        'appName': appName,
-        'widget': manifest?.toJson(),
-      });
+      return json(
+        okJson({'appName': appName, 'widget': manifest?.toJson()}),
+      );
     } catch (e) {
       return error('ZIP install failed: $e');
     }
@@ -200,13 +199,13 @@ Future<shelf.Response> handleApps(
     if (action == 'snapshot' && method == 'GET') {
       final tree = appRegistry.tree(id);
       if (tree == null) {
-        return json({
-          'ok': false,
-          'message':
-              'No render tree available for widget "$id". Is it running?',
-        });
+        return json(
+          errorJson(
+            'No render tree available for widget "$id". Is it running?',
+          ),
+        );
       }
-      return json({'ok': true, 'widgetId': id, 'tree': tree});
+      return json(okJson({'widgetId': id, 'tree': tree}));
     }
 
     // POST /api/apps/:id/execute — call JS event
@@ -214,60 +213,57 @@ Future<shelf.Response> handleApps(
       final requestBody = await body(request);
       final actionId = requestBody['action'] as String?;
       if (actionId == null || actionId.isEmpty) {
-        return error('Missing "action" field');
+        return error(missingField('action'));
       }
       final engine = appRegistry.engine(id);
       if (engine == null) {
-        return json({
-          'ok': false,
-          'message': 'Widget "$id" is not currently running',
-        });
+        return json(
+          errorJson('Widget "$id" is not currently running'),
+        );
       }
       final payload = requestBody['payload'] as Map<String, dynamic>?;
       engine.callEvent(actionId, payload);
-      return json({'ok': true, 'widgetId': id, 'action': actionId});
+      return json(okJson({'widgetId': id, 'action': actionId}));
     }
 
     // GET /api/apps/:id/logs — return console.log buffer
     if (action == 'logs' && method == 'GET') {
       final engine = appRegistry.engine(id);
       if (engine == null) {
-        return json({
-          'ok': false,
-          'message': 'App "$id" is not currently running',
-          'logs': <Map<String, dynamic>>[],
-        });
+        return json(
+          errorJson(
+            'App "$id" is not currently running',
+            extra: {'logs': <Map<String, dynamic>>[]},
+          ),
+        );
       }
       final logs = engine.peekLogs();
-      return json({'ok': true, 'widgetId': id, 'logs': logs});
+      return json(okJson({'widgetId': id, 'logs': logs}));
     }
 
     // POST /api/apps/:id/reload — hot-reload widget JS without restarting the app
     if (action == 'reload' && method == 'POST') {
       final ok = await appRegistry.triggerReload(id);
       if (!ok) {
-        return json({
-          'ok': false,
-          'message': 'Widget "$id" is not currently running',
-        });
+        return json(
+          errorJson('Widget "$id" is not currently running'),
+        );
       }
-      return json({
-        'ok': true,
-        'widgetId': id,
-        'message': 'Widget reloaded',
-      });
+      return json(
+        okJson({'widgetId': id, 'message': 'Widget reloaded'}),
+      );
     }
 
     // POST /api/apps/:id/screenshot
     if (action == 'screenshot' && method == 'POST') {
       // TODO: implement full screenshot once BoardScreenshotService.capturePanel(panelId) is wired to widgetId lookup
-      return json({
-        'ok': false,
-        'message':
-            'Widget screenshot requires the panel to be visible on screen. Use app:snapshot for the render tree.',
-      });
+      return json(
+        errorJson(
+          'Widget screenshot requires the panel to be visible on screen. Use app:snapshot for the render tree.',
+        ),
+      );
     }
   }
 
-  return notFound('Unknown app route');
+  return notFound(unknownRoute('app'));
 }

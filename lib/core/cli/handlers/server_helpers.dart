@@ -32,6 +32,22 @@ BoardPanelInstance? findPanel(BoardDocument board, String idOrTitle) {
 /// - `#RRGGBB` / `#AARRGGBB` hex strings
 /// - Named colors: red, green, blue, yellow, purple, pink, orange, teal, gray, white
 /// - Falls back to [Colors.blue] for unrecognised values
+Map<String, dynamic> okJson([Map<String, dynamic>? extra]) =>
+    <String, dynamic>{'ok': true, if (extra != null) ...extra};
+
+Map<String, dynamic> errorJson(
+  String message, {
+  Map<String, dynamic>? extra,
+}) =>
+    <String, dynamic>{'ok': false, 'message': message, if (extra != null) ...extra};
+
+String missingField(String field) => 'Missing "$field" field';
+
+String missingFields(List<String> fields) =>
+    'Missing required fields: ${fields.join(', ')}';
+
+String unknownRoute(String name) => 'Unknown $name route';
+
 Color? parseColor(String? s) {
   if (s == null || s == 'clear') return null;
   if (s.startsWith('#')) {

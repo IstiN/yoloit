@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
 Future<shelf.Response> handleCloudProviders(
@@ -38,6 +39,17 @@ Future<shelf.Response> handleCloudProviders(
     });
   }
 
+  Future<shelf.Response> withId(
+    Future<shelf.Response> Function(String id) action,
+  ) async {
+    final requestBody = await body(request);
+    final id = requestBody['id'] as String?;
+    if (id == null || id.trim().isEmpty) {
+      return error(missingField('id'));
+    }
+    return action(id);
+  }
+
   // POST /api/cloud-providers/add { name, baseUrl, apiKey, model, extraHeaders? }
   if (sub.length == 1 && sub[0] == 'add' && method == 'POST') {
     final requestBody = await body(request);
@@ -46,7 +58,7 @@ Future<shelf.Response> handleCloudProviders(
     final apiKey = requestBody['apiKey'] as String?;
     final model = requestBody['model'] as String?;
     if (name == null || baseUrl == null || apiKey == null || model == null) {
-      return error('Missing required fields: name, baseUrl, apiKey, model');
+      return error(missingFields(const ['name', 'baseUrl', 'apiKey', 'model']));
     }
     final extra = <String, String>{};
     if (requestBody['extraHeaders'] is Map) {
@@ -63,25 +75,23 @@ Future<shelf.Response> handleCloudProviders(
       extraHeaders: extra,
     );
     await service.upsertConfig(config);
-    return json({'ok': true, 'action': 'add', 'id': config.id});
+    return json(okJson({'action': 'add', 'id': config.id}));
   }
 
   // POST /api/cloud-providers/remove { id }
   if (sub.length == 1 && sub[0] == 'remove' && method == 'POST') {
-    final requestBody = await body(request);
-    final id = requestBody['id'] as String?;
-    if (id == null) return error('Missing "id" field');
-    await service.removeConfig(id);
-    return json({'ok': true, 'action': 'remove', 'id': id});
+    return withId((id) async {
+      await service.removeConfig(id);
+      return json(okJson({'action': 'remove', 'id': id}));
+    });
   }
 
   // POST /api/cloud-providers/select { id }
   if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
-    final requestBody = await body(request);
-    final id = requestBody['id'] as String?;
-    if (id == null) return error('Missing "id" field');
-    await service.saveActiveConfigId(id);
-    return json({'ok': true, 'action': 'select', 'id': id});
+    return withId((id) async {
+      await service.saveActiveConfigId(id);
+      return json(okJson({'action': 'select', 'id': id}));
+    });
   }
 
   // POST /api/cloud-providers/provider-type { type: 'local'|'cloud' }
@@ -94,32 +104,32 @@ Future<shelf.Response> handleCloudProviders(
       );
     }
     await service.saveAssistantProviderType(type);
-    return json({'ok': true, 'action': 'set-provider-type', 'type': type});
+    return json(okJson({'action': 'set-provider-type', 'type': type}));
   }
 
   // POST /api/cloud-providers/update { id, ...fields }
   if (sub.length == 1 && sub[0] == 'update' && method == 'POST') {
-    final requestBody = await body(request);
-    final id = requestBody['id'] as String?;
-    if (id == null) return error('Missing "id" field');
-    final existing = await service.loadConfigById(id);
-    if (existing == null) return error('Config not found: $id');
-    final updated = CloudLlmConfig(
-      id: id,
-      name: requestBody['name'] as String? ?? existing.name,
-      baseUrl: requestBody['baseUrl'] as String? ?? existing.baseUrl,
-      apiKey: requestBody['apiKey'] as String? ?? existing.apiKey,
-      model: requestBody['model'] as String? ?? existing.model,
-      extraHeaders:
-          requestBody['extraHeaders'] is Map
-              ? (requestBody['extraHeaders'] as Map).map(
-                (k, v) => MapEntry(k.toString(), v.toString()),
-              )
-              : existing.extraHeaders,
-    );
-    await service.upsertConfig(updated);
-    return json({'ok': true, 'action': 'update', 'id': id});
+    return withId((id) async {
+      final existing = await service.loadConfigById(id);
+      if (existing == null) return error('Config not found: $id');
+      final requestBody = await body(request);
+      final updated = CloudLlmConfig(
+        id: id,
+        name: requestBody['name'] as String? ?? existing.name,
+        baseUrl: requestBody['baseUrl'] as String? ?? existing.baseUrl,
+        apiKey: requestBody['apiKey'] as String? ?? existing.apiKey,
+        model: requestBody['model'] as String? ?? existing.model,
+        extraHeaders:
+            requestBody['extraHeaders'] is Map
+                ? (requestBody['extraHeaders'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), v.toString()),
+                )
+                : existing.extraHeaders,
+      );
+      await service.upsertConfig(updated);
+      return json(okJson({'action': 'update', 'id': id}));
+    });
   }
 
-  return notFound('Unknown cloud-providers route');
+  return notFound(unknownRoute('cloud-providers'));
 }

@@ -1028,10 +1028,3 @@ class YoloitdServer {
   static String _nextId(String prefix) =>
       '$prefix-${DateTime.now().microsecondsSinceEpoch}';
 }
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull {
-    final iterator = this.iterator;
-    return iterator.moveNext() ? iterator.current : null;
-  }
-}

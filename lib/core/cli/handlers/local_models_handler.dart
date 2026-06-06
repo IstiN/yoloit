@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:shelf/shelf.dart' as shelf;
+import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 
 Future<shelf.Response> handleLocalModels(
@@ -18,71 +19,66 @@ Future<shelf.Response> handleLocalModels(
   if (sub.isEmpty && method == 'GET') {
     return json(service.snapshot());
   }
-  if (sub.length == 1 && sub[0] == 'download' && method == 'POST') {
+
+  Future<shelf.Response> runModelAction(
+    String action,
+    Future<void> Function(String modelId) execute, {
+    String? alias,
+  }) async {
     final requestBody = await body(request);
     final modelId = requestBody['id'] as String?;
     if (modelId == null || modelId.trim().isEmpty) {
-      return error('Missing "id" field');
+      return error(missingField('id'));
     }
-    await service.downloadOrUpdateModel(modelId);
-    return json({'ok': true, 'action': 'download', 'id': modelId});
+    await execute(modelId);
+    return json(
+      okJson({'action': action, 'id': modelId, if (alias != null) 'alias': alias}),
+    );
+  }
+
+  if (sub.length == 1 && sub[0] == 'download' && method == 'POST') {
+    return runModelAction(
+      'download',
+      service.downloadOrUpdateModel,
+    );
   }
   if (sub.length == 1 && sub[0] == 'resume' && method == 'POST') {
-    final requestBody = await body(request);
-    final modelId = requestBody['id'] as String?;
-    if (modelId == null || modelId.trim().isEmpty) {
-      return error('Missing "id" field');
-    }
-    await service.resumeModelDownload(modelId);
-    return json({'ok': true, 'action': 'resume', 'id': modelId});
+    return runModelAction(
+      'resume',
+      service.resumeModelDownload,
+    );
   }
   if (sub.length == 1 && sub[0] == 'stop' && method == 'POST') {
-    final requestBody = await body(request);
-    final modelId = requestBody['id'] as String?;
-    if (modelId == null || modelId.trim().isEmpty) {
-      return error('Missing "id" field');
-    }
-    await service.pauseModelDownload(modelId);
-    return json({
-      'ok': true,
-      'action': 'pause',
-      'id': modelId,
-      'alias': 'stop',
-    });
+    return runModelAction(
+      'pause',
+      service.pauseModelDownload,
+      alias: 'stop',
+    );
   }
   if (sub.length == 1 && sub[0] == 'pause' && method == 'POST') {
-    final requestBody = await body(request);
-    final modelId = requestBody['id'] as String?;
-    if (modelId == null || modelId.trim().isEmpty) {
-      return error('Missing "id" field');
-    }
-    await service.pauseModelDownload(modelId);
-    return json({'ok': true, 'action': 'pause', 'id': modelId});
+    return runModelAction(
+      'pause',
+      service.pauseModelDownload,
+    );
   }
   if (sub.length == 1 && sub[0] == 'cancel' && method == 'POST') {
-    final requestBody = await body(request);
-    final modelId = requestBody['id'] as String?;
-    if (modelId == null || modelId.trim().isEmpty) {
-      return error('Missing "id" field');
-    }
-    await service.cancelModelDownload(modelId);
-    return json({'ok': true, 'action': 'cancel', 'id': modelId});
+    return runModelAction(
+      'cancel',
+      service.cancelModelDownload,
+    );
   }
   if (sub.length == 1 && sub[0] == 'delete' && method == 'POST') {
-    final requestBody = await body(request);
-    final modelId = requestBody['id'] as String?;
-    if (modelId == null || modelId.trim().isEmpty) {
-      return error('Missing "id" field');
-    }
-    await service.deleteInstalledModel(modelId);
-    return json({'ok': true, 'action': 'delete', 'id': modelId});
+    return runModelAction(
+      'delete',
+      service.deleteInstalledModel,
+    );
   }
   if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
     final requestBody = await body(request);
     final kind = requestBody['kind'] as String?;
     final modelId = requestBody['id'] as String?;
     if (kind == null || modelId == null) {
-      return error('Missing "kind" or "id" field');
+      return error(missingFields(const ['kind', 'id']));
     }
     if (kind == 'chat') {
       await service.setSelectedChatModel(modelId);
@@ -91,13 +87,8 @@ Future<shelf.Response> handleLocalModels(
     } else {
       return error('Unsupported kind "$kind". Expected "chat" or "asr".');
     }
-    return json({
-      'ok': true,
-      'action': 'select',
-      'kind': kind,
-      'id': modelId,
-    });
+    return json(okJson({'action': 'select', 'kind': kind, 'id': modelId}));
   }
 
-  return notFound('Unknown local-models route');
+  return notFound(unknownRoute('local-models'));
 }
