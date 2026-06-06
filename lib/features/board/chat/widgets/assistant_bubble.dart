@@ -137,58 +137,60 @@ class AssistantBubbleState extends State<AssistantBubble> {
                               bottomRight: Radius.circular(16),
                             ),
                           ),
-                          child: SelectionArea(
-                            child: MarkdownBody(
-                              data: processedContent,
-                              selectable: false,
-                              onTapLink: (text, href, title) {
-                                if (widget.onLinkTap != null) {
-                                  widget.onLinkTap!(href);
-                                } else if (href != null && href.isNotEmpty) {
-                                  PlatformLauncher.instance.openUrl(href);
-                                }
-                              },
-                              styleSheet: MarkdownStyleSheet(
-                                p: TextStyle(
-                                  fontSize: 13,
-                                  color: textColor,
-                                  height: 1.5,
-                                ),
-                                a: TextStyle(
-                                  fontSize: 13,
-                                  color: colors.primary,
-                                  decoration: TextDecoration.underline,
-                                ),
-                                code: TextStyle(
-                                  fontSize: 11.5,
-                                  fontFamily: 'JetBrains Mono',
-                                  color: colors.terminalPrompt,
-                                  backgroundColor: codeBg,
-                                ),
-                                codeblockDecoration: BoxDecoration(
-                                  color: codeBg,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: colors.border),
-                                ),
-                                codeblockPadding: const EdgeInsets.all(10),
-                                listBullet: TextStyle(
-                                  fontSize: 13,
-                                  color: mutedColor,
-                                ),
-                                h1: TextStyle(
-                                  fontSize: 16,
-                                  color: textColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                h2: TextStyle(
-                                  fontSize: 14,
-                                  color: textColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                h3: TextStyle(
-                                  fontSize: 13,
-                                  color: textColor,
-                                  fontWeight: FontWeight.w500,
+                          child: RepaintBoundary(
+                            child: SelectionArea(
+                              child: MarkdownBody(
+                                data: processedContent,
+                                selectable: false,
+                                onTapLink: (text, href, title) {
+                                  if (widget.onLinkTap != null) {
+                                    widget.onLinkTap!(href);
+                                  } else if (href != null && href.isNotEmpty) {
+                                    PlatformLauncher.instance.openUrl(href);
+                                  }
+                                },
+                                styleSheet: MarkdownStyleSheet(
+                                  p: TextStyle(
+                                    fontSize: 13,
+                                    color: textColor,
+                                    height: 1.5,
+                                  ),
+                                  a: TextStyle(
+                                    fontSize: 13,
+                                    color: colors.primary,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                  code: TextStyle(
+                                    fontSize: 11.5,
+                                    fontFamily: 'JetBrains Mono',
+                                    color: colors.terminalPrompt,
+                                    backgroundColor: codeBg,
+                                  ),
+                                  codeblockDecoration: BoxDecoration(
+                                    color: codeBg,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: colors.border),
+                                  ),
+                                  codeblockPadding: const EdgeInsets.all(10),
+                                  listBullet: TextStyle(
+                                    fontSize: 13,
+                                    color: mutedColor,
+                                  ),
+                                  h1: TextStyle(
+                                    fontSize: 16,
+                                    color: textColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  h2: TextStyle(
+                                    fontSize: 14,
+                                    color: textColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  h3: TextStyle(
+                                    fontSize: 13,
+                                    color: textColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ),

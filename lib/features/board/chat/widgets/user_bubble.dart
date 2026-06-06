@@ -97,31 +97,33 @@ class UserBubbleState extends State<UserBubble> {
                           bottomRight: Radius.circular(4),
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (hasAttachments)
-                            Padding(
-                              padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
-                              child: ChatAttachmentPreview(
-                                paths: resolved.paths,
-                                onLight: false,
-                                onOpenFile: widget.onOpenFile,
-                              ),
-                            ),
-                          if (hasText)
-                            SelectionArea(
-                              child: Text(
-                                resolved.text,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: context.appColors.textPrimary,
-                                  height: 1.4,
+                      child: RepaintBoundary(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (hasAttachments)
+                              Padding(
+                                padding: EdgeInsets.only(bottom: hasText ? 8 : 0),
+                                child: ChatAttachmentPreview(
+                                  paths: resolved.paths,
+                                  onLight: false,
+                                  onOpenFile: widget.onOpenFile,
                                 ),
                               ),
-                            ),
-                        ],
+                            if (hasText)
+                              SelectionArea(
+                                child: Text(
+                                  resolved.text,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: context.appColors.textPrimary,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
