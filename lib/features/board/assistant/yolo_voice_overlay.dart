@@ -796,7 +796,6 @@ class _ResponseCardState extends State<_ResponseCard>
       vsync: this,
       duration: const Duration(milliseconds: 550),
     );
-    _crossfadeAnim.addListener(() => setState(() {}));
     _crossfadeAnim.addStatusListener((s) {
       if (s == AnimationStatus.completed) {
         setState(() => _isCrossfading = false);
@@ -935,12 +934,19 @@ class _ResponseCardState extends State<_ResponseCard>
         final newBody = _buildContentBody(displayText, hasMermaid, contentMaxH);
         final body =
             _isCrossfading
-                ? Opacity(
-                  opacity: Curves.easeOut.transform(_crossfadeAnim.value),
-                  child: Transform.translate(
-                    offset: Offset(0, (1.0 - _crossfadeAnim.value) * 12),
-                    child: newBody,
-                  ),
+                ? AnimatedBuilder(
+                  animation: _crossfadeAnim,
+                  builder: (context, child) {
+                    final t = Curves.easeOut.transform(_crossfadeAnim.value);
+                    return Opacity(
+                      opacity: t,
+                      child: Transform.translate(
+                        offset: Offset(0, (1.0 - t) * 12),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: newBody,
                 )
                 : newBody;
 
