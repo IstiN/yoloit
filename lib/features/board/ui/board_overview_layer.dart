@@ -311,21 +311,23 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
                             )
                             : GestureDetector(
                               onTap: () => _selectBoard(board.id),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                  16 * t.clamp(0.0, 1.0),
+                              child: RepaintBoundary(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    16 * t.clamp(0.0, 1.0),
+                                  ),
+                                  child:
+                                      widget.previewPngs[board.id] != null
+                                          ? Image.memory(
+                                            widget.previewPngs[board.id]!,
+                                            fit: BoxFit.cover,
+                                            gaplessPlayback: true,
+                                          )
+                                          : ColoredBox(
+                                            color: colors.background,
+                                            child: const SizedBox.expand(),
+                                          ),
                                 ),
-                                child:
-                                    widget.previewPngs[board.id] != null
-                                        ? Image.memory(
-                                          widget.previewPngs[board.id]!,
-                                          fit: BoxFit.cover,
-                                          gaplessPlayback: true,
-                                        )
-                                        : ColoredBox(
-                                          color: colors.background,
-                                          child: const SizedBox.expand(),
-                                        ),
                               ),
                             ),
                   ),

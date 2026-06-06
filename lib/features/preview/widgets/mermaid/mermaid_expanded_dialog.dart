@@ -137,10 +137,12 @@ class _MermaidExpandedDialogState extends State<MermaidExpandedDialog> {
                               child: SizedBox(
                                 width: fittedSize.width,
                                 height: fittedSize.height,
-                                child: Image.memory(
-                                  _png,
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.high,
+                                child: RepaintBoundary(
+                                  child: Image.memory(
+                                    _png,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.high,
+                                  ),
                                 ),
                               ),
                             ),

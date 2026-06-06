@@ -502,17 +502,19 @@ class _RasterImagePreviewState extends State<_RasterImagePreview> {
   Widget build(BuildContext context) {
     final bytes = _bytes;
     if (bytes != null) {
-      return Image.memory(
-        bytes,
-        fit: BoxFit.contain,
-        errorBuilder:
-            (context, error, stackTrace) => _FilePreviewError(
-              title: 'Cannot decode image',
-              details: error.toString(),
-              path: widget.path,
-              actionLabel: 'Change file',
-              onAction: widget.onChange,
-            ),
+      return RepaintBoundary(
+        child: Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          errorBuilder:
+              (context, error, stackTrace) => _FilePreviewError(
+                title: 'Cannot decode image',
+                details: error.toString(),
+                path: widget.path,
+                actionLabel: 'Change file',
+                onAction: widget.onChange,
+              ),
+        ),
       );
     }
 

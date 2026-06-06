@@ -413,19 +413,21 @@ class _ImageBody extends StatelessWidget {
           child:
               _isSvg
                   ? SvgPicture.memory(bytes, fit: BoxFit.contain)
-                  : Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                    errorBuilder:
-                        (_, __, ___) => Center(
-                          child: Text(
-                            'Image error',
-                            style: TextStyle(
-                              color: colors.accentBlue,
+                  : RepaintBoundary(
+                    child: Image.memory(
+                      bytes,
+                      fit: BoxFit.contain,
+                      errorBuilder:
+                          (_, __, ___) => Center(
+                            child: Text(
+                              'Image error',
+                              style: TextStyle(
+                                color: colors.accentBlue,
                               fontSize: 10,
                             ),
                           ),
                         ),
+                    ),
                   ),
         ),
       );

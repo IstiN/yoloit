@@ -32,15 +32,17 @@ class BoardSwitchPreviewOverlay extends StatelessWidget {
         onEnd: onHidden,
         child:
             previewPng != null
-                ? Image.memory(
-                  previewPng!,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  errorBuilder:
-                      (_, _, _) => ColoredBox(
-                        color: colors.background,
-                        child: const SizedBox.expand(),
-                      ),
+                ? RepaintBoundary(
+                  child: Image.memory(
+                    previewPng!,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder:
+                        (_, _, _) => ColoredBox(
+                          color: colors.background,
+                          child: const SizedBox.expand(),
+                        ),
+                  ),
                 )
                 : ColoredBox(
                   color: colors.background,
@@ -388,11 +390,13 @@ class BoardOverviewPngPreview extends StatelessWidget {
       children: [
         // Plain background — fallback only shown on image error.
         ColoredBox(color: context.appColors.background),
-        Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          errorBuilder: (_, _, _) => fallback,
+        RepaintBoundary(
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => fallback,
+          ),
         ),
         DecoratedBox(
           decoration: BoxDecoration(
