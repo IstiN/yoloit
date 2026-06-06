@@ -53,7 +53,7 @@ class UserBubbleState extends State<UserBubble> {
               final availableWidth =
                   constraints.maxWidth.isFinite
                       ? constraints.maxWidth
-                      : MediaQuery.of(context).size.width * 0.65;
+                      : MediaQuery.sizeOf(context).width * 0.65;
               final bubbleMaxWidth =
                   availableWidth <= 38 ? availableWidth : availableWidth - 30;
               return Row(

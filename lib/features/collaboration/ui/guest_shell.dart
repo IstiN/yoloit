@@ -151,7 +151,7 @@ class _GuestShellState extends State<GuestShell> {
                       Text(
                         'Connect to a running desktop session',
                         style: TextStyle(
-                          color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                          color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
                           fontSize: 11,
                         ),
                       ),
@@ -270,7 +270,7 @@ class _GuestShellState extends State<GuestShell> {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(102),
             fontSize: 14,
           ),
           filled: true,
@@ -363,7 +363,7 @@ class _GuestShellState extends State<GuestShell> {
             Text(
               '${collab.peerCount} peer${collab.peerCount > 1 ? 's' : ''}',
               style: TextStyle(
-                color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
                 fontSize: 11,
               ),
             ),
@@ -373,7 +373,7 @@ class _GuestShellState extends State<GuestShell> {
             icon: const Icon(Icons.link_off, size: 14),
             label: const Text('Disconnect'),
             style: TextButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+              foregroundColor: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
               textStyle: const TextStyle(fontSize: 12),
             ),
             onPressed: () => ctx.read<CollaborationCubit>().disconnect(),

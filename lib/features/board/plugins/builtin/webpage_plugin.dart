@@ -693,7 +693,7 @@ class _WebpageContentState extends State<_WebpageContent> {
                         Icon(
                           Icons.language,
                           size: 40,
-                          color: colors.accentBlue.withOpacity(0.4),
+                          color: colors.accentBlue.withAlpha(102),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -1424,10 +1424,10 @@ JSON.stringify({
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: colors.accentOrange.withOpacity(0.1),
+                  color: colors.accentOrange.withAlpha(26),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: colors.accentOrange.withOpacity(0.3),
+                    color: colors.accentOrange.withAlpha(76),
                   ),
                 ),
                 child: const Text(

@@ -49,7 +49,7 @@ class AssistantBubbleState extends State<AssistantBubble> {
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final mutedColor =
-        context.appColors.textMuted.withOpacity(0.6);
+        context.appColors.textMuted.withAlpha(153);
     final codeBg = colors.surface;
     final processedContent = widget.content.replaceAll(
       RegExp(r'<br\s*/?>'),
@@ -115,7 +115,7 @@ class AssistantBubbleState extends State<AssistantBubble> {
                   final availableWidth =
                       constraints.maxWidth.isFinite
                           ? constraints.maxWidth
-                          : MediaQuery.of(context).size.width * 0.65;
+                          : MediaQuery.sizeOf(context).width * 0.65;
                   final bubbleMaxWidth =
                       availableWidth <= 158
                           ? availableWidth

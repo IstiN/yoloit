@@ -48,7 +48,7 @@ class _WebMindMapCanvasState extends State<WebMindMapCanvas> {
     _hasCentered = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final viewSize = MediaQuery.of(context).size;
+      final viewSize = MediaQuery.sizeOf(context);
       double minX = double.infinity, minY = double.infinity;
       double maxX = double.negativeInfinity, maxY = double.negativeInfinity;
       for (final e in state.positions.entries) {
@@ -742,7 +742,7 @@ class _QBtn extends StatelessWidget {
                   fontSize: 9,
                   color: accent
                       ? colors.accentRedDim
-                      : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      : Theme.of(context).colorScheme.onSurface.withAlpha(128),
                 ),
               ),
             ],
@@ -1112,7 +1112,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                                   size: 11,
                                   color: widget.activeViewName == name
                                       ? ctx.appColors.accentBlue
-                                      : Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                                      : Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
@@ -1136,7 +1136,7 @@ class _ViewsDropdownState extends State<_ViewsDropdown> {
                             'No saved views yet',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                              color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
                             ),
                           ),
                         ),
@@ -1508,7 +1508,7 @@ class _SidebarRow extends StatelessWidget {
                   child: Icon(
                     expanded ? Icons.expand_less : Icons.expand_more,
                     size: 13,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.onSurface.withAlpha(128),
                   ),
                 ),
               )
@@ -1533,7 +1533,7 @@ class _SidebarRow extends StatelessWidget {
                   hidden ? Icons.visibility_off : Icons.visibility,
                   size: isWs ? 13 : 11,
                   color: hidden
-                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                      ? Theme.of(context).colorScheme.onSurface.withAlpha(128)
                       : (isWs
                             ? colors.primaryLight
                             : colors.primaryLight.withAlpha(153)),
@@ -1545,7 +1545,7 @@ class _SidebarRow extends StatelessWidget {
               icon,
               size: isWs ? 13 : 11,
               color: hidden
-                  ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                  ? Theme.of(context).colorScheme.onSurface.withAlpha(128)
                   : color,
             ),
             const SizedBox(width: 6),
@@ -1557,7 +1557,7 @@ class _SidebarRow extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: isWs ? FontWeight.w700 : FontWeight.normal,
                   color: hidden
-                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                      ? Theme.of(context).colorScheme.onSurface.withAlpha(128)
                       : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
@@ -1567,7 +1567,7 @@ class _SidebarRow extends StatelessWidget {
               Icon(
                 expanded ? Icons.expand_less : Icons.expand_more,
                 size: 13,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(128),
               ),
           ],
         ),
@@ -1744,7 +1744,7 @@ class _WorkspaceFormDialog extends StatelessWidget {
     final bg = colors.surfaceElevated;
     final border = colors.border;
     final text = Theme.of(context).colorScheme.onSurface;
-    final hint = Theme.of(context).colorScheme.onSurface.withOpacity(0.5);
+    final hint = Theme.of(context).colorScheme.onSurface.withAlpha(128);
     final accent = colors.primaryLight;
 
     return AlertDialog(

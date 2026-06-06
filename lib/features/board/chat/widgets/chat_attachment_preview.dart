@@ -76,7 +76,7 @@ class ChatAttachmentPreview extends StatelessWidget {
     final chipBg =
         onLight
             ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : colors.textPrimary.withOpacity(0.15);
+            : colors.textPrimary.withAlpha(38);
     final textColor =
         onLight ? Theme.of(context).colorScheme.onSurface : colors.textPrimary;
     final iconColor =
@@ -108,8 +108,8 @@ class ChatAttachmentPreview extends StatelessWidget {
                         onLight
                             ? Theme.of(
                               context,
-                            ).colorScheme.outline.withOpacity(0.3)
-                            : colors.textPrimary.withOpacity(0.24),
+                            ).colorScheme.outline.withAlpha(76)
+                            : colors.textPrimary.withAlpha(61),
                   ),
                 ),
                 child: Row(

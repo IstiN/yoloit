@@ -23,9 +23,9 @@ Widget buildProviderBadge(BuildContext context, String providerName) {
     padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(3),
-      color: colors.accentGreen.withOpacity(0.08),
+      color: colors.accentGreen.withAlpha(20),
       border: Border.all(
-        color: colors.accentGreen.withOpacity(0.2),
+        color: colors.accentGreen.withAlpha(51),
         width: 0.5,
       ),
     ),

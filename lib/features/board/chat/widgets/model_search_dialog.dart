@@ -76,12 +76,12 @@ class ModelSearchDialogState extends State<ModelSearchDialog> {
                   hintText: 'Search models…',
                   hintStyle: TextStyle(
                     fontSize: 13,
-                    color: colorScheme.onSurface.withOpacity(0.4),
+                    color: colorScheme.onSurface.withAlpha(102),
                   ),
                   prefixIcon: Icon(
                     Icons.search,
                     size: 18,
-                    color: colorScheme.onSurface.withOpacity(0.4),
+                    color: colorScheme.onSurface.withAlpha(102),
                   ),
                   filled: true,
                   fillColor: widget.inputFill,
@@ -109,7 +109,7 @@ class ModelSearchDialogState extends State<ModelSearchDialog> {
                             'No models found',
                             style: TextStyle(
                               fontSize: 12,
-                              color: colorScheme.onSurface.withOpacity(0.5),
+                              color: colorScheme.onSurface.withAlpha(128),
                             ),
                           ),
                         ),
@@ -178,7 +178,7 @@ class ModelSearchDialogState extends State<ModelSearchDialog> {
                                             m.inputCostPerMillion! > 10
                                                 ? colors.statusError
                                                 : colorScheme.onSurface
-                                                    .withOpacity(0.6),
+                                                    .withAlpha(153),
                                       ),
                                     )
                                   else if (m.costMultiplier != null)
@@ -192,7 +192,7 @@ class ModelSearchDialogState extends State<ModelSearchDialog> {
                                                 : m.costMultiplier! > 3
                                                 ? colors.statusError
                                                 : colorScheme.onSurface
-                                                    .withOpacity(0.6),
+                                                    .withAlpha(153),
                                       ),
                                     ),
                                 ],

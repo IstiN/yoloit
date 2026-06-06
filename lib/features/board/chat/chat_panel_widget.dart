@@ -1601,7 +1601,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   Future<void> _showLocalToolsDialog() async {
     final colors = context.appColors;
     final muted =
-        context.appColors.textMuted.withOpacity(0.6);
+        context.appColors.textMuted.withAlpha(153);
     var disabled = _disabledLocalTools();
     final tools = [...YoloitCliToolCatalog.tools]..sort((a, b) {
       final byGroup = a.group.compareTo(b.group);
@@ -1658,7 +1658,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
                           decoration: BoxDecoration(
                             color: Theme.of(
                               context,
-                            ).colorScheme.error.withOpacity(0.12),
+                            ).colorScheme.error.withAlpha(31),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -1960,7 +1960,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
     final hintColor =
-        context.appColors.textMuted.withOpacity(0.6);
+        context.appColors.textMuted.withAlpha(153);
     final changedFiles = _collectChangedFilesForStrip();
     return Container(
       margin: const EdgeInsets.fromLTRB(1.5, 0, 1.5, 1.5),

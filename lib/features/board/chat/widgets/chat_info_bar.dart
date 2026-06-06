@@ -50,7 +50,7 @@ class ChatInfoBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final muted = context.appColors.textMuted.withOpacity(0.6);
+    final muted = context.appColors.textMuted.withAlpha(153);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),

@@ -16,7 +16,7 @@ class ChatChangedFilesStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final labelColor = context.appColors.textMuted.withOpacity(0.7);
+    final labelColor = context.appColors.textMuted.withAlpha(178);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -58,7 +58,7 @@ class ChatChangedFilesStrip extends StatelessWidget {
                             color: colors.surfaceElevated,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: colors.border.withOpacity(0.6),
+                              color: colors.border.withAlpha(153),
                             ),
                           ),
                           child: Row(

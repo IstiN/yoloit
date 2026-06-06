@@ -51,13 +51,13 @@ class ChatImageThumbnail extends StatelessWidget {
                       width: 80,
                       height: 60,
                       decoration: BoxDecoration(
-                        color: context.appColors.background.withOpacity(0.12),
+                        color: context.appColors.background.withAlpha(31),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         Icons.broken_image_outlined,
                         size: 24,
-                        color: context.appColors.textPrimary.withOpacity(0.38),
+                        color: context.appColors.textPrimary.withAlpha(97),
                       ),
                     ),
               ),

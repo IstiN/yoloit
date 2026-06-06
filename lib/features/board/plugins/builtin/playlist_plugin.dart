@@ -667,13 +667,13 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                               width: 72,
                               height: 72,
                               decoration: BoxDecoration(
-                                color: colors.primary.withOpacity(0.12),
+                                color: colors.primary.withAlpha(31),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 Icons.music_note_rounded,
                                 size: 36,
-                                color: colors.primary.withOpacity(0.7),
+                                color: colors.primary.withAlpha(178),
                               ),
                             ),
                           ],
@@ -711,7 +711,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                     activeTrackColor: colors.primary,
                     inactiveTrackColor: colors.border,
                     thumbColor: colors.primary,
-                    overlayColor: colors.primary.withOpacity(0.15),
+                    overlayColor: colors.primary.withAlpha(38),
                     trackHeight: 3,
                     thumbShape: const RoundSliderThumbShape(
                       enabledThumbRadius: 5,
@@ -863,7 +863,7 @@ class _PlaylistContentState extends State<_PlaylistContent> {
                         Icon(
                           Icons.queue_music_rounded,
                           size: 40,
-                          color: colors.primary.withOpacity(0.35),
+                          color: colors.primary.withAlpha(89),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -972,7 +972,7 @@ class _TrackTileState extends State<_TrackTile> {
           decoration: BoxDecoration(
             color:
                 widget.isActive
-                    ? colors.primary.withOpacity(0.1)
+                    ? colors.primary.withAlpha(26)
                     : (_hovered ? colors.surfaceHighlight : Colors.transparent),
             border: Border(
               left: BorderSide(

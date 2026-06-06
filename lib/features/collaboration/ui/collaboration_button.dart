@@ -246,7 +246,7 @@ class _HostTab extends StatelessWidget {
             'Start a server so others on your local network can connect '
             'and mirror your Mindmap board in real time.',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
               fontSize: 12,
               height: 1.5,
             ),

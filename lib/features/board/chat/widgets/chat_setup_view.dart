@@ -364,7 +364,7 @@ class ChatSetupViewState extends State<ChatSetupView> {
     final labelStyle = TextStyle(
       fontSize: 11,
       color:
-          context.appColors.textMuted.withOpacity(0.6),
+          context.appColors.textMuted.withAlpha(153),
     );
     final inputTextStyle = TextStyle(
       fontSize: 12,
@@ -651,7 +651,7 @@ class ChatSetupViewState extends State<ChatSetupView> {
                     Icon(
                       Icons.unfold_more,
                       size: 16,
-                      color: colorScheme.onSurface.withOpacity(0.5),
+                      color: colorScheme.onSurface.withAlpha(128),
                     ),
                   ],
                 ),

@@ -420,7 +420,7 @@ class _MindMapShowHideSidebarState extends State<MindMapShowHideSidebar> {
                             fontWeight: FontWeight.w700,
                             color: Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.5),
+                            ).colorScheme.onSurface.withAlpha(128),
                             letterSpacing: 1,
                           ),
                         ),
@@ -845,7 +845,7 @@ class _SidebarTreeRow extends StatelessWidget {
                         node.hidden
                             ? Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.5)
+                            ).colorScheme.onSurface.withAlpha(128)
                             : colors.primary,
                   ),
                 ),
@@ -858,7 +858,7 @@ class _SidebarTreeRow extends StatelessWidget {
                     node.hidden
                         ? Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.5)
+                        ).colorScheme.onSurface.withAlpha(128)
                         : colors.primary,
               ),
               const SizedBox(width: 6),
@@ -873,7 +873,7 @@ class _SidebarTreeRow extends StatelessWidget {
                         node.hidden
                             ? Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.5)
+                            ).colorScheme.onSurface.withAlpha(128)
                             : Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
@@ -913,7 +913,7 @@ class _SidebarTreeRow extends StatelessWidget {
                         node.hidden
                             ? Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.5)
+                            ).colorScheme.onSurface.withAlpha(128)
                             : colors.primary.withValues(alpha: 0.6),
                   ),
                 ),
@@ -926,7 +926,7 @@ class _SidebarTreeRow extends StatelessWidget {
                     node.hidden
                         ? Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.3)
+                        ).colorScheme.onSurface.withAlpha(76)
                         : color,
               ),
               const SizedBox(width: 5),
@@ -940,10 +940,10 @@ class _SidebarTreeRow extends StatelessWidget {
                         node.hidden
                             ? Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.5)
+                            ).colorScheme.onSurface.withAlpha(128)
                             : Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.6),
+                            ).colorScheme.onSurface.withAlpha(153),
                   ),
                 ),
               ),
@@ -1039,7 +1039,7 @@ class _SidebarTreeRow extends StatelessWidget {
               Icon(
                 Icons.visibility_off_outlined,
                 size: 13,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
               ),
               const SizedBox(width: 8),
               Text(
@@ -1048,7 +1048,7 @@ class _SidebarTreeRow extends StatelessWidget {
                   fontSize: 12,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.6),
+                  ).colorScheme.onSurface.withAlpha(153),
                 ),
               ),
             ],
@@ -1066,7 +1066,7 @@ class _SidebarTreeRow extends StatelessWidget {
               Icon(
                 Icons.visibility_outlined,
                 size: 13,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
               ),
               const SizedBox(width: 8),
               Text(
@@ -1075,7 +1075,7 @@ class _SidebarTreeRow extends StatelessWidget {
                   fontSize: 12,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.6),
+                  ).colorScheme.onSurface.withAlpha(153),
                 ),
               ),
             ],
@@ -1169,7 +1169,7 @@ class _SidebarTreeRow extends StatelessWidget {
                   size: 14,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.6),
+                  ).colorScheme.onSurface.withAlpha(153),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -1178,7 +1178,7 @@ class _SidebarTreeRow extends StatelessWidget {
                     fontSize: 12,
                     color: Theme.of(
                       context,
-                    ).colorScheme.onSurface.withOpacity(0.6),
+                    ).colorScheme.onSurface.withAlpha(153),
                   ),
                 ),
               ],
@@ -1229,7 +1229,7 @@ class _SidebarTreeRow extends StatelessWidget {
                   fontSize: 12,
                   color: Theme.of(
                     dlgCtx,
-                  ).colorScheme.onSurface.withOpacity(0.6),
+                  ).colorScheme.onSurface.withAlpha(153),
                 ),
               ),
               actions: [
@@ -1280,7 +1280,7 @@ class _SidebarTreeRow extends StatelessWidget {
               Icon(
                 Icons.drive_file_rename_outline,
                 size: 14,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
               ),
               const SizedBox(width: 8),
               Text(
@@ -1289,7 +1289,7 @@ class _SidebarTreeRow extends StatelessWidget {
                   fontSize: 12,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.6),
+                  ).colorScheme.onSurface.withAlpha(153),
                 ),
               ),
             ],
@@ -1364,7 +1364,7 @@ class _SidebarTreeRow extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: 'Session name...',
                 hintStyle: TextStyle(
-                  color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                  color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
                 ),
                 filled: true,
                 fillColor: context.appColors.surface,
@@ -1389,7 +1389,7 @@ class _SidebarTreeRow extends StatelessWidget {
                 child: Text(
                   'Cancel',
                   style: TextStyle(
-                    color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                    color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
                   ),
                 ),
               ),
@@ -1437,7 +1437,7 @@ class _SidebarTreeRow extends StatelessWidget {
             content: Text(
               'Would you like to pause the session (keep it running in the background) or kill it permanently?',
               style: TextStyle(
-                color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(ctx).colorScheme.onSurface.withAlpha(153),
                 fontSize: 13,
                 height: 1.5,
               ),
@@ -1448,7 +1448,7 @@ class _SidebarTreeRow extends StatelessWidget {
                 child: Text(
                   'Cancel',
                   style: TextStyle(
-                    color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.5),
+                    color: Theme.of(ctx).colorScheme.onSurface.withAlpha(128),
                   ),
                 ),
               ),
@@ -1604,7 +1604,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                         ? colors.primaryLight
                         : Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.6),
+                        ).colorScheme.onSurface.withAlpha(153),
               ),
               const SizedBox(width: 6),
               Text(
@@ -1617,7 +1617,7 @@ class _SidebarActionState extends State<_SidebarAction> {
                           ? Theme.of(context).colorScheme.onSurface
                           : Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.6),
+                          ).colorScheme.onSurface.withAlpha(153),
                 ),
               ),
             ],
@@ -1645,7 +1645,7 @@ class _QuickFilterBar extends StatelessWidget {
           Icon(
             Icons.search,
             size: 12,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(128),
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -1663,7 +1663,7 @@ class _QuickFilterBar extends StatelessWidget {
                   fontSize: 11,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.4),
+                  ).colorScheme.onSurface.withAlpha(102),
                 ),
                 border: InputBorder.none,
                 isDense: true,
@@ -1684,7 +1684,7 @@ class _QuickFilterBar extends StatelessWidget {
                             size: 12,
                             color: Theme.of(
                               context,
-                            ).colorScheme.onSurface.withOpacity(0.5),
+                            ).colorScheme.onSurface.withAlpha(128),
                           ),
                         ),
           ),
@@ -1749,7 +1749,7 @@ class _TypeFilterBar extends StatelessWidget {
                             hidden
                                 ? Theme.of(
                                   context,
-                                ).colorScheme.onSurface.withOpacity(0.5)
+                                ).colorScheme.onSurface.withAlpha(128)
                                 : colors.primaryLight,
                       ),
                       const SizedBox(width: 3),
@@ -1761,7 +1761,7 @@ class _TypeFilterBar extends StatelessWidget {
                               hidden
                                   ? Theme.of(
                                     context,
-                                  ).colorScheme.onSurface.withOpacity(0.5)
+                                  ).colorScheme.onSurface.withAlpha(128)
                                   : colors.primaryLight,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1773,7 +1773,7 @@ class _TypeFilterBar extends StatelessWidget {
                           size: 8,
                           color: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.5),
+                          ).colorScheme.onSurface.withAlpha(128),
                         ),
                       ],
                     ],

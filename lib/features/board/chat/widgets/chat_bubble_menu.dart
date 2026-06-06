@@ -19,7 +19,7 @@ class ChatBubbleMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final color =
         light
-            ? context.appColors.textPrimary.withOpacity(0.6)
+            ? context.appColors.textPrimary.withAlpha(153)
             : (context.appColors.textMuted);
     return SizedBox(
       width: 24,
