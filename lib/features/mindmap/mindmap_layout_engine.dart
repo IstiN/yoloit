@@ -183,19 +183,20 @@ class MindMapLayoutEngine {
     Map<String, Size> sizes,
     double margin,
   ) {
-    for (final other in List<MapEntry<String, Rect>>.from(allRects.entries)) {
-      if (other.key == newId) continue;
-      if (locked.contains(other.key)) continue;
-      if (!rect.inflate(margin).overlaps(other.value)) continue;
+    for (final otherId in allRects.keys.toList()) {
+      if (otherId == newId) continue;
+      if (locked.contains(otherId)) continue;
+      final otherRect = allRects[otherId]!;
+      if (!rect.inflate(margin).overlaps(otherRect)) continue;
 
-      // Push the overlapping node downward (or rightward if same column).
+      // Push the overlapping node downward.
       final pushY = rect.bottom + margin;
-      final newPos = Offset(other.value.left, pushY);
-      result[other.key] = newPos;
-      final node = nodes.firstWhere((n) => n.id == other.key,
+      final newPos = Offset(otherRect.left, pushY);
+      result[otherId] = newPos;
+      final node = nodes.firstWhere((n) => n.id == otherId,
           orElse: () => nodes.first);
-      final size = sizes[other.key] ?? node.defaultSize;
-      allRects[other.key] =
+      final size = sizes[otherId] ?? node.defaultSize;
+      allRects[otherId] =
           Rect.fromLTWH(newPos.dx, newPos.dy, size.width, size.height);
     }
   }
@@ -206,12 +207,17 @@ class MindMapLayoutEngine {
 
     while (!fits) {
       final rect = Rect.fromLTWH(x, candidate, size.width, size.height);
-      final collision = occupied.any((r) => r.inflate(vMargin).overlaps(rect));
+      var maxBottom = candidate;
+      var collision = false;
+      for (final r in occupied) {
+        if (r.inflate(vMargin).overlaps(rect)) {
+          collision = true;
+          if (r.bottom > maxBottom) maxBottom = r.bottom;
+        }
+      }
       if (!collision) {
         fits = true;
       } else {
-        final blockers = occupied.where((r) => r.inflate(vMargin).overlaps(rect));
-        final maxBottom = blockers.map((r) => r.bottom).reduce(math.max);
         candidate = maxBottom + vMargin;
       }
     }

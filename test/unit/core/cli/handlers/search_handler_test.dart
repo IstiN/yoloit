@@ -333,5 +333,26 @@ void main() {
       });
       expect(result, isEmpty);
     });
+
+    test('handles large nested map without stack overflow', () {
+      final large = <String, dynamic>{
+        for (var i = 0; i < 200; i++) 'k$i': {'v': 'value$i'},
+      };
+      final result = collectSearchStrings(large);
+      expect(result.length, 200);
+      expect(result, contains('value0'));
+      expect(result, contains('value199'));
+    });
+
+    test('skips empty strings', () {
+      final result = collectSearchStrings({
+        'a': '   ',
+        'b': 'valid',
+        'c': '',
+      });
+      expect(result, isNot(contains('')));
+      expect(result, isNot(contains('   ')));
+      expect(result, contains('valid'));
+    });
   });
 }

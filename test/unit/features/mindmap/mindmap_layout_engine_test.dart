@@ -154,6 +154,35 @@ void main() {
         greaterThan(positions['wsA']!.dy + 100),
       );
     });
+
+    test('stacks many new nodes without overlap', () {
+      final engine = MindMapLayoutEngine();
+      final nodes = <WorkspaceNodeData>[];
+      final sizes = <String, Size>{};
+      for (var i = 0; i < 20; i++) {
+        nodes.add(
+          WorkspaceNodeData(
+            id: 'ws$i',
+            workspace: Workspace(id: 'ws$i', name: 'W$i', paths: ['/tmp/$i']),
+          ),
+        );
+        sizes['ws$i'] = const Size(220, 100);
+      }
+      final positions = engine.compute(
+        nodes: nodes,
+        existing: const {},
+        sizes: sizes,
+      );
+
+      final yValues = nodes.map((n) => positions[n.id]!.dy).toList()..sort();
+      for (var i = 1; i < yValues.length; i++) {
+        expect(
+          yValues[i] - yValues[i - 1],
+          greaterThanOrEqualTo(20),
+          reason: 'Nodes $i and ${i - 1} should not overlap',
+        );
+      }
+    });
   });
 
   group('columnLabelX', () {

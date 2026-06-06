@@ -138,28 +138,35 @@ Future<List<Map<String, Object?>>> searchSavedChatSessions(
 }
 
 List<String> collectSearchStrings(dynamic value, {int depth = 0}) {
-  if (value == null || depth > 4) return const [];
+  final out = <String>[];
+  _collectSearchStrings(value, depth, out);
+  return out;
+}
+
+void _collectSearchStrings(dynamic value, int depth, List<String> out) {
+  if (value == null || depth > 4) return;
   if (value is String) {
     final trimmed = value.trim();
-    return trimmed.isEmpty ? const [] : <String>[trimmed];
+    if (trimmed.isNotEmpty) out.add(trimmed);
+    return;
   }
-  if (value is num || value is bool) return <String>['$value'];
+  if (value is num || value is bool) {
+    out.add('$value');
+    return;
+  }
   if (value is List) {
-    final out = <String>[];
     for (final item in value) {
-      out.addAll(collectSearchStrings(item, depth: depth + 1));
+      _collectSearchStrings(item, depth + 1, out);
     }
-    return out;
+    return;
   }
   if (value is Map) {
-    final out = <String>[];
     for (final entry in value.entries) {
       if (entry.key == 'id' || entry.key == 'timestamp') continue;
-      out.addAll(collectSearchStrings(entry.value, depth: depth + 1));
+      _collectSearchStrings(entry.value, depth + 1, out);
     }
-    return out;
+    return;
   }
-  return const [];
 }
 
 /// Returns a snippet of [text] if it matches [query], or null if no match.
