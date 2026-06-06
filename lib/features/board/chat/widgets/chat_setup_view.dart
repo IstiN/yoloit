@@ -145,6 +145,15 @@ class ChatSetupViewState extends State<ChatSetupView> {
     if (adapter == 'codex') _loadCodexModels();
   }
 
+  void _pickDefaultModel(List<ChatModelInfo> models) {
+    if (!models.any((m) => m.id == _selectedModel)) {
+      _selectedModel =
+          models
+              .firstWhere((m) => m.isDefault, orElse: () => models.first)
+              .id;
+    }
+  }
+
   Future<void> _loadOpencodeModels() async {
     try {
       final configuredProviders =
@@ -154,13 +163,7 @@ class ChatSetupViewState extends State<ChatSetupView> {
       if (models.isNotEmpty && mounted) {
         setState(() {
           _opencodeModels = models;
-          // Reset model if current selection is not in the new list
-          if (!models.any((m) => m.id == _selectedModel)) {
-            _selectedModel =
-                models
-                    .firstWhere((m) => m.isDefault, orElse: () => models.first)
-                    .id;
-          }
+          _pickDefaultModel(models);
         });
       }
     } catch (e) {
@@ -186,14 +189,7 @@ class ChatSetupViewState extends State<ChatSetupView> {
       final models = await ProviderModelCatalogService.instance
           .discoverCursorModels(envGroupIds: _selectedEnvGroupIds);
       if (models != null && models.isNotEmpty && mounted) {
-        setState(() {
-          if (!models.any((m) => m.id == _selectedModel)) {
-            _selectedModel =
-                models
-                    .firstWhere((m) => m.isDefault, orElse: () => models.first)
-                    .id;
-          }
-        });
+        setState(() => _pickDefaultModel(models));
       }
     } catch (e) {
       debugPrint('[ChatSetup] cursor models load failed: $e');
@@ -208,14 +204,7 @@ class ChatSetupViewState extends State<ChatSetupView> {
       final models =
           await ProviderModelCatalogService.instance.discoverCodexModels();
       if (models != null && models.isNotEmpty && mounted) {
-        setState(() {
-          if (!models.any((m) => m.id == _selectedModel)) {
-            _selectedModel =
-                models
-                    .firstWhere((m) => m.isDefault, orElse: () => models.first)
-                    .id;
-          }
-        });
+        setState(() => _pickDefaultModel(models));
       }
     } catch (e) {
       debugPrint('[ChatSetup] codex models load failed: $e');

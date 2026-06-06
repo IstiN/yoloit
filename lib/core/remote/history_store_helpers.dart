@@ -23,6 +23,21 @@ abstract final class HistoryStoreHelpers {
     return '${safeSegment(opId)}_${safeSegment(actorId)}.json';
   }
 
+  static Future<void> appendEvent({
+    required String rootPath,
+    required String boardId,
+    required DateTime timestamp,
+    required String opId,
+    required String actorId,
+    required Map<String, dynamic> json,
+  }) async {
+    final dirPath = historyDirPath(rootPath, boardId, timestamp);
+    final dir = Directory(dirPath);
+    await dir.create(recursive: true);
+    final file = File(p.join(dirPath, historyFileName(opId, actorId)));
+    await writeJsonAtomic(file, json);
+  }
+
   static Future<void> writeJsonAtomic(File file, Object? value) async {
     await file.parent.create(recursive: true);
     final tmp = File('${file.path}.tmp');

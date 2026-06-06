@@ -10,6 +10,35 @@ import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 
 enum _RunPreset { custom, flutterApp }
 
+InputDecoration _runInputDecoration(
+  AppColorScheme colors, {
+  String? hintText,
+}) {
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle:
+        hintText != null
+            ? TextStyle(color: colors.textMuted, fontSize: 12)
+            : null,
+    filled: true,
+    fillColor: colors.surface,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(4),
+      borderSide: BorderSide(color: colors.border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(4),
+      borderSide: BorderSide(color: colors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(4),
+      borderSide: BorderSide(color: colors.primary),
+    ),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    isDense: true,
+  );
+}
+
 class RunConfigDialog extends StatefulWidget {
   const RunConfigDialog({super.key, this.initial});
 
@@ -241,27 +270,7 @@ class _RunConfigDialogState extends State<RunConfigDialog> {
                 DropdownButtonFormField<_RunPreset>(
                   value: _preset,
                   dropdownColor: colors.surfaceElevated,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: colors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(color: colors.primary),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    isDense: true,
-                  ),
+                  decoration: _runInputDecoration(colors),
                   items: const [
                     DropdownMenuItem(
                       value: _RunPreset.custom,
@@ -784,28 +793,9 @@ class _WorkingDirFieldState extends State<_WorkingDirField> {
                   fontSize: 12,
                   fontFamily: 'monospace',
                 ),
-                decoration: InputDecoration(
+                decoration: _runInputDecoration(
+                  colors,
                   hintText: 'Leave empty to use workspace root',
-                  hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-                  filled: true,
-                  fillColor: colors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(color: colors.primary),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  isDense: true,
                 ),
               ),
             ),

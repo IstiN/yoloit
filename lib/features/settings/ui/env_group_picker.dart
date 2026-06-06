@@ -519,33 +519,10 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                 children: [
                   Expanded(
                     flex: 2,
-                    child: TextField(
+                    child: _buildKvTextField(
                       controller: kv.keyCtrl,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colors.textPrimary,
-                        fontFamily: 'monospace',
-                      ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'KEY',
-                        hintStyle: TextStyle(
-                          fontSize: 11,
-                          color: colors.textMuted,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
-                      ),
+                      hint: 'KEY',
+                      colors: colors,
                     ),
                   ),
                   Padding(
@@ -561,34 +538,11 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
                   ),
                   Expanded(
                     flex: 3,
-                    child: TextField(
+                    child: _buildKvTextField(
                       controller: kv.valueCtrl,
-                      obscureText: true,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colors.textPrimary,
-                        fontFamily: 'monospace',
-                      ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'value',
-                        hintStyle: TextStyle(
-                          fontSize: 11,
-                          color: colors.textMuted,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
-                      ),
+                      hint: 'value',
+                      colors: colors,
+                      obscure: true,
                     ),
                   ),
                   if (_newKvEntries.length > 1)
@@ -651,6 +605,37 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildKvTextField({
+    required TextEditingController controller,
+    required String hint,
+    required AppColorScheme colors,
+    bool obscure = false,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      style: TextStyle(
+        fontSize: 11,
+        color: colors.textPrimary,
+        fontFamily: 'monospace',
+      ),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: TextStyle(fontSize: 11, color: colors.textMuted),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: colors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: BorderSide(color: colors.border),
+        ),
       ),
     );
   }

@@ -115,6 +115,26 @@ YoloitCliToolParam modelIdParam({bool required = true}) {
   );
 }
 
+YoloitCliToolParam boardFlagParam() {
+  return toolParam(
+    'board',
+    'Target board',
+    flag: '--board',
+    runtimeDefault: YoloitCliRuntimeDefault.board,
+    shortKey: 'b',
+  );
+}
+
+YoloitCliToolParam panelFlagParam() {
+  return toolParam(
+    'panel',
+    'Target panel',
+    flag: '--panel',
+    runtimeDefault: YoloitCliRuntimeDefault.panel,
+    shortKey: 'p',
+  );
+}
+
 YoloitCliToolParam panelTypeParam() {
   return toolParam(
     'type',

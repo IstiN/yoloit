@@ -242,30 +242,7 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
       baseUrl: remote.url,
       token: remote.token,
     ).listDirectory(path);
-    return _DirectoryListing(
-      path: listing.path,
-      parent: listing.parent,
-      roots:
-          listing.roots
-              .map(
-                (entry) => _FileEntry(
-                  name: entry.name,
-                  path: entry.path,
-                  isDirectory: true,
-                ),
-              )
-              .toList(),
-      entries:
-          listing.entries
-              .map(
-                (entry) => _FileEntry(
-                  name: entry.name,
-                  path: entry.path,
-                  isDirectory: entry.isDirectory,
-                ),
-              )
-              .toList(),
-    );
+    return _DirectoryListing.fromRemote(listing);
   }
 
   Future<_DirectoryListing> _loadLocal(String rawPath) async {

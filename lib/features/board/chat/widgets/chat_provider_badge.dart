@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/features/board/model/chat_models.dart';
 
 /// Small grey provider badge used in model picker lists.
 Widget buildProviderBadge(BuildContext context, String providerName) {
@@ -39,4 +40,47 @@ Widget buildProviderBadge(BuildContext context, String providerName) {
       ),
     ),
   );
+}
+
+/// Price tag for a model (FREE, $/M tokens, or multiplier).
+Widget buildModelPriceTag(
+  BuildContext context,
+  ChatModelInfo m, {
+  required Color mutedColor,
+}) {
+  final colors = context.appColors;
+  if (m.isFree) {
+    return Text(
+      'FREE',
+      style: TextStyle(
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+        color: colors.statusActive,
+      ),
+    );
+  }
+  if (m.inputCostPerMillion != null) {
+    return Text(
+      '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
+      style: TextStyle(
+        fontSize: 9,
+        color: m.inputCostPerMillion! > 10 ? colors.statusError : mutedColor,
+      ),
+    );
+  }
+  if (m.costMultiplier != null) {
+    return Text(
+      '${m.costMultiplier}x',
+      style: TextStyle(
+        fontSize: 10,
+        color:
+            m.costMultiplier == 0
+                ? colors.statusActive
+                : m.costMultiplier! > 3
+                ? colors.statusError
+                : mutedColor,
+      ),
+    );
+  }
+  return const SizedBox.shrink();
 }

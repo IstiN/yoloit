@@ -103,39 +103,11 @@ class ChatModelSuggestions extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (m.isFree)
-                        Text(
-                          'FREE',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: colors.statusActive,
-                          ),
-                        )
-                      else if (m.inputCostPerMillion != null)
-                        Text(
-                          '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color:
-                                m.inputCostPerMillion! > 10
-                                    ? colors.statusError
-                                    : context.appColors.textMuted,
-                          ),
-                        )
-                      else if (m.costMultiplier != null)
-                        Text(
-                          '${m.costMultiplier}x',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                m.costMultiplier == 0
-                                    ? colors.statusActive
-                                    : m.costMultiplier! > 3
-                                    ? colors.statusError
-                                    : context.appColors.textMuted,
-                          ),
-                        ),
+                      buildModelPriceTag(
+                        context,
+                        m,
+                        mutedColor: context.appColors.textMuted,
+                      ),
                     ],
                   ),
                 ),

@@ -42,6 +42,29 @@ abstract class PanelCliHandler {
   Map<String, CliActionHelp> get actionHelp => {};
 }
 
+/// Truncate [s] to [max] chars, adding an ellipsis when truncated.
+String truncateText(String s, int max) =>
+    s.length > max ? '${s.substring(0, max)}…' : s;
+
+/// Format stored panel messages for CLI output.
+CliActionResult formatStoredMessages(
+  Map<String, dynamic> args,
+  BoardPanelInstance panel, {
+  String key = 'messages',
+}) {
+  final msgs = panel.state[key] as List<dynamic>? ?? [];
+  final limit = args['limit'] as int? ?? msgs.length;
+  final filtered =
+      msgs.length > limit ? msgs.sublist(msgs.length - limit) : msgs;
+  return CliActionResult(data: {'total': msgs.length, 'messages': filtered});
+}
+
+/// Build a CLI-safe message map from raw panel state.
+Map<String, dynamic> formatMessageItem(Map<String, dynamic> msg, int maxLen) => {
+  'role': msg['role'] ?? 'unknown',
+  'content': truncateText(msg['content'] as String? ?? '', maxLen),
+};
+
 /// Result of a CLI action execution.
 class CliActionResult {
   const CliActionResult({

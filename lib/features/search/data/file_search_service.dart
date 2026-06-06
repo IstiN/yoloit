@@ -78,6 +78,22 @@ class FileSearchService {
     return null;
   }
 
+  Future<List<SearchResult>> _searchWorkspaces(
+    String query,
+    List<({String name, String path})> workspaces,
+    Future<List<SearchResult>> Function(String path, String name, String query)
+    searchFn,
+  ) async {
+    if (query.isEmpty) return [];
+    final results = <SearchResult>[];
+    for (final ws in workspaces) {
+      if (results.length >= _maxResults) break;
+      final wsResults = await searchFn(ws.path, ws.name, query);
+      results.addAll(wsResults.take(_maxResults - results.length));
+    }
+    return results;
+  }
+
   /// Search file names matching [query] in [workspaces] using fuzzy matching.
   ///
   /// Supports:
@@ -86,33 +102,13 @@ class FileSearchService {
   Future<List<SearchResult>> searchFiles({
     required String query,
     required List<({String name, String path})> workspaces,
-  }) async {
-    if (query.isEmpty) return [];
-
-    final results = <SearchResult>[];
-    for (final ws in workspaces) {
-      if (results.length >= _maxResults) break;
-      final wsResults = await _findFiles(ws.path, ws.name, query);
-      results.addAll(wsResults.take(_maxResults - results.length));
-    }
-    return results;
-  }
+  }) => _searchWorkspaces(query, workspaces, _findFiles);
 
   /// Search file contents matching [query] in [workspacePaths].
   Future<List<SearchResult>> searchContent({
     required String query,
     required List<({String name, String path})> workspaces,
-  }) async {
-    if (query.isEmpty) return [];
-
-    final results = <SearchResult>[];
-    for (final ws in workspaces) {
-      if (results.length >= _maxResults) break;
-      final wsResults = await _grepContent(ws.path, ws.name, query);
-      results.addAll(wsResults.take(_maxResults - results.length));
-    }
-    return results;
-  }
+  }) => _searchWorkspaces(query, workspaces, _grepContent);
 
   Future<List<SearchResult>> _findFiles(
     String dirPath,
@@ -178,6 +174,39 @@ class FileSearchService {
     }
   }
 
+  List<String> _topFilesFromStdout(String stdout) => stdout
+      .split('\n')
+      .where((l) => l.isNotEmpty)
+      .take(20)
+      .toList();
+
+  Future<List<SearchResult>> _collectLineResults(
+    List<String> files,
+    String wsName,
+    String dirPath,
+    Future<String?> Function(String file) queryLine,
+  ) async {
+    final results = <SearchResult>[];
+    for (final file in files) {
+      if (results.length >= _maxResults) break;
+      final match = await queryLine(file);
+      if (match == null) continue;
+      final colonIdx = match.indexOf(':');
+      if (colonIdx > 0) {
+        final lineNum = int.tryParse(match.substring(0, colonIdx));
+        final content = match.substring(colonIdx + 1).trim();
+        results.add(SearchResult(
+          filePath: file,
+          workspaceName: wsName,
+          workspacePath: dirPath,
+          lineNumber: lineNum,
+          lineContent: content.length > 80 ? content.substring(0, 80) : content,
+        ));
+      }
+    }
+    return results;
+  }
+
   Future<List<SearchResult>> _rgContent(
     String rgBin,
     String dirPath,
@@ -201,38 +230,16 @@ class FileSearchService {
 
     if (result.exitCode > 1) return [];
 
-    final files = (result.stdout as String)
-        .split('\n')
-        .where((l) => l.isNotEmpty)
-        .take(20)
-        .toList();
-
-    final results = <SearchResult>[];
-    for (final file in files) {
-      if (results.length >= _maxResults) break;
+    final files = _topFilesFromStdout(result.stdout as String);
+    return _collectLineResults(files, wsName, dirPath, (file) async {
       final lineResult = await Process.run(rgBin, [
         '--line-number',
         '-m', '1',
         query,
         file,
       ]);
-      if (lineResult.exitCode == 0) {
-        final match = (lineResult.stdout as String).trim();
-        final colonIdx = match.indexOf(':');
-        if (colonIdx > 0) {
-          final lineNum = int.tryParse(match.substring(0, colonIdx));
-          final content = match.substring(colonIdx + 1).trim();
-          results.add(SearchResult(
-            filePath: file,
-            workspaceName: wsName,
-            workspacePath: dirPath,
-            lineNumber: lineNum,
-            lineContent: content.length > 80 ? content.substring(0, 80) : content,
-          ));
-        }
-      }
-    }
-    return results;
+      return lineResult.exitCode == 0 ? lineResult.stdout as String : null;
+    });
   }
 
   Future<List<SearchResult>> _grepFallback(
@@ -260,18 +267,10 @@ class FileSearchService {
         dirPath,
       ]);
 
-      // Now get line numbers for top matches
       if (result.exitCode > 1) return [];
 
-      final files = (result.stdout as String)
-          .split('\n')
-          .where((l) => l.isNotEmpty)
-          .take(20)
-          .toList();
-
-      final results = <SearchResult>[];
-      for (final file in files) {
-        if (results.length >= _maxResults) break;
+      final files = _topFilesFromStdout(result.stdout as String);
+      return _collectLineResults(files, wsName, dirPath, (file) async {
         final lineResult = await Process.run('grep', [
           '-n',
           '-m', '1',
@@ -279,23 +278,8 @@ class FileSearchService {
           query,
           file,
         ]);
-        if (lineResult.exitCode == 0) {
-          final match = (lineResult.stdout as String).trim();
-          final colonIdx = match.indexOf(':');
-          if (colonIdx > 0) {
-            final lineNum = int.tryParse(match.substring(0, colonIdx));
-            final content = match.substring(colonIdx + 1).trim();
-            results.add(SearchResult(
-              filePath: file,
-              workspaceName: wsName,
-              workspacePath: dirPath,
-              lineNumber: lineNum,
-              lineContent: content.length > 80 ? content.substring(0, 80) : content,
-            ));
-          }
-        }
-      }
-      return results;
+        return lineResult.exitCode == 0 ? lineResult.stdout as String : null;
+      });
     } catch (_) {
       return [];
     }

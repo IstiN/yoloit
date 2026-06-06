@@ -30,6 +30,24 @@ class ChatSessionHistoryDialogState extends State<ChatSessionHistoryDialog> {
     });
   }
 
+  Future<void> _restoreChat(BuildContext context, ChatSessionEntry entry) async {
+    final msgs = await ChatSessionHistory.instance.loadMessages(entry.id);
+    if (!context.mounted) return;
+    Navigator.pop(context);
+    final cubit = context.read<BoardCubit>();
+    await cubit.createChatPanel(
+      title:
+          entry.sessionName.isNotEmpty ? entry.sessionName : 'Restored chat',
+      sessionName: entry.sessionName,
+      workingDir: entry.workingDir,
+      provider: entry.provider,
+      model: entry.model,
+      envGroupIds: entry.envGroupIds,
+      messages: msgs,
+      configured: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -55,23 +73,7 @@ class ChatSessionHistoryDialogState extends State<ChatSessionHistoryDialog> {
         child: SessionHistoryListView(
           future: _entriesFuture,
           currentPanelId: widget.panelId,
-          onItemTap: (entry) async {
-            final msgs = await ChatSessionHistory.instance.loadMessages(entry.id);
-            if (!context.mounted) return;
-            Navigator.pop(context);
-            final cubit = context.read<BoardCubit>();
-            await cubit.createChatPanel(
-              title:
-                  entry.sessionName.isNotEmpty
-                      ? entry.sessionName
-                      : 'Restored chat',
-              sessionName: entry.sessionName,
-              workingDir: entry.workingDir,
-              model: entry.model,
-              envGroupIds: entry.envGroupIds,
-              messages: msgs,
-            );
-          },
+          onItemTap: (entry) => _restoreChat(context, entry),
           trailingActions: (entry, isCurrent) => Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -80,24 +82,7 @@ class ChatSessionHistoryDialogState extends State<ChatSessionHistoryDialog> {
                   icon: Icons.restore,
                   color: colors.accentBlue,
                   tooltip: 'Restore as new chat',
-                  onTap: () async {
-                    final msgs = await ChatSessionHistory.instance
-                        .loadMessages(entry.id);
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    final cubit = context.read<BoardCubit>();
-                    await cubit.createChatPanel(
-                      title:
-                          entry.sessionName.isNotEmpty
-                              ? entry.sessionName
-                              : 'Restored chat',
-                      sessionName: entry.sessionName,
-                      workingDir: entry.workingDir,
-                      model: entry.model,
-                      envGroupIds: entry.envGroupIds,
-                      messages: msgs,
-                    );
-                  },
+                  onTap: () => _restoreChat(context, entry),
                 ),
               ActionIconButton(
                 icon: Icons.delete_outline,

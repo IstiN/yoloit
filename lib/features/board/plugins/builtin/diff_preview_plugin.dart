@@ -366,14 +366,7 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
             children: [
               SizedBox(
                 width: 70,
-                child: Text(
-                  lineNo,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontFamily: 'monospace',
-                    color: colors.textMuted,
-                  ),
-                ),
+                child: Text(lineNo, style: _lineNoStyle(colors)),
               ),
               SizedBox(
                 width: 12,
@@ -387,22 +380,34 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
                   ),
                 ),
               ),
-              Expanded(
-                child: Text(
-                  line.content,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    color: textColor,
-                  ),
-                  overflow: TextOverflow.clip,
-                  softWrap: false,
-                ),
-              ),
+              _diffContentText(line.content, textColor),
             ],
           ),
         );
       },
+    );
+  }
+
+  static TextStyle _lineNoStyle(AppColorScheme colors) {
+    return TextStyle(
+      fontSize: 10,
+      fontFamily: 'monospace',
+      color: colors.textMuted,
+    );
+  }
+
+  static Widget _diffContentText(String content, Color textColor) {
+    return Expanded(
+      child: Text(
+        content,
+        style: TextStyle(
+          fontSize: 11,
+          fontFamily: 'monospace',
+          color: textColor,
+        ),
+        overflow: TextOverflow.clip,
+        softWrap: false,
+      ),
     );
   }
 
@@ -493,25 +498,10 @@ class _DiffPreviewContentState extends State<_DiffPreviewContent> {
             width: 36,
             child: Text(
               lineNo != null ? '$lineNo' : '',
-              style: TextStyle(
-                fontSize: 10,
-                fontFamily: 'monospace',
-                color: colors.textMuted,
-              ),
+              style: _lineNoStyle(colors),
             ),
           ),
-          Expanded(
-            child: Text(
-              line.content,
-              style: TextStyle(
-                fontSize: 11,
-                fontFamily: 'monospace',
-                color: textColor,
-              ),
-              overflow: TextOverflow.clip,
-              softWrap: false,
-            ),
-          ),
+          _diffContentText(line.content, textColor),
         ],
       ),
     );

@@ -353,7 +353,7 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
     super.dispose();
   }
 
-  void _wrapSelection(String before, String after, String placeholder) {
+  ({String selected, int start, int end}) _getNormalizedSelection() {
     final value = _mdCtrl.value;
     final selection =
         value.selection.isValid
@@ -364,8 +364,11 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
     final end =
         selection.start < selection.end ? selection.end : selection.start;
     final selected = start < end ? value.text.substring(start, end) : '';
-    final replacement =
-        '$before${selected.isEmpty ? placeholder : selected}$after';
+    return (selected: selected, start: start, end: end);
+  }
+
+  void _replaceSelection(int start, int end, String replacement) {
+    final value = _mdCtrl.value;
     final updated = value.text.replaceRange(start, end, replacement);
     setState(() {
       _mdCtrl.value = value.copyWith(
@@ -375,29 +378,21 @@ class _MarkdownNoteEditorDialogState extends State<_MarkdownNoteEditorDialog> {
     });
   }
 
+  void _wrapSelection(String before, String after, String placeholder) {
+    final (:selected, :start, :end) = _getNormalizedSelection();
+    final replacement =
+        '$before${selected.isEmpty ? placeholder : selected}$after';
+    _replaceSelection(start, end, replacement);
+  }
+
   void _prefixLines(String prefix) {
-    final value = _mdCtrl.value;
-    final selection =
-        value.selection.isValid
-            ? value.selection
-            : TextSelection.collapsed(offset: value.text.length);
-    final start =
-        selection.start < selection.end ? selection.start : selection.end;
-    final end =
-        selection.start < selection.end ? selection.end : selection.start;
-    final block = start < end ? value.text.substring(start, end) : '';
-    final source = block.isEmpty ? 'item' : block;
+    final (:selected, :start, :end) = _getNormalizedSelection();
+    final source = selected.isEmpty ? 'item' : selected;
     final replacement = source
         .split('\n')
         .map((line) => line.isEmpty ? prefix.trimRight() : '$prefix$line')
         .join('\n');
-    final updated = value.text.replaceRange(start, end, replacement);
-    setState(() {
-      _mdCtrl.value = value.copyWith(
-        text: updated,
-        selection: TextSelection.collapsed(offset: start + replacement.length),
-      );
-    });
+    _replaceSelection(start, end, replacement);
   }
 
   Future<void> _pickColor() async {

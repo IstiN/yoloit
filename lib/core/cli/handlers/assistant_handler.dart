@@ -40,10 +40,7 @@ class AssistantCliHandler extends PanelCliHandler {
               final nl = content.indexOf('\n');
               if (nl != -1) content = content.substring(nl + 1).trim();
             }
-            return {
-              'role': msg['role'] ?? 'unknown',
-              'content': _truncate(content, 200),
-            };
+            return formatMessageItem({'role': msg['role'], 'content': content}, 200);
           }).toList(),
     };
   }
@@ -133,13 +130,8 @@ class AssistantCliHandler extends PanelCliHandler {
   CliActionResult _handleMessages(
     Map<String, dynamic> args,
     BoardPanelInstance panel,
-  ) {
-    final msgs = panel.state['messages'] as List<dynamic>? ?? [];
-    final limit = args['limit'] as int? ?? msgs.length;
-    final filtered =
-        msgs.length > limit ? msgs.sublist(msgs.length - limit) : msgs;
-    return CliActionResult(data: {'total': msgs.length, 'messages': filtered});
-  }
+  ) =>
+      formatStoredMessages(args, panel);
 
   CliActionResult _handleAddSkill(
     Map<String, dynamic> args,
@@ -185,8 +177,7 @@ class AssistantCliHandler extends PanelCliHandler {
     );
   }
 
-  String _truncate(String s, int max) =>
-      s.length > max ? '${s.substring(0, max)}…' : s;
+  String _truncate(String s, int max) => truncateText(s, max);
 
   @override
   Map<String, CliActionHelp> get actionHelp => {

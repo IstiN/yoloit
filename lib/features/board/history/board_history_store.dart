@@ -42,20 +42,14 @@ class LocalBoardHistoryStore extends BoardHistoryStore {
 
   @override
   Future<void> append(BoardHistoryEvent event) async {
-    final dirPath = HistoryStoreHelpers.historyDirPath(
-      rootPath,
-      event.boardId,
-      event.timestamp,
+    await HistoryStoreHelpers.appendEvent(
+      rootPath: rootPath,
+      boardId: event.boardId,
+      timestamp: event.timestamp,
+      opId: event.opId,
+      actorId: event.actorId,
+      json: event.toJson(),
     );
-    final dir = Directory(dirPath);
-    await dir.create(recursive: true);
-    final file = File(
-      p.join(
-        dirPath,
-        HistoryStoreHelpers.historyFileName(event.opId, event.actorId),
-      ),
-    );
-    await HistoryStoreHelpers.writeJsonAtomic(file, event.toJson());
   }
 
   @override

@@ -74,20 +74,10 @@ class BoardToolsPanel extends StatelessWidget {
         if (visible) ...[
           const SizedBox(height: 6),
           // ── Tool buttons ────────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: panelBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border.withAlpha(180)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(isLight ? 18 : 70),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
+          _toolGroup(
+            colors: colors,
+            panelBg: panelBg,
+            isLight: isLight,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -148,20 +138,10 @@ class BoardToolsPanel extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: panelBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border.withAlpha(180)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(isLight ? 18 : 70),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
+          _toolGroup(
+            colors: colors,
+            panelBg: panelBg,
+            isLight: isLight,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -195,20 +175,10 @@ class BoardToolsPanel extends StatelessWidget {
         ],
         // ── Add panel buttons (always visible) ───────────────────────────
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: panelBg,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: colors.border.withAlpha(180)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(isLight ? 18 : 70),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
+        _toolGroup(
+          colors: colors,
+          panelBg: panelBg,
+          isLight: isLight,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -280,6 +250,30 @@ class BoardToolsPanel extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _toolGroup({
+    required AppColorScheme colors,
+    required Color panelBg,
+    required bool isLight,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: panelBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.border.withAlpha(180)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(isLight ? 18 : 70),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }

@@ -1133,7 +1133,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             () => _showMarkdownNoteDialog(
                                               context,
                                             ),
-                                        onAddChat: () => context.read<BoardCubit>().createChatPanel(),
+                                        onAddChat:
+                                            () => context.read<BoardCubit>().createChatPanel(
+                                              configured: false,
+                                            ),
                                         onAddTerminal:
                                             () => context.read<BoardCubit>().createTerminalPanel(),
                                         onAddGeneric:

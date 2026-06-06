@@ -160,41 +160,11 @@ class ModelSearchDialogState extends State<ModelSearchDialog> {
                                       ),
                                     ),
                                   ),
-                                  if (m.isFree)
-                                    Text(
-                                      'FREE',
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                        color: colors.statusActive,
-                                      ),
-                                    )
-                                  else if (m.inputCostPerMillion != null)
-                                    Text(
-                                      '\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        color:
-                                            m.inputCostPerMillion! > 10
-                                                ? colors.statusError
-                                                : colorScheme.onSurface
-                                                    .withAlpha(153),
-                                      ),
-                                    )
-                                  else if (m.costMultiplier != null)
-                                    Text(
-                                      '${m.costMultiplier}x',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color:
-                                            m.costMultiplier == 0
-                                                ? colors.statusActive
-                                                : m.costMultiplier! > 3
-                                                ? colors.statusError
-                                                : colorScheme.onSurface
-                                                    .withAlpha(153),
-                                      ),
-                                    ),
+                                  buildModelPriceTag(
+                                    context,
+                                    m,
+                                    mutedColor: colorScheme.onSurface.withAlpha(153),
+                                  ),
                                 ],
                               ),
                             ),

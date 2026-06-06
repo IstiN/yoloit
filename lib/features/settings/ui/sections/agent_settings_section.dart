@@ -5,6 +5,42 @@ import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 import 'package:yoloit/features/settings/data/provider_model_catalog_service.dart';
 import 'package:yoloit/features/settings/ui/dialogs/asr_picker_dialog.dart';
 
+String _formatAsrLabel(
+  String mode,
+  List<CloudLlmConfig> configs,
+  String? configId,
+  String? model,
+) {
+  if (mode == 'default') return 'Default';
+  if (mode == 'local') return 'Local';
+  final cfg = configs.where((c) => c.id == configId).firstOrNull;
+  final modelName = model ?? '—';
+  final provName = cfg?.name ?? '—';
+  return 'Cloud · $provName · $modelName';
+}
+
+InputDecoration _outlineDecoration({
+  required Color borderColor,
+  String? hint,
+  EdgeInsets contentPadding = const EdgeInsets.symmetric(
+    horizontal: 10,
+    vertical: 6,
+  ),
+}) =>
+    InputDecoration(
+      isDense: true,
+      hintText: hint,
+      contentPadding: contentPadding,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: borderColor),
+      ),
+    );
+
 class AgentSettingsSection extends StatefulWidget {
   const AgentSettingsSection({super.key});
 
@@ -76,16 +112,12 @@ class AgentSettingsSectionState extends State<AgentSettingsSection> {
     await _service.saveDefaultAsr(mode: mode, configId: configId, model: model);
   }
 
-  String _defaultAsrLabel() {
-    if (_defaultAsrMode != 'cloud') return 'Local';
-    final cfg =
-        _cloudConfigs
-            .where((c) => c.id == _defaultAsrCloudConfigId)
-            .firstOrNull;
-    final modelName = _defaultAsrCloudModel ?? '—';
-    final provName = cfg?.name ?? '—';
-    return 'Cloud · $provName · $modelName';
-  }
+  String _defaultAsrLabel() => _formatAsrLabel(
+    _defaultAsrMode,
+    _cloudConfigs,
+    _defaultAsrCloudConfigId,
+    _defaultAsrCloudModel,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -316,18 +348,12 @@ class AgentRowState extends State<AgentRow> {
     );
   }
 
-  String _asrLabel() {
-    final mode = widget.config.asrMode;
-    if (mode == 'default') return 'Default';
-    if (mode == 'local') return 'Local';
-    final cfg =
-        widget.cloudConfigs
-            .where((c) => c.id == widget.config.asrCloudConfigId)
-            .firstOrNull;
-    final modelName = widget.config.asrCloudModel ?? '—';
-    final provName = cfg?.name ?? '—';
-    return 'Cloud · $provName · $modelName';
-  }
+  String _asrLabel() => _formatAsrLabel(
+    widget.config.asrMode,
+    widget.cloudConfigs,
+    widget.config.asrCloudConfigId,
+    widget.config.asrCloudModel,
+  );
 
   Future<void> _pickAsr(BuildContext context) async {
     // Reload cloud configs so any providers added since page load are visible.
@@ -393,19 +419,11 @@ class AgentRowState extends State<AgentRow> {
                     fontSize: 16,
                     fontFamily: 'monospace',
                   ),
-                  decoration: InputDecoration(
-                    isDense: true,
+                  decoration: _outlineDecoration(
+                    borderColor: colors.border,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 6,
                       vertical: 6,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
                     ),
                   ),
                 ),
@@ -422,24 +440,12 @@ class AgentRowState extends State<AgentRow> {
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 13,
                   ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: 'Name',
-                    hintStyle: TextStyle(
-                      color: context.appColors.textMuted,
-                      fontSize: 13,
-                    ),
+                  decoration: _outlineDecoration(
+                    borderColor: colors.border,
+                    hint: 'Name',
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 6,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
                     ),
                   ),
                 ),
@@ -571,21 +577,7 @@ class AgentRowState extends State<AgentRow> {
                       color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 12,
                     ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                    ),
+                    decoration: _outlineDecoration(borderColor: colors.border),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -610,20 +602,12 @@ class AgentRowState extends State<AgentRow> {
                   controller: _cmdCtrl,
                   onChanged: (_) => _emit(),
                   style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                  decoration: InputDecoration(
-                    isDense: true,
+                  decoration: _outlineDecoration(
+                    borderColor: colors.border,
+                    hint: 'e.g. opencode or codemie-opencode',
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 6,
-                    ),
-                    hintText: 'e.g. opencode or codemie-opencode',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: colors.border),
                     ),
                   ),
                 ),
@@ -720,21 +704,7 @@ class AgentRowState extends State<AgentRow> {
                       color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 12,
                     ),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: colors.border),
-                      ),
-                    ),
+                    decoration: _outlineDecoration(borderColor: colors.border),
                   ),
                 ),
                 const SizedBox(width: 16),

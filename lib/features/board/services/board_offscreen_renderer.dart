@@ -50,37 +50,16 @@ class BoardOffscreenRenderer {
     // render error not covered by headless providers (e.g. plugin-specific
     // state that isn't injected yet). The panel shows a broken-image icon and
     // the error is logged; the rest of the board still renders.
-    final originalErrorBuilder = ErrorWidget.builder;
-    ErrorWidget.builder = (FlutterErrorDetails details) {
-      debugPrint(
-        '[BoardOffscreenRenderer] panel render error: ${details.exception}',
-      );
-      return ColoredBox(
-        color: colors.border.withAlpha(32),
-        child: Center(
-          child: Icon(
-            Icons.broken_image_outlined,
-            size: 20,
-            color: colors.textMuted.withAlpha(128),
-          ),
-        ),
-      );
-    };
-
-    try {
-      return await _renderWidgetToImage(
+    return _withErrorBuilder(
+      colors: colors,
+      cubit: headlessCubit,
+      errorMessage: 'render failed',
+      action: () => _renderWidgetToImage(
         _buildBoardPreview(board, headlessCubit, theme, colors),
         size,
         pixelRatio,
-      );
-    } catch (e, st) {
-      debugPrint('[BoardOffscreenRenderer] render failed: $e');
-      debugPrintStack(stackTrace: st);
-      return null;
-    } finally {
-      ErrorWidget.builder = originalErrorBuilder;
-      headlessCubit.close();
-    }
+      ),
+    );
   }
 
   /// Render a single [panel] from [board] to PNG at its native size.
@@ -98,6 +77,79 @@ class BoardOffscreenRenderer {
 
     final headlessCubit = _HeadlessBoardCubit(board);
 
+    final panelSize = Size(
+      panel.bounds.width.clamp(60.0, 4000.0),
+      panel.bounds.height.clamp(60.0, 4000.0),
+    );
+    return _withErrorBuilder(
+      colors: colors,
+      cubit: headlessCubit,
+      errorMessage: 'panel render failed',
+      action: () => _renderWidgetToImage(
+        _buildPanelPreview(board, panel, headlessCubit, theme, colors),
+        panelSize,
+        pixelRatio,
+      ),
+    );
+  }
+
+  Widget _buildPanelPreview(
+    BoardDocument board,
+    BoardPanelInstance panel,
+    BoardCubit cubit,
+    ThemeData theme,
+    AppColorScheme colors,
+  ) {
+    return _wrapHeadless(
+      cubit: cubit,
+      mediaQueryData: MediaQueryData(
+        size: Size(
+          panel.bounds.width.clamp(60.0, 4000.0),
+          panel.bounds.height.clamp(60.0, 4000.0),
+        ),
+      ),
+      theme: theme,
+      colors: colors,
+      child: _OffscreenSinglePanel(
+        panel: panel,
+        colors: colors,
+      ),
+    );
+  }
+
+  Widget _buildBoardPreview(
+    BoardDocument board,
+    BoardCubit cubit,
+    ThemeData theme,
+    AppColorScheme colors,
+  ) {
+    // BlocProvider.value injects headless implementations so all plugins that
+    // call context.read<BoardCubit>() receive a properly populated instance.
+    // Use explicit MediaQuery/Theme (not MaterialApp) — isolated BuildOwner
+    // has no View ancestor, so MaterialApp's ScaffoldMessenger breaks.
+    // Panel-level Material + TooltipVisibility is applied in
+    // [BoardOverviewPanelContent] via [_PreviewSafePanelShell].
+    return _wrapHeadless(
+      cubit: cubit,
+      mediaQueryData: const MediaQueryData(size: Size(1400, 900)),
+      theme: theme,
+      colors: colors,
+      child: ColoredBox(
+        color: colors.background,
+        child: BoardCanvasPreview(
+          board: board,
+          useViewport: true,
+        ),
+      ),
+    );
+  }
+
+  Future<T?> _withErrorBuilder<T>({
+    required AppColorScheme colors,
+    required BoardCubit cubit,
+    required String errorMessage,
+    required Future<T?> Function() action,
+  }) async {
     final originalErrorBuilder = ErrorWidget.builder;
     ErrorWidget.builder = (FlutterErrorDetails details) {
       debugPrint(
@@ -116,32 +168,24 @@ class BoardOffscreenRenderer {
     };
 
     try {
-      final panelSize = Size(
-        panel.bounds.width.clamp(60.0, 4000.0),
-        panel.bounds.height.clamp(60.0, 4000.0),
-      );
-      return await _renderWidgetToImage(
-        _buildPanelPreview(board, panel, headlessCubit, theme, colors),
-        panelSize,
-        pixelRatio,
-      );
+      return await action();
     } catch (e, st) {
-      debugPrint('[BoardOffscreenRenderer] panel render failed: $e');
+      debugPrint('[BoardOffscreenRenderer] $errorMessage: $e');
       debugPrintStack(stackTrace: st);
       return null;
     } finally {
       ErrorWidget.builder = originalErrorBuilder;
-      headlessCubit.close();
+      cubit.close();
     }
   }
 
-  Widget _buildPanelPreview(
-    BoardDocument board,
-    BoardPanelInstance panel,
-    BoardCubit cubit,
-    ThemeData theme,
-    AppColorScheme colors,
-  ) {
+  Widget _wrapHeadless({
+    required BoardCubit cubit,
+    required MediaQueryData mediaQueryData,
+    required ThemeData theme,
+    required AppColorScheme colors,
+    required Widget child,
+  }) {
     return BlocProvider<BoardCubit>.value(
       value: cubit,
       child: Localizations(
@@ -151,12 +195,7 @@ class BoardOffscreenRenderer {
           DefaultWidgetsLocalizations.delegate,
         ],
         child: MediaQuery(
-          data: MediaQueryData(
-            size: Size(
-              panel.bounds.width.clamp(60.0, 4000.0),
-              panel.bounds.height.clamp(60.0, 4000.0),
-            ),
-          ),
+          data: mediaQueryData,
           child: Directionality(
             textDirection: TextDirection.ltr,
             child: ScrollConfiguration(
@@ -170,59 +209,7 @@ class BoardOffscreenRenderer {
                       color: colors.textSecondary,
                       size: 14,
                     ),
-                    child: _OffscreenSinglePanel(
-                      panel: panel,
-                      colors: colors,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBoardPreview(
-    BoardDocument board,
-    BoardCubit cubit,
-    ThemeData theme,
-    AppColorScheme colors,
-  ) {
-    // BlocProvider.value injects headless implementations so all plugins that
-    // call context.read<BoardCubit>() receive a properly populated instance.
-    // Use explicit MediaQuery/Theme (not MaterialApp) — isolated BuildOwner
-    // has no View ancestor, so MaterialApp's ScaffoldMessenger breaks.
-    // Panel-level Material + TooltipVisibility is applied in
-    // [BoardOverviewPanelContent] via [_PreviewSafePanelShell].
-    return BlocProvider<BoardCubit>.value(
-      value: cubit,
-      child: Localizations(
-        locale: const Locale('en', 'US'),
-        delegates: [
-          DefaultMaterialLocalizations.delegate,
-          DefaultWidgetsLocalizations.delegate,
-        ],
-        child: MediaQuery(
-          data: const MediaQueryData(size: Size(1400, 900)),
-          child: Directionality(
-            textDirection: TextDirection.ltr,
-            child: ScrollConfiguration(
-              behavior: const HeadlessScrollBehavior(),
-              child: Theme(
-                data: theme,
-                child: DefaultTextStyle(
-                  style: TextStyle(color: colors.textPrimary, fontSize: 12),
-                  child: IconTheme(
-                    data: IconThemeData(color: colors.textSecondary, size: 14),
-                    child: ColoredBox(
-                      color: colors.background,
-                      child: BoardCanvasPreview(
-                        board: board,
-                        useViewport: true,
-                      ),
-                    ),
+                    child: child,
                   ),
                 ),
               ),
@@ -459,7 +446,7 @@ class HeadlessScrollPhysics extends ScrollPhysics {
   @override
   bool recommendDeferredLoading(
     double velocity,
-    dynamic direction,
+    dynamic metrics,
     BuildContext context,
   ) {
     return false; // Bypass View.of() completely!

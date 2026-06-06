@@ -420,6 +420,39 @@ class _WorktreeTileState extends State<_WorktreeTile> {
   }
 }
 
+Widget _worktreeDialog(BuildContext context, {required Widget child}) {
+  final colors = context.appColors;
+  return Dialog(
+    backgroundColor: colors.surface,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+      side: BorderSide(color: colors.border),
+    ),
+    child: child,
+  );
+}
+
+TextStyle? _cancelTextStyle(BuildContext context) {
+  return TextStyle(
+    color:
+        Theme.of(context).textTheme.bodyMedium?.color ??
+        Theme.of(context).colorScheme.onSurface,
+  );
+}
+
+ButtonStyle _actionButtonStyle({
+  required Color backgroundColor,
+  required Color foregroundColor,
+}) {
+  return ElevatedButton.styleFrom(
+    backgroundColor: backgroundColor,
+    foregroundColor: foregroundColor,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(6),
+    ),
+  );
+}
+
 class _ConfirmRemoveDialog extends StatelessWidget {
   const _ConfirmRemoveDialog({required this.worktreePath});
 
@@ -428,12 +461,8 @@ class _ConfirmRemoveDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Dialog(
-      backgroundColor: colors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: colors.border),
-      ),
+    return _worktreeDialog(
+      context,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -452,9 +481,7 @@ class _ConfirmRemoveDialog extends StatelessWidget {
             Text(
               'Remove worktree at:\n$worktreePath',
               style: TextStyle(
-                color:
-                    Theme.of(context).textTheme.bodyMedium?.color ??
-                    Theme.of(context).colorScheme.onSurface,
+                color: _cancelTextStyle(context)?.color,
                 fontSize: 12,
               ),
             ),
@@ -464,24 +491,14 @@ class _ConfirmRemoveDialog extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color:
-                          Theme.of(context).textTheme.bodyMedium?.color ??
-                          Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
+                  child: Text('Cancel', style: _cancelTextStyle(context)),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  style: ElevatedButton.styleFrom(
+                  style: _actionButtonStyle(
                     backgroundColor: colors.accentRed,
                     foregroundColor: colors.textPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
                   ),
                   child: const Text('Remove', style: TextStyle(fontSize: 13)),
                 ),
@@ -597,12 +614,8 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Dialog(
-      backgroundColor: colors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: colors.border),
-      ),
+    return _worktreeDialog(
+      context,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480, minWidth: 360),
         child: Padding(
@@ -634,9 +647,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
               Text(
                 'Worktree path',
                 style: TextStyle(
-                  color:
-                      Theme.of(context).textTheme.bodyMedium?.color ??
-                      Theme.of(context).colorScheme.onSurface,
+                  color: _cancelTextStyle(context)?.color,
                   fontSize: 11,
                 ),
               ),
@@ -682,9 +693,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                   Text(
                     'Create new branch',
                     style: TextStyle(
-                      color:
-                          Theme.of(context).textTheme.bodyMedium?.color ??
-                          Theme.of(context).colorScheme.onSurface,
+                      color: _cancelTextStyle(context)?.color,
                       fontSize: 12,
                     ),
                   ),
@@ -695,9 +704,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                 Text(
                   'New branch name',
                   style: TextStyle(
-                    color:
-                        Theme.of(context).textTheme.bodyMedium?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                    color: _cancelTextStyle(context)?.color,
                     fontSize: 11,
                   ),
                 ),
@@ -720,9 +727,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                 Text(
                   'Branch / commit',
                   style: TextStyle(
-                    color:
-                        Theme.of(context).textTheme.bodyMedium?.color ??
-                        Theme.of(context).colorScheme.onSurface,
+                    color: _cancelTextStyle(context)?.color,
                     fontSize: 11,
                   ),
                 ),
@@ -776,24 +781,14 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color:
-                            Theme.of(context).textTheme.bodyMedium?.color ??
-                            Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
+                    child: Text('Cancel', style: _cancelTextStyle(context)),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: _loading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
+                    style: _actionButtonStyle(
                       backgroundColor: colors.primary,
                       foregroundColor: colors.textPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
                     ),
                     child:
                         _loading

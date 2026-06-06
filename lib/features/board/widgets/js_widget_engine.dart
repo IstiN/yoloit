@@ -180,6 +180,10 @@ class JsWidgetEngine {
 
   // ── Private ──────────────────────────────────────────────────────────────
 
+  Map<String, dynamic> _parseArgs(dynamic args) => (args is Map)
+      ? Map<String, dynamic>.from(args)
+      : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+
   void _setupBridges(JavascriptRuntime rt) {
     // flutter_js bridges are invoked from JS via: sendMessage(channelName, jsonString)
     // The Dart callback receives args = jsonDecode(jsonString) — already decoded.
@@ -202,9 +206,7 @@ class JsWidgetEngine {
     // yoloit.fetchJson(url, opts) — goes through Dart, no CORS
     rt.setupBridge('__yoloit_fetch', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       if (!WidgetPermissionsService.instance.isAllowed('fetch')) {
         _resolveCallback(rt, id, {'__error': 'fetchJson is disabled in Settings → Apps & Widgets'});
@@ -238,9 +240,7 @@ class JsWidgetEngine {
     // yoloit.storage.get(key)
     rt.setupBridge('__yoloit_storage_get', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       if (!WidgetPermissionsService.instance.isAllowed('storage')) {
         _resolveCallback(rt, id, {'__error': 'storage is disabled in Settings → Apps & Widgets'});
@@ -257,9 +257,7 @@ class JsWidgetEngine {
     rt.setupBridge('__yoloit_storage_set', (args) {
       if (_disposed) return;
       if (!WidgetPermissionsService.instance.isAllowed('storage')) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       _storage[req['key'] as String] = req['value'];
       onStorageUpdate(Map<String, dynamic>.from(_storage));
     });
@@ -284,9 +282,7 @@ class JsWidgetEngine {
     // setInterval — Dart-backed
     rt.setupBridge('__yoloit_set_interval', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       final ms = (req['ms'] as num?)?.toInt() ?? 1000;
       _intervals[id]?.cancel();
@@ -309,9 +305,7 @@ class JsWidgetEngine {
     // yoloit.secrets.get(key) — encrypted secure storage, per-widget namespace
     rt.setupBridge('__yoloit_secrets_get', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       if (!WidgetPermissionsService.instance.isAllowed('secrets')) {
         _resolveCallback(rt, id, {'__error': 'secrets is disabled in Settings → Apps & Widgets'});
@@ -331,9 +325,7 @@ class JsWidgetEngine {
     // yoloit.secrets.set(key, value)
     rt.setupBridge('__yoloit_secrets_set', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       if (!WidgetPermissionsService.instance.isAllowed('secrets')) {
         _resolveCallback(rt, id, false);
@@ -358,9 +350,7 @@ class JsWidgetEngine {
     // yoloit.loadAsset(path) — read a file from the app's folder
     rt.setupBridge('__yoloit_load_asset', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       final assetPath = req['path'] as String? ?? '';
       Future(() async {
@@ -387,9 +377,7 @@ class JsWidgetEngine {
     // yoloit.exec(cmd) — run a yoloit CLI command, returns stdout
     rt.setupBridge('__yoloit_exec', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       final cmd = req['cmd'] as String? ?? '';
       // Permission check
@@ -427,9 +415,7 @@ class JsWidgetEngine {
     // requestAnimationFrame — vsync-driven frame callback
     rt.setupBridge('__yoloit_raf', (args) {
       if (_disposed) return;
-      final req = (args is Map)
-          ? Map<String, dynamic>.from(args)
-          : jsonDecode(args?.toString() ?? '{}') as Map<String, dynamic>;
+      final req = _parseArgs(args);
       final id = req['id'] as String;
       _rafCallbacks[id] = true;
       _ensureRafTicker(rt);

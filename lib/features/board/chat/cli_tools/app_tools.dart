@@ -273,20 +273,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     group: 'yolochat',
     params: <YoloitCliToolParam>[
       toolParam('text', 'Message text', required: true, shortKey: 'tx'),
-      toolParam(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
-      toolParam(
-        'panel',
-        'Target chat panel',
-        flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
-        shortKey: 'p',
-      ),
+      boardFlagParam(),
+      panelFlagParam(),
       toolParam(
         'provider',
         'Provider override (for example cloud:<config-id>)',
@@ -305,20 +293,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     group: 'yolochat',
     params: <YoloitCliToolParam>[
       toolParam('text', 'Terminal input text', required: true, shortKey: 'tx'),
-      toolParam(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
-      toolParam(
-        'panel',
-        'Target terminal panel',
-        flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
-        shortKey: 'p',
-      ),
+      boardFlagParam(),
+      panelFlagParam(),
       toolParam(
         'session',
         'Terminal session id override',
@@ -341,20 +317,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     description: 'Read YoLo chat messages',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
-      toolParam(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
-      toolParam(
-        'panel',
-        'Target chat panel',
-        flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
-        shortKey: 'p',
-      ),
+      boardFlagParam(),
+      panelFlagParam(),
       toolParam(
         'limit',
         'Max messages',
@@ -371,20 +335,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     description: 'Clear YoLo chat messages',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
-      toolParam(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
-      toolParam(
-        'panel',
-        'Target chat panel',
-        flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
-        shortKey: 'p',
-      ),
+      boardFlagParam(),
+      panelFlagParam(),
     ],
   ),
 
@@ -409,20 +361,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     group: 'yolochat',
     params: <YoloitCliToolParam>[
       toolParam('session_id', 'Saved session id', required: true, shortKey: 'sid'),
-      toolParam(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
-      toolParam(
-        'panel',
-        'Target chat panel',
-        flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
-        shortKey: 'p',
-      ),
+      boardFlagParam(),
+      panelFlagParam(),
     ],
   ),
 
@@ -432,20 +372,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     description: 'Show YoLo chat status',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
-      toolParam(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
-      toolParam(
-        'panel',
-        'Target chat panel',
-        flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
-        shortKey: 'p',
-      ),
+      boardFlagParam(),
+      panelFlagParam(),
     ],
   ),
 
@@ -471,20 +399,8 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     description: 'Dump full YoLo chat log for debugging',
     group: 'yolochat',
     params: <YoloitCliToolParam>[
-      toolParam(
-        'board',
-        'Target board',
-        flag: '--board',
-        runtimeDefault: YoloitCliRuntimeDefault.board,
-        shortKey: 'b',
-      ),
-      toolParam(
-        'panel',
-        'Target chat panel',
-        flag: '--panel',
-        runtimeDefault: YoloitCliRuntimeDefault.panel,
-        shortKey: 'p',
-      ),
+      boardFlagParam(),
+      panelFlagParam(),
     ],
   ),
 

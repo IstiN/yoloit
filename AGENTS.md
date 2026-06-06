@@ -151,6 +151,6 @@ A pre-configured `repomix.config.json` lives at the repo root. It excludes `thir
   - Only use `--no-verify` when the user explicitly approves it, or when the failure is a known infrastructure issue outside the current changes.
   - After using `--no-verify`, provide the user with a clear analysis of what failed and why it was skipped.
 - **Pre-existing `jscpd` duplication failure**:
-  - The pre-commit hook enforces `< 1%` code duplication, but the project baseline is **~1.91%** (1,687 duplicated lines across 88K+ lines). This is a known, pre-existing issue.
-  - If `git commit` fails with `Code duplication too high: 1.9%`, this is **not caused by your changes** unless `jscpd` output shows new clones in files you modified.
-  - Remediation options: (1) ask the user to lower the jscpd threshold to `2%` in `.git/hooks/pre-commit`, (2) refactor the existing duplicates (especially `lib/app.dart`, `lib/core/remote/yoloitd_models.dart` ↔ `lib/features/board/model/board_models.dart`), or (3) use `--no-verify` with explicit user approval.
+  - The pre-commit hook enforces `< 1%` code duplication. The baseline has been reduced to **~0.97%** (853 duplicated lines across ~88K lines) and should now pass.
+  - If `git commit` fails with `Code duplication too high`, verify whether `jscpd` output shows new clones in files you modified before assuming it is pre-existing.
+  - Remediation options: (1) refactor the duplicates reported by `jscpd`, or (2) use `--no-verify` with explicit user approval.

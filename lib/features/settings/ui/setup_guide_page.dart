@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/features/settings/data/setup_check_service.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 import 'package:yoloit/ui/components/typography/label.dart';
@@ -21,22 +20,8 @@ class SetupGuideEmbedded extends StatefulWidget {
   State<SetupGuideEmbedded> createState() => _SetupGuideEmbeddedState();
 }
 
-class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
-  SetupCheckResult? _result;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _runChecks();
-  }
-
-  Future<void> _runChecks({bool silent = false}) async {
-    if (!silent) setState(() => _loading = true);
-    final result = await SetupCheckService.check();
-    if (mounted) setState(() { _result = result; _loading = false; });
-  }
-
+class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded>
+    with _SetupGuideBase<SetupGuideEmbedded> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -79,6 +64,23 @@ class _SetupGuideEmbeddedState extends State<SetupGuideEmbedded> {
   }
 }
 
+mixin _SetupGuideBase<T extends StatefulWidget> on State<T> {
+  SetupCheckResult? _result;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _runChecks();
+  }
+
+  Future<void> _runChecks({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
+    final result = await SetupCheckService.check();
+    if (mounted) setState(() { _result = result; _loading = false; });
+  }
+}
+
 // ── Wizard dialog ─────────────────────────────────────────────────────────────
 
 class SetupGuidePage extends StatefulWidget {
@@ -106,22 +108,8 @@ class SetupGuidePage extends StatefulWidget {
   State<SetupGuidePage> createState() => _SetupGuidePageState();
 }
 
-class _SetupGuidePageState extends State<SetupGuidePage> {
-  SetupCheckResult? _result;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _runChecks();
-  }
-
-  Future<void> _runChecks({bool silent = false}) async {
-    if (!silent) setState(() => _loading = true);
-    final result = await SetupCheckService.check();
-    if (mounted) setState(() { _result = result; _loading = false; });
-  }
-
+class _SetupGuidePageState extends State<SetupGuidePage>
+    with _SetupGuideBase<SetupGuidePage> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -275,6 +263,22 @@ class _Body extends StatelessWidget {
   }
 }
 
+Widget _cardContainer({
+  required AppColorScheme colors,
+  required Color borderColor,
+  required Widget child,
+}) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 6),
+    decoration: BoxDecoration(
+      color: colors.surfaceElevated,
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: borderColor),
+    ),
+    child: child,
+  );
+}
+
 // ── macOS Permissions card ────────────────────────────────────────────────────
 
 enum _PermissionStatus { unknown, granted, denied }
@@ -351,13 +355,9 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
             ? colors.accentBlue.withAlpha(60)
             : colors.accentOrange.withAlpha(60);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: borderColor),
-      ),
+    return _cardContainer(
+      colors: colors,
+      borderColor: borderColor,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
@@ -397,23 +397,12 @@ class _MacOsPermissionsCardState extends State<_MacOsPermissionsCard> {
                   child: Text('Granted', style: TextStyle(color: colors.accentGreen, fontSize: 9, fontWeight: FontWeight.w600)),
                 )
               else ...[
-                GestureDetector(
+                _mutedButton(
                   onTap: _check,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: context.appColors.textMuted.withAlpha(60)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.refresh, size: 9, color: context.appColors.textMuted),
-                        const SizedBox(width: 3),
-                        Text('Re-check', style: TextStyle(color: context.appColors.textMuted, fontSize: 9)),
-                      ],
-                    ),
-                  ),
+                  icon: Icons.refresh,
+                  iconSize: 9,
+                  label: 'Re-check',
+                  color: context.appColors.textMuted,
                 ),
                 const SizedBox(width: 4),
               ],
@@ -472,6 +461,33 @@ class _SectionTitle extends StatelessWidget {
       ],
     );
   }
+}
+
+Widget _mutedButton({
+  required VoidCallback onTap,
+  required IconData icon,
+  required double iconSize,
+  required String label,
+  required Color color,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withAlpha(60)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: iconSize, color: color),
+          const SizedBox(width: 3),
+          Text(label, style: TextStyle(color: color, fontSize: 9)),
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Install phase ─────────────────────────────────────────────────────────────
@@ -577,13 +593,9 @@ class _DependencyCardState extends State<_DependencyCard> {
                     ? Colors.red.withAlpha(40)
                     : colors.border;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: borderColor),
-      ),
+    return _cardContainer(
+      colors: colors,
+      borderColor: borderColor,
       child: Column(
         children: [
           // ── Main row ───────────────────────────────────────────────────
@@ -822,35 +834,17 @@ class _CopyButtonState extends State<_CopyButton> {
   Widget build(BuildContext context) {
     return Tooltip(
       message: widget.hint,
-      child: GestureDetector(
+      child: _mutedButton(
         onTap: () async {
           await copyToClipboard(widget.hint);
           setState(() => _copied = true);
           await Future<void>.delayed(const Duration(seconds: 2));
           if (mounted) setState(() => _copied = false);
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: context.appColors.textMuted.withAlpha(60)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                _copied ? Icons.check : Icons.copy_outlined,
-                size: 10,
-                color: context.appColors.textMuted,
-              ),
-              const SizedBox(width: 3),
-              Text(
-                _copied ? 'Copied' : 'Copy',
-                style: TextStyle(color: context.appColors.textMuted, fontSize: 9),
-              ),
-            ],
-          ),
-        ),
+        icon: _copied ? Icons.check : Icons.copy_outlined,
+        iconSize: 10,
+        label: _copied ? 'Copied' : 'Copy',
+        color: context.appColors.textMuted,
       ),
     );
   }

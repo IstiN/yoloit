@@ -122,22 +122,23 @@ Future<shelf.Response> handleDrawingsPost(
   List<List<Offset>> strokes;
   Size size;
 
+  ({double x1, double y1, double x2, double y2}) parseEndpoints() => (
+    x1: (requestBody['x1'] as num?)?.toDouble() ?? posX,
+    y1: (requestBody['y1'] as num?)?.toDouble() ?? posY,
+    x2: (requestBody['x2'] as num?)?.toDouble() ?? posX + 200,
+    y2: (requestBody['y2'] as num?)?.toDouble() ?? posY,
+  );
+
   switch (type) {
     case 'line':
-      final x1 = (requestBody['x1'] as num?)?.toDouble() ?? posX;
-      final y1 = (requestBody['y1'] as num?)?.toDouble() ?? posY;
-      final x2 = (requestBody['x2'] as num?)?.toDouble() ?? posX + 200;
-      final y2 = (requestBody['y2'] as num?)?.toDouble() ?? posY;
-      final result = lineToElement(x1, y1, x2, y2, strokeWidth);
+      final ep = parseEndpoints();
+      final result = lineToElement(ep.x1, ep.y1, ep.x2, ep.y2, strokeWidth);
       strokes = result.$1;
       size = result.$2;
 
     case 'arrow':
-      final x1 = (requestBody['x1'] as num?)?.toDouble() ?? posX;
-      final y1 = (requestBody['y1'] as num?)?.toDouble() ?? posY;
-      final x2 = (requestBody['x2'] as num?)?.toDouble() ?? posX + 200;
-      final y2 = (requestBody['y2'] as num?)?.toDouble() ?? posY;
-      final result = arrowToElement(x1, y1, x2, y2, strokeWidth);
+      final ep = parseEndpoints();
+      final result = arrowToElement(ep.x1, ep.y1, ep.x2, ep.y2, strokeWidth);
       strokes = result.$1;
       size = result.$2;
 
@@ -401,11 +402,7 @@ Map<String, dynamic> drawingToJson(BoardDrawingElement d) => {
   return ([pts], Size(w + sw * 2, h + sw * 2));
 }
 
-(List<List<Offset>>, Size) freehandToElement(
-  List<Offset> points,
-  double sw,
-) {
-  if (points.isEmpty) return ([<Offset>[]], Size(sw * 2, sw * 2));
+(Offset, Size) _computeBBox(List<Offset> points, double sw) {
   double minX = points.first.dx, minY = points.first.dy;
   double maxX = minX, maxY = minY;
   for (final p in points) {
@@ -415,8 +412,17 @@ Map<String, dynamic> drawingToJson(BoardDrawingElement d) => {
     if (p.dy > maxY) maxY = p.dy;
   }
   final origin = Offset(minX - sw, minY - sw);
+  return (origin, Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
+}
+
+(List<List<Offset>>, Size) freehandToElement(
+  List<Offset> points,
+  double sw,
+) {
+  if (points.isEmpty) return ([<Offset>[]], Size(sw * 2, sw * 2));
+  final (origin, size) = _computeBBox(points, sw);
   final rel = points.map((p) => p - origin).toList();
-  return ([rel], Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
+  return ([rel], size);
 }
 
 /// Extract the `d` attribute from a simple SVG string.
@@ -499,20 +505,12 @@ String extractSvgPathD(String svg) {
         cy += num();
         current.add(Offset(cx, cy));
       case 'C': // cubic bezier — approximate with 10 points
-        final x1 = num(), y1 = num(), x2 = num(), y2 = num();
-        final ex = num(), ey = num();
-        for (int s = 1; s <= 10; s++) {
-          final tt = s / 10;
-          final bx = cubicBezier(cx, x1, x2, ex, tt);
-          final by = cubicBezier(cy, y1, y2, ey, tt);
-          current.add(Offset(bx, by));
-        }
-        cx = ex;
-        cy = ey;
       case 'c':
-        final x1 = cx + num(), y1 = cy + num();
-        final x2 = cx + num(), y2 = cy + num();
-        final ex = cx + num(), ey = cy + num();
+        final rel = cmd == 'c';
+        double coord(double c) => rel ? c + num() : num();
+        final x1 = coord(cx), y1 = coord(cy);
+        final x2 = coord(cx), y2 = coord(cy);
+        final ex = coord(cx), ey = coord(cy);
         for (int s = 1; s <= 10; s++) {
           final tt = s / 10;
           current.add(
@@ -525,18 +523,11 @@ String extractSvgPathD(String svg) {
         cx = ex;
         cy = ey;
       case 'Q': // quadratic bezier
-        final x1 = num(), y1 = num(), ex = num(), ey = num();
-        for (int s = 1; s <= 10; s++) {
-          final tt = s / 10;
-          current.add(
-            Offset(quadBezier(cx, x1, ex, tt), quadBezier(cy, y1, ey, tt)),
-          );
-        }
-        cx = ex;
-        cy = ey;
       case 'q':
-        final x1 = cx + num(), y1 = cy + num();
-        final ex = cx + num(), ey = cy + num();
+        final rel = cmd == 'q';
+        double coord(double c) => rel ? c + num() : num();
+        final x1 = coord(cx), y1 = coord(cy);
+        final ex = coord(cx), ey = coord(cy);
         for (int s = 1; s <= 10; s++) {
           final tt = s / 10;
           current.add(
@@ -554,18 +545,10 @@ String extractSvgPathD(String svg) {
 
   // Compute bounding box of all points
   final allPts = strokes.expand((s) => s).toList();
-  double minX = allPts.first.dx, minY = allPts.first.dy;
-  double maxX = minX, maxY = minY;
-  for (final p in allPts) {
-    if (p.dx < minX) minX = p.dx;
-    if (p.dy < minY) minY = p.dy;
-    if (p.dx > maxX) maxX = p.dx;
-    if (p.dy > maxY) maxY = p.dy;
-  }
-  final origin = Offset(minX - sw, minY - sw);
+  final (origin, size) = _computeBBox(allPts, sw);
   final relStrokes =
       strokes.map((s) => s.map((p) => p - origin).toList()).toList();
-  return (relStrokes, Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
+  return (relStrokes, size);
 }
 
 double cubicBezier(double p0, double p1, double p2, double p3, double t) {

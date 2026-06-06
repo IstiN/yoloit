@@ -50,10 +50,11 @@ Future<shelf.Response> handleYoloChat(
     if (text == null || text.trim().isEmpty) {
       return error('Missing "text" field');
     }
-    final target = _resolveYoloChatTarget(
+    final target = _resolveTarget(
       cubit,
       boardHint: requestBody['board'] as String? ?? requestBody['boardId'] as String?,
       panelHint: requestBody['panel'] as String? ?? requestBody['panelId'] as String?,
+      type: 'board.chat',
     );
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
@@ -93,10 +94,11 @@ Future<shelf.Response> handleYoloChat(
     ({BoardDocument board, BoardPanelInstance panel})? target;
 
     if (sessionId.isEmpty) {
-      target = _resolveTerminalTarget(
+      target = _resolveTarget(
         cubit,
         boardHint: requestBody['board'] as String? ?? requestBody['boardId'] as String?,
         panelHint: requestBody['panel'] as String? ?? requestBody['panelId'] as String?,
+        type: 'board.terminal',
       );
       if (target == null) {
         return error('No board.terminal panel found (or target not found)');
@@ -130,10 +132,11 @@ Future<shelf.Response> handleYoloChat(
     final boardHint = request.url.queryParameters['board'];
     final panelHint = request.url.queryParameters['panel'];
     final limitRaw = request.url.queryParameters['limit'];
-    final target = _resolveYoloChatTarget(
+    final target = _resolveTarget(
       cubit,
       boardHint: boardHint,
       panelHint: panelHint,
+      type: 'board.chat',
     );
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
@@ -149,10 +152,11 @@ Future<shelf.Response> handleYoloChat(
   // POST /yolochat/clear
   if (sub.length == 1 && sub[0] == 'clear' && method == 'POST') {
     final requestBody = await body(request);
-    final target = _resolveYoloChatTarget(
+    final target = _resolveTarget(
       cubit,
       boardHint: requestBody['board'] as String?,
       panelHint: requestBody['panel'] as String?,
+      type: 'board.chat',
     );
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
@@ -218,10 +222,11 @@ Future<shelf.Response> handleYoloChat(
     final messages = await ChatSessionHistory.instance.loadMessages(
       sessionId,
     );
-    final target = _resolveYoloChatTarget(
+    final target = _resolveTarget(
       cubit,
       boardHint: requestBody['board'] as String?,
       panelHint: requestBody['panel'] as String?,
+      type: 'board.chat',
     );
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
@@ -254,10 +259,11 @@ Future<shelf.Response> handleYoloChat(
   if (sub.length == 1 && sub[0] == 'status' && method == 'GET') {
     final boardHint = request.url.queryParameters['board'];
     final panelHint = request.url.queryParameters['panel'];
-    final target = _resolveYoloChatTarget(
+    final target = _resolveTarget(
       cubit,
       boardHint: boardHint,
       panelHint: panelHint,
+      type: 'board.chat',
     );
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
@@ -287,10 +293,11 @@ Future<shelf.Response> handleYoloChat(
       }
     }
 
-    final target = _resolveYoloChatTarget(
+    final target = _resolveTarget(
       cubit,
       boardHint: boardHint,
       panelHint: panelHint,
+      type: 'board.chat',
     );
     if (target == null) {
       return error(
@@ -308,10 +315,11 @@ Future<shelf.Response> handleYoloChat(
   if (sub.length == 1 && sub[0] == 'logs' && method == 'GET') {
     final boardHint = request.url.queryParameters['board'];
     final panelHint = request.url.queryParameters['panel'];
-    final target = _resolveYoloChatTarget(
+    final target = _resolveTarget(
       cubit,
       boardHint: boardHint,
       panelHint: panelHint,
+      type: 'board.chat',
     );
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
@@ -358,10 +366,11 @@ Future<int> _stopAllActiveYoloChats() async {
   return stopped;
 }
 
-({BoardDocument board, BoardPanelInstance panel})? _resolveYoloChatTarget(
+({BoardDocument board, BoardPanelInstance panel})? _resolveTarget(
   BoardCubit cubit, {
   String? boardHint,
   String? panelHint,
+  required String type,
 }) {
   BoardDocument? board;
   if (boardHint != null && boardHint.trim().isNotEmpty) {
@@ -374,33 +383,9 @@ Future<int> _stopAllActiveYoloChats() async {
   BoardPanelInstance? panel;
   if (panelHint != null && panelHint.trim().isNotEmpty) {
     panel = findPanel(board, panelHint);
-    if (panel?.type != 'board.chat') return null;
+    if (panel?.type != type) return null;
   } else {
-    panel = board.panels.where((p) => p.type == 'board.chat').firstOrNull;
-  }
-  if (panel == null) return null;
-  return (board: board, panel: panel);
-}
-
-({BoardDocument board, BoardPanelInstance panel})? _resolveTerminalTarget(
-  BoardCubit cubit, {
-  String? boardHint,
-  String? panelHint,
-}) {
-  BoardDocument? board;
-  if (boardHint != null && boardHint.trim().isNotEmpty) {
-    board = findBoard(cubit, boardHint);
-  } else {
-    board = cubit.state.activeBoard ?? cubit.state.boards.firstOrNull;
-  }
-  if (board == null) return null;
-
-  BoardPanelInstance? panel;
-  if (panelHint != null && panelHint.trim().isNotEmpty) {
-    panel = findPanel(board, panelHint);
-    if (panel?.type != 'board.terminal') return null;
-  } else {
-    panel = board.panels.where((p) => p.type == 'board.terminal').firstOrNull;
+    panel = board.panels.where((p) => p.type == type).firstOrNull;
   }
   if (panel == null) return null;
   return (board: board, panel: panel);

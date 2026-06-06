@@ -443,32 +443,7 @@ class MindMapCubit extends Cubit<MindMapState> {
       (n) => n.repoPath != null && filePath.startsWith(n.repoPath!),
     ).firstOrNull;
 
-    final newNodes = [...state.nodes, newNode];
-    final newConnections = treeNode != null
-        ? [
-            ...state.connections,
-            MindMapConnection(
-              fromId: treeNode.id,
-              toId: id,
-              style: ConnectorStyle.dashed,
-              color: connectorColor.withValues(alpha: 0.44),
-            ),
-          ]
-        : state.connections;
-
-    final newPositions = _engine.compute(
-      nodes: newNodes,
-      existing: state.positions,
-      sizes: state.sizes,
-      locked: state.locked,
-      connections: newConnections,
-    );
-    emit(state.copyWith(
-      nodes: newNodes,
-      positions: newPositions,
-      connections: newConnections,
-    ));
-    _savePositions(newPositions);
+    _emitWithConnection(newNode, treeNode, connectorColor);
   }
 
   void openFileDiffAsPanel({
@@ -497,13 +472,23 @@ class MindMapCubit extends Cubit<MindMapState> {
     ).firstOrNull;
     debugPrint('[MindMapCubit] diffNode found: ${diffNode?.id}');
 
+    _emitWithConnection(newNode, diffNode, connectorColor);
+    final newPositions = state.positions; // _emitWithConnection already updated state
+    debugPrint('[MindMapCubit] newNodes.length=${state.nodes.length}, pos for $id=${newPositions[id]}');
+  }
+
+  void _emitWithConnection(
+    MindMapNodeData newNode,
+    MindMapNodeData? sourceNode,
+    Color connectorColor,
+  ) {
     final newNodes = [...state.nodes, newNode];
-    final newConnections = diffNode != null
+    final newConnections = sourceNode != null
         ? [
             ...state.connections,
             MindMapConnection(
-              fromId: diffNode.id,
-              toId: id,
+              fromId: sourceNode.id,
+              toId: newNode.id,
               style: ConnectorStyle.dashed,
               color: connectorColor.withValues(alpha: 0.44),
             ),
@@ -517,7 +502,6 @@ class MindMapCubit extends Cubit<MindMapState> {
       locked: state.locked,
       connections: newConnections,
     );
-    debugPrint('[MindMapCubit] newNodes.length=${newNodes.length}, pos for $id=${newPositions[id]}');
     emit(state.copyWith(
       nodes: newNodes,
       positions: newPositions,

@@ -250,7 +250,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                         ),
                         const SizedBox(height: 4),
                         DropdownButtonFormField<String>(
-                          value:
+                          initialValue:
                               preset.models.any((m) => m.id == modelCtrl.text)
                                   ? modelCtrl.text
                                   : null,
@@ -483,25 +483,9 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                   ? chatConfig?.model
                   : null;
           return <Widget>[
-            DropdownButtonFormField<String>(
+            _providerDropdown(
               value: chatProviderId,
-              decoration: const InputDecoration(
-                labelText: 'Chat provider',
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem<String>(
-                  value: 'local',
-                  child: Text('Local Provider', style: TextStyle(fontSize: 13)),
-                ),
-                ..._configs.map(
-                  (c) => DropdownMenuItem<String>(
-                    value: c.id,
-                    child: Text(c.name, style: const TextStyle(fontSize: 13)),
-                  ),
-                ),
-              ],
+              labelText: 'Chat provider',
               onChanged: (v) {
                 if (v == null) return;
                 _setChatProvider(v);
@@ -525,25 +509,14 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                             ),
                           )
                           : DropdownButtonFormField<String>(
-                            value: chatModelValue,
+                            initialValue: chatModelValue,
                             hint: const Text('Select chat model'),
                             decoration: const InputDecoration(
                               labelText: 'Chat model',
                               isDense: true,
                               border: OutlineInputBorder(),
                             ),
-                            items:
-                                chatModelOptions
-                                    .map(
-                                      (m) => DropdownMenuItem<String>(
-                                        value: m.id,
-                                        child: Text(
-                                          m.label,
-                                          style: const TextStyle(fontSize: 13),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
+                            items: _modelItems(chatModelOptions),
                             onChanged: (v) {
                               if (v == null || chatProviderId == null) return;
                               _setProviderModel(chatProviderId, v);
@@ -606,25 +579,9 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
             return <Widget>[];
           }
           return <Widget>[
-            DropdownButtonFormField<String>(
+            _providerDropdown(
               value: asrProviderValue,
-              decoration: const InputDecoration(
-                labelText: 'ASR provider',
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem<String>(
-                  value: 'local',
-                  child: Text('Local Provider', style: TextStyle(fontSize: 13)),
-                ),
-                ..._configs.map(
-                  (c) => DropdownMenuItem<String>(
-                    value: c.id,
-                    child: Text(c.name, style: const TextStyle(fontSize: 13)),
-                  ),
-                ),
-              ],
+              labelText: 'ASR provider',
               onChanged: (v) {
                 if (v == null) return;
                 if (v == 'local') {
@@ -684,7 +641,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
             return <Widget>[
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: asrValue,
+                initialValue: asrValue,
                 hint: Text(
                   _configById(asrConfigId)?.model ??
                       (_assistantProviderType == 'local'
@@ -697,18 +654,7 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
                   isDense: true,
                   border: OutlineInputBorder(),
                 ),
-                items:
-                    asrOptionsWithSelected
-                        .map(
-                          (m) => DropdownMenuItem<String>(
-                            value: m.id,
-                            child: Text(
-                              m.label,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        )
-                        .toList(),
+                items: _modelItems(asrOptionsWithSelected),
                 onChanged:
                     (v) => _setVoiceSettings(
                       _voiceSettings.copyWith(cloudAsrModel: v),
@@ -746,5 +692,49 @@ class _CloudProvidersSectionState extends State<CloudProvidersSection> {
         ],
       ],
     );
+  }
+
+  DropdownButtonFormField<String> _providerDropdown({
+    required String? value,
+    required String labelText,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: labelText,
+        isDense: true,
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        const DropdownMenuItem<String>(
+          value: 'local',
+          child: Text('Local Provider', style: TextStyle(fontSize: 13)),
+        ),
+        ..._configs.map(
+          (c) => DropdownMenuItem<String>(
+            value: c.id,
+            child: Text(c.name, style: const TextStyle(fontSize: 13)),
+          ),
+        ),
+      ],
+      onChanged: onChanged,
+    );
+  }
+
+  List<DropdownMenuItem<String>> _modelItems(
+    List<({String id, String label})> options,
+  ) {
+    return options
+        .map(
+          (m) => DropdownMenuItem<String>(
+            value: m.id,
+            child: Text(
+              m.label,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        )
+        .toList();
   }
 }

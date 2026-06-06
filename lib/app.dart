@@ -79,175 +79,133 @@ class App extends StatelessWidget {
         BlocProvider(
           create: (ctx) {
             late final CollaborationCubit collaborationCubit;
+            final mindMapCubit = ctx.read<MindMapCubit>();
+            final workspaceCubit = ctx.read<WorkspaceCubit>();
+            final terminalCubit = ctx.read<TerminalCubit>();
+            final reviewCubit = ctx.read<ReviewCubit>();
+            final fileEditorCubit = ctx.read<FileEditorCubit>();
+            final runCubit = ctx.read<RunCubit>();
+            Future<void> sync() => _syncMindMap(
+              mindMapCubit,
+              workspaceCubit.state,
+              terminalCubit.state,
+              reviewCubit.state,
+              fileEditorCubit.state,
+              runCubit.state,
+              collaborationCubit: collaborationCubit,
+              force: true,
+            );
+            void runAction(String nodeId, String action) => _handleRunAction(
+              mindMapCubit,
+              runCubit,
+              workspaceCubit.state,
+              terminalCubit.state,
+              reviewCubit.state,
+              fileEditorCubit.state,
+              nodeId,
+              collaborationCubit,
+              action,
+            );
             collaborationCubit = CollaborationCubit(
-              mindMapCubit: ctx.read<MindMapCubit>(),
+              mindMapCubit: mindMapCubit,
               onTerminalInput: PtyService.instance.write,
-              reviewCubit: ctx.read<ReviewCubit>(),
-              fileEditorCubit: ctx.read<FileEditorCubit>(),
+              reviewCubit: reviewCubit,
+              fileEditorCubit: fileEditorCubit,
               listDirectory: listRepoDir,
               ensureNodesPopulated:
                   () => _populateMindMap(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<WorkspaceCubit>().state,
-                    ctx.read<TerminalCubit>().state,
-                    ctx.read<ReviewCubit>().state,
-                    ctx.read<FileEditorCubit>().state,
-                    ctx.read<RunCubit>().state,
+                    mindMapCubit,
+                    workspaceCubit.state,
+                    terminalCubit.state,
+                    reviewCubit.state,
+                    fileEditorCubit.state,
+                    runCubit.state,
                   ),
               onCreateWorkspace:
                   (payload) => _handleWorkspaceCreate(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<WorkspaceCubit>(),
-                    ctx.read<TerminalCubit>(),
-                    ctx.read<ReviewCubit>(),
-                    ctx.read<FileEditorCubit>(),
-                    ctx.read<RunCubit>(),
+                    mindMapCubit,
+                    workspaceCubit,
+                    terminalCubit,
+                    reviewCubit,
+                    fileEditorCubit,
+                    runCubit,
                     collaborationCubit,
                     payload: payload,
                   ),
               onAddFolder:
                   (nodeId, {String? path}) => _handleAddFolder(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<WorkspaceCubit>(),
-                    ctx.read<TerminalCubit>(),
-                    ctx.read<ReviewCubit>(),
-                    ctx.read<FileEditorCubit>(),
-                    ctx.read<RunCubit>(),
+                    mindMapCubit,
+                    workspaceCubit,
+                    terminalCubit,
+                    reviewCubit,
+                    fileEditorCubit,
+                    runCubit,
                     collaborationCubit,
                     nodeId,
                     path: path,
                   ),
               onCreateSession:
                   (nodeId) => _handleWorkspaceSessionCreate(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<WorkspaceCubit>(),
-                    ctx.read<TerminalCubit>(),
-                    ctx.read<ReviewCubit>(),
-                    ctx.read<FileEditorCubit>(),
-                    ctx.read<RunCubit>(),
+                    mindMapCubit,
+                    workspaceCubit,
+                    terminalCubit,
+                    reviewCubit,
+                    fileEditorCubit,
+                    runCubit,
                     collaborationCubit,
                     nodeId,
                   ),
-              onRunStart:
-                  (nodeId) => _handleRunAction(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<RunCubit>(),
-                    ctx.read<WorkspaceCubit>().state,
-                    ctx.read<TerminalCubit>().state,
-                    ctx.read<ReviewCubit>().state,
-                    ctx.read<FileEditorCubit>().state,
-                    nodeId,
-                    collaborationCubit,
-                    'start',
-                  ),
-              onRunStop:
-                  (nodeId) => _handleRunAction(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<RunCubit>(),
-                    ctx.read<WorkspaceCubit>().state,
-                    ctx.read<TerminalCubit>().state,
-                    ctx.read<ReviewCubit>().state,
-                    ctx.read<FileEditorCubit>().state,
-                    nodeId,
-                    collaborationCubit,
-                    'stop',
-                  ),
-              onRunRestart:
-                  (nodeId) => _handleRunAction(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<RunCubit>(),
-                    ctx.read<WorkspaceCubit>().state,
-                    ctx.read<TerminalCubit>().state,
-                    ctx.read<ReviewCubit>().state,
-                    ctx.read<FileEditorCubit>().state,
-                    nodeId,
-                    collaborationCubit,
-                    'restart',
-                  ),
+              onRunStart: (nodeId) => runAction(nodeId, 'start'),
+              onRunStop: (nodeId) => runAction(nodeId, 'stop'),
+              onRunRestart: (nodeId) => runAction(nodeId, 'restart'),
               onFileSelect:
                   (nodeId, path) => _handleFileSelect(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<FileEditorCubit>(),
-                    ctx.read<WorkspaceCubit>().state,
-                    ctx.read<TerminalCubit>().state,
-                    ctx.read<ReviewCubit>().state,
-                    ctx.read<RunCubit>().state,
+                    mindMapCubit,
+                    fileEditorCubit,
+                    workspaceCubit.state,
+                    terminalCubit.state,
+                    reviewCubit.state,
+                    runCubit.state,
                     nodeId,
                     path,
                     collaborationCubit,
                   ),
               onTreeToggle: (_, path) {
-                ctx.read<ReviewCubit>().toggleNode(path);
-                return _syncMindMap(
-                  ctx.read<MindMapCubit>(),
-                  ctx.read<WorkspaceCubit>().state,
-                  ctx.read<TerminalCubit>().state,
-                  ctx.read<ReviewCubit>().state,
-                  ctx.read<FileEditorCubit>().state,
-                  ctx.read<RunCubit>().state,
-                  collaborationCubit: collaborationCubit,
-                  force: true,
-                );
+                reviewCubit.toggleNode(path);
+                return sync();
               },
               onTreeSelect:
                   (_, path) => _handleTreeSelect(
-                    ctx.read<ReviewCubit>(),
-                    ctx.read<FileEditorCubit>(),
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<WorkspaceCubit>().state,
-                    ctx.read<TerminalCubit>().state,
-                    ctx.read<RunCubit>().state,
+                    reviewCubit,
+                    fileEditorCubit,
+                    mindMapCubit,
+                    workspaceCubit.state,
+                    terminalCubit.state,
+                    runCubit.state,
                     path,
                     collaborationCubit,
                   ),
               onEditorSwitchTab: (_, tabIndex) {
-                ctx.read<FileEditorCubit>().switchTab(tabIndex);
-                return _syncMindMap(
-                  ctx.read<MindMapCubit>(),
-                  ctx.read<WorkspaceCubit>().state,
-                  ctx.read<TerminalCubit>().state,
-                  ctx.read<ReviewCubit>().state,
-                  ctx.read<FileEditorCubit>().state,
-                  ctx.read<RunCubit>().state,
-                  collaborationCubit: collaborationCubit,
-                  force: true,
-                );
+                fileEditorCubit.switchTab(tabIndex);
+                return sync();
               },
               onEditorSave: (_) async {
-                await ctx.read<FileEditorCubit>().saveFile();
-                await _syncMindMap(
-                  ctx.read<MindMapCubit>(),
-                  ctx.read<WorkspaceCubit>().state,
-                  ctx.read<TerminalCubit>().state,
-                  ctx.read<ReviewCubit>().state,
-                  ctx.read<FileEditorCubit>().state,
-                  ctx.read<RunCubit>().state,
-                  collaborationCubit: collaborationCubit,
-                  force: true,
-                );
+                await fileEditorCubit.saveFile();
+                return sync();
               },
               onEditorContentUpdate: (_, content) async {
-                ctx.read<FileEditorCubit>().updateContent(content);
-                await ctx.read<FileEditorCubit>().saveFile();
-                await _syncMindMap(
-                  ctx.read<MindMapCubit>(),
-                  ctx.read<WorkspaceCubit>().state,
-                  ctx.read<TerminalCubit>().state,
-                  ctx.read<ReviewCubit>().state,
-                  ctx.read<FileEditorCubit>().state,
-                  ctx.read<RunCubit>().state,
-                  collaborationCubit: collaborationCubit,
-                  force: true,
-                );
+                fileEditorCubit.updateContent(content);
+                await fileEditorCubit.saveFile();
+                return sync();
               },
               onSessionStart:
                   (nodeId) => _handleSessionStart(
-                    ctx.read<MindMapCubit>(),
-                    ctx.read<TerminalCubit>(),
-                    ctx.read<WorkspaceCubit>().state,
-                    ctx.read<ReviewCubit>().state,
-                    ctx.read<FileEditorCubit>().state,
-                    ctx.read<RunCubit>().state,
+                    mindMapCubit,
+                    terminalCubit,
+                    workspaceCubit.state,
+                    reviewCubit.state,
+                    fileEditorCubit.state,
+                    runCubit.state,
                     collaborationCubit,
                     nodeId,
                   ),

@@ -48,6 +48,54 @@ class WebViewOverlays extends StatelessWidget {
     return Rect.fromLTWH(screenPos.dx, screenPos.dy, w, h);
   }
 
+  Widget _webViewOverlay(
+    BuildContext context, {
+    required String panelId,
+    required Rect rect,
+    required double scale,
+    required WebViewController ctrl,
+    required Color backgroundColor,
+    List<Widget> extraChildren = const [],
+  }) {
+    return Positioned(
+      key: ValueKey(panelId),
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      child: RepaintBoundary(
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(16 * scale),
+            bottomRight: Radius.circular(16 * scale),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(color: backgroundColor),
+              WebViewWidget(controller: ctrl),
+              _loadingOverlay(context, panelId),
+              ...extraChildren,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _loadingOverlay(BuildContext context, String panelId) {
+    return ValueListenableBuilder<bool>(
+      valueListenable:
+          WebpagePlugin.pageLoading[panelId] ?? ValueNotifier<bool>(false),
+      builder: (_, isLoading, _) {
+        if (!isLoading) return const SizedBox.shrink();
+        return ColoredBox(
+          color: context.appColors.surfaceHighlight,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final webPanels =
@@ -102,52 +150,27 @@ class WebViewOverlays extends StatelessWidget {
               }
 
               children.add(
-                Positioned(
-                  key: ValueKey('wv-${panel.id}'),
-                  left: rect.left,
-                  top: rect.top,
-                  width: rect.width,
-                  height: rect.height,
-                  child: RepaintBoundary(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(16 * scale),
-                        bottomRight: Radius.circular(16 * scale),
-                      ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ColoredBox(color: context.appColors.background),
-                          WebViewWidget(controller: ctrl),
-                          // Loading overlay
-                          ValueListenableBuilder<bool>(
-                            valueListenable:
-                                WebpagePlugin.pageLoading[panel.id] ??
-                                ValueNotifier<bool>(false),
-                            builder: (_, isLoading, __) {
-                              if (!isLoading) return const SizedBox.shrink();
-                              return ColoredBox(
-                                color: context.appColors.surfaceHighlight,
-                              );
-                            },
-                          ),
-                          // Absorb clicks → focus this panel
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              if (kDebugMode) {
-                                debugPrint(
-                                  '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
-                                );
-                              }
-                              context.read<BoardCubit>().focusPanel(panel.id);
-                              FocusManager.instance.primaryFocus?.unfocus();
-                            },
-                          ),
-                        ],
-                      ),
+                _webViewOverlay(
+                  context,
+                  panelId: 'wv-${panel.id}',
+                  rect: rect,
+                  scale: scale,
+                  ctrl: ctrl,
+                  backgroundColor: context.appColors.background,
+                  extraChildren: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (kDebugMode) {
+                          debugPrint(
+                            '[BoardWebFocus] unfocused overlay tap -> focus panel=${panel.id}',
+                          );
+                        }
+                        context.read<BoardCubit>().focusPanel(panel.id);
+                        FocusManager.instance.primaryFocus?.unfocus();
+                      },
                     ),
-                  ),
+                  ],
                 ),
               );
             }
@@ -170,39 +193,13 @@ class WebViewOverlays extends StatelessWidget {
                 }
 
                 children.add(
-                  Positioned(
-                    key: ValueKey('wv-focused-${focusedPanel.id}'),
-                    left: rect.left,
-                    top: rect.top,
-                    width: rect.width,
-                    height: rect.height,
-                    child: RepaintBoundary(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.only(
-                          bottomLeft: Radius.circular(16 * scale),
-                          bottomRight: Radius.circular(16 * scale),
-                        ),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ColoredBox(color: context.appColors.surface),
-                            WebViewWidget(controller: ctrl),
-                            // Loading overlay (navigation flash hide)
-                            ValueListenableBuilder<bool>(
-                              valueListenable:
-                                  WebpagePlugin.pageLoading[focusedPanel.id] ??
-                                  ValueNotifier<bool>(false),
-                              builder: (_, isLoading, __) {
-                                if (!isLoading) return const SizedBox.shrink();
-                                return ColoredBox(
-                                  color: context.appColors.surfaceHighlight,
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                  _webViewOverlay(
+                    context,
+                    panelId: 'wv-focused-${focusedPanel.id}',
+                    rect: rect,
+                    scale: scale,
+                    ctrl: ctrl,
+                    backgroundColor: context.appColors.surface,
                   ),
                 );
               }

@@ -117,20 +117,14 @@ class YoloitdStore {
   }
 
   Future<void> appendHistory(RemoteHistoryEvent event) async {
-    final dirPath = HistoryStoreHelpers.historyDirPath(
-      p.join(rootDir.path, 'boards_history'),
-      event.boardId,
-      event.timestamp,
+    await HistoryStoreHelpers.appendEvent(
+      rootPath: p.join(rootDir.path, 'boards_history'),
+      boardId: event.boardId,
+      timestamp: event.timestamp,
+      opId: event.opId,
+      actorId: event.actorId,
+      json: event.toJson(),
     );
-    final dir = Directory(dirPath);
-    await dir.create(recursive: true);
-    final file = File(
-      p.join(
-        dirPath,
-        HistoryStoreHelpers.historyFileName(event.opId, event.actorId),
-      ),
-    );
-    await HistoryStoreHelpers.writeJsonAtomic(file, event.toJson());
   }
 
   Future<List<RemoteHistoryEvent>> historyForBoard(String boardId) async {

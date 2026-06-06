@@ -316,7 +316,6 @@ class OrbColorPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final tm = ThemeManager.instance;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -333,36 +332,11 @@ class OrbColorPreview extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'YoLo ORB',
-                  style: TextStyle(
-                    color: colors.textMuted,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children:
-                      _orbSlots.map((slot) {
-                        final currentColor = tm.colorForSlot(slot.key);
-                        final isOverridden = tm.colorOverrides.containsKey(
-                          slot.key,
-                        );
-                        return ColorSwatch(
-                          label: slot.label,
-                          color: currentColor,
-                          isOverridden: isOverridden,
-                          onTap: () => onPick(slot.key, currentColor),
-                          onReset:
-                              isOverridden
-                                  ? () => tm.removeColorOverride(slot.key)
-                                  : null,
-                        );
-                      }).toList(),
+                ColorCategoryRow(
+                  title: 'YoLo ORB',
+                  slots: _orbSlots,
+                  onPick: onPick,
+                  uppercaseTitle: false,
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -459,11 +433,13 @@ class ColorCategoryRow extends StatelessWidget {
     required this.title,
     required this.slots,
     required this.onPick,
+    this.uppercaseTitle = true,
   });
 
   final String title;
   final List<({String key, String label})> slots;
   final Future<void> Function(String slot, Color current) onPick;
+  final bool uppercaseTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -475,7 +451,7 @@ class ColorCategoryRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title.toUpperCase(),
+            uppercaseTitle ? title.toUpperCase() : title,
             style: TextStyle(
               color: colors.textMuted,
               fontSize: 9,

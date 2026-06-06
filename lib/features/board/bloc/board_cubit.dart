@@ -39,6 +39,7 @@ class BoardCubit extends Cubit<BoardState> {
 
   Future<void> load() async {
     if (state.isLoaded) return;
+    await AgentConfigService.instance.load();
     final prefs = await SharedPreferences.getInstance();
     final rawBoards = prefs.getString(_boardsStorageKey);
     final rawActiveId = prefs.getString(_activeBoardStorageKey);
@@ -612,9 +613,10 @@ class BoardCubit extends Cubit<BoardState> {
     String? sessionName,
     String workingDir = '',
     String model = 'gpt-5-mini',
-    String provider = 'copilot',
+    String? provider,
     List<String> envGroupIds = const [],
     List<Map<String, dynamic>>? messages,
+    bool? configured,
   }) async {
     final board = state.activeBoard;
     if (board == null) return;
@@ -624,8 +626,13 @@ class BoardCubit extends Cubit<BoardState> {
       preferredHeight: 500,
     );
 
+    final effectiveProvider =
+        provider ??
+        AgentConfigService.instance.defaultAgentId ??
+        'copilot';
+
     // Resolve effective model: user's explicit arg → agent default model → catalog default → hardcoded default
-    final effectiveModel = _resolveDefaultModel(provider, model);
+    final effectiveModel = _resolveDefaultModel(effectiveProvider, model);
     final effectiveWorkingDir = _effectiveBoardFolder(board, workingDir);
 
     final config = ChatSessionConfig(
@@ -633,12 +640,15 @@ class BoardCubit extends Cubit<BoardState> {
           sessionName ?? 'chat-${DateTime.now().millisecondsSinceEpoch}',
       workingDir: effectiveWorkingDir,
       model: effectiveModel,
-      provider: provider,
+      provider: effectiveProvider,
       envGroupIds: envGroupIds,
     );
     final panelState = <String, dynamic>{
       'config': config.toJson(),
-      'configured': effectiveWorkingDir.trim().isNotEmpty,
+      'configured':
+          configured ??
+          (messages != null && messages.isNotEmpty) ||
+              effectiveWorkingDir.trim().isNotEmpty,
     };
     if (messages != null && messages.isNotEmpty) {
       panelState['messages'] = messages;

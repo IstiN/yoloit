@@ -57,6 +57,13 @@ class TerminalCubit extends Cubit<TerminalState> {
   List<AgentSession> get _workspaceSessions =>
       _allSessions.where((s) => s.workspaceId == _activeWorkspaceId).toList();
 
+  void _emitVisible() {
+    final cur = _loaded;
+    if (cur != null && !isClosed) {
+      _emitVisible();
+    }
+  }
+
   /// Emits a TerminalLoaded with both visible (workspace) sessions and allSessions.
   void _emitLoaded(
     List<AgentSession> visible,
@@ -98,12 +105,7 @@ class TerminalCubit extends Cubit<TerminalState> {
       if (changed) {
         final cur = _loaded;
         if (cur != null && !isClosed) {
-          emit(
-            cur.copyWith(
-              sessions: _workspaceSessions,
-              allSessions: List.unmodifiable(_allSessions),
-            ),
-          );
+          _emitVisible();
         }
       }
     });
@@ -448,12 +450,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     );
     final cur = _loaded;
     if (cur != null && !isClosed) {
-      emit(
-        cur.copyWith(
-          sessions: _workspaceSessions,
-          allSessions: List.unmodifiable(_allSessions),
-        ),
-      );
+      _emitVisible();
     }
   }
 
@@ -482,42 +479,12 @@ class TerminalCubit extends Cubit<TerminalState> {
     // ThinkingPhase auto-clears after 15s if no other event fires.
     // PTY idle-timer (5s) will usually clear it sooner via spinner detection.
     if (newPhase is ThinkingPhase) {
-      Future.delayed(const Duration(seconds: 15), () {
-        final i = _findSessionIndexForWorkspacePath(event.workspacePath);
-        if (i >= 0 && _allSessions[i].hookPhase is ThinkingPhase) {
-          _allSessions[i] = _allSessions[i].copyWith(clearHookPhase: true);
-          final cur = _loaded;
-          if (cur != null && !isClosed) {
-            final visible = _workspaceSessions;
-            emit(
-              cur.copyWith(
-                sessions: visible,
-                allSessions: List.unmodifiable(_allSessions),
-              ),
-            );
-          }
-        }
-      });
+      _schedulePhaseClear(event.workspacePath, ThinkingPhase, const Duration(seconds: 15));
     }
 
     // DonePhase auto-clears after 3s (brief green flash).
     if (newPhase is DonePhase) {
-      Future.delayed(const Duration(seconds: 3), () {
-        final i = _findSessionIndexForWorkspacePath(event.workspacePath);
-        if (i >= 0 && _allSessions[i].hookPhase is DonePhase) {
-          _allSessions[i] = _allSessions[i].copyWith(clearHookPhase: true);
-          final cur = _loaded;
-          if (cur != null && !isClosed) {
-            final visible = _workspaceSessions;
-            emit(
-              cur.copyWith(
-                sessions: visible,
-                allSessions: List.unmodifiable(_allSessions),
-              ),
-            );
-          }
-        }
-      });
+      _schedulePhaseClear(event.workspacePath, DonePhase, const Duration(seconds: 3));
     }
 
     _allSessions[idx] = _allSessions[idx].copyWith(
@@ -567,6 +534,25 @@ class TerminalCubit extends Cubit<TerminalState> {
       normalized = normalized.substring(0, normalized.length - 1);
     }
     return normalized;
+  }
+
+  void _schedulePhaseClear(String workspacePath, Type phaseType, Duration delay) {
+    Future.delayed(delay, () {
+      final i = _findSessionIndexForWorkspacePath(workspacePath);
+      if (i >= 0 && _allSessions[i].hookPhase.runtimeType == phaseType) {
+        _allSessions[i] = _allSessions[i].copyWith(clearHookPhase: true);
+        final cur = _loaded;
+        if (cur != null && !isClosed) {
+          final visible = _workspaceSessions;
+          emit(
+            cur.copyWith(
+              sessions: visible,
+              allSessions: List.unmodifiable(_allSessions),
+            ),
+          );
+        }
+      }
+    });
   }
 
   /// Batched output buffer per session to avoid flooding the xterm
@@ -670,12 +656,7 @@ class TerminalCubit extends Cubit<TerminalState> {
         _allSessions[i2] = _allSessions[i2].copyWith(clearHookPhase: true);
         final cur = _loaded;
         if (cur != null && !isClosed) {
-          emit(
-            cur.copyWith(
-              sessions: _workspaceSessions,
-              allSessions: List.unmodifiable(_allSessions),
-            ),
-          );
+          _emitVisible();
         }
       }
     });
@@ -718,12 +699,7 @@ class TerminalCubit extends Cubit<TerminalState> {
       );
       final cur = _loaded;
       if (cur != null && !isClosed) {
-        emit(
-          cur.copyWith(
-            sessions: _workspaceSessions,
-            allSessions: List.unmodifiable(_allSessions),
-          ),
-        );
+        _emitVisible();
       }
       // Urgent sound — different from completion sound.
       SessionPrefs.isApprovalSoundEnabled().then((enabled) {
@@ -747,12 +723,7 @@ class TerminalCubit extends Cubit<TerminalState> {
           _allSessions[j] = _allSessions[j].copyWith(clearHookPhase: true);
           final cur = _loaded;
           if (cur != null && !isClosed) {
-            emit(
-              cur.copyWith(
-                sessions: _workspaceSessions,
-                allSessions: List.unmodifiable(_allSessions),
-              ),
-            );
+            _emitVisible();
           }
         }
       });
@@ -776,12 +747,7 @@ class TerminalCubit extends Cubit<TerminalState> {
         _allSessions[j] = _allSessions[j].copyWith(clearHookPhase: true);
         final cur = _loaded;
         if (cur != null && !isClosed) {
-          emit(
-            cur.copyWith(
-              sessions: _workspaceSessions,
-              allSessions: List.unmodifiable(_allSessions),
-            ),
-          );
+          _emitVisible();
         }
       }
     });
@@ -792,12 +758,7 @@ class TerminalCubit extends Cubit<TerminalState> {
     _allSessions[i] = current.copyWith(hookPhase: const ThinkingPhase());
     final cur = _loaded;
     if (cur != null && !isClosed) {
-      emit(
-        cur.copyWith(
-          sessions: _workspaceSessions,
-          allSessions: List.unmodifiable(_allSessions),
-        ),
-      );
+      _emitVisible();
     }
   }
 

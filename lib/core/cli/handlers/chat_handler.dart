@@ -56,8 +56,7 @@ class ChatCliHandler extends PanelCliHandler {
           messages.map((m) {
             final msg = m as Map<String, dynamic>;
             return {
-              'role': msg['role'] ?? 'unknown',
-              'content': _truncate(msg['content'] as String? ?? '', 200),
+              ...formatMessageItem(msg, 200),
               if (msg['toolCalls'] != null) 'toolCalls': msg['toolCalls'],
               if (msg['attachments'] != null) 'attachments': msg['attachments'],
             };
@@ -192,11 +191,7 @@ class ChatCliHandler extends PanelCliHandler {
       );
     }
 
-    final msgs = panel.state['messages'] as List<dynamic>? ?? [];
-    final limit = args['limit'] as int? ?? msgs.length;
-    final filtered =
-        msgs.length > limit ? msgs.sublist(msgs.length - limit) : msgs;
-    return CliActionResult(data: {'total': msgs.length, 'messages': filtered});
+    return formatStoredMessages(args, panel);
   }
 
   CliActionResult _handleConfig(
@@ -287,8 +282,7 @@ class ChatCliHandler extends PanelCliHandler {
     return CliActionResult(data: {'sessions': sessions});
   }
 
-  String _truncate(String s, int max) =>
-      s.length > max ? '${s.substring(0, max)}…' : s;
+  String _truncate(String s, int max) => truncateText(s, max);
 
   Map<String, dynamic> _mergeConfig(
     BoardPanelInstance panel,
