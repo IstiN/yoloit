@@ -4,7 +4,6 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
 import 'package:yoloit/features/board/chat/chat_session_manager.dart';
-import 'package:yoloit/features/board/model/board_models.dart';
 
 Future<shelf.Response> handleSearch(
   String method,

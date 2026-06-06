@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
@@ -475,104 +474,35 @@ class CliServer {
     BoardCubit cubit,
     shelf.Request request,
   ) async {
-    // GET /api/boards/:id → board details
-    if (sub.isEmpty && method == 'GET') {
-      return _boardDetails(board);
-    }
-    // PUT /api/boards/:id → update board (rename, focus)
-    if (sub.isEmpty && method == 'PUT') {
-      final body = await _body(request);
-      return _updateBoard(cubit, board, body);
-    }
-    // DELETE /api/boards/:id → delete board
-    if (sub.isEmpty && method == 'DELETE') {
-      await cubit.deleteBoard(board.id);
-      _scheduleRebuild();
-      return _json({'ok': true, 'message': 'Deleted board ${board.name}'});
-    }
-    // GET /api/boards/:id/snapshot
-    if (sub.length == 1 && sub[0] == 'snapshot' && method == 'GET') {
-      final format = request.url.queryParameters['format'] ?? 'md';
-      return _boardSnapshot(board, format: format);
-    }
-    // POST /api/boards/:id/apply → apply YAML bulk operations
-    if (sub.length == 1 && sub[0] == 'apply' && method == 'POST') {
-      return _applyYaml(cubit, board, request);
-    }
-    // POST /api/boards/:id/undo → undo latest panel history batch
-    if (sub.length == 1 && sub[0] == 'undo' && method == 'POST') {
-      return _undoBoard(cubit, board);
-    }
-    // GET /api/boards/:id/screenshot
-    if (sub.length == 1 && sub[0] == 'screenshot' && method == 'GET') {
-      final forceOffscreen = request.url.queryParameters['mode'] == 'offscreen';
-      return _boardScreenshot(
-        board,
-        cubit: cubit,
-        forceOffscreen: forceOffscreen,
-      );
-    }
-    // GET /api/boards/:id/svg
-    if (sub.length == 1 && sub[0] == 'svg' && method == 'GET') {
-      return _boardSvg(board);
-    }
-    // GET /api/boards/:id/panels
-    if (sub.length == 1 && sub[0] == 'panels' && method == 'GET') {
-      return _listPanels(board);
-    }
-    // POST /api/boards/:id/panels → create panel
-    if (sub.length == 1 && sub[0] == 'panels' && method == 'POST') {
-      final body = await _body(request);
-      return _createPanel(cubit, board, body);
-    }
-    // /api/boards/:id/panels/:panelIdOrTitle/...
-    if (sub.length >= 2 && sub[0] == 'panels') {
-      final panel = findPanel(board, sub[1]);
-      if (panel == null) return _notFound('Panel not found: ${sub[1]}');
-      final panelSub = sub.sublist(2);
-      return _handlePanel(method, panelSub, board, panel, cubit, request);
-    }
-    // GET /api/boards/:id/links
-    if (sub.length == 1 && sub[0] == 'links' && method == 'GET') {
-      return _listLinks(board);
-    }
-    // POST /api/boards/:id/links → create link
-    if (sub.length == 1 && sub[0] == 'links' && method == 'POST') {
-      final body = await _body(request);
-      return _createLink(cubit, board, body);
-    }
-    // DELETE /api/boards/:id/links/:linkId
-    if (sub.length == 2 && sub[0] == 'links' && method == 'DELETE') {
-      await cubit.removeLink(sub[1], boardId: board.id);
-      _scheduleRebuild();
-      return _json({'ok': true, 'message': 'Link deleted'});
-    }
-    // PUT /api/boards/:id/links/:linkId → update link style/color
-    if (sub.length == 2 && sub[0] == 'links' && method == 'PUT') {
-      final body = await _body(request);
-      return _updateLink(cubit, board, sub[1], body);
-    }
-    // GET /api/boards/:id/panel-types → list available panel types
-    if (sub.length == 1 && sub[0] == 'panel-types' && method == 'GET') {
-      return _listPanelTypes();
-    }
-    // PUT /api/boards/:id/viewport → set scale/translation
-    if (sub.length == 1 && sub[0] == 'viewport' && method == 'PUT') {
-      final body = await _body(request);
-      return _updateViewport(cubit, board, body);
-    }
-    // POST /api/boards/:id/fit → auto-fit viewport to show all panels
-    if (sub.length == 1 && sub[0] == 'fit' && method == 'POST') {
-      final body = await _body(request);
-      return _fitViewport(cubit, board, body);
-    }
-    // POST /api/boards/:id/arrange → auto-layout panels in tree/mindmap structure
-    if (sub.length == 1 && sub[0] == 'arrange' && method == 'POST') {
-      final body = await _body(request);
-      return _arrangeBoard(cubit, board, body);
-    }
-
-    return _notFound('Unknown board route');
+    return handleBoard(
+      method,
+      sub,
+      board,
+      cubit,
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+      scheduleRebuild: _scheduleRebuild,
+      boardDetails: _boardDetails,
+      updateBoard: _updateBoard,
+      boardSnapshot: _boardSnapshot,
+      applyYaml: _applyYaml,
+      undoBoard: _undoBoard,
+      boardScreenshot: _boardScreenshot,
+      boardSvg: _boardSvg,
+      listPanels: _listPanels,
+      createPanel: _createPanel,
+      handlePanel: _handlePanel,
+      listLinks: _listLinks,
+      createLink: _createLink,
+      updateLink: _updateLink,
+      listPanelTypes: _listPanelTypes,
+      updateViewport: _updateViewport,
+      fitViewport: _fitViewport,
+      arrangeBoard: _arrangeBoard,
+    );
   }
 
   // ── Panel routes ────────────────────────────────────────────────────────
@@ -1095,7 +1025,7 @@ class CliServer {
     }
     if (body.containsKey('color')) {
       final colorStr = body['color'] as String?;
-      final parsed = colorStr == 'clear' ? null : _parseColor(colorStr);
+      final parsed = colorStr == 'clear' ? null : parseColor(colorStr);
       await cubit.updatePanelColor(panel.id, color: parsed, boardId: board.id);
       _scheduleRebuild();
     }
@@ -1785,7 +1715,7 @@ class CliServer {
     }
     if (raw.containsKey('color')) {
       final colorStr = _string(raw['color']);
-      updates['color'] = colorStr == 'clear' ? null : _parseColor(colorStr);
+      updates['color'] = colorStr == 'clear' ? null : parseColor(colorStr);
     }
     if (raw.containsKey('params')) {
       updates['params'] = {...panel.params, ...?_map(raw['params'])};
@@ -2009,7 +1939,7 @@ class CliServer {
     final colorStr = _string(raw['color']);
     await cubit.updatePanelColor(
       panel.id,
-      color: colorStr == 'clear' ? null : _parseColor(colorStr),
+      color: colorStr == 'clear' ? null : parseColor(colorStr),
       boardId: board.id,
     );
     return {'ok': true, 'panelId': panel.id};
@@ -2202,7 +2132,7 @@ class CliServer {
               orElse: () => link.geometry,
             );
     final color =
-        colorStr == null ? link.color : _parseColor(colorStr) ?? link.color;
+        colorStr == null ? link.color : parseColor(colorStr) ?? link.color;
 
     await cubit.upsertLink(
       link.copyWith(style: style, geometry: geometry, color: color),
@@ -2358,176 +2288,7 @@ class CliServer {
     return null;
   }
 
-  List<Map<String, Object?>> _searchBoards(BoardCubit cubit, String query) {
-    final items = <Map<String, Object?>>[];
-    for (final board in cubit.state.boards) {
-      // Also search board name itself.
-      final boardSnippet = _matchSnippet(board.name, query);
-      if (boardSnippet != null) {
-        items.add({
-          'scope': 'board',
-          'boardId': board.id,
-          'boardName': board.name,
-          'panelId': null,
-          'panelTitle': null,
-          'panelType': null,
-          'snippet': boardSnippet,
-        });
-      }
-      for (final panel in board.panels) {
-        // Include panel ID as a searchable field so queries like
-        // "demo_copilot" or "demo copilot" match a panel named demo_copilot.
-        final texts = <String>[
-          if ((panel.title ?? '').trim().isNotEmpty) panel.title.trim(),
-          panel.id,
-          ..._collectSearchStrings(panel.state),
-        ];
-        for (final text in texts) {
-          final snippet = _matchSnippet(text, query);
-          if (snippet == null) continue;
-          items.add({
-            'scope': 'board',
-            'boardId': board.id,
-            'boardName': board.name,
-            'panelId': panel.id,
-            'panelTitle': panel.title ?? panel.id,
-            'panelType': panel.type,
-            'snippet': snippet,
-          });
-          break;
-        }
-      }
-    }
-    return items;
-  }
-
-  List<Map<String, Object?>> _searchActiveChats(String query) {
-    final items = <Map<String, Object?>>[];
-    for (final panelId in ChatSessionManager.instance.activeSessionIds) {
-      final session = ChatSessionManager.instance.get(panelId);
-      if (session == null) continue;
-      for (final message in session.messages) {
-        final snippet = _matchSnippet(message.content, query);
-        if (snippet == null) continue;
-        items.add({
-          'scope': 'active-chat',
-          'panelId': panelId,
-          'provider': session.config.provider,
-          'model': session.config.model,
-          'role': message.role.name,
-          'snippet': snippet,
-        });
-      }
-    }
-    return items;
-  }
-
-  Future<List<Map<String, Object?>>> _searchSavedChatSessions(
-    String query,
-  ) async {
-    final entries = await ChatSessionHistory.instance.loadAll();
-    final items = <Map<String, Object?>>[];
-    for (final entry in entries) {
-      final messages = await ChatSessionHistory.instance.loadMessages(entry.id);
-      for (final message in messages) {
-        final content = message['content'] as String? ?? '';
-        final snippet = _matchSnippet(content, query);
-        if (snippet == null) continue;
-        items.add({
-          'scope': 'saved-session',
-          'sessionId': entry.id,
-          'sessionName': entry.sessionName,
-          'provider': entry.provider,
-          'model': entry.model,
-          'workingDir': entry.workingDir,
-          'role': message['role'] ?? 'unknown',
-          'snippet': snippet,
-        });
-      }
-    }
-    return items;
-  }
-
-  List<String> _collectSearchStrings(dynamic value, {int depth = 0}) {
-    if (value == null || depth > 4) return const [];
-    if (value is String) {
-      final trimmed = value.trim();
-      return trimmed.isEmpty ? const [] : <String>[trimmed];
-    }
-    if (value is num || value is bool) return <String>['$value'];
-    if (value is List) {
-      final out = <String>[];
-      for (final item in value) {
-        out.addAll(_collectSearchStrings(item, depth: depth + 1));
-      }
-      return out;
-    }
-    if (value is Map) {
-      final out = <String>[];
-      for (final entry in value.entries) {
-        if (entry.key == 'id' || entry.key == 'timestamp') continue;
-        out.addAll(_collectSearchStrings(entry.value, depth: depth + 1));
-      }
-      return out;
-    }
-    return const [];
-  }
-
-  /// Returns a snippet of [text] if it matches [query], or null if no match.
-  ///
-  /// Matching strategy (most-specific first):
-  /// 1. Exact substring (case-insensitive) — highest fidelity, returns a
-  ///    centred snippet.
-  /// 2. Separator-normalised substring — spaces, underscores, hyphens and dots
-  ///    are treated as equivalent (e.g. "demo copilot" matches "demo_copilot").
-  /// 3. All-words anywhere — every whitespace-token in the query appears
-  ///    somewhere in the normalised text (order-independent).
-  String? _matchSnippet(String text, String query) {
-    final haystack = text.toLowerCase();
-    final needle = query.toLowerCase().trim();
-
-    // 1. Exact substring match.
-    final exactIdx = haystack.indexOf(needle);
-    if (exactIdx >= 0) {
-      return _buildSnippet(text, exactIdx, needle.length);
-    }
-
-    // Normalise both sides: replace _, -, . with space.
-    final normHaystack = haystack.replaceAll(RegExp(r'[_\-.]'), ' ');
-    final normNeedle = needle.replaceAll(RegExp(r'[_\-.]'), ' ');
-
-    // 2. Separator-normalised substring match.
-    final normIdx = normHaystack.indexOf(normNeedle);
-    if (normIdx >= 0) {
-      return _buildSnippet(text, normIdx, normNeedle.length);
-    }
-
-    // 3. All query words present anywhere (order-independent).
-    final queryWords =
-        normNeedle.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-    if (queryWords.length > 1) {
-      final allMatch = queryWords.every((w) => normHaystack.contains(w));
-      if (allMatch) {
-        // Find the first word match to anchor the snippet.
-        final firstIdx = normHaystack.indexOf(queryWords.first);
-        return _buildSnippet(
-          text,
-          firstIdx < 0 ? 0 : firstIdx,
-          queryWords.first.length,
-        );
-      }
-    }
-
-    return null;
-  }
-
-  String _buildSnippet(String text, int matchIdx, int matchLen) {
-    final start = (matchIdx - 48).clamp(0, text.length);
-    final end = (matchIdx + matchLen + 72).clamp(0, text.length);
-    final prefix = start > 0 ? '…' : '';
-    final suffix = end < text.length ? '…' : '';
-    return '$prefix${text.substring(start, end).replaceAll('\n', ' ')}$suffix';
-  }
+  // Search helpers moved to search_handler.dart
 
   String? _string(dynamic value) => value?.toString();
   double? _double(dynamic value) =>
@@ -2543,7 +2304,7 @@ class CliServer {
           ? Map<String, dynamic>.from(_yamlToDart(value) as Map)
           : null;
   Color? _color(dynamic value) =>
-      value == null ? null : _parseColor(value.toString());
+      value == null ? null : parseColor(value.toString());
   String _nextBulkId(String prefix) =>
       '$prefix-${DateTime.now().microsecondsSinceEpoch}';
 
@@ -2608,7 +2369,7 @@ class CliServer {
             )
             : link.geometry;
     final color =
-        colorStr != null ? (_parseColor(colorStr) ?? link.color) : link.color;
+        colorStr != null ? (parseColor(colorStr) ?? link.color) : link.color;
 
     final updated = link.copyWith(style: style, geometry: geo, color: color);
     await cubit.upsertLink(updated, boardId: board.id);
@@ -2701,37 +2462,7 @@ class CliServer {
 
   String _short(String id) => id.length > 12 ? '${id.substring(0, 12)}…' : id;
 
-  /// Parse a color string to a [Color].
-  /// - `null` → returns null (clear/no color)
-  /// - `#RRGGBB` / `#AARRGGBB` hex strings
-  /// - Named colors: red, green, blue, yellow, purple, pink, orange, teal, gray, white
-  /// - Falls back to [Colors.blue] for unrecognised values
-  Color? _parseColor(String? s) {
-    if (s == null || s == 'clear') return null;
-    if (s.startsWith('#')) {
-      final hex = s.replaceFirst('#', '');
-      final value = int.tryParse(hex, radix: 16);
-      if (value != null) {
-        // If 6-digit hex, force full opacity
-        return Color(hex.length == 6 ? (value | 0xFF000000) : value);
-      }
-    }
-    const named = <String, int>{
-      'red': 0xFFFF4444,
-      'green': 0xFF44BB44,
-      'blue': 0xFF4488FF,
-      'yellow': 0xFFFFD644,
-      'purple': 0xFFA855F7,
-      'pink': 0xFFEC4899,
-      'orange': 0xFFF97316,
-      'teal': 0xFF14B8A6,
-      'gray': 0xFF6B7280,
-      'white': 0xFFF3F4F6,
-    };
-    final v = named[s.toLowerCase()];
-    if (v != null) return Color(v);
-    return Colors.blue;
-  }
+  // parseColor moved to server_helpers.dart
 
   // ── Widget routes ──────────────────────────────────────────────────────────
 
@@ -2740,43 +2471,15 @@ class CliServer {
     List<String> sub,
     shelf.Request request,
   ) async {
-    final registry = WidgetRegistryService.instance;
-
-    // GET /api/widgets — list all installed widgets
-    if (sub.isEmpty && method == 'GET') {
-      final widgets = await registry.loadAll();
-      return _json({'widgets': widgets.map((m) => m.toJson()).toList()});
-    }
-
-    // POST /api/widgets/install  { path: "..." }
-    if (sub.length == 1 && sub[0] == 'install' && method == 'POST') {
-      final body = await _body(request);
-      final srcPath = body['path'] as String?;
-      if (srcPath == null || srcPath.trim().isEmpty) {
-        return _error('Missing "path" field');
-      }
-      final manifest = await registry.install(srcPath.trim());
-      if (manifest == null) {
-        return _error('Failed to install widget from: $srcPath');
-      }
-      return _json({'ok': true, 'widget': manifest.toJson()});
-    }
-
-    // DELETE /api/widgets/:id
-    if (sub.length == 1 && method == 'DELETE') {
-      final id = sub[0];
-      final removed = await registry.remove(id);
-      return _json({'ok': removed, 'id': id});
-    }
-
-    // GET /api/widgets/:id — single widget details
-    if (sub.length == 1 && method == 'GET') {
-      final manifest = await registry.find(sub[0]);
-      if (manifest == null) return _notFound('Widget not found: ${sub[0]}');
-      return _json({'widget': manifest.toJson()});
-    }
-
-    return _notFound('Unknown widget route');
+    return handleWidgets(
+      method,
+      sub,
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+    );
   }
 
   // ── App routes ─────────────────────────────────────────────────────────────
