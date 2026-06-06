@@ -5,11 +5,9 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/painting.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:local_models_flutter/local_models_flutter.dart' as flm;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yaml/yaml.dart';
@@ -17,15 +15,21 @@ import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/cli/board_svg_exporter.dart';
 import 'package:yoloit/core/cli/handlers/agents_handler.dart';
 import 'package:yoloit/core/cli/handlers/apps_handler.dart';
+import 'package:yoloit/core/cli/handlers/board_handler.dart';
+import 'package:yoloit/core/cli/handlers/cloud_providers_handler.dart';
+import 'package:yoloit/core/cli/handlers/drawings_handler.dart';
+import 'package:yoloit/core/cli/handlers/lm_generate_handler.dart';
+import 'package:yoloit/core/cli/handlers/local_models_handler.dart';
 import 'package:yoloit/core/cli/handlers/panel_handler.dart';
+import 'package:yoloit/core/cli/handlers/search_handler.dart';
 import 'package:yoloit/core/cli/handlers/server_helpers.dart';
 import 'package:yoloit/core/cli/handlers/theme_handler.dart';
+import 'package:yoloit/core/cli/handlers/voice_settings_handler.dart';
+import 'package:yoloit/core/cli/handlers/widgets_handler.dart';
 import 'package:yoloit/core/cli/handlers/yolo_chat_handler.dart';
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
-import 'package:yoloit/features/board/chat/chat_session_history.dart';
-import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
@@ -36,9 +40,6 @@ import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
 import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
-import 'package:yoloit/features/board/widgets/widget_registry_service.dart';
-import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
-import 'package:yoloit/features/settings/data/local_ai_models_service.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 
 /// Local HTTP server that exposes YoLoIT board functionality via a REST-like
@@ -326,94 +327,15 @@ class CliServer {
     List<String> sub,
     shelf.Request request,
   ) async {
-    final service = LocalAiModelsService.instance;
-    await service.initialize();
-
-    if (sub.isEmpty && method == 'GET') {
-      return _json(service.snapshot());
-    }
-    if (sub.length == 1 && sub[0] == 'download' && method == 'POST') {
-      final body = await _body(request);
-      final modelId = body['id'] as String?;
-      if (modelId == null || modelId.trim().isEmpty) {
-        return _error('Missing "id" field');
-      }
-      await service.downloadOrUpdateModel(modelId);
-      return _json({'ok': true, 'action': 'download', 'id': modelId});
-    }
-    if (sub.length == 1 && sub[0] == 'resume' && method == 'POST') {
-      final body = await _body(request);
-      final modelId = body['id'] as String?;
-      if (modelId == null || modelId.trim().isEmpty) {
-        return _error('Missing "id" field');
-      }
-      await service.resumeModelDownload(modelId);
-      return _json({'ok': true, 'action': 'resume', 'id': modelId});
-    }
-    if (sub.length == 1 && sub[0] == 'stop' && method == 'POST') {
-      final body = await _body(request);
-      final modelId = body['id'] as String?;
-      if (modelId == null || modelId.trim().isEmpty) {
-        return _error('Missing "id" field');
-      }
-      await service.pauseModelDownload(modelId);
-      return _json({
-        'ok': true,
-        'action': 'pause',
-        'id': modelId,
-        'alias': 'stop',
-      });
-    }
-    if (sub.length == 1 && sub[0] == 'pause' && method == 'POST') {
-      final body = await _body(request);
-      final modelId = body['id'] as String?;
-      if (modelId == null || modelId.trim().isEmpty) {
-        return _error('Missing "id" field');
-      }
-      await service.pauseModelDownload(modelId);
-      return _json({'ok': true, 'action': 'pause', 'id': modelId});
-    }
-    if (sub.length == 1 && sub[0] == 'cancel' && method == 'POST') {
-      final body = await _body(request);
-      final modelId = body['id'] as String?;
-      if (modelId == null || modelId.trim().isEmpty) {
-        return _error('Missing "id" field');
-      }
-      await service.cancelModelDownload(modelId);
-      return _json({'ok': true, 'action': 'cancel', 'id': modelId});
-    }
-    if (sub.length == 1 && sub[0] == 'delete' && method == 'POST') {
-      final body = await _body(request);
-      final modelId = body['id'] as String?;
-      if (modelId == null || modelId.trim().isEmpty) {
-        return _error('Missing "id" field');
-      }
-      await service.deleteInstalledModel(modelId);
-      return _json({'ok': true, 'action': 'delete', 'id': modelId});
-    }
-    if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
-      final body = await _body(request);
-      final kind = body['kind'] as String?;
-      final modelId = body['id'] as String?;
-      if (kind == null || modelId == null) {
-        return _error('Missing "kind" or "id" field');
-      }
-      if (kind == 'chat') {
-        await service.setSelectedChatModel(modelId);
-      } else if (kind == 'asr') {
-        await service.setSelectedAsrModel(modelId);
-      } else {
-        return _error('Unsupported kind "$kind". Expected "chat" or "asr".');
-      }
-      return _json({
-        'ok': true,
-        'action': 'select',
-        'kind': kind,
-        'id': modelId,
-      });
-    }
-
-    return _notFound('Unknown local-models route');
+    return handleLocalModels(
+      method,
+      sub,
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+    );
   }
 
   // ── Cloud provider routes ──────────────────────────────────────────────
@@ -423,116 +345,15 @@ class CliServer {
     List<String> sub,
     shelf.Request request,
   ) async {
-    final service = CloudLlmSettingsService.instance;
-
-    // GET /api/cloud-providers → list all configs + active id + provider type
-    if (sub.isEmpty && method == 'GET') {
-      final configs = await service.loadConfigs();
-      final activeId = await service.loadActiveConfigId();
-      final providerType = await service.loadAssistantProviderType();
-      return _json({
-        'ok': true,
-        'providerType': providerType,
-        'activeConfigId': activeId,
-        'configs':
-            configs
-                .map(
-                  (c) => {
-                    'id': c.id,
-                    'name': c.name,
-                    'baseUrl': c.baseUrl,
-                    'model': c.model,
-                    'hasKey': c.apiKey.isNotEmpty,
-                  },
-                )
-                .toList(),
-      });
-    }
-
-    // POST /api/cloud-providers/add { name, baseUrl, apiKey, model, extraHeaders? }
-    if (sub.length == 1 && sub[0] == 'add' && method == 'POST') {
-      final body = await _body(request);
-      final name = body['name'] as String?;
-      final baseUrl = body['baseUrl'] as String?;
-      final apiKey = body['apiKey'] as String?;
-      final model = body['model'] as String?;
-      if (name == null || baseUrl == null || apiKey == null || model == null) {
-        return _error('Missing required fields: name, baseUrl, apiKey, model');
-      }
-      final extra = <String, String>{};
-      if (body['extraHeaders'] is Map) {
-        (body['extraHeaders'] as Map).forEach((k, v) {
-          extra[k.toString()] = v.toString();
-        });
-      }
-      final config = CloudLlmConfig(
-        id: 'cloud-${DateTime.now().millisecondsSinceEpoch}',
-        name: name,
-        baseUrl: baseUrl,
-        apiKey: apiKey,
-        model: model,
-        extraHeaders: extra,
-      );
-      await service.upsertConfig(config);
-      return _json({'ok': true, 'action': 'add', 'id': config.id});
-    }
-
-    // POST /api/cloud-providers/remove { id }
-    if (sub.length == 1 && sub[0] == 'remove' && method == 'POST') {
-      final body = await _body(request);
-      final id = body['id'] as String?;
-      if (id == null) return _error('Missing "id" field');
-      await service.removeConfig(id);
-      return _json({'ok': true, 'action': 'remove', 'id': id});
-    }
-
-    // POST /api/cloud-providers/select { id }
-    if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
-      final body = await _body(request);
-      final id = body['id'] as String?;
-      if (id == null) return _error('Missing "id" field');
-      await service.saveActiveConfigId(id);
-      return _json({'ok': true, 'action': 'select', 'id': id});
-    }
-
-    // POST /api/cloud-providers/provider-type { type: 'local'|'cloud' }
-    if (sub.length == 1 && sub[0] == 'provider-type' && method == 'POST') {
-      final body = await _body(request);
-      final type = body['type'] as String?;
-      if (type == null || (type != 'local' && type != 'cloud')) {
-        return _error(
-          'Missing or invalid "type" field. Expected "local" or "cloud".',
-        );
-      }
-      await service.saveAssistantProviderType(type);
-      return _json({'ok': true, 'action': 'set-provider-type', 'type': type});
-    }
-
-    // POST /api/cloud-providers/update { id, ...fields }
-    if (sub.length == 1 && sub[0] == 'update' && method == 'POST') {
-      final body = await _body(request);
-      final id = body['id'] as String?;
-      if (id == null) return _error('Missing "id" field');
-      final existing = await service.loadConfigById(id);
-      if (existing == null) return _error('Config not found: $id');
-      final updated = CloudLlmConfig(
-        id: id,
-        name: body['name'] as String? ?? existing.name,
-        baseUrl: body['baseUrl'] as String? ?? existing.baseUrl,
-        apiKey: body['apiKey'] as String? ?? existing.apiKey,
-        model: body['model'] as String? ?? existing.model,
-        extraHeaders:
-            body['extraHeaders'] is Map
-                ? (body['extraHeaders'] as Map).map(
-                  (k, v) => MapEntry(k.toString(), v.toString()),
-                )
-                : existing.extraHeaders,
-      );
-      await service.upsertConfig(updated);
-      return _json({'ok': true, 'action': 'update', 'id': id});
-    }
-
-    return _notFound('Unknown cloud-providers route');
+    return handleCloudProviders(
+      method,
+      sub,
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+    );
   }
 
   // ── Voice settings routes ──────────────────────────────────────────────
@@ -542,53 +363,15 @@ class CliServer {
     List<String> sub,
     shelf.Request request,
   ) async {
-    final service = CloudLlmSettingsService.instance;
-
-    // GET /api/voice-settings → current voice settings
-    if (sub.isEmpty && method == 'GET') {
-      final settings = await service.loadVoiceSettings();
-      return _json({
-        'ok': true,
-        'useCloudAsr': settings.useCloudAsr,
-        'convertWavToMp3': settings.convertWavToMp3,
-        'useChatModelForCloudAsr': settings.useChatModelForCloudAsr,
-        'cloudAsrConfigId': settings.cloudAsrConfigId,
-        'cloudAsrModel': settings.cloudAsrModel,
-      });
-    }
-
-    // POST /api/voice-settings { useCloudAsr?, convertWavToMp3?, cloudAsrConfigId?, cloudAsrModel? }
-    if (sub.isEmpty && method == 'POST') {
-      final body = await _body(request);
-      final current = await service.loadVoiceSettings();
-      final updated = current.copyWith(
-        useCloudAsr: body['useCloudAsr'] as bool? ?? current.useCloudAsr,
-        convertWavToMp3:
-            body['convertWavToMp3'] as bool? ?? current.convertWavToMp3,
-        useChatModelForCloudAsr:
-            body['useChatModelForCloudAsr'] as bool? ??
-            current.useChatModelForCloudAsr,
-        cloudAsrConfigId:
-            body.containsKey('cloudAsrConfigId')
-                ? body['cloudAsrConfigId'] as String?
-                : current.cloudAsrConfigId,
-        cloudAsrModel:
-            body.containsKey('cloudAsrModel')
-                ? body['cloudAsrModel'] as String?
-                : current.cloudAsrModel,
-      );
-      await service.saveVoiceSettings(updated);
-      return _json({
-        'ok': true,
-        'useCloudAsr': updated.useCloudAsr,
-        'convertWavToMp3': updated.convertWavToMp3,
-        'useChatModelForCloudAsr': updated.useChatModelForCloudAsr,
-        'cloudAsrConfigId': updated.cloudAsrConfigId,
-        'cloudAsrModel': updated.cloudAsrModel,
-      });
-    }
-
-    return _notFound('Unknown voice-settings route');
+    return handleVoiceSettings(
+      method,
+      sub,
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+    );
   }
 
   Future<shelf.Response> _handleAgents(
@@ -623,552 +406,21 @@ class CliServer {
     shelf.Request request,
     BoardCubit cubit,
   ) async {
-    if (method == 'GET') {
-      // GET /api/drawings/svg?board=<id>  → SVG of drawings only
-      final isSvgExport = sub.firstOrNull == 'svg';
-      final boardId =
-          request.url.queryParameters['board'] ??
-          (isSvgExport ? sub.elementAtOrNull(1) : sub.firstOrNull);
-      final board =
-          (boardId != null && boardId.isNotEmpty)
-              ? findBoard(cubit, boardId)
-              : cubit.state.activeBoard;
-      if (board == null) return _error('Board not found');
-
-      if (isSvgExport) {
-        final svg = BoardSvgExporter.exportDrawings(board);
-        return shelf.Response.ok(
-          svg,
-          headers: {'content-type': 'image/svg+xml; charset=utf-8'},
-        );
-      }
-      return _json({
-        'ok': true,
-        'boardId': board.id,
-        'boardName': board.name,
-        'count': board.drawings.length,
-        'drawings': board.drawings.map(_drawingToJson).toList(),
-      });
-    }
-
-    if (method == 'POST') {
-      try {
-        return await _handleDrawingsPost(request, cubit, sub);
-      } catch (e, st) {
-        developer.log('[Drawings] POST error: $e\n$st');
-        return _json({'ok': false, 'error': e.toString()});
-      }
-    }
-
-    if (method == 'DELETE') {
-      // DELETE /api/drawings/<board>/<id>  or  /api/drawings/<board>
-      final boardId = sub.firstOrNull;
-      if (boardId == null) return _error('Missing board ID in path');
-      final board = findBoard(cubit, boardId);
-      if (board == null) return _error('Board not found: $boardId');
-
-      final drawingId = sub.length >= 2 ? sub[1] : null;
-      if (drawingId != null) {
-        await cubit.removeDrawing(drawingId, boardId: board.id);
-        _scheduleRebuild();
-        return _json({'ok': true, 'removed': drawingId});
-      } else {
-        // Clear all drawings
-        for (final d in board.drawings) {
-          await cubit.removeDrawing(d.id, boardId: board.id);
-        }
-        _scheduleRebuild();
-        return _json({'ok': true, 'cleared': board.drawings.length});
-      }
-    }
-
-    return _notFound('Unknown drawings route');
-  }
-
-  // ── Drawing shape helpers ─────────────────────────────────────────────────
-
-  Future<shelf.Response> _handleDrawingsPost(
-    shelf.Request request,
-    BoardCubit cubit,
-    List<String> sub,
-  ) async {
-    final body = await _body(request);
-    final boardId =
-        (body['board'] as String?) ?? request.url.queryParameters['board'];
-    final board =
-        (boardId != null && boardId.isNotEmpty)
-            ? findBoard(cubit, boardId)
-            : cubit.state.activeBoard;
-    if (board == null) return _error('Board not found');
-
-    final type = (body['type'] as String? ?? 'freehand').toLowerCase();
-    final colorStr = body['color'] as String? ?? '#FFFFFF';
-    final color = _parseColor(colorStr) ?? const Color(0xFFFFFFFF);
-    final strokeWidth = (body['width'] as num?)?.toDouble() ?? 3.0;
-    final posX = (body['x'] as num?)?.toDouble() ?? 100.0;
-    final posY = (body['y'] as num?)?.toDouble() ?? 100.0;
-
-    List<List<Offset>> strokes;
-    Size size;
-
-    switch (type) {
-      case 'line':
-        final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
-        final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
-        final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
-        final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
-        final result = _lineToElement(x1, y1, x2, y2, strokeWidth);
-        strokes = result.$1;
-        size = result.$2;
-
-      case 'arrow':
-        final x1 = (body['x1'] as num?)?.toDouble() ?? posX;
-        final y1 = (body['y1'] as num?)?.toDouble() ?? posY;
-        final x2 = (body['x2'] as num?)?.toDouble() ?? posX + 200;
-        final y2 = (body['y2'] as num?)?.toDouble() ?? posY;
-        final result = _arrowToElement(x1, y1, x2, y2, strokeWidth);
-        strokes = result.$1;
-        size = result.$2;
-
-      case 'circle':
-        final cx = (body['cx'] as num?)?.toDouble() ?? posX;
-        final cy = (body['cy'] as num?)?.toDouble() ?? posY;
-        final r =
-            (body['r'] as num?)?.toDouble() ??
-            (body['radius'] as num?)?.toDouble() ??
-            50.0;
-        final result = _circleToElement(cx, cy, r, strokeWidth);
-        strokes = result.$1;
-        size = result.$2;
-
-      case 'rect':
-      case 'rectangle':
-        final rx = (body['x'] as num?)?.toDouble() ?? posX;
-        final ry = (body['y'] as num?)?.toDouble() ?? posY;
-        // Use 'rw' or 'rectWidth' for shape width; fall back to 'width' only if
-        // no stroke-width was explicitly provided (to avoid conflict).
-        final w =
-            (body['rw'] as num?)?.toDouble() ??
-            (body['rectWidth'] as num?)?.toDouble() ??
-            (body['w'] as num?)?.toDouble() ??
-            200.0;
-        final h = (body['height'] as num?)?.toDouble() ?? 100.0;
-        final result = _rectToElement(rx, ry, w, h, strokeWidth);
-        strokes = result.$1;
-        size = result.$2;
-
-      case 'svg':
-        final pathD = body['d'] as String? ?? body['path'] as String? ?? '';
-        final svgStr = body['svg'] as String?;
-        final dStr =
-            pathD.isNotEmpty
-                ? pathD
-                : (svgStr != null ? _extractSvgPathD(svgStr) : '');
-        if (dStr.isEmpty) {
-          return _json({
-            'ok': false,
-            'error': 'Missing "d" (SVG path data) or "svg" field',
-          });
-        }
-        final result = _svgPathToElement(dStr, posX, posY, strokeWidth);
-        if (result == null) {
-          return _json({
-            'ok': false,
-            'error':
-                'Failed to parse SVG path — check "d" syntax (M/L/C/Q/Z commands)',
-          });
-        }
-        strokes = result.$1;
-        size = result.$2;
-
-      case 'file':
-        // Render all paths from an SVG file as a single drawing element
-        final filePath =
-            body['file'] as String? ?? body['path'] as String? ?? '';
-        if (filePath.isEmpty) {
-          return _json({
-            'ok': false,
-            'error': 'Missing "file" — provide path to SVG file',
-          });
-        }
-        final svgFile = File(filePath);
-        if (!svgFile.existsSync()) {
-          return _json({'ok': false, 'error': 'SVG file not found: $filePath'});
-        }
-        final svgContent = await svgFile.readAsString();
-        // Extract all d="" attributes and combine into one element per path
-        final dMatches = RegExp(r'd="([^"]*)"').allMatches(svgContent);
-        final allStrokes = <List<Offset>>[];
-        var maxW = 0.0, maxH = 0.0;
-        for (final m in dMatches) {
-          final d = m.group(1) ?? '';
-          if (d.isEmpty) continue;
-          final r = _svgPathToElement(d, 0, 0, strokeWidth);
-          if (r != null) {
-            allStrokes.addAll(r.$1);
-            if (r.$2.width > maxW) maxW = r.$2.width;
-            if (r.$2.height > maxH) maxH = r.$2.height;
-          }
-        }
-        if (allStrokes.isEmpty) {
-          return _json({
-            'ok': false,
-            'error': 'No drawable paths found in SVG file',
-          });
-        }
-        strokes = allStrokes;
-        size = Size(maxW, maxH);
-
-      case 'freehand':
-      default:
-        final rawPointsVal = body['points'];
-        final rawPoints =
-            rawPointsVal is List
-                ? rawPointsVal
-                : rawPointsVal is String
-                ? (jsonDecode(rawPointsVal) as List?)
-                : null;
-        if (rawPoints == null || rawPoints.isEmpty) {
-          return _json({
-            'ok': false,
-            'error': 'Missing "points" for freehand — provide [[x,y],...]',
-          });
-        }
-        final points =
-            rawPoints.map((p) {
-              final pt = p as List;
-              return Offset(
-                pt[0] is num ? (pt[0] as num).toDouble() : 0,
-                pt[1] is num ? (pt[1] as num).toDouble() : 0,
-              );
-            }).toList();
-        final result = _freehandToElement(points, strokeWidth);
-        strokes = result.$1;
-        size = result.$2;
-    }
-
-    final absPos = switch (type) {
-      'line' || 'arrow' => Offset(
-        math.min(
-              (body['x1'] as num?)?.toDouble() ?? posX,
-              (body['x2'] as num?)?.toDouble() ?? posX + 200,
-            ) -
-            strokeWidth,
-        math.min(
-              (body['y1'] as num?)?.toDouble() ?? posY,
-              (body['y2'] as num?)?.toDouble() ?? posY,
-            ) -
-            strokeWidth,
-      ),
-      'circle' => Offset(
-        ((body['cx'] as num?)?.toDouble() ?? posX) -
-            ((body['r'] as num?)?.toDouble() ?? 50.0) -
-            strokeWidth,
-        ((body['cy'] as num?)?.toDouble() ?? posY) -
-            ((body['r'] as num?)?.toDouble() ?? 50.0) -
-            strokeWidth,
-      ),
-      'rect' || 'rectangle' => Offset(
-        (body['x'] as num?)?.toDouble() ?? posX,
-        (body['y'] as num?)?.toDouble() ?? posY,
-      ),
-      _ => Offset(posX, posY),
-    };
-
-    final maxZ = board.drawings.fold<int>(
-      0,
-      (v, d) => d.zIndex > v ? d.zIndex : v,
+    return handleDrawings(
+      method,
+      sub,
+      request,
+      cubit,
+      body: _body,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+      scheduleRebuild: _scheduleRebuild,
+      parseColor: parseColor,
     );
-    final drawing = BoardDrawingElement(
-      id: 'drawing-${DateTime.now().millisecondsSinceEpoch}',
-      strokes: strokes,
-      position: absPos,
-      size: size,
-      strokeColor: color,
-      strokeWidth: strokeWidth,
-      zIndex: maxZ + 1,
-    );
-    await cubit.addDrawing(drawing, boardId: board.id);
-    _scheduleRebuild();
-    return _json({
-      'ok': true,
-      'id': drawing.id,
-      'boardId': board.id,
-      'type': type,
-      'strokeCount': strokes.length,
-      'pointCount': strokes.fold<int>(0, (s, st) => s + st.length),
-    });
   }
 
-  Map<String, dynamic> _drawingToJson(BoardDrawingElement d) => {
-    'id': d.id,
-    'position': [d.position.dx, d.position.dy],
-    'size': [d.size.width, d.size.height],
-    'strokeCount': d.strokes.length,
-    'pointCount': d.strokes.fold<int>(0, (s, st) => s + st.length),
-    'strokeColor':
-        '#${d.strokeColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}',
-    'strokeWidth': d.strokeWidth,
-    'zIndex': d.zIndex,
-    'hidden': d.hidden,
-  };
-
-  (List<List<Offset>>, Size) _lineToElement(
-    double x1,
-    double y1,
-    double x2,
-    double y2,
-    double sw,
-  ) {
-    final minX = math.min(x1, x2) - sw;
-    final minY = math.min(y1, y2) - sw;
-    final origin = Offset(minX, minY);
-    final pts = [Offset(x1, y1) - origin, Offset(x2, y2) - origin];
-    final size = Size((x2 - x1).abs() + sw * 2, (y2 - y1).abs() + sw * 2);
-    return ([pts], size);
-  }
-
-  (List<List<Offset>>, Size) _arrowToElement(
-    double x1,
-    double y1,
-    double x2,
-    double y2,
-    double sw,
-  ) {
-    final angle = math.atan2(y2 - y1, x2 - x1);
-    const headLen = 20.0;
-    const headAngle = 0.4; // radians
-    final hx1 = x2 - headLen * math.cos(angle - headAngle);
-    final hy1 = y2 - headLen * math.sin(angle - headAngle);
-    final hx2 = x2 - headLen * math.cos(angle + headAngle);
-    final hy2 = y2 - headLen * math.sin(angle + headAngle);
-    final minX = [x1, x2, hx1, hx2].reduce(math.min) - sw;
-    final minY = [y1, y2, hy1, hy2].reduce(math.min) - sw;
-    final maxX = [x1, x2, hx1, hx2].reduce(math.max) + sw;
-    final maxY = [y1, y2, hy1, hy2].reduce(math.max) + sw;
-    final origin = Offset(minX, minY);
-    final shaft = [Offset(x1, y1) - origin, Offset(x2, y2) - origin];
-    final head1 = [Offset(hx1, hy1) - origin, Offset(x2, y2) - origin];
-    final head2 = [Offset(hx2, hy2) - origin, Offset(x2, y2) - origin];
-    return ([shaft, head1, head2], Size(maxX - minX, maxY - minY));
-  }
-
-  (List<List<Offset>>, Size) _circleToElement(
-    double cx,
-    double cy,
-    double r,
-    double sw,
-  ) {
-    const steps = 64;
-    final minX = cx - r - sw;
-    final minY = cy - r - sw;
-    final origin = Offset(minX, minY);
-    final pts = List.generate(steps + 1, (i) {
-      final angle = 2 * math.pi * i / steps;
-      return Offset(cx + r * math.cos(angle), cy + r * math.sin(angle)) -
-          origin;
-    });
-    final size = Size((r + sw) * 2, (r + sw) * 2);
-    return ([pts], size);
-  }
-
-  (List<List<Offset>>, Size) _rectToElement(
-    double rx,
-    double ry,
-    double w,
-    double h,
-    double sw,
-  ) {
-    final origin = Offset(rx - sw, ry - sw);
-    final pts = [
-      Offset(rx, ry) - origin,
-      Offset(rx + w, ry) - origin,
-      Offset(rx + w, ry + h) - origin,
-      Offset(rx, ry + h) - origin,
-      Offset(rx, ry) - origin,
-    ];
-    return ([pts], Size(w + sw * 2, h + sw * 2));
-  }
-
-  (List<List<Offset>>, Size) _freehandToElement(
-    List<Offset> points,
-    double sw,
-  ) {
-    if (points.isEmpty) return ([<Offset>[]], Size(sw * 2, sw * 2));
-    double minX = points.first.dx, minY = points.first.dy;
-    double maxX = minX, maxY = minY;
-    for (final p in points) {
-      if (p.dx < minX) minX = p.dx;
-      if (p.dy < minY) minY = p.dy;
-      if (p.dx > maxX) maxX = p.dx;
-      if (p.dy > maxY) maxY = p.dy;
-    }
-    final origin = Offset(minX - sw, minY - sw);
-    final rel = points.map((p) => p - origin).toList();
-    return ([rel], Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
-  }
-
-  /// Extract the `d` attribute from a simple SVG string.
-  String _extractSvgPathD(String svg) {
-    final match = RegExp(r'd="([^"]*)"').firstMatch(svg);
-    return match?.group(1) ?? '';
-  }
-
-  /// Parse a subset of SVG path commands into strokes.
-  /// Supports: M, L, H, V, C (cubic bezier), Q (quadratic), Z, and lowercase variants.
-  (List<List<Offset>>, Size)? _svgPathToElement(
-    String d,
-    double baseX,
-    double baseY,
-    double sw,
-  ) {
-    final strokes = <List<Offset>>[];
-    List<Offset> current = [];
-    double cx = 0, cy = 0;
-
-    // Tokenize: split on command letters, keeping the letter
-    final tokens =
-        RegExp(
-          r'[MLHVCSQTAZmlhvcsqtaz]|[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?',
-        ).allMatches(d).map((m) => m.group(0)!).toList();
-
-    int i = 0;
-    String cmd = 'M';
-    while (i < tokens.length) {
-      final t = tokens[i];
-      if (RegExp(r'[MLHVCSQTAZmlhvcsqtaz]').hasMatch(t)) {
-        i++;
-        // Z/z need no arguments — handle immediately
-        if (t == 'Z' || t == 'z') {
-          if (current.length > 1) current.add(current.first);
-          if (current.isNotEmpty) strokes.add(current);
-          current = [];
-        } else {
-          cmd = t;
-        }
-        continue;
-      }
-      double num() {
-        final v = double.tryParse(tokens[i]) ?? 0;
-        i++;
-        return v;
-      }
-
-      switch (cmd) {
-        case 'M':
-          if (current.isNotEmpty) strokes.add(current);
-          cx = num();
-          cy = num();
-          current = [Offset(cx, cy)];
-          cmd = 'L';
-        case 'm':
-          if (current.isNotEmpty) strokes.add(current);
-          cx += num();
-          cy += num();
-          current = [Offset(cx, cy)];
-          cmd = 'l';
-        case 'L':
-          cx = num();
-          cy = num();
-          current.add(Offset(cx, cy));
-        case 'l':
-          cx += num();
-          cy += num();
-          current.add(Offset(cx, cy));
-        case 'H':
-          cx = num();
-          current.add(Offset(cx, cy));
-        case 'h':
-          cx += num();
-          current.add(Offset(cx, cy));
-        case 'V':
-          cy = num();
-          current.add(Offset(cx, cy));
-        case 'v':
-          cy += num();
-          current.add(Offset(cx, cy));
-        case 'C': // cubic bezier — approximate with 10 points
-          final x1 = num(), y1 = num(), x2 = num(), y2 = num();
-          final ex = num(), ey = num();
-          for (int s = 1; s <= 10; s++) {
-            final tt = s / 10;
-            final bx = _cubicBezier(cx, x1, x2, ex, tt);
-            final by = _cubicBezier(cy, y1, y2, ey, tt);
-            current.add(Offset(bx, by));
-          }
-          cx = ex;
-          cy = ey;
-        case 'c':
-          final x1 = cx + num(), y1 = cy + num();
-          final x2 = cx + num(), y2 = cy + num();
-          final ex = cx + num(), ey = cy + num();
-          for (int s = 1; s <= 10; s++) {
-            final tt = s / 10;
-            current.add(
-              Offset(
-                _cubicBezier(cx, x1, x2, ex, tt),
-                _cubicBezier(cy, y1, y2, ey, tt),
-              ),
-            );
-          }
-          cx = ex;
-          cy = ey;
-        case 'Q': // quadratic bezier
-          final x1 = num(), y1 = num(), ex = num(), ey = num();
-          for (int s = 1; s <= 10; s++) {
-            final tt = s / 10;
-            current.add(
-              Offset(_quadBezier(cx, x1, ex, tt), _quadBezier(cy, y1, ey, tt)),
-            );
-          }
-          cx = ex;
-          cy = ey;
-        case 'q':
-          final x1 = cx + num(), y1 = cy + num();
-          final ex = cx + num(), ey = cy + num();
-          for (int s = 1; s <= 10; s++) {
-            final tt = s / 10;
-            current.add(
-              Offset(_quadBezier(cx, x1, ex, tt), _quadBezier(cy, y1, ey, tt)),
-            );
-          }
-          cx = ex;
-          cy = ey;
-        default:
-          i++; // skip unknown
-      }
-    }
-    if (current.isNotEmpty) strokes.add(current);
-    if (strokes.isEmpty) return null;
-
-    // Compute bounding box of all points
-    final allPts = strokes.expand((s) => s).toList();
-    double minX = allPts.first.dx, minY = allPts.first.dy;
-    double maxX = minX, maxY = minY;
-    for (final p in allPts) {
-      if (p.dx < minX) minX = p.dx;
-      if (p.dy < minY) minY = p.dy;
-      if (p.dx > maxX) maxX = p.dx;
-      if (p.dy > maxY) maxY = p.dy;
-    }
-    final origin = Offset(minX - sw, minY - sw);
-    final relStrokes =
-        strokes.map((s) => s.map((p) => p - origin).toList()).toList();
-    return (relStrokes, Size(maxX - minX + sw * 2, maxY - minY + sw * 2));
-  }
-
-  double _cubicBezier(double p0, double p1, double p2, double p3, double t) {
-    final mt = 1 - t;
-    return mt * mt * mt * p0 +
-        3 * mt * mt * t * p1 +
-        3 * mt * t * t * p2 +
-        t * t * t * p3;
-  }
-
-  double _quadBezier(double p0, double p1, double p2, double t) {
-    final mt = 1 - t;
-    return mt * mt * p0 + 2 * mt * t * p1 + t * t * p2;
-  }
+  // ── Drawing shape helpers (moved to drawings_handler.dart) ─────────────
 
   Future<shelf.Response> _handleSearch(
     String method,
@@ -1176,124 +428,24 @@ class CliServer {
     shelf.Request request,
     BoardCubit cubit,
   ) async {
-    if (method != 'GET' || (sub.isNotEmpty && sub[0] != 'all')) {
-      return _notFound('Unknown search route');
-    }
-    final query =
-        request.url.queryParameters['q']?.trim() ??
-        request.url.queryParameters['query']?.trim() ??
-        '';
-    if (query.isEmpty) return _error('Missing "q" query parameter');
-    final scope =
-        request.url.queryParameters['scope']?.trim().toLowerCase() ?? 'all';
-
-    final items = <Map<String, Object?>>[];
-    if (scope == 'all' || scope == 'boards' || scope == 'panels') {
-      items.addAll(_searchBoards(cubit, query));
-    }
-    if (scope == 'all' || scope == 'active-chats' || scope == 'chats') {
-      items.addAll(_searchActiveChats(query));
-    }
-    if (scope == 'all' || scope == 'sessions' || scope == 'history') {
-      items.addAll(await _searchSavedChatSessions(query));
-    }
-
-    return _json({'ok': true, 'query': query, 'scope': scope, 'items': items});
+    return handleSearch(
+      method,
+      sub,
+      request,
+      cubit,
+      json: _json,
+      error: _error,
+      notFound: _notFound,
+    );
   }
 
   Future<shelf.Response> _handleLmGenerate(shelf.Request request) async {
-    final body = await _body(request);
-    final service = LocalAiModelsService.instance;
-    final modelId = body['modelId'] as String? ?? service.selectedChatModelId;
-    final systemPrompt = body['systemPrompt'] as String? ?? '';
-    final rawMessages = body['messages'] as List<dynamic>? ?? [];
-    final maxTokens = (body['maxTokens'] as num?)?.toInt() ?? 512;
-    final temperature = (body['temperature'] as num?)?.toDouble() ?? 0.2;
-    // enableThinking: explicit bool from body, or auto-false for Qwen3 models
-    final bool? enableThinking =
-        body.containsKey('enableThinking')
-            ? (body['enableThinking'] as bool?)
-            : (modelId.toLowerCase().contains('qwen3') ? false : null);
-
-    await service.initialize();
-    await service.ensureRuntimeReady();
-    final installedInfo = service.installedModelById(modelId);
-    if (installedInfo == null) {
-      return _error('Model "$modelId" is not installed');
-    }
-
-    final messages = <Map<String, String>>[];
-    if (systemPrompt.isNotEmpty) {
-      messages.add({'role': 'system', 'content': systemPrompt});
-    }
-    for (final m in rawMessages) {
-      if (m is Map) {
-        messages.add({
-          'role': m['role'] as String? ?? 'user',
-          'content': m['content'] as String? ?? '',
-        });
-      }
-    }
-    if (messages.isEmpty || messages.last['role'] != 'user') {
-      return _error('At least one user message is required');
-    }
-
-    try {
-      final engine = flm.NativeLmEngine();
-      final installed = flm.InstalledModel(
-        manifest: installedInfo.manifest,
-        directory: installedInfo.directory,
-        sourceLabel: installedInfo.sourceLabel,
-        installedAt: installedInfo.installedAt,
-        sizeBytes: installedInfo.sizeBytes,
-        metadataUpdatedAt: installedInfo.metadataUpdatedAt,
-      );
-      final t0 = DateTime.now();
-      int firstTokenMs = -1;
-      final buffer = StringBuffer();
-      int tokenCount = 0;
-
-      final full = await engine.completeStreaming(
-        flm.LmCompletionRequest(
-          modelPath: installed.directory.path,
-          manifest: installed.manifest,
-          messages: messages,
-          maxTokens: maxTokens,
-          temperature: temperature,
-          enableThinking: enableThinking,
-          tools: [],
-        ),
-        (chunk) {
-          if (firstTokenMs < 0) {
-            firstTokenMs = DateTime.now().difference(t0).inMilliseconds;
-          }
-          buffer.write(chunk);
-          tokenCount++;
-        },
-      );
-
-      final totalMs = DateTime.now().difference(t0).inMilliseconds;
-      final genMs = totalMs - (firstTokenMs < 0 ? 0 : firstTokenMs);
-      final response =
-          full.trim().isNotEmpty ? full.trim() : buffer.toString().trim();
-      final hasThink = response.contains('<think>');
-
-      return _json({
-        'ok': true,
-        'modelId': modelId,
-        'response': response,
-        'hasThinkBlock': hasThink,
-        'timings': {
-          'ttftMs': firstTokenMs,
-          'generationMs': genMs,
-          'totalMs': totalMs,
-          'tokens': tokenCount,
-          'tps': genMs > 0 ? (tokenCount * 1000.0 / genMs).roundToDouble() : 0,
-        },
-      });
-    } catch (e) {
-      return _error('LM generate error: $e');
-    }
+    return handleLmGenerate(
+      request,
+      body: _body,
+      json: _json,
+      error: _error,
+    );
   }
 
   Future<shelf.Response> _handleYoloChat(
