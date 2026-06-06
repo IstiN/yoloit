@@ -2,18 +2,29 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:yoloit/features/board/common/session_history_store.dart';
 
 /// Stores a registry of past chat sessions for browsing/resuming.
 ///
 /// Metadata is kept in SharedPreferences for fast access.
 /// Full message history is stored as JSON files on disk under
 /// `<appSupportDir>/chat_sessions/<id>.json`.
-class ChatSessionHistory {
+class ChatSessionHistory extends SessionHistoryStore<ChatSessionEntry> {
   ChatSessionHistory._();
   static final instance = ChatSessionHistory._();
 
-  static const _key = 'chat_session_history';
+  @override
+  String get key => 'chat_session_history';
+
+  @override
+  ChatSessionEntry fromJson(Map<String, dynamic> json) =>
+      ChatSessionEntry.fromJson(json);
+
+  @override
+  Map<String, dynamic> toJson(ChatSessionEntry entry) => entry.toJson();
+
+  @override
+  String idOf(ChatSessionEntry entry) => entry.id;
 
   /// Temporary store for messages to restore into a newly created panel.
   /// Key is the new panel ID, value is the message list.
@@ -39,29 +50,10 @@ class ChatSessionHistory {
       }
       entries.removeRange(50, entries.length);
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key,
-      jsonEncode(entries.map((e) => e.toJson()).toList()),
-    );
+    await saveAll(entries);
     // Persist messages to disk
     if (messages != null && messages.isNotEmpty) {
       await _saveMessages(entry.id, messages);
-    }
-  }
-
-  /// Load all session entries (metadata only).
-  Future<List<ChatSessionEntry>> loadAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      final list = jsonDecode(raw) as List;
-      return list
-          .map((e) => ChatSessionEntry.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
     }
   }
 
@@ -76,18 +68,6 @@ class ChatSessionHistory {
     } catch (_) {
       return [];
     }
-  }
-
-  /// Delete a session entry by ID (metadata + messages).
-  Future<void> delete(String id) async {
-    final entries = await loadAll();
-    entries.removeWhere((e) => e.id == id);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key,
-      jsonEncode(entries.map((e) => e.toJson()).toList()),
-    );
-    await _deleteMessageFile(id);
   }
 
   // ── File helpers ──────────────────────────────────────────────────────────
@@ -163,7 +143,8 @@ class ChatSessionEntry {
         provider: json['provider'] as String? ?? 'copilot',
         model: json['model'] as String? ?? '',
         workingDir: json['workingDir'] as String? ?? '',
-        envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
+        envGroupIds:
+            (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
         createdAt:
             DateTime.tryParse(json['createdAt'] as String? ?? '') ??
             DateTime.now(),

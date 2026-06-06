@@ -1,30 +1,24 @@
-import 'dart:convert';
+import 'package:yoloit/features/board/common/session_history_store.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
-class BoardTerminalSessionHistory {
+class BoardTerminalSessionHistory
+    extends SessionHistoryStore<BoardTerminalSessionEntry> {
   BoardTerminalSessionHistory._();
 
   static final instance = BoardTerminalSessionHistory._();
-  static const _key = 'board_terminal_session_history';
 
-  Future<List<BoardTerminalSessionEntry>> loadAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      final list = jsonDecode(raw) as List;
-      return list
-          .map(
-            (e) => BoardTerminalSessionEntry.fromJson(
-              Map<String, dynamic>.from(e as Map),
-            ),
-          )
-          .toList();
-    } catch (_) {
-      return [];
-    }
-  }
+  @override
+  String get key => 'board_terminal_session_history';
+
+  @override
+  BoardTerminalSessionEntry fromJson(Map<String, dynamic> json) =>
+      BoardTerminalSessionEntry.fromJson(json);
+
+  @override
+  Map<String, dynamic> toJson(BoardTerminalSessionEntry entry) =>
+      entry.toJson();
+
+  @override
+  String idOf(BoardTerminalSessionEntry entry) => entry.id;
 
   Future<void> upsert(BoardTerminalSessionEntry entry) async {
     final entries = await loadAll();
@@ -43,21 +37,7 @@ class BoardTerminalSessionHistory {
     if (entries.length > 50) {
       entries.removeRange(50, entries.length);
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key,
-      jsonEncode(entries.map((e) => e.toJson()).toList()),
-    );
-  }
-
-  Future<void> delete(String id) async {
-    final entries = await loadAll();
-    entries.removeWhere((e) => e.id == id);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key,
-      jsonEncode(entries.map((e) => e.toJson()).toList()),
-    );
+    await saveAll(entries);
   }
 }
 
@@ -92,7 +72,8 @@ class BoardTerminalSessionEntry {
       id: json['id'] as String? ?? '',
       sessionName: json['sessionName'] as String? ?? '',
       workingDir: json['workingDir'] as String? ?? '',
-      envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
+      envGroupIds:
+          (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),

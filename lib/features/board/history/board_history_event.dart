@@ -1,48 +1,21 @@
 import 'package:equatable/equatable.dart';
+import 'package:yoloit/core/remote/yoloitd_models.dart';
 
-class BoardHistoryEvent extends Equatable {
+class BoardHistoryEvent extends RemoteHistoryEvent with EquatableMixin {
   const BoardHistoryEvent({
-    required this.opId,
-    required this.boardId,
-    required this.type,
-    required this.entityType,
-    required this.entityId,
-    required this.actorId,
-    required this.timestamp,
-    required this.revision,
-    this.before,
-    this.after,
-    this.patch = const {},
-    this.restoresOpId,
+    required super.opId,
+    required super.boardId,
+    required super.type,
+    required super.entityType,
+    required super.entityId,
+    required super.actorId,
+    required super.timestamp,
+    required super.revision,
+    super.before,
+    super.after,
+    super.patch,
+    super.restoresOpId,
   });
-
-  final String opId;
-  final String boardId;
-  final String type;
-  final String entityType;
-  final String entityId;
-  final String actorId;
-  final DateTime timestamp;
-  final int revision;
-  final Map<String, dynamic>? before;
-  final Map<String, dynamic>? after;
-  final Map<String, dynamic> patch;
-  final String? restoresOpId;
-
-  Map<String, dynamic> toJson() => {
-    'opId': opId,
-    'boardId': boardId,
-    'type': type,
-    'entityType': entityType,
-    'entityId': entityId,
-    'actorId': actorId,
-    'timestamp': timestamp.toUtc().toIso8601String(),
-    'revision': revision,
-    if (before != null) 'before': before,
-    if (after != null) 'after': after,
-    if (patch.isNotEmpty) 'patch': patch,
-    if (restoresOpId != null) 'restoresOpId': restoresOpId,
-  };
 
   factory BoardHistoryEvent.fromJson(Map<String, dynamic> json) {
     Map<String, dynamic>? readMap(String key) {
@@ -63,7 +36,7 @@ class BoardHistoryEvent extends Equatable {
       revision: (json['revision'] as num?)?.toInt() ?? 0,
       before: readMap('before'),
       after: readMap('after'),
-      patch: readMap('patch') ?? const {},
+      patch: readMap('patch') ?? const <String, dynamic>{},
       restoresOpId: json['restoresOpId'] as String?,
     );
   }
