@@ -10,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/remote/board_share_server.dart';
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
@@ -18,52 +17,38 @@ import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
 import 'package:yoloit/ui/components/buttons/markdown_tool_button.dart';
-import 'package:yoloit/ui/components/buttons/overlay_icon_button.dart';
-import 'package:yoloit/ui/components/buttons/panel_header_icon_button.dart';
-import 'package:yoloit/ui/components/chip/toolbar_chip.dart';
-import 'package:yoloit/core/utils/date_utils.dart';
-import 'package:yoloit/features/board/assistant/yolo_assistant_widget.dart';
-import 'package:yoloit/features/board/assistant/yolo_voice_overlay.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/bloc/board_state.dart';
-import 'package:yoloit/features/board/chat/chat_panel_plugin.dart';
-import 'package:yoloit/features/board/chat/chat_panel_widget.dart';
-import 'package:yoloit/features/board/chat/provider_icon.dart';
-import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
-import 'package:yoloit/features/board/model/chat_models.dart';
-import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/board_plugin_registry.dart';
 import 'package:yoloit/features/board/plugins/builtin/webpage_plugin.dart';
 import 'package:yoloit/features/board/services/board_offscreen_renderer.dart';
-import 'package:yoloit/features/board/terminal/board_terminal_panel_plugin.dart';
 import 'package:yoloit/features/board/tools/board_tool.dart';
 import 'package:yoloit/features/board/ui/board_overview_layer.dart';
-import 'package:yoloit/features/board/ui/board_overview_preview.dart';
 import 'package:yoloit/features/board/ui/board_overview_widgets.dart';
 import 'package:yoloit/features/board/ui/dialogs/board_settings_dialog.dart';
-import 'package:yoloit/features/board/ui/miro_panel_toolbar.dart';
 import 'package:yoloit/features/board/ui/dialogs/connect_remote_yoloit_dialog.dart';
 import 'package:yoloit/features/board/ui/dialogs/share_board_dialog.dart';
 import 'package:yoloit/features/board/ui/board_drawing_widgets.dart';
 import 'package:yoloit/features/board/ui/board_history_panel.dart';
 import 'package:yoloit/features/board/ui/board_link_widgets.dart';
-import 'package:yoloit/features/board/ui/board_tools_panel.dart';
 import 'package:yoloit/features/board/ui/board_links_painter.dart';
-import 'package:yoloit/features/board/ui/chat_glow_wrapper.dart';
-import 'package:yoloit/features/board/ui/chat_header_menu.dart';
+import 'package:yoloit/features/board/ui/board_tools_panel.dart';
 import 'package:yoloit/features/board/ui/yolo_badge_with_chat.dart';
 import 'package:yoloit/features/board/widgets/widget_engine_manager.dart';
 import 'package:yoloit/features/mindmap/widgets/canvas_interaction_lock.dart';
 import 'package:yoloit/features/search/ui/file_search_overlay.dart';
-import 'package:yoloit/features/settings/ui/env_group_picker.dart';
 import 'package:yoloit/features/board/ui/board_constants.dart';
 import 'package:yoloit/features/board/ui/board_math.dart';
-import 'package:yoloit/features/board/ui/board_minimap.dart';
 import 'package:yoloit/features/board/ui/board_panel_card.dart';
 import 'package:yoloit/features/board/ui/board_toolbar.dart';
 import 'package:yoloit/features/board/ui/infinite_grid_painter.dart';
 import 'package:yoloit/features/board/ui/webview_overlays.dart';
+import 'package:yoloit/features/board/ui/widgets/board_empty_state.dart';
+import 'package:yoloit/features/board/ui/widgets/board_top_right_controls.dart';
+import 'package:yoloit/features/board/ui/widgets/cancel_connection_bar.dart';
+import 'package:yoloit/features/board/ui/widgets/link_delete_badges.dart';
+import 'package:yoloit/features/board/ui/widgets/text_editing_utils.dart';
 
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
@@ -87,7 +72,6 @@ bool boardShouldRevertInteractionForCanvasLock({
 }
 
 class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
-
   static bool _isPointerOverScrollableCard(Offset position, int viewId) {
     final result = HitTestResult();
     WidgetsBinding.instance.hitTestInView(result, position, viewId);
@@ -95,7 +79,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
       (entry) => entry.target is RenderScrollableCardMarker,
     );
   }
-
   final FocusNode _boardFocus = FocusNode();
 
   final TransformationController _transformController =
@@ -157,7 +140,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   ConnectSettings _connectSettings = const ConnectSettings();
 
   /// Link id currently hovered (for showing delete badge).
-  String? _hoveredLinkId;
 
   /// Points accumulated for the active stroke (board-space).
   final List<Offset> _activeStroke = [];
@@ -584,9 +566,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 // ── Link delete badges ─────────────────────
                                                 if (_activeTool ==
                                                     BoardToolId.select)
-                                                  ..._buildLinkDeleteBadges(
-                                                    context,
-                                                    activeBoard,
+                                                  LinkDeleteBadges(
+                                                    links: activeBoard.links,
+                                                    panels: activeBoard.panels,
+                                                    origin: _canvasOrigin,
                                                   ),
                                                 ...(() {
                                                   final visiblePanels =
@@ -1070,168 +1053,36 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                       ),
                                     ),
                                   if (activeBoard.panels.isEmpty)
-                                    Positioned.fill(
-                                      child: IgnorePointer(
-                                        ignoring: false,
-                                        child: Center(
-                                          child: Container(
-                                            width: 420,
-                                            padding: const EdgeInsets.all(20),
-                                            decoration: BoxDecoration(
-                                              color: colors.surface,
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                              border: Border.all(
-                                                color: colors.divider,
-                                              ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: colors.background
-                                                      .withAlpha(45),
-                                                  blurRadius: 18,
-                                                  offset: const Offset(0, 10),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  Icons
-                                                      .dashboard_customize_outlined,
-                                                  size: 32,
-                                                  color:
-                                                      Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.color,
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Text(
-                                                  'Board foundation is ready',
-                                                  style: TextStyle(
-                                                    color:
-                                                        Theme.of(
-                                                          context,
-                                                        ).colorScheme.onSurface,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  'Create named boards and start with markdown notes. '
-                                                  'The first panel will open in a free slot, and links will support static and dynamic lines/arrows.',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color:
-                                                        Theme.of(context)
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.color,
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 16),
-                                                FilledButton.icon(
-                                                  onPressed:
-                                                      () =>
-                                                          _showMarkdownNoteDialog(
-                                                            context,
-                                                          ),
-                                                  icon: const Icon(
-                                                    Icons.note_add_outlined,
-                                                  ),
-                                                  label: const Text('Add note'),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                                    BoardEmptyState(
+                                      onAddNote:
+                                          () => _showMarkdownNoteDialog(context),
                                     ),
                                   if (!_isBoardOverviewOpen &&
                                       !_isCapturingScreenshot)
-                                    Positioned(
-                                      top: 12,
-                                      right: 12,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              OverlayIconButton(
-                                                icon: Icons.fit_screen_outlined,
-                                                tooltip: 'Fit board to content',
-                                                onTap:
-                                                    () => _fitBoardPanels(
-                                                      activeBoard,
-                                                      persist: true,
-                                                    ),
-                                              ),
-                                              const SizedBox(width: 6),
-                                              OverlayIconButton(
-                                                icon:
-                                                    _showMinimap
-                                                        ? Icons.map
-                                                        : Icons.map_outlined,
-                                                tooltip:
-                                                    _showMinimap
-                                                        ? 'Hide minimap'
-                                                        : 'Show minimap',
-                                                active: _showMinimap,
-                                                onTap:
-                                                    () => setState(
-                                                      () =>
-                                                          _showMinimap =
-                                                              !_showMinimap,
-                                                    ),
-                                              ),
-                                            ],
+                                    BoardTopRightControls(
+                                      showMinimap: _showMinimap,
+                                      onToggleMinimap:
+                                          () => setState(
+                                            () =>
+                                                _showMinimap = !_showMinimap,
                                           ),
-                                          if (_showMinimap) ...[
-                                            const SizedBox(height: 6),
-                                            ValueListenableBuilder<int>(
-                                              valueListenable:
-                                                  ChatPanelWidget
-                                                      .processingChangeNotifier,
-                                              builder:
-                                                  (
-                                                    context,
-                                                    _,
-                                                    __,
-                                                  ) => BoardMiniMap(
-                                                    panels: activeBoard.panels,
-                                                    processingPanelIds:
-                                                        ChatPanelWidget
-                                                            .processingNotifiers
-                                                            .entries
-                                                            .where(
-                                                              (e) =>
-                                                                  e.value.value,
-                                                            )
-                                                            .map((e) => e.key)
-                                                            .toSet(),
-                                                    transformCtrl:
-                                                        _transformController,
-                                                    viewportSize:
-                                                        _viewportSize ??
-                                                        const Size(1, 1),
-                                                    origin: _canvasOrigin,
-                                                    onPanTo:
-                                                        (center) =>
-                                                            _centerViewportOn(
-                                                              activeBoard,
-                                                              center,
-                                                              persist: true,
-                                                            ),
-                                                  ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
+                                      onFitBoard:
+                                          () => _fitBoardPanels(
+                                            activeBoard,
+                                            persist: true,
+                                          ),
+                                      panels: activeBoard.panels,
+                                      transformController: _transformController,
+                                      viewportSize:
+                                          _viewportSize ??
+                                          const Size(1, 1),
+                                      origin: _canvasOrigin,
+                                      onPanTo:
+                                          (center) => _centerViewportOn(
+                                            activeBoard,
+                                            center,
+                                            persist: true,
+                                          ),
                                     ),
                                   if (!_isBoardOverviewOpen &&
                                       !_isCapturingScreenshot)
@@ -1283,9 +1134,9 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                             () => _showMarkdownNoteDialog(
                                               context,
                                             ),
-                                        onAddChat: () => _addChatPanel(context),
+                                        onAddChat: () => context.read<BoardCubit>().createChatPanel(),
                                         onAddTerminal:
-                                            () => _addTerminalPanel(context),
+                                            () => context.read<BoardCubit>().createTerminalPanel(),
                                         onAddGeneric:
                                             (typeId) =>
                                                 _handleGenericToolSelection(
@@ -1313,62 +1164,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   if (!_isBoardOverviewOpen &&
                                       _activeTool == BoardToolId.connect &&
                                       _connectSourceId != null)
-                                    Positioned(
-                                      bottom: 24,
-                                      left: 0,
-                                      right: 0,
-                                      child: Center(
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          child: InkWell(
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                            onTap:
-                                                () => setState(() {
-                                                  _connectSourceId = null;
-                                                  _connectPreviewPointer = null;
-                                                }),
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 16,
-                                                    vertical: 8,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: colors.surfaceElevated
-                                                    .withAlpha(220),
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                                border: Border.all(
-                                                  color: colors.statusError
-                                                      .withAlpha(160),
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.close,
-                                                    size: 14,
-                                                    color: colors.statusError
-                                                        .withAlpha(200),
-                                                  ),
-                                                  const SizedBox(width: 6),
-                                                  Text(
-                                                    'Cancel connection  (Esc)',
-                                                    style: TextStyle(
-                                                      color: colors.statusError
-                                                          .withAlpha(200),
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                                    CancelConnectionBar(
+                                      onCancel:
+                                          () => setState(() {
+                                            _connectSourceId = null;
+                                            _connectPreviewPointer = null;
+                                          }),
                                     ),
                                   // ── YOLO badge removed from canvas stack ──────────────
                                 ],
@@ -2397,89 +2198,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   /// Builds small ×-badge widgets at the midpoint of each link so the user
   /// can delete them by tapping.
-  List<Widget> _buildLinkDeleteBadges(
-    BuildContext context,
-    BoardDocument board,
-  ) {
-    final colors = context.appColors;
-    final panelMap = {for (final p in board.panels) p.id: p};
-    final badges = <Widget>[];
-    for (final link in board.links) {
-      final from = panelMap[link.fromPanelId];
-      final to = panelMap[link.toPanelId];
-      if (from == null || to == null || from.hidden || to.hidden) continue;
-
-      // Use edge-to-edge points (same as painter) for accurate midpoint
-      final fromRect = from.bounds.rect.translate(
-        _canvasOrigin.dx,
-        _canvasOrigin.dy,
-      );
-      final toRect = to.bounds.rect.translate(
-        _canvasOrigin.dx,
-        _canvasOrigin.dy,
-      );
-      final start = BoardLinksPainter.edgePointToward(fromRect, toRect.center);
-      final end = BoardLinksPainter.edgePointToward(toRect, fromRect.center);
-      final mid = linkMidpoint(start, end, link.geometry);
-
-      // Large transparent hit area so mouse-over the line is easy to trigger
-      const hitR = 24.0;
-      const badgeR = 11.0;
-      final isHovered = _hoveredLinkId == link.id;
-      final linkColor = link.color ?? colors.accentBlue;
-      badges.add(
-        Positioned(
-          left: mid.dx - hitR,
-          top: mid.dy - hitR,
-          width: hitR * 2,
-          height: hitR * 2,
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _hoveredLinkId = link.id),
-            onExit:
-                (_) => setState(() {
-                  if (_hoveredLinkId == link.id) _hoveredLinkId = null;
-                }),
-            child: Center(
-              child: GestureDetector(
-                onTap: () => context.read<BoardCubit>().removeLink(link.id),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: isHovered ? badgeR * 2 : 8,
-                  height: isHovered ? badgeR * 2 : 8,
-                  decoration: BoxDecoration(
-                    color:
-                        isHovered
-                            ? colors.statusError.withAlpha(204)
-                            : linkColor.withAlpha(100),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color:
-                          isHovered
-                              ? Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withAlpha(80)
-                              : linkColor.withAlpha(50),
-                      width: 1,
-                    ),
-                  ),
-                  child:
-                      isHovered
-                          ? Icon(
-                            Icons.close,
-                            size: 12,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          )
-                          : null,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return badges;
-  }
-
   void _finishDrawStroke(BuildContext context) {
     if (_activeStroke.length < 2) {
       setState(() => _activeStroke.clear());
@@ -2726,14 +2444,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     await context.read<BoardCubit>().deleteRemoteBoardOnServer(board.id);
   }
 
-  void _addChatPanel(BuildContext context) {
-    context.read<BoardCubit>().createChatPanel();
-  }
-
-  void _addTerminalPanel(BuildContext context) {
-    context.read<BoardCubit>().createTerminalPanel();
-  }
-
   VoidCallback? _editPanelCallback(
     BuildContext context,
     BoardPanelInstance panel,
@@ -2790,7 +2500,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.title,
                             tooltip: 'Heading',
                             onTap: () {
-                              _prefixSelectedLines(markdownController, '# ');
+                              prefixSelectedLines(markdownController, '# ');
                               setDialogState(() {});
                             },
                           ),
@@ -2798,7 +2508,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.format_bold,
                             tooltip: 'Bold',
                             onTap: () {
-                              _wrapSelection(
+                              wrapSelection(
                                 markdownController,
                                 before: '**',
                                 after: '**',
@@ -2811,7 +2521,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.format_italic,
                             tooltip: 'Italic',
                             onTap: () {
-                              _wrapSelection(
+                              wrapSelection(
                                 markdownController,
                                 before: '*',
                                 after: '*',
@@ -2824,7 +2534,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.format_list_bulleted,
                             tooltip: 'Bullet list',
                             onTap: () {
-                              _prefixSelectedLines(markdownController, '- ');
+                              prefixSelectedLines(markdownController, '- ');
                               setDialogState(() {});
                             },
                           ),
@@ -2832,7 +2542,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.check_box_outlined,
                             tooltip: 'Checklist',
                             onTap: () {
-                              _prefixSelectedLines(
+                              prefixSelectedLines(
                                 markdownController,
                                 '- [ ] ',
                               );
@@ -2843,7 +2553,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.link,
                             tooltip: 'Link',
                             onTap: () {
-                              _wrapSelection(
+                              wrapSelection(
                                 markdownController,
                                 before: '[',
                                 after: '](https://)',
@@ -2856,7 +2566,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                             icon: Icons.code,
                             tooltip: 'Code block',
                             onTap: () {
-                              _wrapSelection(
+                              wrapSelection(
                                 markdownController,
                                 before: '```\n',
                                 after: '\n```',
@@ -3083,51 +2793,6 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
           ],
         );
       },
-    );
-  }
-
-  void _wrapSelection(
-    TextEditingController controller, {
-    required String before,
-    required String after,
-    required String placeholder,
-  }) {
-    final value = controller.value;
-    final selection =
-        value.selection.isValid
-            ? value.selection
-            : TextSelection.collapsed(offset: value.text.length);
-    final start = math.min(selection.start, selection.end);
-    final end = math.max(selection.start, selection.end);
-    final selected = start < end ? value.text.substring(start, end) : '';
-    final replacement =
-        '$before${selected.isEmpty ? placeholder : selected}$after';
-    final updated = value.text.replaceRange(start, end, replacement);
-    final cursorOffset = start + replacement.length;
-    controller.value = value.copyWith(
-      text: updated,
-      selection: TextSelection.collapsed(offset: cursorOffset),
-    );
-  }
-
-  void _prefixSelectedLines(TextEditingController controller, String prefix) {
-    final value = controller.value;
-    final selection =
-        value.selection.isValid
-            ? value.selection
-            : TextSelection.collapsed(offset: value.text.length);
-    final start = math.min(selection.start, selection.end);
-    final end = math.max(selection.start, selection.end);
-    final block = start < end ? value.text.substring(start, end) : '';
-    final source = block.isEmpty ? 'item' : block;
-    final replacement = source
-        .split('\n')
-        .map((line) => line.isEmpty ? prefix.trimRight() : '$prefix$line')
-        .join('\n');
-    final updated = value.text.replaceRange(start, end, replacement);
-    controller.value = value.copyWith(
-      text: updated,
-      selection: TextSelection.collapsed(offset: start + replacement.length),
     );
   }
 }

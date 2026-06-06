@@ -15,13 +15,14 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:yoloit/core/utils/json_utils.dart';
-import 'package:yoloit/core/utils/string_utils.dart';
+
 import 'package:yoloit/features/board/assistant/assistant_voice_visualizer.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_history_dialog.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_thinking_indicator.dart';
 import 'package:yoloit/features/board/assistant/widgets/assistant_tool_executor.dart';
-import 'package:yoloit/features/board/assistant/widgets/debug_session_list_view.dart';
+import 'package:yoloit/features/board/assistant/widgets/debug_logs_dialog.dart';
 import 'package:yoloit/features/board/assistant/widgets/session_bar_button.dart';
+import 'package:yoloit/features/board/assistant/widgets/tools_dialog.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
 import 'package:yoloit/features/board/chat/chat_session_history.dart';
@@ -125,7 +126,6 @@ class _YoloAssistantWidgetState extends State<YoloAssistantWidget> {
   Map<String, dynamic>? _pendingAsrDebug;
   bool _isRecordingMic = false;
   bool _isStartingMic = false;
-  bool _stopMicAfterStart = false;
   bool _isTranscribingMic = false;
   bool _isGeneratingReply = false;
   bool _isCancelled = false;
@@ -1271,214 +1271,105 @@ $messagesJson
   // ── Debug logs dialog ─────────────────────────────────────────────────────
 
   Future<void> _showDebugLogsDialog() async {
-    final colors = context.appColors;
     await showDialog<void>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder: (ctx, setDialogState) {
-              final sessions =
-                  List<Map<String, dynamic>>.from(
-                    _debugSessions,
-                  ).reversed.toList();
-              final active = _activeDebugSession;
-              if (active != null &&
-                  !sessions.any((s) => s['id'] == active['id'])) {
-                sessions.insert(0, active);
-              }
-              return AlertDialog(
-                title: Row(
-                  children: [
-                    const Icon(Icons.bug_report_outlined, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(child: Text('LLM Debug Logs')),
-                    Text(
-                      '${sessions.length} sessions',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: ctx.appColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-                content: SizedBox(
-                  width: 800,
-                  height: 660,
-                  child:
-                      sessions.isEmpty
-                          ? const Center(
-                            child: Text(
-                              'No LLM sessions yet.\nSend a message to see raw logs here.',
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                          : DebugSessionListView(
-                            sessions: sessions,
-                            colors: colors,
-                          ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      // Insert a fake simulation session with 5 tool calls
-                      final now = DateTime.now();
-                      final fake = <String, dynamic>{
-                        'id': 'sim_${now.millisecondsSinceEpoch}',
-                        'userMessage':
-                            '[Simulation] Show weather + open browser',
-                        'modelId': 'google/gemini-3.1-flash-lite-preview',
-                        'modelProvider': 'openrouter',
-                        'requestAt':
-                            now
-                                .subtract(const Duration(seconds: 8))
-                                .toIso8601String(),
-                        'promptSentAt':
-                            now
-                                .subtract(const Duration(seconds: 8))
-                                .toIso8601String(),
-                        'firstTokenAt':
-                            now
-                                .subtract(const Duration(milliseconds: 4800))
-                                .toIso8601String(),
-                        'completedAt':
-                            now
-                                .subtract(const Duration(milliseconds: 400))
-                                .toIso8601String(),
-                        'asr': {
-                          'durationMs': 1240,
-                          'status': 'ok',
-                          'mode': 'cloud',
-                          'transcriptChars': 34,
-                          'model': 'google/chirp-3',
-                          'provider': 'openrouter',
-                        },
-                        'maxTokens': null,
-                        'temperature': null,
-                        'toolCalls': [
-                          {
-                            'name': 'panel:focus',
-                            'arguments': {
-                              'board': 'board-1778878703064560',
-                              'panel': 'Список покупок',
-                            },
-                            'startAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 7200),
-                                    )
-                                    .toIso8601String(),
-                            'endAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 6800),
-                                    )
-                                    .toIso8601String(),
-                            'success': true,
-                          },
-                          {
-                            'name': 'web:open',
-                            'arguments': {
-                              'board': 'board-1778878703064560',
-                              'panel': '__yolo_badge__',
-                              'url':
-                                  'https://www.google.com/search?q=weather+in+Grodno',
-                            },
-                            'startAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 6600),
-                                    )
-                                    .toIso8601String(),
-                            'endAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 5900),
-                                    )
-                                    .toIso8601String(),
-                            'success': true,
-                          },
-                          {
-                            'name': 'panels',
-                            'arguments': {'board': 'board-1778878703064560'},
-                            'startAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 5700),
-                                    )
-                                    .toIso8601String(),
-                            'endAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 5200),
-                                    )
-                                    .toIso8601String(),
-                            'success': true,
-                          },
-                          {
-                            'name': 'panel:create',
-                            'arguments': {
-                              'board': 'board-1778878703064560',
-                              'type': 'board.webpage',
-                              'title': 'Weather in Grodno',
-                            },
-                            'startAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 5000),
-                                    )
-                                    .toIso8601String(),
-                            'endAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 3800),
-                                    )
-                                    .toIso8601String(),
-                            'success': true,
-                          },
-                          {
-                            'name': 'agent:run',
-                            'arguments': {
-                              'agent': 'copilot',
-                              'path': '.',
-                              'task': 'Write a Hello World program',
-                            },
-                            'startAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 3600),
-                                    )
-                                    .toIso8601String(),
-                            'endAt':
-                                now
-                                    .subtract(
-                                      const Duration(milliseconds: 1200),
-                                    )
-                                    .toIso8601String(),
-                            'success': true,
-                          },
-                        ],
-                      };
-                      _debugSessions.add(fake);
-                      setDialogState(() {});
-                    },
-                    child: const Text('Simulate'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      _debugSessions.clear();
-                      setDialogState(() {});
-                    },
-                    child: const Text('Clear'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('Close'),
-                  ),
-                ],
-              );
-            },
+          (_) => DebugLogsDialog(
+            sessions: _debugSessions,
+            activeSession: _activeDebugSession,
+            onSimulate: _addFakeDebugSession,
+            onClear: _debugSessions.clear,
           ),
     );
+  }
+
+  void _addFakeDebugSession() {
+    final now = DateTime.now();
+    _debugSessions.add(<String, dynamic>{
+      'id': 'sim_${now.millisecondsSinceEpoch}',
+      'userMessage': '[Simulation] Show weather + open browser',
+      'modelId': 'google/gemini-3.1-flash-lite-preview',
+      'modelProvider': 'openrouter',
+      'requestAt': now.subtract(const Duration(seconds: 8)).toIso8601String(),
+      'promptSentAt':
+          now.subtract(const Duration(seconds: 8)).toIso8601String(),
+      'firstTokenAt':
+          now.subtract(const Duration(milliseconds: 4800)).toIso8601String(),
+      'completedAt':
+          now.subtract(const Duration(milliseconds: 400)).toIso8601String(),
+      'asr': {
+        'durationMs': 1240,
+        'status': 'ok',
+        'mode': 'cloud',
+        'transcriptChars': 34,
+        'model': 'google/chirp-3',
+        'provider': 'openrouter',
+      },
+      'maxTokens': null,
+      'temperature': null,
+      'toolCalls': [
+        {
+          'name': 'panel:focus',
+          'arguments': {
+            'board': 'board-1778878703064560',
+            'panel': 'Список покупок',
+          },
+          'startAt':
+              now.subtract(const Duration(milliseconds: 7200)).toIso8601String(),
+          'endAt':
+              now.subtract(const Duration(milliseconds: 6800)).toIso8601String(),
+          'success': true,
+        },
+        {
+          'name': 'web:open',
+          'arguments': {
+            'board': 'board-1778878703064560',
+            'panel': '__yolo_badge__',
+            'url': 'https://www.google.com/search?q=weather+in+Grodno',
+          },
+          'startAt':
+              now.subtract(const Duration(milliseconds: 6600)).toIso8601String(),
+          'endAt':
+              now.subtract(const Duration(milliseconds: 5900)).toIso8601String(),
+          'success': true,
+        },
+        {
+          'name': 'panels',
+          'arguments': {'board': 'board-1778878703064560'},
+          'startAt':
+              now.subtract(const Duration(milliseconds: 5700)).toIso8601String(),
+          'endAt':
+              now.subtract(const Duration(milliseconds: 5200)).toIso8601String(),
+          'success': true,
+        },
+        {
+          'name': 'panel:create',
+          'arguments': {
+            'board': 'board-1778878703064560',
+            'type': 'board.webpage',
+            'title': 'Weather in Grodno',
+          },
+          'startAt':
+              now.subtract(const Duration(milliseconds: 5000)).toIso8601String(),
+          'endAt':
+              now.subtract(const Duration(milliseconds: 3800)).toIso8601String(),
+          'success': true,
+        },
+        {
+          'name': 'agent:run',
+          'arguments': {
+            'agent': 'copilot',
+            'path': '.',
+            'task': 'Write a Hello World program',
+          },
+          'startAt':
+              now.subtract(const Duration(milliseconds: 3600)).toIso8601String(),
+          'endAt':
+              now.subtract(const Duration(milliseconds: 1200)).toIso8601String(),
+          'success': true,
+        },
+      ],
+    });
   }
 
   void _scrollToBottom() {
@@ -1556,167 +1447,14 @@ $messagesJson
       YoloitCliToolCatalog.tools.length - _disabledLocalTools().length;
 
   void _showToolsDialog() {
-    final colors = context.appColors;
-    final muted =
-        context.appColors.textMuted.withAlpha(153);
-    var disabled = _disabledLocalTools();
-    final tools = [...YoloitCliToolCatalog.tools]..sort((a, b) {
-      final byGroup = a.group.compareTo(b.group);
-      return byGroup == 0 ? a.command.compareTo(b.command) : byGroup;
-    });
-
     showDialog<void>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder: (context, setDialogState) {
-              void persist(Set<String> next) {
-                disabled = {...next};
-                final sorted = disabled.toList()..sort();
-                _updateState({'disabledLocalToolNames': sorted});
-              }
-
-              Widget tile(YoloitCliTool tool) {
-                final enabled = !disabled.contains(tool.functionName);
-                return CheckboxListTile(
-                  dense: true,
-                  value: enabled,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (value) {
-                    final next = {...disabled};
-                    if (value == true) {
-                      next.remove(tool.functionName);
-                    } else {
-                      next.add(tool.functionName);
-                    }
-                    setDialogState(() => persist(next));
-                  },
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'yoloit ${tool.command}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      if (tool.destructive)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.error.withAlpha(28),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            'destructive',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  subtitle: Text(
-                    '${tool.functionName}\n${tool.description}',
-                    style: TextStyle(fontSize: 11, color: muted),
-                  ),
-                );
-              }
-
-              final grouped = <String, List<YoloitCliTool>>{};
-              for (final tool in tools) {
-                grouped.putIfAbsent(tool.group, () => []).add(tool);
-              }
-
-              return AlertDialog(
-                title: Row(
-                  children: [
-                    const Icon(Icons.settings_input_component_outlined),
-                    const SizedBox(width: 8),
-                    const Expanded(child: Text('YoLo tools')),
-                    Text(
-                      '${tools.length - disabled.length}/${tools.length}',
-                      style: TextStyle(fontSize: 12, color: muted),
-                    ),
-                  ],
-                ),
-                content: SizedBox(
-                  width: 720,
-                  height: 560,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Checked tools are available to YoLo Chat. Unchecked tools are hidden from the local LLM and blocked at runtime.',
-                        style: TextStyle(fontSize: 12, color: muted),
-                      ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: ListView(
-                          children: [
-                            for (final entry in grouped.entries) ...[
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 10,
-                                  bottom: 4,
-                                ),
-                                child: Text(
-                                  entry.key.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: colors.primary,
-                                    letterSpacing: 0.6,
-                                  ),
-                                ),
-                              ),
-                              ...entry.value.map(tile),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => setDialogState(() => persist(<String>{})),
-                    child: const Text('Enable all'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      final next = {
-                        for (final tool in tools) tool.functionName,
-                      };
-                      setDialogState(() => persist(next));
-                    },
-                    child: const Text('Disable all'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      final next = {
-                        for (final tool in tools)
-                          if (tool.destructive) tool.functionName,
-                      };
-                      setDialogState(() => persist(next));
-                    },
-                    child: const Text('Disable destructive'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('Done'),
-                  ),
-                ],
-              );
+          (_) => ToolsDialog(
+            initialDisabled: _disabledLocalTools(),
+            onPersist: (next) {
+              final sorted = next.toList()..sort();
+              _updateState({'disabledLocalToolNames': sorted});
             },
           ),
     );
@@ -2354,20 +2092,6 @@ $messagesJson
 
   Widget _buildVoiceMode() {
     final colors = context.appColors;
-
-    VoiceVisualizerState vizState;
-    String label;
-    if (_isListening) {
-      vizState = VoiceVisualizerState.listening;
-      label = 'Listening…';
-    } else if (_isSpeaking) {
-      vizState = VoiceVisualizerState.speaking;
-      label = 'Speaking…';
-    } else {
-      vizState = VoiceVisualizerState.idle;
-      label = 'Tap to speak';
-    }
-
     return Column(
       children: [
         _buildSkillsBar(colors),
@@ -2386,14 +2110,14 @@ $messagesJson
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   AssistantVoiceVisualizer(
-                    state: vizState,
+                    state: VoiceVisualizerState.idle,
                     colors: colors,
                     size: 160,
                     color: colors.primary,
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    label,
+                    'Tap to speak',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -2420,27 +2144,11 @@ $messagesJson
 
   Future<void> _startPushToTalkMic() async {
     if (_isRecordingMic || _isTranscribingMic || _isStartingMic) return;
-    _stopMicAfterStart = false;
     _isStartingMic = true;
     try {
       await _startRecordingFromMic();
     } finally {
       _isStartingMic = false;
-    }
-    if (_stopMicAfterStart && mounted && _isRecordingMic) {
-      _stopMicAfterStart = false;
-      await _stopRecordingAndTranscribe(sendAfterTranscription: true);
-    }
-  }
-
-  Future<void> _finishPushToTalkMic() async {
-    if (_isTranscribingMic) return;
-    if (_isStartingMic) {
-      _stopMicAfterStart = true;
-      return;
-    }
-    if (_isRecordingMic) {
-      await _stopRecordingAndTranscribe(sendAfterTranscription: true);
     }
   }
 
