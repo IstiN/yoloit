@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yoloit/core/remote/history_store_helpers.dart';
 import 'package:yoloit/core/remote/yoloitd_models.dart';
 
 class YoloitdStore {
@@ -43,7 +44,7 @@ class YoloitdStore {
     required String? activeBoardId,
   }) async {
     await rootDir.create(recursive: true);
-    await _writeJsonAtomic(
+    await HistoryStoreHelpers.writeJsonAtomic(
       _boardsFile,
       boards.map((board) => board.toJson()).toList(),
     );
@@ -116,47 +117,35 @@ class YoloitdStore {
   }
 
   Future<void> appendHistory(RemoteHistoryEvent event) async {
-    final dir = Directory(
-      p.join(
-        rootDir.path,
-        'boards_history',
-        _safeSegment(event.boardId),
-        'events',
-        event.timestamp.toUtc().year.toString().padLeft(4, '0'),
-        event.timestamp.toUtc().month.toString().padLeft(2, '0'),
-      ),
+    final dirPath = HistoryStoreHelpers.historyDirPath(
+      p.join(rootDir.path, 'boards_history'),
+      event.boardId,
+      event.timestamp,
     );
+    final dir = Directory(dirPath);
     await dir.create(recursive: true);
     final file = File(
       p.join(
-        dir.path,
-        '${_safeSegment(event.opId)}_${_safeSegment(event.actorId)}.json',
+        dirPath,
+        HistoryStoreHelpers.historyFileName(event.opId, event.actorId),
       ),
     );
-    await _writeJsonAtomic(file, event.toJson());
+    await HistoryStoreHelpers.writeJsonAtomic(file, event.toJson());
   }
 
   Future<List<RemoteHistoryEvent>> historyForBoard(String boardId) async {
     final root = Directory(
-      p.join(rootDir.path, 'boards_history', _safeSegment(boardId), 'events'),
+      p.join(
+        rootDir.path,
+        'boards_history',
+        HistoryStoreHelpers.safeSegment(boardId),
+        'events',
+      ),
     );
-    if (!await root.exists()) return const <RemoteHistoryEvent>[];
-    final events = <RemoteHistoryEvent>[];
-    await for (final entity in root.list(recursive: true, followLinks: false)) {
-      if (entity is! File || !entity.path.endsWith('.json')) continue;
-      final decoded = jsonDecode(await entity.readAsString());
-      if (decoded is Map) {
-        events.add(
-          RemoteHistoryEvent.fromJson(Map<String, dynamic>.from(decoded)),
-        );
-      }
-    }
-    events.sort((a, b) {
-      final byRevision = a.revision.compareTo(b.revision);
-      if (byRevision != 0) return byRevision;
-      return a.opId.compareTo(b.opId);
-    });
-    return events;
+    return HistoryStoreHelpers.loadHistoryEvents(
+      root,
+      RemoteHistoryEvent.fromJson,
+    );
   }
 
   Future<bool> undoLatestPanelHistory(String boardId) async {
@@ -371,23 +360,6 @@ class YoloitdStore {
     return '$prefix-${DateTime.now().microsecondsSinceEpoch}';
   }
 
-  static Future<void> _writeJsonAtomic(File file, Object? value) async {
-    await file.parent.create(recursive: true);
-    final tmp = File('${file.path}.tmp');
-    await tmp.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(value),
-      flush: true,
-    );
-    if (await file.exists()) {
-      await file.delete();
-    }
-    await tmp.rename(file.path);
-  }
-
-  static String _safeSegment(String value) {
-    return value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-  }
-
   static bool _samePanel(RemotePanel a, RemotePanel b) {
     return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
   }
@@ -444,12 +416,5 @@ class YoloitdStore {
     addIfChanged('pinned', before.pinned, after.pinned);
     addIfChanged('state', before.state, after.state);
     return patch;
-  }
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull {
-    final iterator = this.iterator;
-    return iterator.moveNext() ? iterator.current : null;
   }
 }

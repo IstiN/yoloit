@@ -1,0 +1,59 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+import 'package:yoloit/core/remote/yoloitd_models.dart';
+
+abstract final class HistoryStoreHelpers {
+  static String safeSegment(String value) {
+    return value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  }
+
+  static String historyDirPath(String root, String boardId, DateTime timestamp) {
+    return p.join(
+      root,
+      safeSegment(boardId),
+      'events',
+      timestamp.toUtc().year.toString().padLeft(4, '0'),
+      timestamp.toUtc().month.toString().padLeft(2, '0'),
+    );
+  }
+
+  static String historyFileName(String opId, String actorId) {
+    return '${safeSegment(opId)}_${safeSegment(actorId)}.json';
+  }
+
+  static Future<void> writeJsonAtomic(File file, Object? value) async {
+    await file.parent.create(recursive: true);
+    final tmp = File('${file.path}.tmp');
+    await tmp.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(value),
+      flush: true,
+    );
+    if (await file.exists()) {
+      await file.delete();
+    }
+    await tmp.rename(file.path);
+  }
+
+  static Future<List<T>> loadHistoryEvents<T extends RemoteHistoryEvent>(
+    Directory root,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
+    if (!await root.exists()) return const [];
+    final events = <T>[];
+    await for (final entity in root.list(recursive: true, followLinks: false)) {
+      if (entity is! File || !entity.path.endsWith('.json')) continue;
+      final decoded = jsonDecode(await entity.readAsString());
+      if (decoded is Map) {
+        events.add(fromJson(Map<String, dynamic>.from(decoded)));
+      }
+    }
+    events.sort((a, b) {
+      final byRevision = a.revision.compareTo(b.revision);
+      if (byRevision != 0) return byRevision;
+      return a.opId.compareTo(b.opId);
+    });
+    return events;
+  }
+}

@@ -18,26 +18,20 @@ class BoardHistoryEvent extends RemoteHistoryEvent with EquatableMixin {
   });
 
   factory BoardHistoryEvent.fromJson(Map<String, dynamic> json) {
-    Map<String, dynamic>? readMap(String key) {
-      final value = json[key];
-      return value is Map ? Map<String, dynamic>.from(value) : null;
-    }
-
+    final base = RemoteHistoryEvent.fromJson(json, defaultActorId: 'local');
     return BoardHistoryEvent(
-      opId: json['opId'] as String,
-      boardId: json['boardId'] as String,
-      type: json['type'] as String,
-      entityType: json['entityType'] as String,
-      entityId: json['entityId'] as String,
-      actorId: json['actorId'] as String? ?? 'local',
-      timestamp:
-          DateTime.tryParse(json['timestamp'] as String? ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-      revision: (json['revision'] as num?)?.toInt() ?? 0,
-      before: readMap('before'),
-      after: readMap('after'),
-      patch: readMap('patch') ?? const <String, dynamic>{},
-      restoresOpId: json['restoresOpId'] as String?,
+      opId: base.opId,
+      boardId: base.boardId,
+      type: base.type,
+      entityType: base.entityType,
+      entityId: base.entityId,
+      actorId: base.actorId,
+      timestamp: base.timestamp,
+      revision: base.revision,
+      before: base.before,
+      after: base.after,
+      patch: base.patch,
+      restoresOpId: base.restoresOpId,
     );
   }
 

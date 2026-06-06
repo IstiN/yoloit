@@ -278,7 +278,10 @@ class RemoteHistoryEvent {
     if (restoresOpId != null) 'restoresOpId': restoresOpId,
   };
 
-  factory RemoteHistoryEvent.fromJson(Map<String, dynamic> json) {
+  factory RemoteHistoryEvent.fromJson(
+    Map<String, dynamic> json, {
+    String defaultActorId = 'remote',
+  }) {
     Map<String, dynamic>? readMap(String key) {
       final value = json[key];
       return value is Map ? Map<String, dynamic>.from(value) : null;
@@ -290,7 +293,7 @@ class RemoteHistoryEvent {
       type: json['type'] as String,
       entityType: json['entityType'] as String,
       entityId: json['entityId'] as String,
-      actorId: json['actorId'] as String? ?? 'remote',
+      actorId: json['actorId'] as String? ?? defaultActorId,
       timestamp:
           DateTime.tryParse(json['timestamp'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),

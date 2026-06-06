@@ -1,7 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/core/remote/history_store_helpers.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
 
 abstract class BoardHistoryStore {
@@ -41,52 +42,31 @@ class LocalBoardHistoryStore extends BoardHistoryStore {
 
   @override
   Future<void> append(BoardHistoryEvent event) async {
-    final dir = Directory(
-      [
-        rootPath,
-        _safeSegment(event.boardId),
-        'events',
-        event.timestamp.toUtc().year.toString().padLeft(4, '0'),
-        event.timestamp.toUtc().month.toString().padLeft(2, '0'),
-      ].join(Platform.pathSeparator),
+    final dirPath = HistoryStoreHelpers.historyDirPath(
+      rootPath,
+      event.boardId,
+      event.timestamp,
     );
+    final dir = Directory(dirPath);
     await dir.create(recursive: true);
     final file = File(
-      '${dir.path}${Platform.pathSeparator}'
-      '${_safeSegment(event.opId)}_${_safeSegment(event.actorId)}.json',
+      p.join(
+        dirPath,
+        HistoryStoreHelpers.historyFileName(event.opId, event.actorId),
+      ),
     );
-    await file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(event.toJson()),
-      flush: true,
-    );
+    await HistoryStoreHelpers.writeJsonAtomic(file, event.toJson());
   }
 
   @override
   Future<List<BoardHistoryEvent>> eventsForBoard(String boardId) async {
     final root = Directory(
-      [rootPath, _safeSegment(boardId), 'events'].join(Platform.pathSeparator),
+      p.join(rootPath, HistoryStoreHelpers.safeSegment(boardId), 'events'),
     );
-    if (!await root.exists()) return const [];
-    final events = <BoardHistoryEvent>[];
-    await for (final entity in root.list(recursive: true, followLinks: false)) {
-      if (entity is! File || !entity.path.endsWith('.json')) continue;
-      final decoded = jsonDecode(await entity.readAsString());
-      if (decoded is Map) {
-        events.add(
-          BoardHistoryEvent.fromJson(Map<String, dynamic>.from(decoded)),
-        );
-      }
-    }
-    events.sort((a, b) {
-      final byRevision = a.revision.compareTo(b.revision);
-      if (byRevision != 0) return byRevision;
-      return a.opId.compareTo(b.opId);
-    });
-    return events;
-  }
-
-  static String _safeSegment(String value) {
-    return value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return HistoryStoreHelpers.loadHistoryEvents(
+      root,
+      BoardHistoryEvent.fromJson,
+    );
   }
 }
 

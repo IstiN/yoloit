@@ -104,13 +104,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     description: 'Manage a local model download/install state',
     group: 'models',
     params: <YoloitCliToolParam>[
-      toolParam(
-        'model_id',
-        'Local model id',
-        required: true,
-        aliases: const ['id'],
-        shortKey: 'mid',
-      ),
+      modelIdParam(),
     ],
   ),
 
@@ -119,15 +113,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     alias: 'mrs',
     description: 'Manage a local model download/install state',
     group: 'models',
-    params: <YoloitCliToolParam>[
-      toolParam(
-        'model_id',
-        'Local model id',
-        required: true,
-        aliases: const ['id'],
-        shortKey: 'mid',
-      ),
-    ],
+    params: <YoloitCliToolParam>[modelIdParam()],
   ),
 
   YoloitCliTool(
@@ -135,15 +121,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     alias: 'mps',
     description: 'Manage a local model download/install state',
     group: 'models',
-    params: <YoloitCliToolParam>[
-      toolParam(
-        'model_id',
-        'Local model id',
-        required: true,
-        aliases: const ['id'],
-        shortKey: 'mid',
-      ),
-    ],
+    params: <YoloitCliToolParam>[modelIdParam()],
   ),
 
   YoloitCliTool(
@@ -152,15 +130,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     description: 'Manage a local model download/install state',
     group: 'models',
     destructive: true,
-    params: <YoloitCliToolParam>[
-      toolParam(
-        'model_id',
-        'Local model id',
-        required: true,
-        aliases: const ['id'],
-        shortKey: 'mid',
-      ),
-    ],
+    params: <YoloitCliToolParam>[modelIdParam()],
   ),
 
   YoloitCliTool(
@@ -168,15 +138,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     alias: 'mst',
     description: 'Manage a local model download/install state',
     group: 'models',
-    params: <YoloitCliToolParam>[
-      toolParam(
-        'model_id',
-        'Local model id',
-        required: true,
-        aliases: const ['id'],
-        shortKey: 'mid',
-      ),
-    ],
+    params: <YoloitCliToolParam>[modelIdParam()],
   ),
 
   YoloitCliTool(
@@ -185,15 +147,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     description: 'Manage a local model download/install state',
     group: 'models',
     destructive: true,
-    params: <YoloitCliToolParam>[
-      toolParam(
-        'model_id',
-        'Local model id',
-        required: true,
-        aliases: const ['id'],
-        shortKey: 'mid',
-      ),
-    ],
+    params: <YoloitCliToolParam>[modelIdParam()],
   ),
 
   YoloitCliTool(
@@ -203,13 +157,7 @@ final List<YoloitCliTool> appTools = <YoloitCliTool>[
     group: 'models',
     params: <YoloitCliToolParam>[
       toolParam('kind', 'chat or asr', required: true, shortKey: 'k'),
-      toolParam(
-        'model_id',
-        'Local model id',
-        required: true,
-        aliases: const ['id'],
-        shortKey: 'mid',
-      ),
+      modelIdParam(),
     ],
   ),
 

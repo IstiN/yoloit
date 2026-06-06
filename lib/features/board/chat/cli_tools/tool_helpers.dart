@@ -105,6 +105,16 @@ YoloitCliToolParam panelParam([String key = 'panel']) {
   );
 }
 
+YoloitCliToolParam modelIdParam({bool required = true}) {
+  return toolParam(
+    'model_id',
+    'Local model id',
+    required: required,
+    aliases: const <String>['id'],
+    shortKey: 'mid',
+  );
+}
+
 YoloitCliToolParam panelTypeParam() {
   return toolParam(
     'type',
