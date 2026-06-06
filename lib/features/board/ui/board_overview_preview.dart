@@ -57,6 +57,7 @@ class BoardOverviewPreview extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: CustomPaint(
+                  isComplex: true,
                   painter: BoardOverviewLinksPainter(
                     links: board.links,
                     panels: panels,

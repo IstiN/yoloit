@@ -224,6 +224,7 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
                   child: ColoredBox(
                     color: colors.background,
                     child: CustomPaint(
+                      isComplex: true,
                       painter: BoardOverviewBackdropPainter(
                         minorColor: colors.divider.withAlpha(45),
                         majorColor: colors.divider.withAlpha(85),

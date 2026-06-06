@@ -49,7 +49,6 @@ import 'package:yoloit/features/board/ui/widgets/board_top_right_controls.dart';
 import 'package:yoloit/features/board/ui/widgets/cancel_connection_bar.dart';
 import 'package:yoloit/features/board/ui/widgets/link_delete_badges.dart';
 import 'package:yoloit/features/board/ui/widgets/text_editing_utils.dart';
-
 class BoardView extends StatefulWidget {
   const BoardView({super.key, this.skipOverviewPreviewCapture = false});
 
@@ -61,7 +60,6 @@ class BoardView extends StatefulWidget {
   @override
   State<BoardView> createState() => _BoardViewState();
 }
-
 @visibleForTesting
 bool boardShouldRevertInteractionForCanvasLock({
   required bool interactionStartedLocked,
@@ -70,7 +68,6 @@ bool boardShouldRevertInteractionForCanvasLock({
 }) {
   return interactionStartedLocked && currentlyLocked && !isScaleChanging;
 }
-
 class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
   static bool _isPointerOverScrollableCard(Offset position, int viewId) {
     final result = HitTestResult();
@@ -261,6 +258,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                   Positioned.fill(
                                     child: IgnorePointer(
                                       child: CustomPaint(
+                                        isComplex: true,
                                         painter: InfiniteBoardGridPainter(
                                           transformCtrl: _transformController,
                                           origin: _canvasOrigin,
@@ -525,6 +523,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                 Positioned.fill(
                                                   child: IgnorePointer(
                                                     child: CustomPaint(
+                                                      isComplex: true,
                                                       painter:
                                                           BoardLinksPainter(
                                                             panels:
@@ -591,9 +590,10 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                     final boardCubit =
                                                         context
                                                             .read<BoardCubit>();
-                                                    return BoardPanelCard(
-                                                      key: ValueKey(panel.id),
-                                                      panel: panel,
+                                                    return RepaintBoundary(
+                                                      child: BoardPanelCard(
+                                                        key: ValueKey(panel.id),
+                                                        panel: panel,
                                                       positionOffset:
                                                           _canvasOrigin,
                                                       capturingScreenshot:
@@ -865,6 +865,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                                                     panel.id,
                                                                   )
                                                               : null,
+                                                      ),
                                                     );
                                                   }).toList();
                                                 })(),

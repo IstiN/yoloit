@@ -94,6 +94,7 @@ class BoardMiniMap extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(7),
               child: CustomPaint(
+                isComplex: true,
                 painter: BoardMiniMapPainter(
                   panels: panels.where((panel) => !panel.hidden).toList(),
                   processingPanelIds: processingPanelIds,
