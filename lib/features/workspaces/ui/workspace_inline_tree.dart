@@ -11,6 +11,40 @@ import 'package:yoloit/features/workspaces/models/worktree_model.dart';
 import 'package:yoloit/features/workspaces/ui/new_agent_session_dialog.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
+class _TreePrefix extends StatelessWidget {
+  const _TreePrefix({
+    required this.isLast,
+    required this.mutedColor,
+    required this.dotColor,
+  });
+
+  final bool isLast;
+  final Color mutedColor;
+  final Color dotColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          isLast ? '└─ ' : '├─ ',
+          style: TextStyle(color: mutedColor, fontSize: 10),
+        ),
+        Container(
+          width: 6,
+          height: 6,
+          margin: const EdgeInsets.only(right: 6),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: dotColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class WorkspaceInlineTree extends StatefulWidget {
   const WorkspaceInlineTree({super.key, required this.workspace});
 
@@ -235,19 +269,7 @@ class _BranchRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 1, 8, 1),
       child: Row(
         children: [
-          Text(
-            isLast ? '└─ ' : '├─ ',
-            style: TextStyle(color: mutedColor, fontSize: 10),
-          ),
-          Container(
-            width: 6,
-            height: 6,
-            margin: const EdgeInsets.only(right: 6),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: dotColor,
-            ),
-          ),
+          _TreePrefix(isLast: isLast, mutedColor: mutedColor, dotColor: dotColor),
           Expanded(
             child: Text(
               branch,
@@ -458,18 +480,10 @@ class _SessionRowState extends State<_SessionRow> {
         padding: const EdgeInsets.fromLTRB(28, 1, 8, 1),
         child: Row(
           children: [
-            Text(
-              widget.isLast ? '└─ ' : '├─ ',
-              style: TextStyle(color: mutedColor, fontSize: 10),
-            ),
-            Container(
-              width: 6,
-              height: 6,
-              margin: const EdgeInsets.only(right: 6),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: statusColor,
-              ),
+            _TreePrefix(
+              isLast: widget.isLast,
+              mutedColor: mutedColor,
+              dotColor: statusColor,
             ),
             Text(
               widget.session.type.iconLabel,
