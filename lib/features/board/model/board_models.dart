@@ -2,6 +2,10 @@ import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
+import 'package:yoloit/features/board/model/board_json_converters.dart';
+
+part 'board_models.g.dart';
 
 enum BoardLinkStyle { line, arrow }
 
@@ -232,6 +236,7 @@ class BoardViewport extends Equatable {
   List<Object?> get props => [scale, translation, focusedPanelId, zoomOnFocus];
 }
 
+@JsonSerializable()
 class BoardPanelBounds extends Equatable {
   const BoardPanelBounds({
     required this.x,
@@ -240,9 +245,13 @@ class BoardPanelBounds extends Equatable {
     required this.height,
   });
 
+  @JsonKey(defaultValue: 0.0)
   final double x;
+  @JsonKey(defaultValue: 0.0)
   final double y;
+  @JsonKey(defaultValue: 320.0)
   final double width;
+  @JsonKey(defaultValue: 220.0)
   final double height;
 
   Offset get offset => Offset(x, y);
@@ -263,26 +272,16 @@ class BoardPanelBounds extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'x': x,
-    'y': y,
-    'width': width,
-    'height': height,
-  };
+  Map<String, dynamic> toJson() => _$BoardPanelBoundsToJson(this);
 
-  factory BoardPanelBounds.fromJson(Map<String, dynamic> json) {
-    return BoardPanelBounds(
-      x: (json['x'] as num?)?.toDouble() ?? 0,
-      y: (json['y'] as num?)?.toDouble() ?? 0,
-      width: (json['width'] as num?)?.toDouble() ?? 320,
-      height: (json['height'] as num?)?.toDouble() ?? 220,
-    );
-  }
+  factory BoardPanelBounds.fromJson(Map<String, dynamic> json) =>
+      _$BoardPanelBoundsFromJson(json);
 
   @override
   List<Object?> get props => [x, y, width, height];
 }
 
+@JsonSerializable()
 class BoardPanelInstance extends Equatable {
   const BoardPanelInstance({
     required this.id,
@@ -300,14 +299,20 @@ class BoardPanelInstance extends Equatable {
 
   final String id;
   final String type;
+  @JsonKey(defaultValue: 'Panel')
   final String title;
   final BoardPanelBounds bounds;
+  @ColorNullableJsonConverter()
   final Color? color;
   final Map<String, dynamic> params;
   final Map<String, dynamic> state;
+  @JsonKey(defaultValue: 0)
   final int zIndex;
+  @JsonKey(defaultValue: false)
   final bool hidden;
+  @JsonKey(defaultValue: false)
   final bool locked;
+  @JsonKey(defaultValue: false)
   final bool pinned;
 
   BoardPanelInstance copyWith({
@@ -339,38 +344,10 @@ class BoardPanelInstance extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'type': type,
-    'title': title,
-    'bounds': bounds.toJson(),
-    'color': color?.toARGB32(),
-    'params': params,
-    'state': state,
-    'zIndex': zIndex,
-    'hidden': hidden,
-    'locked': locked,
-    'pinned': pinned,
-  };
+  Map<String, dynamic> toJson() => _$BoardPanelInstanceToJson(this);
 
-  factory BoardPanelInstance.fromJson(Map<String, dynamic> json) {
-    return BoardPanelInstance(
-      id: json['id'] as String,
-      type: json['type'] as String,
-      title: json['title'] as String? ?? 'Panel',
-      bounds: BoardPanelBounds.fromJson(
-        Map<String, dynamic>.from(json['bounds'] as Map? ?? const {}),
-      ),
-      color:
-          json['color'] == null ? null : Color((json['color'] as num).toInt()),
-      params: Map<String, dynamic>.from(json['params'] as Map? ?? const {}),
-      state: Map<String, dynamic>.from(json['state'] as Map? ?? const {}),
-      zIndex: (json['zIndex'] as num?)?.toInt() ?? 0,
-      hidden: json['hidden'] as bool? ?? false,
-      locked: json['locked'] as bool? ?? false,
-      pinned: json['pinned'] as bool? ?? false,
-    );
-  }
+  factory BoardPanelInstance.fromJson(Map<String, dynamic> json) =>
+      _$BoardPanelInstanceFromJson(json);
 
   @override
   List<Object?> get props => [
@@ -388,6 +365,7 @@ class BoardPanelInstance extends Equatable {
   ];
 }
 
+@JsonSerializable()
 class BoardPanelLink extends Equatable {
   const BoardPanelLink({
     required this.id,
@@ -404,6 +382,7 @@ class BoardPanelLink extends Equatable {
   final String toPanelId;
   final BoardLinkStyle style;
   final BoardLinkBehavior behavior;
+  @ColorJsonConverter()
   final Color color;
   final BoardLinkGeometry geometry;
 
@@ -427,33 +406,10 @@ class BoardPanelLink extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'fromPanelId': fromPanelId,
-    'toPanelId': toPanelId,
-    'style': style.name,
-    'behavior': behavior.name,
-    'color': color.toARGB32(),
-    'geometry': geometry.name,
-  };
+  Map<String, dynamic> toJson() => _$BoardPanelLinkToJson(this);
 
-  factory BoardPanelLink.fromJson(Map<String, dynamic> json) {
-    return BoardPanelLink(
-      id: json['id'] as String,
-      fromPanelId: json['fromPanelId'] as String,
-      toPanelId: json['toPanelId'] as String,
-      style: BoardLinkStyle.values.byName(
-        json['style'] as String? ?? BoardLinkStyle.arrow.name,
-      ),
-      behavior: BoardLinkBehavior.values.byName(
-        json['behavior'] as String? ?? BoardLinkBehavior.fixed.name,
-      ),
-      color: Color((json['color'] as num?)?.toInt() ?? 0xFF60A5FA),
-      geometry: BoardLinkGeometry.values.byName(
-        json['geometry'] as String? ?? BoardLinkGeometry.bezier.name,
-      ),
-    );
-  }
+  factory BoardPanelLink.fromJson(Map<String, dynamic> json) =>
+      _$BoardPanelLinkFromJson(json);
 
   @override
   List<Object?> get props => [

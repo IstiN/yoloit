@@ -255,9 +255,9 @@ class SessionSettingsState extends State<SessionSettings> {
             Container(
               height: 300,
               decoration: BoxDecoration(
-                color: colors.background,
+                color: context.appColors.background,
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: colors.border),
+                border: Border.all(color: context.appColors.border),
               ),
               child: SingleChildScrollView(
                 reverse: true,
@@ -273,8 +273,7 @@ class SessionSettingsState extends State<SessionSettings> {
               ),
             ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildLogsSection(BuildContext context) {
@@ -339,8 +338,7 @@ class SessionSettingsState extends State<SessionSettings> {
                   ),
                 )),
         ],
-      ),
-    );
+      );
   }
 
   void _showLogContent(BuildContext context, LogFile log) {

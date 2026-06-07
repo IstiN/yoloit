@@ -1,3 +1,8 @@
+import 'package:json_annotation/json_annotation.dart';
+
+part 'yoloitd_models.g.dart';
+
+@JsonSerializable()
 class RemoteBoard {
   const RemoteBoard({
     required this.id,
@@ -58,50 +63,13 @@ class RemoteBoard {
     'active': active,
   };
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'name': name,
-    'viewport': viewport,
-    'panels': panels.map((panel) => panel.toJson()).toList(),
-    'links': links,
-    'drawings': drawings,
-    'metadata': metadata,
-  };
+  Map<String, dynamic> toJson() => _$RemoteBoardToJson(this);
 
-  factory RemoteBoard.fromJson(Map<String, dynamic> json) {
-    return RemoteBoard(
-      id: json['id'] as String,
-      name: json['name'] as String? ?? 'Board',
-      viewport: Map<String, dynamic>.from(
-        json['viewport'] as Map? ??
-            const <String, dynamic>{
-              'scale': 1.0,
-              'translation': <String, dynamic>{'dx': 0.0, 'dy': 0.0},
-            },
-      ),
-      panels:
-          (json['panels'] as List? ?? const <Object?>[])
-              .whereType<Map<Object?, Object?>>()
-              .map(
-                (entry) =>
-                    RemotePanel.fromJson(Map<String, dynamic>.from(entry)),
-              )
-              .toList(),
-      links:
-          (json['links'] as List? ?? const <Object?>[])
-              .whereType<Map<Object?, Object?>>()
-              .map((entry) => Map<String, dynamic>.from(entry))
-              .toList(),
-      drawings:
-          (json['drawings'] as List? ?? const <Object?>[])
-              .whereType<Map<Object?, Object?>>()
-              .map((entry) => Map<String, dynamic>.from(entry))
-              .toList(),
-      metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? const {}),
-    );
-  }
+  factory RemoteBoard.fromJson(Map<String, dynamic> json) =>
+      _$RemoteBoardFromJson(json);
 }
 
+@JsonSerializable()
 class RemotePanel {
   const RemotePanel({
     required this.id,
@@ -118,15 +86,21 @@ class RemotePanel {
   });
 
   final String id;
+  @JsonKey(defaultValue: 'board.note.markdown')
   final String type;
+  @JsonKey(defaultValue: 'Panel')
   final String title;
   final RemotePanelBounds bounds;
   final Map<String, dynamic> state;
   final Map<String, dynamic> params;
   final int? color;
+  @JsonKey(defaultValue: 0)
   final int zIndex;
+  @JsonKey(defaultValue: false)
   final bool hidden;
+  @JsonKey(defaultValue: false)
   final bool locked;
+  @JsonKey(defaultValue: false)
   final bool pinned;
 
   RemotePanel copyWith({
@@ -157,39 +131,13 @@ class RemotePanel {
     );
   }
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'type': type,
-    'title': title,
-    'bounds': bounds.toJson(),
-    'state': state,
-    'params': params,
-    if (color != null) 'color': color,
-    'zIndex': zIndex,
-    'hidden': hidden,
-    'locked': locked,
-    'pinned': pinned,
-  };
+  Map<String, dynamic> toJson() => _$RemotePanelToJson(this);
 
-  factory RemotePanel.fromJson(Map<String, dynamic> json) {
-    return RemotePanel(
-      id: json['id'] as String,
-      type: json['type'] as String? ?? 'board.note.markdown',
-      title: json['title'] as String? ?? 'Panel',
-      bounds: RemotePanelBounds.fromJson(
-        Map<String, dynamic>.from(json['bounds'] as Map? ?? const {}),
-      ),
-      state: Map<String, dynamic>.from(json['state'] as Map? ?? const {}),
-      params: Map<String, dynamic>.from(json['params'] as Map? ?? const {}),
-      color: (json['color'] as num?)?.toInt(),
-      zIndex: (json['zIndex'] as num?)?.toInt() ?? 0,
-      hidden: json['hidden'] == true,
-      locked: json['locked'] == true,
-      pinned: json['pinned'] == true,
-    );
-  }
+  factory RemotePanel.fromJson(Map<String, dynamic> json) =>
+      _$RemotePanelFromJson(json);
 }
 
+@JsonSerializable()
 class RemotePanelBounds {
   const RemotePanelBounds({
     required this.x,
@@ -198,9 +146,13 @@ class RemotePanelBounds {
     required this.height,
   });
 
+  @JsonKey(defaultValue: 120.0)
   final double x;
+  @JsonKey(defaultValue: 120.0)
   final double y;
+  @JsonKey(defaultValue: 360.0)
   final double width;
+  @JsonKey(defaultValue: 240.0)
   final double height;
 
   RemotePanelBounds copyWith({
@@ -217,23 +169,13 @@ class RemotePanelBounds {
     );
   }
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'x': x,
-    'y': y,
-    'width': width,
-    'height': height,
-  };
+  Map<String, dynamic> toJson() => _$RemotePanelBoundsToJson(this);
 
-  factory RemotePanelBounds.fromJson(Map<String, dynamic> json) {
-    return RemotePanelBounds(
-      x: (json['x'] as num?)?.toDouble() ?? 120.0,
-      y: (json['y'] as num?)?.toDouble() ?? 120.0,
-      width: (json['width'] as num?)?.toDouble() ?? 360.0,
-      height: (json['height'] as num?)?.toDouble() ?? 240.0,
-    );
-  }
+  factory RemotePanelBounds.fromJson(Map<String, dynamic> json) =>
+      _$RemotePanelBoundsFromJson(json);
 }
 
+@JsonSerializable()
 class RemoteHistoryEvent {
   const RemoteHistoryEvent({
     required this.opId,
@@ -263,46 +205,15 @@ class RemoteHistoryEvent {
   final Map<String, dynamic> patch;
   final String? restoresOpId;
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'opId': opId,
-    'boardId': boardId,
-    'type': type,
-    'entityType': entityType,
-    'entityId': entityId,
-    'actorId': actorId,
-    'timestamp': timestamp.toUtc().toIso8601String(),
-    'revision': revision,
-    if (before != null) 'before': before,
-    if (after != null) 'after': after,
-    if (patch.isNotEmpty) 'patch': patch,
-    if (restoresOpId != null) 'restoresOpId': restoresOpId,
-  };
+  Map<String, dynamic> toJson() => _$RemoteHistoryEventToJson(this);
 
   factory RemoteHistoryEvent.fromJson(
     Map<String, dynamic> json, {
     String defaultActorId = 'remote',
   }) {
-    Map<String, dynamic>? readMap(String key) {
-      final value = json[key];
-      return value is Map ? Map<String, dynamic>.from(value) : null;
-    }
-
-    return RemoteHistoryEvent(
-      opId: json['opId'] as String,
-      boardId: json['boardId'] as String,
-      type: json['type'] as String,
-      entityType: json['entityType'] as String,
-      entityId: json['entityId'] as String,
-      actorId: json['actorId'] as String? ?? defaultActorId,
-      timestamp:
-          DateTime.tryParse(json['timestamp'] as String? ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
-      revision: (json['revision'] as num?)?.toInt() ?? 0,
-      before: readMap('before'),
-      after: readMap('after'),
-      patch: readMap('patch') ?? const <String, dynamic>{},
-      restoresOpId: json['restoresOpId'] as String?,
-    );
+    final mutable = Map<String, dynamic>.from(json);
+    mutable['actorId'] ??= defaultActorId;
+    return _$RemoteHistoryEventFromJson(mutable);
   }
 }
 
