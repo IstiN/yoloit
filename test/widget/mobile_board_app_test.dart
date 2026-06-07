@@ -18,7 +18,10 @@ void main() {
   });
 
   testWidgets('mobile board app starts without desktop shell', (tester) async {
-    await tester.pumpWidget(const MobileBoardApp());
+    final cubit = _FakeMobileBoardCubit();
+    addTearDown(cubit.close);
+
+    await tester.pumpWidget(MobileBoardApp(boardCubit: cubit));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 

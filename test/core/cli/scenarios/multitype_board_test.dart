@@ -124,12 +124,11 @@ void main() {
       final treeHandler = const FileTreeCliHandler();
       final panel = _panelForType('board.filetree');
 
-      // 'get' and 'set' are code snippet actions not in filetree
-      for (final codeAction in ['get', 'set']) {
-        final r = await treeHandler.handleAction(codeAction, {}, panel);
-        expect(r.ok, isFalse,
-            reason: 'FileTreeCliHandler should reject code snippet action "$codeAction"');
-      }
+      // 'set' is a code snippet action not in filetree
+      // (note: 'get' and 'list' are provided by PanelGetOpenCliHandler mixin)
+      final r = await treeHandler.handleAction('set', {}, panel);
+      expect(r.ok, isFalse,
+          reason: 'FileTreeCliHandler should reject code snippet action "set"');
     });
   });
 
