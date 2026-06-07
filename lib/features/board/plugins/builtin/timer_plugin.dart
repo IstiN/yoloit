@@ -13,6 +13,19 @@ import 'package:yoloit/features/board/plugins/builtin/timer_manager.dart';
 
 final _timerDefaultColors = AppColorScheme.fromAccent(Colors.blue);
 
+InputDecoration _outlineDecoration(AppColorScheme colors, {EdgeInsets? padding}) => InputDecoration(
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(8),
+    borderSide: BorderSide(color: colors.border),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(8),
+    borderSide: BorderSide(color: colors.accentBlue, width: 1.5),
+  ),
+  contentPadding: padding,
+  isDense: true,
+);
+
 class TimerPlugin extends BoardPanelPlugin {
   const TimerPlugin();
 
@@ -608,19 +621,6 @@ class _TimerContentState extends State<_TimerContent>
       ),
     );
   }
-
-  InputDecoration _outlineDecoration(AppColorScheme colors, {EdgeInsets? padding}) => InputDecoration(
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: colors.border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: colors.accentBlue, width: 1.5),
-    ),
-    contentPadding: padding,
-    isDense: true,
-  );
 }
 
 // ─── Time Field ──────────────────────────────────────────────────────────────

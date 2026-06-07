@@ -35,14 +35,14 @@ void main() {
         expect(json['attachments'], ['/a/b.png']);
       });
 
-      test('attachments omitted from json when empty', () {
+      test('attachments is empty list in json when empty', () {
         final msg = ChatMessage(
           id: 'x',
           role: ChatRole.user,
           content: 'text',
         );
         final json = msg.toJson();
-        expect(json.containsKey('attachments'), isFalse);
+        expect(json['attachments'], <String>[]);
       });
 
       test('fromJson with no attachments key returns empty list', () {

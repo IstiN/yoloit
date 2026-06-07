@@ -118,15 +118,27 @@ class ChatSessionEntry {
     this.messageCount = 0,
   });
 
+  @JsonKey(defaultValue: '')
   final String id;
+  @JsonKey(defaultValue: '')
   final String sessionName;
+  @JsonKey(defaultValue: 'copilot')
   final String provider;
+  @JsonKey(defaultValue: '')
   final String model;
+  @JsonKey(defaultValue: '')
   final String workingDir;
+  @JsonKey(defaultValue: <String>[])
   final List<String> envGroupIds;
+  @JsonKey(fromJson: _dateTimeFromJson, toJson: _dateTimeToJson)
   final DateTime createdAt;
   final DateTime? lastMessageAt;
+  @JsonKey(defaultValue: 0)
   final int messageCount;
+
+  static DateTime _dateTimeFromJson(dynamic json) =>
+      json == null ? DateTime.now() : DateTime.parse(json as String);
+  static String _dateTimeToJson(DateTime dt) => dt.toIso8601String();
 
   Map<String, dynamic> toJson() => _$ChatSessionEntryToJson(this);
 

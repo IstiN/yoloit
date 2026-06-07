@@ -180,7 +180,7 @@ void main() {
       final restored = BoardPanelInstance.fromJson(const <String, dynamic>{
         'id': 'p2',
         'type': 'chat',
-        'bounds': {},
+        'bounds': <String, dynamic>{},
       });
       expect(restored.title, 'Panel');
       expect(restored.color, isNull);

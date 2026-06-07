@@ -164,7 +164,7 @@ void main() {
       expect(restored.lastMessageAt, isNull);
     });
 
-    test('toJson omits envGroupIds when empty', () {
+    test('toJson writes empty envGroupIds when empty', () {
       final entry = ChatSessionEntry(
         id: 'sess-5',
         sessionName: 'NoEnv',
@@ -175,7 +175,7 @@ void main() {
       );
 
       final json = entry.toJson();
-      expect(json.containsKey('envGroupIds'), isFalse);
+      expect(json['envGroupIds'], <String>[]);
     });
 
     test('toJson includes envGroupIds when not empty', () {

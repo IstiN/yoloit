@@ -44,7 +44,7 @@ Map<String, dynamic> _$BoardPanelInstanceToJson(BoardPanelInstance instance) =>
       'id': instance.id,
       'type': instance.type,
       'title': instance.title,
-      'bounds': instance.bounds,
+      'bounds': instance.bounds.toJson(),
       'color': const ColorNullableJsonConverter().toJson(instance.color),
       'params': instance.params,
       'state': instance.state,

@@ -8,17 +8,17 @@ part of 'chat_session_history.dart';
 
 ChatSessionEntry _$ChatSessionEntryFromJson(Map<String, dynamic> json) =>
     ChatSessionEntry(
-      id: json['id'] as String,
-      sessionName: json['sessionName'] as String,
-      provider: json['provider'] as String,
-      model: json['model'] as String,
-      workingDir: json['workingDir'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      id: json['id'] as String? ?? '',
+      sessionName: json['sessionName'] as String? ?? '',
+      provider: json['provider'] as String? ?? 'copilot',
+      model: json['model'] as String? ?? '',
+      workingDir: json['workingDir'] as String? ?? '',
+      createdAt: ChatSessionEntry._dateTimeFromJson(json['createdAt']),
       envGroupIds:
           (json['envGroupIds'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
-          const [],
+          [],
       lastMessageAt:
           json['lastMessageAt'] == null
               ? null
@@ -34,7 +34,7 @@ Map<String, dynamic> _$ChatSessionEntryToJson(ChatSessionEntry instance) =>
       'model': instance.model,
       'workingDir': instance.workingDir,
       'envGroupIds': instance.envGroupIds,
-      'createdAt': instance.createdAt.toIso8601String(),
+      'createdAt': ChatSessionEntry._dateTimeToJson(instance.createdAt),
       'lastMessageAt': instance.lastMessageAt?.toIso8601String(),
       'messageCount': instance.messageCount,
     };

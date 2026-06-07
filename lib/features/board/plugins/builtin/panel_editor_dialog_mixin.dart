@@ -4,7 +4,7 @@ import 'package:yoloit/features/board/plugins/board_plugin.dart';
 
 /// Mixin for [PanelPlugin]s whose editor is a simple dialog built via
 /// [showPanelEditorDialog].
-mixin PanelEditorDialogMixin on PanelPlugin {
+mixin PanelEditorDialogMixin on BoardPanelPlugin {
   /// Builds the editor dialog widget for this panel.
   Widget buildEditorDialog(BuildContext context, BoardPanelInstance panel);
 

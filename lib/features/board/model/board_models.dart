@@ -236,7 +236,7 @@ class BoardViewport extends Equatable {
   List<Object?> get props => [scale, translation, focusedPanelId, zoomOnFocus];
 }
 
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true)
 class BoardPanelBounds extends Equatable {
   const BoardPanelBounds({
     required this.x,
@@ -281,7 +281,7 @@ class BoardPanelBounds extends Equatable {
   List<Object?> get props => [x, y, width, height];
 }
 
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true)
 class BoardPanelInstance extends Equatable {
   const BoardPanelInstance({
     required this.id,
@@ -365,7 +365,7 @@ class BoardPanelInstance extends Equatable {
   ];
 }
 
-@JsonSerializable()
+@JsonSerializable(explicitToJson: true)
 class BoardPanelLink extends Equatable {
   const BoardPanelLink({
     required this.id,
