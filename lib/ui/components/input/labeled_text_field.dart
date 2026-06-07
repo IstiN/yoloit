@@ -85,23 +85,44 @@ InputDecoration outlineInputDecoration({
   required AppColorScheme colors,
   String? hintText,
   String? labelText,
+  TextStyle? hintStyle,
+  TextStyle? labelStyle,
   double borderRadius = 8,
-  EdgeInsets contentPadding = const EdgeInsets.symmetric(
-    horizontal: 10,
-    vertical: 8,
-  ),
+  EdgeInsetsGeometry? contentPadding,
+  bool isDense = true,
+  Color? fillColor,
+  bool filled = false,
+  bool focused = true,
+  Widget? prefixIcon,
+  BoxConstraints? prefixIconConstraints,
+  Widget? suffixIcon,
+  BoxConstraints? suffixIconConstraints,
 }) {
   final border = OutlineInputBorder(
     borderRadius: BorderRadius.circular(borderRadius),
     borderSide: BorderSide(color: colors.border),
   );
   return InputDecoration(
-    isDense: true,
+    isDense: isDense,
     hintText: hintText,
     labelText: labelText,
-    hintStyle: TextStyle(color: colors.textMuted, fontSize: 12),
-    contentPadding: contentPadding,
+    hintStyle: hintStyle ?? TextStyle(color: colors.textMuted, fontSize: 12),
+    labelStyle: labelStyle,
+    contentPadding: contentPadding ??
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    filled: filled,
+    fillColor: fillColor,
+    prefixIcon: prefixIcon,
+    prefixIconConstraints: prefixIconConstraints,
+    suffixIcon: suffixIcon,
+    suffixIconConstraints: suffixIconConstraints,
     border: border,
     enabledBorder: border,
+    focusedBorder: focused
+        ? OutlineInputBorder(
+            borderRadius: BorderRadius.circular(borderRadius),
+            borderSide: BorderSide(color: colors.primary),
+          )
+        : null,
   );
 }

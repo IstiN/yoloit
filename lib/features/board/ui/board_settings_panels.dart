@@ -14,30 +14,12 @@ class DrawSettingsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final mutedColor =
-        context.appColors.textMuted;
-    return Container(
+    final mutedColor = colors.textMuted;
+    return _SettingsPanel(
       width: 160,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: colors.surface.withAlpha(0xE5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Draw settings',
-            style: TextStyle(
-              color: mutedColor,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Color swatches
+      title: 'Draw settings',
+      children: [
+        // Color swatches
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -122,26 +104,68 @@ class DrawSettingsPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          // Stroke width slider
-          Text('Size', style: TextStyle(color: mutedColor, fontSize: 11)),
-          SliderTheme(
-            data: SliderThemeData(
-              trackHeight: 2,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-              activeTrackColor: settings.strokeColor,
-              thumbColor: settings.strokeColor,
-              overlayColor: settings.strokeColor.withAlpha(40),
-              inactiveTrackColor: colors.border,
-            ),
-            child: Slider(
-              value: settings.strokeWidth,
-              min: 1,
-              max: 20,
-              onChanged: (v) => onChanged(settings.copyWith(strokeWidth: v)),
+        const SizedBox(height: 8),
+        // Stroke width slider
+        Text('Size', style: TextStyle(color: mutedColor, fontSize: 11)),
+        SliderTheme(
+          data: SliderThemeData(
+            trackHeight: 2,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+            activeTrackColor: settings.strokeColor,
+            thumbColor: settings.strokeColor,
+            overlayColor: settings.strokeColor.withAlpha(40),
+            inactiveTrackColor: colors.border,
+          ),
+          child: Slider(
+            value: settings.strokeWidth,
+            min: 1,
+            max: 20,
+            onChanged: (v) => onChanged(settings.copyWith(strokeWidth: v)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsPanel extends StatelessWidget {
+  const _SettingsPanel({
+    required this.width,
+    required this.title,
+    required this.children,
+  });
+
+  final double width;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final mutedColor = colors.textMuted;
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colors.surface.withAlpha(0xE5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: mutedColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(height: 8),
+          ...children,
         ],
       ),
     );
@@ -161,31 +185,13 @@ class ConnectSettingsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final mutedColor =
-        context.appColors.textMuted;
+    final mutedColor = colors.textMuted;
     final activeColor = settings.color;
-    return Container(
+    return _SettingsPanel(
       width: 200,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: colors.surface.withAlpha(0xE5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Connect',
-            style: TextStyle(
-              color: mutedColor,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          // ── Live mini preview ──────────────────────────────────────────
+      title: 'Connect',
+      children: [
+        // ── Live mini preview ──────────────────────────────────────────
           SizedBox(
             height: 56,
             width: double.infinity,
@@ -324,7 +330,6 @@ class ConnectSettingsPanel extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
+      );
   }
 }

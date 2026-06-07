@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/form_decoration.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 import 'package:yoloit/features/settings/data/cloud_llm_settings_service.dart';
 
 /// Dialog for picking ASR configuration (Default / Local / Cloud + Provider + Model).
@@ -60,7 +60,7 @@ class AsrPickerDialogState extends State<AsrPickerDialog> {
     final catalog = _catalogModels;
 
     final inputDecoration = outlineInputDecoration(
-      colors,
+      colors: colors,
       focused: false,
     );
 

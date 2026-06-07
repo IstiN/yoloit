@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/form_decoration.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 /// HSV-based color picker dialog.
@@ -138,7 +138,7 @@ class ColorPickerDialogState extends State<ColorPickerDialog> {
                         fontFamily: 'SF Mono',
                       ),
                       decoration: outlineInputDecoration(
-                        colors,
+                        colors: colors,
                         labelText: 'Hex',
                         labelStyle: TextStyle(
                           color: colors.textMuted,

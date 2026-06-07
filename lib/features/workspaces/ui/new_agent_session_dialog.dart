@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
-import 'package:yoloit/core/theme/form_decoration.dart';
+import 'package:yoloit/ui/components/input/labeled_text_field.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
@@ -363,7 +363,7 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
       controller: controller,
       style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
       decoration: outlineInputDecoration(
-        colors,
+        colors: colors,
         hintText: hint,
         hintStyle: TextStyle(color: context.appColors.textMuted, fontSize: 12),
         filled: true,
@@ -507,7 +507,7 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
             _exactMatch ? _select(q) : _select(q, isNew: true);
           },
           decoration: outlineInputDecoration(
-            colors,
+            colors: colors,
             hintText: 'Search or create branch…',
             hintStyle:
                 TextStyle(color: context.appColors.textMuted, fontSize: 12),
