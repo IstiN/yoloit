@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/theme/form_decoration.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/ui/components/input/labeled_text_field.dart';
@@ -623,19 +624,12 @@ class _EnvGroupPickerDialogState extends State<_EnvGroupPickerDialog> {
         color: colors.textPrimary,
         fontFamily: 'monospace',
       ),
-      decoration: InputDecoration(
-        isDense: true,
+      decoration: outlineInputDecoration(
+        colors,
         hintText: hint,
         hintStyle: TextStyle(fontSize: 11, color: colors.textMuted),
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: colors.border),
-        ),
+        focused: false,
       ),
     );
   }

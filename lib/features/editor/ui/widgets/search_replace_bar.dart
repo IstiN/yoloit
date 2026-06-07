@@ -3,6 +3,7 @@ import 'package:flutter_code_editor/flutter_code_editor.dart';
 // ignore: implementation_imports
 import 'package:flutter_code_editor/src/search/search_navigation_state.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/ui/components/buttons/overlay_icon_button.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 class SearchReplaceBar extends StatelessWidget {
@@ -66,25 +67,29 @@ class SearchReplaceBar extends StatelessWidget {
                 },
               ),
               const SizedBox(width: 4),
-              MiniIconButton(
+              OverlayIconButton(
+                mini: true,
                 icon: Icons.keyboard_arrow_up,
                 tooltip: 'Previous',
                 onTap:
                     controller.searchController.navigationController.movePrevious,
               ),
-              MiniIconButton(
+              OverlayIconButton(
+                mini: true,
                 icon: Icons.keyboard_arrow_down,
                 tooltip: 'Next',
                 onTap:
                     controller.searchController.navigationController.moveNext,
               ),
-              MiniIconButton(
+              OverlayIconButton(
+                mini: true,
                 icon: Icons.find_replace,
                 tooltip: 'Replace',
                 active: showReplace,
                 onTap: onToggleReplace,
               ),
-              MiniIconButton(
+              OverlayIconButton(
+                mini: true,
                 icon: Icons.close,
                 tooltip: 'Close',
                 onTap:
@@ -164,45 +169,6 @@ class SearchField extends StatelessWidget {
             borderSide: BorderSide(color: colors.primary),
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        ),
-      ),
-    );
-  }
-}
-
-class MiniIconButton extends StatelessWidget {
-  const MiniIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.active = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.appColors;
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: active ? colors.primary.withAlpha(50) : Colors.transparent,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Icon(
-            icon,
-            size: 15,
-            color: active ? colors.primaryLight : colors.textMuted,
-          ),
         ),
       ),
     );

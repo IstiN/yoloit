@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/theme/form_decoration.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
@@ -361,26 +362,12 @@ class _NewAgentSessionDialogState extends State<NewAgentSessionDialog> {
     return TextField(
       controller: controller,
       style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12),
-      decoration: InputDecoration(
+      decoration: outlineInputDecoration(
+        colors,
         hintText: hint,
         hintStyle: TextStyle(color: context.appColors.textMuted, fontSize: 12),
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         filled: true,
         fillColor: colors.surfaceHighlight,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(6),
-          borderSide: BorderSide(color: colors.primary),
-        ),
       ),
     );
   }
@@ -519,11 +506,11 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
             }
             _exactMatch ? _select(q) : _select(q, isNew: true);
           },
-          decoration: InputDecoration(
+          decoration: outlineInputDecoration(
+            colors,
             hintText: 'Search or create branch…',
             hintStyle:
                 TextStyle(color: context.appColors.textMuted, fontSize: 12),
-            isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             filled: true,
@@ -549,18 +536,6 @@ class _BranchPickerFieldState extends State<_BranchPickerField> {
                         size: 14, color: context.appColors.textMuted),
                   ),
             suffixIconConstraints: const BoxConstraints(minWidth: 0),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: colors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: colors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(color: colors.primary),
-            ),
           ),
         ),
       ),
