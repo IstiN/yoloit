@@ -7,6 +7,7 @@ import 'package:yoloit/app.dart';
 import 'package:yoloit/core/cli/real_llm_tool_test_runner.dart';
 import 'package:yoloit/core/config/app_config.dart';
 import 'package:yoloit/core/hotkeys/hotkey_registry.dart';
+import 'package:yoloit/core/platform/macos_cli_setup_service.dart';
 import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/theme/theme_manager.dart';
@@ -78,6 +79,8 @@ void main(List<String> args) async {
   await ThemeManager.instance.load();
   await HotkeyRegistry.instance.load();
   await AppConfig.instance.load();
+  // Ensure CLI symlinks and PATH entries are set up (macOS only, best-effort).
+  unawaited(MacosCliSetupService.instance.ensureInstalled());
   // Init TmuxService early so board terminal panels can reattach to existing
   // tmux sessions during the first frame — before TerminalCubit.initialize()
   // runs in its postFrameCallback.
