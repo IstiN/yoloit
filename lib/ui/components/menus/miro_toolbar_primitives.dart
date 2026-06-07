@@ -2,6 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 
+Widget _toolbarPopup<T>({
+  required String tooltip,
+  required List<T> values,
+  required ValueChanged<T> onSelected,
+  required PopupMenuItem<T> Function(T value) buildItem,
+  required Widget child,
+}) {
+  return Tooltip(
+    message: tooltip,
+    child: PopupMenuButton<T>(
+      tooltip: tooltip,
+      onSelected: onSelected,
+      itemBuilder:
+          (context) => values.map(buildItem).toList(growable: false),
+      child: child,
+    ),
+  );
+}
+
 class MiroToolbarValueMenu<T> extends StatelessWidget {
   const MiroToolbarValueMenu({
     super.key,
@@ -21,31 +40,25 @@ class MiroToolbarValueMenu<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.onSurface;
-    return Tooltip(
-      message: tooltip,
-      child: PopupMenuButton<T>(
-        tooltip: tooltip,
-        onSelected: onSelected,
-        itemBuilder:
-            (context) => values
-                .map(
-                  (value) => PopupMenuItem<T>(
-                    value: value,
-                    child: Text(itemLabel(value)),
-                  ),
-                )
-                .toList(growable: false),
-        child: SizedBox(
-          height: 36,
-          width: 46,
-          child: Center(
-            child: Text(
-              valueLabel,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
+    return _toolbarPopup<T>(
+      tooltip: tooltip,
+      values: values,
+      onSelected: onSelected,
+      buildItem:
+          (value) => PopupMenuItem<T>(
+            value: value,
+            child: Text(itemLabel(value)),
+          ),
+      child: SizedBox(
+        height: 36,
+        width: 46,
+        child: Center(
+          child: Text(
+            valueLabel,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -165,32 +178,26 @@ class MiroToolbarIconValueMenu<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.onSurface;
-    return Tooltip(
-      message: tooltip,
-      child: PopupMenuButton<T>(
-        tooltip: tooltip,
-        onSelected: onSelected,
-        itemBuilder:
-            (context) => values
-                .map(
-                  (value) => PopupMenuItem<T>(
-                    value: value,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(itemIcon(value), size: 19, color: textColor),
-                        const SizedBox(width: 10),
-                        Text(itemLabel(value)),
-                      ],
-                    ),
-                  ),
-                )
-                .toList(growable: false),
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Icon(icon, size: 20, color: textColor),
-        ),
+    return _toolbarPopup<T>(
+      tooltip: tooltip,
+      values: values,
+      onSelected: onSelected,
+      buildItem:
+          (value) => PopupMenuItem<T>(
+            value: value,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(itemIcon(value), size: 19, color: textColor),
+                const SizedBox(width: 10),
+                Text(itemLabel(value)),
+              ],
+            ),
+          ),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Icon(icon, size: 20, color: textColor),
       ),
     );
   }
