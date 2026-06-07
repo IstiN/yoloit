@@ -743,4 +743,5 @@ class AgentRowState extends State<AgentRow> {
       ),
     );
   }
+
 }

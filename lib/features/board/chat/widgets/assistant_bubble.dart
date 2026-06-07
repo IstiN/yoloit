@@ -4,6 +4,7 @@ import 'package:yoloit/core/platform/platform_launcher.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_attachment_preview.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_bubble_menu.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_markdown_styles.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 
 class AssistantBubble extends StatefulWidget {
@@ -48,8 +49,6 @@ class AssistantBubbleState extends State<AssistantBubble> {
     final textColor =
         Theme.of(context).textTheme.bodyMedium?.color ??
         Theme.of(context).colorScheme.onSurface;
-    final mutedColor =
-        context.appColors.textMuted.withAlpha(153);
     final codeBg = colors.surface;
     final processedContent = widget.content.replaceAll(
       RegExp(r'<br\s*/?>'),
@@ -128,15 +127,7 @@ class AssistantBubbleState extends State<AssistantBubble> {
                         constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
                         child: Container(
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: colors.surfaceElevated,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(4),
-                              topRight: Radius.circular(16),
-                              bottomLeft: Radius.circular(16),
-                              bottomRight: Radius.circular(16),
-                            ),
-                          ),
+                          decoration: chatBubbleDecoration(colors),
                           child: RepaintBoundary(
                             child: SelectionArea(
                               child: MarkdownBody(
@@ -149,48 +140,11 @@ class AssistantBubbleState extends State<AssistantBubble> {
                                     PlatformLauncher.instance.openUrl(href);
                                   }
                                 },
-                                styleSheet: MarkdownStyleSheet(
-                                  p: TextStyle(
-                                    fontSize: 13,
-                                    color: textColor,
-                                    height: 1.5,
-                                  ),
-                                  a: TextStyle(
-                                    fontSize: 13,
-                                    color: colors.primary,
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                  code: TextStyle(
-                                    fontSize: 11.5,
-                                    fontFamily: 'JetBrains Mono',
-                                    color: colors.terminalPrompt,
-                                    backgroundColor: codeBg,
-                                  ),
-                                  codeblockDecoration: BoxDecoration(
-                                    color: codeBg,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: colors.border),
-                                  ),
-                                  codeblockPadding: const EdgeInsets.all(10),
-                                  listBullet: TextStyle(
-                                    fontSize: 13,
-                                    color: mutedColor,
-                                  ),
-                                  h1: TextStyle(
-                                    fontSize: 16,
-                                    color: textColor,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  h2: TextStyle(
-                                    fontSize: 14,
-                                    color: textColor,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  h3: TextStyle(
-                                    fontSize: 13,
-                                    color: textColor,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                styleSheet: chatMarkdownStyle(
+                                  context: context,
+                                  colors: colors,
+                                  textColor: textColor,
+                                  codeBg: codeBg,
                                 ),
                               ),
                             ),

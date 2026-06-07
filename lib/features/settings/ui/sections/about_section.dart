@@ -91,14 +91,7 @@ class AboutSectionState extends State<AboutSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── App info ────────────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: colors.background,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
-          ),
-          child: Column(
+        _card(colors, child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -175,19 +168,11 @@ class AboutSectionState extends State<AboutSection> {
                 ),
               ),
             ],
-          ),
-        ),
+          )),
         const SizedBox(height: 16),
 
         // ── Update section ──────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: colors.background,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
-          ),
-          child: Column(
+        _card(colors, child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -327,11 +312,20 @@ class AboutSectionState extends State<AboutSection> {
                   ),
               ],
             ],
-          ),
-        ),
+          )),
       ],
     );
   }
+
+  Widget _card(AppColorScheme colors, {required Widget child}) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: colors.background,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: colors.border),
+    ),
+    child: child,
+  );
 }
 
 class UpdateAvailableCard extends StatelessWidget {

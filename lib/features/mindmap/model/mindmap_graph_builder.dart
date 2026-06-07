@@ -15,16 +15,77 @@ import 'package:yoloit/features/workspaces/bloc/workspace_state.dart';
 
 /// Reads the current branch name from a git directory (main repo or worktree)
 /// by inspecting the HEAD file — no subprocess, instant.
+String _branchFromHead(String headPath) {
+  try {
+    final head = File(headPath).readAsStringSync().trim();
+    if (head.startsWith('ref: refs/heads/')) {
+      return head.substring('ref: refs/heads/'.length);
+    }
+    return head.length >= 7 ? head.substring(0, 7) : head;
+  } catch (_) {
+    return 'HEAD';
+  }
+}
+
+void _addRepoAndBranch({
+  required List<MindMapNodeData> nodes,
+  required List<MindMapConnection> conns,
+  required String agentNodeId,
+  required String repoNodeId,
+  required String branchNodeId,
+  required String sessionId,
+  required String repoPath,
+  required String repoName,
+  required String branch,
+  required AppColorScheme palette,
+}) {
+  if (!nodes.any((node) => node.id == repoNodeId)) {
+    nodes.add(
+      RepoNodeData(
+        id: repoNodeId,
+        sessionId: sessionId,
+        repoPath: repoPath,
+        repoName: repoName,
+        branch: branch,
+      ),
+    );
+  }
+  conns.add(
+    MindMapConnection(
+      fromId: agentNodeId,
+      toId: repoNodeId,
+      style: ConnectorStyle.solid,
+      color: palette.accentBlue.withValues(alpha: 0.35),
+    ),
+  );
+
+  if (!nodes.any((node) => node.id == branchNodeId)) {
+    nodes.add(
+      BranchNodeData(
+        id: branchNodeId,
+        repoId: repoNodeId,
+        repoName: repoName,
+        branch: branch,
+        commitHash: '',
+      ),
+    );
+  }
+  conns.add(
+    MindMapConnection(
+      fromId: repoNodeId,
+      toId: branchNodeId,
+      style: ConnectorStyle.dashed,
+      color: palette.primary.withValues(alpha: 0.35),
+    ),
+  );
+}
+
 String _branchFromDir(String dirPath) {
   try {
     // Main repo: .git is a directory → HEAD lives inside it.
     final dotGitDir = Directory('$dirPath/.git');
     if (dotGitDir.existsSync()) {
-      final head = File('$dirPath/.git/HEAD').readAsStringSync().trim();
-      if (head.startsWith('ref: refs/heads/')) {
-        return head.substring('ref: refs/heads/'.length);
-      }
-      return head.length >= 7 ? head.substring(0, 7) : head;
+      return _branchFromHead('$dirPath/.git/HEAD');
     }
     // Worktree: .git is a file containing "gitdir: <absolute-path>"
     final dotGitFile = File('$dirPath/.git');
@@ -35,11 +96,7 @@ String _branchFromDir(String dirPath) {
         if (!gitdir.startsWith('/')) {
           gitdir = p.normalize('$dirPath/$gitdir');
         }
-        final head = File('$gitdir/HEAD').readAsStringSync().trim();
-        if (head.startsWith('ref: refs/heads/')) {
-          return head.substring('ref: refs/heads/'.length);
-        }
-        return head.length >= 7 ? head.substring(0, 7) : head;
+        return _branchFromHead('$gitdir/HEAD');
       }
     }
   } catch (_) {}
@@ -140,44 +197,17 @@ buildMindMapGraph({
         final repoNodeId = 'repo:${ws.id}:$originalRepoPath:$branchName';
         final branchNodeId = 'branch:${ws.id}:$originalRepoPath:$branchName';
 
-        if (!nodes.any((node) => node.id == repoNodeId)) {
-          nodes.add(
-            RepoNodeData(
-              id: repoNodeId,
-              sessionId: session.id,
-              repoPath: effectivePath,
-              repoName: repoName,
-              branch: branchName,
-            ),
-          );
-        }
-        conns.add(
-          MindMapConnection(
-            fromId: agentNodeId,
-            toId: repoNodeId,
-            style: ConnectorStyle.solid,
-            color: palette.accentBlue.withValues(alpha: 0.35),
-          ),
-        );
-
-        if (!nodes.any((node) => node.id == branchNodeId)) {
-          nodes.add(
-            BranchNodeData(
-              id: branchNodeId,
-              repoId: repoNodeId,
-              repoName: repoName,
-              branch: branchName,
-              commitHash: '',
-            ),
-          );
-        }
-        conns.add(
-          MindMapConnection(
-            fromId: repoNodeId,
-            toId: branchNodeId,
-            style: ConnectorStyle.dashed,
-            color: palette.primary.withValues(alpha: 0.35),
-          ),
+        _addRepoAndBranch(
+          nodes: nodes,
+          conns: conns,
+          agentNodeId: agentNodeId,
+          repoNodeId: repoNodeId,
+          branchNodeId: branchNodeId,
+          sessionId: session.id,
+          repoPath: effectivePath,
+          repoName: repoName,
+          branch: branchName,
+          palette: palette,
         );
       }
     }
@@ -227,43 +257,17 @@ buildMindMapGraph({
         final repoName = p.basename(repoPath);
         final repoNodeId = 'repo:orphan:$repoPath';
         final branchNodeId = 'branch:orphan:$repoPath';
-        if (!nodes.any((node) => node.id == repoNodeId)) {
-          nodes.add(
-            RepoNodeData(
-              id: repoNodeId,
-              sessionId: session.id,
-              repoPath: repoPath,
-              repoName: repoName,
-              branch: p.basename(branchRef),
-            ),
-          );
-        }
-        conns.add(
-          MindMapConnection(
-            fromId: agentNodeId,
-            toId: repoNodeId,
-            style: ConnectorStyle.solid,
-            color: palette.accentBlue.withValues(alpha: 0.35),
-          ),
-        );
-        if (!nodes.any((node) => node.id == branchNodeId)) {
-          nodes.add(
-            BranchNodeData(
-              id: branchNodeId,
-              repoId: repoNodeId,
-              repoName: repoName,
-              branch: p.basename(branchRef),
-              commitHash: '',
-            ),
-          );
-        }
-        conns.add(
-          MindMapConnection(
-            fromId: repoNodeId,
-            toId: branchNodeId,
-            style: ConnectorStyle.dashed,
-            color: palette.primary.withValues(alpha: 0.35),
-          ),
+        _addRepoAndBranch(
+          nodes: nodes,
+          conns: conns,
+          agentNodeId: agentNodeId,
+          repoNodeId: repoNodeId,
+          branchNodeId: branchNodeId,
+          sessionId: session.id,
+          repoPath: repoPath,
+          repoName: repoName,
+          branch: p.basename(branchRef),
+          palette: palette,
         );
       }
     }
