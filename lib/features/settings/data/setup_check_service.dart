@@ -129,12 +129,20 @@ class SetupCheckService {
       } catch (_) {}
     }
 
-    final existing = current.split(':').where((p) => p.isNotEmpty).toSet();
+    return _mergePath(current, candidates, ':');
+  }
+
+  static String _mergePath(
+    String current,
+    List<String> candidates,
+    String separator,
+  ) {
+    final existing = current.split(separator).where((p) => p.isNotEmpty).toSet();
     final merged = <String>[
       ...candidates.where((c) => !existing.contains(c)),
-      ...current.split(':').where((p) => p.isNotEmpty),
+      ...current.split(separator).where((p) => p.isNotEmpty),
     ];
-    return merged.join(':');
+    return merged.join(separator);
   }
 
   static String _buildExtendedPathWindows() {
@@ -173,12 +181,7 @@ class SetupCheckService {
       if (localAppData.isNotEmpty) '$localAppData\\fnm',
     ];
 
-    final existing = current.split(';').where((p) => p.isNotEmpty).toSet();
-    final merged = <String>[
-      ...candidates.where((c) => !existing.contains(c)),
-      ...current.split(';').where((p) => p.isNotEmpty),
-    ];
-    return merged.join(';');
+    return _mergePath(current, candidates, ';');
   }
 
   static String _buildExtendedPathLinux() {
@@ -198,12 +201,7 @@ class SetupCheckService {
       if (home.isNotEmpty) '$home/.volta/bin',
     ];
 
-    final existing = current.split(':').where((p) => p.isNotEmpty).toSet();
-    final merged = <String>[
-      ...candidates.where((c) => !existing.contains(c)),
-      ...current.split(':').where((p) => p.isNotEmpty),
-    ];
-    return merged.join(':');
+    return _mergePath(current, candidates, ':');
   }
 
   static String? _extendedPath;
@@ -770,6 +768,11 @@ class SetupCheckService {
     }
   }
 
+  static String? _extractOutput(ProcessResult r) {
+    final out = (r.stdout as String).trim().split('\n').first.trim();
+    return (r.exitCode == 0 && out.isNotEmpty) ? out : null;
+  }
+
   /// Windows-specific path resolution.
   /// Uses PowerShell `Get-Command` (reads registry PATH) then falls back to
   /// `where.exe` with our manually extended PATH.
@@ -782,8 +785,8 @@ class SetupCheckService {
         '-Command',
         'try { (Get-Command "$cmd" -ErrorAction Stop).Source } catch { exit 1 }',
       ], runInShell: false).timeout(const Duration(seconds: 8));
-      final out = (r.stdout as String).trim().split('\n').first.trim();
-      if (r.exitCode == 0 && out.isNotEmpty) return out;
+      final out = _extractOutput(r);
+      if (out != null) return out;
     } catch (_) {}
 
     // 2) where.exe with our extended PATH as fallback
@@ -794,8 +797,8 @@ class SetupCheckService {
         environment: _env,
         runInShell: true,
       ).timeout(const Duration(seconds: 5));
-      final out = (r.stdout as String).trim().split('\n').first.trim();
-      if (r.exitCode == 0 && out.isNotEmpty) return out;
+      final out = _extractOutput(r);
+      if (out != null) return out;
     } catch (_) {}
 
     return null;
