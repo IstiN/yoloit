@@ -3,12 +3,13 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
+import 'package:yoloit/features/board/plugins/builtin/panel_editor_dialog_mixin.dart';
 import 'package:yoloit/ui/components/color_swatch_row.dart';
 import 'package:yoloit/ui/components/dialog/editor_dialog_actions.dart';
 import 'package:yoloit/ui/components/input/panel_text_controller_mixin.dart';
 import 'package:yoloit/ui/components/typography/editor_section_label.dart';
 
-class StickyNotePlugin extends BoardPanelPlugin {
+class StickyNotePlugin extends BoardPanelPlugin with PanelEditorDialogMixin {
   const StickyNotePlugin();
 
   static const String kTypeId = 'board.sticky';
@@ -71,16 +72,8 @@ class StickyNotePlugin extends BoardPanelPlugin {
   }
 
   @override
-  Future<bool> showEditor(
-    BuildContext context,
-    BoardPanelInstance panel,
-    ValueChanged<Map<String, dynamic>> onSave,
-  ) => showPanelEditorDialog(
-    context,
-    panel,
-    onSave,
-    (ctx) => _StickyEditorDialog(panel: panel),
-  );
+  Widget buildEditorDialog(BuildContext context, BoardPanelInstance panel) =>
+      _StickyEditorDialog(panel: panel);
 }
 
 class _StickyNoteContent extends StatefulWidget {

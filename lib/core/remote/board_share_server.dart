@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:yoloit/core/setup/setup_catalog.dart';
+import 'package:yoloit/core/utils/directory_utils.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
@@ -279,27 +280,16 @@ class BoardShareServer {
       }, 404);
     }
 
-    final entries = <Map<String, Object?>>[];
-    await for (final entity in directory.list(followLinks: false)) {
-      final stat = await entity.stat();
-      if (stat.type != FileSystemEntityType.directory &&
-          stat.type != FileSystemEntityType.file) {
-        continue;
-      }
-      entries.add(<String, Object?>{
-        'name': _fileName(entity.path),
-        'path': entity.path,
-        'isDirectory': stat.type == FileSystemEntityType.directory,
-      });
-    }
-    entries.sort((a, b) {
-      final aDir = a['isDirectory'] == true;
-      final bDir = b['isDirectory'] == true;
-      if (aDir != bDir) return aDir ? -1 : 1;
-      return (a['name'] as String).toLowerCase().compareTo(
-        (b['name'] as String).toLowerCase(),
-      );
-    });
+    final dirEntries = await listDirectoryEntries(directory);
+    final entries = dirEntries
+        .map(
+          (e) => <String, Object?>{
+            'name': e.name,
+            'path': e.path,
+            'isDirectory': e.isDirectory,
+          },
+        )
+        .toList();
 
     return _json(<String, Object?>{
       'ok': true,
@@ -496,21 +486,19 @@ class BoardShareServer {
   }
 
   List<Map<String, Object?>> _fileRoots() {
-    final roots = <Map<String, Object?>>[];
-    final seen = <String>{};
-    void addRoot(String name, String? path) {
-      final value = path?.trim();
-      if (value == null || value.isEmpty || !seen.add(value)) return;
-      roots.add(<String, Object?>{
-        'name': name,
-        'path': value,
-        'isDirectory': true,
-      });
-    }
-
-    addRoot('Home', _homePath());
-    addRoot('Current', Directory.current.path);
-    return roots;
+    final unique = buildUniqueRoots({
+      'Home': _homePath(),
+      'Current': Directory.current.path,
+    });
+    return unique.entries
+        .map(
+          (e) => <String, Object?>{
+            'name': e.key,
+            'path': e.value,
+            'isDirectory': true,
+          },
+        )
+        .toList();
   }
 
   String _defaultFileRoot() => _homePath() ?? Directory.current.path;
@@ -522,15 +510,6 @@ class BoardShareServer {
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
-  static String _fileName(String path) {
-    final normalized =
-        path.endsWith(Platform.pathSeparator)
-            ? path.substring(0, path.length - 1)
-            : path;
-    final index = normalized.lastIndexOf(Platform.pathSeparator);
-    if (index == -1) return normalized;
-    return normalized.substring(index + 1);
-  }
 
   Future<({String executable, List<String> arguments})> _terminalLauncher(
     String shell,

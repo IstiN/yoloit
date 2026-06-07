@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:yoloit/core/platform/platform_shell.dart';
+import 'package:yoloit/core/utils/yoloit_bin_resolver.dart';
 
 /// Resolves the `yoloit` CLI binary path and builds enriched PATH strings
 /// for CLI providers that need to expose YoLoIT commands to sub-processes
@@ -20,42 +21,9 @@ class CliYoloitResolver {
     final cached = _cached;
     if (cached != null && File(cached).existsSync()) return cached;
 
-    final home = Platform.environment['HOME'] ?? '';
-    if (home.isNotEmpty) {
-      final installed = File('$home/.config/yoloit/yoloit');
-      if (installed.existsSync()) {
-        _cached = installed.path;
-        return installed.path;
-      }
-    }
-
-    final roots = <Directory>[];
-    void addRoot(String path) {
-      if (path.isEmpty) return;
-      final dir = Directory(path).absolute;
-      if (roots.any((existing) => existing.path == dir.path)) return;
-      roots.add(dir);
-    }
-
-    addRoot(Directory.current.path);
-    addRoot(File(Platform.resolvedExecutable).parent.path);
-
-    for (final root in roots) {
-      var current = root;
-      for (var depth = 0; depth < 6; depth++) {
-        final candidate = File(
-          '${current.path}${Platform.pathSeparator}tools${Platform.pathSeparator}yoloit',
-        );
-        if (candidate.existsSync()) {
-          _cached = candidate.path;
-          return candidate.path;
-        }
-        final parent = current.parent;
-        if (parent.path == current.path) break;
-        current = parent;
-      }
-    }
-    return null;
+    final result = resolveYoloitBin(maxDepth: 6);
+    _cached = result;
+    return result;
   }
 
   /// Build a session PATH that prepends the directory containing [yoloitBin]

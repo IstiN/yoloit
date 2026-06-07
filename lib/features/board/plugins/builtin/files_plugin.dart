@@ -4,6 +4,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
+import 'package:yoloit/ui/widgets/hover_listener.dart';
 
 final _filesDefaultColors = AppColorScheme.fromAccent(Colors.pink);
 
@@ -283,86 +284,84 @@ class _FileTile extends StatefulWidget {
 }
 
 class _FileTileState extends State<_FileTile> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        color:
-            _hovered
-                ? colors.textPrimary.withValues(alpha: 0.03)
-                : Colors.transparent,
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: colors.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(widget.icon, size: 18, color: colors.primary),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    widget.path,
-                    style: TextStyle(fontSize: 10, color: colors.textSecondary),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ],
-              ),
-            ),
-            if (_hovered) ...[
-              if (widget.onOpenAsPanel != null)
-                IconButton(
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  tooltip: 'Open as preview panel',
-                  onPressed: widget.onOpenAsPanel,
-                  padding: const EdgeInsets.all(4),
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                  color: colors.primaryLight,
+    return HoverListener(
+      builder: (context, hovered) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color:
+              hovered
+                  ? colors.textPrimary.withValues(alpha: 0.03)
+                  : Colors.transparent,
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-              IconButton(
-                icon: const Icon(Icons.folder_open_outlined, size: 16),
-                tooltip: 'Reveal in Finder',
-                onPressed: widget.onReveal,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color: colors.textMuted,
+                child: Icon(widget.icon, size: 18, color: colors.primary),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 16),
-                tooltip: 'Remove',
-                onPressed: widget.onDelete,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                color: colors.accentRed,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      widget.path,
+                      style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
               ),
+              if (hovered) ...[
+                if (widget.onOpenAsPanel != null)
+                  IconButton(
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    tooltip: 'Open as preview panel',
+                    onPressed: widget.onOpenAsPanel,
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                    color: colors.primaryLight,
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.folder_open_outlined, size: 16),
+                  tooltip: 'Reveal in Finder',
+                  onPressed: widget.onReveal,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  color: colors.textMuted,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  tooltip: 'Remove',
+                  onPressed: widget.onDelete,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  color: colors.accentRed,
+                ),
+              ],
             ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

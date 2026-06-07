@@ -10,6 +10,16 @@ class VoiceOverlayDebug extends StatefulWidget {
 }
 
 class _VoiceOverlayDebugState extends State<VoiceOverlayDebug> {
+  InputDecoration _darkInputDecoration() => const InputDecoration(
+    filled: true,
+    fillColor: Color(0xFF1E2030),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(8)),
+      borderSide: BorderSide(color: Color(0xFF3A3C4E)),
+    ),
+    contentPadding: EdgeInsets.all(12),
+  );
+
   String _voiceStatus = 'idle';
   bool _simulateToolsInProcessing = false;
   double _scale = 0.7;
@@ -263,15 +273,7 @@ class _VoiceOverlayDebugState extends State<VoiceOverlayDebug> {
             controller: TextEditingController(text: _voiceResponse),
             onChanged: (v) => setState(() => _voiceResponse = v),
             style: const TextStyle(color: Colors.white, fontSize: 13),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color(0xFF1E2030),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF3A3C4E)),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
+            decoration: _darkInputDecoration(),
           ),
           const SizedBox(height: 12),
           const Label('Transcript Text'),
@@ -280,15 +282,7 @@ class _VoiceOverlayDebugState extends State<VoiceOverlayDebug> {
             controller: TextEditingController(text: _voiceTranscript),
             onChanged: (v) => setState(() => _voiceTranscript = v),
             style: const TextStyle(color: Colors.white, fontSize: 13),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color(0xFF1E2030),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF3A3C4E)),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
+            decoration: _darkInputDecoration(),
           ),
         ],
       ),

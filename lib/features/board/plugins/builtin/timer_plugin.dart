@@ -555,7 +555,10 @@ class _TimerContentState extends State<_TimerContent>
           TextField(
             controller: _labelCtrl,
             style: TextStyle(fontSize: 13, color: onSurface),
-            decoration: InputDecoration(
+            decoration: _outlineDecoration(
+              colors,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ).copyWith(
               hintText: 'Label (optional)',
               hintStyle: TextStyle(
                 fontSize: 12,
@@ -566,19 +569,6 @@ class _TimerContentState extends State<_TimerContent>
                 size: 16,
                 color: onSurface.withValues(alpha: 0.4),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colors.accentBlue, width: 1.5),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
-              isDense: true,
             ),
             onSubmitted: (_) => _saveEdit(),
           ),
@@ -618,6 +608,19 @@ class _TimerContentState extends State<_TimerContent>
       ),
     );
   }
+
+  InputDecoration _outlineDecoration(AppColorScheme colors, {EdgeInsets? padding}) => InputDecoration(
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: colors.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: colors.accentBlue, width: 1.5),
+    ),
+    contentPadding: padding,
+    isDense: true,
+  );
 }
 
 // ─── Time Field ──────────────────────────────────────────────────────────────
@@ -655,20 +658,9 @@ class _TimeField extends StatelessWidget {
               color: onSurface,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
-            decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colors.accentBlue, width: 1.5),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 10,
-              ),
-              isDense: true,
+            decoration: _outlineDecoration(
+              colors,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             ),
           ),
         ),

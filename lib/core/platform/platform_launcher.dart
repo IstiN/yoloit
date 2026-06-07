@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:yoloit/core/utils/yoloit_bin_resolver.dart';
+
 typedef ProcessRunner = Future<ProcessResult> Function(
   String executable,
   List<String> arguments, {
@@ -93,40 +95,8 @@ class MacosPlatformLauncher extends PlatformLauncher {
     ]);
   }
 
-  String? _resolveYoloitBin([String? alsoSearchFrom]) {
-    // Check the installed location first — written by CliServer on startup.
-    final home = Platform.environment['HOME'] ?? '';
-    if (home.isNotEmpty) {
-      final installed = File('$home/.config/yoloit/yoloit');
-      if (installed.existsSync()) return installed.path;
-    }
-
-    final roots = <Directory>[];
-    void addRoot(String path) {
-      if (path.isEmpty) return;
-      final dir = Directory(path).absolute;
-      if (roots.any((existing) => existing.path == dir.path)) return;
-      roots.add(dir);
-    }
-
-    addRoot(Directory.current.path);
-    addRoot(File(Platform.resolvedExecutable).parent.path);
-    if (alsoSearchFrom != null) addRoot(alsoSearchFrom);
-
-    for (final root in roots) {
-      var current = root;
-      for (var depth = 0; depth < 8; depth++) {
-        final candidate = File(
-          '${current.path}${Platform.pathSeparator}tools${Platform.pathSeparator}yoloit',
-        );
-        if (candidate.existsSync()) return candidate.path;
-        final parent = current.parent;
-        if (parent.path == current.path) break;
-        current = parent;
-      }
-    }
-    return null;
-  }
+  String? _resolveYoloitBin([String? alsoSearchFrom]) =>
+      resolveYoloitBin(alsoSearchFrom: alsoSearchFrom, maxDepth: 8);
 }
 
 // ── Linux ────────────────────────────────────────────────────────────────────

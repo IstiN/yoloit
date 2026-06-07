@@ -1,12 +1,20 @@
 import 'package:yoloit/core/cli/panel_cli_handler.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
+import 'package:yoloit/core/cli/panel_getopen_cli_handler.dart';
+
 /// CLI handler for File Tree panels (`board.filetree`).
-class FileTreeCliHandler extends PanelCliHandler {
+class FileTreeCliHandler extends PanelCliHandler with PanelGetOpenCliHandler {
   const FileTreeCliHandler();
 
   @override
   String get typeId => 'board.filetree';
+
+  @override
+  String get openPathKey => 'selectedFile';
+
+  @override
+  String get openMessage => 'Selected';
 
   @override
   List<String> get supportedActions => [
@@ -34,19 +42,6 @@ class FileTreeCliHandler extends PanelCliHandler {
     BoardPanelInstance panel,
   ) async {
     switch (action) {
-      case 'list':
-        return CliActionResult(data: getContent(panel));
-
-      case 'open':
-        final path = args['path'] as String?;
-        if (path == null) {
-          return const CliActionResult(ok: false, message: 'Missing "path"');
-        }
-        return CliActionResult(
-          message: 'Selected $path',
-          stateUpdate: {'selectedFile': path},
-        );
-
       case 'expand':
         final dir = args['dir'] as String?;
         if (dir == null) {
@@ -95,7 +90,7 @@ class FileTreeCliHandler extends PanelCliHandler {
         );
 
       default:
-        return CliActionResult(ok: false, message: 'Unknown action: $action');
+        return super.handleAction(action, args, panel);
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/remote/yoloit_remote_client.dart';
 import 'package:yoloit/core/ui/adaptive_dialog.dart';
+import 'package:yoloit/core/utils/directory_utils.dart';
 
 enum BoardFilePickerMode { directory, file, files }
 
@@ -250,22 +251,16 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
     if (!await directory.exists()) {
       throw FileSystemException('Directory not found', directory.path);
     }
-    final entries = <_FileEntry>[];
-    await for (final entity in directory.list(followLinks: false)) {
-      final stat = await entity.stat();
-      if (stat.type != FileSystemEntityType.directory &&
-          stat.type != FileSystemEntityType.file) {
-        continue;
-      }
-      entries.add(
-        _FileEntry(
-          name: p.basename(entity.path),
-          path: entity.path,
-          isDirectory: stat.type == FileSystemEntityType.directory,
-        ),
-      );
-    }
-    entries.sort(_compareEntries);
+    final dirEntries = await listDirectoryEntries(directory);
+    final entries = dirEntries
+        .map(
+          (e) => _FileEntry(
+            name: e.name,
+            path: e.path,
+            isDirectory: e.isDirectory,
+          ),
+        )
+        .toList();
     return _DirectoryListing(
       path: directory.path,
       parent:
@@ -278,18 +273,14 @@ class _BoardFilePickerDialogState extends State<_BoardFilePickerDialog> {
   }
 
   List<_FileEntry> _localRoots() {
-    final roots = <_FileEntry>[];
-    final seen = <String>{};
-    void addRoot(String name, String? path) {
-      final value = path?.trim();
-      if (value == null || value.isEmpty || !seen.add(value)) return;
-      roots.add(_FileEntry(name: name, path: value, isDirectory: true));
-    }
-
-    addRoot('Home', _localHomePath());
-    addRoot('Current', Directory.current.path);
-    addRoot('Root', Platform.pathSeparator);
-    return roots.toList();
+    final unique = buildUniqueRoots({
+      'Home': _localHomePath(),
+      'Current': Directory.current.path,
+      'Root': Platform.pathSeparator,
+    });
+    return unique.entries
+        .map((e) => _FileEntry(name: e.key, path: e.value, isDirectory: true))
+        .toList();
   }
 
   String? _localHomePath() {
@@ -649,7 +640,4 @@ class _FileEntry {
   final bool isDirectory;
 }
 
-int _compareEntries(_FileEntry a, _FileEntry b) {
-  if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
-  return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-}
+

@@ -3,6 +3,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
+import 'package:yoloit/ui/widgets/hover_listener.dart';
 
 final _checklistDefaultColors = AppColorScheme.fromAccent(Colors.orange);
 
@@ -233,63 +234,61 @@ class _ChecklistItem extends StatefulWidget {
 }
 
 class _ChecklistItemState extends State<_ChecklistItem> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: BoxDecoration(
-          color:
-              _hovered
-                  ? colors.textPrimary.withValues(alpha: 0.04)
-                  : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: widget.isDone,
-                onChanged: (_) => widget.onToggle(),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                activeColor: colors.accentOrange,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                widget.text,
-                style: TextStyle(
-                  fontSize: 13,
-                  decoration: widget.isDone ? TextDecoration.lineThrough : null,
-                  color: widget.isDone ? colors.textSecondary : null,
-                ),
-              ),
-            ),
-            if (_hovered)
+    return HoverListener(
+      builder: (context, hovered) {
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(
+            color:
+                hovered
+                    ? colors.textPrimary.withValues(alpha: 0.04)
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            children: [
               SizedBox(
-                width: 22,
-                height: 22,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: Icon(Icons.close, size: 13, color: colors.textMuted),
-                  onPressed: widget.onDelete,
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: widget.isDone,
+                  onChanged: (_) => widget.onToggle(),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  activeColor: colors.accentOrange,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                 ),
               ),
-          ],
-        ),
-      ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  widget.text,
+                  style: TextStyle(
+                    fontSize: 13,
+                    decoration: widget.isDone ? TextDecoration.lineThrough : null,
+                    color: widget.isDone ? colors.textSecondary : null,
+                  ),
+                ),
+              ),
+              if (hovered)
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(Icons.close, size: 13, color: colors.textMuted),
+                    onPressed: widget.onDelete,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

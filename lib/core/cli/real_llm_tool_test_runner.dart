@@ -244,19 +244,30 @@ class RealLlmToolTestRunner {
     required String assistantText,
     required Map<String, Object?>? resultUsage,
   }) {
+    Map<String, Object?> _result({
+      required bool ok,
+      String? error,
+      int? toolCallCount,
+    }) =>
+        <String, Object?>{
+          'ok': ok,
+          'id': item.id,
+          'message': item.message,
+          'expectedTool': item.expectedToolCalls.map((e) => e.tool).join(', '),
+          'actualTool': toolStarts.map((e) => e.toolName).join(', '),
+          if (error != null) 'error': error,
+          if (toolCallCount != null) 'toolCallCount': toolCallCount,
+          'assistantText': assistantText,
+          if (resultUsage != null) 'usage': resultUsage,
+        };
+
     if (toolStarts.length < item.expectedToolCalls.length) {
-      return <String, Object?>{
-        'ok': false,
-        'id': item.id,
-        'message': item.message,
-        'expectedTool': item.expectedToolCalls.map((e) => e.tool).join(', '),
-        'actualTool': toolStarts.map((e) => e.toolName).join(', '),
-        'error':
+      return _result(
+        ok: false,
+        error:
             'Expected ${item.expectedToolCalls.length} tool calls, '
             'got ${toolStarts.length}.',
-        'assistantText': assistantText,
-        if (resultUsage != null) 'usage': resultUsage,
-      };
+      );
     }
 
     final errors = <String>[];
@@ -288,17 +299,11 @@ class RealLlmToolTestRunner {
       }
     }
 
-    return <String, Object?>{
-      'ok': errors.isEmpty,
-      'id': item.id,
-      'message': item.message,
-      'expectedTool': item.expectedToolCalls.map((e) => e.tool).join(', '),
-      'actualTool': toolStarts.map((e) => e.toolName).join(', '),
-      'toolCallCount': toolStarts.length,
-      'assistantText': assistantText,
-      if (resultUsage != null) 'usage': resultUsage,
-      if (errors.isNotEmpty) 'error': errors.join('; '),
-    };
+    return _result(
+      ok: errors.isEmpty,
+      toolCallCount: toolStarts.length,
+      error: errors.isNotEmpty ? errors.join('; ') : null,
+    );
   }
 
   static String? _argValue(List<String> args, String flagName) {

@@ -18,6 +18,7 @@ mixin PanelGetOpenCliHandler on PanelCliHandler {
   ) async {
     switch (action) {
       case 'get':
+      case 'list':
         return CliActionResult(data: getContent(panel));
       case 'open':
         final path = args['path'] as String?;

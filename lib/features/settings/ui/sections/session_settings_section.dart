@@ -210,38 +210,45 @@ class SessionSettingsState extends State<SessionSettings> {
     }
   }
 
-  Widget _buildAppLogSection(BuildContext context) {
-    final colors = context.appColors;
+  Widget _borderedSection(BuildContext context, {required List<Widget> children}) {
     return Container(
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: colors.border)),
+        border: Border(top: BorderSide(color: context.appColors.border)),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '~/.config/yoloit/app.log',
-                  style: TextStyle(
-                    color: context.appColors.textMuted,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildAppLogSection(BuildContext context) {
+    return _borderedSection(
+      context,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '~/.config/yoloit/app.log',
+                style: TextStyle(
+                  color: context.appColors.textMuted,
+                  fontSize: 11,
+                  fontFamily: 'monospace',
                 ),
               ),
-              TextButton(
-                onPressed: () async {
-                  await AppLogger.instance.clearLog();
-                  _loadAppLog();
-                },
-                child: const Text('Clear', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+            ),
+            TextButton(
+              onPressed: () async {
+                await AppLogger.instance.clearLog();
+                _loadAppLog();
+              },
+              child: const Text('Clear', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
           if (_appLogLoading)
             const Center(child: CircularProgressIndicator())
           else
@@ -271,33 +278,27 @@ class SessionSettingsState extends State<SessionSettings> {
   }
 
   Widget _buildLogsSection(BuildContext context) {
-    final colors = context.appColors;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: colors.border)),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '${_logs.length} file(s)',
-                style: TextStyle(
-                  color: context.appColors.textMuted,
-                  fontSize: 12,
+    return _borderedSection(
+      context,
+      children: [
+        Row(
+          children: [
+            Text(
+              '${_logs.length} file(s)',
+              style: TextStyle(
+                color: context.appColors.textMuted,
+                fontSize: 12,
+              ),
+            ),
+            const Spacer(),
+            if (_logs.isNotEmpty)
+              TextButton(
+                onPressed: _clearAll,
+                child: const Text(
+                  'Clear all',
+                  style: TextStyle(fontSize: 12),
                 ),
               ),
-              const Spacer(),
-              if (_logs.isNotEmpty)
-                TextButton(
-                  onPressed: _clearAll,
-                  child: const Text(
-                    'Clear all',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 16),
                 onPressed: _loadLogs,

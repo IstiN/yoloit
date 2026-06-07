@@ -265,27 +265,21 @@ class RemoteDirectoryListing {
   final List<RemoteDirectoryEntry> roots;
 
   factory RemoteDirectoryListing.fromJson(Map<String, dynamic> json) {
+    List<RemoteDirectoryEntry> parse(dynamic list) =>
+        (list as List? ?? const <Object?>[])
+            .whereType<Map<Object?, Object?>>()
+            .map(
+              (entry) => RemoteDirectoryEntry.fromJson(
+                Map<String, dynamic>.from(entry),
+              ),
+            )
+            .toList();
+
     return RemoteDirectoryListing(
       path: json['path'] as String? ?? '',
       parent: json['parent'] as String?,
-      entries:
-          (json['entries'] as List? ?? const <Object?>[])
-              .whereType<Map<Object?, Object?>>()
-              .map(
-                (entry) => RemoteDirectoryEntry.fromJson(
-                  Map<String, dynamic>.from(entry),
-                ),
-              )
-              .toList(),
-      roots:
-          (json['roots'] as List? ?? const <Object?>[])
-              .whereType<Map<Object?, Object?>>()
-              .map(
-                (entry) => RemoteDirectoryEntry.fromJson(
-                  Map<String, dynamic>.from(entry),
-                ),
-              )
-              .toList(),
+      entries: parse(json['entries']),
+      roots: parse(json['roots']),
     );
   }
 }
