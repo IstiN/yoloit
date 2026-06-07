@@ -1,8 +1,12 @@
 import 'package:equatable/equatable.dart';
+import 'package:json_annotation/json_annotation.dart';
 import 'package:yoloit/features/runs/models/run_config.dart';
+
+part 'run_session.g.dart';
 
 enum RunStatus { idle, running, stopped, failed }
 
+@JsonSerializable()
 class RunOutputLine extends Equatable {
   const RunOutputLine({
     required this.text,
@@ -14,22 +18,16 @@ class RunOutputLine extends Equatable {
   final bool isError;
   final DateTime timestamp;
 
-  Map<String, dynamic> toJson() => {
-        'text': text,
-        'isError': isError,
-        'ts': timestamp.millisecondsSinceEpoch,
-      };
+  Map<String, dynamic> toJson() => _$RunOutputLineToJson(this);
 
-  factory RunOutputLine.fromJson(Map<String, dynamic> j) => RunOutputLine(
-        text: j['text'] as String,
-        isError: j['isError'] as bool,
-        timestamp: DateTime.fromMillisecondsSinceEpoch(j['ts'] as int),
-      );
+  factory RunOutputLine.fromJson(Map<String, dynamic> j) =>
+      _$RunOutputLineFromJson(j);
 
   @override
   List<Object?> get props => [text, isError, timestamp];
 }
 
+@JsonSerializable()
 class RunSession extends Equatable {
   const RunSession({
     required this.id,
@@ -70,32 +68,10 @@ class RunSession extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'config': config.toJson(),
-        'workspacePath': workspacePath,
-        'status': status.name,
-        'output': output.map((l) => l.toJson()).toList(),
-        'exitCode': exitCode,
-        'startedAt': startedAt?.millisecondsSinceEpoch,
-      };
+  Map<String, dynamic> toJson() => _$RunSessionToJson(this);
 
-  factory RunSession.fromJson(Map<String, dynamic> j) => RunSession(
-        id: j['id'] as String,
-        config: RunConfig.fromJson(j['config'] as Map<String, dynamic>),
-        workspacePath: j['workspacePath'] as String,
-        status: RunStatus.values.firstWhere(
-          (s) => s.name == (j['status'] as String? ?? 'stopped'),
-          orElse: () => RunStatus.stopped,
-        ),
-        output: (j['output'] as List<dynamic>? ?? [])
-            .map((e) => RunOutputLine.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        exitCode: j['exitCode'] as int?,
-        startedAt: j['startedAt'] != null
-            ? DateTime.fromMillisecondsSinceEpoch(j['startedAt'] as int)
-            : null,
-      );
+  factory RunSession.fromJson(Map<String, dynamic> j) =>
+      _$RunSessionFromJson(j);
 
   @override
   List<Object?> get props => [id, status, output, exitCode];

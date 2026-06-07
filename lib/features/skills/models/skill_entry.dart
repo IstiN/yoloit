@@ -1,4 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:json_annotation/json_annotation.dart';
+
+part 'skill_entry.g.dart';
 
 /// Where a skill comes from.
 enum SkillSourceType {
@@ -9,6 +12,7 @@ enum SkillSourceType {
 }
 
 /// A single skill available in the store or installed globally.
+@JsonSerializable()
 class SkillEntry extends Equatable {
   const SkillEntry({
     required this.id,
@@ -62,34 +66,10 @@ class SkillEntry extends Equatable {
         computedHash: computedHash ?? this.computedHash,
       );
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'description': description,
-        'source': source,
-        'sourceType': sourceType.name,
-        'storeId': storeId,
-        'installCommand': installCommand,
-        'installUrl': installUrl,
-        'isInstalled': isInstalled,
-        'computedHash': computedHash,
-      };
+  Map<String, dynamic> toJson() => _$SkillEntryToJson(this);
 
-  factory SkillEntry.fromJson(Map<String, dynamic> j) => SkillEntry(
-        id: j['id'] as String,
-        name: j['name'] as String? ?? j['id'] as String,
-        description: j['description'] as String? ?? '',
-        source: j['source'] as String? ?? '',
-        sourceType: SkillSourceType.values.firstWhere(
-          (e) => e.name == j['sourceType'],
-          orElse: () => SkillSourceType.github,
-        ),
-        storeId: j['storeId'] as String?,
-        installCommand: j['installCommand'] as String?,
-        installUrl: j['installUrl'] as String?,
-        isInstalled: j['isInstalled'] as bool? ?? false,
-        computedHash: j['computedHash'] as String?,
-      );
+  factory SkillEntry.fromJson(Map<String, dynamic> j) =>
+      _$SkillEntryFromJson(j);
 
   @override
   List<Object?> get props => [id, source, sourceType, isInstalled];

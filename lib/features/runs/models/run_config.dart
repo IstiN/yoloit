@@ -1,6 +1,11 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
+import 'package:yoloit/features/board/model/board_json_converters.dart';
 
+part 'run_config.g.dart';
+
+@JsonSerializable()
 class RunQuickAction extends Equatable {
   const RunQuickAction({
     required this.id,
@@ -16,26 +21,16 @@ class RunQuickAction extends Equatable {
   final String command;
   final bool appendNewline;
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'label': label,
-    'icon': icon,
-    'command': command,
-    'appendNewline': appendNewline,
-  };
+  Map<String, dynamic> toJson() => _$RunQuickActionToJson(this);
 
-  factory RunQuickAction.fromJson(Map<String, dynamic> json) => RunQuickAction(
-    id: json['id'] as String? ?? 'qa_${DateTime.now().millisecondsSinceEpoch}',
-    label: json['label'] as String? ?? 'Action',
-    icon: json['icon'] as String? ?? 'bolt',
-    command: json['command'] as String? ?? '',
-    appendNewline: json['appendNewline'] as bool? ?? false,
-  );
+  factory RunQuickAction.fromJson(Map<String, dynamic> json) =>
+      _$RunQuickActionFromJson(json);
 
   @override
   List<Object?> get props => [id, label, icon, command, appendNewline];
 }
 
+@JsonSerializable()
 class RunConfig extends Equatable {
   const RunConfig({
     required this.id,
@@ -55,6 +50,7 @@ class RunConfig extends Equatable {
   final String group;
   final String? workingDir;
   final Map<String, String> env;
+  @ColorNullableJsonConverter()
   final Color? color;
   final bool isFlutterRun;
   final List<RunQuickAction> quickActions;
@@ -85,35 +81,10 @@ class RunConfig extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'command': command,
-    'group': group,
-    'workingDir': workingDir,
-    'env': env,
-    'color': color?.toARGB32(),
-    'isFlutterRun': isFlutterRun,
-    'quickActions': quickActions.map((a) => a.toJson()).toList(),
-  };
+  Map<String, dynamic> toJson() => _$RunConfigToJson(this);
 
-  factory RunConfig.fromJson(Map<String, dynamic> json) => RunConfig(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    command: json['command'] as String,
-    group: json['group'] as String? ?? 'default',
-    workingDir: json['workingDir'] as String?,
-    env: (json['env'] as Map<String, dynamic>?)?.cast<String, String>() ?? {},
-    color: json['color'] != null ? Color(json['color'] as int) : null,
-    isFlutterRun: json['isFlutterRun'] as bool? ?? false,
-    quickActions:
-        (json['quickActions'] as List?)
-            ?.whereType<Map<String, dynamic>>()
-            .map(RunQuickAction.fromJson)
-            .where((a) => a.command.trim().isNotEmpty)
-            .toList() ??
-        const [],
-  );
+  factory RunConfig.fromJson(Map<String, dynamic> json) =>
+      _$RunConfigFromJson(json);
 
   // Preset run colors are persisted with the config and reused for run badges
   // outside any widget tree, so they intentionally stay as fixed accent values.

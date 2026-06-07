@@ -1,9 +1,14 @@
 import 'dart:convert';
 
+import 'package:json_annotation/json_annotation.dart';
+
+part 'terminal_runtime_protocol.g.dart';
+
 const terminalRuntimeProtocolVersion = 1;
 
 enum TerminalRuntimeEventType { output, exit, resizeAck, error }
 
+@JsonSerializable()
 class TerminalRuntimeSession {
   const TerminalRuntimeSession({
     required this.id,
@@ -23,29 +28,13 @@ class TerminalRuntimeSession {
   final String? title;
   final int? pid;
 
-  Map<String, Object?> toJson() => {
-    'id': id,
-    'cwd': cwd,
-    'command': command,
-    'createdAt': createdAt.toIso8601String(),
-    'alive': alive,
-    if (title != null) 'title': title,
-    if (pid != null) 'pid': pid,
-  };
+  Map<String, dynamic> toJson() => _$TerminalRuntimeSessionToJson(this);
 
-  factory TerminalRuntimeSession.fromJson(Map<String, Object?> json) {
-    return TerminalRuntimeSession(
-      id: json['id'] as String,
-      cwd: json['cwd'] as String,
-      command: json['command'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      alive: json['alive'] as bool? ?? false,
-      title: json['title'] as String?,
-      pid: json['pid'] as int?,
-    );
-  }
+  factory TerminalRuntimeSession.fromJson(Map<String, dynamic> json) =>
+      _$TerminalRuntimeSessionFromJson(json);
 }
 
+@JsonSerializable()
 class TerminalRuntimeEvent {
   const TerminalRuntimeEvent({
     required this.sessionId,
@@ -61,26 +50,10 @@ class TerminalRuntimeEvent {
   final int? exitCode;
   final String? message;
 
-  Map<String, Object?> toJson() => {
-    'sessionId': sessionId,
-    'type': type.name,
-    if (data != null) 'data': data,
-    if (exitCode != null) 'exitCode': exitCode,
-    if (message != null) 'message': message,
-  };
+  Map<String, dynamic> toJson() => _$TerminalRuntimeEventToJson(this);
 
   String toJsonLine() => '${jsonEncode(toJson())}\n';
 
-  factory TerminalRuntimeEvent.fromJson(Map<String, Object?> json) {
-    return TerminalRuntimeEvent(
-      sessionId: json['sessionId'] as String,
-      type: TerminalRuntimeEventType.values.firstWhere(
-        (type) => type.name == json['type'],
-        orElse: () => TerminalRuntimeEventType.error,
-      ),
-      data: json['data'] as String?,
-      exitCode: json['exitCode'] as int?,
-      message: json['message'] as String?,
-    );
-  }
+  factory TerminalRuntimeEvent.fromJson(Map<String, dynamic> json) =>
+      _$TerminalRuntimeEventFromJson(json);
 }

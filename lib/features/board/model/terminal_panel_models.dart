@@ -1,3 +1,8 @@
+import 'package:json_annotation/json_annotation.dart';
+
+part 'terminal_panel_models.g.dart';
+
+@JsonSerializable()
 class BoardTerminalConfig {
   const BoardTerminalConfig({
     required this.sessionId,
@@ -13,21 +18,10 @@ class BoardTerminalConfig {
 
   bool get isConfigured => workingDir.trim().isNotEmpty;
 
-  Map<String, dynamic> toJson() => {
-    'sessionId': sessionId,
-    'sessionName': sessionName,
-    'workingDir': workingDir,
-    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
-  };
+  Map<String, dynamic> toJson() => _$BoardTerminalConfigToJson(this);
 
-  factory BoardTerminalConfig.fromJson(Map<String, dynamic> json) {
-    return BoardTerminalConfig(
-      sessionId: json['sessionId'] as String? ?? '',
-      sessionName: json['sessionName'] as String? ?? '',
-      workingDir: json['workingDir'] as String? ?? '',
-      envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
-    );
-  }
+  factory BoardTerminalConfig.fromJson(Map<String, dynamic> json) =>
+      _$BoardTerminalConfigFromJson(json);
 
   BoardTerminalConfig copyWith({
     String? sessionId,

@@ -2,12 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:json_annotation/json_annotation.dart';
 import 'package:yoloit/core/skills/yoloit_global_skills_service.dart';
+
+part 'setup_catalog.g.dart';
 
 enum SetupTargetOs { macos, linux, windows, unknown }
 
 enum SetupPackageCategory { system, agents, optional }
 
+@JsonSerializable(explicitToJson: true)
 class SetupRuntimeInfo {
   const SetupRuntimeInfo({
     required this.os,
@@ -23,28 +27,13 @@ class SetupRuntimeInfo {
   final String packageManager;
   final String homeDirectory;
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'os': os.name,
-    'osLabel': osLabel,
-    'versionLabel': versionLabel,
-    'packageManager': packageManager,
-    'homeDirectory': homeDirectory,
-  };
+  Map<String, dynamic> toJson() => _$SetupRuntimeInfoToJson(this);
 
-  factory SetupRuntimeInfo.fromJson(Map<String, dynamic> json) {
-    return SetupRuntimeInfo(
-      os: SetupTargetOs.values.firstWhere(
-        (value) => value.name == json['os'],
-        orElse: () => SetupTargetOs.unknown,
-      ),
-      osLabel: json['osLabel'] as String? ?? 'Unknown OS',
-      versionLabel: json['versionLabel'] as String? ?? '',
-      packageManager: json['packageManager'] as String? ?? 'shell',
-      homeDirectory: json['homeDirectory'] as String? ?? '',
-    );
-  }
+  factory SetupRuntimeInfo.fromJson(Map<String, dynamic> json) =>
+      _$SetupRuntimeInfoFromJson(json);
 }
 
+@JsonSerializable(explicitToJson: true)
 class SetupInstallAction {
   const SetupInstallAction({
     required this.command,
@@ -54,17 +43,10 @@ class SetupInstallAction {
   final String command;
   final bool requiresInteraction;
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'command': command,
-    'requiresInteraction': requiresInteraction,
-  };
+  Map<String, dynamic> toJson() => _$SetupInstallActionToJson(this);
 
-  factory SetupInstallAction.fromJson(Map<String, dynamic> json) {
-    return SetupInstallAction(
-      command: json['command'] as String? ?? '',
-      requiresInteraction: json['requiresInteraction'] == true,
-    );
-  }
+  factory SetupInstallAction.fromJson(Map<String, dynamic> json) =>
+      _$SetupInstallActionFromJson(json);
 }
 
 class SetupPackageSpec {
@@ -91,6 +73,7 @@ class SetupPackageSpec {
   SetupInstallAction? installAction(SetupTargetOs os) => install[os];
 }
 
+@JsonSerializable(explicitToJson: true)
 class SetupPackageStatus {
   const SetupPackageStatus({
     required this.id,
@@ -114,41 +97,13 @@ class SetupPackageStatus {
   final String? version;
   final SetupInstallAction? installAction;
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'id': id,
-    'name': name,
-    'category': category.name,
-    'description': description,
-    'command': command,
-    'required': required,
-    'available': available,
-    if (version != null) 'version': version,
-    if (installAction != null) 'installAction': installAction!.toJson(),
-  };
+  Map<String, dynamic> toJson() => _$SetupPackageStatusToJson(this);
 
-  factory SetupPackageStatus.fromJson(Map<String, dynamic> json) {
-    return SetupPackageStatus(
-      id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      category: SetupPackageCategory.values.firstWhere(
-        (value) => value.name == json['category'],
-        orElse: () => SetupPackageCategory.optional,
-      ),
-      description: json['description'] as String? ?? '',
-      command: json['command'] as String? ?? '',
-      required: json['required'] == true,
-      available: json['available'] == true,
-      version: json['version'] as String?,
-      installAction:
-          json['installAction'] is Map
-              ? SetupInstallAction.fromJson(
-                Map<String, dynamic>.from(json['installAction'] as Map),
-              )
-              : null,
-    );
-  }
+  factory SetupPackageStatus.fromJson(Map<String, dynamic> json) =>
+      _$SetupPackageStatusFromJson(json);
 }
 
+@JsonSerializable(explicitToJson: true)
 class SetupCheckSnapshot {
   const SetupCheckSnapshot({required this.runtime, required this.packages});
 
@@ -158,27 +113,10 @@ class SetupCheckSnapshot {
   bool get allRequiredAvailable =>
       packages.where((pkg) => pkg.required).every((pkg) => pkg.available);
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'runtime': runtime.toJson(),
-    'packages': packages.map((pkg) => pkg.toJson()).toList(),
-  };
+  Map<String, dynamic> toJson() => _$SetupCheckSnapshotToJson(this);
 
-  factory SetupCheckSnapshot.fromJson(Map<String, dynamic> json) {
-    return SetupCheckSnapshot(
-      runtime: SetupRuntimeInfo.fromJson(
-        Map<String, dynamic>.from(json['runtime'] as Map? ?? const {}),
-      ),
-      packages:
-          (json['packages'] as List? ?? const <Object?>[])
-              .whereType<Map<Object?, Object?>>()
-              .map(
-                (entry) => SetupPackageStatus.fromJson(
-                  Map<String, dynamic>.from(entry),
-                ),
-              )
-              .toList(),
-    );
-  }
+  factory SetupCheckSnapshot.fromJson(Map<String, dynamic> json) =>
+      _$SetupCheckSnapshotFromJson(json);
 }
 
 class SetupCatalog {

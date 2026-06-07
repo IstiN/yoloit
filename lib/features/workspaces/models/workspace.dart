@@ -1,8 +1,13 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
+import 'package:yoloit/features/board/model/board_json_converters.dart';
 
+part 'workspace.g.dart';
+
+@JsonSerializable()
 class Workspace extends Equatable {
   const Workspace({
     required this.id,
@@ -26,6 +31,7 @@ class Workspace extends Equatable {
   final int removedLines;
   final bool isActive;
   /// User-chosen accent color for this workspace (null = use theme default)
+  @ColorNullableJsonConverter()
   final Color? color;
   /// Skill IDs enabled in this workspace (symlinked into .agents/skills/).
   final List<String> enabledSkills;
@@ -63,18 +69,7 @@ class Workspace extends Equatable {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'paths': paths,
-        // legacy compat: write 'path' too so older builds can still read it
-        'path': paths.isNotEmpty ? paths.first : '',
-        'gitBranch': gitBranch,
-        'addedLines': addedLines,
-        'removedLines': removedLines,
-        'colorValue': color?.value,
-        'enabledSkills': enabledSkills,
-      };
+  Map<String, dynamic> toJson() => _$WorkspaceToJson(this);
 
   factory Workspace.fromJson(Map<String, dynamic> json) {
     // Support both new 'paths' list and legacy 'path' string.
@@ -86,17 +81,20 @@ class Workspace extends Equatable {
     } else {
       paths = [];
     }
+    // Inject normalized 'paths' into the map so the generated helper
+    // doesn't crash on a missing key.
+    final normalized = Map<String, dynamic>.from(json)..['paths'] = paths;
+    final base = _$WorkspaceFromJson(normalized);
     return Workspace(
-      id: json['id'] as String,
-      name: json['name'] as String,
+      id: base.id,
+      name: base.name,
       paths: paths,
-      gitBranch: json['gitBranch'] as String?,
-      addedLines: (json['addedLines'] as int?) ?? 0,
-      removedLines: (json['removedLines'] as int?) ?? 0,
-      color: json['colorValue'] != null
-          ? Color(json['colorValue'] as int)
-          : null,
-      enabledSkills: (json['enabledSkills'] as List?)?.cast<String>() ?? [],
+      gitBranch: base.gitBranch,
+      addedLines: base.addedLines,
+      removedLines: base.removedLines,
+      isActive: base.isActive,
+      color: base.color,
+      enabledSkills: base.enabledSkills,
     );
   }
 

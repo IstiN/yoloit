@@ -34,7 +34,7 @@ void main() {
       final json = workspace.toJson();
       expect(json['id'], 'ws_1');
       expect(json['name'], 'my-project');
-      expect(json['path'], '/Users/dev/my-project');
+      expect(json['paths'], ['/Users/dev/my-project']);
       expect(json['gitBranch'], 'main');
       expect(json['addedLines'], 150);
       expect(json['removedLines'], 50);
