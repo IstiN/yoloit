@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/tool_call_settings_service.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 
 class IgnoredToolCallsSection extends StatefulWidget {
   const IgnoredToolCallsSection({super.key});
@@ -57,13 +58,10 @@ class IgnoredToolCallsSectionState extends State<IgnoredToolCallsSection> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
+    return SettingsCard(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-        color: colors.surfaceElevated.withAlpha(60),
-      ),
+      borderRadius: 8,
+      color: colors.surfaceElevated.withAlpha(60),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

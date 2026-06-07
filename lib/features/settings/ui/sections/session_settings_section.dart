@@ -6,6 +6,7 @@ import 'package:yoloit/features/settings/ui/sections/toggle_row.dart';
 import 'package:yoloit/features/settings/ui/sections/workspace_storage_row.dart';
 import 'package:yoloit/features/terminal/data/logging_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 
 class SessionSettings extends StatefulWidget {
   const SessionSettings({super.key});
@@ -61,11 +62,9 @@ class SessionSettingsState extends State<SessionSettings> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
+    return SettingsCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 8,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

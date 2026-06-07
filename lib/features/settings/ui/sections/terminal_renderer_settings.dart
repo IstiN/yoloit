@@ -3,6 +3,7 @@ import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 class TerminalRendererSettings extends StatefulWidget {
@@ -45,12 +46,9 @@ class TerminalRendererSettingsState extends State<TerminalRendererSettings> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
+    return SettingsCard(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
+      borderRadius: 8,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

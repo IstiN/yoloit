@@ -3,6 +3,7 @@ import 'package:yoloit/core/services/app_logger.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/clipboard_utils.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 import 'package:yoloit/ui/components/typography/caption.dart';
 
 class SupportSection extends StatefulWidget {
@@ -53,12 +54,9 @@ class SupportSectionState extends State<SupportSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        SettingsCard(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: colors.border),
-          ),
+          borderRadius: 8,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

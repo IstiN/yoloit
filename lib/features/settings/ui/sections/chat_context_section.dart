@@ -3,6 +3,7 @@ import 'package:yoloit/core/session/session_prefs.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/settings/ui/sections/toggle_row.dart';
+import 'package:yoloit/ui/components/cards/settings_card.dart';
 
 class ChatContextSection extends StatefulWidget {
   const ChatContextSection({super.key});
@@ -29,11 +30,9 @@ class ChatContextSectionState extends State<ChatContextSection> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colors.border),
-      ),
+    return SettingsCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 8,
       child: Column(
         children: [
           ToggleRow(

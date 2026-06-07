@@ -10,6 +10,7 @@ class SettingsCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(14),
     this.margin,
+    this.color,
     this.borderColor,
     this.borderRadius = 10,
   });
@@ -17,6 +18,7 @@ class SettingsCard extends StatelessWidget {
   final Widget child;
   final EdgeInsets padding;
   final EdgeInsets? margin;
+  final Color? color;
   final Color? borderColor;
   final double borderRadius;
 
@@ -27,7 +29,7 @@ class SettingsCard extends StatelessWidget {
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
-        color: colors.surfaceElevated,
+        color: color ?? colors.surfaceElevated,
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(color: borderColor ?? colors.border),
       ),
