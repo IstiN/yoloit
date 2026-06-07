@@ -95,3 +95,19 @@ class StringSetJsonConverter implements JsonConverter<Set<String>, List<String>>
   @override
   List<String> toJson(Set<String> object) => object.toList();
 }
+
+/// Serializes [Color] as an 8-character hex string (e.g. 'ff7c3aed').
+class ColorHexJsonConverter implements JsonConverter<Color, String> {
+  const ColorHexJsonConverter();
+
+  @override
+  Color fromJson(String json) {
+    final h = json.replaceFirst('#', '');
+    if (h.length == 6) return Color(int.parse('FF$h', radix: 16));
+    return Color(int.parse(h, radix: 16));
+  }
+
+  @override
+  String toJson(Color object) =>
+      object.value.toRadixString(16).padLeft(8, '0');
+}

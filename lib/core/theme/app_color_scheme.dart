@@ -1,6 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
+import 'package:yoloit/features/board/model/board_json_converters.dart';
+
+part 'app_color_scheme.g.dart';
 
 /// Dynamic colour palette embedded in [ThemeData.extensions].
 ///
@@ -10,6 +14,7 @@ import 'package:flutter/material.dart';
 ///
 /// Themes can be loaded from JSON or derived from a single accent colour via
 /// [AppColorScheme.fromAccent].
+@JsonSerializable()
 class AppColorScheme extends ThemeExtension<AppColorScheme> {
   const AppColorScheme({
     // ── Accent ──────────────────────────────────────────
@@ -64,68 +69,109 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
   });
 
   // ── Accent ──────────────────────────────────────────────────────────────────
+  @ColorHexJsonConverter()
   final Color primary;
+  @ColorHexJsonConverter()
   final Color primaryLight;
+  @ColorHexJsonConverter()
   final Color primaryDark;
+  @ColorHexJsonConverter()
   final Color primaryGlow;
 
   // ── Backgrounds ──────────────────────────────────────────────────────────────
+  @ColorHexJsonConverter()
   final Color background;
+  @ColorHexJsonConverter()
   final Color surface;
+  @ColorHexJsonConverter()
   final Color surfaceElevated;
+  @ColorHexJsonConverter()
   final Color surfaceHighlight;
+  @ColorHexJsonConverter()
   final Color border;
+  @ColorHexJsonConverter()
   final Color divider;
+  @ColorHexJsonConverter()
   final Color terminalBackground;
 
   // ── Semantic accent slots ─────────────────────────────────────────────────────
+  @ColorHexJsonConverter()
   final Color sidebar;
+  @ColorHexJsonConverter()
   final Color sidebarGlow;
+  @ColorHexJsonConverter()
   final Color terminalPrompt;
+  @ColorHexJsonConverter()
   final Color tabBorder;
+  @ColorHexJsonConverter()
   final Color tabActiveBg;
+  @ColorHexJsonConverter()
   final Color tabInactiveBg;
 
   // ── Text ──────────────────────────────────────────────────────────────────────
+  @ColorHexJsonConverter()
   final Color textPrimary;
+  @ColorHexJsonConverter()
   final Color textSecondary;
+  @ColorHexJsonConverter()
   final Color textMuted;
+  @ColorHexJsonConverter()
   final Color textHighlight;
+  @ColorHexJsonConverter()
   final Color terminalText;
 
   // ── Semantic accents ──────────────────────────────────────────────────────────
+  @ColorHexJsonConverter()
   final Color accentGreen;
+  @ColorHexJsonConverter()
   final Color accentGreenDim;
+  @ColorHexJsonConverter()
   final Color accentGreenGlow;
+  @ColorHexJsonConverter()
   final Color accentRed;
+  @ColorHexJsonConverter()
   final Color accentRedDim;
+  @ColorHexJsonConverter()
   final Color accentBlue;
+  @ColorHexJsonConverter()
   final Color accentOrange;
 
   // ── Diff ──────────────────────────────────────────────────────────────────────
+  @ColorHexJsonConverter()
   final Color diffAddBg;
+  @ColorHexJsonConverter()
   final Color diffAddText;
+  @ColorHexJsonConverter()
   final Color diffRemoveBg;
+  @ColorHexJsonConverter()
   final Color diffRemoveText;
+  @ColorHexJsonConverter()
   final Color diffContextBg;
 
   // ── Status ────────────────────────────────────────────────────────────────────
+  @ColorHexJsonConverter()
   final Color statusActive;
+  @ColorHexJsonConverter()
   final Color statusIdle;
+  @ColorHexJsonConverter()
   final Color statusError;
+  @ColorHexJsonConverter()
   final Color statusWarning;
 
   // ── YoLo orb visual identity ──────────────────────────────────────────────────
   /// Primary cyan used across all orb modes.  Users can override this to shift
   /// the orb's "cool" pole colour.
+  @ColorHexJsonConverter()
   final Color orbCyan;
 
   /// Primary purple used in recording / thinking modes.  Overriding this
   /// shifts the orb's "warm" pole colour.
+  @ColorHexJsonConverter()
   final Color orbPurple;
 
   /// Hot-pink accent used in active modes.  Overriding this changes the
   /// energetic highlight colour across all orb states.
+  @ColorHexJsonConverter()
   final Color orbPink;
 
   // ── Shortcut ──────────────────────────────────────────────────────────────────
@@ -255,59 +301,7 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
 
   // ── JSON serialization ────────────────────────────────────────────────────────
 
-  static String _colorToHex(Color c) =>
-      c.value.toRadixString(16).padLeft(8, '0');
-
-  static Color _hexToColor(String hex) {
-    final h = hex.replaceFirst('#', '');
-    if (h.length == 6) return Color(int.parse('FF$h', radix: 16));
-    return Color(int.parse(h, radix: 16));
-  }
-
-  /// Serialises the full colour scheme to a JSON-compatible map.
-  Map<String, String> toJson() => {
-    'primary': _colorToHex(primary),
-    'primaryLight': _colorToHex(primaryLight),
-    'primaryDark': _colorToHex(primaryDark),
-    'primaryGlow': _colorToHex(primaryGlow),
-    'background': _colorToHex(background),
-    'surface': _colorToHex(surface),
-    'surfaceElevated': _colorToHex(surfaceElevated),
-    'surfaceHighlight': _colorToHex(surfaceHighlight),
-    'border': _colorToHex(border),
-    'divider': _colorToHex(divider),
-    'terminalBackground': _colorToHex(terminalBackground),
-    'sidebar': _colorToHex(sidebar),
-    'sidebarGlow': _colorToHex(sidebarGlow),
-    'terminalPrompt': _colorToHex(terminalPrompt),
-    'tabBorder': _colorToHex(tabBorder),
-    'tabActiveBg': _colorToHex(tabActiveBg),
-    'tabInactiveBg': _colorToHex(tabInactiveBg),
-    'textPrimary': _colorToHex(textPrimary),
-    'textSecondary': _colorToHex(textSecondary),
-    'textMuted': _colorToHex(textMuted),
-    'textHighlight': _colorToHex(textHighlight),
-    'terminalText': _colorToHex(terminalText),
-    'accentGreen': _colorToHex(accentGreen),
-    'accentGreenDim': _colorToHex(accentGreenDim),
-    'accentGreenGlow': _colorToHex(accentGreenGlow),
-    'accentRed': _colorToHex(accentRed),
-    'accentRedDim': _colorToHex(accentRedDim),
-    'accentBlue': _colorToHex(accentBlue),
-    'accentOrange': _colorToHex(accentOrange),
-    'diffAddBg': _colorToHex(diffAddBg),
-    'diffAddText': _colorToHex(diffAddText),
-    'diffRemoveBg': _colorToHex(diffRemoveBg),
-    'diffRemoveText': _colorToHex(diffRemoveText),
-    'diffContextBg': _colorToHex(diffContextBg),
-    'statusActive': _colorToHex(statusActive),
-    'statusIdle': _colorToHex(statusIdle),
-    'statusError': _colorToHex(statusError),
-    'statusWarning': _colorToHex(statusWarning),
-    'orbCyan': _colorToHex(orbCyan),
-    'orbPurple': _colorToHex(orbPurple),
-    'orbPink': _colorToHex(orbPink),
-  };
+  Map<String, dynamic> toJson() => _$AppColorSchemeToJson(this);
 
   /// Exports the scheme as a pretty-printed JSON string.
   String toJsonString() =>
@@ -324,54 +318,11 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
       fallbackAccent,
       brightness: brightness,
     );
-    Color c(String key, Color fb) {
-      final v = json[key];
-      if (v is String && v.isNotEmpty) return _hexToColor(v);
-      return fb;
-    }
-    return AppColorScheme(
-      primary: c('primary', fallback.primary),
-      primaryLight: c('primaryLight', fallback.primaryLight),
-      primaryDark: c('primaryDark', fallback.primaryDark),
-      primaryGlow: c('primaryGlow', fallback.primaryGlow),
-      background: c('background', fallback.background),
-      surface: c('surface', fallback.surface),
-      surfaceElevated: c('surfaceElevated', fallback.surfaceElevated),
-      surfaceHighlight: c('surfaceHighlight', fallback.surfaceHighlight),
-      border: c('border', fallback.border),
-      divider: c('divider', fallback.divider),
-      terminalBackground: c('terminalBackground', fallback.terminalBackground),
-      sidebar: c('sidebar', fallback.sidebar),
-      sidebarGlow: c('sidebarGlow', fallback.sidebarGlow),
-      terminalPrompt: c('terminalPrompt', fallback.terminalPrompt),
-      tabBorder: c('tabBorder', fallback.tabBorder),
-      tabActiveBg: c('tabActiveBg', fallback.tabActiveBg),
-      tabInactiveBg: c('tabInactiveBg', fallback.tabInactiveBg),
-      textPrimary: c('textPrimary', fallback.textPrimary),
-      textSecondary: c('textSecondary', fallback.textSecondary),
-      textMuted: c('textMuted', fallback.textMuted),
-      textHighlight: c('textHighlight', fallback.textHighlight),
-      terminalText: c('terminalText', fallback.terminalText),
-      accentGreen: c('accentGreen', fallback.accentGreen),
-      accentGreenDim: c('accentGreenDim', fallback.accentGreenDim),
-      accentGreenGlow: c('accentGreenGlow', fallback.accentGreenGlow),
-      accentRed: c('accentRed', fallback.accentRed),
-      accentRedDim: c('accentRedDim', fallback.accentRedDim),
-      accentBlue: c('accentBlue', fallback.accentBlue),
-      accentOrange: c('accentOrange', fallback.accentOrange),
-      diffAddBg: c('diffAddBg', fallback.diffAddBg),
-      diffAddText: c('diffAddText', fallback.diffAddText),
-      diffRemoveBg: c('diffRemoveBg', fallback.diffRemoveBg),
-      diffRemoveText: c('diffRemoveText', fallback.diffRemoveText),
-      diffContextBg: c('diffContextBg', fallback.diffContextBg),
-      statusActive: c('statusActive', fallback.statusActive),
-      statusIdle: c('statusIdle', fallback.statusIdle),
-      statusError: c('statusError', fallback.statusError),
-      statusWarning: c('statusWarning', fallback.statusWarning),
-      orbCyan: c('orbCyan', fallback.orbCyan),
-      orbPurple: c('orbPurple', fallback.orbPurple),
-      orbPink: c('orbPink', fallback.orbPink),
-    );
+    // Merge fallback hex values with provided JSON so the generated helper
+    // never sees a missing key.
+    final merged = Map<String, dynamic>.from(_$AppColorSchemeToJson(fallback))
+      ..addAll(json);
+    return _$AppColorSchemeFromJson(merged);
   }
 
   // ── ThemeExtension boilerplate ────────────────────────────────────────────────
