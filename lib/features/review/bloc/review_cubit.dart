@@ -212,16 +212,20 @@ class ReviewCubit extends Cubit<ReviewState> {
     await refresh();
   }
 
+  List<FileSystemEntity> _listAndSortEntities(String dirPath) {
+    final dir = Directory(dirPath);
+    return dir.listSync(followLinks: true)
+      ..sort((a, b) {
+        final aIsDir = a is Directory;
+        final bIsDir = b is Directory;
+        if (aIsDir != bIsDir) return aIsDir ? -1 : 1;
+        return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
+      });
+  }
+
   Future<List<FileTreeNode>> _buildFileTree(String dirPath) async {
     try {
-      final dir = Directory(dirPath);
-      final entities = dir.listSync(followLinks: true)
-        ..sort((a, b) {
-          final aIsDir = a is Directory;
-          final bIsDir = b is Directory;
-          if (aIsDir != bIsDir) return aIsDir ? -1 : 1;
-          return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
-        });
+      final entities = _listAndSortEntities(dirPath);
 
       return entities
           .where((e) => p.basename(e.path) != '.git')
@@ -244,14 +248,7 @@ class ReviewCubit extends Cubit<ReviewState> {
       if (node.path == targetPath && node.isDirectory) {
         if (!node.isExpanded) {
           // Expand: load children
-          final dir = Directory(targetPath);
-          final entities = dir.listSync(followLinks: true)
-            ..sort((a, b) {
-              final aIsDir = a is Directory;
-              final bIsDir = b is Directory;
-              if (aIsDir != bIsDir) return aIsDir ? -1 : 1;
-              return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
-            });
+          final entities = _listAndSortEntities(targetPath);
           final children = entities
               .where((e) => p.basename(e.path) != '.git')
               .map((e) => FileTreeNode(
