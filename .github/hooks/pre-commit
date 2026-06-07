@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║  QUALITY GATE — DO NOT LOWER THESE THRESHOLDS WITHOUT TEAM APPROVAL       ║
+# ║  We ship quality code. Every commit must pass these gates.                ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+#
+# Pre-commit hook: runs file-size check + duplication + coverage + CLI registry
+# + Flutter tests.
+# To skip (emergency only): git commit --no-verify
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Unset git env vars so test processes that spawn git subprocesses
+# (e.g. WorktreeService real-repo tests) use the correct working directory
+# rather than the hook's GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 1. FILE SIZE GUARD
+# ═══════════════════════════════════════════════════════════════════════════
+MAX_LINES=2800
+VIOLATIONS=()
+
+while IFS= read -r file; do
+  case "$file" in
+    *.dart)
+      case "$file" in
+        *.g.dart|*.freezed.dart|*.mocks.dart) continue ;;
+      esac
+      lines=$(wc -l < "$file")
+      if (( lines > MAX_LINES )); then
+        VIOLATIONS+=("  $file: $lines lines (max $MAX_LINES)")
+      fi
+      ;;
+  esac
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+if ((${#VIOLATIONS[@]} > 0)); then
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+  echo "║  ❌ QUALITY GATE FAILED — FILE SIZE                                       ║"
+  echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+  echo "   Staged files exceed $MAX_LINES lines:"
+  printf '%s\n' "${VIOLATIONS[@]}"
+  echo ""
+  echo "   Extract widgets / logic into smaller files, then retry."
+  echo "   Use --no-verify to skip (NOT recommended — consult the team first)."
+  exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2. CODE DUPLICATION GUARD
+# ═══════════════════════════════════════════════════════════════════════════
+DUP_THRESHOLD=0.5
+if command -v jscpd >/dev/null 2>&1; then
+  echo "🔍 Checking code duplication (threshold: < ${DUP_THRESHOLD}%)..."
+  jscpd --min-tokens 50 --min-lines 5 --reporters json --output /tmp/jscpd-precommit lib/ >/dev/null 2>&1 || true
+  DUP_PCT=$(python3 -c "
+import json,sys
+try:
+    with open('/tmp/jscpd-precommit/jscpd-report.json') as f:
+        d=json.load(f)
+    print(d['statistics']['total']['percentage'])
+except: print('0.0')
+" 2>/dev/null || echo "0.0")
+  if python3 -c "exit(0 if float('$DUP_PCT') < float('$DUP_THRESHOLD') else 1)" 2>/dev/null; then
+    echo "✅ Duplication check OK ($DUP_PCT% < ${DUP_THRESHOLD}%)"
+  else
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+    echo "║  ❌ QUALITY GATE FAILED — CODE DUPLICATION                                ║"
+    echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+    echo "   Duplication: $DUP_PCT% (max ${DUP_THRESHOLD}%)"
+    echo ""
+    echo "   Run: jscpd --min-tokens 50 --min-lines 5 lib/"
+    echo "   Extract shared helpers / widgets, then retry."
+    echo "   Use --no-verify to skip (NOT recommended — consult the team first)."
+    exit 1
+  fi
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 3. COVERAGE RATCHET
+# ═══════════════════════════════════════════════════════════════════════════
+COVERAGE_BASELINE=44.0
+COVERAGE_TARGET=50.0
+
+if [ ! -f coverage/lcov.info ]; then
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+  echo "║  ❌ QUALITY GATE FAILED — NO COVERAGE DATA                                ║"
+  echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+  echo "   coverage/lcov.info is missing."
+  echo "   Run: flutter test --coverage --no-pub"
+  echo "   Then stage the updated lcov.info and retry."
+  exit 1
+fi
+
+COVERAGE_PCT=$(python3 -c "
+import sys
+with open('coverage/lcov.info','r') as f:
+    content=f.read()
+files=content.split('SF:')
+total_found=0; total_hit=0
+for sec in files[1:]:
+    for line in sec.strip().split('\n')[1:]:
+        if line.startswith('DA:'):
+            total_found+=1
+            if int(line[3:].split(',')[1])>0:
+                total_hit+=1
+if total_found>0:
+    print(f'{(total_hit/total_found)*100:.1f}')
+else:
+    print('0.0')
+" 2>/dev/null || echo "0.0")
+
+if python3 -c "exit(0 if float('$COVERAGE_PCT') >= float('$COVERAGE_BASELINE') else 1)" 2>/dev/null; then
+  echo "✅ Coverage ratchet OK ($COVERAGE_PCT% >= ${COVERAGE_BASELINE}%)"
+  if python3 -c "exit(0 if float('$COVERAGE_PCT') >= float('$COVERAGE_TARGET') else 1)" 2>/dev/null; then
+    echo "   🏆 Coverage target ${COVERAGE_TARGET}% reached — excellent!"
+  else
+    echo "   🎯 Coverage target: ${COVERAGE_TARGET}% (current: $COVERAGE_PCT%)"
+    echo "      Run: flutter test --coverage --no-pub  to update"
+  fi
+else
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+  echo "║  ❌ QUALITY GATE FAILED — TEST COVERAGE                                   ║"
+  echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+  echo "   Coverage: $COVERAGE_PCT% (baseline ${COVERAGE_BASELINE}%)"
+  echo ""
+  echo "   Add tests for changed code, then retry."
+  echo "   Run: flutter test --coverage --no-pub"
+  echo "   Use --no-verify to skip (NOT recommended — consult the team first)."
+  exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 4. CLI REGISTRY VALIDATION
+# ═══════════════════════════════════════════════════════════════════════════
+echo "🔍 Validating CLI command registry..."
+if bash tools/yoloit validate; then
+  echo "✅ CLI registry OK"
+else
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+  echo "║  ❌ QUALITY GATE FAILED — CLI REGISTRY                                    ║"
+  echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+  echo "   Add missing bash case handlers or fix collisions, then retry."
+  echo "   Use --no-verify to skip (NOT recommended — consult the team first)."
+  exit 1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 5. TESTS
+# ═══════════════════════════════════════════════════════════════════════════
+echo "🧪 Running tests before commit..."
+if flutter test --concurrency=4 --exclude-tags=flaky 2>&1; then
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+  echo "║  ✅ ALL QUALITY GATES PASSED — COMMIT APPROVED                            ║"
+  echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+else
+  echo ""
+  echo "╔═══════════════════════════════════════════════════════════════════════════╗"
+  echo "║  ❌ QUALITY GATE FAILED — TESTS                                           ║"
+  echo "╚═══════════════════════════════════════════════════════════════════════════╝"
+  echo "   Fix failing tests or use --no-verify to skip (NOT recommended)."
+  exit 1
+fi

@@ -179,10 +179,40 @@ class MacosPlatformInstaller extends PlatformInstaller {
       if (ditto.exitCode != 0) {
         throw Exception('Install failed: ${ditto.stderr}');
       }
+      await _installCliSymlink(dest);
       return dest; // launch token = installed .app path
     } finally {
       await _run('hdiutil', ['detach', mountPoint, '-force']);
       try { tmpDir.deleteSync(recursive: true); } catch (_) {}
+    }
+  }
+
+  Future<void> _installCliSymlink(String appPath) async {
+    final cliSource = File(
+      '$appPath/Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/tools/yoloit',
+    );
+    if (!cliSource.existsSync()) return;
+
+    final home = Platform.environment['HOME'] ?? '';
+    if (home.isEmpty) return;
+
+    // Always install a user-local symlink so resolveYoloitBin() can find it.
+    final userDir = '$home/.config/yoloit';
+    await Directory(userDir).create(recursive: true);
+    final userLink = File('$userDir/yoloit');
+    if (userLink.existsSync()) userLink.deleteSync();
+    final userResult = await _run('ln', ['-s', cliSource.path, userLink.path]);
+    if (userResult.exitCode != 0) {
+      // Best-effort: ignore user-local symlink failures.
+    }
+
+    // Best-effort system-wide symlink in /usr/local/bin.
+    const systemDir = '/usr/local/bin';
+    const systemLink = '$systemDir/yoloit';
+    final systemResult = await _run('ln', ['-sf', cliSource.path, systemLink]);
+    if (systemResult.exitCode != 0) {
+      await _run('mkdir', ['-p', systemDir]);
+      await _run('ln', ['-sf', cliSource.path, systemLink]);
     }
   }
 
