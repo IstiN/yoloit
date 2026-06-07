@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:record/record.dart';
 import 'package:yoloit/core/cli/board_screenshot_service.dart';
 import 'package:yoloit/core/platform/microphone_permission_service.dart';
@@ -22,23 +21,18 @@ import 'package:yoloit/features/board/chat/chat_session_manager.dart';
 import 'package:yoloit/features/board/chat/cli_guidance_service.dart';
 import 'package:yoloit/features/board/chat/cloud_asr_service.dart';
 import 'package:yoloit/features/board/chat/opencode_provider.dart';
-import 'package:yoloit/features/board/chat/widgets/assistant_bubble.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_action_button.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_ask_user_card.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_context_toggles.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_info_bar.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_model_suggestions.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_running_tools_card.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_slash_chips.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_changed_files_strip.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_context_toggles.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_empty_state.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_info_bar.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_message_list.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_model_suggestions.dart';
 import 'package:yoloit/features/board/chat/widgets/chat_setup_view.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_system_bubble.dart';
-import 'package:yoloit/features/board/chat/widgets/chat_typing_indicator.dart';
+import 'package:yoloit/features/board/chat/widgets/chat_slash_chips.dart';
+import 'package:yoloit/features/board/chat/widgets/local_tools_dialog.dart';
 import 'package:yoloit/features/board/chat/widgets/model_search_dialog.dart';
 import 'package:yoloit/features/board/chat/widgets/session_history_dialog.dart';
-import 'package:yoloit/features/board/chat/widgets/tool_result_card.dart';
-import 'package:yoloit/features/board/chat/widgets/user_bubble.dart';
 import 'package:yoloit/features/board/chat/yoloit_cli_tools.dart';
 import 'package:yoloit/features/board/events/board_event_bus.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
@@ -1573,7 +1567,25 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
             child:
                 _messages.isEmpty && !_isProcessing
                     ? const ChatEmptyState()
-                    : _buildMessageList(),
+                    : ChatMessageList(
+                        messages: _messages,
+                        activeToolCalls: _activeToolCalls,
+                        streamingContent: _streamingContent,
+                        isProcessing: _isProcessing,
+                        scrollController: _scrollController,
+                        subAgents: _subAgents,
+                        subAgentPanels: _subAgentPanels,
+                        isIgnoredToolCall: _isIgnoredToolCall,
+                        isSubAgentToolCall: _isSubAgentToolCall,
+                        onLinkTap: _handleLinkTap,
+                        onOpenFile: _handleOpenFile,
+                        onSendToPanel: _sendToolResultToPanel,
+                        onAskUserChoice: (choice) {
+                          _inputController.text = choice;
+                          _sendMessage();
+                        },
+                        onSendMessage: _sendMessage,
+                      ),
           ),
           // Input
           _buildInputBar(),
@@ -1599,359 +1611,18 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
       YoloitCliToolCatalog.tools.length - _disabledLocalTools().length;
 
   Future<void> _showLocalToolsDialog() async {
-    final colors = context.appColors;
-    final muted =
-        context.appColors.textMuted.withAlpha(153);
-    var disabled = _disabledLocalTools();
-    final tools = [...YoloitCliToolCatalog.tools]..sort((a, b) {
-      final byGroup = a.group.compareTo(b.group);
-      return byGroup == 0 ? a.command.compareTo(b.command) : byGroup;
-    });
-
     await showDialog<void>(
       context: context,
-      builder:
-          (dialogContext) => StatefulBuilder(
-            builder: (context, setDialogState) {
-              void persist(Set<String> next) {
-                disabled = {...next};
-                final sorted = disabled.toList()..sort();
-                setState(() {
-                  _config = _config.copyWith(disabledLocalToolNames: sorted);
-                });
-                _persistMessages();
-              }
-
-              Widget buildToolTile(YoloitCliTool tool) {
-                final enabled = !disabled.contains(tool.functionName);
-                return CheckboxListTile(
-                  dense: true,
-                  value: enabled,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (value) {
-                    final next = {...disabled};
-                    if (value == true) {
-                      next.remove(tool.functionName);
-                    } else {
-                      next.add(tool.functionName);
-                    }
-                    setDialogState(() => persist(next));
-                  },
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'yoloit ${tool.command}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      if (tool.destructive)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.error.withAlpha(31),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            'destructive',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  subtitle: Text(
-                    '${tool.functionName}\n${tool.description}',
-                    style: TextStyle(fontSize: 11, color: muted),
-                  ),
-                );
-              }
-
-              final grouped = <String, List<YoloitCliTool>>{};
-              for (final tool in tools) {
-                grouped.putIfAbsent(tool.group, () => []).add(tool);
-              }
-              return AlertDialog(
-                title: Row(
-                  children: [
-                    const Icon(Icons.settings_input_component_outlined),
-                    const SizedBox(width: 8),
-                    const Expanded(child: Text('YoLo Chat tools')),
-                    Text(
-                      '${_enabledLocalToolCount()}/${tools.length}',
-                      style: TextStyle(fontSize: 12, color: muted),
-                    ),
-                  ],
-                ),
-                content: SizedBox(
-                  width: 720,
-                  height: 560,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Checked tools are exposed to the local LLM. Unchecked tools are removed from the tool schema and blocked if the model still tries to call them.',
-                        style: TextStyle(fontSize: 12, color: muted),
-                      ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: ListView(
-                          children: [
-                            for (final entry in grouped.entries) ...[
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 10,
-                                  bottom: 4,
-                                ),
-                                child: Text(
-                                  entry.key.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: colors.primary,
-                                    letterSpacing: 0.6,
-                                  ),
-                                ),
-                              ),
-                              ...entry.value.map(buildToolTile),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      setDialogState(() => persist(<String>{}));
-                    },
-                    child: const Text('Enable all'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      final next = {
-                        for (final tool in tools)
-                          if (tool.destructive) tool.functionName,
-                      };
-                      setDialogState(() => persist(next));
-                    },
-                    child: const Text('Disable destructive'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('Done'),
-                  ),
-                ],
-              );
-            },
-          ),
-    );
-  }
-
-  Widget _buildMessageList() {
-    final runningTools =
-        _activeToolCalls.values
-            .where((t) => t.isRunning && !_isIgnoredToolCall(t.toolName))
-            .toList();
-    final hasRunningTools = runningTools.isNotEmpty;
-    final showStreaming = _streamingContent.isNotEmpty;
-    // Show thinking indicator when processing but no streaming content and no running tools
-    final showThinking = _isProcessing && !showStreaming && !hasRunningTools;
-
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      itemCount:
-          _messages.length +
-          (showStreaming ? 1 : 0) +
-          (hasRunningTools ? 1 : 0) +
-          (showThinking ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index < _messages.length) {
-          return _buildMessageBubble(_messages[index]);
-        }
-
-        final extra = index - _messages.length;
-
-        // Running tools indicator
-        if (hasRunningTools && extra == 0) {
-          return ChatRunningToolsCard(
-            tools: runningTools,
-            subAgents: _subAgents,
-            subAgentPanels: _subAgentPanels,
-            isSubAgentToolCall: _isSubAgentToolCall,
-            onFocusPanel: (panelId) {
-              context.read<BoardCubit>().focusPanel(panelId);
-            },
-          );
-        }
-
-        // Streaming content
-        if (showStreaming) {
-          return _buildStreamingBubble();
-        }
-
-        // Thinking indicator (pulsing dots)
-        if (showThinking) {
-          return Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.appColors.surfaceElevated,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-              ),
-              child: const ChatTypingIndicator(),
-            ),
-          );
-        }
-
-        return const SizedBox.shrink();
-      },
-    );
-  }
-
-  Widget _buildMessageBubble(ChatMessage message) {
-    switch (message.role) {
-      case ChatRole.user:
-        return UserBubble(
-          content: message.content,
-          attachments: message.attachments,
-          onOpenFile: _handleOpenFile,
-        );
-      case ChatRole.assistant:
-        final visibleToolCalls =
-            message.toolCalls
-                .map(
-                  (tc) => tc.copyWith(
-                    toolName: _resolveToolName(tc.toolName, content: tc.result),
-                  ),
-                )
-                .where((tc) => !_isIgnoredToolCall(tc.toolName))
-                .toList();
-        return AssistantBubble(
-          content: message.content,
-          toolCalls: visibleToolCalls,
-          tokenUsage: message.tokenUsage,
-          onLinkTap: _handleLinkTap,
-          onOpenFile: _handleOpenFile,
-        );
-      case ChatRole.tool:
-        final resolvedToolName = _resolveToolName(
-          message.toolName,
-          content: message.content,
-        );
-        if (_isIgnoredToolCall(resolvedToolName)) {
-          return const SizedBox.shrink();
-        }
-        final persistedSuccess = message.metadata?['success'] as bool?;
-        final toolArgs = _activeToolCalls[message.toolCallId]?.arguments ?? {};
-        return ToolResultCard(
-          toolName: resolvedToolName,
-          toolCallId: message.toolCallId ?? '',
-          content: message.content,
-          success:
-              _activeToolCalls[message.toolCallId]?.success ?? persistedSuccess,
-          onSendToPanel:
-              message.content.isNotEmpty
-                  ? () => unawaited(
-                    _sendToolResultToPanel(
-                      toolName: resolvedToolName,
-                      arguments: toolArgs,
-                      content: message.content,
-                    ),
-                  )
-                  : null,
-          onOpenAgentPanel:
-              _isSubAgentToolCall(resolvedToolName) &&
-                      _subAgentPanels.containsKey(message.toolCallId)
-                  ? () => context.read<BoardCubit>().focusPanel(
-                    _subAgentPanels[message.toolCallId]!,
-                  )
-                  : null,
-        );
-      case ChatRole.system:
-        final meta = message.metadata;
-        if (meta != null && meta['type'] == 'ask_user') {
-          return ChatAskUserCard(
-            question: message.content,
-            choices: (meta['choices'] as List?)?.cast<String>() ?? [],
-            onChoice: (choice) {
-              _inputController.text = choice;
-              _sendMessage();
-            },
-          );
-        }
-        return ChatSystemBubble(content: message.content);
-    }
-  }
-
-  Widget _buildStreamingBubble() {
-    final colors = context.appColors;
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    final codeBg = colors.surface;
-    final processedContent = _streamingContent.replaceAll(_brTagRe, '\n');
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colors.surfaceElevated,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(4),
-            topRight: Radius.circular(16),
-            bottomLeft: Radius.circular(16),
-            bottomRight: Radius.circular(16),
-          ),
-        ),
-        child:
-            processedContent.isEmpty
-                ? const ChatTypingIndicator()
-                : RepaintBoundary(
-                  child: MarkdownBody(
-                    data: processedContent,
-                    onTapLink: (text, href, title) {
-                      _handleLinkTap(href);
-                    },
-                    styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(fontSize: 13, color: textColor, height: 1.5),
-                      a: TextStyle(
-                        fontSize: 13,
-                        color: colors.primary,
-                        decoration: TextDecoration.underline,
-                      ),
-                      code: TextStyle(
-                        fontSize: 11.5,
-                        color: colors.terminalPrompt,
-                        backgroundColor: codeBg,
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: codeBg,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: colors.border),
-                      ),
-                    ),
-                  ),
-                ),
+      builder: (_) => LocalToolsDialog(
+        disabledToolNames: _disabledLocalTools(),
+        enabledCount: _enabledLocalToolCount(),
+        onChanged: (disabled) {
+          final sorted = disabled.toList()..sort();
+          setState(() {
+            _config = _config.copyWith(disabledLocalToolNames: sorted);
+          });
+          _persistMessages();
+        },
       ),
     );
   }

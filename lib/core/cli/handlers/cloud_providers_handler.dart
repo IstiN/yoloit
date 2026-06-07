@@ -12,14 +12,15 @@ Future<shelf.Response> handleCloudProviders(
   required shelf.Response Function(Object) json,
   required shelf.Response Function(String) error,
   required shelf.Response Function(String) notFound,
+  CloudLlmSettingsService? service,
 }) async {
-  final service = CloudLlmSettingsService.instance;
+  final effectiveService = service ?? CloudLlmSettingsService.instance;
 
   // GET /api/cloud-providers → list all configs + active id + provider type
   if (sub.isEmpty && method == 'GET') {
-    final configs = await service.loadConfigs();
-    final activeId = await service.loadActiveConfigId();
-    final providerType = await service.loadAssistantProviderType();
+    final configs = await effectiveService.loadConfigs();
+    final activeId = await effectiveService.loadActiveConfigId();
+    final providerType = await effectiveService.loadAssistantProviderType();
     return json({
       'ok': true,
       'providerType': providerType,
@@ -40,14 +41,14 @@ Future<shelf.Response> handleCloudProviders(
   }
 
   Future<shelf.Response> withId(
-    Future<shelf.Response> Function(String id) action,
+    Future<shelf.Response> Function(String id, Map<String, dynamic> body) action,
   ) async {
     final requestBody = await body(request);
     final id = requestBody['id'] as String?;
     if (id == null || id.trim().isEmpty) {
       return error(missingField('id'));
     }
-    return action(id);
+    return action(id, requestBody);
   }
 
   // POST /api/cloud-providers/add { name, baseUrl, apiKey, model, extraHeaders? }
@@ -74,22 +75,22 @@ Future<shelf.Response> handleCloudProviders(
       model: model,
       extraHeaders: extra,
     );
-    await service.upsertConfig(config);
+    await effectiveService.upsertConfig(config);
     return json(okJson({'action': 'add', 'id': config.id}));
   }
 
   // POST /api/cloud-providers/remove { id }
   if (sub.length == 1 && sub[0] == 'remove' && method == 'POST') {
-    return withId((id) async {
-      await service.removeConfig(id);
+    return withId((id, _) async {
+      await effectiveService.removeConfig(id);
       return json(okJson({'action': 'remove', 'id': id}));
     });
   }
 
   // POST /api/cloud-providers/select { id }
   if (sub.length == 1 && sub[0] == 'select' && method == 'POST') {
-    return withId((id) async {
-      await service.saveActiveConfigId(id);
+    return withId((id, _) async {
+      await effectiveService.saveActiveConfigId(id);
       return json(okJson({'action': 'select', 'id': id}));
     });
   }
@@ -103,16 +104,15 @@ Future<shelf.Response> handleCloudProviders(
         'Missing or invalid "type" field. Expected "local" or "cloud".',
       );
     }
-    await service.saveAssistantProviderType(type);
+    await effectiveService.saveAssistantProviderType(type);
     return json(okJson({'action': 'set-provider-type', 'type': type}));
   }
 
   // POST /api/cloud-providers/update { id, ...fields }
   if (sub.length == 1 && sub[0] == 'update' && method == 'POST') {
-    return withId((id) async {
-      final existing = await service.loadConfigById(id);
+    return withId((id, requestBody) async {
+      final existing = await effectiveService.loadConfigById(id);
       if (existing == null) return error('Config not found: $id');
-      final requestBody = await body(request);
       final updated = CloudLlmConfig(
         id: id,
         name: requestBody['name'] as String? ?? existing.name,
@@ -126,7 +126,7 @@ Future<shelf.Response> handleCloudProviders(
                 )
                 : existing.extraHeaders,
       );
-      await service.upsertConfig(updated);
+      await effectiveService.upsertConfig(updated);
       return json(okJson({'action': 'update', 'id': id}));
     });
   }

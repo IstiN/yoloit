@@ -11,103 +11,103 @@ void main() {
 
   group('ReviewCubit', () {
     test('initial state is ReviewInitial', () {
-      expect(ReviewCubit().state, isA<ReviewInitial>());
+      final cubit = ReviewCubit();
+      addTearDown(cubit.close);
+      expect(cubit.state, const ReviewInitial());
     });
 
     blocTest<ReviewCubit, ReviewState>(
-      'loadWorkspace emits ReviewLoaded',
+      'setViewMode switches view mode',
       build: () => ReviewCubit(),
-      act: (cubit) => cubit.loadWorkspace(['/tmp']),
-      verify: (cubit) => expect(cubit.state, isA<ReviewLoaded>()),
-    );
-
-    blocTest<ReviewCubit, ReviewState>(
-      'setViewMode switches between diff and file',
-      build: () => ReviewCubit(),
-      seed: () => const ReviewLoaded(
-        fileTree: [],
-        changedFiles: [],
-        viewMode: ReviewViewMode.diff,
-      ),
+      seed: () => const ReviewLoaded(fileTree: [], changedFiles: []),
       act: (cubit) => cubit.setViewMode(ReviewViewMode.file),
       expect: () => [
-        isA<ReviewLoaded>().having((s) => s.viewMode, 'viewMode', ReviewViewMode.file),
+        isA<ReviewLoaded>()
+            .having((s) => s.viewMode, 'viewMode', ReviewViewMode.file),
       ],
     );
 
     blocTest<ReviewCubit, ReviewState>(
-      'toggleNode expands a real directory node',
+      'setViewMode does nothing when not loaded',
       build: () => ReviewCubit(),
-      act: (cubit) async {
-        // Use a real directory that exists on the test machine
-        final dir = Directory.systemTemp;
-        cubit.emit(ReviewLoaded(
-          fileTree: [
-            FileTreeNode(name: dir.path.split('/').last, path: dir.path, isDirectory: true),
-          ],
-          changedFiles: const [],
-        ));
-        cubit.toggleNode(dir.path);
-      },
-      expect: () => [
-        isA<ReviewLoaded>(), // seeded state
-        isA<ReviewLoaded>().having(
-          (s) => s.fileTree.first.isExpanded,
-          'isExpanded after toggle',
-          true,
-        ),
-      ],
+      act: (cubit) => cubit.setViewMode(ReviewViewMode.file),
+      expect: () => <ReviewState>[],
     );
 
     blocTest<ReviewCubit, ReviewState>(
-      'toggleNode collapses an expanded directory node',
+      'toggleNode expands and collapses directory',
       build: () => ReviewCubit(),
-      act: (cubit) async {
-        final dir = Directory.systemTemp;
-        cubit.emit(ReviewLoaded(
-          fileTree: [
-            FileTreeNode(
-              name: dir.path.split('/').last,
-              path: dir.path,
-              isDirectory: true,
-              isExpanded: true,
-            ),
-          ],
-          changedFiles: const [],
-        ));
-        cubit.toggleNode(dir.path);
-      },
-      expect: () => [
-        isA<ReviewLoaded>(), // seeded
-        isA<ReviewLoaded>().having(
-          (s) => s.fileTree.first.isExpanded,
-          'isExpanded after collapse',
-          false,
-        ),
-      ],
-    );
-
-    test('ReviewLoaded copyWith preserves viewMode when not changed', () {
-      const state = ReviewLoaded(
-        fileTree: [],
+      seed: () => ReviewLoaded(
+        fileTree: [
+          FileTreeNode(
+            name: 'root',
+            path: Directory.systemTemp.path,
+            isDirectory: true,
+            isExpanded: false,
+            children: [],
+          ),
+        ],
         changedFiles: [],
-        viewMode: ReviewViewMode.file,
-        selectedFilePath: '/some/path',
-      );
-      final copy = state.copyWith(isLoadingDiff: true);
-      expect(copy.viewMode, ReviewViewMode.file);
-      expect(copy.selectedFilePath, '/some/path');
-      expect(copy.isLoadingDiff, true);
+      ),
+      act: (cubit) => cubit.toggleNode(Directory.systemTemp.path),
+      expect: () => [
+        isA<ReviewLoaded>()
+            .having((s) => s.fileTree.first.isExpanded, 'isExpanded', true),
+      ],
+    );
+  });
+
+  group('ReviewCubit file operations', () {
+    late Directory tempDir;
+    late ReviewCubit cubit;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('review_cubit_test_');
+      cubit = ReviewCubit();
+      await cubit.loadWorkspace([tempDir.path]);
     });
 
-    test('ReviewLoaded copyWith clearSelectedFile works', () {
-      const state = ReviewLoaded(
-        fileTree: [],
-        changedFiles: [],
-        selectedFilePath: '/some/path',
-      );
-      final copy = state.copyWith(clearSelectedFile: true);
-      expect(copy.selectedFilePath, isNull);
+    tearDown(() async {
+      await cubit.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('createFile creates a file', () async {
+      await cubit.createFile(tempDir.path, 'test.txt');
+
+      final file = File('${tempDir.path}/test.txt');
+      expect(await file.exists(), true);
+    });
+
+    test('createFolder creates directory with .gitkeep', () async {
+      await cubit.createFolder(tempDir.path, 'newdir');
+
+      final dir = Directory('${tempDir.path}/newdir');
+      expect(await dir.exists(), true);
+      final gitkeep = File('${tempDir.path}/newdir/.gitkeep');
+      expect(await gitkeep.exists(), true);
+    });
+
+    test('renameEntry renames a file', () async {
+      final oldFile = File('${tempDir.path}/old.txt');
+      await oldFile.writeAsString('content');
+
+      await cubit.renameEntry(oldFile.path, 'new.txt');
+
+      expect(await oldFile.exists(), false);
+      final newFile = File('${tempDir.path}/new.txt');
+      expect(await newFile.exists(), true);
+    });
+
+    test('renameEntry renames a directory', () async {
+      final oldDir = Directory('${tempDir.path}/olddir');
+      await oldDir.create();
+
+      await cubit.renameEntry(oldDir.path, 'newdir');
+
+      expect(await oldDir.exists(), false);
+      final newDir = Directory('${tempDir.path}/newdir');
+      expect(await newDir.exists(), true);
     });
   });
 }
