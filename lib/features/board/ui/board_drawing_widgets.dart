@@ -123,20 +123,7 @@ class DrawingElementPainter extends CustomPainter {
   /// underneath can still handle pointer events.
   @override
   bool? hitTest(Offset position) {
-    final hitRadius = (drawing.strokeWidth / 2) + 8.0;
-    for (final stroke in drawing.strokes) {
-      if (stroke.isEmpty) continue;
-      if (stroke.length == 1) {
-        if ((stroke.first - position).distance <= hitRadius) return true;
-        continue;
-      }
-      for (int i = 0; i < stroke.length - 1; i++) {
-        if (_distToSegment(position, stroke[i], stroke[i + 1]) <= hitRadius) {
-          return true;
-        }
-      }
-    }
-    return null; // transparent — let events fall through
+    return strokeHitTest(drawing, position) ? true : null;
   }
 
   static double _distToSegment(Offset p, Offset a, Offset b) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/input_decoration_utils.dart';
 import 'package:yoloit/features/board/ui/board_file_picker.dart';
 import 'package:yoloit/features/workspaces/data/worktree_service.dart';
 import 'package:yoloit/features/workspaces/models/worktree_model.dart';
@@ -663,9 +664,10 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                           color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 12,
                         ),
-                        decoration: _inputDecoration(
-                          'e.g. /path/to/worktree',
-                          context,
+                        decoration: appInputDecoration(
+                          colors: context.appColors,
+                          hintText: 'e.g. /path/to/worktree',
+                          fillColor: context.appColors.surfaceElevated,
                         ),
                       ),
                     ),
@@ -717,9 +719,10 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
                       color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 12,
                     ),
-                    decoration: _inputDecoration(
-                      'e.g. feature/my-feature',
-                      context,
+                    decoration: appInputDecoration(
+                      colors: context.appColors,
+                      hintText: 'e.g. feature/my-feature',
+                      fillColor: context.appColors.surfaceElevated,
                     ),
                   ),
                 ),
@@ -811,33 +814,7 @@ class _AddWorktreeDialogState extends State<_AddWorktreeDialog> {
     );
   }
 
-  InputDecoration _inputDecoration(String hint, BuildContext context) {
-    final colors = context.appColors;
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(
-        color:
-            context.appColors.textMuted,
-        fontSize: 12,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      isDense: true,
-      filled: true,
-      fillColor: colors.surfaceElevated,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
-        borderSide: BorderSide(color: colors.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
-        borderSide: BorderSide(color: colors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
-        borderSide: BorderSide(color: colors.primary),
-      ),
-    );
-  }
+
 }
 
 class _OutlineButton extends StatelessWidget {

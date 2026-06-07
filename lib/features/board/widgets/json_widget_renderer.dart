@@ -214,23 +214,24 @@ class JsonWidgetRenderer {
 
   // ── Container & decoration ────────────────────────────────────────────────
 
-  Widget _container(Map<String, dynamic> m) {
+  Decoration? _containerDecoration(Map<String, dynamic> m) {
     final deco = m['decoration'] as Map?;
-    return Container(
-      width: _doubleOrNull(m['width']),
-      height: _doubleOrNull(m['height']),
-      padding: _edgeInsetsOrNull(m['padding']),
-      margin: _edgeInsetsOrNull(m['margin']),
-      alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
-      decoration:
-          deco != null
-              ? _boxDecoration(deco.cast<String, dynamic>())
-              : (m['color'] != null
-                  ? BoxDecoration(color: _color(m['color'] as String?))
-                  : null),
-      child: _child(m),
-    );
+    return deco != null
+        ? _boxDecoration(deco.cast<String, dynamic>())
+        : (m['color'] != null
+            ? BoxDecoration(color: _color(m['color'] as String?))
+            : null);
   }
+
+  Widget _container(Map<String, dynamic> m) => Container(
+    width: _doubleOrNull(m['width']),
+    height: _doubleOrNull(m['height']),
+    padding: _edgeInsetsOrNull(m['padding']),
+    margin: _edgeInsetsOrNull(m['margin']),
+    alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
+    decoration: _containerDecoration(m),
+    child: _child(m),
+  );
 
   Widget _card(Map<String, dynamic> m) => Card(
     elevation: _double(m['elevation'], 2),
@@ -678,26 +679,18 @@ class JsonWidgetRenderer {
 
   // ── Animated widgets ──────────────────────────────────────────────────────
 
-  Widget _animatedContainer(Map<String, dynamic> m) {
-    final deco = m['decoration'] as Map?;
-    return AnimatedContainer(
-      duration: Duration(milliseconds: _int(m['duration'], 300)),
-      curve: _curve(m['curve'] as String?),
-      width: _doubleOrNull(m['width']),
-      height: _doubleOrNull(m['height']),
-      padding: _edgeInsetsOrNull(m['padding']),
-      margin: _edgeInsetsOrNull(m['margin']),
-      alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
-      decoration:
-          deco != null
-              ? _boxDecoration(deco.cast<String, dynamic>())
-              : (m['color'] != null
-                  ? BoxDecoration(color: _color(m['color'] as String?))
-                  : null),
-      transform: _matrix4(m['transform']),
-      child: _child(m),
-    );
-  }
+  Widget _animatedContainer(Map<String, dynamic> m) => AnimatedContainer(
+    duration: Duration(milliseconds: _int(m['duration'], 300)),
+    curve: _curve(m['curve'] as String?),
+    width: _doubleOrNull(m['width']),
+    height: _doubleOrNull(m['height']),
+    padding: _edgeInsetsOrNull(m['padding']),
+    margin: _edgeInsetsOrNull(m['margin']),
+    alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
+    decoration: _containerDecoration(m),
+    transform: _matrix4(m['transform']),
+    child: _child(m),
+  );
 
   Widget _animatedOpacity(Map<String, dynamic> m) => AnimatedOpacity(
     duration: Duration(milliseconds: _int(m['duration'], 300)),
