@@ -1,4 +1,6 @@
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:process_run/process_run.dart';
 
 class GitService {
@@ -110,6 +112,10 @@ class GitService {
     }
   }
 
+  @visibleForTesting
+  ({int added, int removed}) parseShortstatForTest(String shortstat) =>
+      _parseShortstat(shortstat);
+
   ({int added, int removed}) _parseShortstat(String shortstat) {
     if (shortstat.isEmpty) return (added: 0, removed: 0);
     int added = 0;
@@ -120,6 +126,10 @@ class GitService {
     if (removedMatch != null) removed = int.tryParse(removedMatch.group(1)!) ?? 0;
     return (added: added, removed: removed);
   }
+
+  @visibleForTesting
+  List<GitFileStatus> parseStatusForTest(String statusOutput) =>
+      _parseStatus(statusOutput);
 
   List<GitFileStatus> _parseStatus(String statusOutput) {
     if (statusOutput.isEmpty) return [];

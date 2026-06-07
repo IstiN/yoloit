@@ -243,6 +243,24 @@ class ReviewCubit extends Cubit<ReviewState> {
     }
   }
 
+  @visibleForTesting
+  List<FileSystemEntity> listAndSortEntitiesForTest(String dirPath) =>
+      _listAndSortEntities(dirPath);
+
+  @visibleForTesting
+  Future<List<FileTreeNode>> buildFileTreeForTest(String dirPath) =>
+      _buildFileTree(dirPath);
+
+  @visibleForTesting
+  String? gitRootForForTest(String absolutePath) => _gitRootFor(absolutePath);
+
+  @visibleForTesting
+  List<FileTreeNode> toggleNodeInTreeForTest(
+    List<FileTreeNode> nodes,
+    String targetPath,
+  ) =>
+      _toggleNodeInTree(nodes, targetPath);
+
   List<FileTreeNode> _toggleNodeInTree(List<FileTreeNode> nodes, String targetPath) {
     return nodes.map((node) {
       if (node.path == targetPath && node.isDirectory) {

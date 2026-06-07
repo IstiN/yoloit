@@ -808,6 +808,20 @@ class SetupCheckService {
     return await _findPath(exe) ?? exe;
   }
 
+  @visibleForTesting
+  static String mergePathForTest(
+    String current,
+    List<String> candidates,
+    String separator,
+  ) =>
+      _mergePath(current, candidates, separator);
+
+  @visibleForTesting
+  static String? extractOutputForTest(ProcessResult r) => _extractOutput(r);
+
+  @visibleForTesting
+  static String cleanVersionForTest(String raw) => _cleanVersion(raw);
+
   static Future<DependencyStatus> _checkTool({
     required String id,
     required String name,
