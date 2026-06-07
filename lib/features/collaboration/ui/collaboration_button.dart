@@ -6,6 +6,7 @@ import 'package:yoloit/core/utils/clipboard_utils.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:yoloit/core/theme/app_color_scheme.dart';
+import 'package:yoloit/core/utils/input_decoration_utils.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_cubit.dart';
 import 'package:yoloit/features/collaboration/bloc/collaboration_state.dart';
 import 'package:yoloit/features/collaboration/collaboration_ports.dart';
@@ -813,29 +814,13 @@ class _DarkTextField extends StatelessWidget {
         fontSize: 13,
         fontFamily: 'monospace',
       ),
-      decoration: InputDecoration(
+      decoration: appInputDecoration(
+        colors: colors,
         hintText: hint,
-        hintStyle: TextStyle(
-          color: context.appColors.textMuted,
-          fontSize: 12,
-        ),
-        filled: true,
-        fillColor: colors.surface,
+        borderRadius: 8,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 10,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colors.primary),
         ),
       ),
     );
