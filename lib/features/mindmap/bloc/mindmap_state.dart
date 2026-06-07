@@ -1,8 +1,13 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
+import 'package:yoloit/features/board/model/board_json_converters.dart';
 import 'package:yoloit/features/mindmap/model/mindmap_node_model.dart';
 
+part 'mindmap_state.g.dart';
+
 /// Snapshot of the canvas layout at a point in time.
+@JsonSerializable()
 class MindMapViewSnapshot {
   const MindMapViewSnapshot({
     required this.name,
@@ -13,41 +18,21 @@ class MindMapViewSnapshot {
     required this.hiddenTypes,
   });
   final String name;
+  @OffsetMapJsonConverter()
   final Map<String, Offset> positions;
+  @SizeMapJsonConverter()
   final Map<String, Size> sizes;
+  @StringSetJsonConverter()
   final Set<String> locked;
+  @StringSetJsonConverter()
   final Set<String> hidden;
+  @StringSetJsonConverter()
   final Set<String> hiddenTypes;
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'positions': positions.map((k, v) => MapEntry(k, [v.dx, v.dy])),
-    'sizes': sizes.map((k, v) => MapEntry(k, [v.width, v.height])),
-    'locked': locked.toList(),
-    'hidden': hidden.toList(),
-    'hiddenTypes': hiddenTypes.toList(),
-  };
+  Map<String, dynamic> toJson() => _$MindMapViewSnapshotToJson(this);
 
-  factory MindMapViewSnapshot.fromJson(Map<String, dynamic> j) {
-    final Map<String, Offset> positions = {};
-    final Map<String, Size> sizes = {};
-    (j['positions'] as Map<String, dynamic>? ?? {}).forEach((k, v) {
-      final l = (v as List).cast<double>();
-      positions[k] = Offset(l[0], l[1]);
-    });
-    (j['sizes'] as Map<String, dynamic>? ?? {}).forEach((k, v) {
-      final l = (v as List).cast<double>();
-      sizes[k] = Size(l[0], l[1]);
-    });
-    return MindMapViewSnapshot(
-      name:        j['name'] as String,
-      positions:   positions,
-      sizes:       sizes,
-      locked:      ((j['locked'] as List?) ?? []).cast<String>().toSet(),
-      hidden:      ((j['hidden'] as List?) ?? []).cast<String>().toSet(),
-      hiddenTypes: ((j['hiddenTypes'] as List?) ?? []).cast<String>().toSet(),
-    );
-  }
+  factory MindMapViewSnapshot.fromJson(Map<String, dynamic> j) =>
+      _$MindMapViewSnapshotFromJson(j);
 }
 
 class MindMapState extends Equatable {

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:json_annotation/json_annotation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/utils/http_utils.dart';
@@ -12,10 +13,13 @@ import 'package:yoloit/features/board/chat/cursor_agent_provider.dart';
 import 'package:yoloit/features/board/model/chat_models.dart';
 import 'package:yoloit/features/settings/data/global_env_groups_service.dart';
 
+part 'provider_model_catalog_service.g.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Provider model catalog entry
 // ─────────────────────────────────────────────────────────────────────────────
 
+@JsonSerializable(explicitToJson: true)
 class ProviderCatalog {
   const ProviderCatalog({
     required this.id,
@@ -27,17 +31,10 @@ class ProviderCatalog {
   final String displayName;
   final List<ChatModelInfo> models;
 
-  factory ProviderCatalog.fromJson(Map<String, dynamic> j) {
-    final rawModels = j['models'] as List? ?? [];
-    return ProviderCatalog(
-      id: j['id'] as String,
-      displayName: j['displayName'] as String,
-      models:
-          rawModels
-              .map((e) => ChatModelInfo.fromJson(e as Map<String, dynamic>))
-              .toList(),
-    );
-  }
+  factory ProviderCatalog.fromJson(Map<String, dynamic> j) =>
+      _$ProviderCatalogFromJson(j);
+
+  Map<String, dynamic> toJson() => _$ProviderCatalogToJson(this);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

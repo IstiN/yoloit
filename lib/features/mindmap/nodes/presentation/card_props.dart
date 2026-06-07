@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
 import 'package:yoloit/features/terminal/models/agent_phase.dart';
+
+part 'card_props.g.dart';
 
 // ── Shared sub-types ───────────────────────────────────────────────────────
 
@@ -309,6 +312,7 @@ class FileTreeCardProps {
       );
 }
 
+@JsonSerializable()
 class ChangedFileEntry {
   const ChangedFileEntry({
     required this.path,
@@ -323,21 +327,10 @@ class ChangedFileEntry {
   final int addedLines;
   final int removedLines;
 
-  factory ChangedFileEntry.fromJson(Map<String, dynamic> j) => ChangedFileEntry(
-        path: j['path'] as String? ?? '',
-        name: j['name'] as String? ?? '',
-        status: j['status'] as String? ?? 'modified',
-        addedLines: j['addedLines'] as int? ?? 0,
-        removedLines: j['removedLines'] as int? ?? 0,
-      );
+  factory ChangedFileEntry.fromJson(Map<String, dynamic> j) =>
+      _$ChangedFileEntryFromJson(j);
 
-  Map<String, dynamic> toJson() => {
-        'path': path,
-        'name': name,
-        'status': status,
-        'addedLines': addedLines,
-        'removedLines': removedLines,
-      };
+  Map<String, dynamic> toJson() => _$ChangedFileEntryToJson(this);
 }
 
 class DiffCardProps {

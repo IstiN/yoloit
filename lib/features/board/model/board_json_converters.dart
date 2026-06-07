@@ -50,3 +50,48 @@ class SizeJsonConverter implements JsonConverter<Size, List<dynamic>> {
   @override
   List<double> toJson(Size object) => [object.width, object.height];
 }
+
+/// Serializes [Map<String, Offset>] as a JSON object where each value
+/// is a `[dx, dy]` array.
+class OffsetMapJsonConverter
+    implements JsonConverter<Map<String, Offset>, Map<String, List<double>>> {
+  const OffsetMapJsonConverter();
+
+  @override
+  Map<String, Offset> fromJson(Map<String, List<double>> json) =>
+      json.map(
+        (k, v) => MapEntry(k, Offset(v[0], v[1])),
+      );
+
+  @override
+  Map<String, List<double>> toJson(Map<String, Offset> object) =>
+      object.map((k, v) => MapEntry(k, [v.dx, v.dy]));
+}
+
+/// Serializes [Map<String, Size>] as a JSON object where each value
+/// is a `[width, height]` array.
+class SizeMapJsonConverter
+    implements JsonConverter<Map<String, Size>, Map<String, List<double>>> {
+  const SizeMapJsonConverter();
+
+  @override
+  Map<String, Size> fromJson(Map<String, List<double>> json) =>
+      json.map(
+        (k, v) => MapEntry(k, Size(v[0], v[1])),
+      );
+
+  @override
+  Map<String, List<double>> toJson(Map<String, Size> object) =>
+      object.map((k, v) => MapEntry(k, [v.width, v.height]));
+}
+
+/// Serializes [Set<String>] as a JSON array of strings.
+class StringSetJsonConverter implements JsonConverter<Set<String>, List<String>> {
+  const StringSetJsonConverter();
+
+  @override
+  Set<String> fromJson(List<String> json) => json.toSet();
+
+  @override
+  List<String> toJson(Set<String> object) => object.toList();
+}
