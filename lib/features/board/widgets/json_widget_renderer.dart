@@ -224,7 +224,7 @@ class JsonWidgetRenderer {
             : null);
   }
 
-  Widget _container(Map<String, dynamic> m) => Container(
+  ({double? width, double? height, EdgeInsetsGeometry? padding, EdgeInsetsGeometry? margin, Alignment? alignment, Decoration? decoration, Widget? child}) _containerProps(Map<String, dynamic> m) => (
     width: _doubleOrNull(m['width']),
     height: _doubleOrNull(m['height']),
     padding: _edgeInsetsOrNull(m['padding']),
@@ -233,6 +233,19 @@ class JsonWidgetRenderer {
     decoration: _containerDecoration(m),
     child: _child(m),
   );
+
+  Widget _container(Map<String, dynamic> m) {
+    final p = _containerProps(m);
+    return Container(
+      width: p.width,
+      height: p.height,
+      padding: p.padding,
+      margin: p.margin,
+      alignment: p.alignment,
+      decoration: p.decoration,
+      child: p.child,
+    );
+  }
 
   Widget _card(Map<String, dynamic> m) => Card(
     elevation: _double(m['elevation'], 2),
@@ -680,18 +693,21 @@ class JsonWidgetRenderer {
 
   // ── Animated widgets ──────────────────────────────────────────────────────
 
-  Widget _animatedContainer(Map<String, dynamic> m) => AnimatedContainer(
-    duration: Duration(milliseconds: _int(m['duration'], 300)),
-    curve: _curve(m['curve'] as String?),
-    width: _doubleOrNull(m['width']),
-    height: _doubleOrNull(m['height']),
-    padding: _edgeInsetsOrNull(m['padding']),
-    margin: _edgeInsetsOrNull(m['margin']),
-    alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,
-    decoration: _containerDecoration(m),
-    transform: _matrix4(m['transform']),
-    child: _child(m),
-  );
+  Widget _animatedContainer(Map<String, dynamic> m) {
+    final p = _containerProps(m);
+    return AnimatedContainer(
+      duration: Duration(milliseconds: _int(m['duration'], 300)),
+      curve: _curve(m['curve'] as String?),
+      width: p.width,
+      height: p.height,
+      padding: p.padding,
+      margin: p.margin,
+      alignment: p.alignment,
+      decoration: p.decoration,
+      transform: _matrix4(m['transform']),
+      child: p.child,
+    );
+  }
 
   Widget _animatedOpacity(Map<String, dynamic> m) => AnimatedOpacity(
     duration: Duration(milliseconds: _int(m['duration'], 300)),

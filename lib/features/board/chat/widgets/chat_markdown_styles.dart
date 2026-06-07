@@ -2,6 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 
+final _chatBrTagRe = RegExp(r'<br\s*/?>');
+
+/// Prepares chat bubble content by replacing `<br>` tags and returning
+/// the commonly needed colors.
+(String processedContent, AppColorScheme colors, Color textColor, Color codeBg)
+prepareChatBubble(BuildContext context, String content) {
+  final colors = context.appColors;
+  final textColor =
+      Theme.of(context).textTheme.bodyMedium?.color ??
+      Theme.of(context).colorScheme.onSurface;
+  final codeBg = colors.surface;
+  final processedContent = content.replaceAll(_chatBrTagRe, '\n');
+  return (processedContent, colors, textColor, codeBg);
+}
+
 /// Shared bubble decoration used by both [AssistantBubble] and [StreamingBubble].
 BoxDecoration chatBubbleDecoration(AppColorScheme colors) => BoxDecoration(
   color: colors.surfaceElevated,

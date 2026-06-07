@@ -1,18 +1,18 @@
 {
   "statistics": {
-    "detectionDate": "2026-06-06T21:56:52.913Z",
+    "detectionDate": "2026-06-07T13:48:49.882Z",
     "formats": {
       "dart": {
         "sources": {
           "lib/features/settings/ui/debug_ui/sections/voice_overlay_debug.dart": {
-            "lines": 296,
-            "tokens": 2826,
+            "lines": 290,
+            "tokens": 2767,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 24,
-            "duplicatedTokens": 238,
-            "percentage": 8.11,
-            "percentageTokens": 8.42,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -101,8 +101,8 @@
             "newClones": 0
           },
           "lib/features/settings/ui/widgets/theme_selector.dart": {
-            "lines": 597,
-            "tokens": 4738,
+            "lines": 596,
+            "tokens": 4726,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -137,26 +137,26 @@
             "newClones": 0
           },
           "lib/features/settings/ui/sections/terminal_renderer_settings.dart": {
-            "lines": 128,
-            "tokens": 979,
+            "lines": 126,
+            "tokens": 951,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 20,
-            "duplicatedTokens": 171,
-            "percentage": 15.63,
-            "percentageTokens": 17.47,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/settings/ui/sections/support_section.dart": {
-            "lines": 145,
-            "tokens": 1131,
+            "lines": 143,
+            "tokens": 1103,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 9,
-            "duplicatedTokens": 80,
-            "percentage": 6.21,
-            "percentageTokens": 7.07,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -173,14 +173,14 @@
             "newClones": 0
           },
           "lib/features/settings/ui/sections/session_settings_section.dart": {
-            "lines": 359,
-            "tokens": 2748,
+            "lines": 357,
+            "tokens": 2698,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 36,
-            "duplicatedTokens": 298,
-            "percentage": 10.03,
-            "percentageTokens": 10.84,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -221,32 +221,32 @@
             "newClones": 0
           },
           "lib/features/settings/ui/sections/ignored_tool_calls_section.dart": {
-            "lines": 111,
-            "tokens": 928,
+            "lines": 109,
+            "tokens": 900,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 11,
-            "duplicatedTokens": 91,
-            "percentage": 9.91,
-            "percentageTokens": 9.81,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/settings/ui/sections/chat_context_section.dart": {
-            "lines": 66,
-            "tokens": 525,
+            "lines": 65,
+            "tokens": 506,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 12,
-            "duplicatedTokens": 88,
-            "percentage": 18.18,
-            "percentageTokens": 16.76,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/settings/ui/sections/agent_settings_section.dart": {
-            "lines": 745,
-            "tokens": 5888,
+            "lines": 746,
+            "tokens": 5889,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 26,
@@ -257,14 +257,14 @@
             "newClones": 0
           },
           "lib/features/settings/ui/sections/about_section.dart": {
-            "lines": 423,
-            "tokens": 3023,
+            "lines": 417,
+            "tokens": 2993,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 20,
-            "duplicatedTokens": 178,
-            "percentage": 4.73,
-            "percentageTokens": 5.89,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -293,26 +293,26 @@
             "newClones": 0
           },
           "lib/features/settings/ui/dialogs/color_picker_dialog.dart": {
-            "lines": 313,
-            "tokens": 2415,
+            "lines": 303,
+            "tokens": 2322,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 42,
-            "duplicatedTokens": 366,
-            "percentage": 13.42,
-            "percentageTokens": 15.16,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/settings/ui/dialogs/asr_picker_dialog.dart": {
-            "lines": 238,
-            "tokens": 1955,
+            "lines": 231,
+            "tokens": 1868,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 9,
-            "duplicatedTokens": 80,
-            "percentage": 3.78,
-            "percentageTokens": 4.09,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -557,8 +557,8 @@
             "newClones": 0
           },
           "lib/features/mindmap/nodes/presentation/card_props.dart": {
-            "lines": 388,
-            "tokens": 4043,
+            "lines": 381,
+            "tokens": 3925,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -605,26 +605,26 @@
             "newClones": 0
           },
           "lib/features/editor/ui/widgets/search_replace_bar.dart": {
-            "lines": 230,
-            "tokens": 1764,
+            "lines": 196,
+            "tokens": 1514,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 26,
-            "duplicatedTokens": 209,
-            "percentage": 11.3,
-            "percentageTokens": 11.85,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/board/ui/widgets/text_editing_utils.dart": {
-            "lines": 47,
-            "tokens": 558,
+            "lines": 46,
+            "tokens": 546,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 24,
-            "duplicatedTokens": 334,
-            "percentage": 51.06,
-            "percentageTokens": 59.86,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -737,14 +737,14 @@
             "newClones": 0
           },
           "lib/features/board/plugins/builtin/timer_plugin.dart": {
-            "lines": 776,
-            "tokens": 6047,
+            "lines": 768,
+            "tokens": 5994,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 18,
-            "duplicatedTokens": 192,
-            "percentage": 2.32,
-            "percentageTokens": 3.18,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -761,26 +761,26 @@
             "newClones": 0
           },
           "lib/features/board/plugins/builtin/sticky_note_plugin.dart": {
-            "lines": 246,
-            "tokens": 1808,
+            "lines": 239,
+            "tokens": 1768,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 16,
-            "duplicatedTokens": 113,
-            "percentage": 6.5,
-            "percentageTokens": 6.25,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/board/plugins/builtin/shape_plugin.dart": {
-            "lines": 796,
-            "tokens": 6833,
+            "lines": 789,
+            "tokens": 6793,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 22,
-            "duplicatedTokens": 194,
-            "percentage": 2.76,
-            "percentageTokens": 2.84,
+            "clones": 1,
+            "duplicatedLines": 6,
+            "duplicatedTokens": 81,
+            "percentage": 0.76,
+            "percentageTokens": 1.19,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -820,39 +820,51 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
-          "lib/features/board/plugins/builtin/markdown_note_plugin.dart": {
-            "lines": 597,
-            "tokens": 4753,
+          "lib/features/board/plugins/builtin/panel_editor_dialog_mixin.dart": {
+            "lines": 21,
+            "tokens": 130,
             "sources": 1,
-            "clones": 5,
-            "duplicatedLines": 48,
-            "duplicatedTokens": 544,
-            "percentage": 8.04,
-            "percentageTokens": 11.45,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/plugins/builtin/markdown_note_plugin.dart": {
+            "lines": 592,
+            "tokens": 4690,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/board/plugins/builtin/files_plugin.dart": {
-            "lines": 367,
-            "tokens": 2963,
+            "lines": 366,
+            "tokens": 2919,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 10,
-            "duplicatedTokens": 110,
-            "percentage": 2.72,
-            "percentageTokens": 3.71,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/board/plugins/builtin/diff_preview_plugin.dart": {
-            "lines": 574,
-            "tokens": 4644,
+            "lines": 564,
+            "tokens": 4615,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 40,
-            "duplicatedTokens": 204,
-            "percentage": 6.97,
-            "percentageTokens": 4.39,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -881,14 +893,14 @@
             "newClones": 0
           },
           "lib/features/board/plugins/builtin/checklist_plugin.dart": {
-            "lines": 294,
-            "tokens": 2427,
+            "lines": 293,
+            "tokens": 2383,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 10,
-            "duplicatedTokens": 110,
-            "percentage": 3.4,
-            "percentageTokens": 4.53,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -916,27 +928,75 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
-          "lib/features/board/chat/widgets/session_history_dialog.dart": {
-            "lines": 102,
-            "tokens": 760,
+          "lib/features/board/chat/widgets/streaming_bubble.dart": {
+            "lines": 54,
+            "tokens": 408,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 38,
-            "duplicatedTokens": 286,
-            "percentage": 37.25,
-            "percentageTokens": 37.63,
+            "clones": 1,
+            "duplicatedLines": 7,
+            "duplicatedTokens": 83,
+            "percentage": 12.96,
+            "percentageTokens": 20.34,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/session_history_picker_dialog.dart": {
+            "lines": 145,
+            "tokens": 1113,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/session_history_dialog.dart": {
+            "lines": 26,
+            "tokens": 149,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/board/chat/widgets/model_search_dialog.dart": {
-            "lines": 210,
-            "tokens": 1557,
+            "lines": 180,
+            "tokens": 1352,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 20,
-            "duplicatedTokens": 127,
-            "percentage": 9.52,
-            "percentageTokens": 8.16,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/local_tools_dialog.dart": {
+            "lines": 30,
+            "tokens": 176,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/cli_tools_picker_dialog.dart": {
+            "lines": 206,
+            "tokens": 1614,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1013,8 +1073,8 @@
             "newClones": 0
           },
           "lib/features/board/chat/widgets/chat_provider_badge.dart": {
-            "lines": 41,
-            "tokens": 337,
+            "lines": 85,
+            "tokens": 636,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1025,14 +1085,38 @@
             "newClones": 0
           },
           "lib/features/board/chat/widgets/chat_model_suggestions.dart": {
-            "lines": 147,
-            "tokens": 1103,
+            "lines": 119,
+            "tokens": 905,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 20,
-            "duplicatedTokens": 127,
-            "percentage": 13.61,
-            "percentageTokens": 11.51,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/chat_message_list.dart": {
+            "lines": 199,
+            "tokens": 1752,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/chat/widgets/chat_markdown_styles.dart": {
+            "lines": 66,
+            "tokens": 478,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1145,14 +1229,14 @@
             "newClones": 0
           },
           "lib/features/board/chat/widgets/assistant_bubble.dart": {
-            "lines": 249,
-            "tokens": 1940,
+            "lines": 203,
+            "tokens": 1583,
             "sources": 1,
             "clones": 1,
-            "duplicatedLines": 6,
-            "duplicatedTokens": 76,
-            "percentage": 2.41,
-            "percentageTokens": 3.92,
+            "duplicatedLines": 7,
+            "duplicatedTokens": 83,
+            "percentage": 3.45,
+            "percentageTokens": 5.24,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1253,8 +1337,8 @@
             "newClones": 0
           },
           "lib/features/board/assistant/widgets/tools_dialog.dart": {
-            "lines": 202,
-            "tokens": 1610,
+            "lines": 25,
+            "tokens": 143,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1325,14 +1409,14 @@
             "newClones": 0
           },
           "lib/features/board/assistant/widgets/assistant_history_dialog.dart": {
-            "lines": 105,
-            "tokens": 778,
+            "lines": 21,
+            "tokens": 148,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 38,
-            "duplicatedTokens": 286,
-            "percentage": 36.19,
-            "percentageTokens": 36.76,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1397,14 +1481,14 @@
             "newClones": 0
           },
           "lib/ui/components/menus/miro_toolbar_primitives.dart": {
-            "lines": 517,
-            "tokens": 3920,
+            "lines": 524,
+            "tokens": 3993,
             "sources": 1,
             "clones": 2,
-            "duplicatedLines": 32,
-            "duplicatedTokens": 258,
-            "percentage": 6.19,
-            "percentageTokens": 6.58,
+            "duplicatedLines": 26,
+            "duplicatedTokens": 214,
+            "percentage": 4.96,
+            "percentageTokens": 5.36,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1445,8 +1529,8 @@
             "newClones": 0
           },
           "lib/ui/components/input/labeled_text_field.dart": {
-            "lines": 106,
-            "tokens": 744,
+            "lines": 127,
+            "tokens": 922,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1517,8 +1601,8 @@
             "newClones": 0
           },
           "lib/ui/components/cards/settings_card.dart": {
-            "lines": 36,
-            "tokens": 251,
+            "lines": 38,
+            "tokens": 271,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1565,14 +1649,14 @@
             "newClones": 0
           },
           "lib/ui/components/buttons/overlay_icon_button.dart": {
-            "lines": 51,
-            "tokens": 359,
+            "lines": 64,
+            "tokens": 502,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 18,
-            "duplicatedTokens": 134,
-            "percentage": 35.29,
-            "percentageTokens": 37.33,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1613,38 +1697,38 @@
             "newClones": 0
           },
           "lib/features/workspaces/ui/worktree_section.dart": {
-            "lines": 925,
-            "tokens": 7045,
+            "lines": 880,
+            "tokens": 6652,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 43,
-            "duplicatedTokens": 380,
-            "percentage": 4.65,
-            "percentageTokens": 5.39,
+            "clones": 1,
+            "duplicatedLines": 10,
+            "duplicatedTokens": 95,
+            "percentage": 1.14,
+            "percentageTokens": 1.43,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/workspaces/ui/workspace_inline_tree.dart": {
-            "lines": 547,
-            "tokens": 4567,
+            "lines": 561,
+            "tokens": 4635,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 18,
-            "duplicatedTokens": 178,
-            "percentage": 3.29,
-            "percentageTokens": 3.9,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/workspaces/ui/new_agent_session_dialog.dart": {
-            "lines": 774,
-            "tokens": 6487,
+            "lines": 749,
+            "tokens": 6240,
             "sources": 1,
-            "clones": 7,
-            "duplicatedLines": 75,
-            "duplicatedTokens": 631,
-            "percentage": 9.69,
-            "percentageTokens": 9.73,
+            "clones": 2,
+            "duplicatedLines": 24,
+            "duplicatedTokens": 186,
+            "percentage": 3.2,
+            "percentageTokens": 2.98,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -1661,8 +1745,8 @@
             "newClones": 0
           },
           "lib/features/workspaces/models/workspace.dart": {
-            "lines": 105,
-            "tokens": 985,
+            "lines": 103,
+            "tokens": 900,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1769,8 +1853,8 @@
             "newClones": 0
           },
           "lib/features/terminal/runtime/terminal_runtime_protocol.dart": {
-            "lines": 85,
-            "tokens": 756,
+            "lines": 58,
+            "tokens": 406,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -1997,14 +2081,14 @@
             "newClones": 0
           },
           "lib/features/terminal/bloc/terminal_cubit.dart": {
-            "lines": 836,
-            "tokens": 7151,
+            "lines": 825,
+            "tokens": 7045,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 32,
-            "duplicatedTokens": 234,
-            "percentage": 3.83,
-            "percentageTokens": 3.27,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2021,8 +2105,8 @@
             "newClones": 0
           },
           "lib/features/skills/models/skill_store_config.dart": {
-            "lines": 126,
-            "tokens": 1099,
+            "lines": 108,
+            "tokens": 812,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2033,8 +2117,8 @@
             "newClones": 0
           },
           "lib/features/skills/models/skill_entry.dart": {
-            "lines": 95,
-            "tokens": 738,
+            "lines": 75,
+            "tokens": 472,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2117,14 +2201,14 @@
             "newClones": 0
           },
           "lib/features/settings/ui/setup_guide_page.dart": {
-            "lines": 920,
-            "tokens": 8125,
+            "lines": 914,
+            "tokens": 7965,
             "sources": 1,
-            "clones": 6,
-            "duplicatedLines": 78,
-            "duplicatedTokens": 724,
-            "percentage": 8.48,
-            "percentageTokens": 8.91,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2165,26 +2249,26 @@
             "newClones": 0
           },
           "lib/features/settings/ui/env_group_picker.dart": {
-            "lines": 666,
-            "tokens": 5409,
+            "lines": 645,
+            "tokens": 5245,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 50,
-            "duplicatedTokens": 378,
-            "percentage": 7.51,
-            "percentageTokens": 6.99,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/settings/ui/cloud_providers_section.dart": {
-            "lines": 749,
-            "tokens": 6425,
+            "lines": 739,
+            "tokens": 6332,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 58,
-            "duplicatedTokens": 494,
-            "percentage": 7.74,
-            "percentageTokens": 7.69,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2225,26 +2309,26 @@
             "newClones": 0
           },
           "lib/features/settings/data/setup_check_service.dart": {
-            "lines": 891,
-            "tokens": 6551,
+            "lines": 908,
+            "tokens": 6539,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 26,
-            "duplicatedTokens": 386,
-            "percentage": 2.92,
-            "percentageTokens": 5.89,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/settings/data/provider_model_catalog_service.dart": {
-            "lines": 396,
-            "tokens": 3491,
+            "lines": 393,
+            "tokens": 3435,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 16,
             "duplicatedTokens": 170,
-            "percentage": 4.04,
-            "percentageTokens": 4.87,
+            "percentage": 4.07,
+            "percentageTokens": 4.95,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2286,7 +2370,7 @@
           },
           "lib/features/settings/data/global_env_groups_service.dart": {
             "lines": 493,
-            "tokens": 4430,
+            "tokens": 4363,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2297,8 +2381,8 @@
             "newClones": 0
           },
           "lib/features/settings/data/cloud_llm_settings_service.dart": {
-            "lines": 447,
-            "tokens": 3728,
+            "lines": 423,
+            "tokens": 3403,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2309,8 +2393,8 @@
             "newClones": 0
           },
           "lib/features/settings/data/agent_config_service.dart": {
-            "lines": 418,
-            "tokens": 3623,
+            "lines": 396,
+            "tokens": 3272,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2345,32 +2429,32 @@
             "newClones": 0
           },
           "lib/features/search/data/file_search_service.dart": {
-            "lines": 285,
-            "tokens": 2519,
+            "lines": 286,
+            "tokens": 2528,
             "sources": 1,
             "clones": 2,
             "duplicatedLines": 20,
             "duplicatedTokens": 194,
-            "percentage": 7.02,
-            "percentageTokens": 7.7,
+            "percentage": 6.99,
+            "percentageTokens": 7.67,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/runs/ui/run_config_dialog.dart": {
-            "lines": 919,
-            "tokens": 7116,
+            "lines": 880,
+            "tokens": 6772,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 66,
-            "duplicatedTokens": 545,
-            "percentage": 7.18,
-            "percentageTokens": 7.66,
+            "clones": 1,
+            "duplicatedLines": 13,
+            "duplicatedTokens": 88,
+            "percentage": 1.48,
+            "percentageTokens": 1.3,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/runs/models/run_session.dart": {
-            "lines": 101,
-            "tokens": 987,
+            "lines": 77,
+            "tokens": 635,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2381,8 +2465,8 @@
             "newClones": 0
           },
           "lib/features/runs/models/run_config.dart": {
-            "lines": 174,
-            "tokens": 1570,
+            "lines": 145,
+            "tokens": 1132,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2513,14 +2597,14 @@
             "newClones": 0
           },
           "lib/features/review/bloc/review_cubit.dart": {
-            "lines": 300,
-            "tokens": 2902,
+            "lines": 315,
+            "tokens": 2932,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 16,
-            "duplicatedTokens": 252,
-            "percentage": 5.33,
-            "percentageTokens": 8.68,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2561,20 +2645,20 @@
             "newClones": 0
           },
           "lib/features/mindmap/model/mindmap_graph_builder.dart": {
-            "lines": 377,
-            "tokens": 3404,
+            "lines": 459,
+            "tokens": 3821,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 12,
-            "duplicatedTokens": 146,
-            "percentage": 3.18,
-            "percentageTokens": 4.29,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/mindmap/bloc/mindmap_state.dart": {
-            "lines": 137,
-            "tokens": 1412,
+            "lines": 122,
+            "tokens": 992,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2669,14 +2753,14 @@
             "newClones": 0
           },
           "lib/features/collaboration/ui/collaboration_button.dart": {
-            "lines": 926,
-            "tokens": 6861,
+            "lines": 911,
+            "tokens": 6721,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 19,
-            "duplicatedTokens": 231,
-            "percentage": 2.05,
-            "percentageTokens": 3.37,
+            "clones": 1,
+            "duplicatedLines": 8,
+            "duplicatedTokens": 123,
+            "percentage": 0.88,
+            "percentageTokens": 1.83,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2849,14 +2933,14 @@
             "newClones": 0
           },
           "lib/features/board/widgets/json_widget_renderer.dart": {
-            "lines": 956,
-            "tokens": 10453,
+            "lines": 942,
+            "tokens": 10310,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 33,
-            "duplicatedTokens": 410,
-            "percentage": 3.45,
-            "percentageTokens": 3.92,
+            "clones": 2,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 180,
+            "percentage": 1.27,
+            "percentageTokens": 1.75,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2921,8 +3005,8 @@
             "newClones": 0
           },
           "lib/features/board/ui/chat_session_history_dialog.dart": {
-            "lines": 105,
-            "tokens": 843,
+            "lines": 107,
+            "tokens": 859,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -2957,14 +3041,14 @@
             "newClones": 0
           },
           "lib/features/board/ui/board_tools_panel.dart": {
-            "lines": 551,
-            "tokens": 4305,
+            "lines": 545,
+            "tokens": 4178,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 70,
-            "duplicatedTokens": 640,
-            "percentage": 12.7,
-            "percentageTokens": 14.87,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -2972,23 +3056,23 @@
             "lines": 335,
             "tokens": 2585,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 15,
-            "duplicatedTokens": 159,
-            "percentage": 4.48,
-            "percentageTokens": 6.15,
+            "clones": 1,
+            "duplicatedLines": 9,
+            "duplicatedTokens": 83,
+            "percentage": 2.69,
+            "percentageTokens": 3.21,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/board/ui/board_settings_panels.dart": {
-            "lines": 329,
-            "tokens": 2488,
+            "lines": 334,
+            "tokens": 2495,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 24,
-            "duplicatedTokens": 212,
-            "percentage": 7.29,
-            "percentageTokens": 8.52,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3101,26 +3185,26 @@
             "newClones": 0
           },
           "lib/features/board/ui/board_file_picker.dart": {
-            "lines": 654,
-            "tokens": 5879,
+            "lines": 640,
+            "tokens": 5657,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 12,
-            "duplicatedTokens": 173,
-            "percentage": 1.83,
-            "percentageTokens": 2.94,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/features/board/ui/board_drawing_widgets.dart": {
-            "lines": 365,
-            "tokens": 3037,
+            "lines": 352,
+            "tokens": 2871,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 28,
-            "duplicatedTokens": 376,
-            "percentage": 7.67,
-            "percentageTokens": 12.38,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3161,14 +3245,14 @@
             "newClones": 0
           },
           "lib/features/board/terminal/board_terminal_session_history.dart": {
-            "lines": 103,
-            "tokens": 940,
+            "lines": 86,
+            "tokens": 726,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 7,
-            "duplicatedTokens": 104,
-            "percentage": 6.8,
-            "percentageTokens": 11.06,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3185,14 +3269,14 @@
             "newClones": 0
           },
           "lib/features/board/services/board_offscreen_renderer.dart": {
-            "lines": 466,
-            "tokens": 3161,
+            "lines": 453,
+            "tokens": 3050,
             "sources": 1,
-            "clones": 4,
-            "duplicatedLines": 56,
-            "duplicatedTokens": 452,
-            "percentage": 12.02,
-            "percentageTokens": 14.3,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3221,8 +3305,20 @@
             "newClones": 0
           },
           "lib/features/board/model/terminal_panel_models.dart": {
-            "lines": 44,
-            "tokens": 411,
+            "lines": 38,
+            "tokens": 295,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/model/chat_models.dart": {
+            "lines": 960,
+            "tokens": 6514,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -3233,14 +3329,26 @@
             "newClones": 0
           },
           "lib/features/board/model/board_models.dart": {
-            "lines": 569,
-            "tokens": 5244,
+            "lines": 525,
+            "tokens": 4619,
             "sources": 1,
-            "clones": 5,
-            "duplicatedLines": 40,
-            "duplicatedTokens": 491,
-            "percentage": 7.03,
-            "percentageTokens": 9.36,
+            "clones": 4,
+            "duplicatedLines": 33,
+            "duplicatedTokens": 371,
+            "percentage": 6.29,
+            "percentageTokens": 8.03,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/features/board/model/board_json_converters.dart": {
+            "lines": 112,
+            "tokens": 1051,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3257,14 +3365,14 @@
             "newClones": 0
           },
           "lib/features/board/history/board_history_store.dart": {
-            "lines": 91,
-            "tokens": 703,
+            "lines": 85,
+            "tokens": 648,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 15,
-            "duplicatedTokens": 112,
-            "percentage": 16.48,
-            "percentageTokens": 15.93,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3437,14 +3545,14 @@
             "newClones": 0
           },
           "lib/features/board/chat/cli_yoloit_resolver.dart": {
-            "lines": 78,
-            "tokens": 667,
+            "lines": 46,
+            "tokens": 343,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 12,
-            "duplicatedTokens": 127,
-            "percentage": 15.38,
-            "percentageTokens": 19.04,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3497,14 +3605,14 @@
             "newClones": 0
           },
           "lib/features/board/chat/chat_session_history.dart": {
-            "lines": 156,
-            "tokens": 1415,
+            "lines": 146,
+            "tokens": 1273,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 7,
-            "duplicatedTokens": 104,
-            "percentage": 4.49,
-            "percentageTokens": 7.35,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3581,14 +3689,14 @@
             "newClones": 0
           },
           "lib/core/cli/handlers/yolo_chat_handler.dart": {
-            "lines": 401,
-            "tokens": 4086,
+            "lines": 403,
+            "tokens": 4100,
             "sources": 1,
             "clones": 5,
             "duplicatedLines": 50,
             "duplicatedTokens": 508,
-            "percentage": 12.47,
-            "percentageTokens": 12.43,
+            "percentage": 12.41,
+            "percentageTokens": 12.39,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3597,10 +3705,10 @@
             "tokens": 575,
             "sources": 1,
             "clones": 5,
-            "duplicatedLines": 43,
-            "duplicatedTokens": 508,
-            "percentage": 84.31,
-            "percentageTokens": 88.35,
+            "duplicatedLines": 40,
+            "duplicatedTokens": 488,
+            "percentage": 78.43,
+            "percentageTokens": 84.87,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3797,14 +3905,14 @@
             "newClones": 0
           },
           "lib/core/cli/handlers/filetree_handler.dart": {
-            "lines": 122,
-            "tokens": 1009,
+            "lines": 117,
+            "tokens": 940,
             "sources": 1,
-            "clones": 3,
-            "duplicatedLines": 22,
-            "duplicatedTokens": 279,
-            "percentage": 18.03,
-            "percentageTokens": 27.65,
+            "clones": 2,
+            "duplicatedLines": 14,
+            "duplicatedTokens": 192,
+            "percentage": 11.97,
+            "percentageTokens": 20.43,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3821,14 +3929,14 @@
             "newClones": 0
           },
           "lib/core/cli/handlers/drawings_handler.dart": {
-            "lines": 581,
-            "tokens": 7253,
+            "lines": 564,
+            "tokens": 6809,
             "sources": 1,
-            "clones": 9,
-            "duplicatedLines": 61,
-            "duplicatedTokens": 996,
-            "percentage": 10.5,
-            "percentageTokens": 13.73,
+            "clones": 2,
+            "duplicatedLines": 16,
+            "duplicatedTokens": 212,
+            "percentage": 2.84,
+            "percentageTokens": 3.11,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3846,13 +3954,13 @@
           },
           "lib/core/cli/handlers/cloud_providers_handler.dart": {
             "lines": 134,
-            "tokens": 1504,
+            "tokens": 1524,
             "sources": 1,
             "clones": 1,
-            "duplicatedLines": 11,
-            "duplicatedTokens": 116,
-            "percentage": 8.21,
-            "percentageTokens": 7.71,
+            "duplicatedLines": 8,
+            "duplicatedTokens": 96,
+            "percentage": 5.97,
+            "percentageTokens": 6.3,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -3964,6 +4072,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "lib/ui/widgets/hover_listener.dart": {
+            "lines": 23,
+            "tokens": 205,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "lib/ui/widgets/bouncing_dots_indicator.dart": {
             "lines": 67,
             "tokens": 527,
@@ -4036,6 +4156,18 @@
             "newDuplicatedLines": 0,
             "newClones": 0
           },
+          "lib/core/utils/yoloit_bin_resolver.dart": {
+            "lines": 42,
+            "tokens": 389,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
           "lib/core/utils/svg_utils.dart": {
             "lines": 17,
             "tokens": 195,
@@ -4099,6 +4231,18 @@
           "lib/core/utils/git_init_prompt.dart": {
             "lines": 56,
             "tokens": 488,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "lib/core/utils/directory_utils.dart": {
+            "lines": 54,
+            "tokens": 487,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4205,8 +4349,8 @@
             "newClones": 0
           },
           "lib/core/theme/app_color_scheme.dart": {
-            "lines": 519,
-            "tokens": 5487,
+            "lines": 470,
+            "tokens": 4537,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4229,8 +4373,8 @@
             "newClones": 0
           },
           "lib/core/setup/setup_catalog.dart": {
-            "lines": 752,
-            "tokens": 6534,
+            "lines": 690,
+            "tokens": 5836,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4289,8 +4433,8 @@
             "newClones": 0
           },
           "lib/core/services/git_service.dart": {
-            "lines": 156,
-            "tokens": 1441,
+            "lines": 166,
+            "tokens": 1509,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4325,14 +4469,14 @@
             "newClones": 0
           },
           "lib/core/remote/yoloitd_store.dart": {
-            "lines": 419,
-            "tokens": 4192,
+            "lines": 413,
+            "tokens": 4137,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 15,
-            "duplicatedTokens": 112,
-            "percentage": 3.58,
-            "percentageTokens": 2.67,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -4361,32 +4505,32 @@
             "newClones": 0
           },
           "lib/core/remote/yoloitd_models.dart": {
-            "lines": 308,
-            "tokens": 3246,
+            "lines": 219,
+            "tokens": 2010,
             "sources": 1,
             "clones": 3,
             "duplicatedLines": 27,
-            "duplicatedTokens": 273,
-            "percentage": 8.77,
-            "percentageTokens": 8.41,
+            "duplicatedTokens": 275,
+            "percentage": 12.33,
+            "percentageTokens": 13.68,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/core/remote/yoloit_remote_client.dart": {
-            "lines": 494,
-            "tokens": 4918,
+            "lines": 451,
+            "tokens": 4371,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 16,
-            "duplicatedTokens": 168,
-            "percentage": 3.24,
-            "percentageTokens": 3.42,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
           "lib/core/remote/history_store_helpers.dart": {
-            "lines": 58,
-            "tokens": 615,
+            "lines": 73,
+            "tokens": 778,
             "sources": 1,
             "clones": 0,
             "duplicatedLines": 0,
@@ -4397,14 +4541,14 @@
             "newClones": 0
           },
           "lib/core/remote/board_share_server.dart": {
-            "lines": 708,
-            "tokens": 7631,
+            "lines": 687,
+            "tokens": 7270,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 12,
-            "duplicatedTokens": 173,
-            "percentage": 1.69,
-            "percentageTokens": 2.27,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -4445,14 +4589,14 @@
             "newClones": 0
           },
           "lib/core/platform/platform_launcher.dart": {
-            "lines": 198,
-            "tokens": 1537,
+            "lines": 168,
+            "tokens": 1210,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 12,
-            "duplicatedTokens": 127,
-            "percentage": 6.06,
-            "percentageTokens": 8.26,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -4553,14 +4697,14 @@
             "newClones": 0
           },
           "lib/core/cli/real_llm_tool_test_runner.dart": {
-            "lines": 500,
-            "tokens": 4813,
+            "lines": 505,
+            "tokens": 4806,
             "sources": 1,
-            "clones": 2,
-            "duplicatedLines": 10,
-            "duplicatedTokens": 150,
-            "percentage": 2,
-            "percentageTokens": 3.12,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -4577,14 +4721,14 @@
             "newClones": 0
           },
           "lib/core/cli/panel_getopen_cli_handler.dart": {
-            "lines": 38,
-            "tokens": 269,
+            "lines": 39,
+            "tokens": 275,
             "sources": 1,
-            "clones": 1,
-            "duplicatedLines": 8,
-            "duplicatedTokens": 87,
-            "percentage": 21.05,
-            "percentageTokens": 32.34,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
             "newDuplicatedLines": 0,
             "newClones": 0
           },
@@ -4722,14 +4866,14 @@
           }
         },
         "total": {
-          "lines": 88189,
-          "tokens": 739865,
-          "sources": 393,
-          "clones": 111,
-          "duplicatedLines": 1154,
-          "duplicatedTokens": 11643,
-          "percentage": 1.31,
-          "percentageTokens": 1.57,
+          "lines": 88944,
+          "tokens": 739524,
+          "sources": 405,
+          "clones": 52,
+          "duplicatedLines": 475,
+          "duplicatedTokens": 5157,
+          "percentage": 0.53,
+          "percentageTokens": 0.7,
           "newDuplicatedLines": 0,
           "newClones": 0
         }
@@ -4764,199 +4908,19 @@
       }
     },
     "total": {
-      "lines": 88264,
-      "tokens": 740309,
-      "sources": 394,
-      "clones": 111,
-      "duplicatedLines": 1154,
-      "duplicatedTokens": 11643,
-      "percentage": 1.31,
-      "percentageTokens": 1.57,
+      "lines": 89019,
+      "tokens": 739968,
+      "sources": 406,
+      "clones": 52,
+      "duplicatedLines": 475,
+      "duplicatedTokens": 5157,
+      "percentage": 0.53,
+      "percentageTokens": 0.7,
       "newDuplicatedLines": 0,
       "newClones": 0
     }
   },
   "duplicates": [
-    {
-      "format": "dart",
-      "lines": 13,
-      "fragment": "= v),\n            style: const TextStyle(color: Colors.white, fontSize: 13),\n            decoration: InputDecoration(\n              filled: true,\n              fillColor: const Color(0xFF1E2030),\n              border: OutlineInputBorder(\n                borderRadius: BorderRadius.circular(8),\n                borderSide: const BorderSide(color: Color(0xFF3A3C4E)),\n              ),\n              contentPadding: const EdgeInsets.all(12),\n            ),\n          ),\n        ]",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/debug_ui/sections/voice_overlay_debug.dart",
-        "start": 281,
-        "end": 293,
-        "startLoc": {
-          "line": 281,
-          "column": 63,
-          "position": 2693
-        },
-        "endLoc": {
-          "line": 293,
-          "column": 10,
-          "position": 2812
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/debug_ui/sections/voice_overlay_debug.dart",
-        "start": 264,
-        "end": 276,
-        "startLoc": {
-          "line": 264,
-          "column": 61,
-          "position": 2504
-        },
-        "endLoc": {
-          "line": 276,
-          "column": 16,
-          "position": 2623
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": "Container(\n          padding: const EdgeInsets.all(12),\n          decoration: BoxDecoration(\n            borderRadius: BorderRadius.circular(8),\n            border: Border.all(color: colors.border),\n          ),\n          child: Column(\n            crossAxisAlignment: CrossAxisAlignment.start,\n            children: [\n              Row",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/sections/support_section.dart",
-        "start": 56,
-        "end": 65,
-        "startLoc": {
-          "line": 56,
-          "column": 9,
-          "position": 445
-        },
-        "endLoc": {
-          "line": 65,
-          "column": 18,
-          "position": 525
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/sections/terminal_renderer_settings.dart",
-        "start": 48,
-        "end": 57,
-        "startLoc": {
-          "line": 48,
-          "column": 12,
-          "position": 353
-        },
-        "endLoc": {
-          "line": 57,
-          "column": 15,
-          "position": 433
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 13,
-      "fragment": "(BuildContext context) {\n    final colors = context.appColors;\n    return Container(\n      decoration: BoxDecoration(\n        border: Border(top: BorderSide(color: colors.border)),\n      ),\n      padding: const EdgeInsets.all(12),\n      child: Column(\n        crossAxisAlignment: CrossAxisAlignment.start,\n        children: [\n          Row(\n            children: [\n              Text",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/sections/session_settings_section.dart",
-        "start": 273,
-        "end": 285,
-        "startLoc": {
-          "line": 273,
-          "column": 27,
-          "position": 2095
-        },
-        "endLoc": {
-          "line": 285,
-          "column": 19,
-          "position": 2200
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/sections/session_settings_section.dart",
-        "start": 213,
-        "end": 225,
-        "startLoc": {
-          "line": 213,
-          "column": 29,
-          "position": 1657
-        },
-        "endLoc": {
-          "line": 225,
-          "column": 23,
-          "position": 1762
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 12,
-      "fragment": ");\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return Container(\n      padding: const EdgeInsets.all(12),\n      decoration: BoxDecoration(\n        borderRadius: BorderRadius.circular(8),\n        border: Border.all(color: colors.border),\n        color",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/sections/ignored_tool_calls_section.dart",
-        "start": 54,
-        "end": 65,
-        "startLoc": {
-          "line": 54,
-          "column": 53,
-          "position": 455
-        },
-        "endLoc": {
-          "line": 65,
-          "column": 14,
-          "position": 546
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/sections/terminal_renderer_settings.dart",
-        "start": 42,
-        "end": 53,
-        "startLoc": {
-          "line": 42,
-          "column": 60,
-          "position": 316
-        },
-        "endLoc": {
-          "line": 53,
-          "column": 8,
-          "position": 407
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 13,
-      "fragment": ");\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return Container(\n      decoration: BoxDecoration(\n        borderRadius: BorderRadius.circular(8),\n        border: Border.all(color: colors.border),\n      ),\n      child: Column(\n        children",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/sections/chat_context_section.dart",
-        "start": 26,
-        "end": 38,
-        "startLoc": {
-          "line": 26,
-          "column": 6,
-          "position": 211
-        },
-        "endLoc": {
-          "line": 38,
-          "column": 17,
-          "position": 299
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/sections/session_settings_section.dart",
-        "start": 58,
-        "end": 70,
-        "startLoc": {
-          "line": 58,
-          "column": 21,
-          "position": 440
-        },
-        "endLoc": {
-          "line": 70,
-          "column": 27,
-          "position": 528
-        }
-      }
-    },
     {
       "format": "dart",
       "lines": 14,
@@ -4990,78 +4954,6 @@
           "line": 587,
           "column": 80,
           "position": 4682
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 11,
-      "fragment": "Container(\n          padding: const EdgeInsets.all(14),\n          decoration: BoxDecoration(\n            color: colors.background,\n            borderRadius: BorderRadius.circular(8),\n            border: Border.all(color: colors.border),\n          ),\n          child: Column(\n            crossAxisAlignment: CrossAxisAlignment.start,\n            children: [\n              Text",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/sections/about_section.dart",
-        "start": 183,
-        "end": 193,
-        "startLoc": {
-          "line": 183,
-          "column": 9,
-          "position": 1285
-        },
-        "endLoc": {
-          "line": 193,
-          "column": 19,
-          "position": 1374
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/sections/about_section.dart",
-        "start": 94,
-        "end": 104,
-        "startLoc": {
-          "line": 94,
-          "column": 9,
-          "position": 684
-        },
-        "endLoc": {
-          "line": 104,
-          "column": 18,
-          "position": 773
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": "),\n      border: OutlineInputBorder(\n        borderRadius: BorderRadius.circular(6),\n        borderSide: BorderSide(color: colors.border),\n      ),\n      enabledBorder: OutlineInputBorder(\n        borderRadius: BorderRadius.circular(6),\n        borderSide: BorderSide(color: colors.border),\n      ),\n    )",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/dialogs/asr_picker_dialog.dart",
-        "start": 63,
-        "end": 72,
-        "startLoc": {
-          "line": 63,
-          "column": 77,
-          "position": 534
-        },
-        "endLoc": {
-          "line": 72,
-          "column": 6,
-          "position": 614
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/dialogs/color_picker_dialog.dart",
-        "start": 144,
-        "end": 153,
-        "startLoc": {
-          "line": 144,
-          "column": 25,
-          "position": 1046
-        },
-        "endLoc": {
-          "line": 153,
-          "column": 39,
-          "position": 1126
         }
       }
     },
@@ -5103,721 +4995,73 @@
     },
     {
       "format": "dart",
-      "lines": 9,
-      "fragment": ") {\n  final value = controller.value;\n  final selection =\n      value.selection.isValid\n          ? value.selection\n          : TextSelection.collapsed(offset: value.text.length);\n  final start = math.min(selection.start, selection.end);\n  final end = math.max(selection.start, selection.end);\n  final block",
+      "lines": 8,
+      "fragment": "@override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    final textColor =\n        Theme.of(context).textTheme.bodyMedium?.color ??\n        Theme.of(context).colorScheme.onSurface;\n    final codeBg = colors.surface;\n    final processedContent = widget",
       "tokens": 0,
       "firstFile": {
-        "name": "lib/features/board/ui/widgets/text_editing_utils.dart",
-        "start": 29,
-        "end": 37,
+        "name": "lib/features/board/chat/widgets/assistant_bubble.dart",
+        "start": 46,
+        "end": 53,
         "startLoc": {
-          "line": 29,
-          "column": 73,
-          "position": 288
-        },
-        "endLoc": {
-          "line": 37,
-          "column": 14,
-          "position": 390
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/widgets/text_editing_utils.dart",
-        "start": 10,
-        "end": 18,
-        "startLoc": {
-          "line": 10,
-          "column": 2,
-          "position": 54
-        },
-        "endLoc": {
-          "line": 18,
-          "column": 17,
-          "position": 156
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": "border: OutlineInputBorder(\n                borderRadius: BorderRadius.circular(8),\n                borderSide: BorderSide(color: colors.border),\n              ),\n              focusedBorder: OutlineInputBorder(\n                borderRadius: BorderRadius.circular(8),\n                borderSide: BorderSide(color: colors.accentBlue, width: 1.5),\n              ),\n              contentPadding: const EdgeInsets.symmetric(\n                horizontal: 8",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/plugins/builtin/timer_plugin.dart",
-        "start": 659,
-        "end": 668,
-        "startLoc": {
-          "line": 659,
-          "column": 15,
-          "position": 5121
-        },
-        "endLoc": {
-          "line": 668,
-          "column": 30,
-          "position": 5217
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/plugins/builtin/timer_plugin.dart",
-        "start": 569,
-        "end": 578,
-        "startLoc": {
-          "line": 569,
-          "column": 15,
-          "position": 4403
-        },
-        "endLoc": {
-          "line": 578,
-          "column": 31,
-          "position": 4499
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 17,
-      "fragment": ",\n      onChanged: (value) {\n        renderContext.onUpdateState({...panel.state, 'text': value});\n      },\n    );\n  }\n\n  @override\n  Future<bool> showEditor(\n    BuildContext context,\n    BoardPanelInstance panel,\n    ValueChanged<Map<String, dynamic>> onSave,\n  ) => showPanelEditorDialog(\n    context,\n    panel,\n    onSave,\n    (ctx) => _ShapeEditorDialog",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/plugins/builtin/shape_plugin.dart",
-        "start": 91,
-        "end": 107,
-        "startLoc": {
-          "line": 91,
-          "column": 39,
-          "position": 740
-        },
-        "endLoc": {
-          "line": 107,
-          "column": 32,
-          "position": 853
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/plugins/builtin/sticky_note_plugin.dart",
-        "start": 66,
-        "end": 82,
-        "startLoc": {
-          "line": 66,
-          "column": 25,
-          "position": 469
-        },
-        "endLoc": {
-          "line": 82,
-          "column": 33,
-          "position": 582
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 11,
-      "fragment": ") {\n    final value = _mdCtrl.value;\n    final selection =\n        value.selection.isValid\n            ? value.selection\n            : TextSelection.collapsed(offset: value.text.length);\n    final start =\n        selection.start < selection.end ? selection.start : selection.end;\n    final end =\n        selection.start < selection.end ? selection.end : selection.start;\n    final block",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/plugins/builtin/markdown_note_plugin.dart",
-        "start": 378,
-        "end": 388,
-        "startLoc": {
-          "line": 378,
-          "column": 34,
-          "position": 2935
-        },
-        "endLoc": {
-          "line": 388,
-          "column": 16,
-          "position": 3055
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/plugins/builtin/markdown_note_plugin.dart",
-        "start": 356,
-        "end": 366,
-        "startLoc": {
-          "line": 356,
-          "column": 70,
-          "position": 2683
-        },
-        "endLoc": {
-          "line": 366,
-          "column": 19,
-          "position": 2803
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 9,
-      "fragment": ";\n    final block = start < end ? value.text.substring(start, end) : '';\n    final source = block.isEmpty ? 'item' : block;\n    final replacement = source\n        .split('\\n')\n        .map((line) => line.isEmpty ? prefix.trimRight() : '$prefix$line')\n        .join('\\n');\n    final updated = value.text.replaceRange(start, end, replacement);\n    setState",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/plugins/builtin/markdown_note_plugin.dart",
-        "start": 387,
-        "end": 395,
-        "startLoc": {
-          "line": 387,
-          "column": 74,
-          "position": 3050
-        },
-        "endLoc": {
-          "line": 395,
-          "column": 13,
-          "position": 3180
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/widgets/text_editing_utils.dart",
-        "start": 36,
-        "end": 44,
-        "startLoc": {
-          "line": 36,
-          "column": 55,
-          "position": 385
-        },
-        "endLoc": {
-          "line": 44,
-          "column": 13,
-          "position": 515
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 11,
-      "fragment": ";\n    final updated = value.text.replaceRange(start, end, replacement);\n    setState(() {\n      _mdCtrl.value = value.copyWith(\n        text: updated,\n        selection: TextSelection.collapsed(offset: start + replacement.length),\n      );\n    });\n  }\n\n  Future",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/plugins/builtin/markdown_note_plugin.dart",
-        "start": 393,
-        "end": 403,
-        "startLoc": {
-          "line": 393,
-          "column": 20,
-          "position": 3154
-        },
-        "endLoc": {
-          "line": 403,
-          "column": 9,
-          "position": 3241
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/plugins/builtin/markdown_note_plugin.dart",
-        "start": 368,
-        "end": 378,
-        "startLoc": {
-          "line": 368,
-          "column": 68,
-          "position": 2841
-        },
-        "endLoc": {
-          "line": 378,
-          "column": 7,
-          "position": 2928
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 21,
-      "fragment": ",\n              ),\n            ),\n          ),\n          Expanded(\n            child: Text(\n              line.content,\n              style: TextStyle(\n                fontSize: 11,\n                fontFamily: 'monospace',\n                color: textColor,\n              ),\n              overflow: TextOverflow.clip,\n              softWrap: false,\n            ),\n          ),\n        ],\n      ),\n    );\n  }\n}",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/plugins/builtin/diff_preview_plugin.dart",
-        "start": 499,
-        "end": 519,
-        "startLoc": {
-          "line": 499,
-          "column": 40,
-          "position": 4145
-        },
-        "endLoc": {
-          "line": 519,
-          "column": 2,
-          "position": 4247
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/plugins/builtin/diff_preview_plugin.dart",
-        "start": 386,
-        "end": 405,
-        "startLoc": {
-          "line": 386,
-          "column": 37,
-          "position": 3198
-        },
-        "endLoc": {
-          "line": 405,
-          "column": 9,
-          "position": 3299
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 11,
-      "fragment": "> {\n  bool _hovered = false;\n\n  @override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return MouseRegion(\n      onEnter: (_) => setState(() => _hovered = true),\n      onExit: (_) => setState(() => _hovered = false),\n      child: Container(\n        margin",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/plugins/builtin/checklist_plugin.dart",
-        "start": 235,
-        "end": 245,
-        "startLoc": {
-          "line": 235,
-          "column": 55,
-          "position": 1915
-        },
-        "endLoc": {
-          "line": 245,
-          "column": 15,
-          "position": 2025
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/plugins/builtin/files_plugin.dart",
-        "start": 285,
-        "end": 295,
-        "startLoc": {
-          "line": 285,
-          "column": 45,
-          "position": 2229
-        },
-        "endLoc": {
-          "line": 295,
-          "column": 16,
-          "position": 2339
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 21,
-      "fragment": ",\n                        ),\n                      ),\n                      if (m.isFree)\n                        Text(\n                          'FREE',\n                          style: TextStyle(\n                            fontSize: 9,\n                            fontWeight: FontWeight.bold,\n                            color: colors.statusActive,\n                          ),\n                        )\n                      else if (m.inputCostPerMillion != null)\n                        Text(\n                          '\\$${m.inputCostPerMillion!.toStringAsFixed(m.inputCostPerMillion! < 1 ? 2 : 1)}',\n                          style: TextStyle(\n                            fontSize: 9,\n                            color:\n                                m.inputCostPerMillion! > 10\n                                    ? colors.statusError\n                                    : context",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/chat/widgets/chat_model_suggestions.dart",
-        "start": 103,
-        "end": 123,
-        "startLoc": {
-          "line": 103,
-          "column": 28,
-          "position": 832
-        },
-        "endLoc": {
-          "line": 123,
-          "column": 46,
-          "position": 959
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/chat/widgets/model_search_dialog.dart",
-        "start": 160,
-        "end": 180,
-        "startLoc": {
-          "line": 160,
-          "column": 40,
-          "position": 1253
-        },
-        "endLoc": {
-          "line": 180,
-          "column": 62,
-          "position": 1380
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 11,
-      "fragment": "@override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return AlertDialog(\n      backgroundColor: colors.surface,\n      title: Row(\n        children: [\n          Icon(\n            Icons.history,\n            size: 18,\n            color: Theme.of(context).colorScheme",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
-        "start": 37,
-        "end": 47,
-        "startLoc": {
-          "line": 37,
+          "line": 46,
           "column": 3,
-          "position": 257
+          "position": 362
         },
         "endLoc": {
-          "line": 47,
-          "column": 49,
-          "position": 339
+          "line": 53,
+          "column": 36,
+          "position": 445
         }
       },
       "secondFile": {
-        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
-        "start": 36,
-        "end": 47,
-        "startLoc": {
-          "line": 36,
-          "column": 3,
-          "position": 242
-        },
-        "endLoc": {
-          "line": 47,
-          "column": 44,
-          "position": 325
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": ")\n                ActionIconButton(\n                  icon: Icons.restore,\n                  color: colors.accentBlue,\n                  tooltip: 'Restore',\n                  onTap: () async {\n                    final msgs = await ChatSessionHistory.instance\n                        .loadMessages(entry.id);\n                    if (!context.mounted) return;\n                    Navigator.pop(context,",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
-        "start": 73,
-        "end": 82,
-        "startLoc": {
-          "line": 73,
-          "column": 29,
-          "position": 540
-        },
-        "endLoc": {
-          "line": 82,
-          "column": 43,
-          "position": 624
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
-        "start": 69,
-        "end": 78,
-        "startLoc": {
-          "line": 69,
-          "column": 57,
-          "position": 510
-        },
-        "endLoc": {
-          "line": 78,
-          "column": 43,
-          "position": 594
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 20,
-      "fragment": ",\n                tooltip: 'Delete',\n                onTap: () async {\n                  await ChatSessionHistory.instance.delete(entry.id);\n                  _refresh();\n                },\n              ),\n            ],\n          ),\n        ),\n      ),\n      actions: [\n        TextButton(\n          onPressed: () => Navigator.pop(context),\n          child: const Text('Close'),\n        ),\n      ],\n    );\n  }\n}",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/assistant/widgets/assistant_history_dialog.dart",
-        "start": 87,
-        "end": 106,
-        "startLoc": {
-          "line": 87,
-          "column": 40,
-          "position": 658
-        },
-        "endLoc": {
-          "line": 106,
-          "column": 2,
-          "position": 778
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/chat/widgets/session_history_dialog.dart",
-        "start": 84,
-        "end": 103,
-        "startLoc": {
-          "line": 84,
-          "column": 42,
-          "position": 640
-        },
-        "endLoc": {
-          "line": 103,
-          "column": 2,
-          "position": 760
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 17,
-      "fragment": ";\n  final ValueChanged<T> onSelected;\n\n  @override\n  Widget build(BuildContext context) {\n    final textColor = Theme.of(context).colorScheme.onSurface;\n    return Tooltip(\n      message: tooltip,\n      child: PopupMenuButton<T>(\n        tooltip: tooltip,\n        onSelected: onSelected,\n        itemBuilder:\n            (context) => values\n                .map(\n                  (value) => PopupMenuItem<T>(\n                    value: value,\n                    child: Row",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/ui/components/menus/miro_toolbar_primitives.dart",
-        "start": 162,
-        "end": 178,
-        "startLoc": {
-          "line": 162,
-          "column": 44,
-          "position": 1204
-        },
-        "endLoc": {
-          "line": 178,
-          "column": 31,
-          "position": 1333
-        }
-      },
-      "secondFile": {
-        "name": "lib/ui/components/menus/miro_toolbar_primitives.dart",
-        "start": 18,
-        "end": 34,
-        "startLoc": {
-          "line": 18,
-          "column": 43,
-          "position": 128
-        },
-        "endLoc": {
-          "line": 34,
-          "column": 32,
-          "position": 257
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 19,
-      "fragment": "required this.icon,\n    required this.tooltip,\n    required this.onTap,\n    this.active = false,\n  });\n\n  final IconData icon;\n  final String tooltip;\n  final VoidCallback onTap;\n  final bool active;\n\n  @override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return Tooltip(\n      message: tooltip,\n      child: InkWell(\n        onTap: onTap,\n        borderRadius: BorderRadius.circular(8",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/ui/components/buttons/overlay_icon_button.dart",
-        "start": 9,
+        "name": "lib/features/board/chat/widgets/streaming_bubble.dart",
+        "start": 20,
         "end": 27,
         "startLoc": {
-          "line": 9,
-          "column": 5,
-          "position": 39
+          "line": 20,
+          "column": 3,
+          "position": 112
         },
         "endLoc": {
           "line": 27,
-          "column": 46,
-          "position": 173
+          "column": 37,
+          "position": 195
         }
-      },
-      "secondFile": {
-        "name": "lib/features/editor/ui/widgets/search_replace_bar.dart",
+      }
+    },
+    {
+      "format": "dart",
+      "lines": 14,
+      "fragment": ";\n  final ValueChanged<T> onSelected;\n\n  @override\n  Widget build(BuildContext context) {\n    final textColor = Theme.of(context).colorScheme.onSurface;\n    return _toolbarPopup<T>(\n      tooltip: tooltip,\n      values: values,\n      onSelected: onSelected,\n      buildItem:\n          (value) => PopupMenuItem<T>(\n            value: value,\n            child: Row",
+      "tokens": 0,
+      "firstFile": {
+        "name": "lib/ui/components/menus/miro_toolbar_primitives.dart",
         "start": 175,
-        "end": 193,
+        "end": 188,
         "startLoc": {
           "line": 175,
-          "column": 5,
-          "position": 1319
+          "column": 44,
+          "position": 1317
         },
         "endLoc": {
-          "line": 193,
-          "column": 46,
-          "position": 1453
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": "isLast ? '└─ ' : '├─ ',\n              style: TextStyle(color: mutedColor, fontSize: 10),\n            ),\n            Container(\n              width: 6,\n              height: 6,\n              margin: const EdgeInsets.only(right: 6),\n              decoration: BoxDecoration(\n                shape: BoxShape.circle,\n                color: statusColor",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/workspaces/ui/workspace_inline_tree.dart",
-        "start": 462,
-        "end": 471,
-        "startLoc": {
-          "line": 462,
-          "column": 22,
-          "position": 3900
-        },
-        "endLoc": {
-          "line": 471,
-          "column": 35,
-          "position": 3989
+          "line": 188,
+          "column": 23,
+          "position": 1424
         }
       },
       "secondFile": {
-        "name": "lib/features/workspaces/ui/workspace_inline_tree.dart",
-        "start": 239,
-        "end": 248,
+        "name": "lib/ui/components/menus/miro_toolbar_primitives.dart",
+        "start": 37,
+        "end": 50,
         "startLoc": {
-          "line": 239,
-          "column": 13,
-          "position": 1982
-        },
-        "endLoc": {
-          "line": 248,
-          "column": 30,
-          "position": 2071
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 13,
-      "fragment": ");\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return Dialog(\n      backgroundColor: colors.surface,\n      shape: RoundedRectangleBorder(\n        borderRadius: BorderRadius.circular(10),\n        side: BorderSide(color: colors.border),\n      ),\n      child: Padding",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/workspaces/ui/new_agent_session_dialog.dart",
-        "start": 199,
-        "end": 211,
-        "startLoc": {
-          "line": 199,
-          "column": 22,
-          "position": 1711
-        },
-        "endLoc": {
-          "line": 211,
-          "column": 21,
-          "position": 1802
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/workspaces/ui/worktree_section.dart",
-        "start": 611,
-        "end": 623,
-        "startLoc": {
-          "line": 611,
-          "column": 5,
-          "position": 4696
-        },
-        "endLoc": {
-          "line": 623,
-          "column": 28,
-          "position": 4787
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 9,
-      "fragment": ",\n              const SizedBox(height: 20),\n              Row(\n                mainAxisAlignment: MainAxisAlignment.end,\n                children: [\n                  TextButton(\n                    onPressed: () => Navigator.of(context).pop(),\n                    child: Text('Cancel',\n                        style: TextStyle(color: context",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/workspaces/ui/new_agent_session_dialog.dart",
-        "start": 241,
-        "end": 249,
-        "startLoc": {
-          "line": 241,
-          "column": 16,
-          "position": 2068
-        },
-        "endLoc": {
-          "line": 249,
-          "column": 56,
-          "position": 2145
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/workspaces/ui/worktree_section.dart",
-        "start": 789,
-        "end": 800,
-        "startLoc": {
-          "line": 789,
-          "column": 16,
-          "position": 6039
-        },
-        "endLoc": {
-          "line": 800,
-          "column": 34,
-          "position": 6121
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": ",\n        border: OutlineInputBorder(\n          borderRadius: BorderRadius.circular(6),\n          borderSide: BorderSide(color: colors.border),\n        ),\n        enabledBorder: OutlineInputBorder(\n          borderRadius: BorderRadius.circular(6),\n          borderSide: BorderSide(color: colors.border),\n        ),\n        focusedBorder",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/workspaces/ui/new_agent_session_dialog.dart",
-        "start": 371,
-        "end": 380,
-        "startLoc": {
-          "line": 371,
+          "line": 37,
           "column": 43,
-          "position": 3262
+          "position": 281
         },
         "endLoc": {
-          "line": 380,
-          "column": 22,
-          "position": 3341
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/dialogs/color_picker_dialog.dart",
-        "start": 144,
-        "end": 153,
-        "startLoc": {
-          "line": 144,
-          "column": 26,
-          "position": 1047
-        },
-        "endLoc": {
-          "line": 153,
-          "column": 39,
-          "position": 1126
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 9,
-      "fragment": ": OutlineInputBorder(\n          borderRadius: BorderRadius.circular(6),\n          borderSide: BorderSide(color: colors.border),\n        ),\n        focusedBorder: OutlineInputBorder(\n          borderRadius: BorderRadius.circular(6),\n          borderSide: BorderSide(color: colors.primary),\n        ),\n      )",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/workspaces/ui/new_agent_session_dialog.dart",
-        "start": 376,
-        "end": 384,
-        "startLoc": {
-          "line": 376,
-          "column": 22,
-          "position": 3304
-        },
-        "endLoc": {
-          "line": 384,
-          "column": 8,
-          "position": 3379
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/editor/ui/widgets/search_replace_bar.dart",
-        "start": 158,
-        "end": 166,
-        "startLoc": {
-          "line": 158,
-          "column": 17,
-          "position": 1186
-        },
-        "endLoc": {
-          "line": 166,
-          "column": 25,
-          "position": 1261
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 15,
-      "fragment": "),\n            border: OutlineInputBorder(\n              borderRadius: BorderRadius.circular(6),\n              borderSide: BorderSide(color: colors.border),\n            ),\n            enabledBorder: OutlineInputBorder(\n              borderRadius: BorderRadius.circular(6),\n              borderSide: BorderSide(color: colors.border),\n            ),\n            focusedBorder: OutlineInputBorder(\n              borderRadius: BorderRadius.circular(6),\n              borderSide: BorderSide(color: colors.primary),\n            ),\n          ),\n        ),",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/workspaces/ui/new_agent_session_dialog.dart",
-        "start": 551,
-        "end": 565,
-        "startLoc": {
-          "line": 551,
-          "column": 68,
-          "position": 4818
-        },
-        "endLoc": {
-          "line": 565,
-          "column": 11,
-          "position": 4941
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/dialogs/color_picker_dialog.dart",
-        "start": 144,
-        "end": 385,
-        "startLoc": {
-          "line": 144,
-          "column": 25,
-          "position": 1046
-        },
-        "endLoc": {
-          "line": 385,
-          "column": 7,
-          "position": 3384
+          "line": 50,
+          "column": 24,
+          "position": 388
         }
       }
     },
@@ -5828,32 +5072,32 @@
       "tokens": 0,
       "firstFile": {
         "name": "lib/features/workspaces/ui/new_agent_session_dialog.dart",
-        "start": 707,
-        "end": 719,
+        "start": 682,
+        "end": 694,
         "startLoc": {
-          "line": 707,
+          "line": 682,
           "column": 26,
-          "position": 6019
+          "position": 5772
         },
         "endLoc": {
-          "line": 719,
+          "line": 694,
           "column": 23,
-          "position": 6112
+          "position": 5865
         }
       },
       "secondFile": {
         "name": "lib/features/workspaces/ui/new_agent_session_dialog.dart",
-        "start": 659,
-        "end": 672,
+        "start": 634,
+        "end": 647,
         "startLoc": {
-          "line": 659,
+          "line": 634,
           "column": 23,
-          "position": 5634
+          "position": 5387
         },
         "endLoc": {
-          "line": 672,
+          "line": 647,
           "column": 23,
-          "position": 5729
+          "position": 5482
         }
       }
     },
@@ -5879,17 +5123,17 @@
       },
       "secondFile": {
         "name": "lib/features/workspaces/ui/worktree_section.dart",
-        "start": 866,
-        "end": 877,
+        "start": 821,
+        "end": 832,
         "startLoc": {
-          "line": 866,
+          "line": 821,
           "column": 23,
-          "position": 6620
+          "position": 6227
         },
         "endLoc": {
-          "line": 877,
+          "line": 832,
           "column": 59,
-          "position": 6716
+          "position": 6323
         }
       }
     },
@@ -5967,294 +5211,6 @@
     },
     {
       "format": "dart",
-      "lines": 17,
-      "fragment": ") {\n          _allSessions[i] = _allSessions[i].copyWith(clearHookPhase: true);\n          final cur = _loaded;\n          if (cur != null && !isClosed) {\n            final visible = _workspaceSessions;\n            emit(\n              cur.copyWith(\n                sessions: visible,\n                allSessions: List.unmodifiable(_allSessions),\n              ),\n            );\n          }\n        }\n      });\n    }\n\n    _allSessions",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/terminal/bloc/terminal_cubit.dart",
-        "start": 504,
-        "end": 520,
-        "startLoc": {
-          "line": 504,
-          "column": 61,
-          "position": 4204
-        },
-        "endLoc": {
-          "line": 520,
-          "column": 17,
-          "position": 4321
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/terminal/bloc/terminal_cubit.dart",
-        "start": 484,
-        "end": 500,
-        "startLoc": {
-          "line": 484,
-          "column": 65,
-          "position": 4014
-        },
-        "endLoc": {
-          "line": 500,
-          "column": 59,
-          "position": 4131
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 20,
-      "fragment": "> {\n  SetupCheckResult? _result;\n  bool _loading = true;\n\n  @override\n  void initState() {\n    super.initState();\n    _runChecks();\n  }\n\n  Future<void> _runChecks({bool silent = false}) async {\n    if (!silent) setState(() => _loading = true);\n    final result = await SetupCheckService.check();\n    if (mounted) setState(() { _result = result; _loading = false; });\n  }\n\n  @override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    return",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/setup_guide_page.dart",
-        "start": 109,
-        "end": 128,
-        "startLoc": {
-          "line": 109,
-          "column": 56,
-          "position": 898
-        },
-        "endLoc": {
-          "line": 128,
-          "column": 11,
-          "position": 1077
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/setup_guide_page.dart",
-        "start": 24,
-        "end": 43,
-        "startLoc": {
-          "line": 24,
-          "column": 64,
-          "position": 119
-        },
-        "endLoc": {
-          "line": 43,
-          "column": 7,
-          "position": 298
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": ";\n\n    return Container(\n      margin: const EdgeInsets.only(bottom: 6),\n      decoration: BoxDecoration(\n        color: colors.surfaceElevated,\n        borderRadius: BorderRadius.circular(6),\n        border: Border.all(color: borderColor),\n      ),\n      child: Column",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/setup_guide_page.dart",
-        "start": 578,
-        "end": 587,
-        "startLoc": {
-          "line": 578,
-          "column": 36,
-          "position": 5045
-        },
-        "endLoc": {
-          "line": 587,
-          "column": 20,
-          "position": 5122
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/setup_guide_page.dart",
-        "start": 352,
-        "end": 361,
-        "startLoc": {
-          "line": 352,
-          "column": 48,
-          "position": 2925
-        },
-        "endLoc": {
-          "line": 361,
-          "column": 21,
-          "position": 3002
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 12,
-      "fragment": ",\n        child: Container(\n          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),\n          decoration: BoxDecoration(\n            borderRadius: BorderRadius.circular(4),\n            border: Border.all(color: context.appColors.textMuted.withAlpha(60)),\n          ),\n          child: Row(\n            mainAxisSize: MainAxisSize.min,\n            children: [\n              Icon(\n                _copied",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/setup_guide_page.dart",
-        "start": 831,
-        "end": 842,
-        "startLoc": {
-          "line": 831,
-          "column": 10,
-          "position": 7314
-        },
-        "endLoc": {
-          "line": 842,
-          "column": 24,
-          "position": 7420
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/setup_guide_page.dart",
-        "start": 401,
-        "end": 411,
-        "startLoc": {
-          "line": 401,
-          "column": 32,
-          "position": 3407
-        },
-        "endLoc": {
-          "line": 411,
-          "column": 35,
-          "position": 3511
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 11,
-      "fragment": ",\n                        ),\n                        border: OutlineInputBorder(\n                          borderRadius: BorderRadius.circular(6),\n                          borderSide: BorderSide(color: colors.border),\n                        ),\n                        enabledBorder: OutlineInputBorder(\n                          borderRadius: BorderRadius.circular(6),\n                          borderSide: BorderSide(color: colors.border),\n                        ),\n                      ),",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/env_group_picker.dart",
-        "start": 538,
-        "end": 548,
-        "startLoc": {
-          "line": 538,
-          "column": 38,
-          "position": 4454
-        },
-        "endLoc": {
-          "line": 548,
-          "column": 25,
-          "position": 4538
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/dialogs/color_picker_dialog.dart",
-        "start": 143,
-        "end": 72,
-        "startLoc": {
-          "line": 143,
-          "column": 39,
-          "position": 1043
-        },
-        "endLoc": {
-          "line": 72,
-          "column": 7,
-          "position": 615
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 21,
-      "fragment": ",\n                        hintStyle: TextStyle(\n                          fontSize: 11,\n                          color: colors.textMuted,\n                        ),\n                        contentPadding: const EdgeInsets.symmetric(\n                          horizontal: 8,\n                          vertical: 6,\n                        ),\n                        border: OutlineInputBorder(\n                          borderRadius: BorderRadius.circular(6),\n                          borderSide: BorderSide(color: colors.border),\n                        ),\n                        enabledBorder: OutlineInputBorder(\n                          borderRadius: BorderRadius.circular(6),\n                          borderSide: BorderSide(color: colors.border),\n                        ),\n                      ),\n                    ),\n                  ),\n                  if",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/env_group_picker.dart",
-        "start": 574,
-        "end": 594,
-        "startLoc": {
-          "line": 574,
-          "column": 42,
-          "position": 4709
-        },
-        "endLoc": {
-          "line": 594,
-          "column": 21,
-          "position": 4856
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/env_group_picker.dart",
-        "start": 531,
-        "end": 551,
-        "startLoc": {
-          "line": 531,
-          "column": 40,
-          "position": 4402
-        },
-        "endLoc": {
-          "line": 551,
-          "column": 26,
-          "position": 4549
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 19,
-      "fragment": ",\n                isDense: true,\n                border: OutlineInputBorder(),\n              ),\n              items: [\n                const DropdownMenuItem<String>(\n                  value: 'local',\n                  child: Text('Local Provider', style: TextStyle(fontSize: 13)),\n                ),\n                ..._configs.map(\n                  (c) => DropdownMenuItem<String>(\n                    value: c.id,\n                    child: Text(c.name, style: const TextStyle(fontSize: 13)),\n                  ),\n                ),\n              ],\n              onChanged: (v) {\n                if (v == null) return;\n                if",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/cloud_providers_section.dart",
-        "start": 612,
-        "end": 630,
-        "startLoc": {
-          "line": 612,
-          "column": 42,
-          "position": 5342
-        },
-        "endLoc": {
-          "line": 630,
-          "column": 19,
-          "position": 5507
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/cloud_providers_section.dart",
-        "start": 489,
-        "end": 507,
-        "startLoc": {
-          "line": 489,
-          "column": 43,
-          "position": 4376
-        },
-        "endLoc": {
-          "line": 507,
-          "column": 33,
-          "position": 4541
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 12,
-      "fragment": ".map(\n                          (m) => DropdownMenuItem<String>(\n                            value: m.id,\n                            child: Text(\n                              m.label,\n                              style: const TextStyle(fontSize: 13),\n                            ),\n                          ),\n                        )\n                        .toList(),\n                onChanged:\n                    (v) =",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/ui/cloud_providers_section.dart",
-        "start": 702,
-        "end": 713,
-        "startLoc": {
-          "line": 702,
-          "column": 25,
-          "position": 6088
-        },
-        "endLoc": {
-          "line": 713,
-          "column": 26,
-          "position": 6170
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/ui/cloud_providers_section.dart",
-        "start": 537,
-        "end": 547,
-        "startLoc": {
-          "line": 537,
-          "column": 37,
-          "position": 4744
-        },
-        "endLoc": {
-          "line": 547,
-          "column": 45,
-          "position": 4825
-        }
-      }
-    },
-    {
-      "format": "dart",
       "lines": 10,
       "fragment": "(id)),\n          stateForModel: _service.stateForModel,\n          onDownloadOrUpdate:\n              (id) => _runAction(() => _service.downloadOrUpdateModel(id)),\n          onDelete: (id) => _runAction(() => _service.deleteInstalledModel(id)),\n          onResume: (id) => _runAction(() => _service.resumeModelDownload(id)),\n          onPause: (id) => _runAction(() => _service.pauseModelDownload(id)),\n          onCancel: (id) => _runAction(() => _service.cancelModelDownload(id)),\n        ),\n      ]",
       "tokens": 0,
@@ -6292,108 +5248,36 @@
     {
       "format": "dart",
       "lines": 9,
-      "fragment": "final existing = current.split(':').where((p) => p.isNotEmpty).toSet();\n    final merged = <String>[\n      ...candidates.where((c) => !existing.contains(c)),\n      ...current.split(':').where((p) => p.isNotEmpty),\n    ];\n    return merged.join(':');\n  }\n\n  static String?",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/data/setup_check_service.dart",
-        "start": 201,
-        "end": 209,
-        "startLoc": {
-          "line": 201,
-          "column": 5,
-          "position": 1537
-        },
-        "endLoc": {
-          "line": 209,
-          "column": 17,
-          "position": 1655
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/data/setup_check_service.dart",
-        "start": 132,
-        "end": 140,
-        "startLoc": {
-          "line": 132,
-          "column": 5,
-          "position": 846
-        },
-        "endLoc": {
-          "line": 140,
-          "column": 42,
-          "position": 965
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 6,
-      "fragment": "));\n      final out = (r.stdout as String).trim().split('\\n').first.trim();\n      if (r.exitCode == 0 && out.isNotEmpty) return out;\n    } catch (_) {}\n\n    return",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/settings/data/setup_check_service.dart",
-        "start": 796,
-        "end": 801,
-        "startLoc": {
-          "line": 796,
-          "column": 42,
-          "position": 5753
-        },
-        "endLoc": {
-          "line": 801,
-          "column": 11,
-          "position": 5828
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/settings/data/setup_check_service.dart",
-        "start": 784,
-        "end": 789,
-        "startLoc": {
-          "line": 784,
-          "column": 62,
-          "position": 5620
-        },
-        "endLoc": {
-          "line": 789,
-          "column": 55,
-          "position": 5695
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 9,
       "fragment": ".map(\n        (providerId, models) =>\n            MapEntry(providerId, models.map((m) => m.toJson()).toList()),\n      );\n      await file.writeAsString(jsonEncode(data));\n    } catch (_) {}\n  }\n\n  Future<void> _loadCliModelsCache",
       "tokens": 0,
       "firstFile": {
         "name": "lib/features/settings/data/provider_model_catalog_service.dart",
-        "start": 369,
-        "end": 377,
+        "start": 366,
+        "end": 374,
         "startLoc": {
-          "line": 369,
+          "line": 366,
           "column": 35,
-          "position": 3185
+          "position": 3129
         },
         "endLoc": {
-          "line": 377,
+          "line": 374,
           "column": 35,
-          "position": 3270
+          "position": 3214
         }
       },
       "secondFile": {
         "name": "lib/features/settings/data/provider_model_catalog_service.dart",
-        "start": 338,
-        "end": 346,
+        "start": 335,
+        "end": 343,
         "startLoc": {
-          "line": 338,
+          "line": 335,
           "column": 33,
-          "position": 2841
+          "position": 2785
         },
         "endLoc": {
-          "line": 346,
+          "line": 343,
           "column": 33,
-          "position": 2926
+          "position": 2870
         }
       }
     },
@@ -6440,104 +5324,32 @@
       "tokens": 0,
       "firstFile": {
         "name": "lib/features/search/data/file_search_service.dart",
-        "start": 263,
-        "end": 273,
+        "start": 264,
+        "end": 274,
         "startLoc": {
-          "line": 263,
+          "line": 264,
           "column": 24,
-          "position": 2331
+          "position": 2340
         },
         "endLoc": {
-          "line": 273,
+          "line": 274,
           "column": 52,
-          "position": 2428
+          "position": 2437
         }
       },
       "secondFile": {
         "name": "lib/features/search/data/file_search_service.dart",
-        "start": 224,
-        "end": 234,
+        "start": 225,
+        "end": 235,
         "startLoc": {
-          "line": 224,
+          "line": 225,
           "column": 16,
-          "position": 2019
+          "position": 2028
         },
         "endLoc": {
-          "line": 234,
+          "line": 235,
           "column": 49,
-          "position": 2116
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 14,
-      "fragment": ",\n                    border: OutlineInputBorder(\n                      borderRadius: BorderRadius.circular(4),\n                      borderSide: BorderSide(color: colors.border),\n                    ),\n                    enabledBorder: OutlineInputBorder(\n                      borderRadius: BorderRadius.circular(4),\n                      borderSide: BorderSide(color: colors.border),\n                    ),\n                    focusedBorder: OutlineInputBorder(\n                      borderRadius: BorderRadius.circular(4),\n                      borderSide: BorderSide(color: colors.primary),\n                    ),\n                    contentPadding",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/runs/ui/run_config_dialog.dart",
-        "start": 246,
-        "end": 259,
-        "startLoc": {
-          "line": 246,
-          "column": 46,
-          "position": 2066
-        },
-        "endLoc": {
-          "line": 259,
-          "column": 35,
-          "position": 2183
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/workspaces/ui/worktree_section.dart",
-        "start": 848,
-        "end": 861,
-        "startLoc": {
-          "line": 848,
-          "column": 40,
-          "position": 6480
-        },
-        "endLoc": {
-          "line": 861,
-          "column": 6,
-          "position": 6597
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 21,
-      "fragment": "filled: true,\n                  fillColor: colors.surface,\n                  border: OutlineInputBorder(\n                    borderRadius: BorderRadius.circular(4),\n                    borderSide: BorderSide(color: colors.border),\n                  ),\n                  enabledBorder: OutlineInputBorder(\n                    borderRadius: BorderRadius.circular(4),\n                    borderSide: BorderSide(color: colors.border),\n                  ),\n                  focusedBorder: OutlineInputBorder(\n                    borderRadius: BorderRadius.circular(4),\n                    borderSide: BorderSide(color: colors.primary),\n                  ),\n                  contentPadding: const EdgeInsets.symmetric(\n                    horizontal: 10,\n                    vertical: 8,\n                  ),\n                  isDense: true,\n                ),\n              )",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/runs/ui/run_config_dialog.dart",
-        "start": 790,
-        "end": 810,
-        "startLoc": {
-          "line": 790,
-          "column": 19,
-          "position": 6147
-        },
-        "endLoc": {
-          "line": 810,
-          "column": 16,
-          "position": 6317
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/runs/ui/run_config_dialog.dart",
-        "start": 245,
-        "end": 265,
-        "startLoc": {
-          "line": 245,
-          "column": 21,
-          "position": 2053
-        },
-        "endLoc": {
-          "line": 265,
-          "column": 24,
-          "position": 2223
+          "position": 2125
         }
       }
     },
@@ -6548,17 +5360,17 @@
       "tokens": 0,
       "firstFile": {
         "name": "lib/features/runs/ui/run_config_dialog.dart",
-        "start": 891,
-        "end": 904,
+        "start": 852,
+        "end": 865,
         "startLoc": {
-          "line": 891,
+          "line": 852,
           "column": 27,
-          "position": 6926
+          "position": 6582
         },
         "endLoc": {
-          "line": 904,
+          "line": 865,
           "column": 40,
-          "position": 7014
+          "position": 6670
         }
       },
       "secondFile": {
@@ -6580,93 +5392,21 @@
     {
       "format": "dart",
       "lines": 9,
-      "fragment": ");\n          final entities = dir.listSync(followLinks: true)\n            ..sort((a, b) {\n              final aIsDir = a is Directory;\n              final bIsDir = b is Directory;\n              if (aIsDir != bIsDir) return aIsDir ? -1 : 1;\n              return p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());\n            });\n          final",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/review/bloc/review_cubit.dart",
-        "start": 247,
-        "end": 255,
-        "startLoc": {
-          "line": 247,
-          "column": 43,
-          "position": 2304
-        },
-        "endLoc": {
-          "line": 255,
-          "column": 16,
-          "position": 2430
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/review/bloc/review_cubit.dart",
-        "start": 217,
-        "end": 226,
-        "startLoc": {
-          "line": 217,
-          "column": 36,
-          "position": 1966
-        },
-        "endLoc": {
-          "line": 226,
-          "column": 13,
-          "position": 2093
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 7,
-      "fragment": ").readAsStringSync().trim();\n        if (head.startsWith('ref: refs/heads/')) {\n          return head.substring('ref: refs/heads/'.length);\n        }\n        return head.length >= 7 ? head.substring(0, 7) : head;\n      }\n    }",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/mindmap/model/mindmap_graph_builder.dart",
-        "start": 38,
-        "end": 44,
-        "startLoc": {
-          "line": 38,
-          "column": 41,
-          "position": 317
-        },
-        "endLoc": {
-          "line": 44,
-          "column": 6,
-          "position": 390
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/mindmap/model/mindmap_graph_builder.dart",
-        "start": 23,
-        "end": 29,
-        "startLoc": {
-          "line": 23,
-          "column": 45,
-          "position": 126
-        },
-        "endLoc": {
-          "line": 29,
-          "column": 69,
-          "position": 199
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 9,
       "fragment": "MouseRegion(\n        cursor: SystemMouseCursors.click,\n        onEnter: (_) => setState(() => _hovered = true),\n        onExit: (_) => setState(() => _hovered = false),\n        child: GestureDetector(\n          onTap: widget.onTap,\n          child: AnimatedContainer(\n            duration: const Duration(milliseconds: 120),\n            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6",
       "tokens": 0,
       "firstFile": {
         "name": "lib/features/collaboration/ui/collaboration_button.dart",
-        "start": 873,
-        "end": 881,
+        "start": 858,
+        "end": 866,
         "startLoc": {
-          "line": 873,
+          "line": 858,
           "column": 14,
-          "position": 6416
+          "position": 6276
         },
         "endLoc": {
-          "line": 881,
+          "line": 866,
           "column": 75,
-          "position": 6539
+          "position": 6399
         }
       },
       "secondFile": {
@@ -6795,217 +5535,37 @@
     },
     {
       "format": "dart",
-      "lines": 12,
-      "fragment": "width: _doubleOrNull(m['width']),\n      height: _doubleOrNull(m['height']),\n      padding: _edgeInsetsOrNull(m['padding']),\n      margin: _edgeInsetsOrNull(m['margin']),\n      alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,\n      decoration:\n          deco != null\n              ? _boxDecoration(deco.cast<String, dynamic>())\n              : (m['color'] != null\n                  ? BoxDecoration(color: _color(m['color'] as String?))\n                  : null),\n      transform",
+      "lines": 7,
+      "fragment": "width: _doubleOrNull(m['width']),\n    height: _doubleOrNull(m['height']),\n    padding: _edgeInsetsOrNull(m['padding']),\n    margin: _edgeInsetsOrNull(m['margin']),\n    alignment: m['alignment'] != null ? _alignment(m['alignment']) : null,\n    decoration: _containerDecoration(m),\n    transform",
       "tokens": 0,
       "firstFile": {
         "name": "lib/features/board/widgets/json_widget_renderer.dart",
         "start": 686,
-        "end": 697,
+        "end": 692,
         "startLoc": {
           "line": 686,
-          "column": 7,
-          "position": 7646
+          "column": 5,
+          "position": 7657
         },
         "endLoc": {
-          "line": 697,
-          "column": 16,
-          "position": 7797
+          "line": 692,
+          "column": 14,
+          "position": 7747
         }
       },
       "secondFile": {
         "name": "lib/features/board/widgets/json_widget_renderer.dart",
-        "start": 220,
-        "end": 231,
+        "start": 228,
+        "end": 234,
         "startLoc": {
-          "line": 220,
-          "column": 7,
-          "position": 2416
+          "line": 228,
+          "column": 5,
+          "position": 2511
         },
         "endLoc": {
-          "line": 231,
-          "column": 12,
-          "position": 2567
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 12,
-      "fragment": ",\n        border: OutlineInputBorder(\n          borderRadius: BorderRadius.circular(8),\n          borderSide: BorderSide(color: colors.border),\n        ),\n        enabledBorder: OutlineInputBorder(\n          borderRadius: BorderRadius.circular(8),\n          borderSide: BorderSide(color: colors.border),\n        ),\n        focusedBorder: OutlineInputBorder(\n          borderRadius: BorderRadius.circular(8),\n          borderSide: BorderSide(color: colors.accentBlue",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/widgets/json_widget_renderer.dart",
-        "start": 864,
-        "end": 875,
-        "startLoc": {
-          "line": 864,
-          "column": 42,
-          "position": 9475
-        },
-        "endLoc": {
-          "line": 875,
-          "column": 58,
-          "position": 9583
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/collaboration/ui/collaboration_button.dart",
-        "start": 827,
-        "end": 838,
-        "startLoc": {
-          "line": 827,
+          "line": 234,
           "column": 10,
-          "position": 6086
-        },
-        "endLoc": {
-          "line": 838,
-          "column": 55,
-          "position": 6194
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 18,
-      "fragment": "Container(\n            padding: const EdgeInsets.all(6),\n            decoration: BoxDecoration(\n              color: panelBg,\n              borderRadius: BorderRadius.circular(14),\n              border: Border.all(color: colors.border.withAlpha(180)),\n              boxShadow: [\n                BoxShadow(\n                  color: Colors.black.withAlpha(isLight ? 18 : 70),\n                  blurRadius: 18,\n                  offset: const Offset(0, 8),\n                ),\n              ],\n            ),\n            child: Column(\n              mainAxisSize: MainAxisSize.min,\n              children: [\n                MiroLeftToolbarButton",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/ui/board_tools_panel.dart",
-        "start": 151,
-        "end": 168,
-        "startLoc": {
-          "line": 151,
-          "column": 11,
-          "position": 1180
-        },
-        "endLoc": {
-          "line": 168,
-          "column": 38,
-          "position": 1334
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/board_tools_panel.dart",
-        "start": 77,
-        "end": 94,
-        "startLoc": {
-          "line": 77,
-          "column": 11,
-          "position": 597
-        },
-        "endLoc": {
-          "line": 94,
-          "column": 20,
-          "position": 751
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 19,
-      "fragment": "const SizedBox(height: 8),\n        Container(\n          padding: const EdgeInsets.all(6),\n          decoration: BoxDecoration(\n            color: panelBg,\n            borderRadius: BorderRadius.circular(14),\n            border: Border.all(color: colors.border.withAlpha(180)),\n            boxShadow: [\n              BoxShadow(\n                color: Colors.black.withAlpha(isLight ? 18 : 70),\n                blurRadius: 18,\n                offset: const Offset(0, 8),\n              ),\n            ],\n          ),\n          child: Column(\n            mainAxisSize: MainAxisSize.min,\n            children: [\n              PanelCatalogCategoryButton",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/ui/board_tools_panel.dart",
-        "start": 197,
-        "end": 215,
-        "startLoc": {
-          "line": 197,
-          "column": 9,
-          "position": 1511
-        },
-        "endLoc": {
-          "line": 215,
-          "column": 41,
-          "position": 1677
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/board_tools_panel.dart",
-        "start": 150,
-        "end": 94,
-        "startLoc": {
-          "line": 150,
-          "column": 11,
-          "position": 1168
-        },
-        "endLoc": {
-          "line": 94,
-          "column": 20,
-          "position": 751
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 7,
-      "fragment": "@override\n  Widget build(BuildContext context) {\n    final colors = context.appColors;\n    final textColor =\n        Theme.of(context).textTheme.bodyMedium?.color ??\n        Theme.of(context).colorScheme.onSurface;\n    final mutedColor = context.appColors.textMuted;",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/ui/board_toolbar.dart",
-        "start": 284,
-        "end": 290,
-        "startLoc": {
-          "line": 284,
-          "column": 3,
-          "position": 2155
-        },
-        "endLoc": {
-          "line": 290,
-          "column": 52,
-          "position": 2231
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/chat/widgets/assistant_bubble.dart",
-        "start": 45,
-        "end": 52,
-        "startLoc": {
-          "line": 45,
-          "column": 3,
-          "position": 357
-        },
-        "endLoc": {
-          "line": 52,
-          "column": 37,
-          "position": 434
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 13,
-      "fragment": ",\n      padding: const EdgeInsets.all(10),\n      decoration: BoxDecoration(\n        color: colors.surface.withAlpha(0xE5),\n        borderRadius: BorderRadius.circular(12),\n        border: Border.all(color: colors.border),\n      ),\n      child: Column(\n        crossAxisAlignment: CrossAxisAlignment.start,\n        mainAxisSize: MainAxisSize.min,\n        children: [\n          Text(\n            'Connect'",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/ui/board_settings_panels.dart",
-        "start": 168,
-        "end": 180,
-        "startLoc": {
-          "line": 168,
-          "column": 17,
-          "position": 1263
-        },
-        "endLoc": {
-          "line": 180,
-          "column": 22,
-          "position": 1369
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/board_settings_panels.dart",
-        "start": 20,
-        "end": 32,
-        "startLoc": {
-          "line": 20,
-          "column": 17,
-          "position": 142
-        },
-        "endLoc": {
-          "line": 32,
-          "column": 28,
-          "position": 248
+          "position": 2601
         }
       }
     },
@@ -7067,125 +5627,17 @@
       },
       "secondFile": {
         "name": "lib/features/board/plugins/builtin/shape_plugin.dart",
-        "start": 764,
-        "end": 770,
+        "start": 757,
+        "end": 763,
         "startLoc": {
-          "line": 764,
+          "line": 757,
           "column": 10,
-          "position": 6424
+          "position": 6384
         },
         "endLoc": {
-          "line": 770,
+          "line": 763,
           "column": 2,
-          "position": 6504
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 15,
-      "fragment": "Offset position) {\n    final hitRadius = (drawing.strokeWidth / 2) + 8.0;\n    for (final stroke in drawing.strokes) {\n      if (stroke.isEmpty) continue;\n      if (stroke.length == 1) {\n        if ((stroke.first - position).distance <= hitRadius) return true;\n        continue;\n      }\n      for (int i = 0; i < stroke.length - 1; i++) {\n        if (_distToSegment(position, stroke[i], stroke[i + 1]) <= hitRadius) {\n          return true;\n        }\n      }\n    }\n    return false",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/ui/board_drawing_widgets.dart",
-        "start": 156,
-        "end": 170,
-        "startLoc": {
-          "line": 156,
-          "column": 58,
-          "position": 1351
-        },
-        "endLoc": {
-          "line": 170,
-          "column": 17,
-          "position": 1539
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/board_drawing_widgets.dart",
-        "start": 125,
-        "end": 139,
-        "startLoc": {
-          "line": 125,
-          "column": 17,
-          "position": 920
-        },
-        "endLoc": {
-          "line": 139,
-          "column": 16,
-          "position": 1108
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 19,
-      "fragment": "final originalErrorBuilder = ErrorWidget.builder;\n    ErrorWidget.builder = (FlutterErrorDetails details) {\n      debugPrint(\n        '[BoardOffscreenRenderer] panel render error: ${details.exception}',\n      );\n      return ColoredBox(\n        color: colors.border.withAlpha(32),\n        child: Center(\n          child: Icon(\n            Icons.broken_image_outlined,\n            size: 20,\n            color: colors.textMuted.withAlpha(128),\n          ),\n        ),\n      );\n    };\n\n    try {\n      final",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/services/board_offscreen_renderer.dart",
-        "start": 101,
-        "end": 119,
-        "startLoc": {
-          "line": 101,
-          "column": 5,
-          "position": 646
-        },
-        "endLoc": {
-          "line": 119,
-          "column": 12,
-          "position": 768
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/services/board_offscreen_renderer.dart",
-        "start": 53,
-        "end": 71,
-        "startLoc": {
-          "line": 53,
-          "column": 5,
-          "position": 308
-        },
-        "endLoc": {
-          "line": 71,
-          "column": 13,
-          "position": 430
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 11,
-      "fragment": "),\n          child: Directionality(\n            textDirection: TextDirection.ltr,\n            child: ScrollConfiguration(\n              behavior: const HeadlessScrollBehavior(),\n              child: Theme(\n                data: theme,\n                child: DefaultTextStyle(\n                  style: TextStyle(color: colors.textPrimary, fontSize: 12),\n                  child: IconTheme(\n                    data: IconThemeData(color: colors.textSecondary, size: 14)",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/services/board_offscreen_renderer.dart",
-        "start": 208,
-        "end": 218,
-        "startLoc": {
-          "line": 208,
-          "column": 59,
-          "position": 1396
-        },
-        "endLoc": {
-          "line": 218,
-          "column": 79,
-          "position": 1500
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/services/board_offscreen_renderer.dart",
-        "start": 159,
-        "end": 171,
-        "startLoc": {
-          "line": 159,
-          "column": 11,
-          "position": 1082
-        },
-        "endLoc": {
-          "line": 171,
-          "column": 32,
-          "position": 1189
+          "position": 6464
         }
       }
     },
@@ -7515,73 +5967,37 @@
     },
     {
       "format": "dart",
-      "lines": 8,
-      "fragment": "] as String? ?? '',\n        workingDir: json['workingDir'] as String? ?? '',\n        envGroupIds:\n            (json['envGroupIds'] as List?)?.cast<String>() ?? const [],\n        createdAt:\n            DateTime.tryParse(json['createdAt'] as String? ?? '') ??\n            DateTime.now(),\n        lastMessageAt",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/features/board/chat/chat_session_history.dart",
-        "start": 144,
-        "end": 151,
-        "startLoc": {
-          "line": 144,
-          "column": 28,
-          "position": 1251
-        },
-        "endLoc": {
-          "line": 151,
-          "column": 22,
-          "position": 1355
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/terminal/board_terminal_session_history.dart",
-        "start": 73,
-        "end": 80,
-        "startLoc": {
-          "line": 73,
-          "column": 38,
-          "position": 637
-        },
-        "endLoc": {
-          "line": 80,
-          "column": 19,
-          "position": 741
-        }
-      }
-    },
-    {
-      "format": "dart",
       "lines": 13,
       "fragment": "&& method == 'GET') {\n    final boardHint = request.url.queryParameters['board'];\n    final panelHint = request.url.queryParameters['panel'];\n    final target = _resolveTarget(\n      cubit,\n      boardHint: boardHint,\n      panelHint: panelHint,\n      type: 'board.chat',\n    );\n    if (target == null) {\n      return error('No board.chat panel found (or target not found)');\n    }\n    final",
       "tokens": 0,
       "firstFile": {
         "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
-        "start": 313,
-        "end": 325,
+        "start": 315,
+        "end": 327,
         "startLoc": {
-          "line": 313,
+          "line": 315,
           "column": 43,
-          "position": 3200
+          "position": 3214
         },
         "endLoc": {
-          "line": 325,
+          "line": 327,
           "column": 10,
-          "position": 3310
+          "position": 3324
         }
       },
       "secondFile": {
         "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
-        "start": 257,
-        "end": 269,
+        "start": 259,
+        "end": 271,
         "startLoc": {
-          "line": 257,
+          "line": 259,
           "column": 45,
-          "position": 2704
+          "position": 2718
         },
         "endLoc": {
-          "line": 269,
+          "line": 271,
           "column": 11,
-          "position": 2814
+          "position": 2828
         }
       }
     },
@@ -7772,32 +6188,32 @@
       "tokens": 0,
       "firstFile": {
         "name": "lib/core/cli/handlers/filetree_handler.dart",
-        "start": 64,
-        "end": 71,
+        "start": 59,
+        "end": 66,
         "startLoc": {
-          "line": 64,
+          "line": 59,
           "column": 22,
-          "position": 506
+          "position": 438
         },
         "endLoc": {
-          "line": 71,
+          "line": 66,
           "column": 11,
-          "position": 602
+          "position": 534
         }
       },
       "secondFile": {
         "name": "lib/core/cli/handlers/filetree_handler.dart",
-        "start": 50,
-        "end": 57,
+        "start": 45,
+        "end": 52,
         "startLoc": {
-          "line": 50,
+          "line": 45,
           "column": 20,
-          "position": 353
+          "position": 285
         },
         "endLoc": {
-          "line": 57,
+          "line": 52,
           "column": 11,
-          "position": 449
+          "position": 381
         }
       }
     },
@@ -7839,217 +6255,73 @@
     },
     {
       "format": "dart",
-      "lines": 6,
-      "fragment": ":\n      final x1 = (requestBody['x1'] as num?)?.toDouble() ?? posX;\n      final y1 = (requestBody['y1'] as num?)?.toDouble() ?? posY;\n      final x2 = (requestBody['x2'] as num?)?.toDouble() ?? posX + 200;\n      final y2 = (requestBody['y2'] as num?)?.toDouble() ?? posY;\n      final result = arrowToElement",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 135,
-        "end": 140,
-        "startLoc": {
-          "line": 135,
-          "column": 17,
-          "position": 1477
-        },
-        "endLoc": {
-          "line": 140,
-          "column": 36,
-          "position": 1610
-        }
-      },
-      "secondFile": {
-        "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 126,
-        "end": 131,
-        "startLoc": {
-          "line": 126,
-          "column": 16,
-          "position": 1299
-        },
-        "endLoc": {
-          "line": 131,
-          "column": 35,
-          "position": 1432
-        }
-      }
-    },
-    {
-      "format": "dart",
       "lines": 7,
       "fragment": ") {\n    if (p.dx < minX) minX = p.dx;\n    if (p.dy < minY) minY = p.dy;\n    if (p.dx > maxX) maxX = p.dx;\n    if (p.dy > maxY) maxY = p.dy;\n  }\n  final",
       "tokens": 0,
       "firstFile": {
         "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 411,
-        "end": 417,
+        "start": 408,
+        "end": 414,
         "startLoc": {
-          "line": 411,
+          "line": 408,
           "column": 25,
-          "position": 5032
+          "position": 4925
         },
         "endLoc": {
-          "line": 417,
+          "line": 414,
           "column": 8,
-          "position": 5128
+          "position": 5021
         }
       },
       "secondFile": {
         "name": "lib/features/board/model/board_models.dart",
-        "start": 139,
-        "end": 145,
+        "start": 143,
+        "end": 149,
         "startLoc": {
-          "line": 139,
+          "line": 143,
           "column": 30,
-          "position": 1220
+          "position": 1236
         },
         "endLoc": {
-          "line": 145,
+          "line": 149,
           "column": 10,
-          "position": 1316
+          "position": 1332
         }
       }
     },
     {
       "format": "dart",
-      "lines": 6,
-      "fragment": "= cy + num();\n        final ex = cx + num(), ey = cy + num();\n        for (int s = 1; s <= 10; s++) {\n          final tt = s / 10;\n          current.add(\n            Offset(quadBezier",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 538,
-        "end": 543,
-        "startLoc": {
-          "line": 538,
-          "column": 35,
-          "position": 6562
-        },
-        "endLoc": {
-          "line": 543,
-          "column": 30,
-          "position": 6651
-        }
-      },
-      "secondFile": {
-        "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 514,
-        "end": 520,
-        "startLoc": {
-          "line": 514,
-          "column": 35,
-          "position": 6233
-        },
-        "endLoc": {
-          "line": 520,
-          "column": 26,
-          "position": 6324
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 10,
-      "fragment": "num();\n        for (int s = 1; s <= 10; s++) {\n          final tt = s / 10;\n          current.add(\n            Offset(quadBezier(cx, x1, ex, tt), quadBezier(cy, y1, ey, tt)),\n          );\n        }\n        cx = ex;\n        cy = ey;\n      default",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 539,
-        "end": 548,
-        "startLoc": {
-          "line": 539,
-          "column": 42,
-          "position": 6597
-        },
-        "endLoc": {
-          "line": 548,
-          "column": 14,
-          "position": 6706
-        }
-      },
-      "secondFile": {
-        "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 528,
-        "end": 537,
-        "startLoc": {
-          "line": 528,
-          "column": 56,
-          "position": 6430
-        },
-        "endLoc": {
-          "line": 537,
-          "column": 11,
-          "position": 6539
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 8,
-      "fragment": ") {\n    if (p.dx < minX) minX = p.dx;\n    if (p.dy < minY) minY = p.dy;\n    if (p.dx > maxX) maxX = p.dx;\n    if (p.dy > maxY) maxY = p.dy;\n  }\n  final origin = Offset(minX - sw, minY - sw);\n  final relStrokes",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/cli/handlers/drawings_handler.dart",
-        "start": 559,
-        "end": 566,
-        "startLoc": {
-          "line": 559,
-          "column": 25,
-          "position": 6836
-        },
-        "endLoc": {
-          "line": 566,
-          "column": 19,
-          "position": 6958
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/model/board_models.dart",
-        "start": 139,
-        "end": 418,
-        "startLoc": {
-          "line": 139,
-          "column": 30,
-          "position": 1220
-        },
-        "endLoc": {
-          "line": 418,
-          "column": 12,
-          "position": 5154
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 12,
-      "fragment": "(\n  String method,\n  List<String> sub,\n  shelf.Request request, {\n  required Future<Map<String, dynamic>> Function(shelf.Request) body,\n  required shelf.Response Function(Object) json,\n  required shelf.Response Function(String) error,\n  required shelf.Response Function(String) notFound,\n}) async {\n  final service = CloudLlmSettingsService.instance;\n\n  // GET /api/cloud-providers → list all configs + active id + provider type",
+      "lines": 9,
+      "fragment": "(\n  String method,\n  List<String> sub,\n  shelf.Request request, {\n  required Future<Map<String, dynamic>> Function(shelf.Request) body,\n  required shelf.Response Function(Object) json,\n  required shelf.Response Function(String) error,\n  required shelf.Response Function(String) notFound,\n  CloudLlmSettingsService",
       "tokens": 0,
       "firstFile": {
         "name": "lib/core/cli/handlers/cloud_providers_handler.dart",
         "start": 7,
-        "end": 18,
+        "end": 15,
         "startLoc": {
           "line": 7,
           "column": 44,
           "position": 34
         },
         "endLoc": {
-          "line": 18,
-          "column": 77,
-          "position": 150
+          "line": 15,
+          "column": 26,
+          "position": 130
         }
       },
       "secondFile": {
         "name": "lib/core/cli/handlers/widgets_handler.dart",
         "start": 6,
-        "end": 17,
+        "end": 14,
         "startLoc": {
           "line": 6,
           "column": 37,
           "position": 29
         },
         "endLoc": {
-          "line": 17,
-          "column": 54,
-          "position": 145
+          "line": 14,
+          "column": 2,
+          "position": 124
         }
       }
     },
@@ -8075,17 +6347,17 @@
       },
       "secondFile": {
         "name": "lib/core/cli/handlers/yolo_chat_handler.dart",
-        "start": 174,
-        "end": 185,
+        "start": 175,
+        "end": 186,
         "startLoc": {
-          "line": 174,
+          "line": 175,
           "column": 50,
-          "position": 1899
+          "position": 1906
         },
         "endLoc": {
-          "line": 185,
+          "line": 186,
           "column": 16,
-          "position": 1989
+          "position": 1996
         }
       }
     },
@@ -8343,42 +6615,6 @@
     },
     {
       "format": "dart",
-      "lines": 16,
-      "fragment": ",\n      event.boardId,\n      event.timestamp,\n    );\n    final dir = Directory(dirPath);\n    await dir.create(recursive: true);\n    final file = File(\n      p.join(\n        dirPath,\n        HistoryStoreHelpers.historyFileName(event.opId, event.actorId),\n      ),\n    );\n    await HistoryStoreHelpers.writeJsonAtomic(file, event.toJson());\n  }\n\n  Future",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/remote/yoloitd_store.dart",
-        "start": 121,
-        "end": 136,
-        "startLoc": {
-          "line": 121,
-          "column": 45,
-          "position": 1405
-        },
-        "endLoc": {
-          "line": 136,
-          "column": 9,
-          "position": 1517
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/history/board_history_store.dart",
-        "start": 46,
-        "end": 61,
-        "startLoc": {
-          "line": 46,
-          "column": 15,
-          "position": 316
-        },
-        "endLoc": {
-          "line": 61,
-          "column": 12,
-          "position": 428
-        }
-      }
-    },
-    {
-      "format": "dart",
       "lines": 7,
       "fragment": "=> {\n      'shape': panel.state['shape'] ?? 'rectangle',\n      'text': panel.state['text'] ?? '',\n      'fillColor': panel.state['fillColor'] ?? '#00000000',\n      'strokeColor': panel.state['strokeColor'] ?? '#93C5FD',\n      'textColor': panel.state['textColor'] ?? '#E2E8F0',\n      'strokeWidth': panel.state['strokeWidth'] ?? 3",
       "tokens": 0,
@@ -8456,320 +6692,104 @@
       "tokens": 0,
       "firstFile": {
         "name": "lib/core/remote/yoloitd_models.dart",
-        "start": 35,
-        "end": 46,
+        "start": 40,
+        "end": 51,
         "startLoc": {
-          "line": 35,
+          "line": 40,
           "column": 23,
-          "position": 384
+          "position": 400
         },
         "endLoc": {
-          "line": 46,
+          "line": 51,
           "column": 14,
-          "position": 493
+          "position": 509
         }
       },
       "secondFile": {
         "name": "lib/features/board/model/board_models.dart",
-        "start": 501,
-        "end": 512,
+        "start": 457,
+        "end": 468,
         "startLoc": {
-          "line": 501,
+          "line": 457,
           "column": 25,
-          "position": 4551
+          "position": 3926
         },
         "endLoc": {
-          "line": 512,
+          "line": 468,
           "column": 6,
-          "position": 4660
+          "position": 4035
         }
       }
     },
     {
       "format": "dart",
       "lines": 9,
-      "fragment": ",\n      zIndex: zIndex ?? this.zIndex,\n      hidden: hidden ?? this.hidden,\n      locked: locked ?? this.locked,\n      pinned: pinned ?? this.pinned,\n    );\n  }\n\n  Map<String, dynamic> toJson() => <",
+      "fragment": ",\n      zIndex: zIndex ?? this.zIndex,\n      hidden: hidden ?? this.hidden,\n      locked: locked ?? this.locked,\n      pinned: pinned ?? this.pinned,\n    );\n  }\n\n  Map<String, dynamic> toJson() => _$RemotePanelToJson",
       "tokens": 0,
       "firstFile": {
         "name": "lib/core/remote/yoloitd_models.dart",
-        "start": 152,
-        "end": 160,
+        "start": 126,
+        "end": 134,
         "startLoc": {
-          "line": 152,
+          "line": 126,
           "column": 67,
-          "position": 1625
+          "position": 1232
         },
         "endLoc": {
-          "line": 160,
-          "column": 37,
-          "position": 1707
+          "line": 134,
+          "column": 55,
+          "position": 1315
         }
       },
       "secondFile": {
         "name": "lib/features/board/model/board_models.dart",
-        "start": 334,
-        "end": 342,
+        "start": 339,
+        "end": 347,
         "startLoc": {
-          "line": 334,
+          "line": 339,
           "column": 33,
-          "position": 3018
+          "position": 2997
         },
         "endLoc": {
-          "line": 342,
-          "column": 37,
-          "position": 3100
+          "line": 347,
+          "column": 62,
+          "position": 3080
         }
       }
     },
     {
       "format": "dart",
       "lines": 9,
-      "fragment": "(\n      x: x ?? this.x,\n      y: y ?? this.y,\n      width: width ?? this.width,\n      height: height ?? this.height,\n    );\n  }\n\n  Map<String, dynamic> toJson() => <",
+      "fragment": "(\n      x: x ?? this.x,\n      y: y ?? this.y,\n      width: width ?? this.width,\n      height: height ?? this.height,\n    );\n  }\n\n  Map<String, dynamic> toJson() => _$RemotePanelBoundsToJson",
       "tokens": 0,
       "firstFile": {
         "name": "lib/core/remote/yoloitd_models.dart",
-        "start": 212,
-        "end": 220,
+        "start": 164,
+        "end": 172,
         "startLoc": {
-          "line": 212,
+          "line": 164,
           "column": 29,
-          "position": 2233
+          "position": 1523
         },
         "endLoc": {
-          "line": 220,
-          "column": 37,
-          "position": 2315
+          "line": 172,
+          "column": 61,
+          "position": 1606
         }
       },
       "secondFile": {
         "name": "lib/features/board/model/board_models.dart",
-        "start": 258,
-        "end": 266,
+        "start": 267,
+        "end": 275,
         "startLoc": {
-          "line": 258,
+          "line": 267,
           "column": 28,
-          "position": 2272
+          "position": 2332
         },
         "endLoc": {
-          "line": 266,
-          "column": 37,
-          "position": 2354
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 9,
-      "fragment": "] as List? ?? const <Object?>[])\n              .whereType<Map<Object?, Object?>>()\n              .map(\n                (entry) => RemoteDirectoryEntry.fromJson(\n                  Map<String, dynamic>.from(entry),\n                ),\n              )\n              .toList(),\n    )",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/remote/yoloit_remote_client.dart",
-        "start": 281,
-        "end": 289,
-        "startLoc": {
-          "line": 281,
-          "column": 24,
-          "position": 2534
-        },
-        "endLoc": {
-          "line": 289,
-          "column": 6,
-          "position": 2618
-        }
-      },
-      "secondFile": {
-        "name": "lib/core/remote/yoloit_remote_client.dart",
-        "start": 272,
-        "end": 280,
-        "startLoc": {
-          "line": 272,
-          "column": 26,
-          "position": 2442
-        },
-        "endLoc": {
-          "line": 280,
-          "column": 12,
-          "position": 2526
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 8,
-      "fragment": "[];\n    await for (final entity in directory.list(followLinks: false)) {\n      final stat = await entity.stat();\n      if (stat.type != FileSystemEntityType.directory &&\n          stat.type != FileSystemEntityType.file) {\n        continue;\n      }\n      entries.add(<",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/remote/board_share_server.dart",
-        "start": 282,
-        "end": 289,
-        "startLoc": {
-          "line": 282,
-          "column": 43,
-          "position": 2962
-        },
-        "endLoc": {
-          "line": 289,
-          "column": 20,
-          "position": 3049
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/board_file_picker.dart",
-        "start": 253,
-        "end": 261,
-        "startLoc": {
-          "line": 253,
-          "column": 33,
-          "position": 2253
-        },
-        "endLoc": {
-          "line": 261,
-          "column": 19,
-          "position": 2342
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 6,
-      "fragment": "[];\n    final seen = <String>{};\n    void addRoot(String name, String? path) {\n      final value = path?.trim();\n      if (value == null || value.isEmpty || !seen.add(value)) return;\n      roots.add(<",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/remote/board_share_server.dart",
-        "start": 499,
-        "end": 504,
-        "startLoc": {
-          "line": 499,
-          "column": 41,
-          "position": 5638
-        },
-        "endLoc": {
-          "line": 504,
-          "column": 18,
-          "position": 5724
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/ui/board_file_picker.dart",
-        "start": 281,
-        "end": 286,
-        "startLoc": {
-          "line": 281,
-          "column": 31,
-          "position": 2496
-        },
-        "endLoc": {
-          "line": 286,
-          "column": 27,
-          "position": 2582
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 13,
-      "fragment": "}\n\n    final roots = <Directory>[];\n    void addRoot(String path) {\n      if (path.isEmpty) return;\n      final dir = Directory(path).absolute;\n      if (roots.any((existing) => existing.path == dir.path)) return;\n      roots.add(dir);\n    }\n\n    addRoot(Directory.current.path);\n    addRoot(File(Platform.resolvedExecutable).parent.path);\n    if",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/platform/platform_launcher.dart",
-        "start": 102,
-        "end": 114,
-        "startLoc": {
-          "line": 102,
-          "column": 5,
-          "position": 699
-        },
-        "endLoc": {
-          "line": 114,
-          "column": 7,
-          "position": 826
-        }
-      },
-      "secondFile": {
-        "name": "lib/features/board/chat/cli_yoloit_resolver.dart",
-        "start": 30,
-        "end": 43,
-        "startLoc": {
-          "line": 30,
-          "column": 5,
-          "position": 204
-        },
-        "endLoc": {
-          "line": 43,
-          "column": 8,
-          "position": 332
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 6,
-      "fragment": ",\n      'id': item.id,\n      'message': item.message,\n      'expectedTool': item.expectedToolCalls.map((e) => e.tool).join(', '),\n      'actualTool': toolStarts.map((e) => e.toolName).join(', '),\n      'toolCallCount'",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/cli/real_llm_tool_test_runner.dart",
-        "start": 292,
-        "end": 297,
-        "startLoc": {
-          "line": 292,
-          "column": 27,
-          "position": 2690
-        },
-        "endLoc": {
-          "line": 297,
-          "column": 22,
-          "position": 2765
-        }
-      },
-      "secondFile": {
-        "name": "lib/core/cli/real_llm_tool_test_runner.dart",
-        "start": 249,
-        "end": 254,
-        "startLoc": {
-          "line": 249,
-          "column": 20,
-          "position": 2305
-        },
-        "endLoc": {
-          "line": 254,
-          "column": 16,
-          "position": 2380
-        }
-      }
-    },
-    {
-      "format": "dart",
-      "lines": 9,
-      "fragment": ":\n        return CliActionResult(data: getContent(panel));\n      case 'open':\n        final path = args['path'] as String?;\n        if (path == null) {\n          return const CliActionResult(ok: false, message: 'Missing \"path\"');\n        }\n        return CliActionResult(\n          message: '$openMessage $path'",
-      "tokens": 0,
-      "firstFile": {
-        "name": "lib/core/cli/panel_getopen_cli_handler.dart",
-        "start": 20,
-        "end": 28,
-        "startLoc": {
-          "line": 20,
-          "column": 17,
-          "position": 104
-        },
-        "endLoc": {
-          "line": 28,
-          "column": 40,
-          "position": 191
-        }
-      },
-      "secondFile": {
-        "name": "lib/core/cli/handlers/filetree_handler.dart",
-        "start": 37,
-        "end": 46,
-        "startLoc": {
-          "line": 37,
-          "column": 18,
-          "position": 241
-        },
-        "endLoc": {
-          "line": 46,
-          "column": 36,
-          "position": 329
+          "line": 275,
+          "column": 60,
+          "position": 2415
         }
       }
     }

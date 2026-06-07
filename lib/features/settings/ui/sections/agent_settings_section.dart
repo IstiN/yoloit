@@ -382,6 +382,27 @@ class AgentRowState extends State<AgentRow> {
     }
   }
 
+  Widget _dropdownField(
+    AppColorScheme colors, {
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    required void Function(String?) onChanged,
+    Widget? hint,
+  }) => Expanded(
+    child: DropdownButtonFormField<String>(
+      value: value,
+      hint: hint,
+      items: items,
+      onChanged: onChanged,
+      dropdownColor: colors.surfaceElevated,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
+        fontSize: 12,
+      ),
+      decoration: _outlineDecoration(borderColor: colors.border),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
@@ -536,49 +557,42 @@ class AgentRowState extends State<AgentRow> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value:
-                        catalogModels.any(
-                              (m) => m.id == widget.config.defaultModel,
-                            )
-                            ? widget.config.defaultModel
-                            : null,
-                    hint: Text(
-                      catalogModels
-                          .firstWhere(
-                            (m) => m.isDefault,
-                            orElse: () => catalogModels.first,
+                _dropdownField(
+                  colors,
+                  value:
+                      catalogModels.any(
+                            (m) => m.id == widget.config.defaultModel,
                           )
-                          .displayName,
-                      style: TextStyle(
-                        color: context.appColors.textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                    items:
-                        catalogModels
-                            .map(
-                              (m) => DropdownMenuItem<String>(
-                                value: m.id,
-                                child: Text(
-                                  m.displayName,
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                    onChanged:
-                        (v) => widget.onChanged(
-                          widget.config.copyWith(defaultModel: v),
-                        ),
-                    dropdownColor: colors.surfaceElevated,
+                          ? widget.config.defaultModel
+                          : null,
+                  hint: Text(
+                    catalogModels
+                        .firstWhere(
+                          (m) => m.isDefault,
+                          orElse: () => catalogModels.first,
+                        )
+                        .displayName,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
+                      color: context.appColors.textMuted,
                       fontSize: 12,
                     ),
-                    decoration: _outlineDecoration(borderColor: colors.border),
                   ),
+                  items:
+                      catalogModels
+                          .map(
+                            (m) => DropdownMenuItem<String>(
+                              value: m.id,
+                              child: Text(
+                                m.displayName,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged:
+                      (v) => widget.onChanged(
+                        widget.config.copyWith(defaultModel: v),
+                      ),
                 ),
                 const SizedBox(width: 16),
               ],
@@ -675,37 +689,30 @@ class AgentRowState extends State<AgentRow> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: widget.config.streamAdapter,
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'opencode',
-                        child: Text('OpenCode', style: TextStyle(fontSize: 12)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'cursor',
-                        child: Text('Cursor', style: TextStyle(fontSize: 12)),
-                      ),
-                      DropdownMenuItem(
-                        value: 'copilot',
-                        child: Text('Copilot', style: TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        widget.onChanged(
-                          widget.config.copyWith(streamAdapter: v),
-                        );
-                      }
-                    },
-                    dropdownColor: colors.surfaceElevated,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 12,
+                _dropdownField(
+                  colors,
+                  value: widget.config.streamAdapter,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'opencode',
+                      child: Text('OpenCode', style: TextStyle(fontSize: 12)),
                     ),
-                    decoration: _outlineDecoration(borderColor: colors.border),
-                  ),
+                    DropdownMenuItem(
+                      value: 'cursor',
+                      child: Text('Cursor', style: TextStyle(fontSize: 12)),
+                    ),
+                    DropdownMenuItem(
+                      value: 'copilot',
+                      child: Text('Copilot', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      widget.onChanged(
+                        widget.config.copyWith(streamAdapter: v),
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(width: 16),
               ],

@@ -446,30 +446,32 @@ class LocalAiModelsService {
     unawaited(_runTask(task));
   }
 
-  Future<void> pauseModelDownload(String modelId) async {
+  sdk.DownloadTaskRecord? _validTask(String modelId) {
     final task = _taskByModelId[modelId];
-    final downloadManager = _downloadManager;
-    if (task == null || downloadManager == null) return;
-    if (task.status != sdk.DownloadTaskStatus.running &&
-        task.status != sdk.DownloadTaskStatus.installing &&
-        task.status != sdk.DownloadTaskStatus.queued) {
-      return;
-    }
-    downloadManager.pause(task);
+    if (task == null || _downloadManager == null) return null;
+    return task;
+  }
+
+  bool _isActiveOrQueued(sdk.DownloadTaskRecord task) =>
+      task.status == sdk.DownloadTaskStatus.running ||
+      task.status == sdk.DownloadTaskStatus.installing ||
+      task.status == sdk.DownloadTaskStatus.queued;
+
+  Future<void> pauseModelDownload(String modelId) async {
+    final task = _validTask(modelId);
+    if (task == null || !_isActiveOrQueued(task)) return;
+    _downloadManager!.pause(task);
     _notify();
   }
 
   Future<void> cancelModelDownload(String modelId) async {
-    final task = _taskByModelId[modelId];
-    final downloadManager = _downloadManager;
-    if (task == null || downloadManager == null) return;
-    if (task.status != sdk.DownloadTaskStatus.running &&
-        task.status != sdk.DownloadTaskStatus.installing &&
-        task.status != sdk.DownloadTaskStatus.queued &&
-        task.status != sdk.DownloadTaskStatus.paused) {
+    final task = _validTask(modelId);
+    if (task == null ||
+        (!_isActiveOrQueued(task) &&
+            task.status != sdk.DownloadTaskStatus.paused)) {
       return;
     }
-    downloadManager.cancel(task);
+    _downloadManager!.cancel(task);
     _notify();
   }
 

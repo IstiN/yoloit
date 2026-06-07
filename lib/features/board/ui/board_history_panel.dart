@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/features/board/bloc/board_cubit.dart';
+import 'package:yoloit/features/board/common/shape_paths.dart';
 import 'package:yoloit/features/board/history/board_history_event.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 
@@ -392,13 +393,7 @@ class HistoryPanelPreviewPainter extends CustomPainter {
         stroke,
       );
     } else if (shape == 'diamond') {
-      final path =
-          Path()
-            ..moveTo(rect.center.dx, rect.top)
-            ..lineTo(rect.right, rect.center.dy)
-            ..lineTo(rect.center.dx, rect.bottom)
-            ..lineTo(rect.left, rect.center.dy)
-            ..close();
+      final path = diamondPath(rect);
       canvas.drawPath(path, paint);
       canvas.drawPath(path, stroke);
     } else if (shape == 'circle') {

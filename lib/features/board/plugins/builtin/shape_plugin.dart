@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:yoloit/core/theme/app_color_scheme.dart';
 import 'package:yoloit/core/utils/color_utils.dart';
+import 'package:yoloit/features/board/common/shape_paths.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
 import 'package:yoloit/features/board/plugins/board_plugin.dart';
 import 'package:yoloit/features/board/plugins/builtin/panel_editor_dialog_mixin.dart';
@@ -727,8 +728,8 @@ class _ShapePainter extends CustomPainter {
 
     final path = switch (shape) {
       'circle' || 'oval' => Path()..addOval(shapeRect),
-      'diamond' => _diamond(shapeRect),
-      'triangle' => _triangle(shapeRect),
+      'diamond' => diamondPath(shapeRect),
+      'triangle' => trianglePath(shapeRect),
       'hexagon' => _polygon(shapeRect, 6),
       'frame' =>
         Path()..addRRect(
@@ -753,22 +754,7 @@ class _ShapePainter extends CustomPainter {
   }
 }
 
-Path _diamond(Rect rect) {
-  return Path()
-    ..moveTo(rect.center.dx, rect.top)
-    ..lineTo(rect.right, rect.center.dy)
-    ..lineTo(rect.center.dx, rect.bottom)
-    ..lineTo(rect.left, rect.center.dy)
-    ..close();
-}
 
-Path _triangle(Rect rect) {
-  return Path()
-    ..moveTo(rect.center.dx, rect.top)
-    ..lineTo(rect.right, rect.bottom)
-    ..lineTo(rect.left, rect.bottom)
-    ..close();
-}
 
 Path _polygon(Rect rect, int sides) {
   final path = Path();

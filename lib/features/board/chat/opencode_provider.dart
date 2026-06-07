@@ -281,6 +281,13 @@ class OpencodeProvider extends CliProviderBase {
 
   // ── event mapping ──────────────────────────────────────────────────────
 
+  (String, String) _extractTextAndId(Map<String, dynamic> json) {
+    final part = json['part'] as Map<String, dynamic>?;
+    final text = part?['text'] as String? ?? '';
+    final partId = part?['id'] as String? ?? '';
+    return (text, partId);
+  }
+
   /// Map an `opencode run --format json` NDJSON line to [ChatEvent]s.
   List<ChatEvent> _parseOpenCodeEvent(Map<String, dynamic> json) {
     final type = json['type'] as String? ?? '';
@@ -310,9 +317,7 @@ class OpencodeProvider extends CliProviderBase {
         ];
 
       case 'text':
-        final part = json['part'] as Map<String, dynamic>?;
-        final text = part?['text'] as String? ?? '';
-        final partId = part?['id'] as String? ?? '';
+        final (text, partId) = _extractTextAndId(json);
         return [
           ChatEvent(
             type: ChatEventType.assistantMessageStart,
@@ -368,9 +373,7 @@ class OpencodeProvider extends CliProviderBase {
         ];
 
       case 'reasoning':
-        final part = json['part'] as Map<String, dynamic>?;
-        final text = part?['text'] as String? ?? '';
-        final partId = part?['id'] as String? ?? '';
+        final (text, partId) = _extractTextAndId(json);
         return [
           ChatEvent(
             type: ChatEventType.assistantDelta,

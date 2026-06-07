@@ -36,7 +36,7 @@ class _AiModelsSectionState extends State<AiModelsSection> {
     super.dispose();
   }
 
-  Future<void> _runAction(Future<void> Function() action) async {
+  Future<void> _runAction(FutureOr<void> Function() action) async {
     try {
       await action();
     } catch (e) {
@@ -46,6 +46,29 @@ class _AiModelsSectionState extends State<AiModelsSection> {
       ).showSnackBar(SnackBar(content: Text('Model action failed: $e')));
     }
   }
+
+  Widget _modelCard({
+    required IconData icon,
+    required String title,
+    required bool enabled,
+    required List<LocalAiModelDefinition> options,
+    required String selectedModelId,
+    required ValueChanged<String> onModelChanged,
+  }) => _ModelCard(
+    icon: icon,
+    title: title,
+    enabled: enabled,
+    options: options,
+    selectedModelId: selectedModelId,
+    onModelChanged: (id) { unawaited(_runAction(() => onModelChanged(id))); },
+    stateForModel: _service.stateForModel,
+    onDownloadOrUpdate:
+        (id) { unawaited(_runAction(() => _service.downloadOrUpdateModel(id))); },
+    onDelete: (id) { unawaited(_runAction(() => _service.deleteInstalledModel(id))); },
+    onResume: (id) { unawaited(_runAction(() => _service.resumeModelDownload(id))); },
+    onPause: (id) { unawaited(_runAction(() => _service.pauseModelDownload(id))); },
+    onCancel: (id) { unawaited(_runAction(() => _service.cancelModelDownload(id))); },
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -78,38 +101,22 @@ class _AiModelsSectionState extends State<AiModelsSection> {
           onOpenSetupGuide: () => SetupGuidePage.show(context),
         ),
         const SizedBox(height: 16),
-        _ModelCard(
+        _modelCard(
           icon: Icons.auto_awesome_rounded,
           title: 'Local Chat Model (YoLo Chat)',
           enabled: modelsEnabled,
           options: _service.chatModels,
           selectedModelId: _service.selectedChatModelId,
-          onModelChanged:
-              (id) => _runAction(() => _service.setSelectedChatModel(id)),
-          stateForModel: _service.stateForModel,
-          onDownloadOrUpdate:
-              (id) => _runAction(() => _service.downloadOrUpdateModel(id)),
-          onDelete: (id) => _runAction(() => _service.deleteInstalledModel(id)),
-          onResume: (id) => _runAction(() => _service.resumeModelDownload(id)),
-          onPause: (id) => _runAction(() => _service.pauseModelDownload(id)),
-          onCancel: (id) => _runAction(() => _service.cancelModelDownload(id)),
+          onModelChanged: _service.setSelectedChatModel,
         ),
         const SizedBox(height: 16),
-        _ModelCard(
+        _modelCard(
           icon: Icons.graphic_eq_rounded,
           title: 'ASR Model (Microphone)',
           enabled: modelsEnabled,
           options: _service.asrModels,
           selectedModelId: _service.selectedAsrModelId,
-          onModelChanged:
-              (id) => _runAction(() => _service.setSelectedAsrModel(id)),
-          stateForModel: _service.stateForModel,
-          onDownloadOrUpdate:
-              (id) => _runAction(() => _service.downloadOrUpdateModel(id)),
-          onDelete: (id) => _runAction(() => _service.deleteInstalledModel(id)),
-          onResume: (id) => _runAction(() => _service.resumeModelDownload(id)),
-          onPause: (id) => _runAction(() => _service.pauseModelDownload(id)),
-          onCancel: (id) => _runAction(() => _service.cancelModelDownload(id)),
+          onModelChanged: _service.setSelectedAsrModel,
         ),
       ],
     );

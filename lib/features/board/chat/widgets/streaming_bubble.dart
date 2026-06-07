@@ -15,16 +15,10 @@ class StreamingBubble extends StatelessWidget {
   final String content;
   final ValueChanged<String?>? onLinkTap;
 
-  static final RegExp _brTagRe = RegExp(r'<br\s*/?>');
-
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    final codeBg = colors.surface;
-    final processedContent = content.replaceAll(_brTagRe, '\n');
+    final (processedContent, colors, textColor, codeBg) =
+        prepareChatBubble(context, content);
 
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 48),

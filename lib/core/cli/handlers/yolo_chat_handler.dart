@@ -257,14 +257,7 @@ Future<shelf.Response> handleYoloChat(
 
   // GET /yolochat/status
   if (sub.length == 1 && sub[0] == 'status' && method == 'GET') {
-    final boardHint = request.url.queryParameters['board'];
-    final panelHint = request.url.queryParameters['panel'];
-    final target = _resolveTarget(
-      cubit,
-      boardHint: boardHint,
-      panelHint: panelHint,
-      type: 'board.chat',
-    );
+    final target = _chatTarget(cubit, request);
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
     }
@@ -313,14 +306,7 @@ Future<shelf.Response> handleYoloChat(
 
   // GET /yolochat/logs — full session log for debugging (copy-paste friendly)
   if (sub.length == 1 && sub[0] == 'logs' && method == 'GET') {
-    final boardHint = request.url.queryParameters['board'];
-    final panelHint = request.url.queryParameters['panel'];
-    final target = _resolveTarget(
-      cubit,
-      boardHint: boardHint,
-      panelHint: panelHint,
-      type: 'board.chat',
-    );
+    final target = _chatTarget(cubit, request);
     if (target == null) {
       return error('No board.chat panel found (or target not found)');
     }
@@ -365,6 +351,16 @@ Future<int> _stopAllActiveYoloChats() async {
   }
   return stopped;
 }
+
+({BoardDocument board, BoardPanelInstance panel})? _chatTarget(
+  BoardCubit cubit,
+  shelf.Request request,
+) => _resolveTarget(
+  cubit,
+  boardHint: request.url.queryParameters['board'],
+  panelHint: request.url.queryParameters['panel'],
+  type: 'board.chat',
+);
 
 ({BoardDocument board, BoardPanelInstance panel})? _resolveTarget(
   BoardCubit cubit, {

@@ -283,11 +283,7 @@ class BoardSwitcherButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    final mutedColor = context.appColors.textMuted;
+    final (colors, textColor, mutedColor) = boardTextColors(context);
     return Tooltip(
       message: 'Open boards overview',
       child: InkWell(

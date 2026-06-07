@@ -469,3 +469,15 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
 extension AppColorSchemeX on BuildContext {
   AppColorScheme get appColors => AppColorScheme.of(this);
 }
+
+/// Returns the commonly-used board UI color tuple.
+(AppColorScheme colors, Color textColor, Color mutedColor) boardTextColors(
+  BuildContext context,
+) {
+  final colors = context.appColors;
+  final textColor =
+      Theme.of(context).textTheme.bodyMedium?.color ??
+      Theme.of(context).colorScheme.onSurface;
+  final mutedColor = colors.textMuted;
+  return (colors, textColor, mutedColor);
+}

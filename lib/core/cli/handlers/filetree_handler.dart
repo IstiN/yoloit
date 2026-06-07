@@ -35,6 +35,18 @@ class FileTreeCliHandler extends PanelCliHandler with PanelGetOpenCliHandler {
     };
   }
 
+  (String, List<String>)? _dirExpansion(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) {
+    final dir = args['dir'] as String?;
+    if (dir == null) return null;
+    final expanded = List<String>.from(
+      panel.state['expandedDirs'] as List? ?? <String>[],
+    );
+    return (dir, expanded);
+  }
+
   @override
   Future<CliActionResult> handleAction(
     String action,
@@ -43,13 +55,11 @@ class FileTreeCliHandler extends PanelCliHandler with PanelGetOpenCliHandler {
   ) async {
     switch (action) {
       case 'expand':
-        final dir = args['dir'] as String?;
-        if (dir == null) {
+        final parsed = _dirExpansion(args, panel);
+        if (parsed == null) {
           return const CliActionResult(ok: false, message: 'Missing "dir"');
         }
-        final expanded = List<String>.from(
-          panel.state['expandedDirs'] as List? ?? <String>[],
-        );
+        final (dir, expanded) = parsed;
         if (!expanded.contains(dir)) expanded.add(dir);
         return CliActionResult(
           message: 'Expanded $dir',
@@ -57,13 +67,12 @@ class FileTreeCliHandler extends PanelCliHandler with PanelGetOpenCliHandler {
         );
 
       case 'collapse':
-        final dir = args['dir'] as String?;
-        if (dir == null) {
+        final parsed = _dirExpansion(args, panel);
+        if (parsed == null) {
           return const CliActionResult(ok: false, message: 'Missing "dir"');
         }
-        final expanded = List<String>.from(
-          panel.state['expandedDirs'] as List? ?? <String>[],
-        )..remove(dir);
+        final (dir, expanded) = parsed;
+        expanded.remove(dir);
         return CliActionResult(
           message: 'Collapsed $dir',
           stateUpdate: {'expandedDirs': expanded},

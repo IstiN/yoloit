@@ -133,10 +133,14 @@ class AssistantCliHandler extends PanelCliHandler {
   ) =>
       formatStoredMessages(args, panel);
 
-  CliActionResult _handleAddSkill(
+  CliActionResult _modifySkills(
     Map<String, dynamic> args,
-    BoardPanelInstance panel,
-  ) {
+    BoardPanelInstance panel, {
+    required bool Function(String skill, List<String> skills) predicate,
+    required String Function(String skill) failureMessage,
+    required void Function(String skill, List<String> skills) mutate,
+    required String Function(String skill) successMessage,
+  }) {
     final skill = args['skill'] as String?;
     if (skill == null || skill.isEmpty) {
       return const CliActionResult(ok: false, message: 'Missing "skill" field');
@@ -144,38 +148,39 @@ class AssistantCliHandler extends PanelCliHandler {
     final skills = List<String>.from(
       (panel.state['activeSkills'] as List<dynamic>?) ?? [],
     );
-    if (skills.contains(skill)) {
-      return CliActionResult(
-        ok: false,
-        message: 'Skill already active: $skill',
-      );
+    if (!predicate(skill, skills)) {
+      return CliActionResult(ok: false, message: failureMessage(skill));
     }
-    skills.add(skill);
+    mutate(skill, skills);
     return CliActionResult(
-      message: 'Added skill: $skill',
+      message: successMessage(skill),
       stateUpdate: {'activeSkills': skills},
     );
   }
 
+  CliActionResult _handleAddSkill(
+    Map<String, dynamic> args,
+    BoardPanelInstance panel,
+  ) => _modifySkills(
+    args,
+    panel,
+    predicate: (skill, skills) => !skills.contains(skill),
+    failureMessage: (skill) => 'Skill already active: $skill',
+    mutate: (skill, skills) => skills.add(skill),
+    successMessage: (skill) => 'Added skill: $skill',
+  );
+
   CliActionResult _handleRemoveSkill(
     Map<String, dynamic> args,
     BoardPanelInstance panel,
-  ) {
-    final skill = args['skill'] as String?;
-    if (skill == null || skill.isEmpty) {
-      return const CliActionResult(ok: false, message: 'Missing "skill" field');
-    }
-    final skills = List<String>.from(
-      (panel.state['activeSkills'] as List<dynamic>?) ?? [],
-    );
-    if (!skills.remove(skill)) {
-      return CliActionResult(ok: false, message: 'Skill not active: $skill');
-    }
-    return CliActionResult(
-      message: 'Removed skill: $skill',
-      stateUpdate: {'activeSkills': skills},
-    );
-  }
+  ) => _modifySkills(
+    args,
+    panel,
+    predicate: (skill, skills) => skills.contains(skill),
+    failureMessage: (skill) => 'Skill not active: $skill',
+    mutate: (skill, skills) => skills.remove(skill),
+    successMessage: (skill) => 'Removed skill: $skill',
+  );
 
   String _truncate(String s, int max) => truncateText(s, max);
 

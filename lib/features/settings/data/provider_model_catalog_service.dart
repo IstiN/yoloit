@@ -328,16 +328,19 @@ class ProviderModelCatalogService {
 
   // ── Custom models persistence ───────────────────────────────────────────────
 
-  Future<void> _saveCustomModels() async {
+  Future<void> _writeModelsMap(File file, Map<String, List<ChatModelInfo>> models) async {
     try {
-      final file = File(_customModelsPath);
       await file.parent.create(recursive: true);
-      final data = _customModels.map(
+      final data = models.map(
         (providerId, models) =>
             MapEntry(providerId, models.map((m) => m.toJson()).toList()),
       );
       await file.writeAsString(jsonEncode(data));
     } catch (_) {}
+  }
+
+  Future<void> _saveCustomModels() async {
+    await _writeModelsMap(File(_customModelsPath), _customModels);
   }
 
   Future<void> _loadCustomModels() async {
@@ -358,17 +361,9 @@ class ProviderModelCatalogService {
   // ── CLI models persistence ──────────────────────────────────────────────────
 
   Future<void> _saveCliModelsCache() async {
-    try {
-      final file = File(_cliModelsPath);
-      await file.parent.create(recursive: true);
-      final cacheableModels = Map<String, List<ChatModelInfo>>.from(_cliModels)
-        ..remove('codex');
-      final data = cacheableModels.map(
-        (providerId, models) =>
-            MapEntry(providerId, models.map((m) => m.toJson()).toList()),
-      );
-      await file.writeAsString(jsonEncode(data));
-    } catch (_) {}
+    final cacheableModels = Map<String, List<ChatModelInfo>>.from(_cliModels)
+      ..remove('codex');
+    await _writeModelsMap(File(_cliModelsPath), cacheableModels);
   }
 
   Future<void> _loadCliModelsCache() async {

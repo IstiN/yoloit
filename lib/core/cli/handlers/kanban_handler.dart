@@ -169,8 +169,8 @@ class KanbanCliHandler extends PanelCliHandler {
           );
         }
         final cards = _cards(panel);
-        final idx = cards.indexWhere((card) => card['id'] == cardId);
-        if (idx < 0) {
+        final idx = _cardIndex(cards, cardId);
+        if (idx == null) {
           return CliActionResult(ok: false, message: 'Card not found: $cardId');
         }
         cards[idx] = {...cards[idx], 'columnIndex': toIndex}
@@ -196,8 +196,8 @@ class KanbanCliHandler extends PanelCliHandler {
           return const CliActionResult(ok: false, message: 'Missing "cardId"');
         }
         final cards = _cards(panel);
-        final idx = cards.indexWhere((card) => card['id'] == cardId);
-        if (idx < 0) {
+        final idx = _cardIndex(cards, cardId);
+        if (idx == null) {
           return CliActionResult(ok: false, message: 'Card not found: $cardId');
         }
         final updated = <String, dynamic>{...cards[idx]};
@@ -241,6 +241,11 @@ class KanbanCliHandler extends PanelCliHandler {
           .toList(),
     _ => <Map<String, dynamic>>[],
   };
+
+  int? _cardIndex(List<Map<String, dynamic>> cards, String cardId) {
+    final idx = cards.indexWhere((card) => card['id'] == cardId);
+    return idx < 0 ? null : idx;
+  }
 
   int _findColumnIndex(List<String> columns, String idOrName) {
     final byIndex = int.tryParse(idOrName);

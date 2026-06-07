@@ -53,6 +53,13 @@ class RunConfigsCliHandler extends PanelCliHandler {
     };
   }
 
+  List<RunQuickAction>? _parseQuickActions(dynamic value) =>
+      (value as List?)
+          ?.whereType<Map<String, dynamic>>()
+          .map(RunQuickAction.fromJson)
+          .where((action) => action.command.trim().isNotEmpty)
+          .toList();
+
   @override
   Future<CliActionResult> handleAction(
     String action,
@@ -101,13 +108,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
                   ? Map<String, String>.from(args['env'] as Map)
                   : const {},
           isFlutterRun: args['isFlutterRun'] as bool? ?? false,
-          quickActions:
-              (args['quickActions'] as List?)
-                  ?.whereType<Map<String, dynamic>>()
-                  .map(RunQuickAction.fromJson)
-                  .where((action) => action.command.trim().isNotEmpty)
-                  .toList() ??
-              const [],
+          quickActions: _parseQuickActions(args['quickActions']) ?? const [],
         );
         return CliActionResult(
           message: 'Configuration "$name" added (id: ${config.id})',
@@ -140,12 +141,7 @@ class RunConfigsCliHandler extends PanelCliHandler {
                     ? Map<String, String>.from(args['env'] as Map)
                     : null,
             isFlutterRun: args['isFlutterRun'] as bool?,
-            quickActions:
-                (args['quickActions'] as List?)
-                    ?.whereType<Map<String, dynamic>>()
-                    .map(RunQuickAction.fromJson)
-                    .where((action) => action.command.trim().isNotEmpty)
-                    .toList(),
+            quickActions: _parseQuickActions(args['quickActions']),
           );
           return CliActionResult(
             message: 'Configuration updated',

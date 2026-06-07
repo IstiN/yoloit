@@ -95,6 +95,15 @@ class UpdateService {
     await PlatformLauncher.instance.openUrl(info.releaseUrl);
   }
 
+  static Future<bool> _ensureInAppInstall(UpdateInfo info) async {
+    final installer = PlatformInstaller.instance;
+    if (!installer.supportsInAppInstall || info.downloadUrl == null) {
+      await openRelease(info);
+      return false;
+    }
+    return true;
+  }
+
   /// Downloads the update and prepares it for installation (phase 1).
   /// Returns a launch token to be passed to [applyUpdate].
   /// Falls back to [openRelease] if in-app install is not supported.
@@ -102,12 +111,8 @@ class UpdateService {
     UpdateInfo info, {
     required void Function(double? progress, String status) onProgress,
   }) async {
-    final installer = PlatformInstaller.instance;
-    if (!installer.supportsInAppInstall || info.downloadUrl == null) {
-      await openRelease(info);
-      return null;
-    }
-    return installer.downloadAndPrepare(
+    if (!await _ensureInAppInstall(info)) return null;
+    return PlatformInstaller.instance.downloadAndPrepare(
       downloadUrl: info.downloadUrl!,
       onProgress: onProgress,
     );
@@ -124,12 +129,8 @@ class UpdateService {
     UpdateInfo info, {
     required void Function(double? progress, String status) onProgress,
   }) async {
-    final installer = PlatformInstaller.instance;
-    if (!installer.supportsInAppInstall || info.downloadUrl == null) {
-      await openRelease(info);
-      return;
-    }
-    await installer.install(
+    if (!await _ensureInAppInstall(info)) return;
+    await PlatformInstaller.instance.install(
       downloadUrl: info.downloadUrl!,
       onProgress: onProgress,
     );

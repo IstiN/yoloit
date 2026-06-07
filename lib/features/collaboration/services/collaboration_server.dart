@@ -170,16 +170,7 @@ class CollaborationServer {
           buf.addAll(chunk);
 
           // Find \r\n\r\n
-          int? endIdx;
-          for (int i = 0; i <= buf.length - 4; i++) {
-            if (buf[i] == 13 &&
-                buf[i + 1] == 10 &&
-                buf[i + 2] == 13 &&
-                buf[i + 3] == 10) {
-              endIdx = i + 4;
-              break;
-            }
-          }
+          final endIdx = _findHttpBoundary(buf);
           if (endIdx == null) {
             if (buf.length > 65536) socket.destroy();
             return; // need more data
@@ -358,14 +349,9 @@ class CollaborationServer {
       (chunk) {
         if (requestDone.isCompleted) return;
         buf.addAll(chunk);
-        for (int i = 0; i <= buf.length - 4; i++) {
-          if (buf[i] == 13 &&
-              buf[i + 1] == 10 &&
-              buf[i + 2] == 13 &&
-              buf[i + 3] == 10) {
-            requestDone.complete();
-            return;
-          }
+        if (_findHttpBoundary(buf) != null) {
+          requestDone.complete();
+          return;
         }
         if (buf.length > 65536) requestDone.complete();
       },
@@ -459,6 +445,19 @@ class CollaborationServer {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  /// Returns the index after `\r\n\r\n` if found, otherwise `null`.
+  static int? _findHttpBoundary(List<int> buf) {
+    for (int i = 0; i <= buf.length - 4; i++) {
+      if (buf[i] == 13 &&
+          buf[i + 1] == 10 &&
+          buf[i + 2] == 13 &&
+          buf[i + 3] == 10) {
+        return i + 4;
+      }
+    }
+    return null;
+  }
+
   /// Parses raw header bytes into a map (lowercase keys + '_method'/'_path').
   static Map<String, String> _parseHeaders(List<int> rawBytes) {
     final text = utf8.decode(rawBytes, allowMalformed: true);
@@ -488,13 +487,9 @@ class CollaborationServer {
       await for (final chunk in socket) {
         buf.addAll(chunk);
         // Search entire buffer for \r\n\r\n (handles split-chunk delivery)
-        for (int i = 0; i <= buf.length - 4; i++) {
-          if (buf[i] == 13 &&
-              buf[i + 1] == 10 &&
-              buf[i + 2] == 13 &&
-              buf[i + 3] == 10) {
-            return _parseHeaders(buf.sublist(0, i + 4));
-          }
+        final boundary = _findHttpBoundary(buf);
+        if (boundary != null) {
+          return _parseHeaders(buf.sublist(0, boundary));
         }
         if (buf.length > 65536) return null;
       }

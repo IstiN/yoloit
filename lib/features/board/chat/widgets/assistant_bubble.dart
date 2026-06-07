@@ -45,15 +45,8 @@ class AssistantBubbleState extends State<AssistantBubble> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
-    final textColor =
-        Theme.of(context).textTheme.bodyMedium?.color ??
-        Theme.of(context).colorScheme.onSurface;
-    final codeBg = colors.surface;
-    final processedContent = widget.content.replaceAll(
-      RegExp(r'<br\s*/?>'),
-      '\n',
-    );
+    final (processedContent, colors, textColor, codeBg) =
+        prepareChatBubble(context, widget.content);
 
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 2, right: 16),
