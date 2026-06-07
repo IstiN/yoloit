@@ -3,10 +3,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:json_annotation/json_annotation.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/core/platform/secure_storage_factory.dart';
+
+part 'global_env_groups_service.g.dart';
 
 /// Manages global env variable groups.
 ///
@@ -457,6 +460,7 @@ class _GroupMeta {
   }
 }
 
+@JsonSerializable()
 class GlobalEnvGroup {
   const GlobalEnvGroup({
     required this.id,
@@ -464,21 +468,17 @@ class GlobalEnvGroup {
     required this.values,
   });
 
+  @JsonKey(defaultValue: '')
   final String id;
+  @JsonKey(defaultValue: '')
   final String name;
+  @JsonKey(defaultValue: <String, String>{})
   final Map<String, String> values;
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'values': values};
+  Map<String, dynamic> toJson() => _$GlobalEnvGroupToJson(this);
 
-  factory GlobalEnvGroup.fromJson(Map<String, dynamic> json) {
-    return GlobalEnvGroup(
-      id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      values: (json['values'] as Map? ?? const {}).map(
-        (k, v) => MapEntry(k.toString(), v.toString()),
-      ),
-    );
-  }
+  factory GlobalEnvGroup.fromJson(Map<String, dynamic> json) =>
+      _$GlobalEnvGroupFromJson(json);
 
   GlobalEnvGroup copyWith({
     String? id,

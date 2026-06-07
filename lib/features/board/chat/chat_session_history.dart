@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:json_annotation/json_annotation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:yoloit/features/board/common/session_history_store.dart';
+
+part 'chat_session_history.g.dart';
 
 /// Stores a registry of past chat sessions for browsing/resuming.
 ///
@@ -101,6 +104,7 @@ class ChatSessionHistory extends SessionHistoryStore<ChatSessionEntry> {
 }
 
 /// A single session history entry.
+@JsonSerializable()
 class ChatSessionEntry {
   const ChatSessionEntry({
     required this.id,
@@ -124,34 +128,8 @@ class ChatSessionEntry {
   final DateTime? lastMessageAt;
   final int messageCount;
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'sessionName': sessionName,
-    'provider': provider,
-    'model': model,
-    'workingDir': workingDir,
-    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
-    'createdAt': createdAt.toIso8601String(),
-    'lastMessageAt': lastMessageAt?.toIso8601String(),
-    'messageCount': messageCount,
-  };
+  Map<String, dynamic> toJson() => _$ChatSessionEntryToJson(this);
 
   factory ChatSessionEntry.fromJson(Map<String, dynamic> json) =>
-      ChatSessionEntry(
-        id: json['id'] as String? ?? '',
-        sessionName: json['sessionName'] as String? ?? '',
-        provider: json['provider'] as String? ?? 'copilot',
-        model: json['model'] as String? ?? '',
-        workingDir: json['workingDir'] as String? ?? '',
-        envGroupIds:
-            (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
-        createdAt:
-            DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-            DateTime.now(),
-        lastMessageAt:
-            json['lastMessageAt'] != null
-                ? DateTime.tryParse(json['lastMessageAt'] as String)
-                : null,
-        messageCount: json['messageCount'] as int? ?? 0,
-      );
+      _$ChatSessionEntryFromJson(json);
 }

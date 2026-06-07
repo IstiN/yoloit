@@ -1,13 +1,17 @@
 import 'dart:convert';
 
+import 'package:json_annotation/json_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/secure_storage_factory.dart';
+
+part 'cloud_llm_settings_service.g.dart';
 
 /// A configured cloud LLM endpoint (OpenRouter, Google Gemini, OpenAI, etc.).
 ///
 /// All modern cloud LLM APIs follow the OpenAI chat/completions format,
 /// so a single provider implementation handles them all — only the base URL,
 /// API key, and model ID differ.
+@JsonSerializable()
 class CloudLlmConfig {
   const CloudLlmConfig({
     required this.id,
@@ -37,28 +41,10 @@ class CloudLlmConfig {
   /// Optional extra HTTP headers (e.g. X-Title for OpenRouter).
   final Map<String, String> extraHeaders;
 
-  Map<String, Object?> toJson() => {
-    'id': id,
-    'name': name,
-    'baseUrl': baseUrl,
-    'apiKey': apiKey,
-    'model': model,
-    if (extraHeaders.isNotEmpty) 'extraHeaders': extraHeaders,
-  };
+  Map<String, dynamic> toJson() => _$CloudLlmConfigToJson(this);
 
-  factory CloudLlmConfig.fromJson(Map<String, dynamic> json) {
-    return CloudLlmConfig(
-      id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      baseUrl: json['baseUrl'] as String? ?? '',
-      apiKey: json['apiKey'] as String? ?? '',
-      model: json['model'] as String? ?? '',
-      extraHeaders:
-          json['extraHeaders'] is Map
-              ? Map<String, String>.from(json['extraHeaders'] as Map)
-              : const {},
-    );
-  }
+  factory CloudLlmConfig.fromJson(Map<String, dynamic> json) =>
+      _$CloudLlmConfigFromJson(json);
 
   CloudLlmConfig copyWith({
     String? id,
@@ -393,6 +379,7 @@ class CloudLlmSettingsService {
   }
 }
 
+@JsonSerializable()
 class VoiceSettings {
   const VoiceSettings({
     this.useCloudAsr = false,
@@ -428,21 +415,10 @@ class VoiceSettings {
             : cloudAsrModel as String?,
   );
 
-  Map<String, Object?> toJson() => {
-    'useCloudAsr': useCloudAsr,
-    'convertWavToMp3': convertWavToMp3,
-    'useChatModelForCloudAsr': useChatModelForCloudAsr,
-    if (cloudAsrConfigId != null) 'cloudAsrConfigId': cloudAsrConfigId,
-    if (cloudAsrModel != null) 'cloudAsrModel': cloudAsrModel,
-  };
+  Map<String, dynamic> toJson() => _$VoiceSettingsToJson(this);
 
-  factory VoiceSettings.fromJson(Map<String, dynamic> json) => VoiceSettings(
-    useCloudAsr: json['useCloudAsr'] as bool? ?? false,
-    convertWavToMp3: json['convertWavToMp3'] as bool? ?? false,
-    useChatModelForCloudAsr: json['useChatModelForCloudAsr'] as bool? ?? true,
-    cloudAsrConfigId: json['cloudAsrConfigId'] as String?,
-    cloudAsrModel: json['cloudAsrModel'] as String?,
-  );
+  factory VoiceSettings.fromJson(Map<String, dynamic> json) =>
+      _$VoiceSettingsFromJson(json);
 }
 
 const _voiceSentinel = Object();

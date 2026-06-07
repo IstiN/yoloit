@@ -1,4 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'package:json_annotation/json_annotation.dart';
+
+part 'chat_models.g.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chat message roles
@@ -10,6 +13,7 @@ enum ChatRole { user, assistant, system, tool }
 // Chat message
 // ─────────────────────────────────────────────────────────────────────────────
 
+@JsonSerializable(explicitToJson: true)
 class ChatMessage extends Equatable {
   const ChatMessage({
     required this.id,
@@ -25,12 +29,16 @@ class ChatMessage extends Equatable {
     this.attachments = const [],
   });
 
+  @JsonKey(defaultValue: '')
   final String id;
+  @JsonKey(defaultValue: ChatRole.system)
   final ChatRole role;
+  @JsonKey(defaultValue: '')
   final String content;
   final DateTime? timestamp;
 
   /// Tool calls requested by the assistant in this message.
+  @JsonKey(defaultValue: <ChatToolCall>[])
   final List<ChatToolCall> toolCalls;
 
   /// For tool-role messages: which tool produced this result.
@@ -40,6 +48,8 @@ class ChatMessage extends Equatable {
   final String? toolCallId;
 
   /// True while the message is still being streamed.
+  /// Not persisted — always defaults to false on deserialization.
+  @JsonKey(includeToJson: false, defaultValue: false)
   final bool isStreaming;
 
   /// Token usage info (populated from the `result` event).
@@ -49,59 +59,13 @@ class ChatMessage extends Equatable {
   final Map<String, dynamic>? metadata;
 
   /// File paths attached to this message (images, documents, etc.).
+  @JsonKey(defaultValue: <String>[])
   final List<String> attachments;
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'role': role.name,
-    'content': content,
-    if (timestamp != null) 'timestamp': timestamp!.toIso8601String(),
-    if (toolCalls.isNotEmpty)
-      'toolCalls': toolCalls.map((t) => t.toJson()).toList(),
-    if (toolName != null) 'toolName': toolName,
-    if (toolCallId != null) 'toolCallId': toolCallId,
-    if (tokenUsage != null) 'tokenUsage': tokenUsage!.toJson(),
-    if (metadata != null) 'metadata': metadata,
-    if (attachments.isNotEmpty) 'attachments': attachments,
-  };
+  Map<String, dynamic> toJson() => _$ChatMessageToJson(this);
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) {
-    final roleStr = json['role'] as String? ?? 'system';
-    final role = ChatRole.values.firstWhere(
-      (r) => r.name == roleStr,
-      orElse: () => ChatRole.system,
-    );
-    return ChatMessage(
-      id: json['id'] as String? ?? '',
-      role: role,
-      content: json['content'] as String? ?? '',
-      timestamp:
-          json['timestamp'] != null
-              ? DateTime.tryParse(json['timestamp'] as String)
-              : null,
-      toolCalls:
-          (json['toolCalls'] as List?)
-              ?.map(
-                (e) =>
-                    ChatToolCall.fromJson(Map<String, dynamic>.from(e as Map)),
-              )
-              .toList() ??
-          const [],
-      toolName: json['toolName'] as String?,
-      toolCallId: json['toolCallId'] as String?,
-      tokenUsage:
-          json['tokenUsage'] is Map
-              ? ChatTokenUsage.fromJson(
-                Map<String, dynamic>.from(json['tokenUsage'] as Map),
-              )
-              : null,
-      metadata:
-          json['metadata'] is Map
-              ? Map<String, dynamic>.from(json['metadata'] as Map)
-              : null,
-      attachments: (json['attachments'] as List?)?.cast<String>() ?? const [],
-    );
-  }
+  factory ChatMessage.fromJson(Map<String, dynamic> json) =>
+      _$ChatMessageFromJson(json);
 
   ChatMessage copyWith({
     String? id,
@@ -151,6 +115,7 @@ class ChatMessage extends Equatable {
 // Tool calls
 // ─────────────────────────────────────────────────────────────────────────────
 
+@JsonSerializable()
 class ChatToolCall extends Equatable {
   const ChatToolCall({
     required this.toolCallId,
@@ -161,37 +126,28 @@ class ChatToolCall extends Equatable {
     this.success,
   });
 
+  @JsonKey(defaultValue: '')
   final String toolCallId;
+  @JsonKey(defaultValue: '')
   final String toolName;
+  @JsonKey(defaultValue: <String, dynamic>{})
   final Map<String, dynamic> arguments;
 
   /// Result content after execution.
   final String? result;
 
   /// Whether the tool is currently executing.
+  /// Not persisted — always defaults to false on deserialization.
+  @JsonKey(includeToJson: false, defaultValue: false)
   final bool isRunning;
 
   /// Whether execution succeeded (null = not yet complete).
   final bool? success;
 
-  Map<String, dynamic> toJson() => {
-    'toolCallId': toolCallId,
-    'toolName': toolName,
-    'arguments': arguments,
-    if (result != null) 'result': result,
-    if (success != null) 'success': success,
-  };
+  Map<String, dynamic> toJson() => _$ChatToolCallToJson(this);
 
-  factory ChatToolCall.fromJson(Map<String, dynamic> json) => ChatToolCall(
-    toolCallId: json['toolCallId'] as String? ?? '',
-    toolName: json['toolName'] as String? ?? '',
-    arguments:
-        json['arguments'] is Map
-            ? Map<String, dynamic>.from(json['arguments'] as Map)
-            : <String, dynamic>{},
-    result: json['result'] as String?,
-    success: json['success'] as bool?,
-  );
+  factory ChatToolCall.fromJson(Map<String, dynamic> json) =>
+      _$ChatToolCallFromJson(json);
 
   ChatToolCall copyWith({
     String? toolCallId,
@@ -256,6 +212,7 @@ class ChatAskUser extends Equatable {
 // Token usage
 // ─────────────────────────────────────────────────────────────────────────────
 
+@JsonSerializable()
 class ChatTokenUsage extends Equatable {
   const ChatTokenUsage({
     this.outputTokens = 0,
@@ -273,23 +230,10 @@ class ChatTokenUsage extends Equatable {
   final int linesAdded;
   final int linesRemoved;
 
-  Map<String, dynamic> toJson() => {
-    'outputTokens': outputTokens,
-    'premiumRequests': premiumRequests,
-    'totalApiDurationMs': totalApiDurationMs,
-    'sessionDurationMs': sessionDurationMs,
-    'linesAdded': linesAdded,
-    'linesRemoved': linesRemoved,
-  };
+  Map<String, dynamic> toJson() => _$ChatTokenUsageToJson(this);
 
-  factory ChatTokenUsage.fromJson(Map<String, dynamic> json) => ChatTokenUsage(
-    outputTokens: (json['outputTokens'] as num?)?.toInt() ?? 0,
-    premiumRequests: (json['premiumRequests'] as num?)?.toInt() ?? 0,
-    totalApiDurationMs: (json['totalApiDurationMs'] as num?)?.toInt() ?? 0,
-    sessionDurationMs: (json['sessionDurationMs'] as num?)?.toInt() ?? 0,
-    linesAdded: (json['linesAdded'] as num?)?.toInt() ?? 0,
-    linesRemoved: (json['linesRemoved'] as num?)?.toInt() ?? 0,
-  );
+  factory ChatTokenUsage.fromJson(Map<String, dynamic> json) =>
+      _$ChatTokenUsageFromJson(json);
 
   @override
   List<Object?> get props => [
@@ -493,6 +437,7 @@ class ChatEvent extends Equatable {
 // Chat session config (stored in panel state)
 // ─────────────────────────────────────────────────────────────────────────────
 
+@JsonSerializable()
 class ChatSessionConfig extends Equatable {
   const ChatSessionConfig({
     required this.sessionName,
@@ -508,67 +453,49 @@ class ChatSessionConfig extends Equatable {
     this.disabledLocalToolNames = const [],
   });
 
+  @JsonKey(defaultValue: '')
   final String sessionName;
+  @JsonKey(defaultValue: '')
   final String workingDir;
 
   /// Provider identifier (e.g. 'copilot', 'cursor', 'claude', 'local').
+  @JsonKey(defaultValue: 'copilot')
   final String provider;
 
   /// Model to use.
+  @JsonKey(defaultValue: 'gpt-5-mini')
   final String model;
 
   /// Reasoning effort level: low, medium, high, xhigh (null = default).
   final String? reasoningEffort;
 
   /// Whether to run in autopilot mode (--autopilot flag).
+  @JsonKey(defaultValue: false)
   final bool autopilot;
 
   /// Agent mode: interactive, plan, autopilot (null = default/interactive).
   final String? mode;
 
   /// Max autopilot continuation messages.
+  @JsonKey(defaultValue: 99)
   final int maxAutopilotContinues;
 
   /// Custom extra CLI arguments (provider-specific).
+  @JsonKey(defaultValue: <String>[])
   final List<String> customArgs;
 
   /// Global env groups selected for this session. Last selected group wins.
+  @JsonKey(defaultValue: <String>[])
   final List<String> envGroupIds;
 
   /// Local YoLoIT tool function names disabled for this chat session.
+  @JsonKey(defaultValue: <String>[])
   final List<String> disabledLocalToolNames;
 
-  Map<String, dynamic> toJson() => {
-    'sessionName': sessionName,
-    'workingDir': workingDir,
-    'provider': provider,
-    'model': model,
-    if (reasoningEffort != null) 'reasoningEffort': reasoningEffort,
-    'autopilot': autopilot,
-    if (mode != null) 'mode': mode,
-    'maxAutopilotContinues': maxAutopilotContinues,
-    if (customArgs.isNotEmpty) 'customArgs': customArgs,
-    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
-    if (disabledLocalToolNames.isNotEmpty)
-      'disabledLocalToolNames': disabledLocalToolNames,
-  };
+  Map<String, dynamic> toJson() => _$ChatSessionConfigToJson(this);
 
-  factory ChatSessionConfig.fromJson(Map<String, dynamic> json) {
-    return ChatSessionConfig(
-      sessionName: json['sessionName'] as String? ?? '',
-      workingDir: json['workingDir'] as String? ?? '',
-      provider: json['provider'] as String? ?? 'copilot',
-      model: json['model'] as String? ?? 'gpt-5-mini',
-      reasoningEffort: json['reasoningEffort'] as String?,
-      autopilot: json['autopilot'] as bool? ?? false,
-      mode: json['mode'] as String?,
-      maxAutopilotContinues: json['maxAutopilotContinues'] as int? ?? 99,
-      customArgs: (json['customArgs'] as List?)?.cast<String>() ?? const [],
-      envGroupIds: (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
-      disabledLocalToolNames:
-          (json['disabledLocalToolNames'] as List?)?.cast<String>() ?? const [],
-    );
-  }
+  factory ChatSessionConfig.fromJson(Map<String, dynamic> json) =>
+      _$ChatSessionConfigFromJson(json);
 
   ChatSessionConfig copyWith({
     String? sessionName,
@@ -621,6 +548,7 @@ class ChatSessionConfig extends Equatable {
 // Available models
 // ─────────────────────────────────────────────────────────────────────────────
 
+@JsonSerializable()
 class ChatModelInfo {
   const ChatModelInfo({
     required this.id,
@@ -658,34 +586,10 @@ class ChatModelInfo {
       (inputCostPerMillion == 0 && outputCostPerMillion == 0) ||
       costMultiplier == 0;
 
-  factory ChatModelInfo.fromJson(Map<String, dynamic> j) => ChatModelInfo(
-    id: j['id'] as String,
-    displayName: j['displayName'] as String,
-    costMultiplier: (j['costMultiplier'] as num?)?.toDouble(),
-    isDefault: j['isDefault'] as bool? ?? false,
-    inputCostPerMillion: (j['inputCostPerMillion'] as num?)?.toDouble(),
-    outputCostPerMillion: (j['outputCostPerMillion'] as num?)?.toDouble(),
-    contextWindow: (j['contextWindow'] as num?)?.toInt(),
-    providerGroup: j['providerGroup'] as String?,
-  );
+  factory ChatModelInfo.fromJson(Map<String, dynamic> j) =>
+      _$ChatModelInfoFromJson(j);
 
-  Map<String, dynamic> toJson() {
-    final m = <String, dynamic>{
-      'id': id,
-      'displayName': displayName,
-      'isDefault': isDefault,
-    };
-    if (costMultiplier != null) m['costMultiplier'] = costMultiplier;
-    if (inputCostPerMillion != null) {
-      m['inputCostPerMillion'] = inputCostPerMillion;
-    }
-    if (outputCostPerMillion != null) {
-      m['outputCostPerMillion'] = outputCostPerMillion;
-    }
-    if (contextWindow != null) m['contextWindow'] = contextWindow;
-    if (providerGroup != null) m['providerGroup'] = providerGroup;
-    return m;
-  }
+  Map<String, dynamic> toJson() => _$ChatModelInfoToJson(this);
 }
 
 /// Copilot CLI available models.

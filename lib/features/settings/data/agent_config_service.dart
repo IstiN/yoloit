@@ -1,12 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:json_annotation/json_annotation.dart';
 import 'package:path/path.dart' as p;
 import 'package:yoloit/core/platform/platform_dirs.dart';
 import 'package:yoloit/features/terminal/models/agent_type.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
 import 'package:yoloit/features/terminal/models/terminal_render_engine.dart';
 
+part 'agent_config_service.g.dart';
+
+@JsonSerializable()
 class AgentConfig {
   final String id;
   final String displayName;
@@ -84,37 +89,10 @@ class AgentConfig {
             : asrCloudModel as String?,
   );
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'displayName': displayName,
-    'iconLabel': iconLabel,
-    'launchCommand': launchCommand,
-    'visible': visible,
-    'isBuiltIn': isBuiltIn,
-    if (streamAdapter != null) 'streamAdapter': streamAdapter,
-    'passDefaultArgs': passDefaultArgs,
-    'disableModel': disableModel,
-    if (defaultModel != null) 'defaultModel': defaultModel,
-    if (asrMode != 'default') 'asrMode': asrMode,
-    if (asrCloudConfigId != null) 'asrCloudConfigId': asrCloudConfigId,
-    if (asrCloudModel != null) 'asrCloudModel': asrCloudModel,
-  };
+  Map<String, dynamic> toJson() => _$AgentConfigToJson(this);
 
-  factory AgentConfig.fromJson(Map<String, dynamic> j) => AgentConfig(
-    id: j['id'] as String,
-    displayName: j['displayName'] as String,
-    iconLabel: j['iconLabel'] as String? ?? '◈',
-    launchCommand: j['launchCommand'] as String? ?? '',
-    visible: j['visible'] as bool? ?? true,
-    isBuiltIn: j['isBuiltIn'] as bool? ?? false,
-    streamAdapter: j['streamAdapter'] as String?,
-    passDefaultArgs: j['passDefaultArgs'] as bool? ?? true,
-    disableModel: j['disableModel'] as bool? ?? false,
-    defaultModel: j['defaultModel'] as String?,
-    asrMode: j['asrMode'] as String? ?? 'default',
-    asrCloudConfigId: j['asrCloudConfigId'] as String?,
-    asrCloudModel: j['asrCloudModel'] as String?,
-  );
+  factory AgentConfig.fromJson(Map<String, dynamic> j) =>
+      _$AgentConfigFromJson(j);
 }
 
 const _sentinel = Object();

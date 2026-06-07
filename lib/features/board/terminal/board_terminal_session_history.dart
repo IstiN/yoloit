@@ -1,4 +1,7 @@
+import 'package:json_annotation/json_annotation.dart';
 import 'package:yoloit/features/board/common/session_history_store.dart';
+
+part 'board_terminal_session_history.g.dart';
 
 class BoardTerminalSessionHistory
     extends SessionHistoryStore<BoardTerminalSessionEntry> {
@@ -41,6 +44,7 @@ class BoardTerminalSessionHistory
   }
 }
 
+@JsonSerializable()
 class BoardTerminalSessionEntry {
   const BoardTerminalSessionEntry({
     required this.id,
@@ -58,31 +62,10 @@ class BoardTerminalSessionEntry {
   final DateTime createdAt;
   final DateTime? lastActiveAt;
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'sessionName': sessionName,
-    'workingDir': workingDir,
-    if (envGroupIds.isNotEmpty) 'envGroupIds': envGroupIds,
-    'createdAt': createdAt.toIso8601String(),
-    'lastActiveAt': lastActiveAt?.toIso8601String(),
-  };
+  Map<String, dynamic> toJson() => _$BoardTerminalSessionEntryToJson(this);
 
-  factory BoardTerminalSessionEntry.fromJson(Map<String, dynamic> json) {
-    return BoardTerminalSessionEntry(
-      id: json['id'] as String? ?? '',
-      sessionName: json['sessionName'] as String? ?? '',
-      workingDir: json['workingDir'] as String? ?? '',
-      envGroupIds:
-          (json['envGroupIds'] as List?)?.cast<String>() ?? const [],
-      createdAt:
-          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-          DateTime.now(),
-      lastActiveAt:
-          json['lastActiveAt'] != null
-              ? DateTime.tryParse(json['lastActiveAt'] as String)
-              : null,
-    );
-  }
+  factory BoardTerminalSessionEntry.fromJson(Map<String, dynamic> json) =>
+      _$BoardTerminalSessionEntryFromJson(json);
 
   BoardTerminalSessionEntry copyWith({
     String? id,

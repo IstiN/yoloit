@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:json_annotation/json_annotation.dart';
 import 'package:yoloit/core/setup/setup_catalog.dart';
 import 'package:yoloit/features/board/model/board_models.dart';
+
+part 'yoloit_remote_client.g.dart';
 
 class YoloitRemoteClient {
   YoloitRemoteClient({
@@ -210,20 +213,18 @@ class YoloitRemoteException implements Exception {
   String toString() => message;
 }
 
+@JsonSerializable()
 class RemoteSetupInstallRun {
   const RemoteSetupInstallRun({required this.id, required this.script});
 
   final String id;
   final String script;
 
-  factory RemoteSetupInstallRun.fromJson(Map<String, dynamic> json) {
-    return RemoteSetupInstallRun(
-      id: json['id'] as String? ?? '',
-      script: json['script'] as String? ?? '',
-    );
-  }
+  factory RemoteSetupInstallRun.fromJson(Map<String, dynamic> json) =>
+      _$RemoteSetupInstallRunFromJson(json);
 }
 
+@JsonSerializable()
 class RemoteSetupInstallLog {
   const RemoteSetupInstallLog({
     required this.id,
@@ -237,20 +238,11 @@ class RemoteSetupInstallLog {
   final bool running;
   final int? exitCode;
 
-  factory RemoteSetupInstallLog.fromJson(Map<String, dynamic> json) {
-    return RemoteSetupInstallLog(
-      id: json['id'] as String? ?? '',
-      lines:
-          (json['lines'] as List? ?? const <Object?>[])
-              .map((value) => value.toString())
-              .toList(),
-      running: json['running'] == true,
-      exitCode:
-          json['exitCode'] is num ? (json['exitCode'] as num).toInt() : null,
-    );
-  }
+  factory RemoteSetupInstallLog.fromJson(Map<String, dynamic> json) =>
+      _$RemoteSetupInstallLogFromJson(json);
 }
 
+@JsonSerializable()
 class RemoteDirectoryListing {
   const RemoteDirectoryListing({
     required this.path,
@@ -264,26 +256,11 @@ class RemoteDirectoryListing {
   final List<RemoteDirectoryEntry> entries;
   final List<RemoteDirectoryEntry> roots;
 
-  factory RemoteDirectoryListing.fromJson(Map<String, dynamic> json) {
-    List<RemoteDirectoryEntry> parse(dynamic list) =>
-        (list as List? ?? const <Object?>[])
-            .whereType<Map<Object?, Object?>>()
-            .map(
-              (entry) => RemoteDirectoryEntry.fromJson(
-                Map<String, dynamic>.from(entry),
-              ),
-            )
-            .toList();
-
-    return RemoteDirectoryListing(
-      path: json['path'] as String? ?? '',
-      parent: json['parent'] as String?,
-      entries: parse(json['entries']),
-      roots: parse(json['roots']),
-    );
-  }
+  factory RemoteDirectoryListing.fromJson(Map<String, dynamic> json) =>
+      _$RemoteDirectoryListingFromJson(json);
 }
 
+@JsonSerializable()
 class RemoteDirectoryEntry {
   const RemoteDirectoryEntry({
     required this.name,
@@ -295,15 +272,11 @@ class RemoteDirectoryEntry {
   final String path;
   final bool isDirectory;
 
-  factory RemoteDirectoryEntry.fromJson(Map<String, dynamic> json) {
-    return RemoteDirectoryEntry(
-      name: json['name'] as String? ?? '',
-      path: json['path'] as String? ?? '',
-      isDirectory: json['isDirectory'] == true,
-    );
-  }
+  factory RemoteDirectoryEntry.fromJson(Map<String, dynamic> json) =>
+      _$RemoteDirectoryEntryFromJson(json);
 }
 
+@JsonSerializable()
 class RemoteTerminalLog {
   const RemoteTerminalLog({
     required this.next,
@@ -317,18 +290,8 @@ class RemoteTerminalLog {
   final bool running;
   final int? exitCode;
 
-  factory RemoteTerminalLog.fromJson(Map<String, dynamic> json) {
-    return RemoteTerminalLog(
-      next: (json['next'] as num? ?? 0).toInt(),
-      chunks:
-          (json['chunks'] as List? ?? const <Object?>[])
-              .whereType<String>()
-              .toList(),
-      running: json['running'] == true,
-      exitCode:
-          json['exitCode'] is num ? (json['exitCode'] as num).toInt() : null,
-    );
-  }
+  factory RemoteTerminalLog.fromJson(Map<String, dynamic> json) =>
+      _$RemoteTerminalLogFromJson(json);
 }
 
 typedef RemoteBoardInfo =
