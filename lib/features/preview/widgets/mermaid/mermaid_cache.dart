@@ -88,8 +88,9 @@ class MermaidRasterizedDiagramCache {
       final aspectRatio = parseSvgAspectRatio(svg);
       final imageProvider = MemoryImage(png);
       stopwatch.stop();
+      final fontFamily = options.config?['fontFamily'] as String?;
       debugPrint(
-        '[MermaidCache] STORE key=$key ms=${stopwatch.elapsedMilliseconds} pngBytes=${png.length}',
+        '[MermaidCache] STORE key=$key ms=${stopwatch.elapsedMilliseconds} pngBytes=${png.length} svgLength=${svg.length} fontFamily=$fontFamily',
       );
       final diagram = MermaidRasterizedDiagram(
         svg: svg,
