@@ -354,9 +354,37 @@ jobs:
 
           if [ "$SIGNED" = "true" ] && [ -n "$MACOS_CERTIFICATE_ID" ]; then
             echo "Signing .app bundle..."
+
+            # Sign nested binaries individually before the bundle sign
+            # (codesign --deep misses binaries in Resources/)
+            RESVG_BIN="$APP_PATH/Contents/Resources/resvg"
+            if [ -f "$RESVG_BIN" ]; then
+              echo "Stripping extended attributes from resvg..."
+              xattr -cr "$RESVG_BIN" 2>/dev/null || true
+              echo "Signing resvg binary..."
+              codesign --force --sign "$MACOS_CERTIFICATE_ID" \
+                --options runtime \
+                --timestamp \
+                "$RESVG_BIN"
+            fi
+
+            # Sign any other nested executables (e.g. helpers, frameworks)
+            find "$APP_PATH" -type f \( -perm +111 -o -name '*.dylib' \) | while read -r bin; do
+              # Skip already-signed or the main app binary (signed by --deep)
+              if codesign -dv "$bin" 2>/dev/null | grep -q "$MACOS_CERTIFICATE_ID"; then
+                continue
+              fi
+              echo "Signing nested binary: $bin"
+              codesign --force --sign "$MACOS_CERTIFICATE_ID" \
+                --options runtime \
+                --timestamp \
+                "$bin" 2>/dev/null || true
+            done
+
             codesign_app() {
               codesign --force --deep --sign "$MACOS_CERTIFICATE_ID" \
                 --options runtime \
+                --timestamp \
                 --entitlements macos/Runner/Release.entitlements \
                 "$APP_PATH"
             }
@@ -375,6 +403,10 @@ jobs:
               echo "codesign failed, retrying in ${sleep_seconds}s (attempt $attempt/5)..."
               sleep "$sleep_seconds"
             done
+
+            echo "Verifying code signature..."
+            codesign -vv --deep --strict "$APP_PATH"
+            spctl -a -vv "$APP_PATH" 2>/dev/null || true
           fi
 
           # Create a staging folder with app + Applications symlink (drag-to-install DMG)
