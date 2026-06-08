@@ -99,6 +99,20 @@ jobs:
           export PATH="/opt/homebrew/bin:$PATH"
           flutter --version
 
+      - name: Install Rust toolchain
+        run: |
+          if command -v rustup &> /dev/null; then
+            echo "Rust already installed"
+            rustup show
+          else
+            echo "Installing Rust..."
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+          fi
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          rustup --version
+          cargo --version
+
       # ── Dependencies ────────────────────────────────────────────────────────
       - name: Install Flutter dependencies
         run: flutter pub get
