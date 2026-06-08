@@ -158,24 +158,19 @@ jobs:
           MERMAID_HASH=$(shasum -a 256 packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js | awk '{print $1}')
           FLUTTER_SVG_VER=$(grep -A2 'flutter_svg:' pubspec.lock | grep 'version:' | head -1 | sed 's/.*version: //' || echo 'unknown')
 
-          python3 -c "
-import textwrap
-content = textwrap.dedent('''
-// Generated build info — CI overwrites this file before compilation.
-// ignore_for_file: constant_identifier_names
-
-const String kBuildGitCommit = '${GIT_COMMIT}';
-const String kBuildGitBranch = '${GIT_BRANCH}';
-const String kBuildSubmodules = '${SUBMODULES}';
-const String kSubmoduleMermaidHash = '${SUBMODULE_MERMAID}';
-const String kSubmoduleXtermHash = '${SUBMODULE_XTERM}';
-const String kMermaidBundleHash = '${MERMAID_HASH}';
-const String kMermaidBundleSize = '${MERMAID_SIZE}';
-const String kFlutterSvgVersion = '${FLUTTER_SVG_VER}';
-''').strip()
-with open('lib/core/services/build_info.dart', 'w') as f:
-    f.write(content + '\n')
-"
+          printf '%s\n' \
+            '// Generated build info — CI overwrites this file before compilation.' \
+            '// ignore_for_file: constant_identifier_names' \
+            '' \
+            "const String kBuildGitCommit = '${GIT_COMMIT}';" \
+            "const String kBuildGitBranch = '${GIT_BRANCH}';" \
+            "const String kBuildSubmodules = '${SUBMODULES}';" \
+            "const String kSubmoduleMermaidHash = '${SUBMODULE_MERMAID}';" \
+            "const String kSubmoduleXtermHash = '${SUBMODULE_XTERM}';" \
+            "const String kMermaidBundleHash = '${MERMAID_HASH}';" \
+            "const String kMermaidBundleSize = '${MERMAID_SIZE}';" \
+            "const String kFlutterSvgVersion = '${FLUTTER_SVG_VER}';" \
+            > lib/core/services/build_info.dart
 
           echo "Build info generated:"
           cat lib/core/services/build_info.dart
