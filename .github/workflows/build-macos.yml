@@ -152,6 +152,8 @@ jobs:
           GIT_COMMIT=$(git rev-parse --short HEAD)
           GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           SUBMODULES=$(git submodule status --recursive | tr '\n' ';')
+          SUBMODULE_MERMAID=$(git -C packages/mermaid_renderer_flutter rev-parse --short HEAD 2>/dev/null || echo 'none')
+          SUBMODULE_XTERM=$(git -C packages/xterm rev-parse --short HEAD 2>/dev/null || echo 'none')
           MERMAID_SIZE=$(wc -c < packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js | tr -d ' ')
           MERMAID_HASH=$(shasum -a 256 packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js | awk '{print $1}')
           FLUTTER_SVG_VER=$(grep -A2 'flutter_svg:' pubspec.lock | grep 'version:' | head -1 | sed 's/.*version: //' || echo 'unknown')
@@ -165,6 +167,8 @@ content = textwrap.dedent('''
 const String kBuildGitCommit = '${GIT_COMMIT}';
 const String kBuildGitBranch = '${GIT_BRANCH}';
 const String kBuildSubmodules = '${SUBMODULES}';
+const String kSubmoduleMermaidHash = '${SUBMODULE_MERMAID}';
+const String kSubmoduleXtermHash = '${SUBMODULE_XTERM}';
 const String kMermaidBundleHash = '${MERMAID_HASH}';
 const String kMermaidBundleSize = '${MERMAID_SIZE}';
 const String kFlutterSvgVersion = '${FLUTTER_SVG_VER}';
@@ -175,6 +179,28 @@ with open('lib/core/services/build_info.dart', 'w') as f:
 
           echo "Build info generated:"
           cat lib/core/services/build_info.dart
+
+      # ── Verify repo and dependency state ────────────────────────────────────
+      - name: Verify repo and dependency state
+        run: |
+          echo "=== Git status ==="
+          git status --short
+          echo ""
+          echo "=== Git diff (shortstat) ==="
+          git diff --shortstat
+          echo ""
+          echo "=== Submodule status ==="
+          git submodule status
+          echo ""
+          echo "=== pubspec.lock flutter_svg ==="
+          grep -A2 'flutter_svg:' pubspec.lock | head -3
+          echo ""
+          echo "=== Mermaid bundle ==="
+          wc -c packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js
+          shasum -a 256 packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js
+          echo ""
+          echo "=== flutter pub deps (compact) ==="
+          flutter pub deps --style=compact
 
       # ── Version ─────────────────────────────────────────────────────────────
       - name: Derive build version

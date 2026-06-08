@@ -94,6 +94,8 @@ class SupportLogService {
     buf.writeln('Build git commit: $kBuildGitCommit');
     buf.writeln('Build git branch: $kBuildGitBranch');
     buf.writeln('Build submodules: $kBuildSubmodules');
+    buf.writeln('Submodule mermaid_renderer_flutter: $kSubmoduleMermaidHash');
+    buf.writeln('Submodule xterm: $kSubmoduleXtermHash');
     buf.writeln('Mermaid bundle hash: $kMermaidBundleHash');
     buf.writeln('Mermaid bundle size: $kMermaidBundleSize');
     buf.writeln('flutter_svg version: $kFlutterSvgVersion');

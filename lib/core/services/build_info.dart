@@ -4,6 +4,8 @@
 const String kBuildGitCommit = 'dev';
 const String kBuildGitBranch = 'dev';
 const String kBuildSubmodules = 'dev';
+const String kSubmoduleMermaidHash = 'dev';
+const String kSubmoduleXtermHash = 'dev';
 const String kMermaidBundleHash = 'dev';
 const String kMermaidBundleSize = 'dev';
 const String kFlutterSvgVersion = 'dev';
