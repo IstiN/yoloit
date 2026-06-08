@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"yoloitd/handler"
 	"yoloitd/server"
@@ -33,8 +34,11 @@ func main() {
 	h := handler.New(srv)
 
 	httpSrv := &http.Server{
-		Addr:    "127.0.0.1:0",
-		Handler: h,
+		Addr:         "127.0.0.1:0",
+		Handler:      h,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	listener, err := net.Listen("tcp", httpSrv.Addr)

@@ -5,19 +5,47 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"yoloitd/server"
 	"yoloitd/session"
 )
 
+// rateLimiter tracks per-session input rate limiting.
+type rateLimiter struct {
+	mu          sync.Mutex
+	lastReq     map[string]time.Time
+	minInterval time.Duration
+}
+
+func newRateLimiter(rps int) *rateLimiter {
+	return &rateLimiter{
+		lastReq:     make(map[string]time.Time),
+		minInterval: time.Second / time.Duration(rps),
+	}
+}
+
+func (rl *rateLimiter) allow(id string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	if last, ok := rl.lastReq[id]; ok && now.Sub(last) < rl.minInterval {
+		return false
+	}
+	rl.lastReq[id] = now
+	return true
+}
+
 // Handler implements the HTTP API.
 type Handler struct {
-	server *server.Server
+	server  *server.Server
+	limiter *rateLimiter
 }
 
 // New creates a handler backed by the given server.
 func New(s *server.Server) *Handler {
-	return &Handler{server: s}
+	return &Handler{server: s, limiter: newRateLimiter(100)}
 }
 
 // ServeHTTP routes incoming requests.
@@ -147,6 +175,11 @@ func (h *Handler) streamSession(w http.ResponseWriter, r *http.Request, id strin
 }
 
 func (h *Handler) inputSession(w http.ResponseWriter, r *http.Request, id string) {
+	if !h.limiter.allow(id) {
+		h.json(w, map[string]any{"ok": false, "error": "rate limit exceeded"}, http.StatusTooManyRequests)
+		return
+	}
+
 	sess, ok := h.server.Get(id)
 	if !ok {
 		h.json(w, map[string]any{"ok": false, "error": "session not found"}, http.StatusNotFound)
@@ -164,6 +197,12 @@ func (h *Handler) inputSession(w http.ResponseWriter, r *http.Request, id string
 	decoded, err := base64.StdEncoding.DecodeString(payload.Data)
 	if err != nil {
 		h.json(w, map[string]any{"ok": false, "error": err.Error()}, http.StatusBadRequest)
+		return
+	}
+
+	const maxInputSize = 4096
+	if len(decoded) > maxInputSize {
+		h.json(w, map[string]any{"ok": false, "error": "input too large"}, http.StatusBadRequest)
 		return
 	}
 

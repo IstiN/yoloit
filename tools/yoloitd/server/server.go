@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"yoloitd/session"
 )
@@ -13,10 +14,27 @@ type Server struct {
 	sessions map[string]*session.Session
 }
 
-// New creates a new server instance.
+// New creates a new server instance and starts background cleanup.
 func New() *Server {
-	return &Server{
+	s := &Server{
 		sessions: make(map[string]*session.Session),
+	}
+	go s.cleanupLoop()
+	return s
+}
+
+// cleanupLoop removes dead sessions every 30 seconds.
+func (s *Server) cleanupLoop() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.mu.Lock()
+		for id, sess := range s.sessions {
+			if !sess.Alive() {
+				delete(s.sessions, id)
+			}
+		}
+		s.mu.Unlock()
 	}
 }
 

@@ -7,12 +7,25 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode/utf8"
 
 	"github.com/creack/pty"
 )
+
+var debugEnabled = atomic.Bool{}
+
+func init() {
+	debugEnabled.Store(os.Getenv("YOLOITD_DEBUG") == "1")
+}
+
+func debugLog(format string, v ...any) {
+	if debugEnabled.Load() {
+		log.Printf(format, v...)
+	}
+}
 
 // Event represents a terminal event sent to subscribers.
 type Event struct {
@@ -92,7 +105,7 @@ func New(req *CreateRequest) (*Session, error) {
 	}
 	cmd.Env = env
 
-	log.Printf("[session] starting command=%s cwd=%s cols=%d rows=%d env_keys=%d", req.Command, req.Cwd, req.Cols, req.Rows, len(envMap))
+	debugLog("[session] starting command=%s cwd=%s cols=%d rows=%d env_keys=%d", req.Command, req.Cwd, req.Cols, req.Rows, len(envMap))
 
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{
 		Cols: uint16(req.Cols),
@@ -128,12 +141,12 @@ func (s *Session) readLoop() {
 	for {
 		n, err := s.ptmx.Read(buf)
 		if n > 0 {
-			log.Printf("[session] read id=%s bytes=%d", s.id, n)
+			debugLog("[session] read id=%s bytes=%d", s.id, n)
 			combined := append(carry, buf[:n]...)
 			validLen := validUTF8Prefix(combined)
 			if validLen > 0 {
 				data := string(combined[:validLen])
-				log.Printf("[session] publish id=%s dataLen=%d", s.id, len(data))
+				debugLog("[session] publish id=%s dataLen=%d", s.id, len(data))
 				s.appendRing(data)
 				s.publish(Event{Type: "output", SessionID: s.id, Data: data})
 				carry = append([]byte(nil), combined[validLen:]...)
@@ -142,7 +155,7 @@ func (s *Session) readLoop() {
 			}
 		}
 		if err != nil {
-			log.Printf("[session] read err id=%s err=%v carry=%d", s.id, err, len(carry))
+			debugLog("[session] read err id=%s err=%v carry=%d", s.id, err, len(carry))
 			if len(carry) > 0 {
 				data := string(carry)
 				s.appendRing(data)
@@ -232,7 +245,7 @@ func (s *Session) Unsubscribe(ch chan Event) {
 
 // Write sends input to the PTY.
 func (s *Session) Write(data string) error {
-	log.Printf("[session] write id=%s dataLen=%d", s.id, len(data))
+	debugLog("[session] write id=%s dataLen=%d", s.id, len(data))
 	_, err := s.ptmx.WriteString(data)
 	return err
 }
