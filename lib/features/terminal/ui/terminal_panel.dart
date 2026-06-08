@@ -783,7 +783,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
     // during initial layout, ignoring initialScrollOffset.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.jumpTo(widget.session.scrollOffset);
+        final position = _scrollController.position;
+        final stored = widget.session.scrollOffset;
+        final isDefault = stored <= position.minScrollExtent + 1;
+        final target = isDefault
+            ? position.maxScrollExtent
+            : stored.clamp(
+                position.minScrollExtent,
+                position.maxScrollExtent,
+              );
+        _scrollController.jumpTo(target);
       }
     });
   }
@@ -1771,7 +1780,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
   void _restoreResizeScrollAnchor() {
     final anchor = _resizeScrollAnchor;
     if (anchor == null) return;
-    void restore() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       final position = _scrollController.position;
       final target =
@@ -1783,12 +1792,6 @@ class TerminalWidgetState extends State<TerminalWidget> {
             .clamp(position.minScrollExtent, position.maxScrollExtent)
             .toDouble(),
       );
-    }
-
-    scheduleMicrotask(restore);
-    WidgetsBinding.instance.addPostFrameCallback((_) => restore());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => restore());
     });
   }
 
