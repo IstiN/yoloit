@@ -4608,8 +4608,19 @@ if not os.path.isfile(dart_path):
 
 dart_total = "?"
 if os.path.isfile(dart_path):
+    # Read the main file and all .dart files in its cli_tools/ directory
+    # so that refactored sub-lists are included in the cross-check.
+    dart_src = ""
     with open(dart_path) as f:
-        dart_src = f.read()
+        dart_src += f.read() + "\n"
+    dart_dir = os.path.dirname(dart_path)
+    cli_tools_dir = os.path.join(dart_dir, "cli_tools")
+    if os.path.isdir(cli_tools_dir):
+        for fname in sorted(os.listdir(cli_tools_dir)):
+            if fname.endswith(".dart"):
+                with open(os.path.join(cli_tools_dir, fname)) as f:
+                    dart_src += f.read() + "\n"
+
     dart_commands = set(re.findall(r"command:\s*'([^']+)'", dart_src))
     dart_total = len(dart_commands)
 
