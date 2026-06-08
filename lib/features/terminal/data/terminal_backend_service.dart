@@ -39,7 +39,13 @@ class TerminalBackendService {
   }
 
   void write(String sessionId, String data) {
-    (_bySession[sessionId] ?? _local).write(sessionId, data);
+    final backend = _bySession[sessionId] ?? _local;
+    assert(() {
+      // ignore: avoid_print
+      print('[TerminalBackend] write session=$sessionId backend=${backend.mode.id} dataLen=${data.length}');
+      return true;
+    }());
+    backend.write(sessionId, data);
   }
 
   void resize(String sessionId, int columns, int rows) {

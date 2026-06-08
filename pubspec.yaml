@@ -117,7 +117,7 @@ flutter:
     - assets/config/
     - assets/command_catalog/
     - tools/yoloit
-    - tools/yoloit_runtime.py
+    - tools/yoloitd/yoloitd
     - tools/widgets/weather/manifest.json
     - tools/widgets/weather/widget.js
     - tools/widgets/crypto/manifest.json

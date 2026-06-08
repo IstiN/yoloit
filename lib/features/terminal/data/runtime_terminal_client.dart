@@ -30,6 +30,9 @@ class RuntimeTerminalClient {
   String get _pidPath => '$runtimeHome/runtime.pid';
 
   Future<void> ensureStarted() async {
+    if (kDebugMode) {
+      await _killStaleDebugRuntime();
+    }
     if (await _loadPort() && await _isHealthy()) return;
     await _startRuntime();
     for (var i = 0; i < 50; i++) {
@@ -37,6 +40,52 @@ class RuntimeTerminalClient {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     throw StateError('YoLoIT runtime did not start');
+  }
+
+  Future<void> _killStaleDebugRuntime() async {
+    final scriptPath = await _runtimeBinaryPath();
+    final script = File(scriptPath);
+    if (!await script.exists()) return;
+
+    final mtimePath = '$runtimeHome/script.mtime';
+    final currentMtime = (await script.lastModified()).millisecondsSinceEpoch;
+
+    final mtimeFile = File(mtimePath);
+    int? savedMtime;
+    if (await mtimeFile.exists()) {
+      savedMtime = int.tryParse(await mtimeFile.readAsString());
+    }
+
+    if (savedMtime == currentMtime) {
+      // Script unchanged — keep existing runtime so sessions survive hot-restart.
+      return;
+    }
+
+    // Script changed — kill stale runtime.
+    final pidFile = File(_pidPath);
+    if (await pidFile.exists()) {
+      final pidStr = (await pidFile.readAsString()).trim();
+      final pid = int.tryParse(pidStr);
+      if (pid != null) {
+        try {
+          final result = await Process.run('kill', ['-0', '$pid']);
+          if (result.exitCode == 0) {
+            Process.killPid(pid, ProcessSignal.sigterm);
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+            final check = await Process.run('kill', ['-0', '$pid']);
+            if (check.exitCode == 0) {
+              Process.killPid(pid, ProcessSignal.sigkill);
+            }
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+    }
+
+    await _deleteIfExists(_portPath);
+    await _deleteIfExists(_pidPath);
+    await mtimeFile.writeAsString('$currentMtime');
   }
 
   Future<bool> createSession({
@@ -84,7 +133,15 @@ class RuntimeTerminalClient {
   }
 
   Future<void> resize(String sessionId, int cols, int rows) async {
-    await _post('/sessions/$sessionId/resize', {'cols': cols, 'rows': rows});
+    try {
+      await _post('/sessions/$sessionId/resize', {'cols': cols, 'rows': rows});
+    } on StateError catch (e) {
+      if (e.toString().contains('404')) {
+        // Session expired or runtime was restarted; ignore gracefully.
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<void> kill(String sessionId) async {
@@ -118,36 +175,41 @@ class RuntimeTerminalClient {
     await _deleteIfExists(_portPath);
     await _deleteIfExists(_pidPath);
 
-    final script = await _runtimeScriptPath();
+    final binary = await _runtimeBinaryPath();
+
     if (Platform.isWindows) {
-      await Process.start('python3', [
-        script,
+      await Process.start(binary, [
         '--home',
         runtimeHome,
       ], mode: ProcessStartMode.detached);
       return;
     }
+
     await Process.run('sh', [
       '-c',
-      r'nohup python3 "$1" --home "$2" >> "$2/runtime.log" 2>&1 < /dev/null &',
+      r'nohup "$1" --home "$2" >> "$2/runtime.log" 2>&1 < /dev/null &',
       'yoloit-runtime',
-      script,
+      binary,
       runtimeHome,
     ]);
   }
 
-  Future<String> _runtimeScriptPath() async {
+  Future<String> _runtimeBinaryPath() async {
+    final binaryName = Platform.isWindows ? 'yoloitd.exe' : 'yoloitd';
     final candidates = [
-      'tools/yoloit_runtime.py',
-      '$runtimeHome/yoloit_runtime.py',
+      'tools/yoloitd/$binaryName',
+      '$runtimeHome/$binaryName',
     ];
     for (final path in candidates) {
       if (await File(path).exists()) return path;
     }
-    final installed = File('$runtimeHome/yoloit_runtime.py');
-    final source = await rootBundle.loadString('tools/yoloit_runtime.py');
+
+    // Extract from bundled assets to runtimeHome
+    final installed = File('$runtimeHome/$binaryName');
+    final assetData = await rootBundle.load('tools/yoloitd/$binaryName');
+    final bytes = assetData.buffer.asUint8List();
     await installed.parent.create(recursive: true);
-    await installed.writeAsString(source, flush: true);
+    await installed.writeAsBytes(bytes, flush: true);
     if (!Platform.isWindows) {
       await Process.run('chmod', ['+x', installed.path]);
     }

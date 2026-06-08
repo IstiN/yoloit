@@ -2,13 +2,61 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/features/terminal/data/pty_service.dart';
+import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
 import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
+
+class _BufferedUtf8Decoder extends StreamTransformerBase<List<int>, String> {
+  const _BufferedUtf8Decoder();
+
+  @override
+  Stream<String> bind(Stream<List<int>> stream) {
+    const decoder = Utf8Decoder(allowMalformed: true);
+    var carry = <int>[];
+    return stream.map((chunk) {
+      final combined = [...carry, ...chunk];
+      final validLen = _validUtf8Length(combined);
+      if (validLen == 0) {
+        carry = combined;
+        return '';
+      }
+      final toDecode = combined.sublist(0, validLen);
+      carry = combined.sublist(validLen);
+      return decoder.convert(toDecode);
+    }).where((s) => s.isNotEmpty);
+  }
+
+  static int _validUtf8Length(List<int> bytes) {
+    var i = bytes.length;
+    final min = bytes.length > 3 ? bytes.length - 3 : 0;
+    while (i > min) {
+      i--;
+      if (_isValidUtf8Boundary(bytes, i)) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  static bool _isValidUtf8Boundary(List<int> bytes, int index) {
+    final b = bytes[index];
+    if (b < 0x80) return true;
+    if ((b & 0xC0) == 0x80) return false;
+    final len = _utf8SequenceLength(b);
+    return index + len <= bytes.length;
+  }
+
+  static int _utf8SequenceLength(int firstByte) {
+    if (firstByte < 0xC0) return 1;
+    if (firstByte < 0xE0) return 2;
+    if (firstByte < 0xF0) return 3;
+    return 4;
+  }
+}
 
 class TerminalProcess {
   TerminalProcess({
@@ -24,7 +72,7 @@ class TerminalProcess {
   factory TerminalProcess.fromPty(Pty pty) {
     return TerminalProcess(
       output: pty.output.cast<List<int>>().transform(
-        const Utf8Decoder(allowMalformed: true),
+        const _BufferedUtf8Decoder(),
       ),
       exitCode: pty.exitCode,
     );
@@ -151,7 +199,14 @@ class RuntimeTerminalBackend implements TerminalBackend {
   }
 
   @override
-  void write(String sessionId, String data) => _client.input(sessionId, data);
+  void write(String sessionId, String data) {
+    assert(() {
+      // ignore: avoid_print
+      print('[RuntimeBackend] input session=$sessionId dataLen=${data.length}');
+      return true;
+    }());
+    _client.input(sessionId, data);
+  }
 
   @override
   void resize(String sessionId, int columns, int rows) =>

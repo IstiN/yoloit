@@ -708,7 +708,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
   final _kTerminalViewKey = GlobalKey<kterm.TerminalViewState>();
   Timer? _focusRetryTimer;
   double _fontSize = 13.0;
-  Size _terminalSize = Size.zero;
+
+  bool get _hardwareKeyboardOnly {
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.macOS ||
+      TargetPlatform.windows ||
+      TargetPlatform.linux =>
+        true,
+      _ => false,
+    };
+  }
   _TerminalScrollAnchor? _resizeScrollAnchor;
   _TerminalScrollAnchor? _userScrollAnchor;
   Timer? _userScrollAnchorTimer;
@@ -740,10 +749,18 @@ class TerminalWidgetState extends State<TerminalWidget> {
   List<CellOffset> _searchHits = [];
   int _currentHitIndex = -1;
 
+  Size? get _terminalRenderSize {
+    final context = _terminalViewKey.currentContext ?? _kTerminalViewKey.currentContext;
+    if (context == null) return null;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    return renderBox?.size;
+  }
+
   bool _isTerminalScrollbarHit(Offset localPosition) {
-    if (_terminalSize == Size.zero) return false;
+    final size = _terminalRenderSize;
+    if (size == null || size == Size.zero) return false;
     const scrollbarHitWidth = 24.0;
-    return localPosition.dx >= _terminalSize.width - scrollbarHitWidth;
+    return localPosition.dx >= size.width - scrollbarHitWidth;
   }
 
   late final ScrollController _scrollController;
@@ -823,6 +840,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusNode.requestFocus();
+        _requestKeyboardOnActiveEngine();
       }
     });
     // Retry after dialog dismiss animation (e.g. NewAgentSessionDialog pop).
@@ -830,8 +848,18 @@ class TerminalWidgetState extends State<TerminalWidget> {
     _focusRetryTimer = Timer(const Duration(milliseconds: 300), () {
       if (mounted && widget.isActive && !_focusNode.hasFocus) {
         _focusNode.requestFocus();
+        _requestKeyboardOnActiveEngine();
       }
     });
+  }
+
+  void _requestKeyboardOnActiveEngine() {
+    switch (AgentConfigService.instance.terminalRenderEngine) {
+      case TerminalRenderEngine.kterm:
+        _kTerminalViewKey.currentState?.requestKeyboard();
+      case TerminalRenderEngine.xterm:
+        _terminalViewKey.currentState?.requestKeyboard();
+    }
   }
 
   void _bindTerminal() {
@@ -1160,6 +1188,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
   /// protocol escape sequence (\x1b[13;2u) so modern CLIs (Copilot, Claude
   /// Code) treat it as a newline in the input buffer instead of submitting.
   KeyEventResult _onTerminalKeyEvent(FocusNode node, KeyEvent event) {
+    if (kDebugMode) {
+      debugPrint(
+        '[TerminalKey] _onTerminalKeyEvent key=${event.logicalKey} '
+        'character=${event.character} hasFocus=${node.hasFocus} '
+        'hardwareOnly=$_hardwareKeyboardOnly',
+      );
+    }
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
@@ -1203,6 +1238,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
   ///   Opt+→             → ESC+f   (\x1bf) — word forward
   ///   Cmd+K             → Ctrl+L  (\x0c) — clear screen
   bool _handleHardwareKey(KeyEvent event) {
+    if (kDebugMode) {
+      debugPrint(
+        '[TerminalKey] _handleHardwareKey key=${event.logicalKey} '
+        'character=${event.character} hasFocus=${_focusNode.hasFocus} '
+        'isKeyDown=${event is KeyDownEvent}',
+      );
+    }
     if (!_focusNode.hasFocus) return false;
     if (event is! KeyDownEvent) return false;
 
@@ -1320,6 +1362,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
   }
 
   void _writePty(String sequence) {
+    if (kDebugMode) {
+      debugPrint(
+        '[TerminalKey] _writePty session=${widget.session.id} '
+        'data="${sequence.replaceAll('\n', '\\n').replaceAll('\r', '\\r').replaceAll('\x03', '^C').replaceAll('\x1b', 'ESC')}"',
+      );
+    }
     TerminalBackendService.instance.write(widget.session.id, sequence);
   }
 
@@ -1368,8 +1416,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
         'buf=${buffer.height} '
         'lines=${terminal.lines.length} '
         'font=${_fontSize.toStringAsFixed(1)} '
-        'size=${_terminalSize.width.toStringAsFixed(1)}x'
-        '${_terminalSize.height.toStringAsFixed(1)} $scroll';
+        'size=${_terminalRenderSize?.width.toStringAsFixed(1) ?? '?'}x'
+        '${_terminalRenderSize?.height.toStringAsFixed(1) ?? '?'} $scroll';
   }
 
   void setFontSize(double size) {
@@ -1553,7 +1601,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
       _searchController.clear();
     });
     _controller.clearSelection();
-    if (mounted) _focusNode.requestFocus();
+    if (mounted) {
+      _focusNode.requestFocus();
+      _requestKeyboardOnActiveEngine();
+    }
   }
 
   void _performSearch(String query) {
@@ -1613,8 +1664,10 @@ class TerminalWidgetState extends State<TerminalWidget> {
       return;
     }
 
-    final cellW = (_terminalSize.width - 16) / terminal.viewWidth;
-    final cellH = (_terminalSize.height - 16) / terminal.viewHeight;
+    final termSize = _terminalRenderSize;
+    if (termSize == null) return;
+    final cellW = (termSize.width - 16) / terminal.viewWidth;
+    final cellH = (termSize.height - 16) / terminal.viewHeight;
     final startOffset = Offset(
       hit.x * cellW + 8,
       visRow * cellH + cellH / 2 + 8,
@@ -1671,8 +1724,8 @@ class TerminalWidgetState extends State<TerminalWidget> {
       'view=${widget.session.terminal.viewWidth}x'
       '${widget.session.terminal.viewHeight} '
       'bufferLines=${buffer.lines.length} scrollBack=${buffer.scrollBack} '
-      'size=${_terminalSize.width.toStringAsFixed(1)}x'
-      '${_terminalSize.height.toStringAsFixed(1)} $metrics',
+      'size=${_terminalRenderSize?.width.toStringAsFixed(1) ?? '?'}x'
+      '${_terminalRenderSize?.height.toStringAsFixed(1) ?? '?'} $metrics',
     );
   }
 
@@ -1903,28 +1956,16 @@ class TerminalWidgetState extends State<TerminalWidget> {
     return ValueListenableBuilder<TerminalRenderEngine>(
       valueListenable: AgentConfigService.instance.terminalRenderEngineNotifier,
       builder: (context, engine, _) {
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final nextSize = Size(constraints.maxWidth, constraints.maxHeight);
-            if (_terminalSize != Size.zero && _terminalSize != nextSize) {
-              _captureResizeScrollAnchor();
-              _terminalSize = nextSize;
-              _restoreResizeScrollAnchor();
-            } else {
-              _terminalSize = nextSize;
-            }
-            if (engine == TerminalRenderEngine.kterm) {
-              return _buildKtermTerminal(colors);
-            }
-            return Stack(
-              children: [
-                _buildXtermTerminal(colors),
-                // Search overlay
-                if (_isSearching)
-                  Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
-              ],
-            );
-          },
+        if (engine == TerminalRenderEngine.kterm) {
+          return _buildKtermTerminal(colors);
+        }
+        return Stack(
+          children: [
+            _buildXtermTerminal(colors),
+            // Search overlay
+            if (_isSearching)
+              Positioned(top: 8, right: 8, child: _buildSearchBar(colors)),
+          ],
         );
       },
     );
@@ -1956,13 +1997,13 @@ class TerminalWidgetState extends State<TerminalWidget> {
           controller: _kController,
           focusNode: _focusNode,
           autofocus: widget.isActive,
+          hardwareKeyboardOnly: _hardwareKeyboardOnly,
           scrollController: _scrollController,
           simulateScroll: true,
           showSearchBar: true,
           onKeyEvent: _onTerminalKeyEvent,
           textStyle: kterm.TerminalStyle(
             fontSize: _fontSize,
-            fontFamily: 'JetBrainsMono',
             height: 1.2,
           ),
           theme: kterm.TerminalTheme(
@@ -2167,12 +2208,12 @@ class TerminalWidgetState extends State<TerminalWidget> {
           controller: _controller,
           focusNode: _focusNode,
           autofocus: widget.isActive,
+          hardwareKeyboardOnly: _hardwareKeyboardOnly,
           scrollController: _scrollController,
           simulateScroll: false,
           onKeyEvent: _onTerminalKeyEvent,
           textStyle: TerminalStyle(
             fontSize: _fontSize,
-            fontFamily: 'JetBrainsMono',
             height: 1.2,
           ),
           theme: TerminalTheme(
@@ -2213,7 +2254,7 @@ class TerminalWidgetState extends State<TerminalWidget> {
         child: _TerminalScrollChrome(
           controller: _scrollController,
           colors: colors,
-          child: RepaintBoundary(child: child),
+          child: child,
         ),
       ),
     );
