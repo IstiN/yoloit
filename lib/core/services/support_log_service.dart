@@ -37,14 +37,56 @@ class SupportLogService {
     buf.writeln('Resolved executable: ${Platform.resolvedExecutable}');
     buf.writeln('PATH: ${Platform.environment['PATH'] ?? '(empty)'}');
 
-    // Architecture
+    // Architecture (system + binary)
     try {
       final result = await Process.run('uname', const ['-m']);
       if (result.exitCode == 0) {
-        buf.writeln('Architecture: ${(result.stdout as String).trim()}');
+        buf.writeln('System architecture: ${(result.stdout as String).trim()}');
       }
     } catch (_) {
-      buf.writeln('Architecture: unknown');
+      buf.writeln('System architecture: unknown');
+    }
+
+    try {
+      final resolved = Platform.resolvedExecutable;
+      final result = await Process.run('file', [resolved]);
+      if (result.exitCode == 0) {
+        buf.writeln('Binary file info: ${(result.stdout as String).trim()}');
+      }
+    } catch (_) {
+      buf.writeln('Binary file info: unavailable');
+    }
+
+    try {
+      final resolved = Platform.resolvedExecutable;
+      final result = await Process.run('lipo', ['-info', resolved]);
+      if (result.exitCode == 0) {
+        buf.writeln('Binary architectures: ${(result.stdout as String).trim()}');
+      }
+    } catch (_) {
+      buf.writeln('Binary architectures: unavailable');
+    }
+
+    // Flutter / Dart toolchain versions
+    try {
+      final result = await Process.run('flutter', const ['--version']);
+      if (result.exitCode == 0) {
+        final lines = (result.stdout as String).trim().split('\n');
+        if (lines.isNotEmpty) {
+          buf.writeln('Flutter: ${lines.first.trim()}');
+        }
+      }
+    } catch (_) {
+      buf.writeln('Flutter: not found on PATH');
+    }
+
+    try {
+      final result = await Process.run('dart', const ['--version']);
+      if (result.exitCode == 0) {
+        buf.writeln('Dart CLI: ${(result.stdout as String).trim()}');
+      }
+    } catch (_) {
+      buf.writeln('Dart CLI: not found on PATH');
     }
 
     // rsvg-convert availability
@@ -81,6 +123,21 @@ class SupportLogService {
       }
     } catch (_) {}
 
+    try {
+      final status = await Process.run('git', const ['status', '--short']);
+      if (status.exitCode == 0) {
+        final out = (status.stdout as String).trim();
+        if (out.isNotEmpty) {
+          buf.writeln('Git dirty files:');
+          for (final line in out.split('\n')) {
+            buf.writeln('  $line');
+          }
+        } else {
+          buf.writeln('Git dirty files: none');
+        }
+      }
+    } catch (_) {}
+
     // Submodule hashes
     try {
       final sm = await Process.run(
@@ -94,9 +151,13 @@ class SupportLogService {
           for (final line in lines) {
             buf.writeln('  $line');
           }
+        } else {
+          buf.writeln('Submodules: none');
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      buf.writeln('Submodules: unable to read');
+    }
 
     return buf.toString();
   }

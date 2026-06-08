@@ -93,8 +93,15 @@ jobs:
           echo "=== Submodules ==="
           git submodule status --recursive
           echo ""
+          echo "=== Submodule HEADs ==="
+          git submodule foreach 'git log -1 --oneline'
+          echo ""
           echo "=== Working tree status ==="
           git status --short
+          git diff --shortstat
+          echo ""
+          echo "=== Submodule diffs ==="
+          git diff --submodule || true
           echo ""
           echo "=== Last 5 commits ==="
           git log --oneline -5
@@ -114,6 +121,7 @@ jobs:
           echo "/opt/homebrew/bin" >> $GITHUB_PATH
           export PATH="/opt/homebrew/bin:$PATH"
           flutter --version
+          dart --version
 
       - name: Install Rust toolchain
         run: |
@@ -131,7 +139,10 @@ jobs:
 
       # ── Dependencies ────────────────────────────────────────────────────────
       - name: Install Flutter dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          echo "=== Dependency versions ==="
+          flutter pub deps --style=compact
 
       # ── Version ─────────────────────────────────────────────────────────────
       - name: Derive build version
@@ -229,8 +240,12 @@ jobs:
             --build-number=$BUILD_NUMBER
           # Verify architectures in the produced binary
           MAIN_BIN=$(find build/macos/Build/Products/Release/YoLoIT.app -name "YoLoIT" -type f | head -1)
-          echo "Architectures in binary:"
-          lipo -info "$MAIN_BIN" || file "$MAIN_BIN"
+          echo "=== Binary architecture verification ==="
+          echo "Binary path: $MAIN_BIN"
+          file "$MAIN_BIN"
+          lipo -info "$MAIN_BIN"
+          lipo -detailed_info "$MAIN_BIN" || true
+          echo "=== End binary verification ==="
 
       # ── Build & bundle web client ─────────────────────────────────────────────
       - name: Build web client
