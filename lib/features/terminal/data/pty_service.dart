@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter_pty/flutter_pty.dart';
+import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
 import 'package:yoloit/core/platform/platform_shell.dart';
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 

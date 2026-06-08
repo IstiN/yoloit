@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_pty/flutter_pty.dart';
+import 'package:yoloit/features/terminal/data/pty_wrapper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 

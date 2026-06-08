@@ -1447,6 +1447,7 @@ class _SidebarRow extends StatelessWidget {
     required this.hidden,
     required this.expanded,
     required this.hasChildren,
+    this.onToggleExpand,
     required this.onToggleHide,
     required this.onFocus,
   });
