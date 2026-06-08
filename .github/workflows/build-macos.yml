@@ -83,6 +83,22 @@ jobs:
           echo "flutter_code_editor cloned:"
           git -C "$GITHUB_WORKSPACE/third_party/flutter_code_editor" log -1 --oneline
 
+      # ── Source verification ─────────────────────────────────────────────────
+      - name: Print build source info
+        run: |
+          echo "=== Main repo ==="
+          git rev-parse HEAD
+          git log -1 --oneline
+          echo ""
+          echo "=== Submodules ==="
+          git submodule status --recursive
+          echo ""
+          echo "=== Working tree status ==="
+          git status --short
+          echo ""
+          echo "=== Last 5 commits ==="
+          git log --oneline -5
+
       # ── Environment ─────────────────────────────────────────────────────────
       - name: Setup Flutter environment
         run: |

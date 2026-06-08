@@ -1,4 +1,5 @@
 import 'package:yoloit/core/services/resource_monitor_service.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
@@ -22,6 +23,11 @@ class TerminalBackendService {
     TerminalBackend? backendOverride,
   }) async {
     final backend = backendOverride ?? _selectBackend();
+    final mode = backend.mode;
+    SupportLogService.instance.add(
+      'terminal-backend',
+      'session=$sessionId mode=${mode.id} label=$label',
+    );
     _bySession[sessionId] = backend;
     return backend.launch(
       sessionId: sessionId,

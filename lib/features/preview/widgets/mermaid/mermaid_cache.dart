@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dmtools_mermaid_renderer/dmtools_mermaid_renderer.dart';
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:flutter/material.dart';
+import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/core/utils/svg_utils.dart';
 
 /// Rasterized diagram data holder.
@@ -31,6 +32,7 @@ class MermaidRasterizedDiagramCache {
       LinkedHashMap<String, Future<MermaidRasterizedDiagram>>();
   static final LinkedHashMap<String, MermaidRasterizedDiagram> _resolved =
       LinkedHashMap<String, MermaidRasterizedDiagram>();
+  static bool _renderMethodCallbackSet = false;
 
   static String keyFor(String code, double width, {String variant = ''}) =>
       '${width.round()}:$variant:${code.length}:${code.hashCode}';
@@ -56,6 +58,16 @@ class MermaidRasterizedDiagramCache {
     required MermaidRenderOptions options,
     String variant = '',
   }) {
+    if (!_renderMethodCallbackSet) {
+      _renderMethodCallbackSet = true;
+      MermaidRenderer.onRenderMethod = (String method, String details) {
+        SupportLogService.instance.add(
+          'mermaid-render',
+          'method=$method details=$details',
+        );
+      };
+    }
+
     final key = keyFor(code, width, variant: variant);
     final existing = _entries.remove(key);
     if (existing != null) {
