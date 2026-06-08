@@ -53,6 +53,11 @@ jobs:
 
           if [ -n "$LOCAL_REPO" ]; then
             echo "Using fast local mirror: $LOCAL_REPO"
+            echo "Updating local mirror to latest origin/main..."
+            git -C "$LOCAL_REPO" fetch origin main
+            git -C "$LOCAL_REPO" reset --hard origin/main
+            echo "Local mirror now at:"
+            git -C "$LOCAL_REPO" log -1 --oneline
             rsync -a --delete \
               --exclude='build/' \
               --exclude='.dart_tool/' \
