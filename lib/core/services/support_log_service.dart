@@ -96,27 +96,30 @@ class SupportLogService {
     buf.writeln('Build submodules: $kBuildSubmodules');
     buf.writeln('Submodule mermaid_renderer_flutter: $kSubmoduleMermaidHash');
     buf.writeln('Submodule xterm: $kSubmoduleXtermHash');
+    buf.writeln('Mermaid renderer version: $kMermaidRendererVersion');
     buf.writeln('Mermaid bundle hash: $kMermaidBundleHash');
     buf.writeln('Mermaid bundle size: $kMermaidBundleSize');
+    buf.writeln('xterm version: $kXtermVersion');
     buf.writeln('flutter_svg version: $kFlutterSvgVersion');
+    buf.writeln('resvg version: $kResvgVersion');
 
-    // rsvg-convert availability
+    // resvg availability
     try {
-      final result = await Process.run('which', const ['rsvg-convert']);
+      final result = await Process.run('which', const ['resvg']);
       if (result.exitCode == 0) {
         final path = (result.stdout as String).trim();
-        buf.writeln('rsvg-convert: $path');
+        buf.writeln('resvg PATH: $path');
         try {
           final ver = await Process.run(path, const ['--version']);
           if (ver.exitCode == 0) {
-            buf.writeln('rsvg-convert version: ${(ver.stdout as String).trim()}');
+            buf.writeln('resvg PATH version: ${(ver.stdout as String).trim()}');
           }
         } catch (_) {}
       } else {
-        buf.writeln('rsvg-convert: not found');
+        buf.writeln('resvg PATH: not found');
       }
     } catch (_) {
-      buf.writeln('rsvg-convert: not found (which failed)');
+      buf.writeln('resvg PATH: not found (which failed)');
     }
 
     // Git info

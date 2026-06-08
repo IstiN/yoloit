@@ -154,9 +154,12 @@ jobs:
           SUBMODULES=$(git submodule status --recursive | tr '\n' ';')
           SUBMODULE_MERMAID=$(git -C packages/mermaid_renderer_flutter rev-parse --short HEAD 2>/dev/null || echo 'none')
           SUBMODULE_XTERM=$(git -C packages/xterm rev-parse --short HEAD 2>/dev/null || echo 'none')
+          MERMAID_RENDERER_VER=$(grep '^version:' packages/mermaid_renderer_flutter/pubspec.yaml | sed 's/version: //' || echo 'unknown')
+          XTERM_VER=$(grep '^version:' packages/xterm/pubspec.yaml | sed 's/version: //' || echo 'unknown')
           MERMAID_SIZE=$(wc -c < packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js | tr -d ' ')
           MERMAID_HASH=$(shasum -a 256 packages/mermaid_renderer_flutter/assets/mermaid/mermaid-renderer.js | awk '{print $1}')
           FLUTTER_SVG_VER=$(grep -A2 'flutter_svg:' pubspec.lock | grep 'version:' | head -1 | sed 's/.*version: //' || echo 'unknown')
+          RESVG_VER=$(macos/Runner/Resources/resvg --version 2>/dev/null || echo 'unknown')
 
           printf '%s\n' \
             '// Generated build info — CI overwrites this file before compilation.' \
@@ -167,9 +170,12 @@ jobs:
             "const String kBuildSubmodules = '${SUBMODULES}';" \
             "const String kSubmoduleMermaidHash = '${SUBMODULE_MERMAID}';" \
             "const String kSubmoduleXtermHash = '${SUBMODULE_XTERM}';" \
+            "const String kMermaidRendererVersion = '${MERMAID_RENDERER_VER}';" \
+            "const String kXtermVersion = '${XTERM_VER}';" \
             "const String kMermaidBundleHash = '${MERMAID_HASH}';" \
             "const String kMermaidBundleSize = '${MERMAID_SIZE}';" \
             "const String kFlutterSvgVersion = '${FLUTTER_SVG_VER}';" \
+            "const String kResvgVersion = '${RESVG_VER}';" \
             > lib/core/services/build_info.dart
 
           echo "Build info generated:"
