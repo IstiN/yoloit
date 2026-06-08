@@ -80,7 +80,12 @@ func New(req *CreateRequest) (*Session, error) {
 		req.Rows = 30
 	}
 
-	cmd := exec.Command(req.Command, "-l")
+	var cmd *exec.Cmd
+	if strings.Contains(req.Command, " ") {
+		cmd = exec.Command("sh", "-c", req.Command)
+	} else {
+		cmd = exec.Command(req.Command, "-l")
+	}
 	cmd.Dir = req.Cwd
 
 	// Build environment map to deduplicate and ensure required vars.
