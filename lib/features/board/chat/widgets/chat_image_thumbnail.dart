@@ -46,6 +46,7 @@ class ChatImageThumbnail extends StatelessWidget {
               child: Image.file(
                 file,
                 fit: BoxFit.contain,
+                gaplessPlayback: true,
                 errorBuilder:
                     (_, __, ___) => Container(
                       width: 80,

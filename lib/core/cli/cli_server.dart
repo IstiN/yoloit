@@ -110,9 +110,9 @@ class CliServer {
     try {
       _server = await shelf_io.serve(handler, InternetAddress.loopbackIPv4, 0);
       _writePortFile(_server!.port);
-      debugPrint('[CliServer] listening on localhost:${_server!.port}');
+      assert(() { debugPrint('[CliServer] listening on localhost:${_server!.port}'); return true; }());
     } catch (e) {
-      debugPrint('[CliServer] failed to start: $e');
+      assert(() { debugPrint('[CliServer] failed to start: $e'); return true; }());
     }
   }
 
@@ -153,9 +153,9 @@ class CliServer {
         flush: true,
       );
       await Process.run('chmod', ['+x', binFile.path]);
-      debugPrint('[CliServer] CLI script installed at ${binFile.path}');
+      assert(() { debugPrint('[CliServer] CLI script installed at ${binFile.path}'); return true; }());
     } catch (e) {
-      debugPrint('[CliServer] Failed to install CLI script: $e');
+      assert(() { debugPrint('[CliServer] Failed to install CLI script: $e'); return true; }());
     }
   }
 
@@ -673,7 +673,7 @@ class CliServer {
 
     Uint8List? png;
     if (forceOffscreen) {
-      debugPrint('[CliServer] screenshot: offscreen board=${board.id}');
+      assert(() { debugPrint('[CliServer] screenshot: offscreen board=${board.id}'); return true; }());
       png = await BoardOffscreenRenderer.instance.renderBoard(board);
     } else {
       final activeBoard = activeCubit.state.activeBoard;
@@ -682,7 +682,7 @@ class CliServer {
         _scheduleRebuild();
         png = await BoardScreenshotService.instance.capturePng(pixelRatio: 1.5);
       } else {
-        debugPrint('[CliServer] screenshot: offscreen board=${board.id}');
+        assert(() { debugPrint('[CliServer] screenshot: offscreen board=${board.id}'); return true; }());
         png = await BoardOffscreenRenderer.instance.renderBoard(board);
       }
     }

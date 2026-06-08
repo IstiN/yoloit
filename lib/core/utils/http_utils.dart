@@ -27,7 +27,7 @@ Future<Map<String, dynamic>?> fetchJson({
     final body = await resp.transform(utf8.decoder).join().timeout(timeout);
     return jsonDecode(body) as Map<String, dynamic>;
   } catch (e) {
-    debugPrint('[fetchJson] $url failed: $e');
+    assert(() { debugPrint('[fetchJson] $url failed: $e'); return true; }());
     return null;
   } finally {
     if (ownClient) c.close(force: true);

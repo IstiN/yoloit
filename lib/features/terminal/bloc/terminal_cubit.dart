@@ -455,26 +455,35 @@ class TerminalCubit extends Cubit<TerminalState> {
   }
 
   void _onHookEvent(HookEvent event) {
-    debugPrint(
+    assert(() {
+      debugPrint(
       '[HookEvent] event=${event.event} phase=${event.phase} cwd=${event.workspacePath}',
     );
+      return true;
+    }());
 
     final idx = _findSessionIndexForWorkspacePath(event.workspacePath);
     if (idx < 0) {
       if (_allSessions.isEmpty) return;
-      debugPrint(
+      assert(() {
+        debugPrint(
         '[HookEvent] NO MATCH for cwd=${event.workspacePath}  '
         'sessions: ${_allSessions.map((s) => s.workspacePath).toList()}',
       );
+        return true;
+      }());
       return;
     }
 
     // sessionStart → phase is null, already handled by AgentStatus.live.
     final newPhase = event.phase; // AgentPhase? — null means clear
 
-    debugPrint(
+    assert(() {
+      debugPrint(
       '[HookEvent] MATCHED session[${_allSessions[idx].id}] → newPhase=$newPhase',
     );
+      return true;
+    }());
 
     // ThinkingPhase auto-clears after 15s if no other event fires.
     // PTY idle-timer (5s) will usually clear it sooner via spinner detection.

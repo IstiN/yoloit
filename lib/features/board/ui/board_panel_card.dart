@@ -314,16 +314,22 @@ class BoardPanelCardState extends State<BoardPanelCard>
                       if (isWebpage) {
                         if (!isFocused) {
                           if (kDebugMode) {
-                            debugPrint(
+                            assert(() {
+                              debugPrint(
                               '[BoardWebFocus] panelPointerDown -> focus webpage panel=${panel.id}',
                             );
+                              return true;
+                            }());
                           }
                           onTap();
                         } else {
                           if (kDebugMode) {
-                            debugPrint(
+                            assert(() {
+                              debugPrint(
                               '[BoardWebFocus] panelPointerDown -> already focused, releasing Flutter focus panel=${panel.id}',
                             );
+                              return true;
+                            }());
                           }
                         }
                         // Release ALL Flutter keyboard focus so the native WKWebView

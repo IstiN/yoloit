@@ -152,9 +152,12 @@ class BoardOffscreenRenderer {
   }) async {
     final originalErrorBuilder = ErrorWidget.builder;
     ErrorWidget.builder = (FlutterErrorDetails details) {
-      debugPrint(
+      assert(() {
+        debugPrint(
         '[BoardOffscreenRenderer] panel render error: ${details.exception}',
       );
+        return true;
+      }());
       return ColoredBox(
         color: colors.border.withAlpha(32),
         child: Center(
@@ -170,7 +173,7 @@ class BoardOffscreenRenderer {
     try {
       return await action();
     } catch (e, st) {
-      debugPrint('[BoardOffscreenRenderer] $errorMessage: $e');
+      assert(() { debugPrint('[BoardOffscreenRenderer] $errorMessage: $e'); return true; }());
       debugPrintStack(stackTrace: st);
       return null;
     } finally {

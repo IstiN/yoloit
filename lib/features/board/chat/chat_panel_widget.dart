@@ -1913,7 +1913,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         _insertTextAtCursor(pasted);
       }
     } catch (e) {
-      debugPrint('[ChatPanel] Smart paste error: $e');
+      assert(() { debugPrint('[ChatPanel] Smart paste error: $e'); return true; }());
     }
   }
 

@@ -304,8 +304,8 @@ class _WebpageContentState extends State<_WebpageContent> {
   Future<void> _runExperiment(String id) async {
     final ctrl = _controller;
     if (ctrl == null) return;
-    debugPrint('[WebExp] ══════════════════════════════════════════');
-    debugPrint('[WebExp] Running experiment: $id');
+    assert(() { debugPrint('[WebExp] ══════════════════════════════════════════'); return true; }());
+    assert(() { debugPrint('[WebExp] Running experiment: $id'); return true; }());
 
     switch (id) {
       // ── 📊 Info ────────────────────────────────────────────────────────
@@ -326,7 +326,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   });
 })()
 ''');
-        debugPrint('[WebExp] INFO: $info');
+        assert(() { debugPrint('[WebExp] INFO: $info'); return true; }());
 
       // ── A: User Agent ──────────────────────────────────────────────────
       case 'ua_desktop':
@@ -336,12 +336,12 @@ class _WebpageContentState extends State<_WebpageContent> {
           'Chrome/124.0.0.0 Safari/537.36',
         );
         await ctrl.reload();
-        debugPrint('[WebExp] A: Set desktop Chrome UA, reloading...');
+        assert(() { debugPrint('[WebExp] A: Set desktop Chrome UA, reloading...'); return true; }());
 
       case 'ua_reset':
         await ctrl.setUserAgent(null);
         await ctrl.reload();
-        debugPrint('[WebExp] A: Reset UA to default, reloading...');
+        assert(() { debugPrint('[WebExp] A: Reset UA to default, reloading...'); return true; }());
 
       // ── B: CSS zoom on <html> ──────────────────────────────────────────
       case 'zoom_0_5':
@@ -350,7 +350,7 @@ class _WebpageContentState extends State<_WebpageContent> {
           "window.dispatchEvent(new Event('resize'));"
           "console.log('[WebExp] B: zoom=0.5, innerWidth='+window.innerWidth);",
         );
-        debugPrint('[WebExp] B: Set html zoom=0.5');
+        assert(() { debugPrint('[WebExp] B: Set html zoom=0.5'); return true; }());
 
       case 'zoom_0_75':
         await ctrl.runJavaScript(
@@ -358,7 +358,7 @@ class _WebpageContentState extends State<_WebpageContent> {
           "window.dispatchEvent(new Event('resize'));"
           "console.log('[WebExp] B: zoom=0.75, innerWidth='+window.innerWidth);",
         );
-        debugPrint('[WebExp] B: Set html zoom=0.75');
+        assert(() { debugPrint('[WebExp] B: Set html zoom=0.75'); return true; }());
 
       case 'zoom_1':
         await ctrl.runJavaScript(
@@ -366,7 +366,7 @@ class _WebpageContentState extends State<_WebpageContent> {
           "window.dispatchEvent(new Event('resize'));"
           "console.log('[WebExp] B: zoom reset, innerWidth='+window.innerWidth);",
         );
-        debugPrint('[WebExp] B: Reset html zoom');
+        assert(() { debugPrint('[WebExp] B: Reset html zoom'); return true; }());
 
       // ── C: CSS transform scale on <body> ───────────────────────────────
       case 'scale_body':
@@ -380,7 +380,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   console.log('[WebExp] C: body scale(0.5), bodyClientWidth='+b.clientWidth);
 })();
 ''');
-        debugPrint('[WebExp] C: body transform scale(0.5) + width=200%');
+        assert(() { debugPrint('[WebExp] C: body transform scale(0.5) + width=200%'); return true; }());
 
       case 'scale_reset':
         await ctrl.runJavaScript('''
@@ -393,7 +393,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   console.log('[WebExp] C: body transform reset');
 })();
 ''');
-        debugPrint('[WebExp] C: body transform reset');
+        assert(() { debugPrint('[WebExp] C: body transform reset'); return true; }());
 
       // ── D: Force minWidth on body ──────────────────────────────────────
       case 'min_width':
@@ -404,7 +404,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   console.log('[WebExp] D: minWidth=1280px set, scrollWidth='+document.body.scrollWidth);
 })();
 ''');
-        debugPrint('[WebExp] D: Set body minWidth=1280px');
+        assert(() { debugPrint('[WebExp] D: Set body minWidth=1280px'); return true; }());
 
       case 'min_width_reset':
         await ctrl.runJavaScript('''
@@ -414,7 +414,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   console.log('[WebExp] D: minWidth reset');
 })();
 ''');
-        debugPrint('[WebExp] D: Reset body minWidth');
+        assert(() { debugPrint('[WebExp] D: Reset body minWidth'); return true; }());
 
       // ── E: Override window.innerWidth ─────────────────────────────────
       case 'override_inner_width':
@@ -431,7 +431,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   }
 })();
 ''');
-        debugPrint('[WebExp] E: override window.innerWidth=1278');
+        assert(() { debugPrint('[WebExp] E: override window.innerWidth=1278'); return true; }());
 
       case 'override_inner_width_zoom':
         await ctrl.runJavaScript(r'''
@@ -448,7 +448,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   }
 })();
 ''');
-        debugPrint('[WebExp] E+B: override innerWidth=1278 + zoom=0.5');
+        assert(() { debugPrint('[WebExp] E+B: override innerWidth=1278 + zoom=0.5'); return true; }());
 
       case 'override_inner_width_reset':
         await ctrl.runJavaScript(r'''
@@ -462,7 +462,7 @@ class _WebpageContentState extends State<_WebpageContent> {
   console.log('[WebExp] E: reset, innerWidth=' + window.innerWidth);
 })();
 ''');
-        debugPrint('[WebExp] E: reset innerWidth override');
+        assert(() { debugPrint('[WebExp] E: reset innerWidth override'); return true; }());
     }
 
     // Log state after experiment
@@ -470,8 +470,8 @@ class _WebpageContentState extends State<_WebpageContent> {
     final after = await ctrl.runJavaScriptReturningResult(
       'JSON.stringify({innerWidth:window.innerWidth,zoom:document.documentElement.style.zoom||"none",bodyW:document.body?document.body.clientWidth:null})',
     );
-    debugPrint('[WebExp] After state: $after');
-    debugPrint('[WebExp] ══════════════════════════════════════════');
+    assert(() { debugPrint('[WebExp] After state: $after'); return true; }());
+    assert(() { debugPrint('[WebExp] ══════════════════════════════════════════'); return true; }());
   }
 
   void _showViewportLab(BuildContext context) {
@@ -1001,7 +1001,7 @@ class _ViewportLabDialogState extends State<_ViewportLabDialog> {
       setState(() {
         _result = pretty;
       });
-      debugPrint('[ViewportLab] Result: $raw');
+      assert(() { debugPrint('[ViewportLab] Result: $raw'); return true; }());
     } catch (e) {
       setState(() {
         _result = 'Error: $e';
@@ -1191,7 +1191,7 @@ JSON.stringify({
       setState(() {
         _result = pretty;
       });
-      debugPrint('[ViewportLab] After reload: $afterRaw');
+      assert(() { debugPrint('[ViewportLab] After reload: $afterRaw'); return true; }());
     } catch (e) {
       setState(() {
         _result = 'Error: $e';

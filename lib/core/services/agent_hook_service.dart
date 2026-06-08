@@ -94,13 +94,13 @@ class AgentHookService {
     _timer?.cancel();
     _timer = Timer.periodic(pollInterval, (_) => _poll());
     _poll(); // immediate first poll
-    debugPrint('[HookService] started polling ${_hooksDir.path}');
+    assert(() { debugPrint('[HookService] started polling ${_hooksDir.path}'); return true; }());
   }
 
   void stop() {
     _timer?.cancel();
     _timer = null;
-    debugPrint('[HookService] stopped');
+    assert(() { debugPrint('[HookService] stopped'); return true; }());
   }
 
   Future<void> _poll() async {
@@ -124,7 +124,7 @@ class AgentHookService {
         await _processFile(file);
       }
     } catch (e) {
-      debugPrint('[HookService] poll error: $e');
+      assert(() { debugPrint('[HookService] poll error: $e'); return true; }());
     }
   }
 
@@ -143,7 +143,7 @@ class AgentHookService {
       final ts = (json['ts'] as num?)?.toInt() ?? 0;
       final cwdHash = json['cwdHash'] as String? ?? '';
 
-      debugPrint('[HookService] NEW EVENT: $event  cwd=$cwd  tool=$tool  ts=$ts');
+      assert(() { debugPrint('[HookService] NEW EVENT: $event  cwd=$cwd  tool=$tool  ts=$ts'); return true; }());
 
       _controller.add(HookEvent(
         event: event,
@@ -153,7 +153,7 @@ class AgentHookService {
         timestamp: ts,
       ));
     } catch (e) {
-      debugPrint('[HookService] processFile error for $file: $e');
+      assert(() { debugPrint('[HookService] processFile error for $file: $e'); return true; }());
     }
   }
 

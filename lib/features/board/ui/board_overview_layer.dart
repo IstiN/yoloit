@@ -133,10 +133,11 @@ class BoardOverviewLayerState extends State<BoardOverviewLayer>
       _zoomBoardId = null;
     });
     await _controller.reverse();
+    if (!mounted) return;
     widget.debugLog(
       'create.reverseDone elapsed=${watch.elapsedMilliseconds}ms',
     );
-    if (mounted) widget.onCreateBoard();
+    widget.onCreateBoard();
   }
 
   List<BoardDocument> get _orderedBoards {

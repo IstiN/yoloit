@@ -89,7 +89,7 @@ class BoardCubit extends Cubit<BoardState> {
             return board;
           }).toList();
       if (needsResave) {
-        debugPrint('[BoardCubit] removed duplicate-ID panels, re-saving');
+        assert(() { debugPrint('[BoardCubit] removed duplicate-ID panels, re-saving'); return true; }());
         await _persist(boards: boards, activeBoardId: rawActiveId);
       }
       if (boards.isEmpty) {
@@ -1158,7 +1158,7 @@ class BoardCubit extends Cubit<BoardState> {
     try {
       await _historyStore.append(event);
     } catch (error, stackTrace) {
-      debugPrint('[BoardCubit] failed to append board history: $error');
+      assert(() { debugPrint('[BoardCubit] failed to append board history: $error'); return true; }());
       debugPrintStack(stackTrace: stackTrace);
     }
   }
@@ -1333,14 +1333,20 @@ class BoardCubit extends Cubit<BoardState> {
             baseUrl: remote.url,
             token: remote.token,
           ).fetchBoard(remote.boardId, viewportOverride: board.viewport);
-          debugPrint(
+          assert(() {
+            debugPrint(
             '[BoardCubit] refreshed stale remote board ${board.id} after revision conflict',
           );
+            return true;
+          }());
           continue;
         }
-        debugPrint(
+        assert(() {
+          debugPrint(
           '[BoardCubit] failed to sync remote board ${board.id}: $error',
         );
+          return true;
+        }());
       }
     }
     if (replacements.isEmpty) return;

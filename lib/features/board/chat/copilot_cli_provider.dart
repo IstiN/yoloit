@@ -249,10 +249,13 @@ class CopilotCliProvider extends ChatProvider {
             ? cmdParts.sublist(1).map(normaliseCopilotCommandArg).toList()
             : <String>[];
 
-    debugPrint(
+    assert(() {
+      debugPrint(
       '[CopilotCli] Running: $executable ${[...extraCmdArgs, ...args].join(' ')}',
     );
-    debugPrint('[CopilotCli] cwd: $workingDir');
+      return true;
+    }());
+    assert(() { debugPrint('[CopilotCli] cwd: $workingDir'); return true; }());
 
     try {
       final extraEnv = await GlobalEnvGroupsService.instance
@@ -318,13 +321,13 @@ class CopilotCliProvider extends ChatProvider {
                   final event = ChatEvent.fromJson(json);
                   controller.add(event);
                 } catch (e) {
-                  debugPrint('[CopilotCli] Failed to parse line: $trimmed');
-                  debugPrint('[CopilotCli] Error: $e');
+                  assert(() { debugPrint('[CopilotCli] Failed to parse line: $trimmed'); return true; }());
+                  assert(() { debugPrint('[CopilotCli] Error: $e'); return true; }());
                 }
               }
             },
             onError: (Object error) {
-              debugPrint('[CopilotCli] stdout error: $error');
+              assert(() { debugPrint('[CopilotCli] stdout error: $error'); return true; }());
               if (!controller.isClosed) {
                 controller.addError(error);
               }
@@ -345,7 +348,7 @@ class CopilotCliProvider extends ChatProvider {
           .transform(utf8.decoder)
           .listen(
             (chunk) {
-              debugPrint('[CopilotCli] stderr: $chunk');
+              assert(() { debugPrint('[CopilotCli] stderr: $chunk'); return true; }());
               stderrBuf.write(chunk);
             },
             onError: (_) {
@@ -363,7 +366,7 @@ class CopilotCliProvider extends ChatProvider {
       final exitCode = await process.exitCode;
       await stdoutDone.future;
       await stderrDone.future;
-      debugPrint('[CopilotCli] Process exited with code: $exitCode');
+      assert(() { debugPrint('[CopilotCli] Process exited with code: $exitCode'); return true; }());
 
       // Flush remaining buffer
       final remaining = buffer.toString().trim();
@@ -384,10 +387,13 @@ class CopilotCliProvider extends ChatProvider {
             recoveryAttempted ? null : _recoverLatestSessionId(errText);
         if (recoveredSessionId != null) {
           _sessionIds[config.sessionName] = recoveredSessionId;
-          debugPrint(
+          assert(() {
+            debugPrint(
             '[CopilotCli] Recovering ambiguous session name '
             '"${config.sessionName}" with session ID $recoveredSessionId',
           );
+            return true;
+          }());
           if (_processes[config.sessionName] == process) {
             _processes.remove(config.sessionName);
           }
@@ -412,10 +418,13 @@ class CopilotCliProvider extends ChatProvider {
             _isMissingCopilotSessionError(errText);
         if (shouldCreateReplacementSession) {
           _sessionIds.remove(config.sessionName);
-          debugPrint(
+          assert(() {
+            debugPrint(
             '[CopilotCli] Resume target for "${config.sessionName}" is stale; '
             'creating a replacement named session.',
           );
+            return true;
+          }());
           if (_processes[config.sessionName] == process) {
             _processes.remove(config.sessionName);
           }
@@ -450,8 +459,8 @@ class CopilotCliProvider extends ChatProvider {
       await subAgentWatcher?.dispose();
       await controller.close();
     } catch (e, st) {
-      debugPrint('[CopilotCli] Failed to start process: $e');
-      debugPrint('[CopilotCli] Stack: $st');
+      assert(() { debugPrint('[CopilotCli] Failed to start process: $e'); return true; }());
+      assert(() { debugPrint('[CopilotCli] Stack: $st'); return true; }());
       controller.addError(e);
       await controller.close();
     }
@@ -461,7 +470,7 @@ class CopilotCliProvider extends ChatProvider {
   Future<void> stop(String sessionName) async {
     final process = _processes.remove(sessionName);
     if (process != null) {
-      debugPrint('[CopilotCli] Killing process for session: $sessionName');
+      assert(() { debugPrint('[CopilotCli] Killing process for session: $sessionName'); return true; }());
       unregisterChatProcessResource(process);
       process.kill(ProcessSignal.sigterm);
       // Give SIGTERM up to 2 seconds; escalate to SIGKILL if still alive.
@@ -470,9 +479,12 @@ class CopilotCliProvider extends ChatProvider {
         onTimeout: () => -1,
       );
       if (exitCode == -1) {
-        debugPrint(
+        assert(() {
+          debugPrint(
           '[CopilotCli] SIGTERM ignored, sending SIGKILL: $sessionName',
         );
+          return true;
+        }());
         process.kill(ProcessSignal.sigkill);
         await process.exitCode.timeout(
           const Duration(seconds: 1),

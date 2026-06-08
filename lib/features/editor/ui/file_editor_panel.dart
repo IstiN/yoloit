@@ -652,6 +652,7 @@ class _ImagePreview extends StatelessWidget {
               child: Center(
                 child: Image.file(
                   File(filePath),
+                  gaplessPlayback: true,
                   errorBuilder:
                       (context, error, stackTrace) => Center(
                         child: Text(
@@ -1013,7 +1014,7 @@ class _EditorBodyState extends State<_EditorBody> {
 
   // ── Git gutter ───────────────────────────────────────────────────────────
   Map<int, _GutterMarkerType> _gitMarkers = {};
-  double _codeScrollOffset = 0;
+  final ValueNotifier<double> _codeScrollOffset = ValueNotifier(0);
 
   late final Map<ShortcutActivator, VoidCallback> _shortcutBindings = {
     const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _openFind,
@@ -1074,6 +1075,7 @@ class _EditorBodyState extends State<_EditorBody> {
     _replaceFocus.dispose();
     _editorFocus.dispose();
     _codeFocus.dispose();
+    _codeScrollOffset.dispose();
     super.dispose();
   }
 
@@ -1627,11 +1629,12 @@ class _EditorBodyState extends State<_EditorBody> {
       final result = await Process.run('dart', ['format', '--fix', path]);
       if (result.exitCode == 0 && mounted) {
         final newContent = await File(path).readAsString();
+        if (!mounted) return;
         widget.codeController.value = TextEditingValue(
           text: newContent,
           selection: const TextSelection.collapsed(offset: 0),
         );
-        if (mounted) context.read<FileEditorCubit>().updateContent(newContent);
+        context.read<FileEditorCubit>().updateContent(newContent);
       }
     } catch (_) {}
   }
@@ -1777,11 +1780,8 @@ class _EditorBodyState extends State<_EditorBody> {
                                   >(
                                     onNotification: (n) {
                                       if (n.metrics.axis == Axis.vertical) {
-                                        setState(
-                                          () =>
-                                              _codeScrollOffset =
-                                                  n.metrics.pixels,
-                                        );
+                                        _codeScrollOffset.value =
+                                            n.metrics.pixels;
                                       }
                                       return false;
                                     },
@@ -1825,10 +1825,22 @@ class _EditorBodyState extends State<_EditorBody> {
                                               top: 0,
                                               bottom: 0,
                                               width: 3,
-                                              child: _GitGutterPainter(
-                                                markers: _gitMarkers,
-                                                lineHeight: lineHeight,
-                                                scrollOffset: _codeScrollOffset,
+                                              child: ValueListenableBuilder<
+                                                double
+                                              >(
+                                                valueListenable:
+                                                    _codeScrollOffset,
+                                                builder: (
+                                                  context,
+                                                  scrollOffset,
+                                                  _,
+                                                ) {
+                                                  return _GitGutterPainter(
+                                                    markers: _gitMarkers,
+                                                    lineHeight: lineHeight,
+                                                    scrollOffset: scrollOffset,
+                                                  );
+                                                },
                                               ),
                                             ),
                                         ],

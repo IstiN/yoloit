@@ -33,7 +33,7 @@ class _MarkdownDocumentPreviewState extends State<MarkdownDocumentPreview> {
           if (mounted) setState(() => _rendererReady = true);
         })
         .catchError((Object e) {
-          debugPrint('[Mermaid] init() FAILED: $e');
+          assert(() { debugPrint('[Mermaid] init() FAILED: $e'); return true; }());
         })
         .whenComplete(() {
           HeadlessRenderRegistry.activeTasks.remove(taskKey);

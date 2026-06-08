@@ -158,7 +158,7 @@ class MindMapCubit extends Cubit<MindMapState> {
             !nodes.any((m) => m.id == n.id))
         .toList();
     if (panelEditors.isNotEmpty) {
-      debugPrint('[MindMapCubit] updateNodes: preserving ${panelEditors.length} panel nodes: ${panelEditors.map((n) => n.id).toList()}');
+      assert(() { debugPrint('[MindMapCubit] updateNodes: preserving ${panelEditors.length} panel nodes: ${panelEditors.map((n) => n.id).toList()}'); return true; }());
     }
     final panelConns = state.connections
         .where((c) => panelEditors.any((n) => n.id == c.fromId || n.id == c.toId))
@@ -452,9 +452,9 @@ class MindMapCubit extends Cubit<MindMapState> {
     required Color connectorColor,
   }) {
     final id = 'filediff:${filePath.hashCode}';
-    debugPrint('[MindMapCubit] openFileDiffAsPanel id=$id, state.nodes.length=${state.nodes.length}');
+    assert(() { debugPrint('[MindMapCubit] openFileDiffAsPanel id=$id, state.nodes.length=${state.nodes.length}'); return true; }());
     if (state.nodes.any((n) => n.id == id)) {
-      debugPrint('[MindMapCubit] node already exists, unhiding');
+      assert(() { debugPrint('[MindMapCubit] node already exists, unhiding'); return true; }());
       final newHidden = {...state.hidden}..remove(id);
       emit(state.copyWith(hidden: newHidden));
       _saveHidden(newHidden);
@@ -470,11 +470,11 @@ class MindMapCubit extends Cubit<MindMapState> {
     final diffNode = state.nodes.whereType<DiffNodeData>().where(
       (n) => n.repoPath == repoPath,
     ).firstOrNull;
-    debugPrint('[MindMapCubit] diffNode found: ${diffNode?.id}');
+    assert(() { debugPrint('[MindMapCubit] diffNode found: ${diffNode?.id}'); return true; }());
 
     _emitWithConnection(newNode, diffNode, connectorColor);
     final newPositions = state.positions; // _emitWithConnection already updated state
-    debugPrint('[MindMapCubit] newNodes.length=${state.nodes.length}, pos for $id=${newPositions[id]}');
+    assert(() { debugPrint('[MindMapCubit] newNodes.length=${state.nodes.length}, pos for $id=${newPositions[id]}'); return true; }());
   }
 
   void _emitWithConnection(

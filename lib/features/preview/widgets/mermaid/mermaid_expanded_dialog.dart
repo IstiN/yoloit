@@ -142,6 +142,7 @@ class _MermaidExpandedDialogState extends State<MermaidExpandedDialog> {
                                     _png,
                                     fit: BoxFit.contain,
                                     filterQuality: FilterQuality.high,
+                                    gaplessPlayback: true,
                                   ),
                                 ),
                               ),

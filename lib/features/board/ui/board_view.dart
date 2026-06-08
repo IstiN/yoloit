@@ -289,9 +289,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
                                               .isLocked;
                                       if (_lastLoggedLockCount != lockVersion) {
                                         _lastLoggedLockCount = lockVersion;
-                                        debugPrint(
+                                        assert(() {
+                                          debugPrint(
                                           '[BoardViewLock] activeCount=$activeCount, isLocked=$isLocked',
                                         );
+                                          return true;
+                                        }());
                                       }
                                       return Listener(
                                         behavior: HitTestBehavior.translucent,
@@ -2179,7 +2182,7 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
     if (!kDebugMode || !const bool.fromEnvironment('YOLOIT_BOARD_DEBUG')) {
       return;
     }
-    debugPrint('[BoardView] $message');
+    assert(() { debugPrint('[BoardView] $message'); return true; }());
   }
 
   void _boardSupportLog(String message) {
@@ -2188,12 +2191,12 @@ class _BoardViewState extends State<BoardView> with TickerProviderStateMixin {
 
   void _boardOverviewLog(String message) {
     if (!kDebugMode) return;
-    debugPrint('[BoardOverview] $message');
+    assert(() { debugPrint('[BoardOverview] $message'); return true; }());
   }
 
   void _boardWebFocusLog(String message) {
     if (!kDebugMode) return;
-    debugPrint('[BoardWebFocus] $message');
+    assert(() { debugPrint('[BoardWebFocus] $message'); return true; }());
   }
 
   // ── Tool actions ──────────────────────────────────────────────────────────

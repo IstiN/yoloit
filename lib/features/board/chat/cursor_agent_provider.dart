@@ -151,9 +151,12 @@ class CursorAgentProvider extends CliProviderBase {
       storeSessionId(sessionName, json['session_id'] as String);
       // We don't have access to config.model here; the model is recorded
       // when args are built in the next message via sessionModels.
-      debugPrint(
+      assert(() {
+        debugPrint(
         '[CursorAgent] session_id: ${getSessionId(sessionName)}',
       );
+        return true;
+      }());
     }
 
     return _parseCursorEvent(json);
@@ -423,13 +426,13 @@ class CursorAgentProvider extends CliProviderBase {
         '--list-models',
       ], environment: env).timeout(const Duration(seconds: 10));
       if (result.exitCode != 0) {
-        debugPrint('[CursorAgent] --list-models failed: ${result.stderr}');
+        assert(() { debugPrint('[CursorAgent] --list-models failed: ${result.stderr}'); return true; }());
         return null;
       }
       final output = (result.stdout as String).trim();
       return _parseModelList(output);
     } catch (e) {
-      debugPrint('[CursorAgent] fetchModelsFromCli error: $e');
+      assert(() { debugPrint('[CursorAgent] fetchModelsFromCli error: $e'); return true; }());
       return null;
     }
   }
@@ -456,7 +459,7 @@ class CursorAgentProvider extends CliProviderBase {
         ),
       );
     }
-    debugPrint('[CursorAgent] parsed ${models.length} models from CLI');
+    assert(() { debugPrint('[CursorAgent] parsed ${models.length} models from CLI'); return true; }());
     return models;
   }
 }

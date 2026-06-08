@@ -1002,6 +1002,15 @@ class _ConfigList extends StatelessWidget {
           .putIfAbsent(session.config.id, () => <RunSession>[])
           .add(session);
     }
+    final runningByConfig = <String, RunSession>{};
+    final stoppedByConfig = <String, RunSession>{};
+    for (final s in state.sessions) {
+      if (s.status == RunStatus.running) {
+        runningByConfig[s.config.id] = s;
+      } else {
+        stoppedByConfig[s.config.id] = s;
+      }
+    }
 
     return SizedBox(
       width: 180,
@@ -1070,22 +1079,8 @@ class _ConfigList extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 4),
               children: [
                 ...state.configs.map((c) {
-                  final runningSession =
-                      state.sessions
-                          .where(
-                            (s) =>
-                                s.config.id == c.id &&
-                                s.status == RunStatus.running,
-                          )
-                          .firstOrNull;
-                  final stoppedSession =
-                      state.sessions
-                          .where(
-                            (s) =>
-                                s.config.id == c.id &&
-                                s.status != RunStatus.running,
-                          )
-                          .lastOrNull;
+                  final runningSession = runningByConfig[c.id];
+                  final stoppedSession = stoppedByConfig[c.id];
                   return _ConfigItem(
                     config: c,
                     isRunning: runningSession != null,

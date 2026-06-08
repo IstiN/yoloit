@@ -419,6 +419,7 @@ class _ImageBody extends StatelessWidget {
                     child: Image.memory(
                       bytes,
                       fit: BoxFit.contain,
+                      gaplessPlayback: true,
                       errorBuilder:
                           (_, __, ___) => Center(
                             child: Text(

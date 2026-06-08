@@ -506,6 +506,7 @@ class _RasterImagePreviewState extends State<_RasterImagePreview> {
         child: Image.memory(
           bytes,
           fit: BoxFit.contain,
+          gaplessPlayback: true,
           errorBuilder:
               (context, error, stackTrace) => _FilePreviewError(
                 title: 'Cannot decode image',

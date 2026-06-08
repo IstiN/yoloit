@@ -240,11 +240,14 @@ abstract class CliProviderBase extends ChatProvider {
       extraCmdArgs: extraCmdArgs,
     );
 
-    debugPrint(
+    assert(() {
+      debugPrint(
       '$debugPrefix Running: '
       '$executable ${args.join(' ')}',
     );
-    debugPrint('$debugPrefix cwd: $workingDir');
+      return true;
+    }());
+    assert(() { debugPrint('$debugPrefix cwd: $workingDir'); return true; }());
 
     // 4. Start process.
     try {
@@ -273,7 +276,7 @@ abstract class CliProviderBase extends ChatProvider {
 
       unawaited(
         process.stdin.close().catchError((Object error) {
-          debugPrint('$debugPrefix Failed to close stdin: $error');
+          assert(() { debugPrint('$debugPrefix Failed to close stdin: $error'); return true; }());
         }),
       );
 
@@ -353,8 +356,8 @@ abstract class CliProviderBase extends ChatProvider {
       unregisterChatProcessResource(process);
       await controller.close();
     } catch (error, stack) {
-      debugPrint('$debugPrefix Failed to start process: $error');
-      debugPrint('$debugPrefix Stack: $stack');
+      assert(() { debugPrint('$debugPrefix Failed to start process: $error'); return true; }());
+      assert(() { debugPrint('$debugPrefix Stack: $stack'); return true; }());
       if (!controller.isClosed) controller.addError(error);
       await controller.close();
     }
@@ -374,8 +377,8 @@ abstract class CliProviderBase extends ChatProvider {
     } on CliParseError catch (error) {
       if (!controller.isClosed) controller.addError(error);
     } catch (error) {
-      debugPrint('$debugPrefix Failed to parse line: $trimmed');
-      debugPrint('$debugPrefix Error: $error');
+      assert(() { debugPrint('$debugPrefix Failed to parse line: $trimmed'); return true; }());
+      assert(() { debugPrint('$debugPrefix Error: $error'); return true; }());
     }
   }
 

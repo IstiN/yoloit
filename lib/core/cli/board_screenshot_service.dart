@@ -66,7 +66,7 @@ class BoardScreenshotService {
       await File(filePath).writeAsBytes(bytes);
       return filePath;
     } catch (e) {
-      debugPrint('[BoardScreenshot] JPEG save failed: $e');
+      assert(() { debugPrint('[BoardScreenshot] JPEG save failed: $e'); return true; }());
       return null;
     }
   }
@@ -93,7 +93,7 @@ class BoardScreenshotService {
     await completer.future.timeout(
       const Duration(milliseconds: 200),
       onTimeout: () {
-        debugPrint('[BoardScreenshot] frame timeout, proceeding');
+        assert(() { debugPrint('[BoardScreenshot] frame timeout, proceeding'); return true; }());
       },
     );
   }
@@ -104,7 +104,7 @@ class BoardScreenshotService {
   }) async {
     final key = _boundaryKey;
     if (key == null) {
-      debugPrint('[BoardScreenshot] no boundary key');
+      assert(() { debugPrint('[BoardScreenshot] no boundary key'); return true; }());
       return null;
     }
 
@@ -112,7 +112,7 @@ class BoardScreenshotService {
       await _waitForNextFrame();
       final boundary = key.currentContext?.findRenderObject();
       if (boundary is! RenderRepaintBoundary) {
-        debugPrint('[BoardScreenshot] boundary not ready: ${boundary.runtimeType}');
+        assert(() { debugPrint('[BoardScreenshot] boundary not ready: ${boundary.runtimeType}'); return true; }());
         continue;
       }
 
@@ -122,7 +122,7 @@ class BoardScreenshotService {
         image.dispose();
         if (byteData != null) return byteData.buffer.asUint8List();
       } catch (e, st) {
-        debugPrint('[BoardScreenshot] capture failed: $e');
+        assert(() { debugPrint('[BoardScreenshot] capture failed: $e'); return true; }());
         debugPrintStack(stackTrace: st);
       }
     }

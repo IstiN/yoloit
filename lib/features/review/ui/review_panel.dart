@@ -330,8 +330,6 @@ class _GitChangesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final staged = state.changedFiles.where((f) => f.isStaged).toList();
-    final unstaged = state.changedFiles.where((f) => !f.isStaged).toList();
 
     if (state.changedFiles.isEmpty) {
       return Center(
@@ -355,6 +353,8 @@ class _GitChangesSection extends StatelessWidget {
       return map;
     }
 
+    final staged = state.changedFiles.where((f) => f.isStaged).toList();
+    final unstaged = state.changedFiles.where((f) => !f.isStaged).toList();
     final stagedByRepo = groupByRepo(staged);
     final unstagedByRepo = groupByRepo(unstaged);
     final multipleRepos = state.fileTree.length > 1;

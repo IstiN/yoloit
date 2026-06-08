@@ -230,6 +230,6 @@ class SubAgentEventWatcher {
     if (!(_controller?.isClosed ?? true)) {
       await _controller?.close();
     }
-    debugPrint('[SubAgentWatcher] disposed (pid=$pid, session=$_sessionDir)');
+    assert(() { debugPrint('[SubAgentWatcher] disposed (pid=$pid, session=$_sessionDir)'); return true; }());
   }
 }
