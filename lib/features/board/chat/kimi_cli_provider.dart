@@ -12,6 +12,8 @@ import 'package:yoloit/features/settings/data/provider_model_catalog_service.dar
 class KimiCliProvider extends CliProviderBase {
   KimiCliProvider({super.agentId = 'kimi', super.processStarter});
 
+  final Map<String, String> _toolCallNames = {};
+
   @override
   String get debugPrefix => '[KimiCli]';
 
@@ -26,6 +28,12 @@ class KimiCliProvider extends CliProviderBase {
 
   @override
   ChatImageMode get imageMode => ChatImageMode.filePath;
+
+  @override
+  void dispose() {
+    _toolCallNames.clear();
+    super.dispose();
+  }
 
   @override
   List<ChatModelInfo> get availableModels {
@@ -91,6 +99,10 @@ class KimiCliProvider extends CliProviderBase {
       // running card before the tool result arrives.
       for (final tc in toolCalls) {
         final tcId = tc['toolCallId'] as String? ?? '';
+        final tcName = tc['name'] as String? ?? '';
+        if (tcId.isNotEmpty && tcName.isNotEmpty) {
+          _toolCallNames[tcId] = tcName;
+        }
         events.add(
           ChatEvent(
             type: ChatEventType.toolStart,
@@ -98,7 +110,7 @@ class KimiCliProvider extends CliProviderBase {
             id: tcId,
             data: {
               'toolCallId': tcId,
-              'toolName': tc['name'] as String? ?? '',
+              'toolName': tcName,
               'arguments': tc['arguments'],
             },
           ),
@@ -125,6 +137,7 @@ class KimiCliProvider extends CliProviderBase {
       final content = _extractText(json['content']);
       final toolCallId = json['tool_call_id'] as String? ?? '';
       final isError = content.contains('<system>ERROR:');
+      final resolvedToolName = _toolCallNames[toolCallId] ?? '';
       return [
         ChatEvent(
           type: ChatEventType.toolComplete,
@@ -132,7 +145,7 @@ class KimiCliProvider extends CliProviderBase {
           id: toolCallId,
           data: {
             'toolCallId': toolCallId,
-            'toolName': '',
+            'toolName': resolvedToolName,
             'success': !isError,
             'result': {'content': content},
           },
