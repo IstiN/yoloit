@@ -78,5 +78,19 @@ MarkdownStyleSheet chatMarkdownStyle({
       color: textColor,
       fontWeight: FontWeight.w500,
     ),
+    blockquote: TextStyle(
+      fontSize: 12,
+      color: mutedColor,
+      fontStyle: FontStyle.italic,
+      height: 1.4,
+    ),
+    blockquoteDecoration: BoxDecoration(
+      color: colors.surfaceHighlight.withAlpha(80),
+      borderRadius: BorderRadius.circular(6),
+      border: Border(
+        left: BorderSide(color: colors.primary.withAlpha(120), width: 3),
+      ),
+    ),
+    blockquotePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
   );
 }
