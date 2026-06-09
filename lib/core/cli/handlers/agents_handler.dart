@@ -208,7 +208,7 @@ Future<shelf.Response> handleAgents(
         panelId,
         config,
       );
-      taskSent = session.sendMessage(text: trimmedTask);
+      taskSent = await session.sendMessage(text: trimmedTask);
     }
 
     return json({

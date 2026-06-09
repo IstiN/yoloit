@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:yoloit/features/board/chat/chat_provider.dart';
@@ -230,14 +231,14 @@ class ChatSession extends ChangeNotifier {
     _uiDoneCallback = onDone;
   }
 
-  bool sendMessage({
+  Future<bool> sendMessage({
     required String text,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
     void Function(ChatEvent event)? onEvent,
     void Function(Object error)? onError,
     void Function()? onDone,
-  }) {
+  }) async {
     if (text.trim().isEmpty) return false;
     if (_isProcessing) return false;
 
@@ -264,8 +265,33 @@ class ChatSession extends ChangeNotifier {
       ...attachments,
       ...tokens.where((t) => filePathRe.hasMatch(t)),
     ];
-    final promptText =
+    var promptText =
         tokens.where((t) => !filePathRe.hasMatch(t)).join(' ').trim();
+
+    // Inline plain-text file contents so the model can see them.
+    // (Images are forwarded via the provider's attachment path; other
+    // non-image files are shown as chips in the UI.)
+    final textFileExtras = <String>[];
+    for (final path in allAttachments) {
+      if (path.endsWith('.txt')) {
+        try {
+          final file = File(path);
+          if (await file.exists()) {
+            final content = await file.readAsString();
+            if (content.isNotEmpty) {
+              textFileExtras.add('--- File: $path ---\n$content');
+            }
+          }
+        } catch (_) {
+          // ignore read failures
+        }
+      }
+    }
+    if (textFileExtras.isNotEmpty) {
+      promptText = promptText.isEmpty
+          ? textFileExtras.join('\n\n')
+          : '$promptText\n\n${textFileExtras.join('\n\n')}';
+    }
 
     // Add user message
     _messages.add(
@@ -384,10 +410,10 @@ class ChatSession extends ChangeNotifier {
     required String text,
     List<String> attachments = const [],
     ChatRuntimeContext? runtimeContext,
-  }) {
+  }) async {
     final completer = Completer<List<ChatMessage>>();
 
-    final ok = sendMessage(
+    final ok = await sendMessage(
       text: text,
       attachments: attachments,
       runtimeContext: runtimeContext,

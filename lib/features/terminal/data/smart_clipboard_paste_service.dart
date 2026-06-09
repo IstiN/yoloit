@@ -9,9 +9,7 @@ class SmartClipboardPasteService {
 
   static final instance = SmartClipboardPasteService._();
 
-  Future<String?> readInlineTextOrSavedFilePath({
-    int inlineWordLimit = 1000,
-  }) async {
+  Future<String?> readInlineTextOrSavedFilePath() async {
     String? text;
 
     // Try super_clipboard first.
@@ -46,10 +44,9 @@ class SmartClipboardPasteService {
 
     if (text == null || text.isEmpty) return null;
 
-    final wordCount = text.trim().split(RegExp(r'\s+')).length;
-    if (wordCount <= inlineWordLimit) {
-      return text;
-    }
+    // Always save text to a temp file so terminals and chats get a uniform
+    // file-based paste experience (no inline text that may be interpreted as
+    // escape sequences by terminals or split into unknown tokens by models).
     return ClipboardFileService.instance.saveClipboardToFile();
   }
 }

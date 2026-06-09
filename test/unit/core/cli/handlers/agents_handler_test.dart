@@ -239,7 +239,7 @@ void main() {
     test('POST /agents/run creates panel and sends task', () async {
       final mockSession = _MockChatSession();
       when(() => mockChatSessionManager.getOrCreate(any(), any())).thenReturn(mockSession);
-      when(() => mockSession.sendMessage(text: any(named: 'text'))).thenReturn(true);
+      when(() => mockSession.sendMessage(text: any(named: 'text'))).thenAnswer((_) async => true);
 
       final response = await handleAgents(
         'POST',

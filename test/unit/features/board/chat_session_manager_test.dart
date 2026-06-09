@@ -324,19 +324,19 @@ void main() {
       expect(session.lastUsage, isNull);
     });
 
-    test('sendMessage rejects empty text and concurrent sends', () {
-      expect(session.sendMessage(text: ''), false);
-      expect(session.sendMessage(text: '   '), false);
+    test('sendMessage rejects empty text and concurrent sends', () async {
+      expect(await session.sendMessage(text: ''), false);
+      expect(await session.sendMessage(text: '   '), false);
 
-      expect(session.sendMessage(text: 'first'), true);
+      expect(await session.sendMessage(text: 'first'), true);
       expect(session.isProcessing, true);
-      expect(session.sendMessage(text: 'second'), false);
+      expect(await session.sendMessage(text: 'second'), false);
     });
 
-    test('sendMessage adds user message and forwards parsed payload', () {
+    test('sendMessage adds user message and forwards parsed payload', () async {
       final runtimeContext = ChatRuntimeContext(panelId: 'runtime-panel');
 
-      final ok = session.sendMessage(
+      final ok = await session.sendMessage(
         text: 'hello /notes.txt /image.png',
         attachments: const ['/extra.jpg', '/document.md'],
         runtimeContext: runtimeContext,
@@ -529,7 +529,7 @@ void main() {
     });
 
     test('processes assistant streaming into final message', () async {
-      session.sendMessage(text: 'hello');
+      await session.sendMessage(text: 'hello');
       provider.emitEvent(_assistantMessageStart());
       provider.emitEvent(_assistantDelta('Hi'));
       provider.emitEvent(_assistantDelta(' there'));
@@ -546,7 +546,7 @@ void main() {
     });
 
     test('records tool completion and result usage', () async {
-      session.sendMessage(text: 'hello');
+      await session.sendMessage(text: 'hello');
       provider.emitEvent(_toolComplete(content: 'tool output'));
       provider.emitEvent(_resultEvent(outputTokens: 7, linesAdded: 4));
       await provider.complete();
@@ -562,7 +562,7 @@ void main() {
     });
 
     test('keeps assistant message above tools when tools arrive first', () async {
-      session.sendMessage(text: 'hello');
+      await session.sendMessage(text: 'hello');
       provider.emitEvent(
         _toolComplete(
           toolCallId: 'tool-a',
@@ -584,7 +584,7 @@ void main() {
     });
 
     test('adds system error message on provider error', () async {
-      session.sendMessage(text: 'hello');
+      await session.sendMessage(text: 'hello');
       provider.emitError(Exception('boom'));
       await _flushEvents();
 
@@ -597,7 +597,7 @@ void main() {
     test(
       'stopStreaming finalizes partial content and stops provider',
       () async {
-        session.sendMessage(text: 'hello');
+        await session.sendMessage(text: 'hello');
         provider.emitEvent(_assistantMessageStart());
         provider.emitEvent(_assistantDelta('partial reply'));
         await _flushEvents();
@@ -629,7 +629,7 @@ void main() {
     test(
       'sendAndWait returns existing messages when send is rejected',
       () async {
-        session.sendMessage(text: 'first');
+        await session.sendMessage(text: 'first');
 
         final messages = await session.sendAndWait(text: 'second');
 

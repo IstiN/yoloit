@@ -136,7 +136,7 @@ class ChatCliHandler extends PanelCliHandler {
 
     // Always fire-and-forget — the CLI server never blocks on LLM completion.
     // Use yolochat:messages or yolochat:status to poll for results.
-    final accepted = session.sendMessage(
+    final accepted = await session.sendMessage(
       text: text,
       attachments: attachments,
       runtimeContext: ChatRuntimeContext(

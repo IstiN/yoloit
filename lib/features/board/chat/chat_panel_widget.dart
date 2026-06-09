@@ -953,7 +953,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
 
     // Route through the session — it owns the stream subscription.
     // When this widget is disposed, the session keeps processing events.
-    final ok = _session!.sendMessage(
+    final ok = await _session!.sendMessage(
       text: text,
       attachments: overrideAttachments,
       runtimeContext: ChatRuntimeContext(
@@ -1903,14 +1903,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
   }
 
-  /// Smart paste: images → file ref, text always inline.
+  /// Smart paste: images → file ref, text → temp file ref.
   Future<void> _handleSmartPaste() async {
     try {
       final pasted =
           await SmartClipboardPasteService.instance
-              .readInlineTextOrSavedFilePath(
-                inlineWordLimit: 999999,
-              );
+              .readInlineTextOrSavedFilePath();
       if (pasted != null && mounted) {
         _insertTextAtCursor(pasted);
       }
