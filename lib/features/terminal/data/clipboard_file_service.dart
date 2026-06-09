@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:yoloit/core/platform/platform_dirs.dart';
 
@@ -19,19 +19,38 @@ class ClipboardFileService {
       _hasCleanedUp = true;
       unawaited(_cleanupOldFiles());
     }
-    final clipboard = SystemClipboard.instance;
-    if (clipboard == null) return null;
 
-    final reader = await clipboard.read();
+    String? text;
 
-    // Prefer image formats — use getFile() API for FileFormat types.
-    final imageResult = await _tryReadImage(reader);
-    if (imageResult != null) return imageResult;
+    // Try super_clipboard first.
+    try {
+      final clipboard = SystemClipboard.instance;
+      if (clipboard != null) {
+        final reader = await clipboard.read();
 
-    // Fall back to plain text.
-    if (reader.canProvide(Formats.plainText)) {
-      final text = await reader.readValue(Formats.plainText);
-      if (text == null || text.isEmpty) return null;
+        // Prefer image formats — use getFile() API for FileFormat types.
+        final imageResult = await _tryReadImage(reader);
+        if (imageResult != null) return imageResult;
+
+        if (reader.canProvide(Formats.plainText)) {
+          text = await reader.readValue(Formats.plainText);
+        }
+      }
+    } catch (_) {
+      // ignore super_clipboard failures
+    }
+
+    // Fallback to Flutter's standard clipboard API for text.
+    if (text == null || text.isEmpty) {
+      try {
+        final data = await Clipboard.getData('text/plain');
+        text = data?.text;
+      } catch (_) {
+        // ignore fallback failures
+      }
+    }
+
+    if (text != null && text.isNotEmpty) {
       return _saveText(text);
     }
 
