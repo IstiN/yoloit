@@ -73,6 +73,10 @@ class ChatSession extends ChangeNotifier {
   String? get copilotSessionId => _copilotSessionId;
   String? get cursorSessionId => _cursorSessionId;
 
+  /// Last known scroll offset of the chat message list UI.
+  /// Persisted across board switches so the user returns to the same position.
+  double? savedScrollOffset;
+
   // ── Configuration ───────────────────────────────────────────────────────
 
   void updateConfig(ChatSessionConfig newConfig) {

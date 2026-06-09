@@ -391,7 +391,7 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
         }
       }
       if (_messages.isNotEmpty) {
-        _scrollToBottom();
+        _restoreScrollOffset();
       }
     }
     // Restore last usage
@@ -504,6 +504,12 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     }
     // Persist current messages to board state
     _persistMessages();
+    // Save scroll offset so the user returns to the same position after
+    // switching boards.
+    final session = _session;
+    if (session != null && _scrollController.hasClients) {
+      session.savedScrollOffset = _scrollController.offset;
+    }
     // Detach from session — session keeps its stream subscription alive.
     // The session already has accurate messages via _handleCoreEvent.
     // When the widget re-mounts, it reads from session.messages.
@@ -523,6 +529,26 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  /// Restores the previously saved scroll offset after the widget re-mounts.
+  /// Falls back to scrolling to the bottom when no offset was saved.
+  void _restoreScrollOffset() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final saved = _session?.savedScrollOffset;
+      if (saved != null &&
+          saved >= 0 &&
+          saved <= _scrollController.position.maxScrollExtent) {
+        _scrollController.jumpTo(saved);
+      } else {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 150),
