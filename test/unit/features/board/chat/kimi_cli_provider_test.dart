@@ -140,6 +140,29 @@ void main() {
       expect(events.first.data['content'], 'part1part2');
     });
 
+    test('includes thinking parts as quoted block', () async {
+      final p = KimiCliProvider(
+        processStarter: _starterFor(stdout: [
+          '{"role":"assistant","content":[{"type":"think","think":"I need to check..."},{"type":"text","text":"Here is the answer."}]}',
+        ]),
+      );
+
+      final events = await p
+          .sendMessage(
+            message: 'hi',
+            config: const ChatSessionConfig(
+              sessionName: 's1',
+              workingDir: '/tmp',
+            ),
+            isFirstMessage: true,
+          )
+          .toList();
+
+      expect(events.first.data['content'], contains('> **Thinking**'));
+      expect(events.first.data['content'], contains('I need to check...'));
+      expect(events.first.data['content'], contains('Here is the answer.'));
+    });
+
     test('stores session id from meta event', () async {
       final p = KimiCliProvider(
         processStarter: _starterFor(stdout: [

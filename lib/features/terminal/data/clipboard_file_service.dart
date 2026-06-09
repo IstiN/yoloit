@@ -12,8 +12,13 @@ class ClipboardFileService {
   static final ClipboardFileService instance = ClipboardFileService._();
 
   static String get _dir => '${PlatformDirs.instance.tempDir}/yoloit_clip';
+  bool _hasCleanedUp = false;
 
   Future<String?> saveClipboardToFile() async {
+    if (!_hasCleanedUp) {
+      _hasCleanedUp = true;
+      unawaited(_cleanupOldFiles());
+    }
     final clipboard = SystemClipboard.instance;
     if (clipboard == null) return null;
 
@@ -80,38 +85,26 @@ class ClipboardFileService {
     return File('$_dir/clip_$ts.$ext');
   }
 
-  /// Guess a file extension from text content.
+  /// Deletes clip files older than 24 hours.
+  Future<void> _cleanupOldFiles() async {
+    final dir = Directory(_dir);
+    if (!await dir.exists()) return;
+    final now = DateTime.now();
+    await for (final entity in dir.list()) {
+      if (entity is! File) continue;
+      try {
+        final stat = await entity.stat();
+        if (now.difference(stat.modified).inHours > 24) {
+          await entity.delete();
+        }
+      } catch (_) {
+        // ignore cleanup failures
+      }
+    }
+  }
+
+  /// Clipboard text is always saved as .txt to avoid heuristic mis-detection.
   String _guessExtension(String text) {
-    final trimmed = text.trimLeft();
-
-    if (trimmed.startsWith('#!/usr/bin/env python') ||
-        trimmed.startsWith('#!/usr/bin/python')) {
-      return 'py';
-    }
-    if (trimmed.startsWith('#!/usr/bin/env node') ||
-        trimmed.startsWith('#!/usr/bin/node')) {
-      return 'js';
-    }
-    if (trimmed.startsWith('#!/bin/bash') ||
-        trimmed.startsWith('#!/bin/sh') ||
-        trimmed.startsWith('#!/usr/bin/env bash')) {
-      return 'sh';
-    }
-    if (trimmed.startsWith('import ') ||
-        trimmed.contains('\ndef ') ||
-        (trimmed.contains('\nclass ') && trimmed.contains(':'))) {
-      return 'py';
-    }
-    if (trimmed.startsWith('import "dart:') ||
-        trimmed.contains('\nvoid main(') ||
-        trimmed.contains('Widget build(')) {
-      return 'dart';
-    }
-    if (trimmed.contains('\nfn ') || trimmed.contains('impl ')) { return 'rs'; }
-    if (trimmed.startsWith('func ') || trimmed.contains('\nfunc ')) { return 'go'; }
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) { return 'json'; }
-    if (trimmed.startsWith('<') && trimmed.contains('>')) { return 'html'; }
-
     return 'txt';
   }
 }

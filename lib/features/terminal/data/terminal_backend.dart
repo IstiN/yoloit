@@ -174,6 +174,8 @@ class RuntimeTerminalBackend implements TerminalBackend {
 
   final RuntimeTerminalClient _client;
 
+  RuntimeTerminalClient get client => _client;
+
   @override
   TerminalBackendMode get mode => TerminalBackendMode.runtime;
 

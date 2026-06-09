@@ -26,6 +26,7 @@ import 'package:yoloit/features/settings/ui/settings_page.dart';
 import 'package:yoloit/features/settings/ui/setup_guide_page.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_cubit.dart';
 import 'package:yoloit/features/terminal/bloc/terminal_state.dart';
+import 'package:yoloit/features/terminal/data/terminal_backend_service.dart';
 import 'package:yoloit/features/terminal/ui/terminal_panel.dart';
 import 'package:yoloit/features/updates/data/update_service.dart';
 import 'package:yoloit/features/updates/ui/update_banner.dart';
@@ -320,6 +321,25 @@ class _MainShellState extends State<MainShell> with WindowListener {
                               if (mounted) setState(() => _updatePhase = null);
                             },
                           ),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: TerminalBackendService.instance.runtimeUpdateRequired,
+                          builder: (context, required, _) {
+                            if (!required) return const SizedBox.shrink();
+                            return _RuntimeRestartBanner(
+                              onRestart: () async {
+                                try {
+                                  await TerminalBackendService.instance.restartRuntime();
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to restart runtime: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                            );
+                          },
+                        ),
                         Expanded(
                           child:
                               _canvasMode == _CanvasMode.board
@@ -2044,4 +2064,38 @@ bool resourceSessionCanStop(SessionStat session) {
     'node',
     'python',
   ].any(label.contains);
+}
+
+class _RuntimeRestartBanner extends StatelessWidget {
+  const _RuntimeRestartBanner({required this.onRestart});
+
+  final VoidCallback onRestart;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return Container(
+      color: colors.accentOrange.withAlpha(30),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.update, size: 16, color: colors.accentOrange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Terminal runtime updated. Active sessions will need to be restarted.',
+              style: TextStyle(fontSize: 12, color: colors.accentOrange),
+            ),
+          ),
+          TextButton(
+            onPressed: onRestart,
+            child: Text(
+              'Restart Runtime',
+              style: TextStyle(color: colors.accentOrange),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

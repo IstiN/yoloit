@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, ValueNotifier;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:yoloit/core/platform/platform_dirs.dart';
 
@@ -29,17 +29,76 @@ class RuntimeTerminalClient {
   String get _portPath => '$runtimeHome/runtime.port';
   String get _pidPath => '$runtimeHome/runtime.pid';
 
+  /// Notifies when a new yoloitd binary is bundled but the currently
+  /// running runtime process is still the old one.
+  static final ValueNotifier<bool> updateRequired = ValueNotifier(false);
+
   Future<void> ensureStarted() async {
     if (kDebugMode) {
       await _killStaleDebugRuntime();
     }
-    if (await _loadPort() && await _isHealthy()) return;
+    if (await _loadPort() && await _isHealthy()) {
+      await _checkBinaryUpdate();
+      return;
+    }
     await _startRuntime();
     for (var i = 0; i < 50; i++) {
       if (await _loadPort() && await _isHealthy()) return;
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     throw StateError('YoLoIT runtime did not start');
+  }
+
+  Future<void> _checkBinaryUpdate() async {
+    if (kDebugMode) return;
+    final binaryName = Platform.isWindows ? 'yoloitd.exe' : 'yoloitd';
+    final installed = File('$runtimeHome/$binaryName');
+    if (!await installed.exists()) return;
+    try {
+      final assetData = await rootBundle.load('tools/yoloitd/$binaryName');
+      final assetBytes = assetData.buffer.asUint8List();
+      if (await installed.length() != assetBytes.length) {
+        updateRequired.value = true;
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  /// Kills the current runtime, re-extracts the binary, and starts a fresh one.
+  Future<void> restartRuntime() async {
+    final pidFile = File(_pidPath);
+    if (await pidFile.exists()) {
+      final pidStr = (await pidFile.readAsString()).trim();
+      final pid = int.tryParse(pidStr);
+      if (pid != null) {
+        try {
+          Process.killPid(pid, ProcessSignal.sigterm);
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          final check = await Process.run('kill', ['-0', '$pid']);
+          if (check.exitCode == 0) {
+            Process.killPid(pid, ProcessSignal.sigkill);
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+    }
+    await _deleteIfExists(_portPath);
+    await _deleteIfExists(_pidPath);
+
+    // Re-extract binary and start fresh.
+    await _runtimeBinaryPath();
+    await _startRuntime();
+    for (var i = 0; i < 50; i++) {
+      if (await _loadPort() && await _isHealthy()) {
+        updateRequired.value = false;
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    throw StateError('YoLoIT runtime did not restart');
   }
 
   Future<void> _killStaleDebugRuntime() async {
@@ -109,20 +168,48 @@ class RuntimeTerminalClient {
 
   Stream<String> streamSession(String sessionId) async* {
     await ensureStarted();
-    final request = await _http.getUrl(_uri('/sessions/$sessionId/stream'));
-    final response = await request.close();
-    if (response.statusCode != 200) {
-      throw StateError('Runtime stream failed: HTTP ${response.statusCode}');
-    }
-    await for (final line in response
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())) {
-      if (line.trim().isEmpty) continue;
-      final event = jsonDecode(line) as Map<String, dynamic>;
-      if (event['type'] == 'output') {
-        yield event['data'] as String? ?? '';
+
+    while (true) {
+      try {
+        final request = await _http.getUrl(_uri('/sessions/$sessionId/stream'));
+        final response = await request.close().timeout(
+          const Duration(seconds: 5),
+        );
+        if (response.statusCode == 404) {
+          // Session does not exist anymore — truly ended.
+          return;
+        }
+        if (response.statusCode != 200) {
+          throw StateError('Runtime stream failed: HTTP ${response.statusCode}');
+        }
+        await for (final line in response
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+          if (line.trim().isEmpty) continue;
+          final event = jsonDecode(line) as Map<String, dynamic>;
+          if (event['type'] == 'output') {
+            yield event['data'] as String? ?? '';
+          }
+          if (event['type'] == 'exit') {
+            return;
+          }
+        }
+      } on StateError catch (e) {
+        if (e.toString().contains('404')) {
+          return;
+        }
+        rethrow;
       }
-      if (event['type'] == 'exit') return;
+
+      // The HTTP stream closed without an exit event. This can happen when the
+      // OS drops idle connections (e.g. App Nap) or during brief network gaps.
+      // Wait a moment and attempt one reconnect if the runtime is still alive.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!await _isHealthy()) {
+        // Runtime is gone (and likely restarted), so the session is dead.
+        return;
+      }
+      // Otherwise loop around and re-attach to the stream.
     }
   }
 
@@ -196,23 +283,27 @@ class RuntimeTerminalClient {
 
   Future<String> _runtimeBinaryPath() async {
     final binaryName = Platform.isWindows ? 'yoloitd.exe' : 'yoloitd';
-    final candidates = [
-      'tools/yoloitd/$binaryName',
-      '$runtimeHome/$binaryName',
-    ];
-    for (final path in candidates) {
-      if (await File(path).exists()) return path;
+
+    // In debug mode prefer the live binary in the project tree so developers
+    // can iterate without rebuilding Flutter assets.
+    if (kDebugMode) {
+      final debugPath = 'tools/yoloitd/$binaryName';
+      if (await File(debugPath).exists()) return debugPath;
     }
 
-    // Extract from bundled assets to runtimeHome
     final installed = File('$runtimeHome/$binaryName');
     final assetData = await rootBundle.load('tools/yoloitd/$binaryName');
     final bytes = assetData.buffer.asUint8List();
-    await installed.parent.create(recursive: true);
-    await installed.writeAsBytes(bytes, flush: true);
-    if (!Platform.isWindows) {
-      await Process.run('chmod', ['+x', installed.path]);
+
+    // Re-extract if missing or different size (cheap proxy for "outdated").
+    if (!await installed.exists() || await installed.length() != bytes.length) {
+      await installed.parent.create(recursive: true);
+      await installed.writeAsBytes(bytes, flush: true);
+      if (!Platform.isWindows) {
+        await Process.run('chmod', ['+x', installed.path]);
+      }
     }
+
     return installed.path;
   }
 

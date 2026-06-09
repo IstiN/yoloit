@@ -1903,12 +1903,14 @@ class _ChatPanelWidgetState extends State<ChatPanelWidget>
     );
   }
 
-  /// Smart paste: short text pastes inline, long text or images → file ref.
+  /// Smart paste: images → file ref, text always inline.
   Future<void> _handleSmartPaste() async {
     try {
       final pasted =
           await SmartClipboardPasteService.instance
-              .readInlineTextOrSavedFilePath();
+              .readInlineTextOrSavedFilePath(
+                inlineWordLimit: 999999,
+              );
       if (pasted != null && mounted) {
         _insertTextAtCursor(pasted);
       }

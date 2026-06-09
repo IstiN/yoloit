@@ -184,20 +184,40 @@ class KimiCliProvider extends CliProviderBase {
 
   /// Extracts plain text from Kimi message content.
   /// Content may be a single string or a list of content parts.
+  /// Thinking parts (type: "think") are included as a quoted block.
   String _extractText(Object? content) {
     if (content is String) return content;
     if (content is List) {
-      return content
-          .map((part) {
-            if (part is String) return part;
-            if (part is Map) {
-              final text = part['text'];
-              if (text is String) return text;
-            }
-            return '';
-          })
-          .where((text) => text.isNotEmpty)
-          .join();
+      final textParts = <String>[];
+      final thinkParts = <String>[];
+      for (final part in content) {
+        if (part is String) {
+          textParts.add(part);
+          continue;
+        }
+        if (part is Map) {
+          final text = part['text'];
+          if (text is String && text.isNotEmpty) {
+            textParts.add(text);
+            continue;
+          }
+          final think = part['think'];
+          if (think is String && think.isNotEmpty) {
+            thinkParts.add(think);
+          }
+        }
+      }
+      final result = <String>[];
+      if (thinkParts.isNotEmpty) {
+        final thinking = thinkParts.join();
+        result.add('> **Thinking**\n');
+        for (final line in thinking.split('\n')) {
+          result.add('> $line\n');
+        }
+        result.add('\n');
+      }
+      result.addAll(textParts);
+      return result.join();
     }
     return '';
   }

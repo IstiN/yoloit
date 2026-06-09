@@ -156,6 +156,10 @@ func (h *Handler) streamSession(w http.ResponseWriter, r *http.Request, id strin
 	ch := sess.Subscribe()
 	defer sess.Unsubscribe(ch)
 
+	// Heartbeat to prevent OS / NAT idle timeouts from closing the stream.
+	heartbeat := time.NewTicker(15 * time.Second)
+	defer heartbeat.Stop()
+
 	ctx := r.Context()
 	for {
 		select {
@@ -168,6 +172,9 @@ func (h *Handler) streamSession(w http.ResponseWriter, r *http.Request, id strin
 			if ev.Type == "exit" {
 				return
 			}
+		case <-heartbeat.C:
+			_, _ = w.Write([]byte("\n"))
+			flusher.Flush()
 		case <-ctx.Done():
 			return
 		}

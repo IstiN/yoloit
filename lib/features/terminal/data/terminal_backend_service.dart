@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:yoloit/core/services/resource_monitor_service.dart';
 import 'package:yoloit/core/services/support_log_service.dart';
 import 'package:yoloit/features/settings/data/agent_config_service.dart';
+import 'package:yoloit/features/terminal/data/runtime_terminal_client.dart';
 import 'package:yoloit/features/terminal/data/terminal_backend.dart';
 import 'package:yoloit/features/terminal/data/tmux_service.dart';
 import 'package:yoloit/features/terminal/models/terminal_backend_mode.dart';
@@ -59,6 +61,14 @@ class TerminalBackendService {
   TerminalBackendMode modeFor(String sessionId) {
     return _bySession[sessionId]?.mode ?? TerminalBackendMode.local;
   }
+
+  /// Notifies when the bundled yoloitd binary is newer than the running
+  /// runtime process. Only relevant when [TerminalBackendMode.runtime] is used.
+  ValueNotifier<bool> get runtimeUpdateRequired => RuntimeTerminalClient.updateRequired;
+
+  /// Kills the current runtime, re-extracts the latest binary, and restarts.
+  /// Active terminal sessions will be lost and need manual restart.
+  Future<void> restartRuntime() => _runtime.client.restartRuntime();
 
   TerminalBackend _selectBackend() {
     return switch (AgentConfigService.instance.terminalBackendMode) {

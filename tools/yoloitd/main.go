@@ -37,8 +37,8 @@ func main() {
 		Addr:         "127.0.0.1:0",
 		Handler:      h,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		WriteTimeout: 0, // disabled — stream endpoint is long-lived SSE
+		IdleTimeout:  0, // disabled — let OS manage idle TCP
 	}
 
 	listener, err := net.Listen("tcp", httpSrv.Addr)
